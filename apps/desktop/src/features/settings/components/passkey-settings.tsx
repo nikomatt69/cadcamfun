@@ -6,9 +6,11 @@
  * renders the legacy empty state instead of a fabricated error; "Add Passkey" drives
  * `POST /api/auth/passkey-register`, whose legacy handler answers 501 — the message is
  * surfaced exactly like the legacy failure path surfaced `result.message`.
+ *
+ * Styling is the workstation vocabulary: neutral translucent surfaces, one accent
+ * (blue), no hover scaling.
  */
 import { For, Show, createSignal, onMount, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
 import { AlertTriangle, Computer, Fingerprint, Phone, Plus, ShieldCheck, Trash } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
@@ -47,9 +49,9 @@ const describe = (cause: unknown): string => {
 
 const DeviceIcon = (props: { readonly transports: readonly string[] }): JSX.Element => {
   const transports = props.transports
-  if (transports.includes("usb") || transports.includes("nfc")) return <ShieldCheck class="h-5 w-5 text-blue-500" />
-  if (transports.includes("internal")) return <Phone class="h-5 w-5 text-green-500" />
-  return <Computer class="h-5 w-5 text-gray-500" />
+  if (transports.includes("usb") || transports.includes("nfc")) return <ShieldCheck class="h-5 w-5 text-slate-400 dark:text-slate-500" />
+  if (transports.includes("internal")) return <Phone class="h-5 w-5 text-slate-400 dark:text-slate-500" />
+  return <Computer class="h-5 w-5 text-slate-400 dark:text-slate-500" />
 }
 
 const getDeviceType = (transports: readonly string[]): string => {
@@ -59,6 +61,11 @@ const getDeviceType = (transports: readonly string[]): string => {
   if (transports.includes("ble")) return t("settings.passkeys.deviceBle")
   return t("settings.passkeys.deviceKey")
 }
+
+/** Card surface — the neutral translucent panel of the list pages. */
+const CARD = "rounded-xl border border-slate-200/70 bg-white/80 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60"
+const PRIMARY_BUTTON = "inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
+const ICON_BUTTON = "rounded-md p-1.5 text-slate-400 transition-colors duration-150 ease-out hover:bg-red-50 hover:text-red-600 dark:text-slate-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
 
 export function PasskeySettings(): JSX.Element {
   const app = useApp()
@@ -104,91 +111,76 @@ export function PasskeySettings(): JSX.Element {
     <Show
       when={supported()}
       fallback={
-        <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
-          <div class="flex items-start space-x-3">
-            <AlertTriangle class="h-6 w-6 text-amber-500 flex-shrink-0 mt-1" />
+        <div class="rounded-xl border border-amber-200/70 bg-amber-50/70 p-6 dark:border-amber-800/50 dark:bg-amber-900/20">
+          <div class="flex items-start gap-3">
+            <AlertTriangle class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
             <div>
-              <h3 class="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
+              <h3 class="mb-2 text-base font-medium text-amber-900 dark:text-amber-200">
                 {t("settings.passkeys.unsupported")}
               </h3>
-              <p class="text-amber-700 dark:text-amber-300 mb-4">{t("settings.passkeys.unsupportedBody")}</p>
-              <ul class="list-disc list-inside text-amber-700 dark:text-amber-300 space-y-1 text-sm">
+              <p class="mb-4 text-sm text-amber-800 dark:text-amber-300">{t("settings.passkeys.unsupportedBody")}</p>
+              <ul class="list-inside list-disc space-y-1 text-sm text-amber-800 dark:text-amber-300">
                 <li>A modern browser (Chrome 67+, Safari 14+, Firefox 60+)</li>
                 <li>A device with biometric authentication (TouchID, FaceID, Windows Hello)</li>
                 <li>Or a security key (YubiKey, etc.)</li>
               </ul>
             </div>
           </div>
-        </Motion.div>
+        </div>
       }
     >
-      <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} class="space-y-6">
+      <div class="space-y-6">
         {/* Header */}
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-              <Fingerprint class="h-7 w-7 mr-3 text-blue-500" />
-              {t("settings.passkeys.title")}
-            </h2>
-            <p class="text-gray-600 dark:text-gray-400 mt-1">{t("settings.passkeys.subtitle")}</p>
+            <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("settings.passkeys.title")}</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.passkeys.subtitle")}</p>
           </div>
 
-          <Motion.button
+          <button
+            type="button"
             onClick={() => void handleRegisterPasskey()}
             disabled={registering()}
-            hover={{ scale: 1.02 }}
-            press={{ scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            class="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+            class={PRIMARY_BUTTON}
           >
             <Show
               when={registering()}
               fallback={
                 <>
-                  <Plus class="h-4 w-4 mr-2" />
+                  <Plus class="h-4 w-4" />
                   {t("settings.passkeys.add")}
                 </>
               }
             >
               <>
-                <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2 animate-spin" />
+                <div class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 {t("settings.passkeys.adding")}
               </>
             </Show>
-          </Motion.button>
+          </button>
         </div>
 
         {/* Messages */}
         <Show when={error() !== undefined}>
-          <Motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2 }}
-            class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg"
-          >
+          <div class="rounded-lg border border-red-200/70 bg-red-50/70 px-3.5 py-2.5 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300">
             {error()}
-          </Motion.div>
+          </div>
         </Show>
 
         <Show when={success() !== undefined}>
-          <Motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2 }}
-            class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-lg"
-          >
+          <div class="rounded-lg border border-emerald-200/70 bg-emerald-50/70 px-3.5 py-2.5 text-sm text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300">
             {success()}
-          </Motion.div>
+          </div>
         </Show>
 
         {/* Passkeys List */}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class={CARD}>
           <Show
             when={!loading()}
             fallback={
               <div class="p-8 text-center">
-                <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4 animate-spin" />
-                <p class="text-gray-500 dark:text-gray-400">{t("settings.passkeys.loading")}</p>
+                <div class="mx-auto mb-4 h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600 dark:border-slate-700 dark:border-t-blue-500" />
+                <p class="text-sm text-slate-500 dark:text-slate-400">{t("settings.passkeys.loading")}</p>
               </div>
             }
           >
@@ -196,49 +188,42 @@ export function PasskeySettings(): JSX.Element {
               when={passkeys().length > 0}
               fallback={
                 <div class="p-8 text-center">
-                  <Fingerprint class="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">{t("settings.passkeys.empty")}</h3>
-                  <p class="text-gray-500 dark:text-gray-400 mb-4">{t("settings.passkeys.emptyHint")}</p>
+                  <Fingerprint class="mx-auto mb-4 h-10 w-10 text-slate-300 dark:text-slate-600" />
+                  <h4 class="mb-2 text-base font-medium text-slate-900 dark:text-white">{t("settings.passkeys.empty")}</h4>
+                  <p class="text-sm text-slate-500 dark:text-slate-400">{t("settings.passkeys.emptyHint")}</p>
                 </div>
               }
             >
-              <div class="divide-y divide-gray-200 dark:divide-gray-700">
+              <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
                 <For each={passkeys()}>
-                  {(passkey, index) => (
-                    <Motion.div
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: index() * 0.1 }}
-                      class="p-6 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                    >
+                  {(passkey) => (
+                    <div class="flex items-center justify-between p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <div class="flex items-center space-x-4">
                         <DeviceIcon transports={passkey.transports ?? []} />
                         <div>
-                          <h4 class="font-medium text-gray-900 dark:text-white">
+                          <h5 class="font-medium text-slate-900 dark:text-white">
                             {getDeviceType(passkey.transports ?? [])}
-                          </h4>
-                          <div class="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                          </h5>
+                          <div class="space-y-1 text-sm text-slate-500 dark:text-slate-400">
                             <Show when={passkey.lastUsed !== undefined}>
                               <p>{t("settings.passkeys.lastUsed", { date: new Date(passkey.lastUsed ?? "").toLocaleDateString() })}</p>
                             </Show>
-                            <p class="text-xs font-mono text-gray-400">
+                            <p class="font-mono text-xs text-slate-400 dark:text-slate-500">
                               ID: {passkey.credentialID.slice(0, 8)}...
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <Motion.button
+                      <button
+                        type="button"
                         onClick={() => handleDeletePasskey(passkey.id)}
-                        hover={{ scale: 1.05 }}
-                        press={{ scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        class={ICON_BUTTON}
                         title={t("settings.passkeys.removeTitle")}
                       >
                         <Trash class="h-4 w-4" />
-                      </Motion.button>
-                    </Motion.div>
+                      </button>
+                    </div>
                   )}
                 </For>
               </div>
@@ -247,16 +232,16 @@ export function PasskeySettings(): JSX.Element {
         </div>
 
         {/* Info Section */}
-        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
-          <h3 class="font-semibold text-blue-900 dark:text-blue-200 mb-3">{t("settings.passkeys.about")}</h3>
-          <ul class="text-blue-800 dark:text-blue-300 text-sm space-y-2">
+        <div class={CARD + " p-6"}>
+          <h4 class="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">{t("settings.passkeys.about")}</h4>
+          <ul class="space-y-2 text-sm text-slate-500 dark:text-slate-400">
             <li>• Passkeys are more secure than passwords - they can't be phished or stolen</li>
             <li>• You can add multiple passkeys for different devices</li>
             <li>• Passkeys work with TouchID, FaceID, Windows Hello, or security keys</li>
             <li>• You can still use your email and password if needed</li>
           </ul>
         </div>
-      </Motion.div>
+      </div>
     </Show>
   )
 }

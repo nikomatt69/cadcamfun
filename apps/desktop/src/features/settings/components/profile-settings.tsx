@@ -264,58 +264,57 @@ export function ProfileSettings(): JSX.Element {
   const completeness = (): number => getProfileCompleteness()
 
   const fieldClass = (invalid: boolean): string =>
-    `w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
-      !isEditing() ? "cursor-not-allowed bg-gray-50 dark:bg-gray-800" : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-    }${invalid ? " border-red-500" : ""}`
+    `w-full rounded-md border px-2.5 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 ${
+      !isEditing()
+        ? "cursor-not-allowed border-slate-200/70 bg-slate-50/80 text-slate-500 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-400"
+        : "border-slate-200/70 bg-white/80 text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
+    }${invalid ? " border-red-400 focus:border-red-500 focus:ring-red-500 dark:border-red-500" : ""}`
 
   return (
-    <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} class="space-y-8">
+    <div class="space-y-8">
       {/* Header */}
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="flex text-2xl font-bold text-gray-900 dark:text-white">
-            <User class="mr-3 h-7 w-7 text-blue-500" />
-            {t("settings.profile.title")}
-          </h2>
-          <p class="mt-1 text-gray-600 dark:text-gray-400">{t("settings.profile.subtitle")}</p>
+          <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("settings.profile.title")}</h3>
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.profile.subtitle")}</p>
         </div>
 
-        <Motion.button
+        <button
+          type="button"
           onClick={() => setIsEditing(!isEditing())}
-          hover={{ scale: 1.02 }}
-          press={{ scale: 0.98 }}
-          transition={{ duration: 0.2 }}
-          class={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            isEditing() ? "bg-gray-600 hover:bg-gray-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
+          class={`rounded-lg px-3.5 py-2 text-sm font-medium shadow-sm transition-colors duration-150 ease-out ${
+            isEditing()
+              ? "border border-slate-200/70 bg-white/70 text-slate-700 hover:bg-white dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+              : "bg-blue-600 text-white hover:bg-blue-700"
           }`}
         >
           {isEditing() ? t("common.cancel") : t("settings.profile.edit")}
-        </Motion.button>
+        </button>
       </div>
 
       {/* Profile Completeness */}
-      <div class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-semibold text-blue-900 dark:text-blue-200">{t("settings.profile.completeness")}</h3>
-          <span class="text-2xl font-bold text-blue-600 dark:text-blue-400">{completeness()}%</span>
+      <div class="rounded-xl border border-slate-200/70 bg-white/80 p-5 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60">
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="text-sm font-medium text-slate-700 dark:text-slate-300">{t("settings.profile.completeness")}</h3>
+          <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">{completeness()}%</span>
         </div>
-        <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-3">
+        <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
           <div
-            class="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-500"
+            class="h-full rounded-full bg-blue-600 transition-[width] duration-300 ease-out"
             style={{ width: `${completeness()}%` }}
           />
         </div>
-        <p class="text-sm text-blue-700 dark:text-blue-300 mt-2">{t("settings.profile.completenessHint")}</p>
+        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">{t("settings.profile.completenessHint")}</p>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column - Photo & Basic Info */}
         <div class="lg:col-span-1">
-          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60">
             {/* Profile Photo */}
             <div class="text-center">
               <div class="relative inline-block">
-                <div class="h-32 w-32 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-900 mx-auto">
+                <div class="mx-auto h-32 w-32 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                   <Show when={isUploading()}>
                     <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full z-10">
                       <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white" />
@@ -325,7 +324,7 @@ export function ProfileSettings(): JSX.Element {
                     when={profileImage()}
                     fallback={
                       <div class="h-full w-full flex items-center justify-center">
-                        <User class="h-16 w-16 text-gray-400" />
+                        <User class="h-16 w-16 text-slate-400 dark:text-slate-500" />
                       </div>
                     }
                   >
@@ -334,15 +333,13 @@ export function ProfileSettings(): JSX.Element {
                 </div>
 
                 <Show when={isEditing()}>
-                  <Motion.button
+                  <button
+                    type="button"
                     onClick={() => fileInput?.click()}
-                    hover={{ scale: 1.1 }}
-                    press={{ scale: 0.9 }}
-                    transition={{ duration: 0.2 }}
-                    class="absolute bottom-2 right-2 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full shadow-lg"
+                    class="absolute bottom-2 right-2 rounded-full bg-blue-600 p-2 text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700"
                   >
                     <Camera class="h-4 w-4" />
-                  </Motion.button>
+                  </button>
                 </Show>
               </div>
 
@@ -359,7 +356,7 @@ export function ProfileSettings(): JSX.Element {
                   <button
                     type="button"
                     onClick={() => fileInput?.click()}
-                    class="w-full py-2 px-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-colors"
+                    class="w-full rounded-lg border border-slate-200/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-white dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
                   >
                     {t("settings.profile.uploadPhoto")}
                   </button>
@@ -367,12 +364,12 @@ export function ProfileSettings(): JSX.Element {
                     <button
                       type="button"
                       onClick={handleRemoveImage}
-                      class="w-full py-2 px-4 bg-red-100 dark:bg-red-900/20 hover:bg-red-200 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 rounded-lg text-sm font-medium transition-colors"
+                      class="w-full rounded-lg border border-red-200/70 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition-colors duration-150 ease-out hover:bg-red-100 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30"
                     >
                       {t("settings.profile.removePhoto")}
                     </button>
                   </Show>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">JPG, PNG, or GIF. Max 2MB.</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">JPG, PNG, or GIF. Max 2MB.</p>
                 </div>
               </Show>
             </div>
@@ -385,38 +382,38 @@ export function ProfileSettings(): JSX.Element {
                   <div class="space-y-4">
                     <div class="grid grid-cols-2 gap-4">
                       <div class="text-center">
-                        <div class="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center">
-                          <Folder class="h-5 w-5 mr-1 text-blue-500" />
+                        <div class="flex items-center justify-center text-xl font-semibold tabular-nums text-slate-900 dark:text-white">
+                          <Folder class="mr-1.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
                           {userStats().projectsCount}
                         </div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">{t("shell.projects")}</div>
+                        <div class="text-xs font-medium text-slate-500 dark:text-slate-400">{t("shell.projects")}</div>
                       </div>
                       <div class="text-center">
-                        <div class="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center">
-                          <PenTool class="h-5 w-5 mr-1 text-green-500" />
+                        <div class="flex items-center justify-center text-xl font-semibold tabular-nums text-slate-900 dark:text-white">
+                          <PenTool class="mr-1.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
                           {userStats().totalDesigns}
                         </div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">{t("settings.profile.designs")}</div>
+                        <div class="text-xs font-medium text-slate-500 dark:text-slate-400">{t("settings.profile.designs")}</div>
                       </div>
                     </div>
 
                     <Show when={userStats().drawingsCount > 0 || userStats().toolpathsCount > 0}>
-                      <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                      <div class="border-t border-slate-200/70 pt-4 dark:border-slate-700/50">
                         <div class="grid grid-cols-2 gap-4 text-sm">
                           <div class="text-center">
-                            <div class="font-semibold text-gray-900 dark:text-white">{userStats().drawingsCount}</div>
-                            <div class="text-gray-500 dark:text-gray-400">{t("settings.profile.drawings")}</div>
+                            <div class="font-medium tabular-nums text-slate-900 dark:text-white">{userStats().drawingsCount}</div>
+                            <div class="text-slate-500 dark:text-slate-400">{t("settings.profile.drawings")}</div>
                           </div>
                           <div class="text-center">
-                            <div class="font-semibold text-gray-900 dark:text-white">{userStats().toolpathsCount}</div>
-                            <div class="text-gray-500 dark:text-gray-400">{t("shell.toolpaths")}</div>
+                            <div class="font-medium tabular-nums text-slate-900 dark:text-white">{userStats().toolpathsCount}</div>
+                            <div class="text-slate-500 dark:text-slate-400">{t("shell.toolpaths")}</div>
                           </div>
                         </div>
                       </div>
                     </Show>
 
-                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-                      <div class="flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+                    <div class="border-t border-slate-200/70 pt-4 dark:border-slate-700/50">
+                      <div class="flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                         <Clock class="h-4 w-4 mr-1" />
                         {t("settings.profile.memberSince", { date: formatMemberSince(userStats().memberSince) })}
                       </div>
@@ -427,12 +424,12 @@ export function ProfileSettings(): JSX.Element {
                 <div class="animate-pulse">
                   <div class="grid grid-cols-2 gap-4">
                     <div class="text-center">
-                      <div class="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
-                      <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                      <div class="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-2" />
+                      <div class="h-4 bg-slate-200 dark:bg-slate-700 rounded" />
                     </div>
                     <div class="text-center">
-                      <div class="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
-                      <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                      <div class="h-8 bg-slate-200 dark:bg-slate-700 rounded mb-2" />
+                      <div class="h-4 bg-slate-200 dark:bg-slate-700 rounded" />
                     </div>
                   </div>
                 </div>
@@ -441,40 +438,40 @@ export function ProfileSettings(): JSX.Element {
 
             {/* Badges */}
             <div class="mt-6">
-              <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">{t("settings.profile.achievements")}</h4>
+              <h4 class="mb-3 text-sm font-medium text-slate-900 dark:text-white">{t("settings.profile.achievements")}</h4>
               <div class="flex flex-wrap gap-2">
                 <Show when={userStats().totalDesigns >= 10}>
-                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     <Star class="h-3 w-3 mr-1" />
                     {t("settings.profile.badgeExpert")}
                   </span>
                 </Show>
                 <Show when={userStats().projectsCount >= 5}>
-                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     <TrendingUp class="h-3 w-3 mr-1" />
                     {t("settings.profile.badgeActive")}
                   </span>
                 </Show>
                 <Show when={profile.data() !== undefined}>
-                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     <ShieldCheck class="h-3 w-3 mr-1" />
                     {t("settings.profile.badgeVerified")}
                   </span>
                 </Show>
                 <Show when={userStats().toolpathsCount >= 3}>
-                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400">
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     <SettingsIcon class="h-3 w-3 mr-1" />
                     {t("settings.profile.badgeCam")}
                   </span>
                 </Show>
                 <Show when={userStats().totalDesigns >= 50}>
-                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400">
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     <Star class="h-3 w-3 mr-1" />
                     {t("settings.profile.badgeMaster")}
                   </span>
                 </Show>
                 <Show when={userStats().projectsCount === 0 && userStats().totalDesigns === 0}>
-                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     <User class="h-3 w-3 mr-1" />
                     {t("settings.profile.badgeNew")}
                   </span>
@@ -486,14 +483,14 @@ export function ProfileSettings(): JSX.Element {
 
         {/* Right Column - Profile Details */}
         <div class="lg:col-span-2">
-          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60">
             <div class="space-y-6">
               {/* Basic Information */}
               <div>
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t("settings.profile.basicInfo")}</h3>
+                <h3 class="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">{t("settings.profile.basicInfo")}</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.profile.fullName")}
                     </label>
                     <input
@@ -509,20 +506,20 @@ export function ProfileSettings(): JSX.Element {
                   </div>
 
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       {t("auth.email")}
                     </label>
                     <input
                       type="email"
                       value={profileData().email}
                       disabled
-                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                      class="w-full cursor-not-allowed rounded-md border border-slate-200/70 bg-slate-50/80 px-2.5 py-1.5 text-sm text-slate-500 shadow-sm dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-400"
                     />
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("settings.profile.emailLocked")}</p>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("settings.profile.emailLocked")}</p>
                   </div>
 
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.profile.jobTitle")}
                     </label>
                     <input
@@ -536,7 +533,7 @@ export function ProfileSettings(): JSX.Element {
                   </div>
 
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.profile.company")}
                     </label>
                     <input
@@ -550,7 +547,7 @@ export function ProfileSettings(): JSX.Element {
                   </div>
 
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       <MapPin class="h-4 w-4 inline mr-1" />
                       {t("settings.profile.location")}
                     </label>
@@ -565,7 +562,7 @@ export function ProfileSettings(): JSX.Element {
                   </div>
 
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
                       <Globe class="h-4 w-4 inline mr-1" />
                       {t("settings.profile.website")}
                     </label>
@@ -586,7 +583,7 @@ export function ProfileSettings(): JSX.Element {
 
               {/* Bio */}
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   {t("settings.profile.bio")}
                 </label>
                 <textarea
@@ -595,40 +592,37 @@ export function ProfileSettings(): JSX.Element {
                   disabled={!isEditing()}
                   rows={4}
                   placeholder="Tell us about yourself, your experience, and what you're passionate about..."
-                  class={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none ${
-                    !isEditing() ? "cursor-not-allowed bg-gray-50 dark:bg-gray-800" : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  class={`w-full resize-none rounded-md border px-2.5 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 ${
+                    !isEditing()
+                      ? "cursor-not-allowed border-slate-200/70 bg-slate-50/80 text-slate-500 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-400"
+                      : "border-slate-200/70 bg-white/80 text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
                   }`}
                 />
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {t("settings.profile.bioCount", { count: profileData().bio.length })}
                 </p>
               </div>
 
               {/* Skills */}
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   {t("settings.profile.skills")}
                 </label>
-                <div class="flex flex-wrap gap-2 mb-3">
+                <div class="mb-3 flex flex-wrap gap-2">
                   <For each={profileData().skills}>
                     {(skill) => (
-                      <Motion.span
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.2 }}
-                        class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
-                      >
+                      <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         {skill}
                         <Show when={isEditing()}>
                           <button
                             type="button"
                             onClick={() => removeSkill(skill)}
-                            class="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+                            class="ml-2 text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
                           >
                             <CircleX class="h-4 w-4" />
                           </button>
                         </Show>
-                      </Motion.span>
+                      </span>
                     )}
                   </For>
                 </div>
@@ -647,11 +641,11 @@ export function ProfileSettings(): JSX.Element {
                         }
                       }}
                       placeholder="Add a skill..."
-                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      class="w-full rounded-md border border-slate-200/70 bg-white/80 px-2.5 py-1.5 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
                     />
 
                     <Show when={showSkillSuggestions()}>
-                      <div class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      <div class="absolute z-10 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-slate-200/70 bg-white shadow-lg dark:border-slate-700/50 dark:bg-slate-800">
                         <For
                           each={skillSuggestions.filter(
                             (skill) =>
@@ -663,7 +657,7 @@ export function ProfileSettings(): JSX.Element {
                             <button
                               type="button"
                               onClick={() => addSkill(skill)}
-                              class="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-sm text-gray-900 dark:text-white"
+                              class="w-full px-3 py-2 text-left text-sm text-slate-900 transition-colors hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700/60"
                             >
                               {skill}
                             </button>
@@ -677,19 +671,19 @@ export function ProfileSettings(): JSX.Element {
 
               {/* Privacy Settings */}
               <div>
-                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">{t("settings.profile.privacy")}</h4>
+                <h4 class="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">{t("settings.profile.privacy")}</h4>
                 <div class="space-y-3">
                   <label class="flex items-center justify-between">
                     <div class="flex items-center">
-                      <Eye class="h-4 w-4 mr-2 text-gray-500" />
-                      <span class="text-sm text-gray-900 dark:text-white">{t("settings.profile.publicProfile")}</span>
+                      <Eye class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />
+                      <span class="text-sm text-slate-900 dark:text-white">{t("settings.profile.publicProfile")}</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setProfileData((previous) => ({ ...previous, publicProfile: !previous.publicProfile }))}
                       disabled={!isEditing()}
                       class={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        profileData().publicProfile ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
+                        profileData().publicProfile ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700"
                       } ${!isEditing() ? "cursor-not-allowed opacity-50" : ""}`}
                     >
                       <span
@@ -702,17 +696,17 @@ export function ProfileSettings(): JSX.Element {
 
                   <label class="flex items-center justify-between">
                     <div class="flex items-center">
-                      <Show when={profileData().showEmail} fallback={<EyeOff class="h-4 w-4 mr-2 text-gray-500" />}>
-                        <Eye class="h-4 w-4 mr-2 text-gray-500" />
+                      <Show when={profileData().showEmail} fallback={<EyeOff class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />}>
+                        <Eye class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                       </Show>
-                      <span class="text-sm text-gray-900 dark:text-white">{t("settings.profile.showEmail")}</span>
+                      <span class="text-sm text-slate-900 dark:text-white">{t("settings.profile.showEmail")}</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setProfileData((previous) => ({ ...previous, showEmail: !previous.showEmail }))}
                       disabled={!isEditing()}
                       class={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        profileData().showEmail ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
+                        profileData().showEmail ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700"
                       } ${!isEditing() ? "cursor-not-allowed opacity-50" : ""}`}
                     >
                       <span
@@ -733,16 +727,16 @@ export function ProfileSettings(): JSX.Element {
       <Presence>
         <Show when={isEditing()}>
           <Motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            class="flex justify-end space-x-3"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            class="flex justify-end gap-3"
           >
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              class="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              class="rounded-lg border border-slate-200/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-white dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
             >
               {t("common.cancel")}
             </button>
@@ -750,16 +744,16 @@ export function ProfileSettings(): JSX.Element {
               type="button"
               onClick={() => void handleSave()}
               disabled={isUploading()}
-              class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center"
+              class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
             >
               <Show when={isUploading()}>
-                <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                <div class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               </Show>
               {t("settings.profile.save")}
             </button>
           </Motion.div>
         </Show>
       </Presence>
-    </Motion.div>
+    </div>
   )
 }

@@ -2,8 +2,8 @@
  * `/settings` — visual parity with `.reference/src/pages/settings/index.tsx`.
  *
  * Eight tabs (Profile / Account / Security / Subscription / Notifications / AI /
- * Devices / Language) over the glassmorphic gradient page, each rendering the legacy component of
- * the same name ported under `src/features/settings/components/`.
+ * Devices / Language) over the workstation chrome, each rendering the ported legacy
+ * component of the same name under `src/features/settings/components/`.
  *
  * The legacy page gates on `useSession()` (pending spinner, redirect to sign-in). The
  * desktop app has one local profile that is always present, so there is nothing to
@@ -12,7 +12,6 @@
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
-import { Motion } from "solid-motionone"
 import { Bell, Cpu, Globe, Lock, Shield, Smartphone, Tag, User } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
@@ -90,12 +89,7 @@ export function SettingsScreen(): JSX.Element {
   }
 
   const tabPanel = (tab: TabId): JSX.Element => (
-    <Motion.div
-      class="p-4 sm:p-6"
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.3 }}
-    >
+    <div class="p-4 sm:p-6">
       <Show when={tab === "profile"}><ProfileSettings /></Show>
 
       <Show when={tab === "account"}>
@@ -119,17 +113,14 @@ export function SettingsScreen(): JSX.Element {
               </p>
             </div>
             <div class="mt-4">
-              <Motion.button
+              <button
                 type="button"
                 onClick={() => void handleDeleteAccount()}
                 disabled={isDeleting()}
-                hover={{ scale: 1.05 }}
-                press={{ scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                class="inline-flex items-center justify-center px-4 py-2 border border-transparent font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 dark:text-red-100 dark:bg-red-900/40 dark:hover:bg-red-900/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out"
+                class="inline-flex items-center justify-center rounded-lg border border-red-200/70 bg-red-50 px-3.5 py-2 text-sm font-medium text-red-700 transition-colors duration-150 ease-out hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30"
               >
                 {isDeleting() ? t("settings.account.deleting") : t("settings.account.delete")}
-              </Motion.button>
+              </button>
               <Show when={deleteError() !== undefined}>
                 <p class="mt-2 text-sm text-red-600 dark:text-red-400">{deleteError()}</p>
               </Show>
@@ -165,7 +156,7 @@ export function SettingsScreen(): JSX.Element {
             <div class="mt-8">
               <h4 class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.glass.title")}</h4>
               <label class="mt-3 flex items-start gap-3 text-sm text-slate-700 dark:text-slate-300" data-testid="glass-setting">
-                <input type="checkbox" class="mt-1" aria-label={t("settings.glass.title")} checked={app.settings.settings().glass} onChange={(event) => app.settings.update({ glass: event.currentTarget.checked })} />
+                <input type="checkbox" class="mt-1 h-4 w-4 accent-blue-600" aria-label={t("settings.glass.title")} checked={app.settings.settings().glass} onChange={(event) => app.settings.update({ glass: event.currentTarget.checked })} />
                 <span>{t("settings.glass.body")}</span>
               </label>
             </div>
@@ -193,7 +184,7 @@ export function SettingsScreen(): JSX.Element {
               </div>
             </div>
 
-            <div class="mt-8 bg-slate-50 dark:bg-slate-900 p-4 rounded-md">
+            <div class="mt-8 rounded-lg border border-slate-200/60 bg-slate-50/70 p-4 dark:border-slate-700/40 dark:bg-slate-800/30">
               <div class="flex items-start">
                 <div class="flex-shrink-0">
                   <Globe class="h-5 w-5 text-slate-400" aria-hidden="true" />
@@ -230,7 +221,7 @@ export function SettingsScreen(): JSX.Element {
                       name="comments"
                       type="checkbox"
                       checked
-                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 dark:border-slate-700 rounded bg-slate-100 dark:bg-slate-800"
+                      class="h-4 w-4 accent-blue-600"
                     />
                   </div>
                   <div class="ml-3 text-sm">
@@ -249,7 +240,7 @@ export function SettingsScreen(): JSX.Element {
                       name="mentions"
                       type="checkbox"
                       checked
-                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 dark:border-slate-700 rounded bg-slate-100 dark:bg-slate-800"
+                      class="h-4 w-4 accent-blue-600"
                     />
                   </div>
                   <div class="ml-3 text-sm">
@@ -275,7 +266,7 @@ export function SettingsScreen(): JSX.Element {
                       name="push-notifications"
                       type="radio"
                       checked
-                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
+                      class="h-4 w-4 accent-blue-600"
                     />
                   </div>
                   <div class="ml-3 text-sm">
@@ -291,7 +282,7 @@ export function SettingsScreen(): JSX.Element {
                       id="push-email"
                       name="push-notifications"
                       type="radio"
-                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
+                      class="h-4 w-4 accent-blue-600"
                     />
                   </div>
                   <div class="ml-3 text-sm">
@@ -307,7 +298,7 @@ export function SettingsScreen(): JSX.Element {
                       id="push-nothing"
                       name="push-notifications"
                       type="radio"
-                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
+                      class="h-4 w-4 accent-blue-600"
                     />
                   </div>
                   <div class="ml-3 text-sm">
@@ -370,7 +361,7 @@ export function SettingsScreen(): JSX.Element {
           </div>
         </div>
       </Show>
-    </Motion.div>
+    </div>
   )
 
   return (
@@ -379,38 +370,29 @@ export function SettingsScreen(): JSX.Element {
         <p class="mb-4 text-sm text-slate-600 dark:text-slate-300">{t("settings.index.subtitle")}</p>
 
         {/* Main Content */}
-        <Motion.div
-          class="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-lg rounded-2xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        <div class="overflow-hidden rounded-xl border border-slate-200/70 bg-white/80 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60">
           {/* Tabs - Desktop */}
-          <div class="hidden sm:block bg-slate-50/70 dark:bg-slate-900/70 border-b border-slate-200/50 dark:border-slate-700/50">
+          <div class="hidden border-b border-slate-200/70 bg-slate-50/70 dark:border-slate-700/50 dark:bg-slate-800/30 sm:block">
             <div class="px-4 sm:px-6 lg:px-8">
-              <nav class="-mb-px flex justify-between w-full">
+              <nav class="-mb-px flex w-full justify-between">
                 <For each={tabs}>
                   {(tab) => (
-                    <Motion.button
+                    <button
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      hover={{ scale: 1.05 }}
-                      press={{ scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                      class="flex-1 py-4 px-2 border-b-2 font-medium text-sm transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out whitespace-nowrap rounded-t-lg"
+                      class="flex-1 whitespace-nowrap border-b-2 px-2 py-3.5 text-sm font-medium transition-colors duration-150 ease-out"
                       classList={{
-                        "border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-900/20":
-                          activeTab() === tab.id,
-                        "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300 hover:bg-slate-100/30 dark:hover:bg-gray-700/20":
+                        "border-blue-600 text-slate-900 dark:border-blue-400 dark:text-white": activeTab() === tab.id,
+                        "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200":
                           activeTab() !== tab.id
                       }}
                       aria-pressed={activeTab() === tab.id}
                     >
-                      <div class="flex items-center justify-center">
-                        <span class="mr-1 lg:mr-2 flex-shrink-0"><tab.Icon size={18} /></span>
-                        <span class="hidden md:inline-block lg:inline-block truncate">{tab.name}</span>
-                      </div>
-                    </Motion.button>
+                      <span class="flex items-center justify-center">
+                        <span class="mr-1.5 flex-shrink-0"><tab.Icon size={16} /></span>
+                        <span class="hidden truncate md:inline-block">{tab.name}</span>
+                      </span>
+                    </button>
                   )}
                 </For>
               </nav>
@@ -418,28 +400,24 @@ export function SettingsScreen(): JSX.Element {
           </div>
 
           {/* Tabs - Mobile */}
-          <div class="sm:hidden bg-slate-50/70 dark:bg-slate-900/70 border-b border-slate-200/50 dark:border-slate-700/50">
+          <div class="border-b border-slate-200/70 bg-slate-50/70 dark:border-slate-700/50 dark:bg-slate-800/30 sm:hidden">
             <div class="px-1">
-              <div class="flex justify-between w-full py-1">
+              <div class="flex w-full justify-between py-1">
                 <For each={tabs}>
                   {(tab) => (
-                    <Motion.button
+                    <button
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      hover={{ scale: 1.05 }}
-                      press={{ scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                      class="flex-1 flex flex-col items-center py-2 px-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out rounded-lg"
+                      class="flex flex-1 flex-col items-center rounded-lg px-1 py-2 text-xs font-medium transition-colors duration-150 ease-out"
                       classList={{
-                        "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20": activeTab() === tab.id,
-                        "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-gray-700/30":
-                          activeTab() !== tab.id
+                        "text-blue-600 dark:text-blue-400": activeTab() === tab.id,
+                        "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300": activeTab() !== tab.id
                       }}
                       aria-pressed={activeTab() === tab.id}
                     >
-                      <span class="mb-1 text-base"><tab.Icon size={18} /></span>
-                      <span class="text-xs leading-tight text-center max-w-full truncate">{tab.name}</span>
-                    </Motion.button>
+                      <span class="mb-1"><tab.Icon size={16} /></span>
+                      <span class="max-w-full truncate text-center text-xs leading-tight">{tab.name}</span>
+                    </button>
                   )}
                 </For>
               </div>
@@ -450,7 +428,7 @@ export function SettingsScreen(): JSX.Element {
           <Show when={activeTab()} keyed>
             {(tab) => tabPanel(tab)}
           </Show>
-        </Motion.div>
+        </div>
       </div>
     </WorkspacePage>
   )

@@ -7,7 +7,21 @@ import { Show, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import { ArrowLeft } from "lucide-solid"
 import { Motion } from "solid-motionone"
+import { prefersReducedMotion } from "../ui/animated-section.tsx"
 import "../../styles/workstation.css"
+
+/** Page entry motion — deliberately short: a workspace that eases in for a
+ *  full second feels slow every time you navigate back to it. Motion runs on
+ *  the Web Animations API, which the global CSS reduced-motion rule cannot
+ *  reach, so the user preference is honoured here instead. */
+const ENTER_DURATION = 0.22
+const ENTER_DURATION_REDUCED = 0.12
+
+/** Spread helper for the y-based entrances (page container, toolbars). */
+const enter = (y: number, delay: number) =>
+  prefersReducedMotion()
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: ENTER_DURATION_REDUCED, delay: 0 } }
+    : { initial: { opacity: 0, y }, animate: { opacity: 1, y: 0 }, transition: { duration: ENTER_DURATION, delay } }
 
 export const TOOLBAR_BUTTON = "workstation-toolbar-button inline-flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-white/70 px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-white/90 hover:border-slate-300/70 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70 dark:hover:border-slate-600/50 disabled:opacity-50"
 export const TOOLBAR_PRIMARY = "inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-blue-700 disabled:opacity-50"
@@ -40,16 +54,12 @@ export function WorkspacePage(props: WorkspacePageProps): JSX.Element {
   return (
     <Motion.div
       class="cam-workspace h-full w-full flex flex-col overflow-hidden"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
+      {...enter(20, 0)}
     >
       <div class="cam-workspace__frame flex flex-col h-full w-full">
         <Motion.div
           class="workstation-toolbar w-full flex flex-wrap items-center justify-between gap-2"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          {...enter(-20, 0)}
         >
           <div class="ui-card ui-card-light flex w-max items-center !p-2">
             <h1 class="px-2 text-base font-semibold text-slate-900 dark:text-white">{props.title}</h1>
@@ -63,7 +73,12 @@ export function WorkspacePage(props: WorkspacePageProps): JSX.Element {
               <div class="ui-card ui-card-light flex flex-col gap-3 !p-3 overflow-y-auto">{props.rail}</div>
             </aside>
           </Show>
-          <Motion.div class="cam-workspace__stage ui-card ui-card-default flex-1 min-w-0 overflow-y-auto !p-4" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.6 }}>
+          <Motion.div
+            class="cam-workspace__stage ui-card ui-card-default flex-1 min-w-0 overflow-y-auto !p-4"
+            initial={prefersReducedMotion() ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: prefersReducedMotion() ? ENTER_DURATION_REDUCED : ENTER_DURATION, delay: prefersReducedMotion() ? 0 : 0.04 }}
+          >
             {props.children}
           </Motion.div>
         </div>
@@ -126,9 +141,9 @@ export interface WorkspaceDetailProps {
 /** The detail-page frame of the toolpaths detail: a toolbar with back, title and actions over a scrolling body. */
 export function WorkspaceDetail(props: WorkspaceDetailProps): JSX.Element {
   return (
-    <Motion.div class="cam-workspace h-full w-full flex flex-col overflow-hidden" data-testid={props.testId} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+    <Motion.div class="cam-workspace h-full w-full flex flex-col overflow-hidden" data-testid={props.testId} {...enter(20, 0)}>
       <div class="cam-workspace__frame flex flex-col h-full w-full">
-        <Motion.div class="workstation-toolbar w-full flex flex-wrap items-center justify-between gap-2" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.4 }}>
+        <Motion.div class="workstation-toolbar w-full flex flex-wrap items-center justify-between gap-2" {...enter(-20, 0)}>
           <div class="flex min-w-0 items-center gap-3">
             <A href={props.backHref} class="rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-200/60 dark:text-gray-300 dark:hover:bg-gray-800/60" aria-label={props.backLabel}><ArrowLeft size={18} aria-hidden="true" /></A>
             <div class="min-w-0">

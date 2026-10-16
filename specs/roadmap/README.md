@@ -42,9 +42,9 @@ See `specs/00-overview.md` §4. Snapshot as of this file:
 | WP0 Database | `LocalKeyValue` + `KvStore` exist; leftover: typed Json columns, FK indexes |
 | WP1 CAD core | done |
 | WP2 CAM core | done for 2.5D / 3D / lathe / verify / indexing; WP14 program grouping incomplete |
-| WP3/WP4 API | **121/195** legacy route files in the contract (`bun run --filter @cadcamfun/api coverage`) |
+| WP3/WP4 API | **121/184** legacy route files in the contract (`bun run --filter @cadcamfun/api coverage`) |
 | WP5 Tauri | M1 done |
-| WP6/WP7 UI | pages are no longer `PageStub`; marketplace/chat/2FA still fake; CAM setup store missing |
+| WP6/WP7 UI | pages are no longer `PageStub`; chat/2FA still fake; CAM setup store missing |
 | WP8 AI | nikcli host, specialists (incl. `reviewer`), 16 skills, per-verb tools (~32 built-ins). Spec 26 **not landed** (`tools/action.ts` absent) |
 | WP9 Plugins | SDK + host; SDK host not on HTTP |
 | WP10 Release | pipeline done; secrets unset |

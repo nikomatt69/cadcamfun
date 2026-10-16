@@ -3,13 +3,11 @@ import App from "./app/App.tsx"
 import "./styles/globals.css"
 import "./styles/ui.css"
 import "./features/dashboard/styles/dashboard.css"
-import "./features/marketplace/styles/marketplace.css"
 import "./features/library/styles/library.css"
 import "./styles/misc.css"
 import "./styles/professional.css"
 import "./styles/glass.css"
 import { ToastViewport } from "./shared/ui/feedback.tsx"
-import { Toaster } from "./shared/ui/toast.tsx"
 
 // In the desktop app the webview's console and uncaught errors go to the shell log (next to the sidecar's), where support finds them.
 // (`attachConsole` of the log plugin goes the other way, Rust to console, so the calls are forwarded here.)
@@ -31,9 +29,8 @@ if ("__TAURI_INTERNALS__" in window) {
 render(() => (
   <>
     <App />
+    {/* Every toast renders here — `shared/ui/toast.tsx` forwards the CAD/CAM
+        call sites to this same viewport. */}
     <ToastViewport />
-    {/* Mounted once at the root so `toast.tsx` messages raised outside the
-        CAD/CAM pages (assistant panel, AI settings) are visible too. */}
-    <Toaster />
   </>
 ), document.getElementById("root")!)

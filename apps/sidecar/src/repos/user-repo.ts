@@ -37,14 +37,6 @@ const ACCOUNT_CLEANUP = [
   `DELETE FROM "ConversationParticipant" WHERE "userId" = ?1`,
   `DELETE FROM "Notification" WHERE "userId" = ?1`,
   `DELETE FROM "PushSubscription" WHERE "userId" = ?1`,
-  `DELETE FROM "MarketplaceWishlist" WHERE "userId" = ?1`,
-  `DELETE FROM "MarketplaceReview" WHERE "buyerId" = ?1`,
-  `DELETE FROM "MarketplaceOrder" WHERE "buyerId" = ?1`,
-  `DELETE FROM "MarketplacePayout" WHERE "sellerId" IN (SELECT "id" FROM "MarketplaceSeller" WHERE "userId" = ?1)`,
-  `DELETE FROM "MarketplaceCollectionItem" WHERE "collectionId" IN (SELECT c."id" FROM "MarketplaceCollection" c JOIN "MarketplaceSeller" s ON s."id" = c."sellerId" WHERE s."userId" = ?1)`,
-  `DELETE FROM "MarketplaceCollection" WHERE "sellerId" IN (SELECT "id" FROM "MarketplaceSeller" WHERE "userId" = ?1)`,
-  `DELETE FROM "MarketplaceItem" WHERE "sellerId" IN (SELECT "id" FROM "MarketplaceSeller" WHERE "userId" = ?1)`,
-  `DELETE FROM "MarketplaceSeller" WHERE "userId" = ?1`,
   `DELETE FROM "FileUpload" WHERE "ownerId" = ?1`,
   `DELETE FROM "Subscription" WHERE "id" = ?1`
 ]

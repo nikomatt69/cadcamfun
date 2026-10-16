@@ -52,7 +52,12 @@
   background: linear-gradient(180deg, #0f172a 0%, #0b1220 50%, #020617 100%);
 }
 
-.reference-shell :is(button, a):focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+/* Keyboard focus: one outline for every interactive control, including the
+   non-native roles (listbox options, menu items, tabs) the AI panels use. */
+.reference-shell :is(button, a, [role="button"], [role="option"], [role="menuitem"], [role="tab"]):focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 3px;
+}
 /* Press feedback on pointer-down (Apple), subtle and quick (Emil: 0.95–0.98, fast
    in / slower out). Scoped to controls: plain text links highlight but never scale. */
 .reference-shell :is(button, a.btn, [role="button"]):not(:disabled):active {

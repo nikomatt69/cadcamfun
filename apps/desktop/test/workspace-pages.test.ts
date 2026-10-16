@@ -51,20 +51,6 @@ describe("list pages use the workspace chrome", () => {
     } finally { dispose() }
   }, PAGE_TIMEOUT)
 
-  test("/marketplace filters the catalogue from the rail", async () => {
-    resetStores()
-    const { dispose } = app.visit("/marketplace")
-    try {
-      await find(".cam-workspace")
-      expect(await app.wait(() => byText("h3", "Gear Set 24T/48T"), 30000)).toBeDefined()
-      const input = document.querySelector<HTMLInputElement>('input[name="search"]')!
-      input.value = "gear"
-      input.dispatchEvent(new window.Event("input", { bubbles: true }))
-      await app.wait(() => byText("h3", "Gear Set 24T/48T") && !byText("h3", "Pneumatic Cylinder 50mm"), 30000)
-      expect(byText("h3", "Pneumatic Cylinder 50mm")).toBeUndefined()
-    } finally { dispose() }
-  }, PAGE_TIMEOUT)
-
   test("/mcp/directory shows the empty stage", async () => {
     resetStores()
     const { dispose } = app.visit("/mcp/directory")
@@ -81,9 +67,7 @@ describe("detail and settings pages use the workspace chrome", () => {
     { path: "/analytics/history", title: "Activity" },
     { path: "/costs", title: "Costs" },
     { path: "/settings", title: "Settings" },
-    { path: "/settings/subscription", title: "Subscription" },
-    { path: "/marketplace/purchases", title: "Purchases" },
-    { path: "/marketplace/seller/dashboard", title: "Seller" }
+    { path: "/settings/subscription", title: "Subscription" }
   ] as const
   for (const { path, title } of pages) {
     test(`${path} has the workspace toolbar`, async () => {

@@ -4,7 +4,7 @@ Status: **pending**. May run in parallel with RM-02 on **disjoint** files. Desig
 
 ## Problem
 
-Measured: **121/195** legacy route files in the contract (`bun run --filter @cadcamfun/api coverage`, 2026-10-11). Missing families (abbrev.): remaining `ai/*` proxies and code-interpreter, `components/*` (list/comments/versions/storage/library), `conversation/*`, marketplace + Polar webhook, MCP extras, `ml/*`, nested `organizations/:id/{conversations,invite,members,projects}`, invitations accept, `toolpaths/export-import`, websocket, og/graphql-playground/route.
+Measured: **121/184** legacy route files in the contract (`bun run --filter @cadcamfun/api coverage`, 2026-10-16). Missing families (abbrev.): remaining `ai/*` proxies and code-interpreter, `components/*` (list/comments/versions/storage/library), `conversation/*`, MCP extras, `ml/*`, nested `organizations/:id/{conversations,invite,members,projects}`, invitations accept, `toolpaths/export-import`, websocket, og/graphql-playground/route.
 
 Each family is one **module**: HttpApi group **interface** (path, method, Schema, status, `{ message }` body) + sidecar handler **adapter**. Do not invent a new envelope. Cloud deps stay Effect services with local/no-op defaults (`00-overview.md` §6).
 
@@ -20,10 +20,9 @@ Port one family per change, in this order (user-visible CAD/CAM first; cloud las
 2. `toolpaths/export-import`
 3. Nested `organizations/:id/*` + `invitations/:token/accept` + `conversation/*`
 4. Remaining `auth` leftovers listed in `11-api-parity-brief.md` (get-session, signin-direct, signup, verify-magic-link)
-5. Marketplace + Polar webhook (local `PaymentProvider`)
-6. Remaining `analytics/*`, `ml/*`
-7. MCP extras and AI proxies — **only** as typed no-op/local adapters unless `27` says the action lives on the catalogue (do not resurrect MCP as a fourth dispatch; spec 27 rejected MCP)
-8. Static leftovers (`/api/og*`, `/api/route`, graphql-playground)
+5. Remaining `analytics/*`, `ml/*`
+6. MCP extras and AI proxies — **only** as typed no-op/local adapters unless `27` says the action lives on the catalogue (do not resurrect MCP as a fourth dispatch; spec 27 rejected MCP)
+7. Static leftovers (`/api/og*`, `/api/route`, graphql-playground)
 
 Append Done/Deviations to `11-api-parity-brief.md`. Do not tick `api-inventory.md`.
 
@@ -45,10 +44,11 @@ bun --no-env-file run --filter @cadcamfun/sidecar typecheck
 bun --no-env-file test packages/api apps/sidecar
 ```
 
-Gate: coverage rises per family; `--strict` is green only when 195/195. Handler parity is HTTP tests, not the coverage script.
+Gate: coverage rises per family; `--strict` is green only when 184/184. Handler parity is HTTP tests, not the coverage script.
 
 ## Change log
 
 - v1: remaining 74 route files, CAD/CAM-adjacent families first.
 - 2026-10-12: scoped AI-02 revision/receipt prerequisite for RM-04 and WP0 generated migration ownership; runtime implementation pending.
 - 2026-10-12: made RM-03 the independent persistence prerequisite for RM-02 consumers and RM-09 acceptance, without a reverse RM-02 dependency. Documentation only; no gate claimed.
+- 2026-10-16: marketplace removed from the product (owner decision); the `/api/marketplace/*` rows and the Polar-webhook deliverable are gone, inventory total is 184.

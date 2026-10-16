@@ -1,6 +1,6 @@
 # Legacy API inventory (source of truth for API parity)
 
-Generated from `.reference/src/pages/api` (195 route files). The v6 sidecar must expose the **same paths, methods, request/response shapes and status codes** under the same `/api` prefix. Methods are detected heuristically (`?` = read the source file); `auth` = route checks a session/token; `sub` = plan-gated; `tables` = Prisma models touched (map to Drizzle tables of the same name, `xTable`).
+Generated from `.reference/src/pages/api` (184 route files). The v6 sidecar must expose the **same paths, methods, request/response shapes and status codes** under the same `/api` prefix. Methods are detected heuristically (`?` = read the source file); `auth` = route checks a session/token; `sub` = plan-gated; `tables` = Prisma models touched (map to Drizzle tables of the same name, `xTable`).
 
 | Route | Methods | Auth | Sub | Tables | Lines | Legacy source |
 |---|---|---|---|---|---|---|
@@ -91,17 +91,6 @@ Generated from `.reference/src/pages/api` (195 route files). The v6 sidecar must
 | `/api/machine-configs/:id/clone` | POST | y |  | machineConfig | 77 | `src/pages/api/machine-configs/[id]/clone.ts` |
 | `/api/machine-configs/:id/storage` | DELETE, GET, POST | y |  | machineConfig | 143 | `src/pages/api/machine-configs/[id]/storage.ts` |
 | `/api/machine-configs/export-import` | GET, POST | y |  | machineConfig, userOrganization | 332 | `src/pages/api/machine-configs/export-import.ts` |
-| `/api/marketplace/checkout` | POST | y |  | marketplaceItem, user | 81 | `src/pages/api/marketplace/checkout.ts` |
-| `/api/marketplace/checkout/route` | GET |  |  |  | 40 | `src/pages/api/marketplace/checkout/route.ts` |
-| `/api/marketplace/config/test` | GET | y |  |  | 87 | `src/pages/api/marketplace/config/test.ts` |
-| `/api/marketplace/items` | GET, POST | y |  | marketplaceItem, marketplaceSeller, user | 345 | `src/pages/api/marketplace/items/index.ts` |
-| `/api/marketplace/items/:id` | DELETE, GET, PUT | y |  | marketplaceItem | 268 | `src/pages/api/marketplace/items/[id]/index.ts` |
-| `/api/marketplace/items/:id/download` | POST | y |  | marketplaceItem, marketplaceOrder | 334 | `src/pages/api/marketplace/items/[id]/download.ts` |
-| `/api/marketplace/orders/:id/download` | POST | y |  | marketplaceOrder | 300 | `src/pages/api/marketplace/orders/[id]/download.ts` |
-| `/api/marketplace/orders/my-purchases` | GET | y |  | marketplaceOrder | 70 | `src/pages/api/marketplace/orders/my-purchases.ts` |
-| `/api/marketplace/seller/dashboard` | GET, PUT | y |  | marketplaceItem, marketplaceOrder, marketplacePayout, marketplaceSeller, user | 352 | `src/pages/api/marketplace/seller/dashboard.ts` |
-| `/api/marketplace/webhooks/polar` | ? |  |  | marketplaceItem, marketplaceOrder, marketplaceSeller | 167 | `src/pages/api/marketplace/webhooks/polar.ts` |
-| `/api/marketplace/wishlist` | DELETE, GET, POST | y |  | marketplaceItem, marketplaceWishlist | 184 | `src/pages/api/marketplace/wishlist.ts` |
 | `/api/materials` | GET, POST | y |  | material, userOrganization | 103 | `src/pages/api/materials/index.ts` |
 | `/api/materials/:id` | DELETE, GET, PUT | y |  | material, userOrganization | 127 | `src/pages/api/materials/[id].ts` |
 | `/api/materials/:id/storage` | DELETE, GET, POST | y |  | material, userOrganization | 169 | `src/pages/api/materials/[id]/storage.ts` |
@@ -187,7 +176,7 @@ Generated from `.reference/src/pages/api` (195 route files). The v6 sidecar must
 | `/api/user/:id` | GET | y |  | user | 62 | `src/pages/api/user/[id].ts` |
 | `/api/user/api-keys` | DELETE, GET, POST | y |  | apiKey | 98 | `src/pages/api/user/api-keys.ts` |
 | `/api/user/components` | GET | y |  | component | 38 | `src/pages/api/user/components.ts` |
-| `/api/user/delete-account` | DELETE | y |  | aIAnalysisLog, account, activityLog, apiKey, authenticator, componentComment, componentVersion, conversationParticipant, costSettings, libraryItem, machineConfig, marketplaceCollection, marketplaceCollectionItem, marketplaceItem, marketplaceOrder, marketplacePayout, marketplaceReview, marketplaceSeller, marketplaceWishlist, material, materialCost, message, notification, operationCost, productionCostEstimate, project, pushSubscription, session, subscription, tool, toolWearCost, toolpath, toolpathComment, toolpathVersion, user, userOrganization | 228 | `src/pages/api/user/delete-account.ts` |
+| `/api/user/delete-account` | DELETE | y |  | aIAnalysisLog, account, activityLog, apiKey, authenticator, componentComment, componentVersion, conversationParticipant, costSettings, libraryItem, machineConfig, material, materialCost, message, notification, operationCost, productionCostEstimate, project, pushSubscription, session, subscription, tool, toolWearCost, toolpath, toolpathComment, toolpathVersion, user, userOrganization | 228 | `src/pages/api/user/delete-account.ts` |
 | `/api/user/organizations` | GET | y |  | userOrganization | 53 | `src/pages/api/user/organizations.ts` |
 | `/api/user/password` | PUT | y |  | account, user | 97 | `src/pages/api/user/password.ts` |
 | `/api/user/profile` | GET, PUT | y |  | user | 218 | `src/pages/api/user/profile.ts` |

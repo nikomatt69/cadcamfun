@@ -58,7 +58,7 @@ Public, versioned, dependency-light package that plugin authors import.
 ## 4. Trust model
 
 - Local development plugins (installed from a folder, flagged `dev: true`) skip signature checks and show a persistent "dev plugin" badge.
-- Packaged plugins must carry an Ed25519 signature over the archive hash; the app ships with a trusted public-key list. Unsigned/unknown-signer plugins can be installed only after an explicit, scary confirmation. (Marketplace is deferred; the same check will apply to it.)
+- Packaged plugins must carry an Ed25519 signature over the archive hash; the app ships with a trusted public-key list. Unsigned/unknown-signer plugins can be installed only after an explicit, scary confirmation.
 
 ## 5. Testing
 

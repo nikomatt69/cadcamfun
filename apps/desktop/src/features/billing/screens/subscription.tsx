@@ -7,6 +7,8 @@
  * the canonical `FREE | BASIC | PRO | ENTERPRISE` the sidecar normalises to. The card reads
  * `GET /api/subscriptions` through the typed client, so `Manage Billing` posts to
  * `POST /api/subscriptions/portal` exactly like the legacy `createBillingPortalSession`.
+ *
+ * Styling is the workstation vocabulary: neutral translucent surfaces, one accent (blue).
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
@@ -31,6 +33,11 @@ const PlanIcon = (props: { readonly plan: string }): JSX.Element => {
   const Icon = icon
   return <Icon class="h-6 w-6 text-blue-600 dark:text-blue-400" />
 }
+
+/** Card surface — the neutral translucent panel of the list pages. */
+const CARD = "rounded-xl border border-slate-200/70 bg-white/80 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60"
+const PRIMARY_BUTTON = "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+const SECONDARY_BUTTON = "inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200/70 bg-white/70 px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
 
 /** The `Subscription` card: current plan, trial banner, limits and the billing actions. */
 function SubscriptionCard(): JSX.Element {
@@ -63,38 +70,38 @@ function SubscriptionCard(): JSX.Element {
   }
 
   return (
-    <div class="rounded-lg bg-white shadow dark:bg-gray-800">
+    <div class={CARD}>
       <div class="px-4 py-5 sm:p-6">
         <div class="mb-6 flex items-center space-x-3">
           <PlanIcon plan={info()?.plan ?? "FREE"} />
-          <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("subscription.card.title")}</h3>
+          <h3 class="text-base font-medium leading-6 text-slate-900 dark:text-white">{t("subscription.card.title")}</h3>
         </div>
 
         <Show when={subscription.loading()}><LoadingState label={t("subscription.card.title")} /></Show>
         <Show when={subscription.error()}><ErrorState label={t("common.error")} detail={subscription.error()} /></Show>
 
         <Show when={isOnTrial() && trialDaysLeft() !== null && (trialDaysLeft() ?? 99) <= 3}>
-          <div class="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-700 dark:bg-yellow-900/20">
+          <div class="mb-6 rounded-lg border border-amber-200/70 bg-amber-50/70 p-4 dark:border-amber-800/50 dark:bg-amber-900/20">
             <div class="flex items-center space-x-2">
-              <AlertTriangle class="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+              <AlertTriangle class="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <p class="text-sm font-medium text-amber-900 dark:text-amber-200">
                 {(trialDaysLeft() ?? 0) === 1
                   ? t("subscription.trialExpiresOne", { days: trialDaysLeft() ?? 0 })
                   : t("subscription.trialExpiresMany", { days: trialDaysLeft() ?? 0 })}
               </p>
             </div>
-            <p class="mt-1 text-sm text-yellow-700 dark:text-yellow-300">{t("subscription.trialUpgrade")}</p>
+            <p class="mt-1 text-sm text-amber-800 dark:text-amber-300">{t("subscription.trialUpgrade")}</p>
           </div>
         </Show>
 
-        <div class="border-t border-gray-200 pt-5 dark:border-gray-700">
+        <div class="border-t border-slate-200/70 pt-5 dark:border-slate-700/50">
           <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
             <div class="sm:col-span-1">
-              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{t("subscription.currentPlan")}</dt>
+              <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">{t("subscription.currentPlan")}</dt>
               <dd class="mt-1 flex items-center space-x-2">
-                <span class="text-sm font-medium text-gray-900 dark:text-white">{features().name || t("subscription.free")}</span>
+                <span class="text-sm font-medium text-slate-900 dark:text-white">{features().name || t("subscription.free")}</span>
                 <Show when={isOnTrial()}>
-                  <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     <Clock class="mr-1 h-3 w-3" />{t("subscription.trial")}
                   </span>
                 </Show>
@@ -102,16 +109,16 @@ function SubscriptionCard(): JSX.Element {
             </div>
 
             <div class="sm:col-span-1">
-              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{t("subscription.status")}</dt>
-              <dd class="mt-1 text-sm capitalize text-gray-900 dark:text-gray-400">
+              <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">{t("subscription.status")}</dt>
+              <dd class="mt-1 text-sm capitalize text-slate-600 dark:text-slate-300">
                 {info()?.cancelAtPeriodEnd ? t("subscription.cancelled") : info()?.status}
               </dd>
             </div>
 
             <Show when={isOnTrial() && info()?.trialEnd}>
               <div class="sm:col-span-1">
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{t("subscription.trialEnds")}</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-gray-400">
+                <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">{t("subscription.trialEnds")}</dt>
+                <dd class="mt-1 text-sm text-slate-600 dark:text-slate-300">
                   {formatDate(info()!.trialEnd!)} ({t("subscription.trialDaysLeft", { days: trialDaysLeft() ?? 0 })})
                 </dd>
               </div>
@@ -119,21 +126,21 @@ function SubscriptionCard(): JSX.Element {
 
             <Show when={!isOnTrial() && info()?.plan !== "FREE" && info()?.periodEnd}>
               <div class="sm:col-span-1">
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{t("subscription.nextBilling")}</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-gray-400">{formatDate(info()!.periodEnd!)}</dd>
+                <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">{t("subscription.nextBilling")}</dt>
+                <dd class="mt-1 text-sm text-slate-600 dark:text-slate-300">{formatDate(info()!.periodEnd!)}</dd>
               </div>
             </Show>
 
             <Show when={info()?.plan !== "FREE" && features().price}>
               <div class="sm:col-span-1">
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{t("subscription.price")}</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-gray-400">{t("subscription.perMonth", { price: features().price })}</dd>
+                <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">{t("subscription.price")}</dt>
+                <dd class="mt-1 text-sm text-slate-600 dark:text-slate-300">{t("subscription.perMonth", { price: features().price })}</dd>
               </div>
             </Show>
 
             <div class="sm:col-span-2">
-              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{t("subscription.features")}</dt>
-              <dd class="mt-1 text-sm text-gray-900 dark:text-gray-400">
+              <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">{t("subscription.features")}</dt>
+              <dd class="mt-1 text-sm text-slate-600 dark:text-slate-300">
                 <ul class="list-disc space-y-1 pl-5">
                   <For each={features().features}>{(feature) => <li>{feature}</li>}</For>
                 </ul>
@@ -141,8 +148,8 @@ function SubscriptionCard(): JSX.Element {
             </div>
 
             <div class="sm:col-span-2">
-              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">{t("subscription.limits")}</dt>
-              <dd class="mt-1 text-sm text-gray-900 dark:text-gray-400">
+              <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">{t("subscription.limits")}</dt>
+              <dd class="mt-1 text-sm text-slate-600 dark:text-slate-300">
                 <ul class="list-disc space-y-1 pl-5">
                   <li>{t("subscription.limitProjects", { value: features().limits.maxProjects === -1 ? t("subscription.unlimited") : features().limits.maxProjects })}</li>
                   <li>{t("subscription.limitComponents", { value: features().limits.maxComponents === -1 ? t("subscription.unlimited") : features().limits.maxComponents })}</li>
@@ -155,12 +162,12 @@ function SubscriptionCard(): JSX.Element {
 
         <div class="mt-8 flex flex-col space-y-3 sm:flex-row sm:justify-end sm:space-x-3 sm:space-y-0">
           <Show when={showManageBilling()}>
-            <button type="button" class="btn btn-outline" disabled={subscription.loading() || billingPending()} onClick={() => void openPortal()}>
+            <button type="button" class={SECONDARY_BUTTON} disabled={subscription.loading() || billingPending()} onClick={() => void openPortal()}>
               {t("subscription.manageBilling")}
             </button>
           </Show>
           <Show when={showUpgradeLink()}>
-            <A class={isOnTrial() ? "btn btn-primary bg-green-600 hover:bg-green-700" : "btn btn-primary"} href="/pricing">
+            <A class={PRIMARY_BUTTON} href="/pricing">
               {isOnTrial() ? t("subscription.upgradeNow") : t("subscription.upgradePlan")}
             </A>
           </Show>
@@ -180,18 +187,18 @@ export function SubscriptionScreen(): JSX.Element {
       title={t("settings.subscription.title")}
       actions={<A class={TOOLBAR_PRIMARY} href="/pricing">{t("settings.subscription.viewPlans")}</A>}
     >
-      <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">{t("settings.subscription.subtitle")}</p>
+      <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">{t("settings.subscription.subtitle")}</p>
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="space-y-6 lg:col-span-3">
           <SubscriptionCard />
           <div class={PANEL}>
             <div>
-              <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("settings.subscription.helpTitle")}</h3>
-              <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+              <h3 class="text-base font-medium leading-6 text-slate-900 dark:text-white">{t("settings.subscription.helpTitle")}</h3>
+              <div class="mt-2 max-w-xl text-sm text-slate-500 dark:text-slate-400">
                 <p>{t("settings.subscription.helpBody")}</p>
               </div>
               <div class="mt-5">
-                <a class="btn btn-outline" href="mailto:nicom.19@icloud.com">{t("settings.subscription.contactSupport")}</a>
+                <a class={SECONDARY_BUTTON} href="mailto:nicom.19@icloud.com">{t("settings.subscription.contactSupport")}</a>
               </div>
             </div>
           </div>

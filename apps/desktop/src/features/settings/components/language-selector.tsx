@@ -46,7 +46,7 @@ export function useLanguage(): { readonly language: Accessor<LanguageCode>; read
   return { language, setLanguage }
 }
 
-/** The legacy `<select>` + icon overlay, classes verbatim. */
+/** The legacy `<select>` + icon overlay, restyled to the design system inputs. */
 export function LanguageSelector(): JSX.Element {
   const { language, setLanguage } = useLanguage()
   return (
@@ -54,12 +54,12 @@ export function LanguageSelector(): JSX.Element {
       <select
         value={language()}
         onChange={(e) => setLanguage(e.currentTarget.value as LanguageCode)}
-        class="block w-full rounded-md border border-gray-300 py-2 pl-10 pr-4 text-base shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+        class="block w-full rounded-md border border-slate-200/70 bg-white/80 py-2 pl-10 pr-4 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
       >
         <For each={Object.entries(SUPPORTED_LANGUAGES)}>{([code, name]) => <option value={code}>{name}</option>}</For>
       </select>
       <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-        <Globe class="h-5 w-5 text-gray-400" aria-hidden="true" />
+        <Globe class="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
       </div>
     </div>
   )

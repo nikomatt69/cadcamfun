@@ -1564,3 +1564,27 @@ html.dark .ui-error-fallback { background: rgba(239, 68, 68, 0.12); border-color
 .ui-theme-toggle-label { line-height: 1; }
 html.dark .ui-theme-toggle { background: rgba(148, 163, 184, 0.16); color: rgb(203, 213, 225); }
 html.dark .ui-theme-toggle-icon { background: rgba(30, 41, 59, 0.6); color: rgb(241, 245, 249); }
+
+/* ---- Focus: the component's own ring wins ----
+   `reference-shell.css`, `page-consistency.css` and `workstation.css` draw the
+   app-wide outline for raw controls; the refined primitives under `shared/ui`
+   draw their own `--ui-ring` instead. Without this rule both land on the same
+   control (outline + ring stacked), so the component style stays authoritative
+   for the controls that define one. `:root` only adds specificity — it wins
+   over the scoped outline rules no matter the stylesheet order. */
+:root :is(
+  .ui-btn,
+  .ui-icon-btn,
+  .ui-modal-close,
+  .ui-sheet-close,
+  .ui-toast-close,
+  .ui-tabs-trigger,
+  .ui-accordion-trigger,
+  .ui-theme-toggle,
+  .ui-menu-item,
+  .ui-switch,
+  .ui-slider-input,
+  .ui-stepper-input
+):focus-visible {
+  outline: none;
+}

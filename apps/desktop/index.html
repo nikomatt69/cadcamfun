@@ -4,9 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CADCAM FUN</title>
+    <script src="/theme-boot.js"></script>
     <style>
       /* Neutral until the app paints; no opaque colour here, so the window material shows through in the desktop app. */
       html, body { margin: 0; font: 16px system-ui, -apple-system, sans-serif; color: #475569; }
+      html.dark, html.dark body { color: #94a3b8; }
       #root:empty::before { content: "Loading…"; position: fixed; inset: 0; display: grid; place-items: center; }
     </style>
   </head>

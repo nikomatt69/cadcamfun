@@ -8,11 +8,13 @@
  * does when the endpoint answers nothing. API tokens come from `GET /api/user/tokens`.
  * `revoke*`/`disconnect*` were already no-ops in legacy (confirm + message + reload),
  * and stay that way here.
+ *
+ * Styling is the workstation vocabulary: neutral translucent surfaces, one accent
+ * (blue), status colours only where they carry meaning.
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
 import {
-  AlertTriangle, CheckCircle, Clock, Database, Key, Laptop, MapPin, Monitor, RefreshCw,
+  AlertTriangle, CheckCircle, Clock, Database, Key, Laptop, MapPin, RefreshCw,
   Shield, Smartphone, Tablet, Trash, Wifi, XCircle
 } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
@@ -85,18 +87,23 @@ const formatTimeAgo = (dateString: string): string => {
 
 const getStatusColor = (status: string): string => {
   switch (status) {
-    case "connected": return "text-green-500"
-    case "disconnected": return "text-gray-500"
-    case "error": return "text-red-500"
-    default: return "text-gray-500"
+    case "connected": return "text-emerald-600 dark:text-emerald-400"
+    case "disconnected": return "text-slate-500 dark:text-slate-400"
+    case "error": return "text-red-600 dark:text-red-400"
+    default: return "text-slate-500 dark:text-slate-400"
   }
 }
 
 const DeviceIcon = (props: { readonly deviceInfo: DeviceInfo }): JSX.Element => {
-  if (props.deviceInfo.isMobile) return <Smartphone class="h-5 w-5 text-green-500" />
-  if (props.deviceInfo.os.includes("iPad")) return <Tablet class="h-5 w-5 text-blue-500" />
-  return <Laptop class="h-5 w-5 text-gray-500" />
+  if (props.deviceInfo.isMobile) return <Smartphone class="h-5 w-5 text-slate-400 dark:text-slate-500" />
+  if (props.deviceInfo.os.includes("iPad")) return <Tablet class="h-5 w-5 text-slate-400 dark:text-slate-500" />
+  return <Laptop class="h-5 w-5 text-slate-400 dark:text-slate-500" />
 }
+
+/** Card surface — the neutral translucent panel of the list pages. */
+const CARD = "rounded-xl border border-slate-200/70 bg-white/80 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60"
+const SECONDARY_BUTTON = "inline-flex items-center gap-2 rounded-lg border border-slate-200/70 bg-white/70 px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-white disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+const ICON_BUTTON = "rounded-md p-1.5 text-slate-400 transition-colors duration-150 ease-out hover:bg-red-50 hover:text-red-600 dark:text-slate-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
 
 export function SessionManagement(): JSX.Element {
   const tokens = useRead((client) => client.user.tokens())
@@ -136,112 +143,92 @@ export function SessionManagement(): JSX.Element {
   }
 
   return (
-    <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} class="space-y-6">
+    <div class="space-y-6">
       {/* Header */}
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center">
-            <Monitor class="h-7 w-7 mr-3 text-blue-500" />
-            {t("settings.sessions.title")}
-          </h2>
-          <p class="text-gray-600 dark:text-gray-400 mt-1">{t("settings.sessions.subtitle")}</p>
+          <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("settings.sessions.title")}</h3>
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.sessions.subtitle")}</p>
         </div>
 
-        <Motion.button
+        <button
+          type="button"
           onClick={reload}
           disabled={tokens.loading()}
-          hover={{ scale: 1.02 }}
-          press={{ scale: 0.98 }}
-          transition={{ duration: 0.2 }}
-          class="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+          class={SECONDARY_BUTTON}
         >
-          <RefreshCw class="h-4 w-4 mr-2" />
+          <RefreshCw class="h-4 w-4" />
           {t("settings.sessions.refresh")}
-        </Motion.button>
+        </button>
       </div>
 
       {/* Messages */}
       <Show when={error() !== undefined}>
-        <Motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.2 }}
-          class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg"
-        >
+        <div class="rounded-lg border border-red-200/70 bg-red-50/70 px-3.5 py-2.5 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300">
           {error()}
-        </Motion.div>
+        </div>
       </Show>
 
       <Show when={success() !== undefined}>
-        <Motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.2 }}
-          class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-lg"
-        >
+        <div class="rounded-lg border border-emerald-200/70 bg-emerald-50/70 px-3.5 py-2.5 text-sm text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300">
           {success()}
-        </Motion.div>
+        </div>
       </Show>
 
       <Show when={tokens.error() !== undefined}>
-        <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
+        <div class="rounded-lg border border-red-200/70 bg-red-50/70 px-3.5 py-2.5 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-900/20 dark:text-red-300">
           <p>{t("settings.sessions.loadFailed")}</p>
-          <p class="mt-1 text-xs font-mono break-all">{tokens.error()}</p>
+          <p class="mt-1 break-all font-mono text-xs">{tokens.error()}</p>
         </div>
       </Show>
 
       {/* Current Session Info */}
-      <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
-        <h3 class="font-semibold text-blue-900 dark:text-blue-200 mb-4 flex items-center">
-          <CheckCircle class="h-5 w-5 mr-2" />
+      <div class={CARD + " p-6"}>
+        <h4 class="mb-4 flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
+          <CheckCircle class="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           {t("settings.sessions.current")}
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        </h4>
+        <div class="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
           <div>
-            <span class="text-blue-700 dark:text-blue-300 font-medium">{t("settings.sessions.device")}</span>
-            <p class="text-blue-600 dark:text-blue-400">{deviceInfo.browser} on {deviceInfo.os}</p>
+            <span class="text-xs font-medium text-slate-500 dark:text-slate-400">{t("settings.sessions.device")}</span>
+            <p class="mt-0.5 text-sm font-medium text-slate-900 dark:text-white">{deviceInfo.browser} on {deviceInfo.os}</p>
           </div>
           <div>
-            <span class="text-blue-700 dark:text-blue-300 font-medium">{t("settings.sessions.loginMethod")}</span>
-            <p class="text-blue-600 dark:text-blue-400 capitalize">{lastLoginMethod || t("settings.sessions.unknown")}</p>
+            <span class="text-xs font-medium text-slate-500 dark:text-slate-400">{t("settings.sessions.loginMethod")}</span>
+            <p class="mt-0.5 text-sm font-medium capitalize text-slate-900 dark:text-white">{lastLoginMethod || t("settings.sessions.unknown")}</p>
           </div>
           <div>
-            <span class="text-blue-700 dark:text-blue-300 font-medium">{t("settings.sessions.expires")}</span>
-            <p class="font-medium text-blue-600 dark:text-blue-400">{t("settings.sessions.never")}</p>
+            <span class="text-xs font-medium text-slate-500 dark:text-slate-400">{t("settings.sessions.expires")}</span>
+            <p class="mt-0.5 text-sm font-medium text-slate-900 dark:text-white">{t("settings.sessions.never")}</p>
           </div>
         </div>
       </div>
 
       {/* Auth Sessions */}
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-            <Shield class="h-5 w-5 mr-2 text-green-500" />
+      <div class={CARD}>
+        <div class="border-b border-slate-200/70 px-6 py-4 dark:border-slate-700/50">
+          <h4 class="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
+            <Shield class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />
             {t("settings.sessions.authTitle", { count: authSessions.length })}
-          </h3>
+          </h4>
         </div>
 
-        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+        <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
           <For each={authSessions}>
-            {(session, index) => (
-              <Motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: index() * 0.1 }}
-                class="p-6 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-              >
+            {(session) => (
+              <div class="flex items-center justify-between p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <div class="flex items-center space-x-4">
                   <DeviceIcon deviceInfo={session.deviceInfo} />
                   <div>
-                    <h4 class="font-medium text-gray-900 dark:text-white flex items-center">
+                    <h5 class="flex items-center font-medium text-slate-900 dark:text-white">
                       {session.deviceInfo.browser} on {session.deviceInfo.os}
                       <Show when={session.isCurrent}>
-                        <span class="ml-2 px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-xs rounded-full">
+                        <span class="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                           {t("settings.sessions.currentBadge")}
                         </span>
                       </Show>
-                    </h4>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                    </h5>
+                    <div class="space-y-1 text-sm text-slate-500 dark:text-slate-400">
                       <p class="flex items-center">
                         <Clock class="h-3 w-3 mr-1" />
                         {t("settings.sessions.lastActive", { when: formatTimeAgo(session.lastActivity) })}
@@ -252,7 +239,7 @@ export function SessionManagement(): JSX.Element {
                           {session.location?.city}, {session.location?.country} ({session.location?.ip})
                         </p>
                       </Show>
-                      <p class="text-xs font-mono text-gray-400">
+                      <p class="font-mono text-xs text-slate-400 dark:text-slate-500">
                         {t("settings.sessions.sessionId", { id: session.id.slice(0, 8) })}
                       </p>
                     </div>
@@ -260,46 +247,39 @@ export function SessionManagement(): JSX.Element {
                 </div>
 
                 <Show when={!session.isCurrent}>
-                  <Motion.button
+                  <button
+                    type="button"
                     onClick={() => revokeAuthSession(session.id)}
-                    hover={{ scale: 1.05 }}
-                    press={{ scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                    class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    class={ICON_BUTTON}
                     title={t("settings.sessions.revokeTitle")}
                   >
                     <Trash class="h-4 w-4" />
-                  </Motion.button>
+                  </button>
                 </Show>
-              </Motion.div>
+              </div>
             )}
           </For>
         </div>
       </div>
 
       {/* MCP Sessions */}
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-            <Database class="h-5 w-5 mr-2 text-purple-500" />
+      <div class={CARD}>
+        <div class="border-b border-slate-200/70 px-6 py-4 dark:border-slate-700/50">
+          <h4 class="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
+            <Database class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />
             {t("settings.sessions.mcpTitle", { count: mcpSessions.length })}
-          </h3>
+          </h4>
         </div>
 
-        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+        <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
           <For each={mcpSessions}>
-            {(session, index) => (
-              <Motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: index() * 0.1 }}
-                class="p-6 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-              >
+            {(session) => (
+              <div class="flex items-center justify-between p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <div class="flex items-center space-x-4">
                   <Wifi class={`h-5 w-5 ${getStatusColor(session.status)}`} />
                   <div>
-                    <h4 class="font-medium text-gray-900 dark:text-white">{session.serverName}</h4>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                    <h5 class="font-medium text-slate-900 dark:text-white">{session.serverName}</h5>
+                    <div class="space-y-1 text-sm text-slate-500 dark:text-slate-400">
                       <p class="flex items-center">
                         {t("settings.sessions.status")}
                         <span class={`ml-1 font-medium ${getStatusColor(session.status)}`}>{session.status}</span>
@@ -311,59 +291,52 @@ export function SessionManagement(): JSX.Element {
                   </div>
                 </div>
 
-                <Motion.button
+                <button
+                  type="button"
                   onClick={() => disconnectMcpSession(session.id)}
-                  hover={{ scale: 1.05 }}
-                  press={{ scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                  class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  class={ICON_BUTTON}
                   title={t("settings.sessions.disconnectTitle")}
                 >
                   <XCircle class="h-4 w-4" />
-                </Motion.button>
-              </Motion.div>
+                </button>
+              </div>
             )}
           </For>
         </div>
       </div>
 
       {/* API Tokens */}
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-            <Key class="h-5 w-5 mr-2 text-yellow-500" />
+      <div class={CARD}>
+        <div class="border-b border-slate-200/70 px-6 py-4 dark:border-slate-700/50">
+          <h4 class="flex items-center text-sm font-medium text-slate-700 dark:text-slate-300">
+            <Key class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />
             {t("settings.sessions.tokensTitle", { count: apiTokens().length })}
-          </h3>
+          </h4>
         </div>
 
         <Show when={tokens.loading()}>
           <div class="p-8 text-center">
-            <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4 animate-spin" />
-            <p class="text-gray-500 dark:text-gray-400">{t("settings.sessions.loading")}</p>
+            <div class="mx-auto mb-4 h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600 dark:border-slate-700 dark:border-t-blue-500" />
+            <p class="text-sm text-slate-500 dark:text-slate-400">{t("settings.sessions.loading")}</p>
           </div>
         </Show>
 
-        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+        <div class="divide-y divide-slate-200/70 dark:divide-slate-700/50">
           <For each={apiTokens()}>
-            {(token, index) => (
-              <Motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: index() * 0.1 }}
-                class="p-6 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-              >
+            {(token) => (
+              <div class="flex items-center justify-between p-6 transition-colors duration-150 ease-out hover:bg-slate-50 dark:hover:bg-slate-800/40">
                 <div class="flex items-center space-x-4">
-                  <Key class={`h-5 w-5 ${token.isActive ? "text-green-500" : "text-gray-400"}`} />
+                  <Key class={`h-5 w-5 ${token.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`} />
                   <div>
-                    <h4 class="font-medium text-gray-900 dark:text-white flex items-center">
+                    <h5 class="flex items-center font-medium text-slate-900 dark:text-white">
                       {token.name}
                       <Show when={!token.isActive}>
-                        <span class="ml-2 px-2 py-1 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs rounded-full">
+                        <span class="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                           {t("settings.sessions.inactive")}
                         </span>
                       </Show>
-                    </h4>
-                    <div class="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                    </h5>
+                    <div class="space-y-1 text-sm text-slate-500 dark:text-slate-400">
                       <p class="font-mono">{token.prefix}...</p>
                       <p>{t("settings.sessions.created", { when: formatTimeAgo(token.createdAt) })}</p>
                       <Show when={token.lastUsed !== undefined}>
@@ -377,29 +350,27 @@ export function SessionManagement(): JSX.Element {
                   </div>
                 </div>
 
-                <Motion.button
+                <button
+                  type="button"
                   onClick={() => revokeApiToken(token.id)}
-                  hover={{ scale: 1.05 }}
-                  press={{ scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                  class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  class={ICON_BUTTON}
                   title={t("settings.sessions.revokeTokenTitle")}
                 >
                   <Trash class="h-4 w-4" />
-                </Motion.button>
-              </Motion.div>
+                </button>
+              </div>
             )}
           </For>
         </div>
       </div>
 
       {/* Security Tips */}
-      <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
-        <h3 class="font-semibold text-amber-900 dark:text-amber-200 mb-3 flex items-center">
-          <AlertTriangle class="h-5 w-5 mr-2" />
+      <div class="rounded-xl border border-amber-200/70 bg-amber-50/70 p-6 dark:border-amber-800/50 dark:bg-amber-900/20">
+        <h4 class="mb-3 flex items-center text-sm font-medium text-amber-900 dark:text-amber-200">
+          <AlertTriangle class="h-4 w-4 mr-2" />
           {t("settings.sessions.tips")}
-        </h3>
-        <ul class="text-amber-800 dark:text-amber-300 text-sm space-y-2">
+        </h4>
+        <ul class="space-y-2 text-sm text-amber-800 dark:text-amber-300">
           <li>• Regularly review and revoke unused sessions and tokens</li>
           <li>• Sign out of sessions on shared or public devices</li>
           <li>• Use API tokens with minimal required permissions</li>
@@ -407,6 +378,6 @@ export function SessionManagement(): JSX.Element {
           <li>• Set appropriate expiration dates for API tokens</li>
         </ul>
       </div>
-    </Motion.div>
+    </div>
   )
 }

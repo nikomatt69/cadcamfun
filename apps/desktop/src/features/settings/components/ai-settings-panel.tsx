@@ -1,6 +1,5 @@
 /** AI settings reuse the shell AI provider; non-secret preferences live in sidecar KV. */
 import { Show, createSignal, onMount, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
 import {
   AlertTriangle, Clock, Cpu, Database, DollarSign, RefreshCw, Save, Server, Shield, Sliders, Zap
 } from "lucide-solid"
@@ -147,26 +146,24 @@ export function AISettingsPanel(): JSX.Element {
 
   return (
     <div class="p-4 space-y-6">
-      <div class="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
-        <h2 class="text-lg font-semibold flex items-center">
-          <Sliders class="mr-2 text-blue-500" size={20} />
+      <div class="flex items-center justify-between border-b border-slate-200/70 pb-4 dark:border-slate-700/50">
+        <h3 class="flex items-center text-lg font-medium leading-6 text-slate-900 dark:text-white">
+          <Sliders class="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           {t("settings.ai.title")}
-        </h2>
+        </h3>
 
         <div class="flex space-x-2">
-          <Motion.button
+          <button
+            type="button"
             onClick={() => void handleSaveSettings()}
             disabled={isSaving() || isLoading()}
-            hover={{ scale: 1.02 }}
-            press={{ scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            class="flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+            class="inline-flex items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors duration-150 ease-out hover:bg-blue-700 disabled:opacity-50"
           >
             {isSaving()
               ? <RefreshCw size={14} class="mr-1.5 animate-spin" />
               : <Save size={14} class="mr-1.5" />}
             {t("settings.ai.save")}
-          </Motion.button>
+          </button>
         </div>
       </div>
 
@@ -327,19 +324,17 @@ export function AISettingsPanel(): JSX.Element {
                   </div>
 
                   <div class="pt-2">
-                    <Motion.button
+                    <button
+                      type="button"
                       onClick={() => void runMcpTest()}
                       disabled={mcpTestStatus() === "testing"}
-                      hover={{ scale: 1.02 }}
-                      press={{ scale: 0.98 }}
-                      transition={{ duration: 0.2 }}
-                      class="flex items-center text-sm px-3 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800"
+                      class="inline-flex items-center rounded-lg border border-slate-200/70 bg-white/70 px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-colors duration-150 ease-out hover:bg-white disabled:opacity-50 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800/70"
                     >
                       {mcpTestStatus() === "testing"
                         ? <RefreshCw size={14} class="mr-1.5 animate-spin" />
                         : <Server size={14} class="mr-1.5" />}
                       {t("settings.ai.mcpTest")}
-                    </Motion.button>
+                    </button>
 
                     <Show when={mcpTestStatus() !== "idle" && mcpTestResult() !== undefined}>
                       <div

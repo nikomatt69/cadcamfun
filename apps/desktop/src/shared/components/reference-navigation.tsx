@@ -6,19 +6,16 @@ import Grid from "lucide-solid/icons/grid-2x2"
 import Tool from "lucide-solid/icons/wrench"
 import Package from "lucide-solid/icons/package"
 import Users from "lucide-solid/icons/users"
-import ShoppingBag from "lucide-solid/icons/shopping-bag"
 import Puzzle from "lucide-solid/icons/puzzle"
 import Globe from "lucide-solid/icons/globe"
 import DollarSign from "lucide-solid/icons/dollar-sign"
 import Cpu from "lucide-solid/icons/cpu"
 import BarChart from "lucide-solid/icons/chart-no-axes-column"
-import BookOpen from "lucide-solid/icons/book-open"
 import Settings from "lucide-solid/icons/settings"
 import User from "lucide-solid/icons/user"
 import Database from "lucide-solid/icons/database"
 import Server from "lucide-solid/icons/server"
 import PlusSquare from "lucide-solid/icons/square-plus"
-import TrendingUp from "lucide-solid/icons/trending-up"
 import Activity from "lucide-solid/icons/activity"
 import CreditCard from "lucide-solid/icons/credit-card"
 import ChevronDown from "lucide-solid/icons/chevron-down"
@@ -61,11 +58,6 @@ const navigation: ReadonlyArray<NavItem> = [
     { key: "shell.tools", href: "/tools", icon: Tool }
   ] },
   { key: "shell.organization", href: "/organizations", icon: Users },
-  { key: "shell.marketplace", href: "/marketplace", icon: ShoppingBag, children: [
-    { key: "shell.browseItems", href: "/marketplace", icon: ShoppingBag },
-    { key: "shell.sellerDashboard", href: "/marketplace/seller/dashboard", icon: TrendingUp },
-    { key: "shell.purchases", href: "/marketplace/purchases", icon: Package }
-  ] },
   { key: "shell.plugins", href: "/plugins", icon: Puzzle },
   { key: "shell.website", href: "https://cadcam.fun", icon: Globe },
   { key: "shell.pricing", href: "/pricing", icon: DollarSign },
@@ -73,10 +65,6 @@ const navigation: ReadonlyArray<NavItem> = [
   { key: "shell.analytics", href: "/analytics", icon: BarChart, children: [
     { key: "shell.dashboard", href: "/analytics", icon: BarChart },
     { key: "shell.history", href: "/analytics/history", icon: Activity }
-  ] },
-  { key: "shell.docs", href: "https://cadcam.fun/docs", icon: BookOpen, children: [
-    { key: "shell.userGuide", href: "https://cadcam.fun/docs", icon: FileText },
-    { key: "shell.apiPlayground", href: "https://cadcam.fun/docs", icon: Cpu }
   ] },
   { key: "shell.settings", href: "/settings", icon: Settings, children: [
     { key: "shell.profile", href: "/profile", icon: User },
@@ -153,8 +141,7 @@ export function ReferenceNavbar(props: { readonly sidebarOpen: boolean; readonly
               { href: "/profile", key: "shell.myProfile" as const, icon: User },
               { href: "/settings", key: "shell.settings" as const, icon: Settings },
               { href: "/organizations", key: "shell.organizations" as const, icon: Users },
-              { href: "https://cadcam.fun", key: "shell.website" as const, icon: Globe },
-              { href: "https://cadcam.fun/docs", key: "shell.documentation" as const, icon: BookOpen }
+              { href: "https://cadcam.fun", key: "shell.website" as const, icon: Globe }
             ]}>{(item) => <ReferenceLink href={item.href} class="reference-profile-link" onNavigate={close}><item.icon size={16} /><span>{t(item.key)}</span></ReferenceLink>}</For>
             <Show when={signedIn()} fallback={<ReferenceLink href="/auth/signin" class="reference-profile-link" onNavigate={close}><LogIn size={16} /><span>{t("shell.signIn")}</span></ReferenceLink>}>
               <button type="button" class="reference-profile-link w-[calc(100%-1rem)] text-left" data-testid="sign-out" onClick={() => void signOut()}><LogOut size={16} /><span>{t("shell.signOut")}</span></button>

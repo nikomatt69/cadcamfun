@@ -20,7 +20,7 @@ const FEATURES = [
   "cad_3d_modeling", "cad_assemblies", "cad_parametric", "cad_simulation", "cam_basic", "cam_advanced", "cam_multiaxis",
   "cam_toolpath_optimization", "export_step", "export_iges", "export_stl", "export_gcode", "export_pdf", "import_advanced",
   "real_time_collaboration", "team_management", "project_sharing", "comments_annotations", "cloud_storage", "unlimited_projects",
-  "large_file_support", "marketplace_access", "custom_plugins", "third_party_integrations", "advanced_analytics", "usage_reports",
+  "large_file_support", "custom_plugins", "third_party_integrations", "advanced_analytics", "usage_reports",
   "performance_monitoring", "priority_support", "dedicated_support", "training_resources", "api_access", "webhook_support", "custom_branding"
 ]
 /** Same rules as the legacy `BetterAuthStripeService.hasFeatureAccess`. */

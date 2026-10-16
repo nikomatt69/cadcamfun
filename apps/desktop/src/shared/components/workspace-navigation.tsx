@@ -2,7 +2,7 @@ import { For, Show, createSignal, type JSX } from "solid-js"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { Motion, Presence } from "solid-motionone"
 import {
-  Activity, BarChart2, BookOpen, BrainCircuit, ChevronDown, ChevronUp, Cpu, CreditCard, Database,
+  Activity, BarChart2, ChevronDown, ChevronUp, Cpu, CreditCard, Database,
   DollarSign, FileText, Globe, Home, Package, Puzzle, Server, Settings, SquarePlus, User, Users, Wrench, LayoutGrid
 } from "lucide-solid"
 
@@ -50,13 +50,6 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
       children: [
         { name: "Dashboard", href: "/analytics", icon: <BarChart2 size={16} />, current: path() === "/analytics" },
         { name: "Activity History", href: "/analytics/history", icon: <Activity size={16} />, current: path() === "/analytics/history" }
-      ]
-    },
-    {
-      name: "Docs", href: "#", icon: <BookOpen size={20} />, current: false,
-      children: [
-        { name: "UserGuide", href: "https://cadcam.fun/docs", icon: <FileText size={16} />, current: false },
-        { name: "Api Playground", href: "/graphql", icon: <BrainCircuit size={16} />, current: path() === "/graphql" }
       ]
     },
     {

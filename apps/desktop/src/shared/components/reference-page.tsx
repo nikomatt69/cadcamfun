@@ -7,14 +7,14 @@ const labels: Readonly<Record<string, Key>> = {
   projects: "shell.projects", cad: "shell.cad", cam: "shell.cam", library: "shell.resources",
   toolpaths: "shell.toolpaths", components: "shell.components", materials: "shell.materials",
   machine: "shell.configurations", tools: "shell.tools", organizations: "shell.organizations",
-  marketplace: "shell.marketplace", plugins: "shell.plugins", pricing: "shell.pricing",
+  plugins: "shell.plugins", pricing: "shell.pricing",
   ai: "shell.ai", analytics: "shell.analytics", history: "shell.history", settings: "shell.settings",
-  profile: "shell.profile", subscription: "shell.subscription", purchases: "shell.purchases"
+  profile: "shell.profile", subscription: "shell.subscription"
 }
 
 export const referenceLayout = (pathname: string): "workspace" | "standalone" | "page" => {
   if (pathname === "/cad" || pathname === "/cam") return "workspace"
-  if (pathname.startsWith("/auth/") || pathname.startsWith("/invitations/") || ["/404", "/500", "/offline", "/marketplace/purchase/success"].includes(pathname)) return "standalone"
+  if (pathname.startsWith("/auth/") || pathname.startsWith("/invitations/") || ["/404", "/500", "/offline"].includes(pathname)) return "standalone"
   return "page"
 }
 
