@@ -51012,8 +51012,24 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "exclusiveMinimum": 0,
                         "type": "number",
                       },
+                      "buildHeight": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
                       "centerOnBed": {
                         "type": "boolean",
+                      },
+                      "chuckType": {
+                        "enum": [
+                          "3-jaw",
+                          "4-jaw",
+                          "collet",
+                        ],
+                        "type": "string",
+                      },
+                      "clampDepth": {
+                        "minimum": 0,
+                        "type": "number",
                       },
                       "coolant": {
                         "type": "boolean",
@@ -51087,6 +51103,17 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "flutes": {
                         "exclusiveMinimum": 0,
                         "type": "integer",
+                      },
+                      "gripLength": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "latheTurret": {
+                        "enum": [
+                          "rear",
+                          "front",
+                        ],
+                        "type": "string",
                       },
                       "latheZero": {
                         "enum": [
@@ -51181,6 +51208,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "originZ": {
                         "type": "number",
                       },
+                      "parallelsHeight": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
                       "plungerate": {
                         "exclusiveMinimum": 0,
                         "type": "number",
@@ -51192,6 +51223,15 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "printTemperature": {
                         "exclusiveMinimum": 0,
                         "type": "number",
+                      },
+                      "printerKinematics": {
+                        "enum": [
+                          "cartesian",
+                          "corexy",
+                          "bed-slinger",
+                          "delta",
+                        ],
+                        "type": "string",
                       },
                       "probeCycle": {
                         "enum": [
@@ -51267,6 +51307,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "maximum": 100,
                         "type": "number",
                       },
+                      "stockBore": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
                       "stockDiameter": {
                         "exclusiveMinimum": 0,
                         "type": "number",
@@ -51290,6 +51334,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "steep-shallow",
                         ],
                         "type": "string",
+                      },
+                      "tailstock": {
+                        "type": "boolean",
                       },
                       "threadHand": {
                         "enum": [
@@ -51384,6 +51431,17 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "useToolCompensation": {
                         "type": "boolean",
                       },
+                      "viseJawAxis": {
+                        "enum": [
+                          "x",
+                          "y",
+                        ],
+                        "type": "string",
+                      },
+                      "viseJawHeight": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
                       "workOffset": {
                         "enum": [
                           "G54",
@@ -51394,6 +51452,18 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "G59",
                         ],
                         "type": "string",
+                      },
+                      "workholding": {
+                        "enum": [
+                          "vise",
+                          "clamps",
+                          "plate",
+                          "none",
+                        ],
+                        "type": "string",
+                      },
+                      "workholdingConfigured": {
+                        "type": "boolean",
                       },
                     },
                     "type": "object",
@@ -55144,6 +55214,156 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "motion": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "paths": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "count": {
+                                "minimum": 0,
+                                "type": "integer",
+                              },
+                              "extrude": {
+                                "items": {
+                                  "type": "number",
+                                },
+                                "type": "array",
+                              },
+                              "homes": {
+                                "items": {
+                                  "minimum": 0,
+                                  "type": "integer",
+                                },
+                                "type": "array",
+                              },
+                              "lines": {
+                                "items": {
+                                  "minimum": 0,
+                                  "type": "integer",
+                                },
+                                "type": "array",
+                              },
+                              "retracts": {
+                                "items": {
+                                  "minimum": 0,
+                                  "type": "integer",
+                                },
+                                "type": "array",
+                              },
+                              "rpm": {
+                                "items": {
+                                  "type": "number",
+                                },
+                                "type": "array",
+                              },
+                              "runs": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "coolant": {
+                                      "enum": [
+                                        "off",
+                                        "flood",
+                                        "mist",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "css": {
+                                      "type": "boolean",
+                                    },
+                                    "feedMode": {
+                                      "enum": [
+                                        "min",
+                                        "rev",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "plane": {
+                                      "enum": [
+                                        17,
+                                        18,
+                                        19,
+                                      ],
+                                      "type": "number",
+                                    },
+                                    "rpm": {
+                                      "type": "number",
+                                    },
+                                    "spindle": {
+                                      "enum": [
+                                        "cw",
+                                        "ccw",
+                                        "off",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "start": {
+                                      "minimum": 0,
+                                      "type": "integer",
+                                    },
+                                    "tool": {
+                                      "type": "integer",
+                                    },
+                                    "xMode": {
+                                      "enum": [
+                                        "diameter",
+                                        "radius",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "start",
+                                    "spindle",
+                                    "rpm",
+                                    "css",
+                                    "plane",
+                                    "xMode",
+                                    "coolant",
+                                    "feedMode",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
+                              },
+                            },
+                            "required": [
+                              "count",
+                              "runs",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "unsupported": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "line": {
+                                "minimum": 0,
+                                "type": "integer",
+                              },
+                              "word": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "line",
+                              "word",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                      },
+                      "required": [
+                        "paths",
+                        "unsupported",
+                      ],
+                      "type": "object",
+                    },
                     "program": {
                       "additionalProperties": false,
                       "properties": {
@@ -55830,8 +56050,24 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "exclusiveMinimum": 0,
                         "type": "number",
                       },
+                      "buildHeight": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
                       "centerOnBed": {
                         "type": "boolean",
+                      },
+                      "chuckType": {
+                        "enum": [
+                          "3-jaw",
+                          "4-jaw",
+                          "collet",
+                        ],
+                        "type": "string",
+                      },
+                      "clampDepth": {
+                        "minimum": 0,
+                        "type": "number",
                       },
                       "coolant": {
                         "type": "boolean",
@@ -55905,6 +56141,17 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "flutes": {
                         "exclusiveMinimum": 0,
                         "type": "integer",
+                      },
+                      "gripLength": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "latheTurret": {
+                        "enum": [
+                          "rear",
+                          "front",
+                        ],
+                        "type": "string",
                       },
                       "latheZero": {
                         "enum": [
@@ -55999,6 +56246,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "originZ": {
                         "type": "number",
                       },
+                      "parallelsHeight": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
                       "plungerate": {
                         "exclusiveMinimum": 0,
                         "type": "number",
@@ -56010,6 +56261,15 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "printTemperature": {
                         "exclusiveMinimum": 0,
                         "type": "number",
+                      },
+                      "printerKinematics": {
+                        "enum": [
+                          "cartesian",
+                          "corexy",
+                          "bed-slinger",
+                          "delta",
+                        ],
+                        "type": "string",
                       },
                       "probeCycle": {
                         "enum": [
@@ -56085,6 +56345,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "maximum": 100,
                         "type": "number",
                       },
+                      "stockBore": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
                       "stockDiameter": {
                         "exclusiveMinimum": 0,
                         "type": "number",
@@ -56108,6 +56372,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "steep-shallow",
                         ],
                         "type": "string",
+                      },
+                      "tailstock": {
+                        "type": "boolean",
                       },
                       "threadHand": {
                         "enum": [
@@ -56202,6 +56469,17 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "useToolCompensation": {
                         "type": "boolean",
                       },
+                      "viseJawAxis": {
+                        "enum": [
+                          "x",
+                          "y",
+                        ],
+                        "type": "string",
+                      },
+                      "viseJawHeight": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
                       "workOffset": {
                         "enum": [
                           "G54",
@@ -56212,6 +56490,18 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "G59",
                         ],
                         "type": "string",
+                      },
+                      "workholding": {
+                        "enum": [
+                          "vise",
+                          "clamps",
+                          "plate",
+                          "none",
+                        ],
+                        "type": "string",
+                      },
+                      "workholdingConfigured": {
+                        "type": "boolean",
                       },
                     },
                     "type": "object",

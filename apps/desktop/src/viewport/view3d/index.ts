@@ -2,3 +2,4 @@ export { View3D, type View3DProps, type ViewPreset, type RenderMode, type Transf
 export * from "./playback.ts"
 export * from "./toolpath-overlays.ts"
 export { solidsFromProfiles } from "./modeling.ts"
+export { createMachineScene, DEFAULT_MACHINE_DISPLAY, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"

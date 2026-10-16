@@ -91,11 +91,11 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `cam.plan_check` | read | — | operations*, expectedRevision | handler `validateMachiningPlan` → `apps/sidecar/src/services/ai.ts:288` | yes | declared | ai-cad-to-gcode-e2e.test.ts |
 | `cam.review` | read | — | operationId* | handler `reviewOperation` → `apps/sidecar/src/services/ai.ts:327` | yes | declared | ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-verify-binding.test.ts |
-| `cam.machine` (was `cam_describe_machine`) | read | — | machineType* | local (core cam.kinematicsOf) — `packages/ai/src/actions/cam.ts` | yes | declared | ai-cam-chain.test.ts |
+| `cam.machine` (was `cam_describe_machine`) | read | — | machineType*, gcode, operationId, params, at | handler `operationProgram` → `apps/sidecar/src/services/ai.ts:768` | yes | declared | machine-kinematics.test.ts, ai-cam-chain.test.ts |
 | `cam.operations` (was `cam_list_operations`) | read | — | — | handler `listOperations` → `apps/sidecar/src/services/ai.ts:683` | yes | declared | cam-wire.test.ts, tool-definitions.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts |
 | `cam.suggest` (was `cam_suggest_parameters`) | read | — | params | handler `suggestParameters` → `apps/sidecar/src/services/ai.ts:724` | yes | declared | ai-cam-tools.test.ts |
 | `cam.compare_setups` (was `cam_suggest_parameters`) | read | — | candidates* | handler `compareSetups` → `apps/sidecar/src/services/ai.ts:730` | yes | declared | cam-wire.test.ts, ai-stock-inspection.test.ts |
-| `cam.analyze` (was `cam_analyze_gcode`) | read | — | gcode, operationId, machineType | **handler `machine`: implementation not found**<br>handler `operationProgram` → `apps/sidecar/src/services/ai.ts:768` | yes | declared | ai-cad-to-gcode-e2e.test.ts, ai-streaming-performance.test.ts, ai-timeline.test.ts, ai-tool-views.test.ts |
+| `cam.analyze` (was `cam_analyze_gcode`) | read | — | gcode, operationId, machineType | **handler `machine`: implementation not found**<br>handler `operationProgram` → `apps/sidecar/src/services/ai.ts:768` | yes | declared | machine-kinematics.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-streaming-performance.test.ts, ai-timeline.test.ts, ai-tool-views.test.ts |
 | `cam.stock` (was `cam_stock`) | read | — | — | handler `stock` → `apps/sidecar/src/services/ai.ts:353`, `apps/sidecar/src/services/ai.ts:845` | yes | declared | cam-wire.test.ts, ai-stock-inspection.test.ts |
 | `cam.vision` (was `cam_vision`) | read | interface | focus | handler `vision` → `apps/sidecar/src/services/ai.ts:477` | yes | declared | ai-cam-chain.test.ts |
 | `cam.chain_suggest` (was `cam_operations_suggest_chain`) | read | — | fromOperationId, materialHint, toolHint | handler `suggestChain` → `apps/sidecar/src/services/ai.ts:1013` | yes | declared | ai-cam-chain.test.ts |
@@ -288,7 +288,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `drilling-and-holes` | cam | 788 | — |
 | `precision-and-tolerances` | cam | 2197 | cam_edit |
 | `industrial-standards` | cad | 5993 | cad, library, parts |
-| `machines-and-axes` | cam | 2205 | cam, cam_edit, parts |
+| `machines-and-axes` | cam | 4957 | cam, cam_edit, parts |
 | `drawings-and-images` | cad | 2381 | cad, cad_edit, parts |
 | `plugin-authoring` | dev | 1659 | — |
 | `parametric-design` | cad | 6710 | cad, cad_edit, parts, vcs_edit |
@@ -298,7 +298,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `workflows-cadcam` | workflows | 1468 | cam, vcs_edit |
 | `machining-cycle-presets` | cam | 1320 | cam, cam_edit, library |
 | `project-auto-memory` | general | 904 | memory, memory_edit |
-| `stock-and-fixtures` | cam | 644 | — |
+| `stock-and-fixtures` | cam | 837 | — |
 
 ## Composer commands (`apps/desktop/src/features/ai/lib/commands.ts`)
 

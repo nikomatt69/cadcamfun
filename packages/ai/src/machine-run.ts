@@ -1,0 +1,91 @@
+/**
+ * How a program runs on its machine, for the assistant (spec 31 §7): the same timeline, set-up, bodies and checks the CAM
+ * preview draws, as data. What turns and in which sense, where the tool is at a given time (program and preview
+ * coordinates, spindle, line), the set-up findings (vise jaws, chuck, bed), and the result so far: the turned part on a lathe,
+ * the deposited layers on a printer. Pure: it never touches the project.
+ */
+import { Schema } from "effect"
+import { cam } from "@cadcamfun/core"
+
+export interface MachineRunInput {
+  readonly kind: cam.MachineKind
+  readonly gcode: string
+  /** Generator settings laid over the machine's defaults (workholding, turret, grip, bed...). A `stock` key is the mill stock. */
+  readonly params?: Readonly<Record<string, unknown>>
+  /** Seconds into the program for the pose; the end when absent. */
+  readonly at?: number
+}
+
+const round = (n: number) => Math.round(n * 1000) / 1000
+const point = (p: { readonly x: number; readonly y: number; readonly z: number }) => ({ x: round(p.x), y: round(p.y), z: round(p.z) })
+
+export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
+  const { stock: stockParam, ...rest } = (input.params ?? {}) as Record<string, unknown>
+  let settings: cam.generator.ToolpathSettings
+  try { settings = cam.generator.withMachineDefaults(cam.generator.decodeSettings({ ...rest, machineType: input.kind })) }
+  catch (cause) { return { ok: false, error: `params are not valid generator settings: ${cause instanceof Error ? cause.message.slice(0, 300) : String(cause)}` } }
+  const analysis = cam.generator.analyseGcode(input.gcode)
+  const timeline = cam.viewer.buildTimeline(analysis.program, analysis.motion)
+  // The mill stock: given, else a box round the cutting moves (top at the highest cut, at least Z0).
+  let stock: cam.generator.Stock
+  if (stockParam !== undefined) {
+    try { stock = Schema.decodeUnknownSync(cam.generator.StockSchema)(stockParam) } catch { return { ok: false, error: "params.stock must be { width, height, depth, x?, y?, topZ? } in mm" } }
+  } else {
+    const cuts = timeline.moves.filter((m) => m.kind === "feed")
+    const xs = cuts.flatMap((m) => [m.from.x, m.to.x]), ys = cuts.flatMap((m) => [m.from.y, m.to.y]), zs = cuts.flatMap((m) => [m.from.z, m.to.z])
+    const margin = settings.toolDiameter + 2
+    const top = Math.max(0, ...zs)
+    stock = xs.length === 0
+      ? { width: 100, height: 100, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 }
+      : { width: Math.max(...xs) - Math.min(...xs) + 2 * margin, height: Math.max(...ys) - Math.min(...ys) + 2 * margin, depth: Math.max(1, top - Math.min(...zs) + 5), radius: 0, x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2, topZ: top, allowance: 0 }
+  }
+  const setup = cam.viewer.setupOf(input.kind, settings, stock)
+  const at = Math.min(timeline.duration, Math.max(0, input.at ?? timeline.duration))
+  const pose = cam.viewer.poseAt(timeline, at)
+  const sense = pose.state === undefined || pose.state.spindle === "off" ? 0 : cam.viewer.spinSense(input.kind, pose.state.spindle)
+  const findings = cam.viewer.checkSetup(setup, timeline, { radius: settings.toolDiameter / 2, length: Math.max(20, 3 * settings.toolDiameter + 10) })
+  const { axes, rotary } = cam.viewer.displayAxes(setup)
+  const out: Record<string, unknown> = {
+    ok: true,
+    machine: input.kind,
+    turns: cam.KINEMATICS[input.kind].rotates,
+    axes: axes.map((a) => ({ name: a.name, display: a.direction, moves: a.moves, positive: a.positive })),
+    ...(rotary !== undefined ? { rotary: rotary.name } : {}),
+    setup: { ...setup, assumedParts: setup.assumed },
+    setupProblems: cam.viewer.validateMachineSetup(setup),
+    duration: round(timeline.duration),
+    moves: timeline.moves.length,
+    pose: {
+      seconds: round(at),
+      program: point(pose.point),
+      preview: point(cam.viewer.displayPoint(setup, pose.point, pose.state?.xMode)),
+      ...(pose.state !== undefined ? { spindle: pose.state.spindle, rpm: Math.round(pose.state.rpm), plane: `G${pose.state.plane}`, xMode: pose.state.xMode, extrude: round(pose.state.extrude), ...(pose.state.line !== undefined ? { line: pose.state.line } : {}), ...(pose.state.tool !== undefined ? { tool: pose.state.tool } : {}) } : {}),
+      rotation: sense === 0 ? "nothing turns" : cam.viewer.spinSenseText(input.kind, pose.state!.spindle as "cw" | "ccw"),
+      displaySpin: round(cam.viewer.spinAngleAt(timeline, input.kind, cam.viewer.spinTable(timeline, input.kind), at))
+    },
+    findings: findings.slice(0, 20).map((f) => ({ code: f.code, severity: f.severity, assumed: f.assumed, ...(f.line !== undefined ? { line: f.line } : {}), count: f.count, message: f.message })),
+    unsupported: analysis.motion.unsupported.slice(0, 20)
+  }
+  if (setup.kind === "lathe") {
+    const runs = cam.viewer.profileRuns(cam.viewer.turnedProfileAt(setup, timeline, at), 0.01)
+    out["turnedPart"] = {
+      note: "point tool (nose radius 0); Z of the program, diameters",
+      sections: runs.slice(0, 60).map((r) => ({ zFrom: round(r.x0), zTo: round(r.x1), diameter: round(2 * r.outer), bore: round(2 * r.inner) })),
+      ...(runs.length > 60 ? { more: runs.length - 60 } : {})
+    }
+  }
+  if (setup.kind === "3dprinter") {
+    const deposits = cam.viewer.printerDeposits(timeline, setup.layerHeight)
+    const laid = cam.viewer.depositedAt(deposits, timeline, at)
+    out["print"] = {
+      layers: deposits.layers.length,
+      ...(deposits.layers.length > 0 ? { firstZ: round(deposits.layers[0]!), lastZ: round(deposits.layers[deposits.layers.length - 1]!) } : {}),
+      beads: deposits.beads.length,
+      depositedBeads: laid.length,
+      currentLayer: laid.length > 0 ? laid[laid.length - 1]!.layer + 1 : 0,
+      filament: round(timeline.moves.reduce((sum, m) => sum + Math.max(0, m.state.extrude), 0)),
+      travelMoves: deposits.travels.length
+    }
+  }
+  return out
+}

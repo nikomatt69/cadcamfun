@@ -7,11 +7,12 @@
  * gizmos. The shell hosts only the controls that are CAM-specific (playback
  * timeline, simulator overlay).
  */
-import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import { RotateCcw, Settings, X } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
-import { View3D, toolpathOverlayModel, type RenderMode, type ToolpathPointKind, type ViewPreset } from "../../../viewport/view3d/index.ts"
+import { View3D, toolpathOverlayModel, type MachineInfo, type RenderMode, type ToolpathPointKind, type ViewPreset } from "../../../viewport/view3d/index.ts"
+import { MACHINE_LABELS, SOURCE_LABELS, type MachineChoice } from "../lib/machine-view.ts"
 import { t } from "../../../i18n/index.ts"
 import type { Workpiece } from "../store/camStore.ts"
 
@@ -27,7 +28,21 @@ export interface ToolpathVisualizerProps {
   readonly tools?: ReadonlyMap<string, cam.kernel.Cutter>
   /** Cutter for the toolpaths `tools` does not name (the generator's tool settings). */
   readonly defaultTool?: cam.kernel.Cutter
+  /** The machine the program runs on (spec 31): vise / chuck / bed, its axes, what turns. */
+  readonly machine?: cam.viewer.MachineSetup
+  /** Machine state per move (the parse's motion track). */
+  readonly motion?: cam.viewer.MotionTrack
+  /** Why this machine is shown, and whether the G-code disagrees. */
+  readonly machineChoice?: MachineChoice
+  /** The user picks the machine (`undefined` = follow the program). */
+  readonly onMachineOverride?: (kind: cam.MachineKind | undefined) => void
 }
+
+const prefersReducedMotion = (): boolean => {
+  try { return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true } catch { return false }
+}
+
+const fmt = (n: number): string => (Math.round(n * 1000) / 1000).toString()
 
 const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
 
@@ -55,6 +70,28 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const [arcTolerance, setArcTolerance] = createSignal(0.1)
   const [showTool, setShowTool] = createSignal(true)
   const [showHolder, setShowHolder] = createSignal(true)
+  const [showWorkholding, setShowWorkholding] = createSignal(true)
+  const [spin, setSpin] = createSignal(!prefersReducedMotion())
+  const [depositMode, setDepositMode] = createSignal<"progressive" | "all">("progressive")
+  const [layer, setLayer] = createSignal<number>()
+  const [machineInfo, setMachineInfo] = createSignal<MachineInfo>()
+  const machineDisplay = createMemo(() => ({ showWorkholding: showWorkholding(), showTriad: true, spin: spin(), depositMode: depositMode(), ...(layer() !== undefined ? { layer: layer()! } : {}) }))
+  // Each machine opens on the view its operator reads: a lathe from the front (the XZ plane flat, the chuck on the left).
+  const presetFor = (kind: cam.MachineKind | undefined): ViewPreset => (kind === "lathe" ? "front" : "perspective")
+  createEffect(on(() => props.machine?.kind, (kind) => { setPreset(presetFor(kind)); setLayer(undefined) }))
+  /** Where the tool is now and what the machine is doing (from the timeline the 3D view plays). */
+  const pose = createMemo(() => {
+    const info = machineInfo()
+    return info && props.machine ? cam.viewer.poseAt(info.timeline, props.playbackTime) : undefined
+  })
+  const spindleText = (): string => {
+    const kind = props.machine?.kind
+    const state = pose()?.state
+    if (kind === undefined) return ""
+    if (kind === "3dprinter") return state && state.extrude > 0 ? t("cam.visualizer.extruding") : t("cam.visualizer.travel")
+    if (!state || state.spindle === "off") return t("cam.visualizer.spindleOff")
+    return `${kind === "lathe" ? "M" + (state.spindle === "cw" ? "3" : "4") : state.spindle === "cw" ? "M3" : "M4"} S${Math.round(state.rpm)}${state.css ? " (G96)" : ""} ${state.spindle === "cw" ? "CW" : "CCW"}`
+  }
   /** The cutters the program uses, as the viewport draws them, for the stats overlay. */
   const usedTools = createMemo(() => {
     const seen = new Map<string, cam.kernel.Cutter>()
@@ -66,7 +103,10 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   })
   const overlay = createMemo(() => toolpathOverlayModel(props.program))
 
-  const stock = createMemo(() => ({
+  const stock = createMemo(() => props.machine?.kind === "mill" ? {
+    origin: props.machine.stock.min,
+    size: { x: props.machine.stock.max.x - props.machine.stock.min.x, y: props.machine.stock.max.y - props.machine.stock.min.y, z: props.machine.stock.max.z - props.machine.stock.min.z }
+  } : ({
     origin: props.stock ? { x: props.stock.x - props.stock.width / 2, y: props.stock.y - props.stock.height / 2, z: props.stock.topZ - props.stock.depth } : { x: -props.workpiece.x / 2, y: -props.workpiece.y / 2, z: 0 },
     size: props.stock ? { x: props.stock.width, y: props.stock.height, z: props.stock.depth } : { x: props.workpiece.x, y: props.workpiece.y, z: props.workpiece.z }
   }))
@@ -74,7 +114,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const hasProgram = (): boolean => props.program.toolpaths.length > 0
 
   const resetView = (): void => {
-    setPreset("perspective")
+    setPreset(presetFor(props.machine?.kind))
     setMode("shaded-edges")
     setGridVisible(true)
     setAxesVisible(true)
@@ -88,6 +128,10 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     setArcTolerance(0.1)
     setShowTool(true)
     setShowHolder(true)
+    setShowWorkholding(true)
+    setSpin(!prefersReducedMotion())
+    setDepositMode("progressive")
+    setLayer(undefined)
     props.onPlaybackTimeChange(0)
   }
 
@@ -125,6 +169,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             onPlaybackTimeChange={props.onPlaybackTimeChange}
             stock={stock()}
             toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder() }}
+            {...(props.machine !== undefined ? { machine: props.machine, machineDisplay: machineDisplay(), onMachineInfo: setMachineInfo } : {})}
+            {...(props.motion !== undefined ? { motion: props.motion } : {})}
             showControls
             onPresetChange={setPreset}
             onRenderModeChange={setMode}
@@ -166,6 +212,36 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             </button>
           </div>
         </div>
+        {/* Below the viewport's own control bar, so the machine shown is always readable. */}
+        <div class="absolute left-4 top-16 z-30 flex flex-wrap items-center gap-2 pointer-events-auto" data-testid="machine-header">
+            <Show when={props.machineChoice}>{(choice) => (
+            <label class="px-2 py-1 rounded-lg bg-black/40 backdrop-blur text-white text-xs flex items-center gap-1.5" title={t("cam.visualizer.machineSource", { machine: MACHINE_LABELS[choice().kind], source: SOURCE_LABELS[choice().source] })}>
+              <span data-testid="machine-badge">{MACHINE_LABELS[choice().kind]}</span>
+              <span class="text-white/50">· {SOURCE_LABELS[choice().source]}</span>
+              <select
+                aria-label={t("cam.visualizer.machine")}
+                class="ml-1 rounded bg-slate-800 border border-slate-600 px-1 py-0.5"
+                value={choice().source === "override" ? choice().kind : "auto"}
+                onChange={(event) => { const value = event.currentTarget.value; props.onMachineOverride?.(value === "auto" ? undefined : value as cam.MachineKind) }}
+              >
+                <option value="auto">{t("cam.visualizer.machineAuto")}</option>
+                <option value="mill">{MACHINE_LABELS.mill}</option>
+                <option value="lathe">{MACHINE_LABELS.lathe}</option>
+                <option value="3dprinter">{MACHINE_LABELS["3dprinter"]}</option>
+              </select>
+            </label>
+          )}</Show>
+          <Show when={props.machineChoice?.mismatch}>{(mismatch) => (
+            <span data-testid="machine-mismatch" role="status" class="px-2 py-1 rounded-lg bg-amber-500/80 text-black text-xs" title={mismatch().reasons.join("; ")}>
+              {t("cam.visualizer.machineMismatch", { machine: MACHINE_LABELS[mismatch().inferred] })}
+            </span>
+          )}</Show>
+          <Show when={(props.motion?.unsupported.length ?? 0) > 0}>
+            <span data-testid="partial-preview" role="status" class="px-2 py-1 rounded-lg bg-orange-600/80 text-white text-xs" title={props.motion!.unsupported.slice(0, 20).map((u) => `line ${u.line}: ${u.word}`).join("\n")}>
+              {t("cam.visualizer.partialPreview", { count: props.motion!.unsupported.length })}
+            </span>
+          </Show>
+        </div>
         <button
           type="button"
           class={`absolute right-4 top-16 z-30 rounded-lg p-2 text-white backdrop-blur ${settingsOpen() ? "bg-blue-600" : "bg-black/50 hover:bg-black/70"}`}
@@ -180,6 +256,19 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             <div>{t("cam.visualizer.moves")}: <span class="text-white">{overlay().moveCount}</span></div>
             <div>{t("cam.visualizer.points")}: <span class="text-white">{overlay().points.length}</span></div>
             <div>{t("cam.visualizer.arcs")}: <span class="text-white">{overlay().arcs.length}</span></div>
+            <Show when={props.machine}>{(machine) => (
+              <div data-testid="visualizer-machine">
+                <div>{t("cam.visualizer.machine")}: <span class="text-white">{MACHINE_LABELS[machine().kind]}</span> · {machine().kind === "mill" ? t("cam.visualizer.toolTurns") : machine().kind === "lathe" ? t("cam.visualizer.partTurns") : t("cam.visualizer.nothingTurns")}</div>
+                <div>{machine().kind === "3dprinter" ? "E" : t("cam.visualizer.spindle")}: <span class="text-white" data-testid="visualizer-spindle">{spindleText()}</span></div>
+                <Show when={pose()}>{(p) => (
+                  <div>{t("cam.visualizer.position")}: <span class="text-white">{machine().kind === "lathe" ? `X${fmt(p().point.x)} Z${fmt(p().point.z)}` : `X${fmt(p().point.x)} Y${fmt(p().point.y)} Z${fmt(p().point.z)}`}</span>{p().state?.line !== undefined ? ` · ${t("cam.visualizer.line")} ${p().state!.line}` : ""}</div>
+                )}</Show>
+                <Show when={machine().assumed.includes("workholding")}><div class="text-amber-300">{t("cam.visualizer.assumedWorkholding")}</div></Show>
+                <For each={(machineInfo()?.findings ?? []).slice(0, 3)}>{(f) => (
+                  <div data-testid="visualizer-finding" class={f.severity === "error" ? "text-red-400" : "text-amber-300"}>{t("cam.visualizer.setupFindings")}: {f.message}{f.count > 1 ? ` (×${f.count})` : ""}</div>
+                )}</For>
+              </div>
+            )}</Show>
             <For each={usedTools()}>{(c) => <div data-testid="visualizer-tool">{t("cam.visualizer.activeTool")}: <span class="text-white">{c.name} · Ø{c.diameter} · {c.fluteLength} mm flutes · {c.stickout} mm out{c.holder ? ` · holder Ø${c.holder.diameter}` : ""}</span></div>}</For>
           </div>
         </Show>
@@ -219,6 +308,25 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 {toggle(t("cam.visualizer.showTool"), showTool, setShowTool)}
                 <Show when={showTool()}>{toggle(t("cam.visualizer.showHolder"), showHolder, setShowHolder)}</Show>
               </section>
+              <Show when={props.machine}>{(machine) => (
+                <section class="space-y-2 border-t border-slate-700 pt-3">
+                  <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.machine")}</h4>
+                  {toggle(t("cam.visualizer.showWorkholding"), showWorkholding, setShowWorkholding)}
+                  <Show when={machine().kind !== "3dprinter"}>{toggle(t("cam.visualizer.spin"), spin, setSpin)}</Show>
+                  <Show when={machine().kind === "3dprinter"}>
+                    <label class="block text-xs text-slate-200">{t("cam.visualizer.deposit")}
+                      <select class="mt-1 w-full rounded border border-slate-600 bg-slate-800 p-1.5" value={depositMode()} onChange={(event) => setDepositMode(event.currentTarget.value as "progressive" | "all")}>
+                        <option value="progressive">{t("cam.visualizer.depositProgressive")}</option><option value="all">{t("cam.visualizer.depositAll")}</option>
+                      </select>
+                    </label>
+                    <Show when={(machineInfo()?.layers.length ?? 0) > 1}>
+                      <label class="block text-xs text-slate-200">{t("cam.visualizer.layer")} <span class="float-right text-slate-400">{layer() === undefined ? t("cam.visualizer.allLayers") : `${layer()! + 1} · Z${fmt(machineInfo()!.layers[layer()!] ?? 0)}`}</span>
+                        <input aria-label={t("cam.visualizer.layer")} class="mt-1 w-full accent-blue-500" type="range" min="0" max={String(machineInfo()!.layers.length)} step="1" value={String(layer() ?? machineInfo()!.layers.length)} onInput={(event) => { const n = Number(event.currentTarget.value); setLayer(n >= machineInfo()!.layers.length ? undefined : n) }} />
+                      </label>
+                    </Show>
+                  </Show>
+                </section>
+              )}</Show>
               <section class="space-y-2 border-t border-slate-700 pt-3">
                 <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.workpiece")}</h4>
                 {toggle(t("cam.visualizer.showWorkpiece"), stockVisible, setStockVisible)}

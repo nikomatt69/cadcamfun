@@ -33,12 +33,9 @@ export const turnedProfileAt = (setup: LatheSetup, timeline: Timeline, seconds: 
   const { outer, inner, bin, x0 } = profile
   const n = outer.length
   const half = setup.toolWidth / 2
-  const apply = (x: number, r: number) => {
-    const lo = Math.floor((x - half - x0) / bin), hi = Math.floor((x + half - x0) / bin)
-    for (let b = Math.max(0, lo); b <= Math.min(n - 1, hi); b++) {
-      if (setup.internal) { if (r > inner[b]!) inner[b] = Math.min(r, outer[b]!) }
-      else if (r < outer[b]!) outer[b] = Math.max(inner[b]!, r)
-    }
+  const cut = (b: number, r: number) => {
+    if (setup.internal) { if (r > inner[b]!) inner[b] = Math.min(r, outer[b]!) }
+    else if (r < outer[b]!) outer[b] = Math.max(inner[b]!, r)
   }
   for (const move of timeline.moves) {
     if (move.start >= seconds) break
@@ -46,16 +43,20 @@ export const turnedProfileAt = (setup: LatheSetup, timeline: Timeline, seconds: 
     const f = move.duration > 0 ? Math.min(1, (seconds - move.start) / move.duration) : 1
     const radiusOf = (px: number) => Math.max(0, move.state.xMode === "diameter" ? Math.abs(px) / 2 : Math.abs(px))
     const a = move.from, b = pointOn(move, f)
-    // Display x is program Z. Sample at bin resolution along Z, at least both ends.
-    const steps = Math.max(1, Math.ceil(Math.abs(b.z - a.z) / bin))
-    for (let k = 0; k <= steps; k++) {
-      const t = k / steps
-      apply(a.z + (b.z - a.z) * t, radiusOf(a.x + (b.x - a.x) * t))
-    }
-    // A radial move inside one bin: its innermost (outermost, for a boring bar) radius is what it reached.
+    // Display x is program Z. Every bin the move (and the blade's width) covers takes the radius at the nearest point of
+    // the move to the bin's centre: no bin is skipped between samples, whatever the float rounding.
+    const zlo = Math.min(a.z, b.z), zhi = Math.max(a.z, b.z)
+    const radial = zhi - zlo < 1e-12
     // A facing cut that runs past the axis (X-1) has gone through the centre on the way.
     const crosses = (a.x < 0) !== (b.x < 0) && a.x !== 0 && b.x !== 0
-    if (steps === 1) apply(b.z, setup.internal ? Math.max(radiusOf(a.x), radiusOf(b.x)) : crosses ? 0 : Math.min(radiusOf(a.x), radiusOf(b.x)))
+    const radialR = setup.internal ? Math.max(radiusOf(a.x), radiusOf(b.x)) : crosses ? 0 : Math.min(radiusOf(a.x), radiusOf(b.x))
+    const lo = Math.max(0, Math.floor((zlo - half - x0) / bin)), hi = Math.min(n - 1, Math.floor((zhi + half - x0) / bin))
+    for (let k = lo; k <= hi; k++) {
+      if (radial) { cut(k, radialR); continue }
+      const zc = Math.min(zhi, Math.max(zlo, x0 + (k + 0.5) * bin))
+      const t = (zc - a.z) / (b.z - a.z)
+      cut(k, radiusOf(a.x + (b.x - a.x) * t))
+    }
   }
   // Material is held by the chuck: past the first bin cut through, the rest of the bar has fallen away.
   for (let b = 0; b < n; b++) {

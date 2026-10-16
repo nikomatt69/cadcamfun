@@ -5883,6 +5883,28 @@ export type ToolpathGeneratorParseOutput = {
     }>
     metadata?: { [x: string]: string }
   }
+  motion?: {
+    paths: Array<{
+      count: number
+      runs: Array<{
+        start: number
+        spindle: "cw" | "ccw" | "off"
+        rpm: number
+        css: boolean
+        plane: 17 | 18 | 19
+        xMode: "diameter" | "radius"
+        tool?: number
+        coolant: "off" | "flood" | "mist"
+        feedMode: "min" | "rev"
+      }>
+      extrude?: Array<number>
+      lines?: Array<number>
+      rpm?: Array<number>
+      retracts?: Array<number>
+      homes?: Array<number>
+    }>
+    unsupported: Array<{ line: number; word: string }>
+  }
 }
 
 export type ToolpathGeneratorVerifyInput = {

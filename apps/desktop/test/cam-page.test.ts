@@ -168,6 +168,28 @@ describe("CAM page", () => {
     } finally { second.dispose() }
   }, 60000)
 
+  test("the preview shows the program's machine (spec 31): a lathe program, the pick, the mismatch, a partial replay", async () => {
+    const { dispose } = app.visit("/cam")
+    try {
+      await app.wait(() => editor())
+      await type(editor()!, "G18 G90 G21\nG96 S180 M3\nG50 S2500\nG0 X52 Z2\nG1 X44 F0.2\nG1 Z-40\nG71 U1 R0.5\nG0 X60 Z5\nM30")
+      await clickText("button", "Preview")
+      const badge = await app.wait(() => document.querySelector<HTMLElement>('[data-testid="machine-badge"]'), 30000)
+      await app.wait(() => (badge.textContent === "Lathe" ? badge : undefined), 30000)
+      await app.wait(() => document.querySelector('[data-testid="partial-preview"]'), 30000)
+      expect(document.querySelector('[data-testid="partial-preview"]')!.textContent).toContain("1 lines")
+      expect(document.querySelector('[data-testid="machine-mismatch"]')).toBeNull()
+      const pick = document.querySelector<HTMLSelectElement>('select[aria-label="Machine"]')!
+      pick.value = "mill"
+      pick.dispatchEvent(new window.Event("change", { bubbles: true }))
+      await app.wait(() => (document.querySelector('[data-testid="machine-badge"]')?.textContent === "Mill" ? true : undefined))
+      expect(document.querySelector('[data-testid="machine-mismatch"]')!.textContent).toContain("Lathe")
+      pick.value = "auto"
+      pick.dispatchEvent(new window.Event("change", { bubbles: true }))
+      await app.wait(() => (document.querySelector('[data-testid="machine-badge"]')?.textContent === "Lathe" ? true : undefined))
+    } finally { dispose() }
+  }, 60000)
+
   test("no console errors", () => {
     expect(errors.filter((line) => !/WebGL/i.test(line))).toEqual([])
   })

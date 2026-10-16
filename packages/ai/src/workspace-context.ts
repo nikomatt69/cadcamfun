@@ -102,6 +102,12 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
     str(settings["workOffset"]) !== undefined ? `offset ${str(settings["workOffset"])}` : undefined
   ].filter((x): x is string => x !== undefined)
   if (machineBits.length > 0) lines.push(`CAM: ${machineBits.join(", ")}.`)
+  // What the CAM preview shows (spec 31): the machine, why, how the part is held and what turns.
+  const machinePreview = rec(cam["preview"])
+  if (str(machinePreview["machine"]) !== undefined) {
+    const unsupported = num(machinePreview["unsupportedLines"]) ?? 0
+    lines.push(`Preview: ${label(machinePreview["machine"])} (${str(machinePreview["source"]) ?? "?"})${str(machinePreview["mismatch"]) !== undefined ? `, but the G-code looks like a ${label(machinePreview["mismatch"])} program` : ""}; ${str(machinePreview["turns"]) ?? ""}; ${str(machinePreview["workholding"]) ?? ""}${machinePreview["assumed"] === true ? " (assumed: set workholdingConfigured to check it)" : ""}${unsupported > 0 ? `; partial preview, ${unsupported} lines not replayed` : ""}. Kinematics of a program: cam action machine with gcode or operationId.`)
+  }
   const cutting = [["depth", "depth mm"], ["stepdown", "stepdown mm"], ["stepover", "stepover %"], ["feedrate", "feed mm/min"], ["rpm", "spindle rpm"], ["plungerate", "plunge mm/min"], ["safeZ", "safe Z mm"]] as const
   const values = cutting.filter(([key]) => num(settings[key]) !== undefined).map(([key, label]) => `${label} ${n(settings[key])}`)
   if (num(settings["rpm"]) === undefined && num(settings["spindleSpeed"]) !== undefined) values.push(`spindle rpm ${n(settings["spindleSpeed"])}`)

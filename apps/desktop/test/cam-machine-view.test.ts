@@ -1,0 +1,194 @@
+/**
+ * Spec 31 in the desktop: which machine the CAM preview shows, and the Three.js machine scene it mounts — vise and table for
+ * a mill (the tool turns), chuck, jaws and the turned bar for a lathe (the part turns), bed, nozzle and growing deposits for a
+ * printer. No WebGL: the scene is plain Three.js objects.
+ */
+import { describe, expect, test } from "bun:test"
+import * as THREE from "three"
+import { cam } from "@cadcamfun/core"
+import { createMachineScene, DEFAULT_MACHINE_DISPLAY, machineSpatial } from "../src/viewport/view3d/machine-scene.ts"
+import { buildPlayback } from "../src/viewport/view3d/playback.ts"
+import { previewSetup, resolveMachineKind } from "../src/features/cam/lib/machine-view.ts"
+
+const g = cam.generator
+const v = cam.viewer
+const settings = (patch: Record<string, unknown> = {}) => g.withMachineDefaults(g.decodeSettings(patch) as cam.generator.ToolpathSettings)
+const stock = { width: 100, height: 60, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 }
+const parsed = (gcode: string) => g.analyseGcode(gcode)
+const scene = (setup: cam.viewer.MachineSetup, gcode: string, display = DEFAULT_MACHINE_DISPLAY, tool?: cam.viewer.ToolEnvelope) => {
+  const a = parsed(gcode)
+  return createMachineScene({ setup, program: a.program, motion: a.motion, display, scale: 100, ...(tool ? { tool } : {}) })
+}
+const names = (o: THREE.Object3D): string[] => { const out: string[] = []; o.traverse((c) => { if (c.name) out.push(c.name) }); return out }
+
+describe("which machine the preview shows (spec 31 §4.5)", () => {
+  const lathe = cam.inferMachineKind(g.generateLatheGCode(settings({ machineType: "lathe" })))
+  test("the pick wins, then the producer, then clear words, then the setting", () => {
+    expect(resolveMachineKind({ override: "3dprinter", produced: { kind: "mill", source: "kernel" }, inferred: lathe, setting: "mill" })).toMatchObject({ kind: "3dprinter", source: "override" })
+    expect(resolveMachineKind({ produced: { kind: "lathe", source: "generator" }, inferred: lathe, setting: "lathe" })).toEqual({ kind: "lathe", source: "generator" })
+    expect(resolveMachineKind({ inferred: lathe, setting: "mill" })).toEqual({ kind: "lathe", source: "inferred" })
+    expect(resolveMachineKind({ inferred: { kind: "lathe", confidence: "weak", reasons: [] }, setting: "mill" })).toEqual({ kind: "mill", source: "settings" })
+    expect(resolveMachineKind({ setting: "3dprinter" })).toEqual({ kind: "3dprinter", source: "settings" })
+  })
+
+  test("a program whose words belong to another machine is flagged, not switched", () => {
+    const choice = resolveMachineKind({ produced: { kind: "mill", source: "generator" }, inferred: lathe, setting: "mill" })
+    expect(choice.kind).toBe("mill")
+    expect(choice.mismatch?.inferred).toBe("lathe")
+    expect(choice.mismatch?.reasons.length).toBeGreaterThan(0)
+  })
+
+  test("the set-up follows the machine: the kernel's stock and table for its program", () => {
+    expect(previewSetup("lathe", settings({ machineType: "lathe" }), stock).kind).toBe("lathe")
+    expect(previewSetup("3dprinter", settings(), stock).kind).toBe("3dprinter")
+    const mill = previewSetup("mill", settings(), stock, { machineId: "haas-vf2" })
+    expect(mill.kind === "mill" && mill.table).toEqual({ length: 762, width: 406 })
+    expect(mill.kind === "mill" && mill.assumed).toEqual(["workholding"])
+  })
+})
+
+describe("playback carries the move it plays (motion track index)", () => {
+  test("each segment names its toolpath and expanded move; arcs keep one index for all their pieces", () => {
+    const a = parsed("M3 S1000\nG0 X10 Y0\nG3 X10 Y0 I-10 J0 F100\nG1 X20")
+    const p = buildPlayback(a.program)
+    expect(p.segments[0]).toMatchObject({ path: 0, index: 0 })
+    const arc = p.segments.filter((s) => s.index === 1)
+    expect(arc.length).toBeGreaterThan(10)
+    expect(p.segments[p.segments.length - 1]).toMatchObject({ path: 0, index: 2 })
+    // The same clock as the core timeline the machine scene plays.
+    expect(v.buildTimeline(a.program, a.motion).duration).toBeCloseTo(p.duration, 9)
+  })
+})
+
+describe("mill: the part is clamped, the tool turns", () => {
+  const setup = v.millSetupOf(settings({ workholdingConfigured: true }), stock)
+  test("vise jaws, parallels, base and table; the RGB triad with the spindle arrow", () => {
+    const s = scene(setup, "M3 S6000\nG0 X0 Y0 Z5\nG1 Z-2 F100")
+    const all = names(s.root)
+    for (const n of ["jaw:jaw-fixed", "jaw:jaw-moving", "parallel:parallel-1", "vise-base:vise-base", "table:table (assumed)", "axis:X", "axis:Y", "axis:Z", "rotary:S"]) expect(all).toContain(n)
+    expect(all.some((n) => n.startsWith("stock:"))).toBe(false)
+    s.dispose()
+    expect(s.root.children).toHaveLength(0)
+  })
+
+  test("assumed workholding is translucent; hidden when switched off", () => {
+    const s = scene(v.millSetupOf(settings(), stock), "M3 S6000\nG1 X1 F100")
+    const jaw = s.root.getObjectByName("jaw:jaw-fixed (assumed)") as THREE.Mesh
+    expect((jaw.material as THREE.MeshStandardMaterial).opacity).toBeCloseTo(0.45)
+    expect(jaw.getObjectByName("edges")).toBeDefined()
+    const hidden = scene(setup, "M3 S6000\nG1 X1 F100", { ...DEFAULT_MACHINE_DISPLAY, showWorkholding: false })
+    expect(names(hidden.root).some((n) => n.startsWith("jaw:"))).toBe(false)
+  })
+
+  test("a cut into the jaws is listed and drawn red", () => {
+    const s = scene(setup, "M3 S9000\nG0 X-55 Y-33 Z5\nG1 Z-18 F200\nG1 X55\nG0 Z5", DEFAULT_MACHINE_DISPLAY, { radius: 3, length: 40 })
+    expect(s.findings.map((f) => f.code)).toContain("MILL_INTO_VISE")
+    expect(s.root.getObjectByName("collisions")).toBeDefined()
+  })
+
+  test("the spindle angle turns clockwise from above with M3 and stops with M5", () => {
+    const s = scene(setup, "M3 S60\nG1 X60 F60\nM5\nG1 X120")
+    expect(s.spinAngle(30)).toBeCloseTo(-30 * 2 * Math.PI, 6)
+    expect(s.spinAngle(90)).toBeCloseTo(s.spinAngle(60), 9)
+    expect(scene(setup, "M3 S60\nG1 X60 F60", { ...DEFAULT_MACHINE_DISPLAY, spin: false }).spinAngle(30)).toBe(0)
+  })
+})
+
+describe("lathe: the part turns in the chuck, the tool moves in X and Z", () => {
+  const program = "G18 G90\nM3 S60\nG0 X52 Z2\nG0 X44\nG1 Z-40 F60\nG0 X52\nG0 Z2\nM30"
+  const setup = v.latheSetupOf(settings({ machineType: "lathe" }))
+  test("chuck, jaws and the turned bar turn together, positively about the spindle axis with M3; no Y in the triad", () => {
+    const s = scene(setup, program)
+    const spindle = s.root.getObjectByName("spindle")!
+    for (const n of ["chuck:chuck (assumed)", "jaw:jaw-1 (assumed)", "turned-part", "spindle-marker"]) expect(names(spindle)).toContain(n)
+    expect(names(s.root)).not.toContain("axis:Y")
+    expect(names(s.root)).toContain("rotary:C")
+    s.update(10)
+    expect(spindle.rotation.x).toBeGreaterThan(0)
+    expect(spindle.rotation.x).toBeCloseTo(s.spinAngle(10), 9)
+  })
+
+  test("the tool is at the program point mapped onto the lathe (Z along x, radius up for a rear turret)", () => {
+    const s = scene(setup, program)
+    const cut = s.timeline.moves.find((m) => m.kind === "feed")!
+    s.update(cut.start + cut.duration / 2)
+    const tool = s.root.getObjectByName("lathe-tool")!
+    // Half-way along G1 Z-40 from Z2.
+    expect(tool.position.x).toBeCloseTo(-19, 6)
+    expect(tool.position.z).toBeCloseTo(22, 6)
+    const front = scene(v.latheSetupOf(settings({ machineType: "lathe", latheTurret: "front" })), program)
+    front.update(cut.start + cut.duration / 2)
+    const ft = front.root.getObjectByName("lathe-tool")!
+    expect(ft.position.z).toBeCloseTo(-22, 6)
+    expect(ft.scale.z).toBe(-1)
+  })
+
+  test("the turned part shrinks where the tool has passed", () => {
+    const s = scene(setup, program)
+    const radiusOf = () => { const m = s.root.getObjectByName("turned-part") as THREE.Mesh; m.geometry.computeBoundingBox(); return m.geometry.boundingBox! }
+    s.update(0)
+    const before = radiusOf().max.y
+    s.update(s.timeline.duration)
+    const mesh = s.root.getObjectByName("turned-part") as THREE.Mesh
+    const pos = mesh.geometry.getAttribute("position")
+    // The turned length (Z -40..0) is one band at radius 22; nothing between its ends is left at the bar's 25.
+    let turned = false, leftover = false
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), r = Math.hypot(pos.getY(i), pos.getZ(i))
+      if (Math.abs(r - 22) < 1e-3 && x > -40.1 && x < 0.1) turned = true
+      if (Math.abs(r - 25) < 1e-3 && x > -39.9 && x < -0.1) leftover = true
+    }
+    expect(before).toBeCloseTo(25, 3)
+    expect(turned).toBe(true)
+    expect(leftover).toBe(false)
+  })
+
+  test("a turn into the jaws is a set-up finding", () => {
+    const s = scene(v.latheSetupOf(settings({ machineType: "lathe", workholdingConfigured: true })), "G18 M3 S500\nG0 X52 Z2\nG0 X44\nG1 Z-95 F100\nG0 X52")
+    expect(s.findings[0]).toMatchObject({ code: "LATHE_INTO_CHUCK", severity: "error" })
+  })
+})
+
+describe("printer: nothing turns, the nozzle deposits layer by layer", () => {
+  const setup = v.printerSetupOf(settings({ machineType: "3dprinter" }))
+  const code = "M104 S200\nG28\nG92 E0\nG0 X10 Y10 Z0.2\nG1 X20 E1 F600\nG1 X20 Y20 E2\nG0 X10 Y10 Z0.4\nG1 X20 E3\nG1 X20 Y20 E4"
+  test("bed, build volume and nozzle; no spindle", () => {
+    const s = scene(setup, code)
+    for (const n of ["bed:bed", "build-volume:build-volume", "nozzle", "deposits", "travel"]) expect(names(s.root)).toContain(n)
+    expect(names(s.root)).not.toContain("rotary:S")
+    expect(s.spinAngle(5)).toBe(0)
+    expect(s.layers).toEqual([0.2, 0.4])
+  })
+
+  test("deposits grow with time; the bead under the nozzle is cut there; all / a layer at a time", () => {
+    const s = scene(setup, code)
+    const beads = s.root.getObjectByName("deposits") as THREE.LineSegments
+    const partial = s.root.getObjectByName("deposit-current") as THREE.Line
+    s.update(0)
+    expect(beads.geometry.drawRange.count).toBe(0)
+    const first = s.timeline.moves.find((m) => m.state.extrude > 0)!
+    s.update(first.start + first.duration / 2)
+    expect(partial.visible).toBe(true)
+    expect(beads.geometry.drawRange.count).toBe(0)
+    s.update(s.timeline.duration)
+    expect(beads.geometry.drawRange.count).toBe(8)
+    expect(partial.visible).toBe(false)
+    const all = scene(setup, code, { ...DEFAULT_MACHINE_DISPLAY, depositMode: "all", layer: 0 })
+    all.update(0)
+    expect((all.root.getObjectByName("deposits") as THREE.LineSegments).geometry.drawRange.count).toBe(4)
+    const nozzle = s.root.getObjectByName("nozzle")!
+    expect(nozzle.position.toArray()).toEqual([20, 20, 0.4])
+  })
+})
+
+describe("what the assistant reads from a CAM frame", () => {
+  test("machine, mapping, axes, tool position in program and display coordinates, findings", () => {
+    const setup = v.latheSetupOf(settings({ machineType: "lathe" }))
+    const a = parsed("G18 G90\nM3 S800\nG0 X52 Z2\nG1 X40 Z-10 F100")
+    const s = createMachineScene({ setup, program: a.program, motion: a.motion, display: DEFAULT_MACHINE_DISPLAY, scale: 100 })
+    const spatial = machineSpatial(setup, s, s.timeline.duration)
+    expect(spatial).toMatchObject({ machine: "lathe", rotates: "workpiece", tool: { program: { x: 40, z: -10 }, display: { x: -10, z: 20 }, spindle: "cw", rpm: 800, line: 4 } })
+    expect(String(spatial["mapping"])).toContain("X/2")
+    expect((spatial["axes"] as Array<{ name: string }>).map((x) => x.name)).toEqual(["Z", "X"])
+  })
+})

@@ -6,6 +6,8 @@ import { analyseGcode } from "../generator/analysis.ts"
 import { originShift } from "../generator/dispatch.ts"
 import type { GenerateRequest, ToolpathSettings } from "../generator/schema.ts"
 import type { VerifyBounds, VerifyRequest, VerifyTool, VerifyToolKind } from "./schema.ts"
+import { millSetupOf } from "../viewer/machine-setup.ts"
+import { fixtureBoxes } from "../viewer/machine-bodies.ts"
 
 /** What a caller may add to (or replace in) what the settings already say. */
 export interface VerifyOverrides {
@@ -56,6 +58,16 @@ export const verifyStockOf = (request: GenerateRequest): VerifyBounds | undefine
   }
 }
 
+/**
+ * The workholding the user or the assistant configured (vise jaws, parallels, clamps), as verifier fixtures in the G-code's
+ * coordinates (spec 31 §6.1). Assumed workholding is not a fixture: nothing is claimed about a clamp nobody described.
+ */
+export const workholdingFixtures = (request: GenerateRequest): VerifyRequest["fixtures"] => {
+  const stock = request.geometry.stock
+  if (stock === undefined || request.settings.machineType !== "mill" || !request.settings.workholdingConfigured) return []
+  return fixtureBoxes(millSetupOf(request.settings, stock))
+}
+
 export const verifyRequestFor = (request: GenerateRequest, gcode: string, overrides: VerifyOverrides = {}): VerifyRequestResult => {
   const base = verifyToolOf(request.settings)
   if (base === undefined) return { ok: false, error: "Verification supports milling operations only" }
@@ -77,7 +89,7 @@ export const verifyRequestFor = (request: GenerateRequest, gcode: string, overri
       gcode,
       stock,
       tool,
-      fixtures: overrides.fixtures ?? [],
+      fixtures: overrides.fixtures ?? workholdingFixtures(request),
       start: overrides.start ?? { x: 0, y: 0, z: stock.maxZ + 10 },
       ...(overrides.target !== undefined ? { target: overrides.target } : {}),
       ...(overrides.resolution !== undefined ? { resolution: overrides.resolution } : {}),

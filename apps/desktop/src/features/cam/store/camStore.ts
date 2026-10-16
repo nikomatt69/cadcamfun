@@ -71,6 +71,10 @@ interface CAMState {
 
   // Last generated program (camera simulation)
   program: cam.Program
+  /** Machine state per move of `program` (spec 31), from the parse; absent for programs that were not parsed. */
+  motion: cam.viewer.MotionTrack | undefined
+  /** The machine the preview shows when the user picks it (else it follows the program's source or its words). */
+  machineOverride: cam.MachineKind | undefined
 
   /** The generated program of each stored operation, in the order they were first generated. */
   operationResults: ReadonlyArray<OperationResult>
@@ -101,7 +105,9 @@ interface CAMState {
   setSelectedOperationId(id: string | undefined): void
   setPlaying(playing: boolean): void
   setPlaybackTime(seconds: number): void
-  setProgram(program: cam.Program): void
+  /** Replaces the program; its motion track goes with it (a track describes one program only). */
+  setProgram(program: cam.Program, motion?: cam.viewer.MotionTrack): void
+  setMachineOverride(kind: cam.MachineKind | undefined): void
   setGcode(gcode: string): void
   /**
    * Keeps the program of one stored operation next to the others: generating five operations shows all five (the preview
@@ -174,6 +180,8 @@ export const useCamStore = create<CAMState>((set, get) => ({
   playing: false,
   playbackTime: 0,
   program: initialProgram,
+  motion: undefined,
+  machineOverride: undefined,
   ...legacyInitial,
 
   setWorkpiece: (workpiece) => set({ workpiece }),
@@ -189,21 +197,22 @@ export const useCamStore = create<CAMState>((set, get) => ({
   setSelectedOperationId: (id) => set({ selectedOperationId: id }),
   setPlaying: (playing) => set({ playing }),
   setPlaybackTime: (seconds) => set({ playbackTime: seconds }),
-  setProgram: (program) => set({ program }),
+  setProgram: (program, motion) => set({ program, motion }),
+  setMachineOverride: (machineOverride) => set({ machineOverride }),
   kernelArtifact: undefined,
   setKernelArtifact: (kernelArtifact) => set({ kernelArtifact }),
   setGcode: (gcode) => set({ gcode }),
   upsertOperationResult: (result) => set((state) => {
     const at = state.operationResults.findIndex((r) => r.id === result.id)
     const operationResults = at < 0 ? [...state.operationResults, result] : state.operationResults.map((r, i) => (i === at ? result : r))
-    return { operationResults, ...combineOperationResults(operationResults) }
+    return { operationResults, ...combineOperationResults(operationResults), motion: undefined }
   }),
   removeOperationResult: (id) => set((state) => {
     if (!state.operationResults.some((r) => r.id === id)) return {}
     const operationResults = state.operationResults.filter((r) => r.id !== id)
-    return { operationResults, ...combineOperationResults(operationResults) }
+    return { operationResults, ...combineOperationResults(operationResults), motion: undefined }
   }),
-  clearOperationResults: () => set({ operationResults: [], ...combineOperationResults([]) }),
+  clearOperationResults: () => set({ operationResults: [], ...combineOperationResults([]), motion: undefined }),
   toggleEntitySelection: (id) => set((state) => ({
     selectedEntities: state.selectedEntities.includes(id) ? state.selectedEntities.filter((entity) => entity !== id) : [...state.selectedEntities, id]
   })),
@@ -282,6 +291,8 @@ export const useCamStore = create<CAMState>((set, get) => ({
     playing: false,
     playbackTime: 0,
     program: initialProgram,
+    motion: undefined,
+    machineOverride: undefined,
     ...legacyInitial
   })
 }))

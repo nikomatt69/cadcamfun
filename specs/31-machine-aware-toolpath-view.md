@@ -1,6 +1,6 @@
 # Machine-aware toolpath view (mill in a vise, lathe in a chuck, printer on a bed)
 
-Status: **specified, not built** (2026-10-17). Cross-WP increment: WP2 `packages/core/src/cam` (frames, interpreter, setup, checks), WP3 `packages/api` (one optional field on the parse response), WP7 `apps/desktop/src/viewport/view3d` (CAM scene), WP6 `apps/desktop/src/features/cam` (setup fields, visualizer shell), WP8 `packages/ai` (skill, actions, context). Contracts in [04-core-cam](04-core-cam.md), [06-desktop-ui](06-desktop-ui.md) and [29-native-cam-kernel](29-native-cam-kernel.md) §3, §8 are extended here, not replaced.
+Status: **built** except §5.5 (rotary mills), see §12 (2026-10-17). Cross-WP increment: WP2 `packages/core/src/cam` (frames, interpreter, setup, checks), WP3 `packages/api` (one optional field on the parse response), WP7 `apps/desktop/src/viewport/view3d` (CAM scene), WP6 `apps/desktop/src/features/cam` (setup fields, visualizer shell), WP8 `packages/ai` (skill, actions, context). Contracts in [04-core-cam](04-core-cam.md), [06-desktop-ui](06-desktop-ui.md) and [29-native-cam-kernel](29-native-cam-kernel.md) §3, §8 are extended here, not replaced.
 
 ## 0. Goal
 
@@ -372,6 +372,28 @@ Each phase is committed and merged into local `main` when its gate passes; nothi
 - **Not covered**: lathe canned cycles G70–G76 expansion, mill-turn/live tooling, sub-spindle, Y-axis lathes, tilting heads (as in `indexing.ts`), multi-extruder colours beyond tool colours, tool nose radius compensation (G41/G42 on lathes is drawn at the programmed point).
 - **CAD triad colours** (X blue, Y magenta, Z green in the CAD viewport) disagree with the RGB origin helper; fixing them in CAD is a WP7 owner decision outside this spec — the CAM view uses RGB from P3.
 
+## 12. Implementation status (2026-10-17)
+
+Done, with tests (`packages/core/test/cam/{machine-view,interpreter-characterization}.test.ts`, `apps/desktop/test/cam-machine-view.test.ts`, `apps/desktop/test/cam-page.test.ts` "the preview shows the program's machine", `packages/ai/test/machine-kinematics.test.ts`) and checked in the running app (Vite + real sidecar, headless Chromium screenshots of the three machines):
+
+- §4.4 interpreter words and the motion track (`viewer/motion-track.ts`, parse response `motion`); milling replay bit-identical (fingerprints recorded before the change).
+- §4.1–4.3 set-ups, frames, bodies (`viewer/machine-setup.ts`, `frames.ts`, `machine-bodies.ts`); D7 fixed with the shared `stockInWork`.
+- §4.5 `inferMachineKind`; desktop `features/cam/lib/machine-view.ts` resolves the machine shown (pick > producer > clear words > setting) and flags mismatches.
+- §5.1–5.4, 5.6, 5.7 viewer: `viewport/view3d/machine-scene.ts` mounted by `View3D` only when `machine` is given; mill vise / clamps / plate, table, flute marker and spindle angle; lathe chuck, jaws, live turned part (`viewer/turned-profile.ts`), lathe tool outlines, horizontal spindle axis, front view by default; printer bed, build volume, nozzle, progressive beads and layer limit (`viewer/printer-layers.ts`); RGB machine triad with S / C rotation arcs; red segments for set-up collisions; machine header (badge, pick, mismatch, partial preview) below the viewport's control bar; Machine section in the settings; spindle / position / line / findings in the stats.
+- §5.6 set-up fields: generator section "Workholding" (`components/generator/WorkholdingSection.tsx`, CAD `NumberField`), new `ToolpathSettings` keys with defaults.
+- §6 checks: `viewer/setup-checks.ts` `checkSetup` (MILL_INTO_VISE / CLAMP / PARALLEL / TABLE, LATHE_INTO_CHUCK / TAILSTOCK, PRINTER_OFF_BED / ABOVE_VOLUME / FIRST_LAYER_HIGH); `verify/request.ts` `workholdingFixtures` passes the configured vise / clamps to the verifier.
+- §7 AI: skill sections (preview, running a program on its machine, workholding); `cam.machine` returns the preview mapping and, with `gcode` / `operationId` (+ `params`, `at`), the program's run on the machine (`packages/ai/src/machine-run.ts`: pose, rotation sense, findings, turned part, printed layers); `cam.analyze` reports `inferredMachine`; the workspace context has a `Preview:` line; vision `spatial` has machine, mapping, pose and findings.
+
+Deviations from the plan above:
+- §6.2 / §6.3 are a separate `checkSetup` (timeline-based, shared with the preview) instead of new `checkAxes` codes; `LATHE_PAST_STOCK_END` is covered by `LATHE_INTO_CHUCK`, `LATHE_BORE_TOO_SMALL` is not implemented (the bar diameter of the boring tool is not known).
+- §7.4: the workholding is set through the operation `params` of `cam_edit.create` / `update` (they already flow into the generator store, so the preview updates live); `cam_edit.stock_set` is unchanged.
+- The first move of a program starts from an unknown machine position (drawn from the origin, as before): the set-up checks test only its end point.
+- Found while checking the running app: the 1 mm CAM grid at Z0 occluded every cut below Z0 in the depth buffer (already on `main`: only rapids above the stock were visible). In CAM mode the grid now does not write depth and is drawn first. The CAD viewport's grid is unchanged.
+- The live turned profile marks every bin the move covers (sampling at exactly the bin pitch skipped bins through float rounding; regression test added).
+
+Not done: §5.5 rotary mills (Orient / rotary words are still not drawn as table or tool tilt); a fixture-level unit test of the CAM grid depth setting (it needs WebGL; verified by screenshot).
+
 ## Change log
 
 - 2026-10-17: spec written from the analysis of `main` @ 063eed5; baseline §1 verified green.
+- 2026-10-17: built (§12); full suites green except two failures that also fail on clean `main` (`packages/web` API documentation coverage, a type error in `packages/ai/test/helpers/mcp-server.ts`).

@@ -313,6 +313,16 @@ describe("live turned part (spec 31 §5.3)", () => {
     expect(v.turnedProfileAt(setup, tl, 0).outer.every((r) => r === 25)).toBe(true)
   })
 
+  test("a long pass leaves no bin at the bar radius inside its range (float rounding of the samples)", () => {
+    for (const end of [-40, -37.3, -99.95]) {
+      const tl = timelineOf(`G18 M3 S800\nG0 X52 Z2\nG0 X44\nG1 Z${end} F80\nG0 X52`)
+      const p = v.turnedProfileAt(setup, tl, tl.duration)
+      const inside = [...p.outer].filter((_, b) => { const x = p.x0 + (b + 0.5) * p.bin; return x > end + p.bin && x < -p.bin })
+      expect(inside.every((r) => r === 22)).toBe(true)
+      expect(v.profileRuns(p).filter((r) => r.outer === 22)).toHaveLength(1)
+    }
+  })
+
   test("facing past the axis cuts the end off; parting drops the rest", () => {
     const tl = timelineOf("M3 S800\nG0 X52 Z-2\nG1 X-1 F100\nG0 X52")
     const p = v.turnedProfileAt(setup, tl, tl.duration)
@@ -422,5 +432,20 @@ describe("lathe tools", () => {
       expect(outlines.some((o) => o.part === "shank")).toBe(true)
     }
     expect(v.latheToolOutlines("turning", 0).find((o) => o.part === "shank")!.points.every((p) => p.z > 0)).toBe(true)
+  })
+})
+
+describe("configured workholding is verified (spec 31 §6.1)", () => {
+  const stock = { width: 100, height: 60, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 }
+  const request = (patch: Record<string, unknown>) => ({ settings: settings(patch), geometry: { ...g.DEFAULT_GEOMETRY, stock }, printer: g.DEFAULT_PRINTER_EXTRAS }) as never
+  test("the verifier gets the jaws only when the vise was configured, and finds the cut into them", () => {
+    expect(cam.verify.workholdingFixtures(request({}))).toEqual([])
+    const fixtures = cam.verify.workholdingFixtures(request({ workholdingConfigured: true }))
+    expect(fixtures.map((f) => f.id)).toContain("jaw-fixed")
+    const into = cam.verify.verifyRequestFor(request({ workholdingConfigured: true }), "G90 G21\nM3 S9000\nG0 X-55 Y-33 Z5\nG1 Z-18 F200\nG1 X55 F600\nG0 Z5\nM30")
+    expect(into.ok).toBe(true)
+    if (!into.ok) return
+    const report = cam.verify.verifyToolpath(into.request)
+    expect(report.issues.some((i) => i.code === "FixtureCollision" && i.fixtureId === "jaw-moving")).toBe(true)
   })
 })

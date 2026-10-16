@@ -8,6 +8,9 @@ export interface PlaybackSegment {
   readonly duration: number
   /** The tool cutting it (the toolpath's `toolId`), so the preview can colour each tool. */
   readonly toolId: string
+  /** Toolpath and index in `expandMoves(path.moves)` of the move it belongs to (the motion track's index). */
+  readonly path: number
+  readonly index: number
 }
 export interface Playback { readonly segments: readonly PlaybackSegment[]; readonly duration: number; readonly end: Vec3 }
 
@@ -15,12 +18,15 @@ export const buildPlayback = (program: cam.Program, rapidRate = 5000, tolerance 
   const segments: PlaybackSegment[] = []
   let from: Vec3 = { x: 0, y: 0, z: 0 }, time = 0
   let toolId = ""
+  let pathIndex = 0, moveIndex = 0
   const append = (to: Vec3, rapid: boolean, duration: number) => {
-    segments.push({ from, to, rapid, start: time, duration, toolId }); time += duration; from = to
+    segments.push({ from, to, rapid, start: time, duration, toolId, path: pathIndex, index: moveIndex }); time += duration; from = to
   }
-  for (const path of program.toolpaths) {
+  for (const [p, path] of program.toolpaths.entries()) {
     toolId = path.toolId
-    for (const move of cam.expandMoves(path.moves, from)) {
+    pathIndex = p
+    for (const [i, move] of cam.expandMoves(path.moves, from).entries()) {
+      moveIndex = i
       if (move._tag === "Comment" || move._tag === "Orient") continue
       if (move._tag === "Dwell") { append(from, false, move.seconds); continue }
       if (move._tag === "Cycle") continue

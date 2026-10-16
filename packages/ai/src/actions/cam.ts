@@ -8,6 +8,7 @@
 import { cam } from "@cadcamfun/core"
 import { CAM_ACTION_INPUTS, VisionInput as CAM_VISION_INPUT, CamSetupCandidate, CamMachiningPlan, CamManufactureInput } from "@cadcamfun/api"
 import { analyzeGcode } from "../gcode-analysis.ts"
+import { machineRun } from "../machine-run.ts"
 import { vision } from "./cad.ts"
 import { defineAction, defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
 
@@ -36,8 +37,35 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({
     id: "cam.machine", kind: "read", replaces: "cam_describe_machine",
     parameters: CAM_ACTION_INPUTS["cam.machine"],
-    // Pure: reads the kinematics table, needs no project data.
-    run: async ({ machineType: kind }) => ({ ...cam.kinematicsOf(kind), origins: cam.ORIGINS[kind] })
+    // The kinematics table; with a program, its run on the machine (an operation's program is read from the project).
+    run: async ({ machineType: kind, gcode: text, operationId, params, at }, { handlers, projectId }) => {
+      // How the CAM preview draws this machine (spec 31): the default set-up's triad, what turns and in which sense.
+      const setup = cam.viewer.setupOf(kind, cam.generator.withMachineDefaults({ ...cam.generator.DEFAULT_SETTINGS, machineType: kind }), { width: 100, height: 100, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 })
+      const { axes, rotary } = cam.viewer.displayAxes(setup)
+      const table = {
+        ...cam.kinematicsOf(kind), origins: cam.ORIGINS[kind],
+        preview: {
+          axes: axes.map((a) => ({ name: a.name, display: a.direction, positive: a.positive })),
+          ...(rotary !== undefined ? { turns: rotary.turns } : {}),
+          mapping: kind === "lathe" ? "spindle axis horizontal: display x = Z (chuck on the left), display z = X/2 (rear turret up, front turret down)" : "as programmed, Z up",
+          rotation: kind === "3dprinter" ? cam.viewer.spinSenseText(kind, "cw") : { M3: cam.viewer.spinSenseText(kind, "cw"), M4: cam.viewer.spinSenseText(kind, "ccw") },
+          workholding: kind === "mill"
+            ? "vise (default, jaws along X), clamps, plate or none: params workholding, viseJawAxis, clampDepth, parallelsHeight, viseJawHeight, workholdingConfigured"
+            : kind === "lathe" ? "3-jaw / 4-jaw chuck or collet: params chuckType, gripLength, latheTurret, stockBore, tailstock, workholdingConfigured" : "bed: params bedWidth, bedDepth, bedOrigin, buildHeight, printerKinematics"
+        }
+      }
+      if (text === undefined && operationId === undefined) return table
+      if (text !== undefined && operationId !== undefined) return { ok: false, error: "Send at most one of gcode or operationId." }
+      let gcode = text ?? ""
+      if (operationId !== undefined) {
+        if (handlers.operationProgram === undefined) return { ok: false, error: "Stored programs are not available in this host: send the program text as gcode." }
+        const program = await handlers.operationProgram(projectId, operationId)
+        if (!program.ok) return program
+        gcode = program.gcode
+      }
+      // The program on this machine: the same timeline, set-up and checks the preview draws.
+      return { ...table, run: machineRun({ kind, gcode, ...(params !== undefined ? { params } : {}), ...(at !== undefined ? { at } : {}) }) }
+    }
   }),
   defineWireAction({
     id: "cam.operations", kind: "read", replaces: "cam_list_operations",
@@ -70,7 +98,8 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
         gcode = program.gcode
       }
       const report = analyzeGcode(gcode, await handlers.machine?.(projectId))
-      if (kind === undefined) return report
+      // Without a machine type, say which machine the words point at (the preview uses the same reading).
+      if (kind === undefined) { const inferred = cam.inferMachineKind(gcode); return inferred === undefined ? report : { ...report, inferredMachine: inferred } }
       // The checks of the line scanner plus the ones that follow from the machine's own axes and what rotates.
       const axes = cam.checkAxes(gcode, kind).map((issue) => ({ severity: issue.severity, code: issue.code, line: issue.line, message: issue.message }))
       return { ...report, machineType: kind, issues: [...report.issues, ...axes] }

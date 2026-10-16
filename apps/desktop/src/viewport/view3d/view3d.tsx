@@ -11,6 +11,8 @@ import { entityPaths, renderEntity } from "../editor2d/render.ts"
 import { t } from "../../i18n/index.ts"
 import { buildPlayback, positionAt, toolAt, toolColors, type Playback } from "./playback.ts"
 import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
+import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
+export { machineSpatial, type MachineInfo } from "./machine-scene.ts"
 
 export type ViewPreset = "perspective" | "top" | "front" | "right" | "isometric" | "bottom" | "back" | "left" | "four-view"
 export type RenderMode = "shaded" | "shaded-edges" | "wireframe" | "xray"
@@ -71,6 +73,16 @@ export interface View3DProps {
   readonly lighting?: ViewportLighting
   readonly material?: ViewportMaterial
   readonly section?: ViewportSection
+  /**
+   * The machine the program runs on (spec 31): the vise / chuck / bed around it, its own axes, what turns. Lathe programs are
+   * drawn with the spindle axis horizontal; without it the program is drawn as written, as before.
+   */
+  readonly machine?: cam.viewer.MachineSetup
+  /** Spindle, extrusion and plane of every move (the parse's motion track); derived from the program when absent or stale. */
+  readonly motion?: cam.viewer.MotionTrack
+  readonly machineDisplay?: MachineDisplay
+  /** What the machine scene found (set-up findings, printer layers) after each rebuild. */
+  readonly onMachineInfo?: (info: MachineInfo) => void
   readonly toolpathDisplay?: {
     readonly showPoints: boolean
     readonly showPointLabels: boolean
@@ -101,6 +113,7 @@ export const disposeGroup = (group: THREE.Object3D): void => {
   group.clear()
 }
 
+/** What the assistant needs to read a CAM frame: the machine, how program coordinates map to the picture, where the tool is. */
 export function View3D(props: View3DProps) {
   let host: HTMLDivElement | undefined
   // A webview (or a test DOM) without WebGL must not take the whole screen down with it.
@@ -117,7 +130,7 @@ export function View3D(props: View3DProps) {
   let rebuild = () => {}, setPreset = () => {}
   let playback: Playback = { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
   let seconds = 0
-  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; props.tools; props.defaultTool; untrack(rebuild) })
+  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; props.tools; props.defaultTool; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
   createEffect(() => { if (props.preset) updatePreset(props.preset) })
   createEffect(() => { preset(); untrack(setPreset) })
   createEffect(() => { if (props.renderMode) updateMode(props.renderMode) })
@@ -168,6 +181,11 @@ export function View3D(props: View3DProps) {
     scene.add(content, helpers)
     const grid = new THREE.GridHelper(500, 500, 0x777777, 0x444444)
     grid.rotation.x = Math.PI / 2
+    if (props.visionMode === "cam") {
+      // Toolpaths cut below Z0: a dense grid there must not hide them in the depth buffer (it is drawn first, never occludes).
+      for (const material of Array.isArray(grid.material) ? grid.material : [grid.material]) material.depthWrite = false
+      grid.renderOrder = -1
+    }
     const axes = new THREE.Group()
     for (const [end, color] of [[new THREE.Vector3(500, 0, 0), 0x0000ff], [new THREE.Vector3(0, 500, 0), 0xff00ff], [new THREE.Vector3(0, 0, 500), 0x00ff7f]] as const) {
       axes.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([end.clone().negate(), end]), new THREE.LineBasicMaterial({ color })))
@@ -241,6 +259,8 @@ export function View3D(props: View3DProps) {
     scene.add(marker)
     // The tool in the spindle as its 3D assembly (cutting zone in the tool's colour, shank, holder), one group per toolId.
     const toolGroups = new Map<string, THREE.Group | null>()
+    let machineScene: MachineScene | undefined
+    const disposeMachine = (): void => { if (machineScene) { scene.remove(machineScene.root); machineScene.dispose(); machineScene = undefined } }
     let toolColorOf: ReadonlyMap<string, number> = new Map()
     const disposeTools = (): void => { for (const g of toolGroups.values()) if (g) { scene.remove(g); disposeGroup(g) } toolGroups.clear() }
     const toolGroupFor = (id: string): THREE.Group | null => {
@@ -261,6 +281,13 @@ export function View3D(props: View3DProps) {
         const mesh = new THREE.Mesh(geometry, material)
         mesh.name = `${part.part}${part.assumed ? " (assumed)" : ""}`
         group.add(mesh)
+      }
+      if (props.machine?.kind === "mill") {
+        // A flat stripe on the flutes: a solid of revolution does not show that it turns.
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.4, cutter.diameter * 0.12), 0.3, Math.max(1, cutter.fluteLength)), new THREE.MeshBasicMaterial({ color: 0x0f172a }))
+        stripe.position.set(cutter.diameter / 2, 0, cutter.fluteLength / 2)
+        stripe.name = "flute-marker"
+        group.add(stripe)
       }
       group.visible = false
       scene.add(group)
@@ -291,7 +318,11 @@ export function View3D(props: View3DProps) {
     }
     appearance = () => {
       invalidate()
-      grid.visible = gridVisible(); axes.visible = axesVisible(); origin.visible = axesVisible()
+      grid.visible = gridVisible(); axes.visible = axesVisible() && !machineScene; origin.visible = axesVisible() && !machineScene
+      // A lathe works in the XZ plane: its grid lies there.
+      grid.rotation.x = props.machine?.kind === "lathe" ? 0 : Math.PI / 2
+      const machineTriad = machineScene?.root.getObjectByName("machine-triad")
+      if (machineTriad) machineTriad.visible = axesVisible()
       origin.position.set(props.origin?.x ?? 0, props.origin?.y ?? 0, props.origin?.z ?? 0)
       content.traverse(object => {
         if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshStandardMaterial) {
@@ -346,7 +377,7 @@ export function View3D(props: View3DProps) {
       gizmo.detach(); selectedMesh = undefined; setSelected(undefined)
       disposeGroup(content)
       for (const [index, solid] of (props.solids ?? []).entries()) addSolid(solid, index)
-      if (props.stock) {
+      if (props.stock && (props.machine === undefined || props.machine.kind === "mill")) {
         const { size, origin: stockOrigin } = props.stock
         const boxGeometry = new THREE.BoxGeometry(size.x, size.y, size.z)
         const stock = new THREE.LineSegments(new THREE.EdgesGeometry(boxGeometry), new THREE.LineBasicMaterial({ color: 0xc8a878, transparent: true, opacity: props.toolpathDisplay?.stockOpacity ?? .6 }))
@@ -365,14 +396,32 @@ export function View3D(props: View3DProps) {
         }
       }
       playback = props.program ? buildPlayback(props.program, 5000, props.toolpathDisplay?.arcTolerance ?? .1) : { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
+      disposeMachine()
+      const machine = props.machine
+      if (machine && props.program) {
+        const cutter = props.tools?.get(props.program.toolpaths[0]?.toolId ?? "") ?? props.defaultTool
+        const extent = props.stock ? Math.max(props.stock.size.x, props.stock.size.y, props.stock.size.z) : 100
+        machineScene = createMachineScene({
+          setup: machine, program: props.program, ...(props.motion !== undefined ? { motion: props.motion } : {}), display: props.machineDisplay ?? DEFAULT_MACHINE_DISPLAY,
+          ...(cutter ? { tool: { radius: cutter.diameter / 2, length: cutter.stickout } } : {}),
+          scale: machine.kind === "lathe" ? Math.max(machine.stock.diameter, machine.stock.length / 2) : machine.kind === "3dprinter" ? Math.max(machine.bed.width, machine.bed.depth) / 2 : extent
+        })
+        scene.add(machineScene.root)
+        props.onMachineInfo?.({ findings: machineScene.findings, layers: machineScene.layers, timeline: machineScene.timeline })
+      }
+      const track = machineScene?.timeline.track
+      // Program -> display: the identity, except on a lathe (spindle axis horizontal, X as a radius).
+      const shown = (p: Vec3, path: number, index: number): Vec3 => machine?.kind === "lathe" ? cam.viewer.displayPoint(machine, p, track ? cam.viewer.stateAt(track, path, index).xMode : undefined) : p
       // Rapids dashed; cuts one colour per tool, so the operations of a multi-tool program read apart.
       const colors = props.program ? toolColors(props.program) : new Map<string, number>()
       disposeTools()
       toolColorOf = colors
       const rapid: number[] = [], cuts = new Map<string, number[]>()
-      for (const s of playback.segments) {
+      // A printer's path is drawn by the machine scene: deposited beads and travel, not cuts.
+      for (const s of machine?.kind === "3dprinter" ? [] : playback.segments) {
         const into = s.rapid ? rapid : cuts.get(s.toolId) ?? (cuts.set(s.toolId, []), cuts.get(s.toolId)!)
-        into.push(s.from.x, s.from.y, s.from.z, s.to.x, s.to.y, s.to.z)
+        const a = shown(s.from, s.path, s.index), b = shown(s.to, s.path, s.index)
+        into.push(a.x, a.y, a.z, b.x, b.y, b.z)
       }
       addLines(rapid, true)
       for (const [toolId, positions] of cuts) addLines(positions, false, colors.get(toolId))
@@ -383,8 +432,9 @@ export function View3D(props: View3DProps) {
             if (props.toolpathDisplay.pointFilter !== "all" && props.toolpathDisplay.pointFilter !== point.kind) continue
             const geometry = new THREE.SphereGeometry(props.toolpathDisplay.pointSize, 10, 8)
             const marker = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: pointColor[point.kind], depthTest: false }))
-            marker.position.set(point.position.x, point.position.y, point.position.z); marker.renderOrder = 20; content.add(marker)
-            if (props.toolpathDisplay.showPointLabels) addPointLabel(String(point.index), point.position)
+            const at = machine?.kind === "lathe" ? cam.viewer.displayPoint(machine, point.position) : point.position
+            marker.position.set(at.x, at.y, at.z); marker.renderOrder = 20; content.add(marker)
+            if (props.toolpathDisplay.showPointLabels) addPointLabel(String(point.index), at)
           }
         }
         if (props.toolpathDisplay.showArcCenters || props.toolpathDisplay.showArcRadii) {
@@ -403,6 +453,7 @@ export function View3D(props: View3DProps) {
     let initialized = false
     fit = () => {
       const box = new THREE.Box3().setFromObject(content)
+      if (machineScene) fitBounds(machineScene.root, box)
       if (!box.isEmpty()) { box.getCenter(controls.target); radius = Math.max(1, box.getSize(new THREE.Vector3()).length() / 2) }
       setPreset()
     }
@@ -462,9 +513,16 @@ export function View3D(props: View3DProps) {
       }
       previous = now
       const p = positionAt(playback, seconds)
-      const visible = playback.segments.length > 0
+      if (machineScene?.update(seconds)) invalidate()
+      // A lathe tool or a printer nozzle is the machine scene's; the milling cutter and the marker are for mills only.
+      const ownTool = machineScene !== undefined && props.machine?.kind !== "mill"
+      const visible = playback.segments.length > 0 && !ownTool
       const activeId = visible ? toolAt(playback, seconds) : undefined
       const active = activeId !== undefined ? toolGroupFor(activeId) : null
+      if (active && machineScene) {
+        const angle = machineScene.spinAngle(seconds)
+        if (active.rotation.z !== angle) { active.rotation.z = angle; invalidate() }
+      }
       for (const [id, g] of toolGroups) if (g && id !== activeId && g.visible) { g.visible = false; invalidate() }
       if (active) {
         if (!active.visible || active.position.x !== p.x || active.position.y !== p.y || active.position.z !== p.z) { active.position.set(p.x, p.y, p.z); active.visible = true; invalidate() }
@@ -486,9 +544,9 @@ export function View3D(props: View3DProps) {
     const unregisterCapture = registerViewportCapture(props.visionMode ?? "cad", () => {
       if (meshJobs.pending > 0 || meshError() || !renderer.domElement.isConnected || renderer.domElement.clientWidth === 0 || renderer.domElement.clientHeight === 0) return undefined
       renderFrame()
-      return { canvas: renderer.domElement, camera: { position: [activeCamera.position.x, activeCamera.position.y, activeCamera.position.z], target: [controls.target.x, controls.target.y, controls.target.z] }, ...(props.visionMode === "cam" && props.program ? { programText: cam.programGeometryText(props.program) } : {}) }
+      return { canvas: renderer.domElement, camera: { position: [activeCamera.position.x, activeCamera.position.y, activeCamera.position.z], target: [controls.target.x, controls.target.y, controls.target.z] }, ...(props.visionMode === "cam" && props.program ? { programText: cam.programGeometryText(props.program) } : {}), ...(machineScene && props.machine ? { spatial: machineSpatial(props.machine, machineScene, seconds) } : {}) }
     })
-    onCleanup(() => { unregisterCapture(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
+    onCleanup(() => { unregisterCapture(); disposeMachine(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />

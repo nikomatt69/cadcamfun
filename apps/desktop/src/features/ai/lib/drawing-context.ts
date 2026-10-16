@@ -18,6 +18,7 @@ import { useCamStore } from "../../cam/store/camStore.ts"
 import { captureEditorOwner, rememberPushed } from "./editor-sync.ts"
 import { useGeneratorStore } from "../../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../../cam/store/verifyStore.ts"
+import { previewSummary } from "../../cam/lib/machine-view.ts"
 import { drawingPayload } from "../../cad/lib/projectSnapshot.ts"
 import { toJsonSafe } from "../../../shared/state/json-safe.ts"
 
@@ -117,7 +118,8 @@ export function currentDrawingContext(app: AppState) {
         id: toolpath.id, name: toolpath.name, toolId: toolpath.toolId, moveCount: toolpath.moves.length,
         duration: estimateTime(toolpath, RAPID_RATE_MM_PER_MIN)
       })),
-      verification: verificationState()
+      verification: verificationState(),
+      preview: previewSummary({ gcode, kernelNc: camStore.kernelArtifact?.nc, generatorGcode: generator.currentGCode, settings: generator.settings, override: camStore.machineOverride, motion: camStore.motion }) ?? null
     }
   }
 }

@@ -88,7 +88,18 @@ export const CamStockSetInput = Schema.Struct({
 export const CAM_ACTION_INPUTS = {
   "cam.plan_check": CamMachiningPlan,
   "cam.review": Schema.Struct({ operationId: id }),
-  "cam.machine": Schema.Struct({ machineType: cam.generator.MachineTypeSchema }),
+  /**
+   * The machine's kinematics; with a program (text or operation), how it runs there (spec 31): what turns and in which sense,
+   * where the tool is at `at` seconds, the set-up findings (vise, chuck, bed), the turned part or the printed layers. `params`
+   * are generator settings (workholding, lathe turret and grip, printer bed...) laid over the machine's defaults.
+   */
+  "cam.machine": Schema.Struct({
+    machineType: cam.generator.MachineTypeSchema,
+    gcode: Schema.optionalKey(id),
+    operationId: Schema.optionalKey(id),
+    params: Schema.optionalKey(params),
+    at: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)))
+  }),
   "cam.operations": empty,
   "cam.suggest": Schema.Struct({ params: Schema.optionalKey(params) }),
   "cam.compare_setups": Schema.Struct({ candidates: Schema.Array(CamSetupCandidate).check(Schema.isMinLength(1), Schema.isMaxLength(4)) }),

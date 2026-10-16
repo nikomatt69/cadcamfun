@@ -7603,6 +7603,33 @@ var CODE_OF = {
   [FixedCycleType.CUSTOM]: "G81"
 };
 
+// packages/core/src/cam/viewer/motion-track.ts
+var Index = Int.check(isGreaterThanOrEqualTo2(0));
+var MotionRunSchema = Struct({
+  start: Index,
+  spindle: Literals(["cw", "ccw", "off"]),
+  rpm: Finite,
+  css: Boolean3,
+  plane: Literals([17, 18, 19]),
+  xMode: Literals(["diameter", "radius"]),
+  tool: optionalKey2(Int),
+  coolant: Literals(["off", "flood", "mist"]),
+  feedMode: Literals(["min", "rev"])
+});
+var MotionPathTrackSchema = Struct({
+  count: Index,
+  runs: ArraySchema(MotionRunSchema),
+  extrude: optionalKey2(ArraySchema(Finite)),
+  lines: optionalKey2(ArraySchema(Index)),
+  rpm: optionalKey2(ArraySchema(Finite)),
+  retracts: optionalKey2(ArraySchema(Index)),
+  homes: optionalKey2(ArraySchema(Index))
+});
+var MotionTrackSchema = Struct({
+  paths: ArraySchema(MotionPathTrackSchema),
+  unsupported: ArraySchema(Struct({ line: Index, word: String4 }))
+});
+
 // packages/core/src/cam/kernel/identity.ts
 var K = new Uint32Array([
   1116352408,
@@ -7754,33 +7781,6 @@ var EMPTY2 = new Float64Array(0);
 // packages/core/src/cam/model/model.ts
 var BOOLEANS2 = new Set(["boolean-union", "boolean-subtract", "boolean-intersect"]);
 
-// packages/core/src/cam/generator/history-features.ts
-var cache2 = new Map;
-
-// packages/core/src/cam/generator/unified-geometry.ts
-var SOLID_TYPES2 = new Set([
-  "cube",
-  "sphere",
-  "hemisphere",
-  "cylinder",
-  "cone",
-  "capsule",
-  "pyramid",
-  "prism",
-  "ellipsoid",
-  "rectangle",
-  "circle",
-  "polygon",
-  "ellipse",
-  "triangle",
-  "mesh",
-  "custom",
-  "imported"
-]);
-
-// packages/core/src/cam/generator/evidence.ts
-var PART_TYPES = new Set(["parametric", "brep", "mesh"]);
-
 // packages/core/src/cam/generator/schema.ts
 var Num2 = Finite;
 var PositiveInt = Int.check(isGreaterThan2(0));
@@ -7889,6 +7889,19 @@ var ToolpathSettingsSchema = Struct({
   spindleDirection: withDefault2(Literals(["cw", "ccw"]), "cw"),
   turningOperation: withDefault2(Literals(["external", "internal", "face"]), "external"),
   applyToolCompensation: withDefault2(Boolean3, true),
+  workholding: withDefault2(Literals(["vise", "clamps", "plate", "none"]), "vise"),
+  viseJawAxis: withDefault2(Literals(["x", "y"]), "x"),
+  clampDepth: withDefault2(NonNegative3, 0),
+  viseJawHeight: withDefault2(Positive3, 40),
+  parallelsHeight: withDefault2(NonNegative3, 10),
+  workholdingConfigured: withDefault2(Boolean3, false),
+  latheTurret: withDefault2(Literals(["rear", "front"]), "rear"),
+  chuckType: withDefault2(Literals(["3-jaw", "4-jaw", "collet"]), "3-jaw"),
+  gripLength: withDefault2(Positive3, 20),
+  tailstock: withDefault2(Boolean3, false),
+  stockBore: withDefault2(NonNegative3, 0),
+  printerKinematics: withDefault2(Literals(["cartesian", "corexy", "bed-slinger", "delta"]), "cartesian"),
+  buildHeight: withDefault2(Positive3, 250),
   originType: withDefault2(OriginTypeSchema, "workpiece-center"),
   originX: withDefault2(Num2, 0),
   originY: withDefault2(Num2, 0),
@@ -8014,7 +8027,8 @@ var ParseRequestSchema = Struct({
 var ParseResponseSchema = Struct({
   warnings: ArraySchema(String4),
   stats: GcodeStatsSchema,
-  program: ProgramSchema
+  program: ProgramSchema,
+  motion: optionalKey2(MotionTrackSchema)
 });
 var SuggestRequestSchema = Struct({
   settings: withDefault2(ToolpathSettingsSchema, DEFAULT_SETTINGS),
@@ -8037,6 +8051,36 @@ var SuggestResponseSchema = Struct({
   operation: Struct({ title: String4, description: String4 }),
   warnings: ArraySchema(String4)
 });
+
+// packages/core/src/cam/generator/history-features.ts
+var cache2 = new Map;
+
+// packages/core/src/cam/generator/unified-geometry.ts
+var SOLID_TYPES2 = new Set([
+  "cube",
+  "sphere",
+  "hemisphere",
+  "cylinder",
+  "cone",
+  "capsule",
+  "pyramid",
+  "prism",
+  "ellipsoid",
+  "rectangle",
+  "circle",
+  "polygon",
+  "ellipse",
+  "triangle",
+  "mesh",
+  "custom",
+  "imported"
+]);
+
+// packages/core/src/cam/viewer/machine-setup.ts
+var INTERNAL_TOOLS = new Set(["boring"]);
+
+// packages/core/src/cam/generator/evidence.ts
+var PART_TYPES = new Set(["parametric", "brep", "mesh"]);
 // packages/core/src/cam/verify/schema.ts
 var VerifyToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
 var VerifyToolSchema = Struct({

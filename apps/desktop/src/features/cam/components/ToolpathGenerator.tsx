@@ -27,6 +27,7 @@ import { MachineSection } from "./generator/MachineSection.tsx"
 import { MaterialSection } from "./generator/MaterialSection.tsx"
 import { OperationSection } from "./generator/OperationSection.tsx"
 import { OriginSection } from "./generator/OriginSection.tsx"
+import { WorkholdingSection } from "./generator/WorkholdingSection.tsx"
 import { PrinterParamsSection } from "./generator/PrinterParamsSection.tsx"
 import { ToolSection } from "./generator/ToolSection.tsx"
 import CapabilitiesOverview from "./CapabilitiesOverview.tsx"
@@ -129,6 +130,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
       </Motion.div>
 
       <OriginSection />
+      <WorkholdingSection />
       <MachineSection />
       <Show when={gen.settings.machineType === "mill"}><KernelSection onGCodeGenerated={props.onGCodeGenerated} /></Show>
       <OperationSection />
