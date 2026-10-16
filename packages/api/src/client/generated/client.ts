@@ -1924,6 +1924,12 @@ type Endpoint19_1Input = {
   readonly cuttingLength?: Endpoint19_1Request["payload"]["cuttingLength"]
   readonly totalLength?: Endpoint19_1Request["payload"]["totalLength"]
   readonly shankDiameter?: Endpoint19_1Request["payload"]["shankDiameter"]
+  readonly cornerRadius?: Endpoint19_1Request["payload"]["cornerRadius"]
+  readonly tipAngle?: Endpoint19_1Request["payload"]["tipAngle"]
+  readonly threadPitch?: Endpoint19_1Request["payload"]["threadPitch"]
+  readonly holderDiameter?: Endpoint19_1Request["payload"]["holderDiameter"]
+  readonly holderLength?: Endpoint19_1Request["payload"]["holderLength"]
+  readonly stickout?: Endpoint19_1Request["payload"]["stickout"]
   readonly notes?: Endpoint19_1Request["payload"]["notes"]
   readonly organizationId?: Endpoint19_1Request["payload"]["organizationId"]
   readonly isPublic?: Endpoint19_1Request["payload"]["isPublic"]
@@ -1941,6 +1947,12 @@ const Endpoint19_1 = (raw: RawClient["tools"]) => (input?: Endpoint19_1Input) =>
       cuttingLength: input?.["cuttingLength"],
       totalLength: input?.["totalLength"],
       shankDiameter: input?.["shankDiameter"],
+      cornerRadius: input?.["cornerRadius"],
+      tipAngle: input?.["tipAngle"],
+      threadPitch: input?.["threadPitch"],
+      holderDiameter: input?.["holderDiameter"],
+      holderLength: input?.["holderLength"],
+      stickout: input?.["stickout"],
       notes: input?.["notes"],
       organizationId: input?.["organizationId"],
       isPublic: input?.["isPublic"],
@@ -1965,6 +1977,12 @@ type Endpoint19_3Input = {
   readonly cuttingLength?: Endpoint19_3Request["payload"]["cuttingLength"]
   readonly totalLength?: Endpoint19_3Request["payload"]["totalLength"]
   readonly shankDiameter?: Endpoint19_3Request["payload"]["shankDiameter"]
+  readonly cornerRadius?: Endpoint19_3Request["payload"]["cornerRadius"]
+  readonly tipAngle?: Endpoint19_3Request["payload"]["tipAngle"]
+  readonly threadPitch?: Endpoint19_3Request["payload"]["threadPitch"]
+  readonly holderDiameter?: Endpoint19_3Request["payload"]["holderDiameter"]
+  readonly holderLength?: Endpoint19_3Request["payload"]["holderLength"]
+  readonly stickout?: Endpoint19_3Request["payload"]["stickout"]
   readonly notes?: Endpoint19_3Request["payload"]["notes"]
   readonly organizationId?: Endpoint19_3Request["payload"]["organizationId"]
   readonly isPublic?: Endpoint19_3Request["payload"]["isPublic"]
@@ -1983,6 +2001,12 @@ const Endpoint19_3 = (raw: RawClient["tools"]) => (input: Endpoint19_3Input) =>
       cuttingLength: input["cuttingLength"],
       totalLength: input["totalLength"],
       shankDiameter: input["shankDiameter"],
+      cornerRadius: input["cornerRadius"],
+      tipAngle: input["tipAngle"],
+      threadPitch: input["threadPitch"],
+      holderDiameter: input["holderDiameter"],
+      holderLength: input["holderLength"],
+      stickout: input["stickout"],
       notes: input["notes"],
       organizationId: input["organizationId"],
       isPublic: input["isPublic"],

@@ -37,10 +37,20 @@ The machine shown comes from the generator's output, the kernel (mill), or the G
 ## Running a program on its machine
 cam action machine with `gcode` (or `operationId`), optional `params` (the workholding below, a mill `stock`) and `at` (seconds) answers the kinematics for that program: what turns and in which sense, where the tool is at `at` (program and preview coordinates, spindle, rpm, line), the set-up findings, the turned part (Z ranges and diameters) or the printed layers. Use it to check a change before writing it, and to explain what the preview shows.
 
+## Tools in 3D
+Every tool has one 3D model from its type and properties: the user's tool in Resources (type, diameter, flutes, cutting / total length, shank, corner or nose radius, included or taper angle, thread pitch, holder, stickout), the generator's tool, or the kernel's cutter. The Resources page, the preview and the set-up checks draw and use that same model; a property not given is taken from the type and said to be assumed.
+- Mill types: endmill, roughingendmill, ballendmill, bullnose, cornerroundingmill, chamfermill, vbit, engraver, spotdrill, drillbit, reamer, taperedendmill, facemill, threadmill (teeth at the pitch), tslotcutter / woodruffcutter / keywaycutter (disc on a neck), dovetailcutter, boringbar, probe (ruby ball, spindle off), toolsetter (on the table).
+- Lathe: turning, facing, threading, grooving, parting (blade width), boring (inside the bore), knurling; `noseRadius` rounds the insert (0 = sharp) and the turned shoulder corners.
+- Printer nozzles: brass, hardened, ruby, standard, with `nozzleDiameter`.
+- cam action machine params.tool takes a tool resource to check a program with that exact tool.
+
+## Rotary (3+2, 5-axis)
+The preview reads the trunnion (table-AC / table-BC) from the program header or its A/B/C words, and the frame of the coordinates (control TCP G234 / G43.4: part; indexed Orient or no TCP: machine). Part view: the part stays, the tool leans along R^T Z; machine view: the tool stays vertical and the table turns. Say when the layout or frame is assumed.
+
 ## Workholding
 Set it with the operation's params (cam_edit create / update), then the preview updates:
 - Mill: `workholding` vise | clamps | plate | none; `viseJawAxis` x (jaws along X, clamping across Y) | y; `clampDepth` mm gripped (0 = a third of the stock, 3-10 mm); `parallelsHeight`; `viseJawHeight`. Keep the deepest cut above the jaws (stock top - depth > stock bottom + clampDepth) or cut outside the jaws.
-- Lathe: `latheTurret` rear | front, `chuckType` 3-jaw | 4-jaw | collet, `gripLength`, `stockBore`, `tailstock`. Stickout = stockLength - gripLength; above 4 x the diameter use the tailstock. Never feed into the jaws: Z stays in front of the grip.
+- Lathe: `latheTurret` rear | front, `chuckType` 3-jaw | 4-jaw | collet, `gripLength`, `stockBore`, `tailstock`, `noseRadius`. Stickout = stockLength - gripLength; above 4 x the diameter use the tailstock. The generator keeps every cut 2 mm in front of the jaws (Z >= -(stockLength - gripLength - 2)) and says so in the program; a turned profile gets bar for the grip.
 - Printer: `printerKinematics`, `buildHeight`, `bedWidth`, `bedDepth`, `bedOrigin`.
 - `workholdingConfigured: true` makes it real: drawn solid, checked, and passed to the verifier as fixtures. Until then it is an assumption (translucent) and its findings are warnings. Say which it is.
 

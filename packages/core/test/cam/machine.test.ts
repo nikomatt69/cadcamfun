@@ -97,8 +97,20 @@ describe("what the generator writes agrees with its machine", () => {
 
   test("external turning feeds into the part, below the face (negative Z)", () => {
     const gcode = run({ machineType: "lathe", toolType: "turning", operationType: "turning", depth: 2, stepdown: 1, stockLength: 60 })
-    expect(gcode).toContain("G1 Z-60.000")
+    expect(gcode).toContain("G1 Z-38.000")
     expect(gcode).not.toMatch(/G1 Z60/)
+  })
+
+  test("every lathe operation stays in front of the chuck jaws (spec 31)", () => {
+    for (const operationType of ["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"]) {
+      for (const [stockLength, gripLength] of [[100, 20], [40, 25], [30, 20]] as const) {
+        const gcode = run({ machineType: "lathe", operationType, depth: 2, stepdown: 1, stockLength, gripLength })
+        const zs = [...gcode.matchAll(/^G(?:1|32) .*?\bZ(-?[\d.]+)/gm)].map((m) => Number(m[1]))
+        expect(Math.min(...zs, 0), `${operationType} ${stockLength}/${gripLength}`).toBeGreaterThanOrEqual(-(stockLength - gripLength - 2) - 1e-9)
+      }
+    }
+    // A short grip lets it go further.
+    expect(run({ machineType: "lathe", toolType: "turning", operationType: "turning", depth: 2, stepdown: 1, stockLength: 60, gripLength: 5 })).toContain("G1 Z-53.000")
   })
 
   test("mill programs turn the tool and stay in the mill's plane", () => {

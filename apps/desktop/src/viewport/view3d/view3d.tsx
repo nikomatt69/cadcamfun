@@ -11,6 +11,7 @@ import { entityPaths, renderEntity } from "../editor2d/render.ts"
 import { t } from "../../i18n/index.ts"
 import { buildPlayback, positionAt, toolAt, toolColors, type Playback } from "./playback.ts"
 import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
+import { toolObject } from "./tool-object.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
 export { machineSpatial, type MachineInfo } from "./machine-scene.ts"
 
@@ -55,6 +56,12 @@ export interface View3DProps {
   readonly tools?: ReadonlyMap<string, cam.kernel.Cutter>
   /** Cutter for a `toolId` that `tools` does not know (the generator's settings tool). */
   readonly defaultTool?: cam.kernel.Cutter
+  /**
+   * The 3D model of the tools by `toolId` and of the default tool (spec 31: the same model the tool's Resources page shows);
+   * they win over `tools` / `defaultTool`, which are drawn through the same model.
+   */
+  readonly toolModels?: ReadonlyMap<string, cam.ToolModel>
+  readonly defaultToolModel?: cam.ToolModel
   readonly preset?: ViewPreset
   readonly playing?: boolean
   readonly playbackTime?: number
@@ -130,7 +137,7 @@ export function View3D(props: View3DProps) {
   let rebuild = () => {}, setPreset = () => {}
   let playback: Playback = { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
   let seconds = 0
-  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; props.tools; props.defaultTool; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
+  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
   createEffect(() => { if (props.preset) updatePreset(props.preset) })
   createEffect(() => { preset(); untrack(setPreset) })
   createEffect(() => { if (props.renderMode) updateMode(props.renderMode) })
@@ -260,35 +267,57 @@ export function View3D(props: View3DProps) {
     // The tool in the spindle as its 3D assembly (cutting zone in the tool's colour, shank, holder), one group per toolId.
     const toolGroups = new Map<string, THREE.Group | null>()
     let machineScene: MachineScene | undefined
+    let rotary: cam.viewer.RotarySetup | undefined
+    const anglesOf = new Map<string, cam.viewer.Angles>()
+    const zAxis = new THREE.Vector3(0, 0, 1)
+    /** Where the tool is and how it leans at `seconds` on a rotary mill, and how the table is turned (machine frame). */
+    const rotaryPose = (seconds: number): { readonly at: Vec3; readonly axis: THREE.Vector3; readonly table?: THREE.Matrix4 } | undefined => {
+      if (!rotary || !machineScene) return undefined
+      const pose = cam.viewer.poseAt(machineScene.timeline, seconds)
+      if ((props.machineDisplay?.frame ?? "part") === "machine") {
+        const r = cam.viewer.rotationOf(pose.angles, rotary)
+        const pv = rotary.pivot
+        // x' = R (x - pivot) + pivot, as a 4x4 matrix for the turning table.
+        const m = new THREE.Matrix4().set(r[0], r[1], r[2], 0, r[3], r[4], r[5], 0, r[6], r[7], r[8], 0, 0, 0, 0, 1)
+        const t = new THREE.Vector3(pv.x, pv.y, pv.z).sub(new THREE.Vector3(pv.x, pv.y, pv.z).applyMatrix4(m))
+        m.setPosition(t)
+        return { at: cam.viewer.machinePointOf(pose.point, pose.angles, rotary), axis: zAxis.clone(), table: m }
+      }
+      const axis = cam.viewer.toolAxisInPart(pose.angles, rotary)
+      return { at: cam.viewer.partPointOf(pose.point, pose.angles, rotary), axis: new THREE.Vector3(axis.x, axis.y, axis.z).normalize() }
+    }
+    /** Turns the part side (path, stock, setter, workholding) as the table does; identity in the part frame. */
+    const placeTable = (table: THREE.Matrix4 | undefined): boolean => {
+      const target = table ?? new THREE.Matrix4()
+      const bodies = machineScene?.root.getObjectByName("machine-bodies")
+      let changed = false
+      for (const group of [content, bodies]) {
+        if (!group) continue
+        if (!group.matrix.equals(target)) { group.matrixAutoUpdate = false; group.matrix.copy(target); group.matrixWorldNeedsUpdate = true; changed = true }
+      }
+      return changed
+    }
     const disposeMachine = (): void => { if (machineScene) { scene.remove(machineScene.root); machineScene.dispose(); machineScene = undefined } }
     let toolColorOf: ReadonlyMap<string, number> = new Map()
     const disposeTools = (): void => { for (const g of toolGroups.values()) if (g) { scene.remove(g); disposeGroup(g) } toolGroups.clear() }
+    /** The model the preview draws for a toolpath's tool: its own, the kernel's cutter, the generator's tool. A tool setter is
+     * on the table (see `rebuild`): what moves is the cutter it measures. */
+    const modelFor = (id: string): cam.ToolModel | undefined => {
+      const own = props.toolModels?.get(id)
+      if (own !== undefined) return own
+      const cutter = props.tools?.get(id)
+      if (cutter !== undefined) return cam.toolModelFromCutter(cutter)
+      const fallback = props.defaultToolModel ?? (props.defaultTool !== undefined ? cam.toolModelFromCutter(props.defaultTool) : undefined)
+      return fallback?.family === "setter" ? cam.toolModelOf({ type: "endmill", diameter: 6 }) : fallback
+    }
     const toolGroupFor = (id: string): THREE.Group | null => {
       const known = toolGroups.get(id)
       if (known !== undefined) return known
-      const cutter = props.tools?.get(id) ?? props.defaultTool
-      if (cutter === undefined || props.toolpathDisplay?.showTool === false) { toolGroups.set(id, null); return null }
-      const group = new THREE.Group()
+      const model = modelFor(id)
+      if (model === undefined || props.toolpathDisplay?.showTool === false || model.family === "lathe" || model.family === "nozzle") { toolGroups.set(id, null); return null }
+      const group = toolObject(model, { color: toolColorOf.get(id) ?? 0xf59e0b, assumeHolder: props.toolpathDisplay?.showHolder !== false })
+      if (props.toolpathDisplay?.showHolder === false) for (const child of [...group.children]) if (child.name.startsWith("holder")) { group.remove(child); disposeGroup(child) }
       group.name = `tool:${id}`
-      for (const part of cam.kernel.assemblyMeshes(cutter, { assumeHolder: props.toolpathDisplay?.showHolder !== false, segments: 40 })) {
-        if (part.part === "holder" && props.toolpathDisplay?.showHolder === false) continue
-        const geometry = new THREE.BufferGeometry()
-        geometry.setAttribute("position", new THREE.BufferAttribute(part.positions, 3))
-        geometry.setAttribute("normal", new THREE.BufferAttribute(part.normals, 3))
-        geometry.setIndex(new THREE.BufferAttribute(part.indices, 1))
-        const color = part.part === "cutting" ? toolColorOf.get(id) ?? 0xf59e0b : part.part === "shank" ? 0xb8bec6 : 0x4b5563
-        const material = new THREE.MeshStandardMaterial({ color, metalness: part.part === "holder" ? 0.4 : 0.75, roughness: part.part === "cutting" ? 0.3 : 0.45, transparent: part.assumed, opacity: part.assumed ? 0.35 : 1, side: THREE.DoubleSide })
-        const mesh = new THREE.Mesh(geometry, material)
-        mesh.name = `${part.part}${part.assumed ? " (assumed)" : ""}`
-        group.add(mesh)
-      }
-      if (props.machine?.kind === "mill") {
-        // A flat stripe on the flutes: a solid of revolution does not show that it turns.
-        const stripe = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.4, cutter.diameter * 0.12), 0.3, Math.max(1, cutter.fluteLength)), new THREE.MeshBasicMaterial({ color: 0x0f172a }))
-        stripe.position.set(cutter.diameter / 2, 0, cutter.fluteLength / 2)
-        stripe.name = "flute-marker"
-        group.add(stripe)
-      }
       group.visible = false
       scene.add(group)
       toolGroups.set(id, group)
@@ -395,7 +424,9 @@ export function View3D(props: View3DProps) {
           addLines(positions, false)
         }
       }
-      playback = props.program ? buildPlayback(props.program, 5000, props.toolpathDisplay?.arcTolerance ?? .1) : { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
+      // With a machine the first move starts where that machine believably is, not at the work zero inside the part.
+      const start = props.machine && props.program ? cam.viewer.programStart(props.machine.kind, props.program) : undefined
+      playback = props.program ? buildPlayback(props.program, 5000, props.toolpathDisplay?.arcTolerance ?? .1, start) : { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
       disposeMachine()
       const machine = props.machine
       if (machine && props.program) {
@@ -403,15 +434,31 @@ export function View3D(props: View3DProps) {
         const extent = props.stock ? Math.max(props.stock.size.x, props.stock.size.y, props.stock.size.z) : 100
         machineScene = createMachineScene({
           setup: machine, program: props.program, ...(props.motion !== undefined ? { motion: props.motion } : {}), display: props.machineDisplay ?? DEFAULT_MACHINE_DISPLAY,
+          ...(start !== undefined ? { start } : {}),
           ...(cutter ? { tool: { radius: cutter.diameter / 2, length: cutter.stickout } } : {}),
           scale: machine.kind === "lathe" ? Math.max(machine.stock.diameter, machine.stock.length / 2) : machine.kind === "3dprinter" ? Math.max(machine.bed.width, machine.bed.depth) / 2 : extent
         })
         scene.add(machineScene.root)
         props.onMachineInfo?.({ findings: machineScene.findings, layers: machineScene.layers, timeline: machineScene.timeline })
       }
+      // A tool setter stands on the table where the program measures (its pad top is the length reference, Z0).
+      const setterModel = props.defaultToolModel?.family === "setter" ? props.defaultToolModel : undefined
+      if (setterModel !== undefined && props.program) {
+        const first = props.program.toolpaths.flatMap((tp) => tp.moves).find((m) => m._tag === "Rapid" || m._tag === "Linear")
+        const at = first && (first._tag === "Rapid" || first._tag === "Linear") ? first.to : { x: 0, y: 0, z: 0 }
+        const body = toolObject(setterModel)
+        body.position.set(at.x, at.y, 0)
+        content.add(body)
+      }
       const track = machineScene?.timeline.track
       // Program -> display: the identity, except on a lathe (spindle axis horizontal, X as a radius).
-      const shown = (p: Vec3, path: number, index: number): Vec3 => machine?.kind === "lathe" ? cam.viewer.displayPoint(machine, p, track ? cam.viewer.stateAt(track, path, index).xMode : undefined) : p
+      // Rotary mills: every point in the part frame (a machine-coordinate program is turned back by its move's angles).
+      rotary = machine?.kind === "mill" ? machine.rotary : undefined
+      anglesOf.clear()
+      if (rotary && machineScene) for (const m of machineScene.timeline.moves) anglesOf.set(`${m.path}:${m.index}`, m.angles)
+      const shown = (p: Vec3, path: number, index: number): Vec3 => machine?.kind === "lathe"
+        ? cam.viewer.displayPoint(machine, p, track ? cam.viewer.stateAt(track, path, index).xMode : undefined)
+        : rotary ? cam.viewer.partPointOf(p, anglesOf.get(`${path}:${index}`) ?? {}, rotary) : p
       // Rapids dashed; cuts one colour per tool, so the operations of a multi-tool program read apart.
       const colors = props.program ? toolColors(props.program) : new Map<string, number>()
       disposeTools()
@@ -512,17 +559,22 @@ export function View3D(props: View3DProps) {
         props.onPlaybackTimeChange?.(seconds)
       }
       previous = now
-      const p = positionAt(playback, seconds)
+      let p = positionAt(playback, seconds)
       if (machineScene?.update(seconds)) invalidate()
       // A lathe tool or a printer nozzle is the machine scene's; the milling cutter and the marker are for mills only.
       const ownTool = machineScene !== undefined && props.machine?.kind !== "mill"
       const visible = playback.segments.length > 0 && !ownTool
       const activeId = visible ? toolAt(playback, seconds) : undefined
       const active = activeId !== undefined ? toolGroupFor(activeId) : null
+      const lean = rotaryPose(seconds)
+      if (placeTable(lean?.table)) invalidate()
       if (active && machineScene) {
         const angle = machineScene.spinAngle(seconds)
-        if (active.rotation.z !== angle) { active.rotation.z = angle; invalidate() }
+        // The tool's own turning about its axis, then its lean (rotary mills, part frame).
+        const q = new THREE.Quaternion().setFromUnitVectors(zAxis, lean?.axis ?? zAxis).multiply(new THREE.Quaternion().setFromAxisAngle(zAxis, angle))
+        if (!active.quaternion.equals(q)) { active.quaternion.copy(q); invalidate() }
       }
+      if (lean) p = lean.at
       for (const [id, g] of toolGroups) if (g && id !== activeId && g.visible) { g.visible = false; invalidate() }
       if (active) {
         if (!active.visible || active.position.x !== p.x || active.position.y !== p.y || active.position.z !== p.z) { active.position.set(p.x, p.y, p.z); active.visible = true; invalidate() }

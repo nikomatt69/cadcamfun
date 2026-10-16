@@ -294,6 +294,13 @@ export const toolTable = sqliteTable(
   cuttingLength: real("cuttingLength"),
   totalLength: real("totalLength"),
   shankDiameter: real("shankDiameter"),
+  // Shape of the tool for its 3D model (spec 31): corner / nose radius, included or taper angle, thread pitch, holder.
+  cornerRadius: real("cornerRadius"),
+  tipAngle: real("tipAngle"),
+  threadPitch: real("threadPitch"),
+  holderDiameter: real("holderDiameter"),
+  holderLength: real("holderLength"),
+  stickout: real("stickout"),
   notes: text("notes"),
   isPublic: integer("isPublic", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),

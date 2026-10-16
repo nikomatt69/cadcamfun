@@ -58,6 +58,11 @@ export interface InterpretOptions {
   readonly start?: P3
   /** Return the machine state of every segment in `states` (the viewer's motion track). */
   readonly track?: boolean
+  /**
+   * Replay probing moves (`G38.2`-`G38.5`, Fanuc `G31`) as feed moves to their programmed end (the search limit; where the
+   * stylus touches is not known before the machine runs). Off by default: the verifier and the evidence never see them as cuts.
+   */
+  readonly probeMoves?: boolean
 }
 
 /** Largest chord sagitta of a G18/G19 arc, mm (the IR's `Arc` lies in XY, so other planes are replayed as chords). */
@@ -83,6 +88,8 @@ export interface MotionSample {
   readonly coolant: "off" | "flood" | "mist"
   readonly feedMode: "min" | "rev"
   readonly line: number
+  /** A probing move (touch probe or tool setter), not a cut. */
+  readonly probe: boolean
 }
 
 export interface InterpretResult {
@@ -186,7 +193,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   }
   const sample = (line: number, at: P3): void => {
     if (states === undefined) return
-    states.push({ spindle, rpm: spindle === "off" ? 0 : rpmAt(at.x), css, plane, xMode, extrude: 0, retract: retracted, home: homed, tool, coolant, feedMode: feedRev ? "rev" : "min", line })
+    states.push({ spindle, rpm: spindle === "off" ? 0 : rpmAt(at.x), css, plane, xMode, extrude: 0, retract: retracted, home: homed, tool, coolant, feedMode: feedRev ? "rev" : "min", line, probe: motion === 38 })
     retracted = false
     homed = false
   }
@@ -290,6 +297,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
           motion = g
           if (g === 73 || (g >= 81 && g <= 83)) cycleStarted = true
         } else if (g === 32 || g === 33) motion = 32
+        else if (options.probeMoves === true && ((g >= 38.2 && g <= 38.5) || g === 31)) motion = 38
         else if (g === 20) unit = 25.4
         else if (g === 21) unit = 1
         else if (g === 98 || g === 99) retractMode = g
@@ -310,7 +318,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if (g === 92.1) { shift.x = 0; shift.y = 0; shift.z = 0 }
         else if (g === 50) setting = "g50"
         else if (g === 28) setting = "home"
-        else if ([40, 49, 43, 54, 55, 56, 57, 58, 59].includes(g)) {
+        else if ([40, 49, 43, 43.4, 43.5, 234, 54, 55, 56, 57, 58, 59].includes(g)) {
           // Accepted modal words without geometric effect here.
         } else { errors.push(`line ${physical}: unsupported G${g}`); unsupported.push({ line: physical, word: `G${g}` }) }
       } else if (w.letter === "M") {
@@ -381,6 +389,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     if (motion === 0 && hasAxis) rapid(target, lineNo)
     else if (motion === 1 && hasAxis) linear(target, lineNo, feedNow(false))
     else if (motion === 32 && hasAxis) linear(target, lineNo, feedNow(true))
+    else if (motion === 38 && hasAxis) linear(target, lineNo, feedNow(false))
     else if ((motion === 2 || motion === 3) && hasAxis && plane !== 17) {
       const i = get("I"), j = get("J"), k = get("K"), r = get("R")
       planeArc(target, motion === 2, { ...(i !== undefined ? { i } : {}), ...(j !== undefined ? { j } : {}), ...(k !== undefined ? { k } : {}), ...(r !== undefined ? { r } : {}) }, lineNo)

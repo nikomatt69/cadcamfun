@@ -28,6 +28,8 @@ export interface ToolpathVisualizerProps {
   readonly tools?: ReadonlyMap<string, cam.kernel.Cutter>
   /** Cutter for the toolpaths `tools` does not name (the generator's tool settings). */
   readonly defaultTool?: cam.kernel.Cutter
+  /** The 3D model of the generator's tool (a user's tool resource or the settings), drawn instead of `defaultTool`. */
+  readonly defaultToolModel?: cam.ToolModel
   /** The machine the program runs on (spec 31): vise / chuck / bed, its axes, what turns. */
   readonly machine?: cam.viewer.MachineSetup
   /** Machine state per move (the parse's motion track). */
@@ -74,8 +76,10 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const [spin, setSpin] = createSignal(!prefersReducedMotion())
   const [depositMode, setDepositMode] = createSignal<"progressive" | "all">("progressive")
   const [layer, setLayer] = createSignal<number>()
+  const [frame, setFrame] = createSignal<"part" | "machine">("part")
   const [machineInfo, setMachineInfo] = createSignal<MachineInfo>()
-  const machineDisplay = createMemo(() => ({ showWorkholding: showWorkholding(), showTriad: true, spin: spin(), depositMode: depositMode(), ...(layer() !== undefined ? { layer: layer()! } : {}) }))
+  const machineDisplay = createMemo(() => ({ showWorkholding: showWorkholding(), showTriad: true, spin: spin(), depositMode: depositMode(), frame: frame(), ...(layer() !== undefined ? { layer: layer()! } : {}) }))
+  const rotary = (): cam.viewer.RotarySetup | undefined => (props.machine?.kind === "mill" ? props.machine.rotary : undefined)
   // Each machine opens on the view its operator reads: a lathe from the front (the XZ plane flat, the chuck on the left).
   const presetFor = (kind: cam.MachineKind | undefined): ViewPreset => (kind === "lathe" ? "front" : "perspective")
   createEffect(on(() => props.machine?.kind, (kind) => { setPreset(presetFor(kind)); setLayer(undefined) }))
@@ -159,6 +163,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             program={props.program}
             {...(props.tools !== undefined ? { tools: props.tools } : {})}
             {...(props.defaultTool !== undefined ? { defaultTool: props.defaultTool } : {})}
+            {...(props.defaultToolModel !== undefined ? { defaultToolModel: props.defaultToolModel } : {})}
             preset={preset()}
             renderMode={mode()}
             gridVisible={gridVisible()}
@@ -269,7 +274,10 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 )}</For>
               </div>
             )}</Show>
-            <For each={usedTools()}>{(c) => <div data-testid="visualizer-tool">{t("cam.visualizer.activeTool")}: <span class="text-white">{c.name} · Ø{c.diameter} · {c.fluteLength} mm flutes · {c.stickout} mm out{c.holder ? ` · holder Ø${c.holder.diameter}` : ""}</span></div>}</For>
+            <Show when={props.defaultToolModel !== undefined && (props.tools === undefined || props.machine?.kind !== "mill")}>
+              <div data-testid="visualizer-tool-model">{t("cam.visualizer.activeTool")}: <span class="text-white">{cam.describeTool(props.defaultToolModel!)}</span></div>
+            </Show>
+            <For each={props.defaultToolModel !== undefined && props.tools === undefined ? [] : usedTools()}>{(c) => <div data-testid="visualizer-tool">{t("cam.visualizer.activeTool")}: <span class="text-white">{c.name} · Ø{c.diameter} · {c.fluteLength} mm flutes · {c.stickout} mm out{c.holder ? ` · holder Ø${c.holder.diameter}` : ""}</span></div>}</For>
           </div>
         </Show>
         <Show when={settingsOpen()}>
@@ -313,6 +321,13 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                   <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.machine")}</h4>
                   {toggle(t("cam.visualizer.showWorkholding"), showWorkholding, setShowWorkholding)}
                   <Show when={machine().kind !== "3dprinter"}>{toggle(t("cam.visualizer.spin"), spin, setSpin)}</Show>
+                  <Show when={rotary()}>{(r) => (
+                    <label class="block text-xs text-slate-200" title={r().reasons.join("; ")}>{t("cam.visualizer.rotaryFrame")} <span class="text-slate-400">({r().layout}{r().assumed ? `, ${t("cam.visualizer.assumed")}` : ""})</span>
+                      <select aria-label={t("cam.visualizer.rotaryFrame")} class="mt-1 w-full rounded border border-slate-600 bg-slate-800 p-1.5" value={frame()} onChange={(event) => setFrame(event.currentTarget.value as "part" | "machine")}>
+                        <option value="part">{t("cam.visualizer.framePart")}</option><option value="machine">{t("cam.visualizer.frameMachine")}</option>
+                      </select>
+                    </label>
+                  )}</Show>
                   <Show when={machine().kind === "3dprinter"}>
                     <label class="block text-xs text-slate-200">{t("cam.visualizer.deposit")}
                       <select class="mt-1 w-full rounded border border-slate-600 bg-slate-800 p-1.5" value={depositMode()} onChange={(event) => setDepositMode(event.currentTarget.value as "progressive" | "all")}>

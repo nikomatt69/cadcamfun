@@ -12,6 +12,8 @@ export interface MachineRunInput {
   readonly gcode: string
   /** Generator settings laid over the machine's defaults (workholding, turret, grip, bed...). A `stock` key is the mill stock. */
   readonly params?: Readonly<Record<string, unknown>>
+  /** A tool resource (Resources: type, diameter, lengths, corner radius, angle, pitch, holder); else the params' tool. */
+  readonly tool?: cam.ToolResource
   /** Seconds into the program for the pose; the end when absent. */
   readonly at?: number
 }
@@ -25,7 +27,9 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
   try { settings = cam.generator.withMachineDefaults(cam.generator.decodeSettings({ ...rest, machineType: input.kind })) }
   catch (cause) { return { ok: false, error: `params are not valid generator settings: ${cause instanceof Error ? cause.message.slice(0, 300) : String(cause)}` } }
   const analysis = cam.generator.analyseGcode(input.gcode)
-  const timeline = cam.viewer.buildTimeline(analysis.program, analysis.motion)
+  // The same believable start the preview draws (the program does not say where the machine is before its first move).
+  const timeline = cam.viewer.buildTimeline(analysis.program, analysis.motion, cam.viewer.DEFAULT_RAPID_RATE, cam.viewer.programStart(input.kind, analysis.program))
+  const toolModel = input.tool !== undefined ? cam.toolModelOf(input.tool, input.kind) : cam.toolModelFromSettings(settings, input.kind)
   // The mill stock: given, else a box round the cutting moves (top at the highest cut, at least Z0).
   let stock: cam.generator.Stock
   if (stockParam !== undefined) {
@@ -39,11 +43,12 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
       ? { width: 100, height: 100, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 }
       : { width: Math.max(...xs) - Math.min(...xs) + 2 * margin, height: Math.max(...ys) - Math.min(...ys) + 2 * margin, depth: Math.max(1, top - Math.min(...zs) + 5), radius: 0, x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2, topZ: top, allowance: 0 }
   }
-  const setup = cam.viewer.setupOf(input.kind, settings, stock)
+  const base = input.kind === "lathe" && toolModel.family === "lathe" ? cam.viewer.latheSetupOf(settings, toolModel) : cam.viewer.setupOf(input.kind, settings, stock)
+  const setup = cam.viewer.withRotary(base, analysis.program, input.gcode)
   const at = Math.min(timeline.duration, Math.max(0, input.at ?? timeline.duration))
   const pose = cam.viewer.poseAt(timeline, at)
   const sense = pose.state === undefined || pose.state.spindle === "off" ? 0 : cam.viewer.spinSense(input.kind, pose.state.spindle)
-  const findings = cam.viewer.checkSetup(setup, timeline, { radius: settings.toolDiameter / 2, length: Math.max(20, 3 * settings.toolDiameter + 10) })
+  const findings = cam.viewer.checkSetup(setup, timeline, cam.toolEnvelope(toolModel))
   const { axes, rotary } = cam.viewer.displayAxes(setup)
   const out: Record<string, unknown> = {
     ok: true,
@@ -52,6 +57,8 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
     axes: axes.map((a) => ({ name: a.name, display: a.direction, moves: a.moves, positive: a.positive })),
     ...(rotary !== undefined ? { rotary: rotary.name } : {}),
     setup: { ...setup, assumedParts: setup.assumed },
+    tool: { model: toolModel, description: cam.describeTool(toolModel) },
+    ...(setup.kind === "mill" && setup.rotary !== undefined ? { rotary: { ...setup.rotary, toolAxisAtPose: cam.viewer.toolAxisInPart(cam.viewer.poseAt(timeline, Math.min(timeline.duration, Math.max(0, input.at ?? timeline.duration))).angles, setup.rotary) } } : {}),
     setupProblems: cam.viewer.validateMachineSetup(setup),
     duration: round(timeline.duration),
     moves: timeline.moves.length,

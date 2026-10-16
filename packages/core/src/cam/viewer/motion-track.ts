@@ -26,7 +26,9 @@ export const MotionRunSchema = Schema.Struct({
   xMode: Schema.Literals(["diameter", "radius"]),
   tool: Schema.optionalKey(Schema.Int),
   coolant: Schema.Literals(["off", "flood", "mist"]),
-  feedMode: Schema.Literals(["min", "rev"])
+  feedMode: Schema.Literals(["min", "rev"]),
+  /** Probing moves (touch probe, tool setter): they touch, they do not cut. */
+  probe: Schema.optionalKey(Schema.Boolean)
 })
 export type MotionRun = typeof MotionRunSchema.Type
 
@@ -65,11 +67,12 @@ export interface MotionState {
   readonly feedMode: "min" | "rev"
   readonly extrude: number
   readonly line: number | undefined
+  readonly probe: boolean
 }
 
 const sameRun = (a: MotionRun, s: MotionSample, css: boolean): boolean =>
   a.spindle === s.spindle && a.css === s.css && a.plane === s.plane && a.xMode === s.xMode && a.tool === s.tool &&
-  a.coolant === s.coolant && a.feedMode === s.feedMode && (css || a.rpm === s.rpm)
+  a.coolant === s.coolant && a.feedMode === s.feedMode && (a.probe === true) === s.probe && (css || a.rpm === s.rpm)
 
 /** The track of a parsed program (one toolpath) from the interpreter's samples. */
 export const motionTrackOf = (samples: ReadonlyArray<MotionSample>, unsupported: MotionTrack["unsupported"] = []): MotionTrack => {
@@ -84,7 +87,7 @@ export const motionTrackOf = (samples: ReadonlyArray<MotionSample>, unsupported:
   samples.forEach((s, index) => {
     const last = runs[runs.length - 1]
     if (last === undefined || !sameRun(last, s, css)) {
-      runs.push({ start: index, spindle: s.spindle, rpm: s.rpm, css: s.css, plane: s.plane, xMode: s.xMode, ...(s.tool !== undefined ? { tool: s.tool } : {}), coolant: s.coolant, feedMode: s.feedMode })
+      runs.push({ start: index, spindle: s.spindle, rpm: s.rpm, css: s.css, plane: s.plane, xMode: s.xMode, ...(s.tool !== undefined ? { tool: s.tool } : {}), coolant: s.coolant, feedMode: s.feedMode, ...(s.probe ? { probe: true } : {}) })
     }
     extrude.push(s.extrude)
     if (s.extrude !== 0) extruding = true
@@ -137,7 +140,7 @@ export const trackFits = (track: MotionTrack, program: Program): boolean => {
 export const trackFor = (program: Program, track: MotionTrack | undefined): MotionTrack =>
   track !== undefined && trackFits(track, program) ? track : motionTrackFromProgram(program)
 
-const OFF: MotionState = { spindle: "off", rpm: 0, css: false, plane: 17, xMode: "diameter", tool: undefined, coolant: "off", feedMode: "min", extrude: 0, line: undefined }
+const OFF: MotionState = { spindle: "off", rpm: 0, css: false, plane: 17, xMode: "diameter", tool: undefined, coolant: "off", feedMode: "min", extrude: 0, line: undefined, probe: false }
 
 /** State of move `index` of toolpath `path`. Out-of-range indices read as a stopped machine. */
 export const stateAt = (track: MotionTrack, path: number, index: number): MotionState => {
@@ -148,6 +151,6 @@ export const stateAt = (track: MotionTrack, path: number, index: number): Motion
   const run = p.runs[lo]!
   return {
     spindle: run.spindle, rpm: p.rpm?.[index] ?? run.rpm, css: run.css, plane: run.plane, xMode: run.xMode, tool: run.tool,
-    coolant: run.coolant, feedMode: run.feedMode, extrude: p.extrude?.[index] ?? 0, line: p.lines?.[index]
+    coolant: run.coolant, feedMode: run.feedMode, extrude: p.extrude?.[index] ?? 0, line: p.lines?.[index], probe: run.probe === true
   }
 }

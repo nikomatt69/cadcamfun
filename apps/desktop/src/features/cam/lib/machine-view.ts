@@ -44,12 +44,28 @@ export const previewSetup = (
   kind: cam.MachineKind,
   settings: cam.generator.ToolpathSettings,
   stock: cam.generator.Stock,
-  options: { readonly artifact?: cam.kernel.CamArtifact | undefined; readonly machineId?: string | undefined } = {}
+  options: { readonly artifact?: cam.kernel.CamArtifact | undefined; readonly machineId?: string | undefined; readonly program?: cam.Program; readonly gcode?: string; readonly tool?: cam.ToolModel } = {}
 ): cam.viewer.MachineSetup => {
   const table = options.machineId !== undefined ? cam.kernel.findMachine(options.machineId)?.table : undefined
   const tableSize = table !== undefined ? { length: table.length, width: table.width } : undefined
-  if (kind === "mill" && options.artifact !== undefined) return cam.viewer.millSetupFromArtifact(options.artifact, settings, tableSize)
-  return cam.viewer.setupOf(kind, settings, stock, tableSize)
+  const base = kind === "mill" && options.artifact !== undefined ? cam.viewer.millSetupFromArtifact(options.artifact, settings, tableSize)
+    : kind === "lathe" ? cam.viewer.latheSetupOf(settings, options.tool?.family === "lathe" ? options.tool : undefined)
+    : kind === "3dprinter" ? { ...cam.viewer.printerSetupOf(settings), ...(options.tool?.family === "nozzle" ? { tool: options.tool, nozzle: options.tool.diameter } : {}) }
+    : cam.viewer.setupOf(kind, settings, stock, tableSize)
+  // A rotary program (A/B/C words, indexed Orient moves) gets its trunnion table.
+  return options.program !== undefined ? cam.viewer.withRotary(base, options.program, options.gcode ?? "") : base
+}
+
+/**
+ * The model of the tool the preview draws for the generator's program: the user's tool resource when one is chosen for this
+ * machine (and its diameter is still the generator's), else the generator's tool settings (spec 31: the same model the
+ * resource's page shows).
+ */
+export const previewToolModel = (kind: cam.MachineKind, settings: cam.generator.ToolpathSettings, library: (cam.ToolResource & { readonly type?: string }) | null | undefined): cam.ToolModel => {
+  if (library?.type !== undefined && cam.toolMachineOf(library.type) === kind && (kind !== "mill" || Math.abs((library.diameter ?? 0) - settings.toolDiameter) < 1e-9)) {
+    return cam.toolModelOf(library as cam.ToolResource, kind)
+  }
+  return cam.toolModelFromSettings(settings, kind)
 }
 
 export const MACHINE_LABELS: Readonly<Record<cam.MachineKind, string>> = { mill: "Mill", lathe: "Lathe", "3dprinter": "3D printer" }

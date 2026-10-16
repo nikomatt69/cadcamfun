@@ -39,7 +39,8 @@ export interface Analysis {
 }
 
 export const analyseGcode = (gcode: string, name = "Program", rapidRate = DEFAULT_RAPID_RATE): Analysis => {
-  const result = interpretGcode(gcode, { track: true })
+  // The preview replays probing moves too (to their search limit); the verifier's own replay does not.
+  const result = interpretGcode(gcode, { track: true, probeMoves: true })
   const moves: Move[] = []
   const min = { x: Infinity, y: Infinity, z: Infinity }
   const max = { x: -Infinity, y: -Infinity, z: -Infinity }

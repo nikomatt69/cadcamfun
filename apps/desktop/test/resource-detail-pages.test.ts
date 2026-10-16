@@ -93,6 +93,41 @@ describe("resource detail pages", () => {
     } finally { view.dispose() }
   }, PAGE_TIMEOUT)
 
+  test("a tool resource is drawn in 3D from its type and properties, and saves its shape (spec 31)", async () => {
+    resetStores()
+    const { dispose } = app.visit(`/tools/${toolId}`)
+    try {
+      await find(".cam-workspace")
+      await app.wait(() => byText("h1", "Endmill 6"), 30000)
+      const description = await find('[data-testid="tool-preview-description"]')
+      expect(description.textContent).toContain("flat Ø6, 3 flutes")
+      expect(document.querySelector('[data-testid="tool-preview-assumed"]')!.textContent).toContain("cuttingLength")
+      toolbarButton("Edit")?.click()
+      await settle()
+      toolbarButton("Details")?.click()
+      await settle()
+      const type = await find<HTMLSelectElement>("#res-type")
+      expect([...type.querySelectorAll("optgroup")].map((g) => g.getAttribute("label"))).toEqual(["Milling", "Turning", "3D printing nozzle"])
+      type.value = "bullnose"
+      type.dispatchEvent(new window.Event("change", { bubbles: true }))
+      await settle()
+      const corner = await find<HTMLInputElement>("#res-corner")
+      // A dimension field: comma decimals are typed as written.
+      corner.value = "1,5"
+      corner.dispatchEvent(new window.Event("input", { bubbles: true }))
+      await settle()
+      expect(await app.wait(() => [...document.querySelectorAll('[data-testid="tool-preview-description"]')].find((el) => el.textContent?.includes("bull Ø6") && el.textContent.includes("r1.5")) ?? undefined, 15000)).toBeDefined()
+      toolbarButton("Save")?.click()
+      await settle(400)
+      const { body } = await app.sidecar.call(`/api/tools/${toolId}`)
+      expect(body.type).toBe("bullnose")
+      expect(body.cornerRadius).toBe(1.5)
+      // What the CAM preview draws for this resource is the same model.
+      const { cam } = await import("@cadcamfun/core")
+      expect(cam.describeTool(cam.toolModelOf(body, "mill"))).toContain("bull Ø6")
+    } finally { dispose() }
+  }, PAGE_TIMEOUT)
+
   test("Edit saves the material through the typed client", async () => {
     resetStores()
     const { dispose } = app.visit(`/materials/${materialId}`)

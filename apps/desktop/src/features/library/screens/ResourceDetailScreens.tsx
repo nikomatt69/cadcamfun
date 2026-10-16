@@ -16,6 +16,9 @@ import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
 import { Modal } from "../../toolpaths/components/shared.tsx"
 import { ResourceGeometryPreview, resourceElements } from "../components/ResourceGeometryPreview.tsx"
+import { ToolPreview3D, toolResourceOf } from "../components/ToolPreview3D.tsx"
+import { NumberField } from "../../cad/components/property-inputs/NumberField.tsx"
+import { cam } from "@cadcamfun/core"
 import { componentEntries } from "../../cad/lib/component-assembly.ts"
 import { t } from "../../../i18n/index.ts"
 import "../../../styles/workstation.css"
@@ -57,6 +60,9 @@ const payloadOf = (kind: Kind, form: Row): Record<string, unknown> => {
       name: str(form["name"]).trim(), type: str(form["type"]), diameter: num(form["diameter"]), material: str(form["material"]),
       numberOfFlutes: num(form["numberOfFlutes"]) || null, maxRPM: num(form["maxRPM"]) || null, coolantType: str(form["coolantType"]) || null,
       cuttingLength: num(form["cuttingLength"]) || null, totalLength: num(form["totalLength"]) || null, shankDiameter: num(form["shankDiameter"]) || null,
+      // Shape fields of the 3D model: empty stays null (drawn from the type); a corner / nose radius of 0 is kept.
+      cornerRadius: toolResourceOf(form).cornerRadius ?? null, tipAngle: toolResourceOf(form).tipAngle || null, threadPitch: toolResourceOf(form).threadPitch || null,
+      holderDiameter: toolResourceOf(form).holderDiameter || null, holderLength: toolResourceOf(form).holderLength || null, stickout: toolResourceOf(form).stickout || null,
       notes: str(form["notes"]) || null
     }
   }
@@ -209,6 +215,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                           <p class="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{str(current()["description"] ?? current()["notes"])}</p>
                         </Show>
                         <Show when={props.kind === "components"}><div class="mt-5"><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div></Show>
+                        <Show when={props.kind === "tools"}><div class="mt-5"><ToolPreview3D tool={current()} /></div></Show>
                         <div class="mt-5 grid grid-cols-2 gap-4">
                           <For each={summaryFields(props.kind, current())}>{(field) => (
                             <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">{field.label}</h3><p class="font-medium text-gray-900 dark:text-white">{field.value}</p></div>
@@ -243,7 +250,13 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                   <Show when={tab() === "details"}>
                     <div class={PANEL}>
                       <Show when={editing()} fallback={<DetailsView kind={props.kind} row={current()} />}>
-                        <DetailsForm kind={props.kind} form={form()} onPatch={patch} onPatchConfig={patchConfig} />
+                        <Show when={props.kind === "tools"} fallback={<DetailsForm kind={props.kind} form={form()} onPatch={patch} onPatchConfig={patchConfig} />}>
+                          {/* The tool redraws as it is edited: what is saved is what the CAM preview will draw. */}
+                          <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                            <div class="lg:col-span-2"><DetailsForm kind={props.kind} form={form()} onPatch={patch} onPatchConfig={patchConfig} /></div>
+                            <ToolPreview3D tool={form()} />
+                          </div>
+                        </Show>
                       </Show>
                     </div>
                   </Show>
@@ -286,7 +299,8 @@ const summaryFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: st
     return [{ label: "Density", value: `${str(p["density"]) || "-"} kg/m³` }, { label: "Hardness", value: str(p["hardness"]) || "-" }, { label: "Yield strength", value: str(p["yieldStrength"]) || "-" }, { label: "Color", value: str(p["color"]) || "-" }]
   }
   if (kind === "tools") {
-    return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Diameter", value: `${str(row["diameter"]) || "-"} mm` }, { label: "Material", value: str(row["material"]) || "-" }, { label: "Flutes", value: str(row["numberOfFlutes"]) || "-" }]
+    return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Diameter", value: `${str(row["diameter"]) || "-"} mm` }, { label: "Material", value: str(row["material"]) || "-" }, { label: "Flutes", value: str(row["numberOfFlutes"]) || "-" },
+      { label: "3D model", value: cam.describeTool(cam.toolModelOf(toolResourceOf(row), cam.toolMachineOf(str(row["type"])))) }]
   }
   if (kind === "machines") {
     const c = asRecord(row["config"])
@@ -314,7 +328,15 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
     {input("res-name", "Name", "name")}
     <Show when={props.kind === "machines" || props.kind === "components"}>{input("res-type", "Type", "type")}</Show>
     <Show when={props.kind === "tools"}>
-      {input("res-type", "Type", "type")}
+      <div>
+        <label for="res-type" class={LABEL}>Type</label>
+        <select id="res-type" name="type" class={INPUT} value={str(props.form["type"])} onChange={(e) => props.onPatch("type", e.currentTarget.value)}>
+          <Show when={str(props.form["type"]) !== "" && cam.toolMachineOf(str(props.form["type"])) === undefined}><option value={str(props.form["type"])}>{str(props.form["type"])} (drawn as an end mill)</option></Show>
+          <For each={[["mill", "Milling"], ["lathe", "Turning"], ["3dprinter", "3D printing nozzle"]] as const}>{([machine, label]) => (
+            <optgroup label={label}><For each={cam.TOOL_TYPES[machine]}>{(type) => <option value={type}>{type}</option>}</For></optgroup>
+          )}</For>
+        </select>
+      </div>
       {input("res-diameter", "Diameter (mm)", "diameter", "number")}
       {input("res-material", "Material", "material")}
       {input("res-flutes", "Number of flutes", "numberOfFlutes", "number")}
@@ -323,6 +345,7 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
       {input("res-cutting", "Cutting length (mm)", "cuttingLength", "number")}
       {input("res-total", "Total length (mm)", "totalLength", "number")}
       {input("res-shank", "Shank diameter (mm)", "shankDiameter", "number")}
+      <ToolShapeFields form={props.form} onPatch={props.onPatch} />
     </Show>
     <Show when={props.kind === "materials"}>
       {input("res-density", "Density", "density", "number")}
@@ -354,6 +377,32 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
       <label for="res-public" class="text-sm text-gray-900 dark:text-gray-300">Make public (visible to all users)</label>
     </div>
   </form>
+}
+
+/** The shape fields the tool's type uses (corner / nose radius, angle, pitch, holder, stickout): they shape its 3D model. */
+function ToolShapeFields(props: { readonly form: Row; readonly onPatch: (key: string, value: unknown) => void }): JSX.Element {
+  const model = createMemo(() => cam.toolModelOf(toolResourceOf(props.form), cam.toolMachineOf(str(props.form["type"]))))
+  const field = (id: string, label: string, key: string, min = 0) => (
+    <div>
+      <label for={id} class={LABEL}>{label}</label>
+      <NumberField id={id} class={INPUT} min={min} value={props.form[key] ?? ""} onChange={(value) => props.onPatch(key, value)} />
+    </div>
+  )
+  const m = () => model()
+  return <>
+    <Show when={(m().family === "mill" && (m() as cam.MillModel).cornerRadius !== undefined) || (m().family === "lathe" && (m() as cam.LatheModel).insert !== "grooving" && (m() as cam.LatheModel).insert !== "parting" && (m() as cam.LatheModel).insert !== "threading" && (m() as cam.LatheModel).insert !== "knurling")}>
+      {field("res-corner", m().family === "lathe" ? "Nose radius (mm)" : "Corner radius (mm)", "cornerRadius")}
+    </Show>
+    <Show when={m().family === "mill" && (m() as cam.MillModel).angle !== undefined}>
+      {field("res-angle", (m() as cam.MillModel).shape === "tapered" ? "Taper angle per side (°)" : "Included angle (°)", "tipAngle", 1)}
+    </Show>
+    <Show when={m().family === "mill" && (m() as cam.MillModel).shape === "threadmill"}>{field("res-pitch", "Thread pitch (mm)", "threadPitch", 0.1)}</Show>
+    <Show when={m().family === "mill" || m().family === "probe"}>
+      {field("res-stickout", "Stickout from the holder (mm)", "stickout", 1)}
+      {field("res-holder-d", "Holder diameter (mm)", "holderDiameter", 1)}
+      {field("res-holder-l", "Holder length (mm)", "holderLength", 1)}
+    </Show>
+  </>
 }
 
 export const MaterialDetailScreen = (): JSX.Element => <ResourceDetailScreen kind="materials" />

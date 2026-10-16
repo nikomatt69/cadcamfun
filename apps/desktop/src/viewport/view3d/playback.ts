@@ -14,9 +14,10 @@ export interface PlaybackSegment {
 }
 export interface Playback { readonly segments: readonly PlaybackSegment[]; readonly duration: number; readonly end: Vec3 }
 
-export const buildPlayback = (program: cam.Program, rapidRate = 5000, tolerance = 0.1): Playback => {
+/** `start`: where the machine is before the first move (the origin when not given, as before; see `cam.viewer.programStart`). */
+export const buildPlayback = (program: cam.Program, rapidRate = 5000, tolerance = 0.1, start: Vec3 = { x: 0, y: 0, z: 0 }): Playback => {
   const segments: PlaybackSegment[] = []
-  let from: Vec3 = { x: 0, y: 0, z: 0 }, time = 0
+  let from: Vec3 = start, time = 0
   let toolId = ""
   let pathIndex = 0, moveIndex = 0
   const append = (to: Vec3, rapid: boolean, duration: number) => {

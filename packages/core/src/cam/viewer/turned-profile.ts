@@ -1,7 +1,9 @@
 /**
  * The turned part at time t (spec 31 §5.3): the bar's outer and inner radius along the spindle axis after the feed moves made
- * so far with the spindle turning. A point tool (nose radius 0) on a round part removes, at its Z, everything outside its
- * radius (external tools) or inside it (boring / internal tools); a grooving or parting blade does so over its width. Material
+ * so far with the spindle turning. The insert's nose (its radius, the set-up's `noseRadius`) removes, under it, everything
+ * outside its arc (external tools) or inside it (boring / internal tools): shoulders come out with the nose radius in their
+ * corner. A sharp tool (radius 0) removes at its Z everything outside its radius; a grooving or parting blade does so over its
+ * width. Material
  * no longer joined to the chuck (in front of a cut that reached the bore or the axis) falls away: that is how facing and
  * parting look. Rapids remove nothing (a rapid into material is a crash the checks report, not a cut).
  */
@@ -37,12 +39,32 @@ export const turnedProfileAt = (setup: LatheSetup, timeline: Timeline, seconds: 
     if (setup.internal) { if (r > inner[b]!) inner[b] = Math.min(r, outer[b]!) }
     else if (r < outer[b]!) outer[b] = Math.max(inner[b]!, r)
   }
+  const rn = Math.max(0, setup.noseRadius)
   for (const move of timeline.moves) {
     if (move.start >= seconds) break
-    if (move.kind !== "feed" || move.state.spindle === "off") continue
+    if (move.kind !== "feed" || move.state.spindle === "off" || move.state.probe) continue
     const f = move.duration > 0 ? Math.min(1, (seconds - move.start) / move.duration) : 1
     const radiusOf = (px: number) => Math.max(0, move.state.xMode === "diameter" ? Math.abs(px) / 2 : Math.abs(px))
     const a = move.from, b = pointOn(move, f)
+    if (rn > 0) {
+      // A rounded nose: its centre sits rn towards the free end and rn off the part from the theoretical tip; every bin under
+      // the nose takes the circle's height there. Centres every half bin, so the arc's flat bottom covers every bin.
+      const signedR = (px: number) => (move.state.xMode === "diameter" ? px / 2 : px)
+      const length = Math.hypot(b.z - a.z, signedR(b.x) - signedR(a.x))
+      const steps = Math.min(200_000, Math.max(1, Math.ceil(length / (bin / 2))))
+      for (let k = 0; k <= steps; k++) {
+        const t = k / steps
+        const cz = a.z + (b.z - a.z) * t + rn
+        const cr = signedR(a.x + (b.x - a.x) * t) + (setup.internal ? -rn : rn)
+        const lo = Math.max(0, Math.floor((cz - rn - x0) / bin)), hi = Math.min(n - 1, Math.floor((cz + rn - x0) / bin))
+        for (let q = lo; q <= hi; q++) {
+          const dz = x0 + (q + 0.5) * bin - cz
+          const h = Math.sqrt(Math.max(0, rn * rn - dz * dz))
+          cut(q, Math.max(0, setup.internal ? cr + h : cr - h))
+        }
+      }
+      continue
+    }
     // Display x is program Z. Every bin the move (and the blade's width) covers takes the radius at the nearest point of
     // the move to the bin's centre: no bin is skipped between samples, whatever the float rounding.
     const zlo = Math.min(a.z, b.z), zhi = Math.max(a.z, b.z)

@@ -9,6 +9,7 @@
  */
 import * as THREE from "three"
 import { cam, type Vec3 } from "@cadcamfun/core"
+import { toolObject } from "./tool-object.ts"
 
 const v = cam.viewer
 
@@ -21,6 +22,8 @@ export interface MachineDisplay {
   readonly depositMode: "progressive" | "all"
   /** Printer: highest layer shown (index into the layers), all when absent. */
   readonly layer?: number
+  /** Rotary mills: the part stays and the tool leans (`part`), or the tool stays vertical and the table turns (`machine`). */
+  readonly frame?: "part" | "machine"
 }
 
 export const DEFAULT_MACHINE_DISPLAY: MachineDisplay = { showWorkholding: true, showTriad: true, spin: true, depositMode: "progressive" }
@@ -34,6 +37,8 @@ export interface MachineSceneInput {
   readonly tool?: cam.viewer.ToolEnvelope
   /** Size the triad and labels to the scene. */
   readonly scale: number
+  /** Where the machine is before the first move (`cam.viewer.programStart`). */
+  readonly start?: Vec3
 }
 
 export interface MachineScene {
@@ -153,38 +158,6 @@ const triad = (setup: cam.viewer.MachineSetup, length: number): THREE.Group => {
   return group
 }
 
-const latheTool = (setup: cam.viewer.LatheSetup): THREE.Group => {
-  const group = new THREE.Group()
-  group.name = "lathe-tool"
-  for (const outline of v.latheToolOutlines(setup.toolType, setup.toolWidth)) {
-    // The outline is in the (x, z) tool plane; a Shape is drawn in (x, y), so y stands for z and the extrusion runs along y.
-    const shape = new THREE.Shape(outline.points.map((p) => new THREE.Vector2(p.x, p.z)))
-    const geometry = new THREE.ExtrudeGeometry(shape, { depth: outline.thickness, bevelEnabled: false })
-    geometry.translate(0, 0, -outline.thickness / 2)
-    geometry.rotateX(Math.PI / 2)
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: outline.part === "insert" ? 0xfbbf24 : 0x9ca3af, metalness: 0.7, roughness: 0.35, side: THREE.DoubleSide }))
-    mesh.name = `lathe-tool:${outline.part}`
-    group.add(mesh)
-  }
-  // A front turret is the mirror image of a rear one across the spindle axis.
-  if (setup.turret === "front") group.scale.z = -1
-  return group
-}
-
-const nozzle = (setup: cam.viewer.PrinterSetup): THREE.Group => {
-  const group = new THREE.Group()
-  group.name = "nozzle"
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(3, 6, 24), new THREE.MeshStandardMaterial({ color: 0xd4a017, metalness: 0.8, roughness: 0.3 }))
-  tip.rotation.x = -Math.PI / 2
-  tip.position.z = 3
-  const block = new THREE.Mesh(new THREE.BoxGeometry(16, 12, 10), new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.6, roughness: 0.4 }))
-  block.position.z = 11
-  const opening = new THREE.Mesh(new THREE.CylinderGeometry(setup.nozzle / 2, setup.nozzle / 2, 0.4, 12), new THREE.MeshBasicMaterial({ color: 0xef4444 }))
-  opening.rotation.x = Math.PI / 2
-  group.add(tip, block, opening)
-  return group
-}
-
 const layerColor = (layer: number, count: number): THREE.Color => new THREE.Color().setHSL(0.6 - 0.6 * (count > 1 ? layer / (count - 1) : 0), 0.85, 0.55)
 
 export const disposeObject = (object: THREE.Object3D): void => {
@@ -200,7 +173,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   const { setup, program, display } = input
   const root = new THREE.Group()
   root.name = `machine:${setup.kind}`
-  const timeline = v.buildTimeline(program, input.motion)
+  const timeline = v.buildTimeline(program, input.motion, v.DEFAULT_RAPID_RATE, input.start)
   const findings = v.checkSetup(setup, timeline, input.tool)
   const statics = new THREE.Group(); statics.name = "machine-bodies"
   const spinning = new THREE.Group(); spinning.name = "spindle"
@@ -245,7 +218,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   const spinAngle = (seconds: number): number => (spin ? v.spinAngleAt(timeline, setup.kind, spin, seconds) : 0)
 
   if (setup.kind === "lathe") {
-    tool = latheTool(setup)
+    tool = toolObject(setup.tool, { turret: setup.turret })
     root.add(tool)
     const marker = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 3), new THREE.MeshBasicMaterial({ color: 0xfacc15 }))
     const { back } = v.latheStockEnds(setup)
@@ -253,7 +226,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     marker.name = "spindle-marker"
     spinning.add(marker)
   } else if (setup.kind === "3dprinter") {
-    tool = nozzle(setup)
+    tool = toolObject(setup.tool)
     root.add(tool)
     deposits = v.printerDeposits(timeline, setup.layerHeight)
     const positions = new Float32Array(deposits.beads.length * 6)

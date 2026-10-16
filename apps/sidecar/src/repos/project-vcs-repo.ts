@@ -101,6 +101,7 @@ export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
                 type: String(e.type ?? "endmill"), diameter: Number(e.diameter ?? 0), material: String(e.material ?? ""), numberOfFlutes: (e.numberOfFlutes as number | null) ?? null,
                 maxRPM: (e.maxRPM as number | null) ?? null, coolantType: str(e.coolantType), cuttingLength: (e.cuttingLength as number | null) ?? null,
                 totalLength: (e.totalLength as number | null) ?? null, shankDiameter: (e.shankDiameter as number | null) ?? null, notes: str(e.notes),
+                cornerRadius: (e.cornerRadius as number | null) ?? null, tipAngle: (e.tipAngle as number | null) ?? null, threadPitch: (e.threadPitch as number | null) ?? null, holderDiameter: (e.holderDiameter as number | null) ?? null, holderLength: (e.holderLength as number | null) ?? null, stickout: (e.stickout as number | null) ?? null,
               }))
               upsertLibrary(schema.machineConfigTable, s.machineConfigs, (e) => ({ type: String(e.type ?? "mill"), description: str(e.description), config: e.config ?? {} }))
 

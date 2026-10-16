@@ -170,6 +170,8 @@ export const ToolpathSettingsSchema = Schema.Struct({
   /** Lathe turret behind the axis (slant bed, +X up in the preview) or in front of it (+X towards the operator). */
   latheTurret: withDefault(Schema.Literals(["rear", "front"]), "rear"),
   chuckType: withDefault(Schema.Literals(["3-jaw", "4-jaw", "collet"]), "3-jaw"),
+  /** Lathe insert nose radius, mm (0 = a sharp point); the programmed point is the theoretical sharp tip. */
+  noseRadius: withDefault(NonNegative, 0.4),
   /** Stock length inside the chuck jaws, mm. */
   gripLength: withDefault(Positive, 20),
   tailstock: withDefault(Schema.Boolean, false),

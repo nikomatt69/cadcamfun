@@ -18,7 +18,7 @@ import { syncDocumentSettings } from "../../../shared/state/document-settings.ts
 import { useCADStore } from "../../cad/store/cadStore.ts"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
 import { kernelStockOf, stockOf } from "../lib/job.ts"
-import { previewSetup, resolveMachineKind } from "../lib/machine-view.ts"
+import { previewSetup, previewToolModel, resolveMachineKind } from "../lib/machine-view.ts"
 import CamStatusBar from "../components/CamStatusBar.tsx"
 import { buildPlayback, colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
 import { makeToolpathGenerator } from "../api/generator.ts"
@@ -76,7 +76,11 @@ export default function CamPage(): JSX.Element {
     inferred: inferredMachine(),
     setting: gen.settings.machineType
   }))
-  const previewMachine = createMemo(() => previewSetup(machineChoice().kind, gen.settings, previewStock(), kernelShown() ? { artifact: camStore.kernelArtifact, machineId: gen.kernelSettings.machine } : {}))
+  const toolModel = createMemo(() => previewToolModel(machineChoice().kind, gen.settings, gen.selectedLibraryTool as never))
+  const previewMachine = createMemo(() => previewSetup(machineChoice().kind, gen.settings, previewStock(), {
+    ...(kernelShown() ? { artifact: camStore.kernelArtifact, machineId: gen.kernelSettings.machine } : {}),
+    program: camStore.program, gcode: camStore.gcode, tool: toolModel()
+  }))
   const previewDefaultTool = createMemo(() => machineChoice().kind === "mill" ? cam.kernel.settingsCutter(gen.settings) : undefined)
   const generator = makeToolpathGenerator(app.client)
   const [search, setSearch] = useSearchParams()
@@ -133,7 +137,8 @@ export default function CamPage(): JSX.Element {
     onCleanup(() => { clearTimeout(timer); controller.abort() })
   }, { defer: true }))
 
-  const duration = createMemo(() => buildPlayback(camStore.program).duration)
+  // The same start as the preview, so the clock stops where the drawn program ends.
+  const duration = createMemo(() => buildPlayback(camStore.program, 5000, 0.1, cam.viewer.programStart(machineChoice().kind, camStore.program)).duration)
   // Leaving the page stops the simulation clock.
   onCleanup(() => camStore.setPlaying(false))
 
@@ -367,7 +372,7 @@ export default function CamPage(): JSX.Element {
           >
             <Show when={camStore.activeTab === "preview"}>
               <div class="h-full">
-                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} />
+                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} defaultToolModel={toolModel()} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} />
               </div>
             </Show>
             <Show when={camStore.activeTab === "editor"}>
@@ -377,7 +382,7 @@ export default function CamPage(): JSX.Element {
             </Show>
             <Show when={camStore.activeTab === "toolpath"}>
               <div class="h-full rounded-xl">
-                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} />
+                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} defaultToolModel={toolModel()} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} />
               </div>
             </Show>
             <Show when={camStore.activeTab === "post"}>

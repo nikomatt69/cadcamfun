@@ -15,7 +15,6 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX 
 import ChevronDown from "lucide-solid/icons/chevron-down"
 import Ellipsis from "lucide-solid/icons/ellipsis"
 import X from "lucide-solid/icons/x"
-import Terminal from "lucide-solid/icons/terminal"
 import { t } from "../../../i18n/index.ts"
 import { useAiStore } from "../store/context.tsx"
 import { ProviderBadge } from "./ProviderBadge.tsx"
@@ -89,7 +88,7 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
     >
       <div class="assistant-bar-row">
         <div class="assistant-bar-identity">
-          <span class="assistant-bar-mark" aria-hidden="true"><Terminal size={13} /></span>
+          <span class="assistant-bar-mark" aria-hidden="true"><img src="/icon.png" alt="" draggable={false} /></span>
           <button
             type="button"
             class="assistant-bar-heading assistant-bar-title-trigger"

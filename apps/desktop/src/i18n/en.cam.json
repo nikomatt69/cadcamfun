@@ -501,5 +501,9 @@
   "cam.workholding.bore": "Bar bore Ø (mm)",
   "cam.workholding.kinematics": "Printer motion",
   "cam.workholding.buildHeight": "Build height (mm)",
-  "cam.workholding.configured": "Use this set-up for the checks"
+  "cam.workholding.configured": "Use this set-up for the checks",
+  "cam.visualizer.rotaryFrame": "Rotary view",
+  "cam.visualizer.framePart": "Part still, the tool leans",
+  "cam.visualizer.frameMachine": "Tool vertical, the table turns",
+  "cam.visualizer.assumed": "assumed"
 }

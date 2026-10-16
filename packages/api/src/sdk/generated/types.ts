@@ -1025,6 +1025,12 @@ export type ToolsCreatePayload = {
   readonly cuttingLength?: number | null | undefined
   readonly totalLength?: number | null | undefined
   readonly shankDiameter?: number | null | undefined
+  readonly cornerRadius?: number | null | undefined
+  readonly tipAngle?: number | null | undefined
+  readonly threadPitch?: number | null | undefined
+  readonly holderDiameter?: number | null | undefined
+  readonly holderLength?: number | null | undefined
+  readonly stickout?: number | null | undefined
   readonly notes?: string | null | undefined
   readonly organizationId?: string | null | undefined
   readonly isPublic?: boolean | undefined
@@ -1041,6 +1047,12 @@ export type ToolsUpdatePayload = {
   readonly cuttingLength?: number | null | undefined
   readonly totalLength?: number | null | undefined
   readonly shankDiameter?: number | null | undefined
+  readonly cornerRadius?: number | null | undefined
+  readonly tipAngle?: number | null | undefined
+  readonly threadPitch?: number | null | undefined
+  readonly holderDiameter?: number | null | undefined
+  readonly holderLength?: number | null | undefined
+  readonly stickout?: number | null | undefined
   readonly notes?: string | null | undefined
   readonly organizationId?: string | null | undefined
   readonly isPublic?: boolean | undefined
@@ -3758,6 +3770,12 @@ export type ProductionCostsListToolWearOutput = Array<{
     cuttingLength: number | null
     totalLength: number | null
     shankDiameter: number | null
+    cornerRadius?: number | null
+    tipAngle?: number | null
+    threadPitch?: number | null
+    holderDiameter?: number | null
+    holderLength?: number | null
+    stickout?: number | null
     notes: string | null
     isPublic: boolean
     createdAt: string
@@ -3801,6 +3819,12 @@ export type ProductionCostsCreateToolWearOutput = {
     cuttingLength: number | null
     totalLength: number | null
     shankDiameter: number | null
+    cornerRadius?: number | null
+    tipAngle?: number | null
+    threadPitch?: number | null
+    holderDiameter?: number | null
+    holderLength?: number | null
+    stickout?: number | null
     notes: string | null
     isPublic: boolean
     createdAt: string
@@ -3835,6 +3859,12 @@ export type ProductionCostsGetToolWearOutput = {
     cuttingLength: number | null
     totalLength: number | null
     shankDiameter: number | null
+    cornerRadius?: number | null
+    tipAngle?: number | null
+    threadPitch?: number | null
+    holderDiameter?: number | null
+    holderLength?: number | null
+    stickout?: number | null
     notes: string | null
     isPublic: boolean
     createdAt: string
@@ -3877,6 +3907,12 @@ export type ProductionCostsUpdateToolWearOutput = {
     cuttingLength: number | null
     totalLength: number | null
     shankDiameter: number | null
+    cornerRadius?: number | null
+    tipAngle?: number | null
+    threadPitch?: number | null
+    holderDiameter?: number | null
+    holderLength?: number | null
+    stickout?: number | null
     notes: string | null
     isPublic: boolean
     createdAt: string
@@ -4777,6 +4813,12 @@ export type ToolsListOutput = Array<{
   cuttingLength: number | null
   totalLength: number | null
   shankDiameter: number | null
+  cornerRadius?: number | null
+  tipAngle?: number | null
+  threadPitch?: number | null
+  holderDiameter?: number | null
+  holderLength?: number | null
+  stickout?: number | null
   notes: string | null
   isPublic: boolean
   createdAt: string
@@ -4796,6 +4838,12 @@ export type ToolsCreateInput = {
   readonly cuttingLength?: ToolsCreatePayload["cuttingLength"]
   readonly totalLength?: ToolsCreatePayload["totalLength"]
   readonly shankDiameter?: ToolsCreatePayload["shankDiameter"]
+  readonly cornerRadius?: ToolsCreatePayload["cornerRadius"]
+  readonly tipAngle?: ToolsCreatePayload["tipAngle"]
+  readonly threadPitch?: ToolsCreatePayload["threadPitch"]
+  readonly holderDiameter?: ToolsCreatePayload["holderDiameter"]
+  readonly holderLength?: ToolsCreatePayload["holderLength"]
+  readonly stickout?: ToolsCreatePayload["stickout"]
   readonly notes?: ToolsCreatePayload["notes"]
   readonly organizationId?: ToolsCreatePayload["organizationId"]
   readonly isPublic?: ToolsCreatePayload["isPublic"]
@@ -4813,6 +4861,12 @@ export type ToolsCreateOutput = {
   cuttingLength: number | null
   totalLength: number | null
   shankDiameter: number | null
+  cornerRadius?: number | null
+  tipAngle?: number | null
+  threadPitch?: number | null
+  holderDiameter?: number | null
+  holderLength?: number | null
+  stickout?: number | null
   notes: string | null
   isPublic: boolean
   createdAt: string
@@ -4835,6 +4889,12 @@ export type ToolsGetOutput = {
   cuttingLength: number | null
   totalLength: number | null
   shankDiameter: number | null
+  cornerRadius?: number | null
+  tipAngle?: number | null
+  threadPitch?: number | null
+  holderDiameter?: number | null
+  holderLength?: number | null
+  stickout?: number | null
   notes: string | null
   isPublic: boolean
   createdAt: string
@@ -4857,6 +4917,12 @@ export type ToolsUpdateInput = {
   readonly cuttingLength?: ToolsUpdatePayload["cuttingLength"]
   readonly totalLength?: ToolsUpdatePayload["totalLength"]
   readonly shankDiameter?: ToolsUpdatePayload["shankDiameter"]
+  readonly cornerRadius?: ToolsUpdatePayload["cornerRadius"]
+  readonly tipAngle?: ToolsUpdatePayload["tipAngle"]
+  readonly threadPitch?: ToolsUpdatePayload["threadPitch"]
+  readonly holderDiameter?: ToolsUpdatePayload["holderDiameter"]
+  readonly holderLength?: ToolsUpdatePayload["holderLength"]
+  readonly stickout?: ToolsUpdatePayload["stickout"]
   readonly notes?: ToolsUpdatePayload["notes"]
   readonly organizationId?: ToolsUpdatePayload["organizationId"]
   readonly isPublic?: ToolsUpdatePayload["isPublic"]
@@ -4874,6 +4940,12 @@ export type ToolsUpdateOutput = {
   cuttingLength: number | null
   totalLength: number | null
   shankDiameter: number | null
+  cornerRadius?: number | null
+  tipAngle?: number | null
+  threadPitch?: number | null
+  holderDiameter?: number | null
+  holderLength?: number | null
+  stickout?: number | null
   notes: string | null
   isPublic: boolean
   createdAt: string
@@ -5896,6 +5968,7 @@ export type ToolpathGeneratorParseOutput = {
         tool?: number
         coolant: "off" | "flood" | "mist"
         feedMode: "min" | "rev"
+        probe?: boolean
       }>
       extrude?: Array<number>
       lines?: Array<number>
@@ -6255,6 +6328,12 @@ export type LibraryToolsOutput = {
     cuttingLength: number | null
     totalLength: number | null
     shankDiameter: number | null
+    cornerRadius?: number | null
+    tipAngle?: number | null
+    threadPitch?: number | null
+    holderDiameter?: number | null
+    holderLength?: number | null
+    stickout?: number | null
     notes: string | null
     isPublic: boolean
     createdAt: string

@@ -14,7 +14,7 @@ export const ToolsStorageHandlers = HttpApiBuilder.group(Api, "toolsStorage", Ef
     exportRow: (t, by) => ({
       id: t.id, name: t.name, type: t.type, diameter: t.diameter, material: t.material,
       numberOfFlutes: t.numberOfFlutes, maxRPM: t.maxRPM, coolantType: t.coolantType, cuttingLength: t.cuttingLength,
-      totalLength: t.totalLength, shankDiameter: t.shankDiameter, notes: t.notes, metadata: exportMeta(by)
+      totalLength: t.totalLength, shankDiameter: t.shankDiameter, cornerRadius: t.cornerRadius ?? null, tipAngle: t.tipAngle ?? null, threadPitch: t.threadPitch ?? null, holderDiameter: t.holderDiameter ?? null, holderLength: t.holderLength ?? null, stickout: t.stickout ?? null, notes: t.notes, metadata: exportMeta(by)
     }),
     visibleByIds: repo.visibleByIds,
     listAll: (userId) => repo.list(userId, { includePublic: false }),

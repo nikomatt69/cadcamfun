@@ -192,3 +192,49 @@ describe("what the assistant reads from a CAM frame", () => {
     expect((spatial["axes"] as Array<{ name: string }>).map((x) => x.name)).toEqual(["Z", "X"])
   })
 })
+
+describe("one 3D object per tool (spec 31): Resources page, CAM preview and machine scene", () => {
+  const { toolObject } = await import("../src/viewport/view3d/tool-object.ts")
+  test("every mill type of the Resources: cutting, shank, holder and its flutes", () => {
+    for (const type of cam.TOOL_TYPES.mill.filter((t) => t !== "probe" && t !== "toolsetter")) {
+      const model = cam.toolModelOf({ type, diameter: 10, numberOfFlutes: 4 }, "mill")
+      const object = toolObject(model)
+      const all = names(object)
+      expect(all, type).toContain("cutting")
+      expect(all, type).toContain("shank")
+      expect(all.some((n) => n.startsWith("holder")), type).toBe(true)
+      expect(all.filter((n) => n === "flute-marker").length, type).toBe(type === "boringbar" ? 1 : 4)
+    }
+  })
+
+  test("the probe has a ruby ball; the setter stands with its pad top at the origin", () => {
+    const probe = toolObject(cam.toolModelOf({ type: "probe", diameter: 4 }))
+    const ball = probe.getObjectByName("cutting") as THREE.Mesh
+    expect((ball.material as THREE.MeshStandardMaterial).color.getHex()).toBe(0xdc2626)
+    const setter = toolObject(cam.toolModelOf({ type: "toolsetter", diameter: 30 }))
+    const box = new THREE.Box3().setFromObject(setter)
+    expect(box.max.z).toBeCloseTo(0, 6)
+  })
+
+  test("lathe inserts in the tool plane (a front turret mirrors them), knurling wheels, nozzles by material", () => {
+    for (const type of cam.TOOL_TYPES.lathe) {
+      const object = toolObject(cam.toolModelOf({ type, diameter: 3 }, "lathe"))
+      expect(names(object), type).toContain("lathe-tool:insert")
+      expect(new THREE.Box3().setFromObject(object).isEmpty(), type).toBe(false)
+    }
+    expect(toolObject(cam.toolModelOf({ type: "turning", diameter: 3 }, "lathe"), { turret: "front" }).scale.z).toBe(-1)
+    expect(names(toolObject(cam.toolModelOf({ type: "knurling", diameter: 3 }, "lathe"))).filter((n) => n === "lathe-tool:insert")).toHaveLength(2)
+    const ruby = toolObject(cam.toolModelOf({ type: "ruby", diameter: 0.6 }))
+    expect(names(ruby)).toContain("nozzle:ruby")
+    expect((ruby.getObjectByName("nozzle:hardened") ?? null)).toBeNull()
+  })
+
+  test("the machine scene draws the lathe insert and the nozzle of the set-up's tool model", () => {
+    const groove = v.latheSetupOf(settings({ machineType: "lathe" }), cam.toolModelOf({ type: "grooving", diameter: 4 }, "lathe") as cam.LatheModel)
+    const s = scene(groove, "G18 M3 S500\nG0 X52 Z-20\nG1 X40 F50\nG0 X52")
+    expect(s.root.getObjectByName("lathe-tool")).toBeDefined()
+    expect(groove.toolWidth).toBe(4)
+    const printer = { ...v.printerSetupOf(settings({ machineType: "3dprinter" })), tool: cam.toolModelOf({ type: "hardened", diameter: 0.8 }) as cam.NozzleModel }
+    expect(names(scene(printer, "M104 S200\nG1 X10 Y10 Z0.2 E1 F600").root)).toContain("nozzle:hardened")
+  })
+})

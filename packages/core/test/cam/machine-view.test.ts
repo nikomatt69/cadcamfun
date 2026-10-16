@@ -299,7 +299,8 @@ describe("the generator's stock is drawn where its program is (spec 31 D7)", () 
 })
 
 describe("live turned part (spec 31 §5.3)", () => {
-  const setup = v.latheSetupOf(lathe())
+  // A sharp tool: the profile is exactly the programmed radii.
+  const setup = v.latheSetupOf(lathe({ noseRadius: 0 }))
   const radiusAt = (p: cam.viewer.TurnedProfile, x: number) => p.outer[Math.floor((x - p.x0) / p.bin)]!
   test("a turning pass leaves its radius where it went and the bar elsewhere; half-way, half of it", () => {
     const tl = timelineOf("G18 M3 S800\nG0 X52 Z2\nG0 X48\nG1 Z-50 F200\nG0 X52\nM30")
@@ -323,6 +324,31 @@ describe("live turned part (spec 31 §5.3)", () => {
     }
   })
 
+  test("a nose radius: the turned diameter is the programmed one, the shoulder corner is the nose's arc", () => {
+    const rn = 0.8
+    const nosed = v.latheSetupOf(lathe({ noseRadius: rn }))
+    expect(nosed.noseRadius).toBe(rn)
+    const tl = timelineOf("G18 M3 S800\nG0 X52 Z2\nG0 X44\nG1 Z-40 F80\nG1 X52\nG0 Z2")
+    const p = v.turnedProfileAt(nosed, tl, tl.duration)
+    const at = (x: number) => p.outer[Math.floor((x - p.x0) / p.bin)]!
+    expect(at(-20)).toBeCloseTo(22, 2)
+    // At the shoulder (the tool stopped at Z-40 then went up): the nose's centre is at Z-40 + rn, radius 22 + rn.
+    for (const offset of [0.2, 0.5, 0.75]) {
+      // Compared at the bin's centre: the profile is sampled per bin.
+      const b = Math.floor((-40 + rn - offset - p.x0) / p.bin)
+      const dz = rn - (p.x0 + (b + 0.5) * p.bin - (-40))
+      const expected = 22 + rn - Math.sqrt(Math.max(0, rn * rn - dz * dz))
+      expect(p.outer[b]!).toBeCloseTo(expected, 2)
+    }
+    // Behind the nose the bar is whole.
+    expect(at(-41)).toBe(25)
+    // A boring bar's nose rounds the other way (radius outwards).
+    const bored = v.latheSetupOf(lathe({ stockBore: 10, toolType: "boring", operationType: "boring", noseRadius: rn }))
+    const bt = timelineOf("M3 S500\nG0 X10 Z2\nG1 X16 F100\nG1 Z-30")
+    const bp = v.turnedProfileAt(bored, bt, bt.duration)
+    expect(bp.inner[Math.floor((-15 - bp.x0) / bp.bin)]).toBeCloseTo(8, 2)
+  })
+
   test("facing past the axis cuts the end off; parting drops the rest", () => {
     const tl = timelineOf("M3 S800\nG0 X52 Z-2\nG1 X-1 F100\nG0 X52")
     const p = v.turnedProfileAt(setup, tl, tl.duration)
@@ -333,7 +359,7 @@ describe("live turned part (spec 31 §5.3)", () => {
   })
 
   test("a boring bar opens the bore; a stopped spindle removes nothing; a grooving blade cuts its width", () => {
-    const bored = v.latheSetupOf(lathe({ stockBore: 10, toolType: "boring", operationType: "boring" }))
+    const bored = v.latheSetupOf(lathe({ stockBore: 10, toolType: "boring", operationType: "boring", noseRadius: 0 }))
     const tl = timelineOf("M3 S500\nG0 X10 Z2\nG1 X16 F100\nG1 Z-30")
     const p = v.turnedProfileAt(bored, tl, tl.duration)
     expect(p.inner[Math.floor((-15 - p.x0) / p.bin)]).toBe(8)

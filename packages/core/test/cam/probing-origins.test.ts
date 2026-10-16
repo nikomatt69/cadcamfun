@@ -80,13 +80,15 @@ describe("zeros and offsets, by machine", () => {
   test("a lathe zero on the chuck moves every Z by the stock length and keeps the direction", () => {
     const face = run({ machineType: "lathe", toolType: "turning", operationType: "turning", depth: 2, stepdown: 1, stockLength: 60 })
     const chuck = run({ machineType: "lathe", toolType: "turning", operationType: "turning", depth: 2, stepdown: 1, stockLength: 60, latheZero: "chuck" })
-    expect(face).toContain("G1 Z-60.000")
-    expect(chuck).toContain("G1 Z0.000")
+    // The chuck grips 20 mm of the 60 mm bar: the turning stops 2 mm in front of the jaws (spec 31).
+    expect(face).toContain("G1 Z-38.000")
+    expect(face).toContain("; Limited to Z-38.000: the chuck grips 20.000 mm of the 60.000 mm bar")
+    expect(chuck).toContain("G1 Z22.000")
     expect(chuck).toContain("; Z zero is the chuck face")
     const zs = (g: string) => [...g.matchAll(/^G[01] .*?\bZ(-?[\d.]+)/gm)].map((m) => Number(m[1]))
     expect(zs(chuck).map((z, i) => z - 60)).toEqual(zs(face))
     // Moving towards the chuck is still -Z: the turning feed ends lower than it starts.
-    expect(chuck.indexOf("Z62.000")).toBeLessThan(chuck.indexOf("G1 Z0.000"))
+    expect(chuck.indexOf("Z62.000")).toBeLessThan(chuck.indexOf("G1 Z22.000"))
   })
 
   test("a printer zero at the plate centre centres the part on X0 Y0; at the corner on the middle of the plate", () => {

@@ -28,6 +28,16 @@ export interface LibraryTool {
   readonly numberOfFlutes?: number
   readonly maxRPM?: number
   readonly material?: string
+  /** The resource's shape fields (spec 31): the preview draws the tool from them. */
+  readonly cuttingLength?: number | null
+  readonly totalLength?: number | null
+  readonly shankDiameter?: number | null
+  readonly cornerRadius?: number | null
+  readonly tipAngle?: number | null
+  readonly threadPitch?: number | null
+  readonly holderDiameter?: number | null
+  readonly holderLength?: number | null
+  readonly stickout?: number | null
 }
 
 export interface DetectedCycle { readonly gcode: string }

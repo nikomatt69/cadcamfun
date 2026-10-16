@@ -7,8 +7,10 @@
 import type { Vec3 } from "../../cad/vec.ts"
 import { expandMoves, moveLength, type Program } from "../ir.ts"
 import type { MachineKind } from "../machine.ts"
+import { lerpAngles } from "./rotary.ts"
 import { displaySpinRate, spinSense } from "./frames.ts"
 import { stateAt, trackFor, type MotionState, type MotionTrack } from "./motion-track.ts"
+import type { Angles as RotaryAngles } from "./rotary.ts"
 
 export interface TimedMove {
   readonly path: number
@@ -23,6 +25,9 @@ export interface TimedMove {
   readonly start: number
   readonly duration: number
   readonly state: MotionState
+  /** Rotary angles at the start and the end of the move (empty for a 3-axis program). */
+  readonly anglesFrom: RotaryAngles
+  readonly angles: RotaryAngles
 }
 
 export interface Timeline {
@@ -33,23 +38,31 @@ export interface Timeline {
 
 export const DEFAULT_RAPID_RATE = 5000
 
-export const buildTimeline = (program: Program, track?: MotionTrack, rapidRate = DEFAULT_RAPID_RATE): Timeline => {
+/**
+ * `start` is where the machine is before the first move (the program does not say; `programStart` gives a believable one per
+ * machine). The origin when absent, as the playback always assumed.
+ */
+export const buildTimeline = (program: Program, track?: MotionTrack, rapidRate = DEFAULT_RAPID_RATE, start: Vec3 = { x: 0, y: 0, z: 0 }): Timeline => {
   const used = trackFor(program, track)
   const moves: TimedMove[] = []
-  let from: Vec3 = { x: 0, y: 0, z: 0 }
+  let from: Vec3 = start
   let time = 0
+  let angles: RotaryAngles = {}
   program.toolpaths.forEach((path, p) => {
     expandMoves(path.moves, from).forEach((move, index) => {
-      if (move._tag === "Comment" || move._tag === "Orient" || move._tag === "Cycle") return
+      if (move._tag === "Orient") { angles = { ...angles, ...(move.a !== undefined ? { a: move.a } : {}), ...(move.b !== undefined ? { b: move.b } : {}), ...(move.c !== undefined ? { c: move.c } : {}) }; return }
+      if (move._tag === "Comment" || move._tag === "Cycle") return
       const state = stateAt(used, p, index)
+      const anglesFrom = angles
+      if ((move._tag === "Rapid" || move._tag === "Linear") && move.rotary !== undefined) angles = { ...angles, ...move.rotary }
       if (move._tag === "Dwell") {
-        moves.push({ path: p, index, kind: "dwell", from, to: from, start: time, duration: move.seconds, state })
+        moves.push({ path: p, index, kind: "dwell", from, to: from, start: time, duration: move.seconds, state, anglesFrom, angles })
         time += move.seconds
         return
       }
       const duration = (moveLength(move, from) / Math.max(1e-6, move._tag === "Rapid" ? rapidRate : move.feed)) * 60
       moves.push({
-        path: p, index, kind: move._tag === "Rapid" ? "rapid" : "feed", from, to: move.to, start: time, duration, state,
+        path: p, index, kind: move._tag === "Rapid" ? "rapid" : "feed", from, to: move.to, start: time, duration, state, anglesFrom, angles,
         ...(move._tag === "Arc" ? { center: move.center, clockwise: move.clockwise } : {})
       })
       time += duration
@@ -83,12 +96,27 @@ export const pointOn = (move: TimedMove, f: number): Vec3 => {
 }
 
 /** Where the tool is at `seconds`, in program coordinates, with the state of that move. */
-export const poseAt = (timeline: Timeline, seconds: number): { readonly point: Vec3; readonly state: MotionState | undefined; readonly move: TimedMove | undefined } => {
+export const poseAt = (timeline: Timeline, seconds: number): { readonly point: Vec3; readonly state: MotionState | undefined; readonly move: TimedMove | undefined; readonly angles: RotaryAngles } => {
   const i = timedIndexAt(timeline, seconds)
   const move = timeline.moves[i] ?? timeline.moves[timeline.moves.length - 1]
-  if (move === undefined) return { point: { x: 0, y: 0, z: 0 }, state: undefined, move: undefined }
-  const f = move.duration > 0 ? (Math.max(0, Math.min(timeline.duration, seconds)) - move.start) / move.duration : 1
-  return { point: pointOn(move, i >= timeline.moves.length ? 1 : f), state: move.state, move }
+  if (move === undefined) return { point: { x: 0, y: 0, z: 0 }, state: undefined, move: undefined, angles: {} }
+  const f = i >= timeline.moves.length ? 1 : move.duration > 0 ? Math.max(0, Math.min(1, (Math.max(0, Math.min(timeline.duration, seconds)) - move.start) / move.duration)) : 1
+  return { point: pointOn(move, f), state: move.state, move, angles: lerpAngles(move.anglesFrom, move.angles, f) }
+}
+
+/**
+ * Where the machine believably is before the first move (spec 31 §9: the program does not say). A mill comes down onto
+ * the first position from the program's highest Z; a lathe turret starts out at the largest X and Z the program uses; a
+ * printer from its homed origin. Drawn as the first rapid, never checked as a cut.
+ */
+export const programStart = (kind: "mill" | "lathe" | "3dprinter", program: Program): Vec3 => {
+  const targets: Vec3[] = []
+  for (const path of program.toolpaths) for (const m of path.moves) if (m._tag === "Rapid" || m._tag === "Linear" || m._tag === "Arc") targets.push(m.to)
+  const first = targets[0]
+  if (first === undefined || kind === "3dprinter") return { x: 0, y: 0, z: 0 }
+  const maxZ = Math.max(...targets.map((p) => p.z))
+  if (kind === "mill") return { x: first.x, y: first.y, z: Math.max(first.z, maxZ) }
+  return { x: Math.max(...targets.map((p) => p.x)), y: 0, z: maxZ }
 }
 
 /**

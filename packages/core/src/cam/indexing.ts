@@ -93,7 +93,7 @@ export const anglesFor = (normal: Vec3, layout: RotaryLayout, limits: RotaryLimi
   return out.sort((p, q) => Math.abs(p.a ?? p.b ?? 0) - Math.abs(q.a ?? q.b ?? 0))
 }
 
-type Matrix = readonly [number, number, number, number, number, number, number, number, number]
+export type Matrix = readonly [number, number, number, number, number, number, number, number, number]
 
 const mul = (m: Matrix, p: Vec3): Vec3 => ({
   x: m[0] * p.x + m[1] * p.y + m[2] * p.z,

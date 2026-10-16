@@ -15,7 +15,9 @@ import type { WorkOffset } from "../ir.ts"
 import type { Stock, ToolpathSettings } from "../generator/schema.ts"
 import { stockInWork } from "../generator/dispatch.ts"
 import type { CamArtifact } from "../kernel/contracts.ts"
-import type { RotaryLayout } from "../indexing.ts"
+import { toolModelFromSettings, type LatheModel, type NozzleModel } from "../tool-model.ts"
+import { rotaryOfProgram, type RotarySetup } from "./rotary.ts"
+import type { Program } from "../ir.ts"
 
 export interface StockBox { readonly min: Vec3; readonly max: Vec3 }
 
@@ -42,7 +44,8 @@ export type AssumedPart = "workholding" | "table" | "stock"
 export interface MillSetup {
   readonly kind: "mill"
   readonly axes: 3 | 4 | 5
-  readonly rotary?: { readonly layout: RotaryLayout; readonly pivot: Vec3 }
+  /** A 4/5-axis or indexed program: its trunnion table and the frame of its coordinates (`rotary.ts`). */
+  readonly rotary?: RotarySetup
   readonly workholding: MillWorkholding
   readonly table: { readonly length: number; readonly width: number }
   readonly stock: StockBox
@@ -62,6 +65,10 @@ export interface LatheSetup {
   /** The tool's cutting width along Z, mm (a grooving or parting blade; a turning insert is a point). */
   readonly toolWidth: number
   readonly toolType: string
+  /** Nose radius of the insert, mm (0: a sharp point). The programmed point is the theoretical sharp tip. */
+  readonly noseRadius: number
+  /** The insert as the preview draws it (`tool-model.ts`). */
+  readonly tool: LatheModel
   readonly assumed: ReadonlyArray<AssumedPart>
 }
 
@@ -73,6 +80,8 @@ export interface PrinterSetup {
   readonly nozzle: number
   readonly layerHeight: number
   readonly extrusionWidth: number
+  /** The hot end as the preview draws it (`tool-model.ts`). */
+  readonly tool: NozzleModel
   readonly assumed: ReadonlyArray<AssumedPart>
 }
 
@@ -123,10 +132,10 @@ export const millSetupFromArtifact = (artifact: CamArtifact, settings: ToolpathS
 
 const INTERNAL_TOOLS = new Set(["boring"])
 
-export const latheSetupOf = (settings: ToolpathSettings): LatheSetup => {
+export const latheSetupOf = (settings: ToolpathSettings, tool: LatheModel = toolModelFromSettings(settings, "lathe") as LatheModel): LatheSetup => {
   const diameter = settings.stockDiameter
-  const internal = INTERNAL_TOOLS.has(settings.toolType) || settings.operationType === "boring" || settings.turningOperation === "internal"
-  const blade = settings.toolType === "grooving" || settings.toolType === "parting" || settings.operationType === "grooving" || settings.operationType === "parting"
+  const internal = INTERNAL_TOOLS.has(settings.toolType) || tool.insert === "boring" || settings.operationType === "boring" || settings.turningOperation === "internal"
+  const blade = tool.insert === "grooving" || tool.insert === "parting" || settings.operationType === "grooving" || settings.operationType === "parting"
   return {
     kind: "lathe", turret: settings.latheTurret, xMode: "diameter", zero: settings.latheZero,
     stock: { diameter, length: settings.stockLength, bore: Math.min(settings.stockBore, diameter * 0.95) },
@@ -136,7 +145,9 @@ export const latheSetupOf = (settings: ToolpathSettings): LatheSetup => {
     },
     internal,
     toolWidth: blade ? Math.max(0.5, Math.min(settings.toolDiameter, 10)) : 0,
-    toolType: settings.toolType,
+    toolType: tool.insert,
+    noseRadius: tool.noseRadius,
+    tool,
     assumed: settings.workholdingConfigured ? [] : ["workholding"]
   }
 }
@@ -145,12 +156,21 @@ export const printerSetupOf = (settings: ToolpathSettings): PrinterSetup => ({
   kind: "3dprinter", kinematics: settings.printerKinematics,
   bed: { width: settings.bedWidth, depth: settings.bedDepth, origin: settings.bedOrigin },
   buildHeight: settings.buildHeight, nozzle: settings.nozzleDiameter, layerHeight: settings.layerHeight, extrusionWidth: settings.extrusionWidth,
+  tool: toolModelFromSettings(settings, "3dprinter") as NozzleModel,
   assumed: []
 })
 
 /** The set-up of the generator settings for a machine kind (the stock is needed by a mill only). */
 export const setupOf = (kind: MachineSetup["kind"], settings: ToolpathSettings, stock: Stock, table?: { readonly length: number; readonly width: number }): MachineSetup =>
   kind === "lathe" ? latheSetupOf(settings) : kind === "3dprinter" ? printerSetupOf(settings) : millSetupOf(settings, stock, table)
+
+/** A mill set-up with the rotary table its program uses (none for a 3-axis program). */
+export const withRotary = (setup: MachineSetup, program: Program, gcode = "", pivot?: Vec3): MachineSetup => {
+  if (setup.kind !== "mill") return setup
+  const rotary = rotaryOfProgram(program, gcode, pivot)
+  if (rotary === undefined) { const { rotary: _drop, ...rest } = setup; void _drop; return { ...rest, axes: 3 } }
+  return { ...setup, rotary, axes: 5 }
+}
 
 export interface SetupProblem {
   readonly code: string

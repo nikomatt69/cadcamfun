@@ -118,9 +118,12 @@ export const assemblyProfile = (c: Cutter, options: { readonly assumeHolder?: bo
  * The assembly revolved about +Z with `segments` facets around, one mesh per part. Each profile segment owns its two rings,
  * so a corner of the profile stays sharp while the surface is smooth around the axis.
  */
-export const assemblyMeshes = (c: Cutter, options: { readonly assumeHolder?: boolean; readonly segments?: number } = {}): ReadonlyArray<AssemblyMesh> => {
-  const profile = assemblyProfile(c, options)
-  const n = Math.max(6, Math.min(256, Math.round(options.segments ?? 48)))
+export const assemblyMeshes = (c: Cutter, options: { readonly assumeHolder?: boolean; readonly segments?: number } = {}): ReadonlyArray<AssemblyMesh> =>
+  revolveProfile(assemblyProfile(c, options), options.segments)
+
+/** Any tool half-section revolved about +Z, one mesh per part (the tool model of the preview and the library uses it too). */
+export const revolveProfile = (profile: AssemblyProfile, segments = 48): ReadonlyArray<AssemblyMesh> => {
+  const n = Math.max(6, Math.min(256, Math.round(segments)))
   const cos = Array.from({ length: n + 1 }, (_, k) => Math.cos((2 * Math.PI * k) / n))
   const sin = Array.from({ length: n + 1 }, (_, k) => Math.sin((2 * Math.PI * k) / n))
   const out: AssemblyMesh[] = []

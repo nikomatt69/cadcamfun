@@ -64,7 +64,10 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
         gcode = program.gcode
       }
       // The program on this machine: the same timeline, set-up and checks the preview draws.
-      return { ...table, run: machineRun({ kind, gcode, ...(params !== undefined ? { params } : {}), ...(at !== undefined ? { at } : {}) }) }
+      // A tool resource in params.tool (type, diameter, cuttingLength, cornerRadius, tipAngle, threadPitch, holder...) is drawn
+      // and checked with the same 3D model the preview uses.
+      const { tool, ...settingsParams } = (params ?? {}) as Record<string, unknown>
+      return { ...table, run: machineRun({ kind, gcode, params: settingsParams, ...(tool !== undefined && typeof tool === "object" ? { tool: tool as never } : {}), ...(at !== undefined ? { at } : {}) }) }
     }
   }),
   defineWireAction({

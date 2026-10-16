@@ -12,6 +12,8 @@ export interface ToolInput {
   name?: string | undefined; type?: string | undefined; diameter?: number | undefined; material?: string | undefined
   numberOfFlutes?: number | null | undefined; maxRPM?: number | null | undefined; coolantType?: string | null | undefined
   cuttingLength?: number | null | undefined; totalLength?: number | null | undefined; shankDiameter?: number | null | undefined
+  cornerRadius?: number | null | undefined; tipAngle?: number | null | undefined; threadPitch?: number | null | undefined
+  holderDiameter?: number | null | undefined; holderLength?: number | null | undefined; stickout?: number | null | undefined
   notes?: string | null | undefined; organizationId?: string | null | undefined; isPublic?: boolean | undefined
 }
 
@@ -78,6 +80,8 @@ export class ToolRepo extends Context.Service<ToolRepo, {
               name: String(t.name), type: String(t.type), diameter: parseFloat(String(t.diameter)), material: String(t.material),
               numberOfFlutes: int(t.numberOfFlutes) ?? null, maxRPM: int(t.maxRPM) ?? null, coolantType: (t.coolantType as string) || null,
               cuttingLength: num(t.cuttingLength) ?? null, totalLength: num(t.totalLength) ?? null, shankDiameter: num(t.shankDiameter) ?? null,
+              cornerRadius: num(t.cornerRadius) ?? null, tipAngle: num(t.tipAngle) ?? null, threadPitch: num(t.threadPitch) ?? null,
+              holderDiameter: num(t.holderDiameter) ?? null, holderLength: num(t.holderLength) ?? null, stickout: num(t.stickout) ?? null,
               notes: (t.notes as string) || null
             })
             return importLoop(items, mode, {
@@ -103,6 +107,8 @@ export class ToolRepo extends Context.Service<ToolRepo, {
               name: input.name, type: input.type, diameter: input.diameter, material: input.material,
               numberOfFlutes: input.numberOfFlutes ?? null, maxRPM: input.maxRPM ?? null, coolantType: input.coolantType ?? null,
               cuttingLength: input.cuttingLength ?? null, totalLength: input.totalLength ?? null, shankDiameter: input.shankDiameter ?? null,
+              cornerRadius: input.cornerRadius ?? null, tipAngle: input.tipAngle ?? null, threadPitch: input.threadPitch ?? null,
+              holderDiameter: input.holderDiameter ?? null, holderLength: input.holderLength ?? null, stickout: input.stickout ?? null,
               notes: input.notes ?? null, ownerId: userId, organizationId: input.organizationId || null, isPublic: input.isPublic || false
             }).returning()
             return toRow(row!)
@@ -119,6 +125,12 @@ export class ToolRepo extends Context.Service<ToolRepo, {
               ...(i.cuttingLength !== undefined && { cuttingLength: i.cuttingLength }),
               ...(i.totalLength !== undefined && { totalLength: i.totalLength }),
               ...(i.shankDiameter !== undefined && { shankDiameter: i.shankDiameter }),
+              ...(i.cornerRadius !== undefined && { cornerRadius: i.cornerRadius }),
+              ...(i.tipAngle !== undefined && { tipAngle: i.tipAngle }),
+              ...(i.threadPitch !== undefined && { threadPitch: i.threadPitch }),
+              ...(i.holderDiameter !== undefined && { holderDiameter: i.holderDiameter }),
+              ...(i.holderLength !== undefined && { holderLength: i.holderLength }),
+              ...(i.stickout !== undefined && { stickout: i.stickout }),
               ...(i.notes !== undefined && { notes: i.notes }),
               ...(i.isPublic !== undefined && { isPublic: i.isPublic }),
               updatedAt: new Date()
