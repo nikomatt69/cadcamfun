@@ -1,5 +1,11 @@
 # WP3 + WP4 — Shared API contract and sidecar server
 
+## Subscription provider connections (2026-10-16)
+
+Owner clarification: also provide OpenCode Zen (`opencode`) and Go (`opencode-go`) account-key connections. Their documented account/subscription access uses API keys, not an invented OAuth grant. WP8 owns explicit provider fallbacks and native session headers; WP6 owns console links and key guidance. Preserve models.dev per-model protocol routing. Reference: https://opencode.ai/v2/docs/console/go/ and https://opencode.ai/v2/docs/console/models/.
+
+Integration authorized by 08-ai.md: application-only POST /api/ai/oauth/authorize takes provider (openai or xai) and returns attemptId, url, method and instructions. POST /api/ai/oauth/complete takes provider, attemptId and optional code, delegates to native nikcli and returns AI status. External bridge grants cannot manage provider credentials. Regenerate both clients. Status: implemented; typechecks and targeted provider/UI regressions pass.
+
 ## Assistant extensions (2026-10-16)
 
 Owner-requested assistant extensions: add typed AI endpoints for project-owned MCP configuration/status and local Worker plugin installation/enablement. Reuse the native nikcli MCP client and existing AiPlugins host; reject external bridge grants for extension management. Regenerate clients. Status: implemented and verified at source-runtime level.
@@ -94,6 +100,8 @@ apps/sidecar/src/
 - `bunx tsc` clean for both packages; coverage of every endpoint by at least one in-process HTTP test.
 
 ## 5. Change log
+
+- 2026-10-16: Added application-only OAuth authorize/complete endpoints, regenerated clients and OpenAPI snapshot. Wired subscription credential changes and OpenCode Zen/Go declarations into the native host. Provider tests exercise real handlers and native plugins against simulated external services.
 
 - 2026-10-16: Regression review: refreshed the OpenAPI snapshot for the assistant extension endpoints and contributed mode ids. The snapshot adds seven paths and removes none; contract assertions and generated-client freshness checks pass.
 

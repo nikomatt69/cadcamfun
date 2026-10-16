@@ -20,6 +20,8 @@ import { seedModelsCache, type CatalogueSeed } from "./models-cache.ts"
 import { bootstrapStep, describeBootstrapFailure } from "./bootstrap-errors.ts"
 import { HostToolRegistry } from "./tool-registry.ts"
 import { findHostSession } from "./chat.ts"
+import { providerOAuth } from "./provider-oauth.ts"
+import { readOAuthGrants } from "./oauth-store.ts"
 
 /** A tool exposed to the model. `execute` receives already zod-validated input. */
 export interface HostToolSpec {
@@ -117,6 +119,8 @@ export interface NikCliRuntime {
   /** Push a key into the host (`provider.api.set`). */
   setProviderKey(providerId: string, key: string): Effect.Effect<void, AiConfigError>
   clearProviderKey(providerId: string): Effect.Effect<void>
+  useProviderOAuth(providerId: string): Effect.Effect<void, AiConfigError>
+  readonly oauth: ReturnType<typeof providerOAuth>
   /** Replace the provider declarations (e.g. new MiniMax base URL) and reload live hosts. */
   updateProviders(providers: ReadonlyArray<HostProviderSpec>): Effect.Effect<void, AiConfigError>
   /** Rewrite the skills (built-in + the user's) into the host config and make live hosts see them. */
@@ -409,6 +413,7 @@ export const makeNikCliRuntime = (
     }
 
     const runtime: NikCliRuntime = {
+      oauth: providerOAuth(() => Effect.tryPromise({ try: () => getHost("default"), catch: toConfigError("Could not open provider sign-in") }), join(paths.data, "auth.json")),
       toolCatalogue: () => toolRegistry.catalogue("default"),
       paths,
       get catalogueReady() {
@@ -479,11 +484,24 @@ export const makeNikCliRuntime = (
           if (closed) return
           pendingKeys.delete(providerId)
           liveKeys.delete(providerId)
+          if (readOAuthGrants(join(paths.data, "auth.json"))[providerId] && hosts.size === 0) await getHost("default")
           for (const promise of hosts.values()) {
             const host = await promise.catch(() => undefined)
             await host?.client.provider.removeAuth({ providerID: providerId }).catch(() => undefined)
           }
         }),
+      useProviderOAuth: (providerId) => Effect.tryPromise({
+        try: async () => {
+          pendingKeys.delete(providerId)
+          liveKeys.delete(providerId)
+          for (const promise of hosts.values()) {
+            const host = await promise
+            await host.client["config-management"].reload()
+            for (const [id, key] of pendingKeys) await host.client.provider.api({ providerID: id, key })
+          }
+        },
+        catch: () => new AiConfigError({ message: "Could not refresh the subscription provider.", provider: providerId })
+      }),
       reloadSkills: () =>
         Effect.tryPromise({
           try: async () => {

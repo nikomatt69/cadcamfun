@@ -1,7 +1,8 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
-import { dirname } from "node:path"
+import { dirname, join } from "node:path"
 import { Context, Effect, Layer, Option, Redacted, Scope } from "effect"
 import { AiConfigError } from "./errors.ts"
+import { readOAuthGrants } from "./nikcli/oauth-store.ts"
 import { BUILTIN_PROVIDER_IDS, isProviderId, type ProviderId } from "./models.ts"
 
 export interface StoredCredential {
@@ -10,6 +11,7 @@ export interface StoredCredential {
 }
 
 export type CredentialChange =
+  | { readonly _tag: "oauth"; readonly provider: ProviderId }
   | { readonly _tag: "set"; readonly provider: ProviderId; readonly credential: StoredCredential }
   | { readonly _tag: "clear"; readonly provider: ProviderId }
 
@@ -22,6 +24,7 @@ export type CredentialStatus = "configured" | "missing"
 
 /** Where the credentials survive a restart: read once when the service starts, rewritten after every change. */
 export interface CredentialPersistence {
+  readonly loadOAuth?: () => ReadonlyArray<string>
   readonly load: () => ReadonlyArray<readonly [ProviderId, StoredCredential]>
   readonly save: (entries: ReadonlyArray<readonly [ProviderId, StoredCredential]>) => void
 }
@@ -32,6 +35,7 @@ export interface CredentialPersistence {
  * file reads as empty, and a failed write never fails the change in memory.
  */
 export const jsonFileCredentials = (file: string): CredentialPersistence => ({
+  loadOAuth: () => Object.keys(readOAuthGrants(join(dirname(file), "nikcli", "data", "auth.json"))),
   load: () => {
     try {
       if (!existsSync(file)) return []
@@ -65,6 +69,8 @@ export class AiCredentials extends Context.Service<
   {
     set(provider: ProviderId, key: Redacted.Redacted<string>, opts?: { baseUrl?: string }): Effect.Effect<void, AiConfigError>
     clear(provider: ProviderId): Effect.Effect<void>
+    /** Native nikcli already saved the grant; replace the app's API key without deleting that grant. */
+    useOAuth(provider: ProviderId): Effect.Effect<void, AiConfigError>
     status: Effect.Effect<Record<ProviderId, CredentialStatus>>
     /** Changes whenever the effective provider credentials change; used to invalidate cached AI workflows. */
     revision: Effect.Effect<number>
@@ -85,6 +91,8 @@ export class AiCredentials extends Context.Service<
 
   private static build(persistence?: CredentialPersistence): Layer.Layer<AiCredentials> { return Layer.sync(AiCredentials, () => {
     const store = new Map<ProviderId, StoredCredential>(persistence?.load() ?? [])
+    const oauth = new Set(persistence?.loadOAuth?.() ?? [])
+    for (const provider of oauth) store.delete(provider)
     let revision = 0
     const persist = () => persistence?.save([...store])
     const sinks = new Set<CredentialSink>()
@@ -118,6 +126,7 @@ export class AiCredentials extends Context.Service<
             ...(opts?.baseUrl ? { baseUrl: opts.baseUrl.replace(/\/+$/, "") } : {})
           }
           const previous = store.get(provider)
+          oauth.delete(provider)
           if (previous === undefined || Redacted.value(previous.key) !== Redacted.value(key) || previous.baseUrl !== credential.baseUrl) revision++
           store.set(provider, credential)
           persist()
@@ -125,15 +134,23 @@ export class AiCredentials extends Context.Service<
         }),
       clear: (provider) =>
         Effect.gen(function* () {
+          if (oauth.delete(provider)) revision++
           if (store.delete(provider)) revision++
           persist()
           yield* broadcast({ _tag: "clear", provider }).pipe(Effect.ignore)
         }),
+      useOAuth: Effect.fn("AiCredentials.useOAuth")(function*(provider) {
+        store.delete(provider)
+        oauth.add(provider)
+        revision++
+        persist()
+        yield* broadcast({ _tag: "oauth", provider })
+      }),
       status: Effect.sync(() => {
         // Builtins plus every provider the user saved a key for: a models.dev
         // provider has to stay visible in the settings once configured.
-        const ids = new Set<string>([...BUILTIN_PROVIDER_IDS, ...store.keys()])
-        return Object.fromEntries([...ids].map((id) => [id, store.has(id) ? "configured" : "missing"])) as Record<
+        const ids = new Set<string>([...BUILTIN_PROVIDER_IDS, ...store.keys(), ...oauth])
+        return Object.fromEntries([...ids].map((id) => [id, store.has(id) || oauth.has(id) ? "configured" : "missing"])) as Record<
           ProviderId,
           CredentialStatus
         >
@@ -150,6 +167,7 @@ export class AiCredentials extends Context.Service<
             })
           )
           for (const [provider, credential] of store) yield* sink.apply({ _tag: "set", provider, credential })
+          for (const provider of oauth) yield* sink.apply({ _tag: "oauth", provider })
         })
     })
   }) }

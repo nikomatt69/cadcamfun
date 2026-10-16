@@ -2,6 +2,8 @@ import { hostAgentWithPermissions, type PermissionMode } from "./nikcli/permissi
 import { Context, Effect, Layer, Option, Ref, Schema, Semaphore, Stream } from "effect"
 import { AiConfig } from "./ai-config.ts"
 import { AiCredentials } from "./credentials.ts"
+import { subscriptionText } from "./nikcli/subscription-call.ts"
+import { isOpenCodeProvider } from "./nikcli/opencode.ts"
 import { DirectModel } from "./direct-model.ts"
 import { AiCache } from "./cache.ts"
 import { AiAborted, AiConfigError, AiProviderError, type AiError } from "./errors.ts"
@@ -181,6 +183,36 @@ export class AiService extends Context.Service<AiService, {
       )
       const catalogOf = (_runtime: NikCliRuntime) => cachedCatalog.pipe(Effect.tapError(() => invalidateCatalog))
 
+      const resolveSelection = Effect.fn("AiService.resolveSelection")(function*(selector?: ModelSelector) {
+        const ok = yield* configured
+        let selected = selector
+        if (Option.isSome(host) && !config.forceGateway && !selector?.model) {
+          const provider = selector?.provider ?? [...ok].find((id) => providerAllowed(config.policies ?? [], id))
+          if (provider && ok.has(provider) && (isOpenCodeProvider(provider) || Option.isNone(yield* credentials.get(provider)))) {
+            const catalogue = yield* catalogOf(host.value.runtime)
+            const model = catalogue.find((entry) => entry.id === provider)?.models.find((entry) => entry.tools)
+            if (model) selected = { ...selector, provider, model: model.id }
+          }
+        }
+        const resolved = resolveModel(selected, { configured: ok, forceGateway: config.forceGateway, ...(config.policies ? { policies: config.policies } : {}) })
+        if (resolved instanceof AiConfigError) return yield* resolved
+        return resolved
+      })
+      const completeText = Effect.fn("AiService.completeText")(function*(input: { prompt: string; system?: string; model?: ModelSelector }) {
+        const resolved = yield* resolveSelection(input.model)
+        if (Option.isSome(host) && (isOpenCodeProvider(resolved.provider) || Option.isNone(yield* credentials.get(resolved.provider)))) return yield* subscriptionText(host.value.runtime, resolved, input)
+        return yield* direct.generateText(input).pipe(Effect.map((result) => ({ text: result.text, model: result.model })))
+      })
+      const generateObject = Effect.fn("AiService.generateObject")(function*<A>(input: { prompt: string; system?: string; model?: ModelSelector; schema: Schema.Decoder<A> }): Effect.fn.Return<A, AiError> {
+        const resolved = yield* resolveSelection(input.model)
+        if (Option.isNone(host) || (!isOpenCodeProvider(resolved.provider) && Option.isSome(yield* credentials.get(resolved.provider)))) return yield* direct.generateObject(input)
+        const document = Schema.toJsonSchemaDocument(input.schema)
+        const schema = JSON.stringify({ ...document.schema, $defs: document.definitions })
+        const result = yield* subscriptionText(host.value.runtime, resolved, { ...input, prompt: `${input.prompt}\nReturn only valid JSON matching this schema:\n${schema}` })
+        const raw = yield* Effect.try({ try: () => JSON.parse(result.text) as unknown, catch: () => new AiProviderError({ message: "The model returned invalid JSON.", provider: resolved.provider }) })
+        return yield* Schema.decodeUnknownEffect(input.schema)(raw).pipe(Effect.mapError(() => new AiProviderError({ message: "The model returned data that does not match the requested schema.", provider: resolved.provider })))
+      })
+
       /** The built-in tier defaults shaped as host models: direct mode has no catalogue to read. */
       const builtinModels = (provider: BuiltinProviderId): ReadonlyArray<HostModelInfo> =>
         allModels([provider]).map((m) => ({
@@ -305,7 +337,7 @@ export class AiService extends Context.Service<AiService, {
           const key = cache.keyFor(payload)
           const hit = yield* cache.get<A>(key)
           if (hit !== undefined) return hit
-          const result = yield* direct.generateObject({ prompt: prompt.user, system: prompt.system, schema, model })
+          const result = yield* generateObject({ prompt: prompt.user, system: prompt.system, schema, model })
           yield* cache.set(key, result)
           return result
         })
@@ -314,9 +346,7 @@ export class AiService extends Context.Service<AiService, {
       const chat = (input: ChatInput): Stream.Stream<AiEvent, AiError> =>
         Stream.unwrap(
           Effect.gen(function* () {
-            const ok = yield* configured
-            const resolved = resolveModel(input.model, { configured: ok, forceGateway: config.forceGateway, ...(config.policies ? { policies: config.policies } : {}) })
-            if (resolved instanceof AiConfigError) return yield* resolved
+            const resolved = yield* resolveSelection(input.model)
             // Resolve the reply language once per chat (nikcli `locale/resolve.ts` shape, mirrored
             // locally because the SDK does not expose it). English is the silent default; every
             // other language becomes a deterministic instruction in the system prompt.
@@ -462,8 +492,8 @@ export class AiService extends Context.Service<AiService, {
         chat,
         agents: PRIMARY_IDS.map((id) => ({ id, title: PRIMARIES[id].title, description: PRIMARIES[id].description, tools: [], edits: true })),
         controlSession,
-        complete: (input) => direct.generateText(input).pipe(Effect.map((r) => ({ text: r.text, model: r.model }))),
-        generate: (input) => direct.generateObject(input),
+        complete: completeText,
+        generate: generateObject,
         suggestedFor: (mode) => SUGGESTED_PROMPTS[isAssistantMode(mode) ? mode : "general"],
         suggestTitle: (input) =>
           workflow(TITLE_GENERATION, { excerpt: clipForPrompt(input.excerpt) }, TitleOutput, input.model),

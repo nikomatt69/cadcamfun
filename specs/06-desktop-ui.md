@@ -1,5 +1,11 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Subscription provider connections (2026-10-16)
+
+Owner clarification: also provide OpenCode Zen (`opencode`) and Go (`opencode-go`) account-key connections. Their documented account/subscription access uses API keys, not an invented OAuth grant. WP8 owns explicit provider fallbacks and native session headers; WP6 owns console links and key guidance. Preserve models.dev per-model protocol routing. Reference: https://opencode.ai/v2/docs/console/go/ and https://opencode.ai/v2/docs/console/models/.
+
+Integration authorized by 08-ai.md: Settings → AI offers ChatGPT/Codex and SuperGrok subscription login when native OAuth is available, opens the system browser, displays completion instructions and the optional xAI manual code input, and refreshes status/catalogue after connection or disconnection. API-key entry remains available. Status: implemented; typechecks and targeted provider/UI regressions pass.
+
 ## Assistant extensions (2026-10-16)
 
 Owner-requested assistant extensions: WP6 owns a compact MCP/plugin settings disclosure in the existing assistant, project-local connection management, Worker plugin installation/enablement and links to existing CAD/CAM plugin pages. AI locale and desktop tests are included. Status: implemented and verified at source-runtime level.
@@ -77,6 +83,8 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 - Keyboard-only workflow for create project → draw → generate → export works.
 
 ## 5. Change log
+
+- 2026-10-16: Added ChatGPT/Codex and SuperGrok browser connections with xAI manual-code completion, plus OpenCode Zen/Go console links and account-key instructions. Provider settings tests cover all connection forms and clear entered secrets after success.
 
 - 2026-10-16: The assistant overflow menu exposes MCP & plugins. Project MCP configuration/status/enablement/removal and Worker plugin installation/enablement/removal share the existing disclosure styling; CAD/CAM interface plugins link to the existing manager. The DOM flow installs an inert plugin, enables/disables its tools and removes it. Desktop typecheck and production build pass. Native visual verification was not performed.
 

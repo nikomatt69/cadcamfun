@@ -11,7 +11,7 @@
  */
 import { createContext, createResource, createSignal, onCleanup, useContext, type Accessor, type JSX } from "solid-js"
 import { createAiStore, type AiStore } from "./store.ts"
-import { makeCatalog, type AiCatalogService } from "../lib/models.ts"
+import { makeCatalog, type AiCatalogService, type OAuthAuthorization } from "../lib/models.ts"
 import type { AiStatus, ModelInfo, ProviderId, ProviderInfo } from "../lib/types.ts"
 import { useApp, type AppState } from "../../../shared/state/context.ts"
 
@@ -26,6 +26,8 @@ export interface AiContextValue {
   readonly refresh: () => void
   readonly saveCredentials: (provider: ProviderId, key: string, baseUrl?: string) => Promise<void>
   readonly removeCredentials: (provider: ProviderId) => Promise<void>
+  readonly authorizeOAuth: (provider: "openai" | "xai") => Promise<OAuthAuthorization>
+  readonly completeOAuth: (provider: "openai" | "xai", attemptId: string, code?: string) => Promise<void>
 }
 
 /** What every consumer of `useAiStore()` actually gets: the store plus the cached catalogue. */
@@ -80,7 +82,12 @@ export const AiProvider = (props: { readonly children: JSX.Element }): JSX.Eleme
       providersPending: () => { enableProviders(true); return providersResource.state === "pending" },
       refresh,
       saveCredentials,
-      removeCredentials
+      removeCredentials,
+      authorizeOAuth: (provider) => app.runtime.run(catalog.authorizeOAuth(provider)),
+      completeOAuth: async (provider, attemptId, code) => {
+        await app.runtime.run(catalog.completeOAuth(provider, attemptId, code))
+        refresh()
+      }
     },
     get children() { return props.children }
   })

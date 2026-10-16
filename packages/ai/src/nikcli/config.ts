@@ -33,6 +33,8 @@ export const workerToolAllowed = (id: string): boolean => WORKER_TOOL_IDS.includ
 export type HostProtocol = "openai-compatible" | "openai-responses" | "anthropic"
 
 export interface HostProviderSpec {
+  /** Retain models.dev routing for the undeclared models of a mixed-protocol provider. */
+  readonly catalogueRouting?: boolean
   readonly id: string
   readonly name: string
   readonly protocol: HostProtocol
@@ -201,12 +203,14 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
     }
     provider[p.id] = {
       name: p.name,
-      npm: p.protocol === "anthropic" ? "@ai-sdk/anthropic" : p.protocol === "openai-responses" ? "@ai-sdk/openai" : "@ai-sdk/openai-compatible",
-      options: { baseURL: p.baseURL, protocol: p.protocol },
+      ...(!p.catalogueRouting ? {
+        npm: p.protocol === "anthropic" ? "@ai-sdk/anthropic" : p.protocol === "openai-responses" ? "@ai-sdk/openai" : "@ai-sdk/openai-compatible",
+        options: { baseURL: p.baseURL, protocol: p.protocol }
+      } : {}),
       models: Object.fromEntries(
         p.models.map((m) => [
           m.id,
-          { name: m.name, tool_call: true, ...(m.vision !== undefined || m.pdf !== undefined ? { attachment: m.vision === true || m.pdf === true, modalities: { input: ["text", ...(m.vision ? ["image"] : []), ...(m.pdf ? ["pdf"] : [])], output: ["text"] } } : {}), ...((m.context !== undefined || m.output !== undefined || m.input !== undefined) ? { limit: { ...(m.context !== undefined ? { context: m.context } : {}), ...(m.input !== undefined ? { input: m.input } : {}), ...(m.output !== undefined ? { output: m.output } : {}) } } : {}) }
+          { name: m.name, ...(p.catalogueRouting ? { provider: { npm: "@ai-sdk/openai-compatible", api: p.baseURL } } : {}), tool_call: true, ...(m.vision !== undefined || m.pdf !== undefined ? { attachment: m.vision === true || m.pdf === true, modalities: { input: ["text", ...(m.vision ? ["image"] : []), ...(m.pdf ? ["pdf"] : [])], output: ["text"] } } : {}), ...((m.context !== undefined || m.output !== undefined || m.input !== undefined) ? { limit: { ...(m.context !== undefined ? { context: m.context } : {}), ...(m.input !== undefined ? { input: m.input } : {}), ...(m.output !== undefined ? { output: m.output } : {}) } } : {}) }
         ])
       )
     }

@@ -26,6 +26,13 @@ export class GcodeActionFailure extends Schema.TaggedError<GcodeActionFailure>()
 }, { httpApiStatus: 500 }) {}
 
 export const CredentialBody = Schema.Struct({ provider: opt(Schema.String), key: opt(Schema.String), baseUrl: opt(Schema.String) })
+export const OAuthProvider = Schema.Literals(["openai", "xai"])
+export const OAuthAuthorizeBody = Schema.Struct({ provider: OAuthProvider })
+export const OAuthCompleteBody = Schema.Struct({ provider: OAuthProvider, attemptId: Schema.String, code: opt(Schema.String) })
+export const OAuthAuthorization = Schema.Struct({
+  attemptId: Schema.String, url: Schema.String, instructions: Schema.String,
+  method: Schema.Literals(["auto", "code", "auto-code"])
+})
 export const CredentialStatus = Schema.Record(Schema.String, Schema.Literals(["configured", "missing"]))
 export const AiStatus = Schema.Struct({
   providers: CredentialStatus,
@@ -293,6 +300,8 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.post("gcode", "/api/ai/gcode", { payload: GcodeActionBody, success: GcodeActionReply, error: [GcodeActionError, GcodeActionFailure] }),
     HttpApiEndpoint.post("toolpathAnalysis", "/api/ai/toolpath-analysis", { payload: ToolpathAnalysisBody, success: ToolpathAnalysisReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("feedback", "/api/ai/feedback", { payload: FeedbackBody, success: FeedbackReply, error: [AiBadRequest, AiFailure] }),
-    HttpApiEndpoint.post("proxy", "/api/ai/proxy", { payload: ProxyBody, success: AnthropicMessage, error: InternalError })
+    HttpApiEndpoint.post("proxy", "/api/ai/proxy", { payload: ProxyBody, success: AnthropicMessage, error: InternalError }),
+    HttpApiEndpoint.post("oauthAuthorize", "/api/ai/oauth/authorize", { payload: OAuthAuthorizeBody, success: OAuthAuthorization, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("oauthComplete", "/api/ai/oauth/complete", { payload: OAuthCompleteBody, success: AiStatus, error: [BadRequest, InternalError] })
   )
 {}

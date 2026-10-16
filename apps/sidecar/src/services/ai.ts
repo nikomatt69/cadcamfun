@@ -1,3 +1,4 @@
+import { openCodeProviderSpecs } from "@cadcamfun/ai"
 import { inspectProperties, readProperty, componentParameters, originEntry, ORIGIN_AXES } from "./ai-inspection.ts"
 import { createHash } from "node:crypto"
 import {
@@ -1200,7 +1201,7 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
     isolation: { mods: true },
     mods: () => [...new Set([...modSpecs(isolatedPaths(config.dataDir)), ...plugins.modSpecs()])],
     ...(policies.length > 0 ? { policies } : {}),
-    providers: defaultProviderSpecs(config.aiMinimaxBaseUrl ? { minimax: config.aiMinimaxBaseUrl } : {}),
+    providers: [...defaultProviderSpecs(config.aiMinimaxBaseUrl ? { minimax: config.aiMinimaxBaseUrl } : {}), ...openCodeProviderSpecs()],
     systemPrompt: agentSystemPrompt(),
     // Host imports and model metadata start on demand, after the editor is usable.
     // One request to models.dev, only while `<cache>/models.json` is missing: that file is
@@ -1220,7 +1221,7 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   yield* credentials.attach({
     apply: (change) => change._tag === "set"
       ? runtime.setProviderKey(change.provider, Redacted.value(change.credential.key))
-      : runtime.clearProviderKey(change.provider)
+      : change._tag === "oauth" ? runtime.useProviderOAuth(change.provider) : runtime.clearProviderKey(change.provider)
   })
   return AiHost.of({ runtime, scheduler })
 }))

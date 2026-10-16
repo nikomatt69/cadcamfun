@@ -14,6 +14,8 @@ import { t } from "../../../i18n/index.ts"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { useAiStore } from "../store/context.tsx"
 import type { ProviderInfo } from "../lib/types.ts"
+import type { OAuthAuthorization } from "../lib/models.ts"
+import { openExternal } from "../../../app/external.ts"
 
 const FIELD = "assistant-field"
 
@@ -33,6 +35,12 @@ function ProviderRow(props: {
   const [key, setKey] = createSignal("")
   const [baseUrl, setBaseUrl] = createSignal("")
   const [busy, setBusy] = createSignal(false)
+  const [authorization, setAuthorization] = createSignal<OAuthAuthorization>()
+  const [code, setCode] = createSignal("")
+  const oauthProvider = (): "openai" | "xai" | undefined => {
+    const id = props.provider.id
+    return ai.aiStatus()?.host === "nikcli" && props.provider.auth.includes("oauth") && (id === "openai" || id === "xai") ? id : undefined
+  }
   const [modelSearch, setModelSearch] = createSignal("")
   const [modelLimit, setModelLimit] = createSignal(50)
   const matchingModels = createMemo(() => props.provider.models.filter((model) => `${model.id} ${model.name}`.toLowerCase().includes(modelSearch().trim().toLowerCase())))
@@ -72,6 +80,41 @@ function ProviderRow(props: {
       </button>
       <Show when={props.open}>
         <div class="assistant-provider-detail" data-testid="ai-provider-detail">
+          <Show when={props.provider.id === "opencode" || props.provider.id === "opencode-go"}>
+            <section class="space-y-1.5" data-testid="ai-provider-opencode-connect">
+              <p class="assistant-meta-text">{props.provider.id === "opencode-go" ? t("ai.providers.openCodeGoHint") : t("ai.providers.openCodeZenHint")}</p>
+              <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => openExternal("https://opencode.ai/auth")}>{t("ai.providers.openCodeAccount")}</button>
+            </section>
+          </Show>
+          <Show when={oauthProvider()}>{(provider) => (
+            <section class="space-y-1.5" data-testid="ai-provider-oauth">
+              <p class="assistant-meta-text">{t("ai.providers.subscriptionHint")}</p>
+              <Show when={!authorization()}>
+                <button type="button" class="assistant-btn assistant-btn-primary" disabled={busy()} onClick={() => {
+                  setBusy(true)
+                  void ai.authorizeOAuth(provider()).then((result) => {
+                    setAuthorization(result)
+                    openExternal(result.url)
+                  }).catch((cause: unknown) => toast.error(cause instanceof Error ? cause.message : t("ai.providers.failed"))).finally(() => setBusy(false))
+                }}>{provider() === "openai" ? t("ai.providers.connectChatGPT") : t("ai.providers.connectSuperGrok")}</button>
+              </Show>
+              <Show when={authorization()}>{(attempt) => (
+                <div class="space-y-1.5" aria-live="polite">
+                  <p class="assistant-meta-text">{attempt().instructions}</p>
+                  <button type="button" class="assistant-link-btn" onClick={() => openExternal(attempt().url)}>{t("ai.providers.openBrowser")}</button>
+                  <Show when={attempt().method !== "auto"}>
+                    <input class={FIELD} autocomplete="off" aria-label={t("ai.providers.authorizationCode")} placeholder={t("ai.providers.authorizationCode")} value={code()} onInput={(event) => setCode(event.currentTarget.value)} />
+                  </Show>
+                  <button type="button" class="assistant-btn assistant-btn-primary" disabled={busy() || (attempt().method === "code" && !code().trim())} onClick={() => {
+                    void run(async () => {
+                      try { await ai.completeOAuth(provider(), attempt().attemptId, code().trim() || undefined) }
+                      finally { setAuthorization(undefined); setCode("") }
+                    }, t("ai.providers.connected"))
+                  }}>{busy() ? t("ai.providers.connecting") : t("ai.providers.finishSignIn")}</button>
+                </div>
+              )}</Show>
+            </section>
+          )}</Show>
           <form
             class="space-y-1.5"
             onSubmit={(event) => {
@@ -105,7 +148,7 @@ function ProviderRow(props: {
             <div class="flex gap-1.5 pt-0.5">
               <button
                 type="submit"
-                disabled={busy() || key().trim().length === 0}
+                disabled={busy() || !!authorization() || key().trim().length === 0}
                 class="assistant-btn assistant-btn-primary"
               >
                 {t("ai.providers.save")}
@@ -113,7 +156,7 @@ function ProviderRow(props: {
               <Show when={configured()}>
                 <button
                   type="button"
-                  disabled={busy()}
+                  disabled={busy() || !!authorization()}
                   class="assistant-btn assistant-btn-secondary is-danger"
                   onClick={() => void run(() => ai.removeCredentials(props.provider.id), t("ai.providers.removed"))}
                 >

@@ -211,6 +211,8 @@ declare module "@nikcli-ai/sdk-next" {
       auth(options?: RequestOptions): Promise<Readonly<Record<string, ReadonlyArray<{ type: string; label?: string }>>>>
       api(input: { providerID: string; key: string }, options?: RequestOptions): Promise<unknown>
       removeAuth(input: { providerID: string }, options?: RequestOptions): Promise<unknown>
+      oauthAuthorize(input: { providerID: string; method: number }, options?: RequestOptions): Promise<unknown>
+      oauthCallback(input: { providerID: string; method: number; code?: string }, options?: RequestOptions): Promise<boolean>
     }
     readonly permission: {
       list(options?: RequestOptions): Promise<ReadonlyArray<Record<string, unknown>>>

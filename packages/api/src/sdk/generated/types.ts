@@ -608,6 +608,14 @@ export type AiProxyPayload = {
   readonly reasoning?: unknown | undefined
 }
 
+export type AiOauthAuthorizePayload = { readonly provider: "openai" | "xai" }
+
+export type AiOauthCompletePayload = {
+  readonly provider: "openai" | "xai"
+  readonly attemptId: string
+  readonly code?: string | undefined
+}
+
 export type McpUpdateConfigPayload = {
   readonly id?: string | undefined
   readonly name?: string | undefined
@@ -2871,6 +2879,28 @@ export type AiProxyOutput = {
   content: Array<{ type: "text"; text: string }>
   stop_reason: string | null
   usage: { input_tokens: number; output_tokens: number }
+}
+
+export type AiOauthAuthorizeInput = { readonly provider: AiOauthAuthorizePayload["provider"] }
+
+export type AiOauthAuthorizeOutput = {
+  attemptId: string
+  url: string
+  instructions: string
+  method: "auto" | "code" | "auto-code"
+}
+
+export type AiOauthCompleteInput = {
+  readonly provider: AiOauthCompletePayload["provider"]
+  readonly attemptId: AiOauthCompletePayload["attemptId"]
+  readonly code?: AiOauthCompletePayload["code"]
+}
+
+export type AiOauthCompleteOutput = {
+  providers: { [x: string]: "configured" | "missing" }
+  configured: boolean
+  tools?: Array<{ id: string; description: string }> | undefined
+  host: "nikcli" | "direct"
 }
 
 export type McpListConfigInput = { readonly source?: { readonly source?: string | undefined }["source"] }

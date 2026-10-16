@@ -144,6 +144,10 @@ import type {
   AiFeedbackOutput,
   AiProxyInput,
   AiProxyOutput,
+  AiOauthAuthorizeInput,
+  AiOauthAuthorizeOutput,
+  AiOauthCompleteInput,
+  AiOauthCompleteOutput,
   McpListConfigInput,
   McpListConfigOutput,
   McpUpdateConfigInput,
@@ -1721,6 +1725,30 @@ export function make(options: ClientOptions) {
             },
             successStatus: 200,
             declaredStatuses: [500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      oauthAuthorize: (input: AiOauthAuthorizeInput, requestOptions?: RequestOptions) =>
+        request<AiOauthAuthorizeOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/oauth/authorize`,
+            body: { provider: input["provider"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      oauthComplete: (input: AiOauthCompleteInput, requestOptions?: RequestOptions) =>
+        request<AiOauthCompleteOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/oauth/complete`,
+            body: { provider: input["provider"], attemptId: input["attemptId"], code: input["code"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
             empty: false,
           },
           requestOptions,

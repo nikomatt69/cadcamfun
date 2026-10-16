@@ -22,6 +22,12 @@ export interface CredentialsInput {
   readonly key: string
   readonly baseUrl?: string
 }
+export interface OAuthAuthorization {
+  readonly attemptId: string
+  readonly url: string
+  readonly method: "auto" | "code" | "auto-code"
+  readonly instructions: string
+}
 
 export interface AiCatalog {
   readonly status: Effect.Effect<AiStatus, AiConfigError, never>
@@ -30,6 +36,8 @@ export interface AiCatalog {
   readonly providers: Effect.Effect<ReadonlyArray<ProviderInfo>, AiConfigError, never>
   readonly setCredentials: (input: CredentialsInput) => Effect.Effect<AiStatus, AiConfigError, never>
   readonly clearCredentials: (provider: ProviderId) => Effect.Effect<AiStatus, AiConfigError, never>
+  readonly authorizeOAuth: (provider: "openai" | "xai") => Effect.Effect<OAuthAuthorization, AiConfigError>
+  readonly completeOAuth: (provider: "openai" | "xai", attemptId: string, code?: string) => Effect.Effect<AiStatus, AiConfigError>
   readonly feedback: (input: { readonly messageId: string; readonly rating: "up" | "down"; readonly comment?: string }) => Effect.Effect<void, AiConfigError, never>
 }
 
@@ -101,6 +109,8 @@ export const makeCatalog = (client: Client): AiCatalog => ({
   providers: fetchProviders(client),
   setCredentials: (input) => setCredentials(client, input),
   clearCredentials: (provider) => clearCredentials(client, provider),
+  authorizeOAuth: (provider) => client.ai.oauthAuthorize({ payload: { provider } }).pipe(Effect.mapError(invalid)),
+  completeOAuth: (provider, attemptId, code) => client.ai.oauthComplete({ payload: { provider, attemptId, ...(code ? { code } : {}) } }).pipe(Effect.mapError(invalid)),
   feedback: (input) => feedback(client, input)
 })
 

@@ -99,6 +99,31 @@ export interface HostPatch {
 
 export const HOST_PATCHES: ReadonlyArray<HostPatch> = [
   { name: "media-in-tool-results", marker: MEDIA_RULE_MARKER, replacement: "return false;" },
+  {
+    name: "openai-oauth-loopback-only",
+    marker: "  oauthServer = Bun.serve({\n    port: OAUTH_PORT,",
+    replacement: '  oauthServer = Bun.serve({\n    hostname: "127.0.0.1",\n    port: OAUTH_PORT,'
+  },
+  {
+    name: "openai-oauth-timeout-cleanup",
+    marker: "            const callbackPromise = waitForOAuthCallback(pkce, state);",
+    replacement: "            const callbackPromise = waitForOAuthCallback(pkce, state);\n            void callbackPromise.catch(() => stopOAuthServer());"
+  },
+  {
+    name: "xai-oauth-timeout-cleanup",
+    marker: "            const callbackPromise = waitForOAuthCallback2(pkce, state);",
+    replacement: "            const callbackPromise = waitForOAuthCallback2(pkce, state);\n            void callbackPromise.catch(() => stopOAuthServer2());"
+  },
+  {
+    name: "xai-oauth-manual-settlement",
+    marker: 'const tokens = code?.trim() ? await exchangeCodeForTokens2(code.trim(), redirectUri, pkce, endpoints.token_endpoint) : await callbackPromise;',
+    replacement: 'const tokens = code?.trim() ? await exchangeCodeForTokens2(code.trim(), redirectUri, pkce, endpoints.token_endpoint) : await callbackPromise;\n                  if (pendingOAuth2) { pendingOAuth2.resolve(tokens); pendingOAuth2 = undefined; }'
+  },
+  {
+    name: "opencode-session-headers",
+    marker: '      if (providerID.startsWith("nikcli")) {\n        return {\n          "x-nikcli-project": projectID,',
+    replacement: '      if (providerID === "opencode" || providerID === "opencode-go") {\n        return { "User-Agent": "CADCAMFUN/6", "x-opencode-session": sessionID };\n      }\n      if (providerID.startsWith("nikcli")) {\n        return {\n          "x-nikcli-project": projectID,'
+  },
   { name: "fold-instructions-per-step", marker: STEP_INSTRUCTIONS_MARKER, replacement: `        InstructionSync.foldDelivered(sessionID);\n${STEP_INSTRUCTIONS_MARKER}` },
   {
     name: "instance-config-file",

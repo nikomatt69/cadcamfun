@@ -167,12 +167,28 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     ai.complete({ prompt, ...(system ? { system } : {}), ...(model ? { model: { model } } : {}) })
 
   return handlers
+    .handle("oauthAuthorize", ({ payload }) => Effect.gen(function*() {
+      yield* extensionAccess
+      if (Option.isNone(host)) return yield* new BadRequest({ message: "Subscription sign-in requires the nikcli host." })
+      const providers = yield* catalogue
+      if (!knownProvider(payload.provider, providers)) return yield* new BadRequest({ message: "Unknown provider" })
+      return yield* host.value.runtime.oauth.authorize(payload.provider).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+    }))
+    .handle("oauthComplete", ({ payload }) => Effect.gen(function*() {
+      yield* extensionAccess
+      if (Option.isNone(host)) return yield* new BadRequest({ message: "Subscription sign-in requires the nikcli host." })
+      yield* host.value.runtime.oauth.complete(payload.provider, payload.attemptId, payload.code, credentials.useOAuth(payload.provider)).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+      yield* ai.invalidateCatalogue
+      return yield* status
+    }))
     .handle("agents", () => Effect.succeed(ai.agents))
     .handle("sessionControl", ({ payload }) => Effect.gen(function*() {
       const projectId = yield* controlProject(payload.sessionId, payload.projectId)
       return yield* ai.controlSession({ ...payload, projectId }).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
     }))
     .handle("setCredentials", ({ payload }) => Effect.gen(function*() {
+      yield* extensionAccess
+      if (Option.isSome(host)) yield* host.value.runtime.oauth.idle
       const provider = payload.provider
       if (provider === undefined || provider.trim() === "") return yield* new BadRequest({ message: "Unknown provider" })
       if (!isBuiltinProviderId(provider)) {
@@ -185,6 +201,8 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       return yield* status
     }).pipe(Effect.catchTag("AiConfigError", (e) => Effect.fail(new BadRequest({ message: e.message })))))
     .handle("clearCredentials", ({ params }) => Effect.gen(function*() {
+      yield* extensionAccess
+      if (Option.isSome(host)) yield* host.value.runtime.oauth.idle.pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
       const provider = params.provider
       if (!isBuiltinProviderId(provider)) {
         const known = yield* catalogue

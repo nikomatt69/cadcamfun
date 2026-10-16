@@ -834,6 +834,22 @@ const Endpoint6_44 = (raw: RawClient["ai"]) => (input?: Endpoint6_44Input) =>
     },
   }).pipe(Effect.mapError(mapClientError))
 
+type Endpoint6_45Request = Parameters<RawClient["ai"]["oauthAuthorize"]>[0]
+type Endpoint6_45Input = { readonly provider: Endpoint6_45Request["payload"]["provider"] }
+const Endpoint6_45 = (raw: RawClient["ai"]) => (input: Endpoint6_45Input) =>
+  raw["oauthAuthorize"]({ payload: { provider: input["provider"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint6_46Request = Parameters<RawClient["ai"]["oauthComplete"]>[0]
+type Endpoint6_46Input = {
+  readonly provider: Endpoint6_46Request["payload"]["provider"]
+  readonly attemptId: Endpoint6_46Request["payload"]["attemptId"]
+  readonly code?: Endpoint6_46Request["payload"]["code"]
+}
+const Endpoint6_46 = (raw: RawClient["ai"]) => (input: Endpoint6_46Input) =>
+  raw["oauthComplete"]({
+    payload: { provider: input["provider"], attemptId: input["attemptId"], code: input["code"] },
+  }).pipe(Effect.mapError(mapClientError))
+
 const adaptGroup6 = (raw: RawClient["ai"]) => ({
   actions: Endpoint6_0(raw),
   invokeAction: Endpoint6_1(raw),
@@ -880,6 +896,8 @@ const adaptGroup6 = (raw: RawClient["ai"]) => ({
   toolpathAnalysis: Endpoint6_42(raw),
   feedback: Endpoint6_43(raw),
   proxy: Endpoint6_44(raw),
+  oauthAuthorize: Endpoint6_45(raw),
+  oauthComplete: Endpoint6_46(raw),
 })
 
 type Endpoint7_0Request = Parameters<RawClient["mcp"]["listConfig"]>[0]

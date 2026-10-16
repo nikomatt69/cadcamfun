@@ -1,4 +1,5 @@
-import { mkdirSync, rmSync } from "node:fs"
+import { mkdirSync } from "node:fs"
+import { retainOAuthGrants } from "./oauth-store.ts"
 import { createHash } from "node:crypto"
 import { join } from "node:path"
 
@@ -148,8 +149,8 @@ export const applyIsolation = (paths: IsolatedPaths, options?: IsolationOptions)
   for (const dir of [paths.root, paths.home, paths.data, paths.cache, paths.config, paths.state, paths.projects]) {
     mkdirSync(dir, { recursive: true })
   }
-  // nikcli persists API keys here in plaintext; this app keeps keys in memory only.
-  rmSync(join(paths.data, "auth.json"), { force: true })
+  // Renewable app-owned subscription grants survive; transient API keys do not.
+  retainOAuthGrants(join(paths.data, "auth.json"))
   for (const key of SCRUBBED_ENV) delete process.env[key]
   // `mods: true` must also *clear* an inherited flag: the ledger is read by the bundle when it loads, so a value left in
   // this process by an earlier host (or by the shell that started it, which test children inherit) would keep every mod
