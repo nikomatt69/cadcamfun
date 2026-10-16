@@ -8,7 +8,8 @@
  */
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
-import { BASE_LAYERS, CADCAM_SYSTEM_PROMPT, MODE_PROMPTS, systemPrompt, turnSystemPrompt } from "../src/prompts/system.ts"
+import { modeTable } from "../src/prompts/contributed-modes.ts"
+import { BASE_LAYERS, CADCAM_SYSTEM_PROMPT, MODE_PROMPTS, modeBlock, systemPrompt, turnSystemPrompt } from "../src/prompts/system.ts"
 import { CADCAM_SKILLS } from "../src/skills/index.ts"
 
 const literals = (schema: unknown): ReadonlyArray<string> =>
@@ -163,6 +164,28 @@ describe("mode prompts", () => {
   test("unknown modes still fall back to general", () => {
     expect(systemPrompt(undefined, "nope")).toContain("general CAD/CAM")
     expect(systemPrompt()).not.toContain("{{")
+  })
+})
+
+describe("contributed modes (spec 09-plugins.md assistant extensions)", () => {
+  const modes = { "com.example.shipping:feeds": "You are focused on feeds and speeds. Quote the material and tool data behind every number, in metric." }
+
+  test("a contributed id replaces the mode block in both prompts; built-ins and unknowns are untouched", () => {
+    const now = new Date("2026-10-14T10:00:00Z")
+    expect(systemPrompt(undefined, "com.example.shipping:feeds", undefined, undefined, now, modes)).toContain("focused on feeds and speeds")
+    expect(turnSystemPrompt(undefined, "com.example.shipping:feeds", undefined, undefined, now, modes)).toContain("focused on feeds and speeds")
+    expect(systemPrompt(undefined, "cad", undefined, undefined, now, modes)).toContain(MODE_PROMPTS.cad)
+    expect(systemPrompt(undefined, "nope", undefined, undefined, now, modes)).toContain("general CAD/CAM")
+    // Without the table (the direct path, a build without plugins) the id is just an unknown mode.
+    expect(systemPrompt(undefined, "com.example.shipping:feeds", undefined, undefined, now)).toContain("general CAD/CAM")
+  })
+
+  test("modeTable turns contributed modes into the lookup modeBlock reads", () => {
+    const table = modeTable([{ id: "com.example.shipping:feeds", title: "Feeds and speeds", description: "d", instructions: "FOCUS", pluginId: "com.example.shipping", pluginName: "Extras" }])
+    expect(modeBlock("com.example.shipping:feeds", table)).toBe("FOCUS")
+    expect(modeBlock("cad", table)).toBe(MODE_PROMPTS.cad)
+    expect(modeBlock(undefined, table)).toBe(MODE_PROMPTS.general)
+    expect(modeTable([])).toBeUndefined()
   })
 })
 

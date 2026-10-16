@@ -35,6 +35,16 @@ const effectiveAgents = async (projectId: string): Promise<Agents> => ((await (a
 const registered = async (projectId: string): Promise<ReadonlyArray<string>> => (await hostOf(projectId)).client.experimental.toolIDs()
 
 describe("one host configuration per project", () => {
+  test("a failed mod inspection is distinct from a successfully empty loaded list", async () => {
+    expect(await Effect.runPromise(runtime.loadedMods("instances-not-started"))).toEqual([])
+    const alpha = await hostOf("instances-alpha")
+    const list = alpha.client.mod.list
+    alpha.client.mod.list = async () => { throw new Error("Temporary mod inspection failure") }
+    try {
+      await expect(Effect.runPromise(runtime.loadedMods("instances-alpha"))).rejects.toMatchObject({ _tag: "AiConfigError" })
+    } finally { alpha.client.mod.list = list }
+  })
+
   test("two projects with different allow-lists each see only their own, whichever host loaded last", async () => {
     const alpha = await hostOf("instances-alpha")
     await hostOf("instances-beta")

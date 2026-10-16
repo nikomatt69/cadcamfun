@@ -5,23 +5,23 @@
  * A mod is a nikcli extension module that exports `register(on, options)`: its hooks observe and rewrite tool calls,
  * the prompt and the session (`@nikcli-ai/plugin/mod` lists every event). The store keeps one ES module per mod under
  * `<dataDir>/ai/nikcli/mods/` and an `index.json` of records; `modSpecs` turns the enabled ones into the `file://`
- * plugin entries `buildHostConfig` writes into the global `nikcli.json`. The host loads them when it starts, so a
- * change applies to the next host, not to the conversation that made it.
+ * plugin entries `buildHostConfig` writes into the instance configuration. The runtime republishes the configuration and reloads live hosts after a change.
  *
  * A mod an assistant authors is deliberately dependency-free: it exports `register` and imports nothing — every
  * capability it may reach arrives on the `$` argument of its hooks, and `modSourceProblems` refuses anything else.
  * The file is data the host imports; the person's consent is the `enabled` flag the UI and the tools both write.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
+import { MOD_ID_PATTERN, MOD_SOURCE_MAX_CHARS as MAX_MOD_SOURCE_CHARS } from "@cadcamfun/api"
 import type { IsolatedPaths } from "./isolation.ts"
 
-/** `plugin.json`-style id, lower case and short, because it names a file. */
-export const MOD_ID_PATTERN = /^[a-z][a-z0-9_-]{0,39}$/
-
-/** The largest source a mod may carry; the whole file is read by the person in the UI. */
-export const MAX_MOD_SOURCE_CHARS = 20_000
+/**
+ * The id grammar and the source ceiling live in `@cadcamfun/api` (the action inputs enforce the same two), so the
+ * store and the model-visible schema cannot drift: re-exported here for the store's callers.
+ */
+export { MOD_ID_PATTERN, MAX_MOD_SOURCE_CHARS }
 
 /** Who wrote the module; plugin-contributed mods live in their own space and never pass through this store. */
 export type ModOrigin = "assistant" | "user"
@@ -43,7 +43,11 @@ export const modIndexFile = (paths: IsolatedPaths): string => join(modsDir(paths
 export const modModuleFile = (paths: IsolatedPaths, id: string): string => join(modsDir(paths), `${id}.js`)
 
 /** The plugin spec the host loads for one mod: an absolute `file://` URL, the only shape the config accepts for local code. */
-export const modSpec = (paths: IsolatedPaths, id: string): string => pathToFileURL(modModuleFile(paths, id)).href
+export const modSpec = (paths: IsolatedPaths, id: string): string => {
+  // Bun resolves generation-tagged imports through the canonical path, including macOS temporary-directory aliases.
+  const file = modModuleFile(paths, id)
+  return pathToFileURL(existsSync(file) ? realpathSync(file) : file).href
+}
 
 /** Reasons a mod source is not acceptable, each a full sentence the model can act on. Empty: the source is fine. */
 export const modSourceProblems = (source: string): ReadonlyArray<string> => {

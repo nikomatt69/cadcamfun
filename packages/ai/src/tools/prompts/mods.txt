@@ -16,10 +16,11 @@ Parameters
 - read: id.
 
 Result (JSON)
-- list: ok, mods[] — each entry has id, name, description, enabled, origin (assistant | user), createdAt, updatedAt and
-  events[] (the host's report for the mods its running instance loaded).
+- list: ok, mods[] — each entry has id, name, description, enabled, origin (assistant | user | plugin), createdAt,
+  updatedAt and events[] (the host's report for the mods its running instance loaded).
 - read: ok, the record, source (the module's text), events[] and tools[] of the live instance.
-- A missing mod answers ok:false with the ids that exist.
+- A plugin's own mod appears from `origin: "plugin"` with the events the host reports; it is managed with the plugin,
+  not here. A missing mod answers ok:false with the ids that exist.
 
 Do not use it
 - To create, change, enable or remove one: mods_edit.

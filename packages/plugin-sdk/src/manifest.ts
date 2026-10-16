@@ -79,12 +79,48 @@ export const AiToolContributionSchema = Schema.Struct({
 })
 export type AiToolContribution = typeof AiToolContributionSchema.Type
 
+/**
+ * A nikcli mod the plugin ships (spec 09-plugins.md, assistant extensions): an ES module that exports `register(on, options)`
+ * and hooks tool calls, the prompt and the session. It is separate code inside the plugin folder, not the plugin entry, and is
+ * declared to the embedded host only while the plugin is enabled. Requires the `ai:mod` capability.
+ */
+export const ModContributionSchema = Schema.Struct({
+  /** Lower-case identifier, unique within the plugin; the host knows the mod as `<plugin id>.<id>`. */
+  id: Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9_-]{0,39}$/)),
+  /** Display name in the Mods panel; the id is the fallback. */
+  title: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(120)),
+  /** What the mod hooks, read by the person (and the assistant) before enabling anything. */
+  description: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(500)),
+  /** ES module inside the plugin folder that exports `register`; a plain `.js` file name, no path. */
+  entry: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*\.js$/))
+})
+export type ModContribution = typeof ModContributionSchema.Type
+
+/**
+ * An assistant mode the plugin contributes (spec 09-plugins.md, assistant extensions): a named system-prompt block that appears
+ * in the mode picker of the assistant. Declarative and bounded — the block is prepended to every turn of a conversation that
+ * picks it. Requires the `ai:mode` capability.
+ */
+export const ModeContributionSchema = Schema.Struct({
+  /** Lower-case identifier, unique within the plugin; conversations address the mode as `<plugin id>:<id>`. */
+  id: Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9_-]{0,39}$/)),
+  /** Display name in the mode picker. */
+  title: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(120)),
+  /** One line the picker shows under the name. */
+  description: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(500)),
+  /** The prompt block itself; kept short because it is re-sent with the system prompt on every turn. */
+  instructions: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(4_000))
+})
+export type ModeContribution = typeof ModeContributionSchema.Type
+
 export const ContributionsSchema = Schema.Struct({
   commands: Schema.optional(Schema.Array(CommandContributionSchema)),
   panels: Schema.optional(Schema.Array(PanelContributionSchema)),
   postProcessors: Schema.optional(Schema.Array(PostProcessorContributionSchema)),
   operations: Schema.optional(Schema.Array(OperationContributionSchema)),
-  aiTools: Schema.optional(Schema.Array(AiToolContributionSchema))
+  aiTools: Schema.optional(Schema.Array(AiToolContributionSchema)),
+  mods: Schema.optional(Schema.Array(ModContributionSchema)),
+  modes: Schema.optional(Schema.Array(ModeContributionSchema))
 })
 export type Contributions = typeof ContributionsSchema.Type
 

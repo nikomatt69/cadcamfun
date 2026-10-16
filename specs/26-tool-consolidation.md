@@ -124,10 +124,11 @@ The saving comes from stating the shared conventions once per tool instead of on
 3. Every tool has exactly one `tools/<id>.ts` and one `tools/prompts/<id>.txt`; every action name and every parameter of every action is documented in its prompt; every prompt still carries "Do not use it" where a neighbouring action could be confused with it.
 4. `cad`, `cam`, `library`, `vcs`, `memory` and `research` contain **no action that mutates the document, the operations or the libraries**; `cad_edit`, `cam_edit`, `parts`, `library_edit` and `vcs_edit` contain **no read that a specialist already had read-only**. A test derives both halves from the tool definitions, not from a hand-written list.
 5. The researcher still cannot change anything, the editor still cannot run CAM, the machinist still cannot edit geometry, and no specialist can commit or open a pull request (`agents.test.ts`, restated against the merged ids).
-6. The tool prompt catalogue is under 24 000 characters.
+6. The tool prompt catalogue (everything but the `cam_verify` exposure) is under 31 000 characters; raised from 25 000 by the two mods tools (about 5 200 characters, spec 27 §4.3), so `PROMPT_BUDGETS.descriptions` is 34 000.
 7. `bunx tsgo -p packages/{ai,api}/tsconfig.json --noEmit`, the sidecar and desktop typechecks and `bun test packages apps` are clean; the contract snapshot in `packages/api` is regenerated where tool ids appear.
 
 ## 7. Change log
 
 - v1 (2026-10-11): contract for the 12-tool catalogue, the read/write capability boundary it is cut on, and `defineActionTool`. Verb parity with the 63-tool catalogue is an acceptance criterion, not an aspiration.
 - 2026-10-12: corrected unsupported implementation label; added spec 28 authority, shared Effect contracts, real effect classification and native grouped-tool safety. Existing counts are targets/historical evidence, not freshly verified results.
+- 2026-10-16: `mods` and `mods_edit` join the catalogue (spec 27 §4.3, RM-11): the prompt budget moves to 31 000, tool counts reach 14 + the exposures.

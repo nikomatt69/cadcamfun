@@ -91,6 +91,12 @@ import type {
   AiInstallExtensionPluginOutput,
   AiToggleExtensionPluginInput,
   AiToggleExtensionPluginOutput,
+  AiExtensionModsOutput,
+  AiToggleExtensionModInput,
+  AiToggleExtensionModOutput,
+  AiRemoveExtensionModInput,
+  AiRemoveExtensionModOutput,
+  AiModesOutput,
   AiSkillsOutput,
   AiSaveSkillInput,
   AiSaveSkillOutput,
@@ -1309,7 +1315,7 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/ai/extensions/plugins`,
-            body: { manifest: input["manifest"], source: input["source"] },
+            body: { manifest: input["manifest"], source: input["source"], files: input["files"] },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
             empty: false,
@@ -1326,6 +1332,45 @@ export function make(options: ClientOptions) {
             declaredStatuses: [400, 500, 401],
             empty: false,
           },
+          requestOptions,
+        ),
+      extensionMods: (requestOptions?: RequestOptions) =>
+        request<AiExtensionModsOutput>(
+          {
+            method: "GET",
+            path: `/api/ai/extensions/mods`,
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      toggleExtensionMod: (input: AiToggleExtensionModInput, requestOptions?: RequestOptions) =>
+        request<AiToggleExtensionModOutput>(
+          {
+            method: "PUT",
+            path: `/api/ai/extensions/mods/${encodeURIComponent(input.id)}`,
+            body: { enabled: input["enabled"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      removeExtensionMod: (input: AiRemoveExtensionModInput, requestOptions?: RequestOptions) =>
+        request<AiRemoveExtensionModOutput>(
+          {
+            method: "DELETE",
+            path: `/api/ai/extensions/mods/${encodeURIComponent(input.id)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      modes: (requestOptions?: RequestOptions) =>
+        request<AiModesOutput>(
+          { method: "GET", path: `/api/ai/modes`, successStatus: 200, declaredStatuses: [500, 401], empty: false },
           requestOptions,
         ),
       skills: (requestOptions?: RequestOptions) =>

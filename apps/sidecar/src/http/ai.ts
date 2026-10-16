@@ -1,4 +1,4 @@
-import { withHeartbeat, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
+import { withHeartbeat, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, isolatedPaths, readModIndex, removeMod, replyHostPermission, setModEnabled, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
   AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError
 } from "@cadcamfun/api"
@@ -104,9 +104,36 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     return host.value.runtime
   })
   const pluginList = plugins.installed.pipe(Effect.map((plugins) => ({ plugins })), Effect.mapError((error) => new InternalError({ message: error.message })))
+  /** Live hosts re-read the mods; the store is on disk either way, so this failing only delays it to the next host start. */
+  const refreshMods = Option.isSome(host)
+    ? host.value.runtime.reloadMods().pipe(Effect.mapError((error) => new InternalError({ message: error.message })))
+    : Effect.void
   const refreshPluginTools = Effect.gen(function*() {
     yield* registry.reload
     if (Option.isSome(host)) yield* host.value.runtime.reloadTools().pipe(Effect.mapError((error) => new InternalError({ message: error.message })))
+    // A plugin toggle also changes which plugin mods the configuration declares.
+    yield* refreshMods
+  })
+  /**
+   * The mods the Extensions panel lists: the app-owned store's records plus the mods enabled plugins ship. A plugin's mod
+   * is host-managed — it follows the plugin and is neither toggled nor removed here.
+   */
+  const modsList = Effect.sync(() => ({
+    mods: [
+      ...readModIndex(isolatedPaths(appConfig.dataDir)).map((record) => ({
+        id: record.id, name: record.name, description: record.description, enabled: record.enabled, origin: record.origin
+      })),
+      ...plugins.modList().map((mod) => ({
+        id: mod.id, name: mod.title, description: mod.description, enabled: true, origin: "plugin" as const, pluginId: mod.pluginId
+      }))
+    ]
+  }))
+  /** Runs one store mutation; its message becomes the request's 400, never an unhandled defect. */
+  const applyMod = (work: () => void) => Effect.gen(function*() {
+    const failure = yield* Effect.sync(() => {
+      try { work(); return undefined } catch (cause) { return cause instanceof Error ? cause.message : "The mod store refused the change." }
+    })
+    if (failure !== undefined) return yield* new BadRequest({ message: failure })
   })
   const status = Effect.gen(function*() {
     const providers = yield* credentials.status
@@ -328,7 +355,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     .handle("extensionPlugins", () => Effect.gen(function*() { yield* extensionAccess; return yield* pluginList }))
     .handle("installExtensionPlugin", ({ payload }) => Effect.gen(function*() {
       yield* extensionAccess
-      yield* plugins.install(payload.manifest, payload.source).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+      yield* plugins.install(payload.manifest, payload.source, payload.files).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
       return yield* pluginList
     }))
     .handle("toggleExtensionPlugin", ({ params, payload }) => Effect.gen(function*() {
@@ -337,6 +364,26 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       yield* refreshPluginTools
       return yield* pluginList
     }))
+    .handle("extensionMods", () => Effect.gen(function*() {
+      yield* extensionAccess
+      return yield* modsList
+    }))
+    .handle("toggleExtensionMod", ({ params, payload }) => Effect.gen(function*() {
+      yield* extensionAccess
+      yield* applyMod(() => setModEnabled(isolatedPaths(appConfig.dataDir), params.id, payload.enabled))
+      yield* refreshMods
+      return yield* modsList
+    }))
+    .handle("removeExtensionMod", ({ params }) => Effect.gen(function*() {
+      yield* extensionAccess
+      const removed = yield* Effect.sync(() => removeMod(isolatedPaths(appConfig.dataDir), params.id))
+      if (!removed) return yield* new BadRequest({ message: `There is no mod "${params.id}".` })
+      yield* refreshMods
+      return yield* modsList
+    }))
+    .handle("modes", () => Effect.sync(() => ({
+      modes: plugins.modes().map((mode) => ({ id: mode.id, title: mode.title, description: mode.description, pluginId: mode.pluginId, pluginName: mode.pluginName }))
+    })))
     .handle("skills", () => skillInfos.pipe(Effect.map((skills) => ({ skills, max: MAX_USER_SKILLS }))))
     .handle("saveSkill", ({ payload }) => Effect.gen(function*() {
       const parsed = payload.markdown !== undefined

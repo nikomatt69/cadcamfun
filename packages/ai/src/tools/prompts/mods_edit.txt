@@ -1,54 +1,49 @@
 Write, change, enable, disable or remove a mod: a small extension module the host loads and runs, so a standing rule
-survives without the user repeating it.
+survives without the user repeating it. A mod acts on the whole application, not on one project.
 
 Authoring (the only shape the store accepts)
-- Plain ESM, dependency-free: no `import`, no `require`. Everything reachable arrives on the hook's `$` argument.
-- Export `register`: `export const register = (on, options) => { on("tool.call", { tool: "cad_edit" }, async ($, e, next) => { ...; return next(e) }) }`.
-- `on(event, matcher?, hook)`; the matcher compares event fields (value, array of allowed values or a RegExp). A hook is
-  `async ($, e, next)`, `e` is frozen: `return next(e)` to observe, `return next({ ...e, field })` to rewrite,
-  `return { deny: "reason" }` to refuse a call, or `await next(e)` and return a changed result (wrap).
-- The host skips a hook that throws or runs long; add the hook's own `.catch(...)` (on the object `on(...)` returns) when
-  the rule must fail closed.
-
-Events (e: fields; result)
-- tool.call: tool, input, sessionID, agent, callID, plus the call's arguments top-level (`e.command`, `e.ids`, ...) ->
-  a tool result `{ output, title?, isError? }`, `{ deny }` or `{ result }`. The place for "never allow this" and for
-  annotations the user asked for.
-- tool.check: tool, patterns, input, rule, sessionID -> `{ decision: "allow" | "ask" | "deny", reason? }`. The place for
-  "always confirm before deleting" (`{ decision: "ask", reason }`).
-- prompt.submit: text, context[], sessionID, agent -> a changed copy (`return next({ ...e, context: [...e.context, "…"] })`)
-  adds text only the model reads; `{ drop }` is not for this application.
-- session.start (reason), session.end, turn.start/turn.step/turn.complete (usage, answer, model), session.compact
-  (`{ skip: reason }` leaves the conversation), skill.prompt (text), command.run, command.describe, agent.offer/spawn.
-- ui.render (`{ tree }` drawn by clients that show mod panes), ui.press/input/select (`{ handled }`).
-
-The `$` API (the essentials; every method is also an event name, e.g. `fs.read`)
-- $ .ui: log, toast, notice, ask, copy, open/close panes, resolve(event) -> Box/Text/Button/... constructors.
-- $ .tool.register({ name, description, args, execute }) -> a tool the model can call; dispose() to remove it.
-- $ .command.register, $ .prompt.submit({ text }), $ .prompt.fill, $ .turn.abort, $ .session (id, cwd, messages,
-  model, turns, repo, usage), $ .model.complete/classify (one completion on the user's own model), $ .agent.list,
-  $ .mcp.call, $ .settings.read, $ .env.get/set, $ .fs (read/write/list/exists/stat/ancestors),
-  $ .process.run/spawn, $ .http.fetch, $ .store (machine-wide key-value, 4 MiB), $ .state (in-memory, reload-surviving),
-  $ .clock (now, sleep, after, every).
+- Plain ESM, dependency-free: no `import`, no `require`; everything reachable arrives on the hook's `$` argument.
+- Export `register(on, options)`; register hooks with `on(event, matcher?, hook)`. The matcher compares event fields
+  with a value, an array of allowed values or a RegExp.
+- A hook is `async ($, e, next)` and `e` is frozen: `return next(e)` observes, `return next({ ...e, field })` rewrites,
+  `return { deny: "reason" }` refuses, `await next(e)` and returning a changed result wraps. A hook that throws or runs
+  long is skipped; add `.catch(...)` on the object `on(...)` returns when the rule must fail closed.
+- Events (fields of `e`, what a hook may answer): tool.call (tool, input, plus the arguments top-level -> a result, a
+  `{ deny }` or a `{ result }`; the place for "never allow this"), tool.check (patterns, rule -> a decision allow, ask
+  or deny with a reason; the place for "always confirm"), prompt.submit (text, context[] -> add text only the model
+  reads), session.start and session.end, turn.start/step/complete, session.compact (a skip keeps the conversation),
+  skill.prompt, command.run/describe, the delegation events spawn/offer, ui.render/press/input/select.
+- The `$` API (each item is also an event name, e.g. `fs.read`): ui (log, toast, notice, ask, copy, panes, resolve),
+  tool.register (a tool the model can call; dispose() removes it), command.register, prompt.submit and prompt.fill,
+  turn.abort, session (id, messages, model, usage), model.complete/classify (one completion on the user's model),
+  mcp.call, settings.read, env.get/set, fs read/write/list/exists/stat, process.run/spawn, http.fetch, store
+  (machine-wide key-value, 4 MiB), state (reload-surviving), clock (now, sleep, after, every).
 
 Actions
-- save: write or replace one mod's source. Disabled unless `enable: true`; replacing keeps the current state.
-- set_enabled: arm or stop one mod.
-- remove: delete the module and its record. Not reversible; it exists only in action history.
-- (This tool is destructive because of remove, so every call is confirmed by the person first.)
+- save: write or replace one mod's source. A new mod stays disabled unless `enable: true`; `enable: false` stops a
+  running one; an absent flag keeps the current state. Replacing source you did not write: ask first.
+- set_enabled: arm or stop one mod; an armed mod is consent to run it.
+- remove: delete the module and its record. Not reversible.
+- (This tool carries remove, so it is destructive: every call is confirmed by the person first.)
 
 Parameters
 - save: id (lower-case file name, e.g. `confirm_deletes`), name?, description (what it hooks and why), source, enable?.
 - set_enabled: id, enabled. remove: id.
 
 Result (JSON)
-- A saved or toggled mod answers ok, id, enabled and events[] (what the live host reports); a removal answers ok, id,
-  removed: true. A refused source answers ok:false with every problem the checker found.
+- save and set_enabled: ok, id, enabled, events[] (the events the live host reports for it now) and reloaded.
+- remove: ok, id, removed: true. A refused source: ok:false with every problem the checker found.
+- A mod that was armed but did not load (the host refused it) answers ok:false and is disabled again; read it back,
+  fix the source, then enable it.
+- If reload or live inspection fails, the stored enabled state is preserved and a note explains what remains unverified.
+  Read it again before assuming its hooks are active.
 
 Rules
-- The mod applies to the whole application, not one project: write it for the standing rule the user stated.
-- Enable, change or remove a mod only on the user's request (or with their yes after you offered). `mods` shows what
-  exists; ask before replacing source you did not write.
-- The user can see every mod's source in Extensions, switch it off and delete it; write source a person can follow.
-- Changes reach the running host immediately; the next turn already runs under the new rule.
-- Keep it small and single-purpose, and never store secrets in it.
+- Enable, change or remove a mod only when the user asks or after they agree to your offer. `mods` shows what exists.
+- The user reads every mod's source in Extensions and can switch it off or delete it; write source a person can follow.
+- Changes reach the running host at once: the next turn already runs under the new rule.
+- Keep it small and single-purpose; never store secrets in it.
+
+Do not use it
+- To read, list or review mods: `mods`.
+- To change the drawing, the CAM program or project memory: `cad_edit`, `cam_edit`, `memory_edit`.

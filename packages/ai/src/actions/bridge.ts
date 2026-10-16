@@ -27,7 +27,7 @@ import { policyAllows, toolAllowed, type PolicyStatement } from "../nikcli/polic
 /** What a scoped token may do: `read` reaches only read actions, `write` reaches reads and writes (never destructive ones). */
 export type BridgeMode = "read" | "write"
 
-export const BRIDGE_EXCLUDED_TOOLS: ReadonlyArray<string> = ["agent"]
+export const BRIDGE_EXCLUDED_TOOLS: ReadonlyArray<string> = ["agent", "mods", "mods_edit"]
 
 export interface BridgeAction {
   readonly id: string

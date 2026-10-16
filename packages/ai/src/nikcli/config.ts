@@ -128,11 +128,13 @@ const withoutDeniedTools = (permission: Record<string, PermissionRule>, policies
 /**
  * The host reads two files (see the `instance-config-file` host patch): the global one every Instance shares (providers,
  * defaults, policies, compaction) and the one in the Instance's own directory, which holds the project's agents and their
- * permission maps. A project's allow-list therefore never reaches another project's host.
+ * permission maps, its MCP connections and its mods. A project's allow-list therefore never reaches another project's
+ * host. Empty maps are left out entirely, so a fresh instance file carries only what this project actually uses.
  */
 export const splitHostConfig = (config: Record<string, unknown>): { readonly shared: Record<string, unknown>; readonly instance: Record<string, unknown> } => {
-  const { agent, mcp, ...shared } = config
-  return { shared, instance: { agent, ...(mcp ? { mcp } : {}) } }
+  const { agent, mcp, plugin, ...shared } = config
+  const empty = (value: unknown): boolean => value === undefined || (Array.isArray(value) ? value.length === 0 : typeof value === "object" && value !== null && Object.keys(value).length === 0)
+  return { shared, instance: { agent, ...(empty(mcp) ? {} : { mcp }), ...(empty(plugin) ? {} : { plugin }) } }
 }
 
 export const buildHostConfig = (input: HostConfigInput): Record<string, unknown> => {

@@ -27,6 +27,8 @@ const runProbe = async (modsEnabled: "1" | "0") => {
   if (!line) throw new Error(`probe produced no result.\nstdout: ${out.slice(-800)}\nstderr: ${err.slice(-800)}`)
   return JSON.parse(line.slice("PROBE_RESULT ".length)) as {
     modsFlag: string | undefined
+    liveLifecycleEvidence: unknown
+    liveLifecycle: boolean
     appSpec: string
     loaded: ReadonlyArray<{ id: string; name: string; events: ReadonlyArray<string>; tools: ReadonlyArray<string> }>
     appLoaded: boolean
@@ -42,6 +44,7 @@ describe("the pinned bundle loads the app's mods and only those (spec 27 §4.3)"
     const result = await runProbe("1")
     expect(result.modsFlag).toBeUndefined()
     expect(result.appLoaded).toBe(true)
+    expect(result.liveLifecycle, JSON.stringify(result.liveLifecycleEvidence)).toBe(true)
     // The host reports the events the module registered: proof the hook table, not just the import, went through.
     expect([...result.appEvents].sort()).toEqual(["prompt.submit", "tool.call"])
     // A user's global config declares a mod and both plugin folders hold one; none of it is loaded or even read.

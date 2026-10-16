@@ -221,7 +221,8 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
     args: "[general|cad|cam|gcode|toolpath]",
     keywords: ["cad", "cam", "gcode", "toolpath", "domain"],
     run: ({ args, host }) => {
-      const wanted = oneOf(args, MODES)
+      // Built-in modes by name; a contributed mode by its namespaced id (`<pluginId>:<id>`), lower-cased like the rest.
+      const wanted = oneOf(args, MODES) ?? host.ai.pluginModes().find((mode) => mode.id.toLowerCase() === normalise(args))?.id
       if (wanted === undefined) return reject("ai.cmd.mode.unknown")
       host.ai.setMode(wanted)
       return done

@@ -6,6 +6,7 @@ import { AiConfig } from "../src/ai-config.ts"
 import { AiCredentials } from "../src/credentials.ts"
 import { DirectModel, type LanguageModelFactory } from "../src/direct-model.ts"
 import { analyzeGcode } from "../src/gcode-analysis.ts"
+import { AiModes } from "../src/prompts/contributed-modes.ts"
 import { render, systemPrompt } from "../src/prompts/system.ts"
 import { AiHost, AiService } from "../src/service.ts"
 import type { NikCliRuntime } from "../src/nikcli/runtime.ts"
@@ -93,6 +94,46 @@ describe("AiService without the embedded host", () => {
     expect(events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text)).toEqual(["Hel", "lo"])
     const done = events.at(-1)
     expect(done).toMatchObject({ type: "done", text: "Hello", usage: { inputTokens: 4, outputTokens: 6 } })
+  })
+
+  test("contributed modes reach the system prompt the model receives; an unknown id falls back", async () => {
+    let system = ""
+    const capturing: LanguageModelFactory = () => new MockLanguageModelV4({
+      doStream: async (options) => {
+        system = (options.prompt ?? []).filter((message) => message.role === "system")
+          .map((message) => message.content)
+          .join("\n\n")
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: "stream-start", warnings: [] },
+              { type: "text-start", id: "t" },
+              { type: "text-delta", id: "t", delta: "ok" },
+              { type: "text-end", id: "t" },
+              { type: "finish", finishReason: { unified: "stop", raw: undefined }, usage }
+            ]
+          })
+        }
+      }
+    })
+    const shipping = AiModes.of({ modes: () => [{
+      id: "com.example.shipping:feeds", title: "Feeds and speeds", description: "Cutting parameters, reasoned.",
+      instructions: "FOCUS-BLOCK: quote the material and tool data behind every number.", pluginId: "com.example.shipping", pluginName: "Extras"
+    }] })
+    // Same direction as the production wiring: AiService.layer is the base, the contributed modes come with the provided layers.
+    const withModes = AiService.layer.pipe(Layer.provideMerge(Layer.mergeAll(
+      DirectModel.layerWith(capturing).pipe(Layer.provideMerge(Layer.mergeAll(AiCredentials.layer, AiConfig.layer({ dataDir: "/unused", forceGateway: false })))),
+      Layer.succeed(AiModes, shipping)
+    )))
+    const ask = (mode: string) => Effect.gen(function* () {
+      yield* (yield* AiCredentials).set("anthropic", Redacted.make("sk-test-1234"))
+      yield* (yield* AiService).chat({ message: "hi", mode }).pipe(Stream.runCollect)
+    }).pipe(Effect.provide(withModes))
+    await Effect.runPromise(ask("com.example.shipping:feeds"))
+    expect(system).toContain("FOCUS-BLOCK: quote the material and tool data behind every number.")
+    await Effect.runPromise(ask("com.example.shipping:gone"))
+    expect(system).not.toContain("FOCUS-BLOCK")
+    expect(system).toContain("general CAD/CAM")
   })
 
   test("chat without any key fails with a config error", async () => {

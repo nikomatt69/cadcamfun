@@ -5725,7 +5725,9 @@ var CAPABILITIES = [
   "toolpath:read",
   "storage",
   "ui:panel",
-  "ai:tool"
+  "ai:tool",
+  "ai:mod",
+  "ai:mode"
 ];
 var CapabilitySchema = Literals(CAPABILITIES);
 var ALL_CAPABILITIES = [...CAPABILITIES];
@@ -5760,12 +5762,26 @@ var AiToolContributionSchema = Struct({
   parameters: Record(String4, Unknown2),
   entry: String4.check(isMinLength(1))
 });
+var ModContributionSchema = Struct({
+  id: String4.check(isPattern2(/^[a-z][a-z0-9_-]{0,39}$/)),
+  title: String4.check(isMinLength(1)).check(isMaxLength(120)),
+  description: String4.check(isMinLength(1)).check(isMaxLength(500)),
+  entry: String4.check(isPattern2(/^[A-Za-z0-9][A-Za-z0-9._-]*\.js$/))
+});
+var ModeContributionSchema = Struct({
+  id: String4.check(isPattern2(/^[a-z][a-z0-9_-]{0,39}$/)),
+  title: String4.check(isMinLength(1)).check(isMaxLength(120)),
+  description: String4.check(isMinLength(1)).check(isMaxLength(500)),
+  instructions: String4.check(isMinLength(1)).check(isMaxLength(4000))
+});
 var ContributionsSchema = Struct({
   commands: optional2(ArraySchema(CommandContributionSchema)),
   panels: optional2(ArraySchema(PanelContributionSchema)),
   postProcessors: optional2(ArraySchema(PostProcessorContributionSchema)),
   operations: optional2(ArraySchema(OperationContributionSchema)),
-  aiTools: optional2(ArraySchema(AiToolContributionSchema))
+  aiTools: optional2(ArraySchema(AiToolContributionSchema)),
+  mods: optional2(ArraySchema(ModContributionSchema)),
+  modes: optional2(ArraySchema(ModeContributionSchema))
 });
 var PluginManifestSchema = Struct({
   id: PluginIdSchema,

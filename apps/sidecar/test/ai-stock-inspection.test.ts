@@ -99,3 +99,32 @@ test("inspection uses actual rotated and scaled mesh bounds", async () => {
   expect(bounds.max.y - bounds.min.y).toBeCloseTo(20, 5)
   expect((bounds.max.x + bounds.min.x) / 2).toBeCloseTo(50, 5)
 })
+
+test("origins answer where everything sits: the CAD zero, each origin's meaning and relative children", async () => {
+  const created = await run("cad_edit", { action: "add", elements: [
+    { type: "cube", width: 10, height: 10, depth: 10, x: 100, y: 20 },
+    { type: "cylinder", radius: 5, height: 20, x: 100, y: 60, rotation: { x: 0, y: 0, z: 45 } }
+  ] })
+  const grouped = await run("cad_edit", { action: "group", ids: created.ids, name: "Fixture" })
+  const component = grouped.ids[0]
+  const result = await run("cad", { action: "inspect_origins", ids: [component] })
+  expect(result.ok).toBe(true)
+  expect(result.units).toBe("mm")
+  expect(result.zero).toEqual({ x: 0, y: 0, z: 0 })
+  const fixture = result.elements[0]
+  expect(fixture.id).toBe(component)
+  expect(fixture.origin).toEqual({ x: 100, y: 20, z: 0 })
+  expect(fixture.convention).toContain("component")
+  expect(fixture.distanceFromZeroMm).toBeCloseTo(Math.hypot(100, 20), 2)
+  expect(fixture.children).toHaveLength(2)
+  // Children are stored relative to the component; a leaf's own gizmo does not remove its world placement.
+  expect(fixture.children[0]).toMatchObject({ type: "cube", origin: { x: 0, y: 0, z: 0 }, absolute: { x: 100, y: 20, z: 0 } })
+  expect(fixture.children[1]).toMatchObject({ type: "cylinder", origin: { x: 0, y: 40, z: 0 }, absolute: { x: 100, y: 60, z: 0 } })
+  expect(fixture.children[1].gizmo.rotation.z).toBe(45)
+  expect(fixture.children[1].distanceFromZeroMm).toBeCloseTo(Math.hypot(100, 60), 2)
+  // A turned component moves its children by a transform this reading does not apply: it refuses to guess their world positions.
+  await run("cad_edit", { action: "transform", ids: [component], rotateDegrees: 90, rotateAxis: "z" })
+  const turned = await run("cad", { action: "inspect_origins", ids: [component] })
+  expect(turned.elements[0].gizmo.rotation.z).toBe(90)
+  expect(turned.elements[0].children.map((child: { absolute: unknown }) => child.absolute)).toEqual([null, null])
+})

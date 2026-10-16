@@ -22,6 +22,7 @@ import { prepareAttachments, type Attachment } from "./attachments.ts"
 import { abortHostSession, createHostSession, hostChatStream, queueHostMessage, readHostSessionState, sessionExists, taskInfos, type HostSessionState, type PendingDelivery } from "./nikcli/chat.ts"
 import type { NikCliRuntime, ProjectHost } from "./nikcli/runtime.ts"
 import { isAssistantMode, SUGGESTED_PROMPTS, type AssistantMode } from "./prompts/modes.ts"
+import { AiModes, modeTable } from "./prompts/contributed-modes.ts"
 import { systemPrompt, turnSystemPrompt, type ReplyLanguage } from "./prompts/system.ts"
 import { resolveLocale } from "./nikcli/locale.ts"
 import { providerAllowed } from "./nikcli/policy.ts"
@@ -152,6 +153,8 @@ export class AiService extends Context.Service<AiService, {
       const cache = yield* AiCache
       const host = yield* Effect.serviceOption(AiHost)
       const background = yield* Effect.serviceOption(AiBackground)
+      // Contributed modes are optional: a build without plugins resolves every mode the built-in way.
+      const contributedModes = yield* Effect.serviceOption(AiModes)
       const controllers = yield* Ref.make(new Map<string, AbortController>())
       /** Client session id (owned by the UI) → the host session it actually talks to. */
       const sessionMap = yield* Ref.make(new Map<string, { host: ProjectHost; sessionId: string }>())
@@ -321,7 +324,9 @@ export class AiService extends Context.Service<AiService, {
               const locale = resolveLocale()
               return { tag: locale.replyLanguage, name: locale.replyLanguage ? locale.languageName : "" }
             })()
-            const system = Option.isSome(host) ? turnSystemPrompt(input.context, input.mode, resolved.modelId, reply) : systemPrompt(input.context, input.mode, resolved.modelId, reply)
+            // The modes enabled plugins contribute, read per chat so a plugin toggle applies from the next turn.
+            const modes = Option.isSome(contributedModes) ? modeTable(contributedModes.value.modes()) : undefined
+            const system = Option.isSome(host) ? turnSystemPrompt(input.context, input.mode, resolved.modelId, reply, new Date(), modes) : systemPrompt(input.context, input.mode, resolved.modelId, reply, new Date(), modes)
             const attached = prepareAttachments(input.projectId ?? "default", input.attachments)
             const message = input.message + attached.note
 

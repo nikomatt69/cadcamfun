@@ -2,7 +2,13 @@
 
 ## Assistant extensions (2026-10-16)
 
-Owner-requested assistant plugin management extends apps/sidecar/src/services/ai-plugins.ts and its tests: install a validated local manifest/source bundle, list installed Worker plugins and persist enable/disable with live tool refresh. Only ai:tool is currently wired; unsupported capabilities are refused explicitly. Existing browser CAD/CAM plugin installation and management remain available. Worker code is user-trusted and is not an OS sandbox. Status: in progress.
+Owner-requested assistant plugin management extends apps/sidecar/src/services/ai-plugins.ts and its tests: install a validated local manifest/source bundle, list installed Worker plugins and persist enable/disable with live tool refresh. Supported capabilities are ai:tool, ai:mod and ai:mode; unsupported capabilities are refused explicitly. Uploaded mod modules accompany the worker source, and enabled plugins contribute namespaced assistant modes. Existing browser CAD/CAM plugin installation and management remain available. Worker code is user-trusted and is not an OS sandbox. Status: implemented and verified at source-runtime level; plugin mod hooks and mode instructions are additionally verified through the compiled sidecar's live enable/disable flow.
+
+Assistant contribution contract (separate from the browser CAD/CAM plugin manager):
+
+- `contributes.mods[]` declares `{ id, title, description, entry }` and requires `ai:mod`. The entry is a plain `.js` filename, distinct from the plugin's worker entry. An upload carries its source in `files[entry]`, alongside `manifest` and `source`; missing and undeclared files are refused. Enabled modules are declared to the isolated nikcli host. The panel identifies them as `<pluginId>.<id>`; their lifecycle follows the plugin.
+- `contributes.modes[]` declares `{ id, title, description, instructions }` and requires `ai:mode`. Instructions are bounded to 4,000 characters and stay server-side; the picker lists metadata under `<pluginId>:<id>`. Each turn resolves that id against the currently enabled plugins; an absent or disabled id falls back to `general`.
+- Mod and mode ids use lowercase letters, digits, underscore and dash, start with a letter and contain at most 40 characters. Titles and descriptions are bounded to 120 and 500 characters. Install is inert; explicit activation persists the grant. Startup loading and contribution readers enforce the same supported-capability checks.
 
 ## Worker RPC lifecycle alignment (2026-10-09)
 
@@ -67,6 +73,12 @@ Public, versioned, dependency-light package that plugin authors import.
 - `bunx tsc` clean; tests above pass.
 
 ## 7. Change log
+
+- 2026-10-16: Documented the mod/mode manifest and upload contracts. The compiled-extension regression exercises plugin mod hooks and contributed mode instructions through the real sidecar executable and a local simulated provider, including withdrawal after disable.
+
+- 2026-10-16: Regression review: install, startup loading, mod declarations and mode listings now share the same supported-capability checks. An enabled manifest refused by the worker loader cannot publish mod code or mode instructions through the file readers. The regression fixture reproduces the former inconsistent admission with an unsupported drawing grant.
+
+- 2026-10-16: The existing Worker host now has authenticated assistant management: validated manifest/index.js bundles install disabled, explicit activation persists consent and refreshes the central tool registry, and disable/removal revoke tools live. Worker execution, capabilities, timeout, persistence and HTTP/DOM flows pass. Only ai:tool is wired to this Worker adapter; browser CAD/CAM plugins retain their existing manager. Native mod actions use the app-owned isolated store and the compatibility/lifecycle gate in WP8. Worker code remains trusted local JavaScript, not an OS sandbox.
 
 - v1: initial spec.
 - SDK implemented (`packages/plugin-sdk`):

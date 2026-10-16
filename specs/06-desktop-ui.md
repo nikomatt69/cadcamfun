@@ -2,7 +2,7 @@
 
 ## Assistant extensions (2026-10-16)
 
-Owner-requested assistant extensions: WP6 owns a compact MCP/plugin settings disclosure in the existing assistant, project-local connection management, Worker plugin installation/enablement and links to existing CAD/CAM plugin pages. AI locale and desktop tests are included. Status: in progress.
+Owner-requested assistant extensions: WP6 owns a compact MCP/plugin settings disclosure in the existing assistant, project-local connection management, Worker plugin installation/enablement and links to existing CAD/CAM plugin pages. AI locale and desktop tests are included. Status: implemented and verified at source-runtime level.
 
 ## Component creation and library round-trip (2026-10-13)
 
@@ -77,6 +77,8 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 - Keyboard-only workflow for create project → draw → generate → export works.
 
 ## 5. Change log
+
+- 2026-10-16: The assistant overflow menu exposes MCP & plugins. Project MCP configuration/status/enablement/removal and Worker plugin installation/enablement/removal share the existing disclosure styling; CAD/CAM interface plugins link to the existing manager. The DOM flow installs an inert plugin, enables/disables its tools and removes it. Desktop typecheck and production build pass. Native visual verification was not performed.
 
 - 2026-10-16: minor assistant composer spacing refinement (WP6): narrow docks use icon-only agent, mode, thinking and drawing triggers with accessible names and tooltips. The model name can shrink with ellipsis, secondary effort text collapses at narrow widths, and fixed icons retain their spacing. Layout and assistant behavior are preserved. Validation: desktop typecheck, production build and all 5 targeted assistant panel/agent tests pass; no native visual verification was performed.
 - 2026-10-15: assistant streaming retains message/segment DOM nodes, memoizes unchanged Markdown and tool facts,

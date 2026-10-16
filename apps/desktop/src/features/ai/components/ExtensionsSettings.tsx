@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createResource, createSignal, onCleanup, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createResource, createSignal, onCleanup, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import RefreshCw from "lucide-solid/icons/refresh-cw"
 import Power from "lucide-solid/icons/power"
@@ -25,6 +25,9 @@ export function ExtensionsSettings(): JSX.Element {
   const [problem, setProblem] = createSignal<string>()
   const [serverProblem, setServerProblem] = createSignal<string>()
   const [pluginProblem, setPluginProblem] = createSignal<string>()
+  const [modProblem, setModProblem] = createSignal<string>()
+  // The mod modules the pasted manifest declares (`contributes.mods[].entry` → source); an upload must carry one for each.
+  const [modSources, setModSources] = createSignal<Record<string, string>>({})
   const controller = new AbortController()
   onCleanup(() => controller.abort())
   const run = <A, E>(effect: import("effect").Effect.Effect<A, E>) => app.runtime.run(effect, { signal: controller.signal })
@@ -41,6 +44,24 @@ export function ExtensionsSettings(): JSX.Element {
       if (!controller.signal.aborted) setPluginProblem(t("ai.extensions.failed"))
       return { plugins: [] }
     }
+  })
+  const [mods, modActions] = createResource(async () => {
+    setModProblem(undefined)
+    try { return await run(app.client.ai.extensionMods()) } catch {
+      if (!controller.signal.aborted) setModProblem(t("ai.extensions.failed"))
+      return { mods: [] }
+    }
+  })
+  const declaredModEntries = createMemo<ReadonlyArray<string>>(() => {
+    try {
+      const parsed: unknown = JSON.parse(manifest())
+      const entries = (parsed as { contributes?: { mods?: unknown } } | null)?.contributes?.mods
+      if (!Array.isArray(entries)) return []
+      return entries.flatMap((entry) => {
+        const file = (entry as { entry?: unknown } | undefined)?.entry
+        return typeof file === "string" && file.length > 0 ? [file] : []
+      })
+    } catch { return [] }
   })
   createEffect(() => { ai.projectId(); setName(""); setConfig(REMOTE); setProblem(undefined) })
   const mutate = async (work: () => Promise<unknown>): Promise<void> => {
@@ -60,7 +81,7 @@ export function ExtensionsSettings(): JSX.Element {
       await refreshServers()
     })
   }
-  const error = () => problem() ?? serverProblem() ?? pluginProblem()
+  const error = () => problem() ?? serverProblem() ?? pluginProblem() ?? modProblem()
   return (
     <div class="space-y-4" data-testid="ai-extensions">
       <Show when={error()}>{(message) => <p class="assistant-attachment-problem" role="alert">{message()}</p>}</Show>
@@ -104,18 +125,37 @@ export function ExtensionsSettings(): JSX.Element {
         <p class="text-xs assistant-meta-text">{t("ai.extensions.pluginsHint")}</p>
         <Show when={plugins.loading}><p class="text-xs assistant-meta-text" role="status">{t("ai.extensions.loading")}</p></Show>
         <ul class="space-y-1"><For each={plugins()?.plugins}>{(plugin) => <li class="assistant-list-card gap-2">
-          <div class="min-w-0 flex-1"><strong class="block truncate">{plugin.name}</strong><span class="text-xs assistant-meta-text">{plugin.version} · {t("ai.extensions.toolCount", { count: plugin.tools })}</span></div>
-          <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(plugin.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: plugin.name })} aria-pressed={plugin.enabled} onClick={() => void mutate(async () => { await run(app.client.ai.toggleExtensionPlugin({ params: { id: plugin.id }, payload: { enabled: !plugin.enabled } })); await pluginActions.refetch(); ai.refresh() })}><Power size={13} aria-hidden="true" /></button>
-          <button type="button" class="assistant-icon-action is-danger" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t("ai.extensions.remove", { name: plugin.name })} onClick={() => void mutate(async () => { await run(app.client.ai.removeExtensionPlugin({ params: { id: plugin.id } })); await pluginActions.refetch(); ai.refresh() })}><Trash2 size={13} aria-hidden="true" /></button>
+          <div class="min-w-0 flex-1"><strong class="block truncate">{plugin.name}</strong><span class="text-xs assistant-meta-text">{plugin.version} · {t("ai.extensions.toolCount", { count: plugin.tools })}{plugin.mods > 0 ? ` · ${t("ai.extensions.modCount", { count: plugin.mods })}` : ""}{plugin.modes > 0 ? ` · ${t("ai.extensions.modeCount", { count: plugin.modes })}` : ""}</span></div>
+          <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(plugin.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: plugin.name })} aria-pressed={plugin.enabled} onClick={() => void mutate(async () => { await run(app.client.ai.toggleExtensionPlugin({ params: { id: plugin.id }, payload: { enabled: !plugin.enabled } })); await pluginActions.refetch(); await modActions.refetch(); ai.refresh(); ai.refreshModes() })}><Power size={13} aria-hidden="true" /></button>
+          <button type="button" class="assistant-icon-action is-danger" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t("ai.extensions.remove", { name: plugin.name })} onClick={() => void mutate(async () => { await run(app.client.ai.removeExtensionPlugin({ params: { id: plugin.id } })); await pluginActions.refetch(); await modActions.refetch(); ai.refresh(); ai.refreshModes() })}><Trash2 size={13} aria-hidden="true" /></button>
         </li>}</For></ul>
         <details class="space-y-2">
           <summary class="cursor-pointer text-xs">{t("ai.extensions.install")}</summary>
           <p class="text-xs assistant-meta-text">{t("ai.extensions.trust")}</p>
           <label class="block text-xs">plugin.json<textarea class="assistant-field mt-1 font-mono text-xs" rows={8} maxLength={64000} value={manifest()} spellcheck={false} onInput={(event) => setManifest(event.currentTarget.value)} /></label>
           <label class="block text-xs">index.js<textarea class="assistant-field mt-1 font-mono text-xs" rows={5} maxLength={500000} value={source()} spellcheck={false} onInput={(event) => setSource(event.currentTarget.value)} /></label>
-          <button type="button" class="assistant-btn assistant-btn-secondary" disabled={busy() || !manifest().trim() || !source().trim()} onClick={() => void mutate(async () => { await run(app.client.ai.installExtensionPlugin({ payload: { manifest: manifest(), source: source() } })); await pluginActions.refetch() })}>{t("ai.extensions.install")}</button>
+          <For each={declaredModEntries()}>{(entry) => <label class="block text-xs">{t("ai.extensions.modModule", { entry })}
+            <textarea class="assistant-field mt-1 font-mono text-xs" rows={5} maxLength={500000} value={modSources()[entry] ?? ""} spellcheck={false} onInput={(event) => setModSources((current) => ({ ...current, [entry]: event.currentTarget.value }))} />
+          </label>}</For>
+          <button type="button" class="assistant-btn assistant-btn-secondary" disabled={busy() || !manifest().trim() || !source().trim() || declaredModEntries().some((entry) => !(modSources()[entry] ?? "").trim())} onClick={() => void mutate(async () => { await run(app.client.ai.installExtensionPlugin({ payload: { manifest: manifest(), source: source(), files: Object.fromEntries(declaredModEntries().map((entry) => [entry, modSources()[entry] ?? ""])) } })); await pluginActions.refetch() })}>{t("ai.extensions.install")}</button>
         </details>
         <A href="/plugins" class="assistant-link-btn text-xs">{t("ai.extensions.manageCadPlugins")}</A>
+      </section>
+      <section class="space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="text-sm font-medium">{t("ai.extensions.mods")}</h3>
+          <button type="button" class="assistant-icon-action" disabled={busy() || mods.loading} aria-label={t("ai.extensions.refresh")} onClick={() => void mutate(async () => { await modActions.refetch() })}><RefreshCw size={13} aria-hidden="true" /></button>
+        </div>
+        <p class="text-xs assistant-meta-text">{t("ai.extensions.modsHint")}</p>
+        <Show when={mods.loading}><p class="text-xs assistant-meta-text" role="status">{t("ai.extensions.loading")}</p></Show>
+        <ul class="space-y-1"><For each={mods()?.mods}>{(mod) => <li class="assistant-list-card gap-2">
+          <div class="min-w-0 flex-1"><strong class="block truncate">{mod.name}</strong><span class="text-xs assistant-meta-text">{mod.description} · {mod.origin === "plugin" ? t("ai.extensions.modFromPlugin", { name: mod.pluginId ?? "" }) : t("ai.extensions.modWrittenBy", { origin: mod.origin })}</span></div>
+          <Show when={mod.origin !== "plugin"}>
+            <button type="button" class="assistant-icon-action" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t(mod.enabled ? "ai.extensions.disable" : "ai.extensions.enable", { name: mod.name })} aria-pressed={mod.enabled} onClick={() => void mutate(async () => { await run(app.client.ai.toggleExtensionMod({ params: { id: mod.id }, payload: { enabled: !mod.enabled } })); await modActions.refetch() })}><Power size={13} aria-hidden="true" /></button>
+            <button type="button" class="assistant-icon-action is-danger" disabled={busy() || ai.status() === "streaming" || ai.status() === "connecting"} aria-label={t("ai.extensions.remove", { name: mod.name })} onClick={() => void mutate(async () => { await run(app.client.ai.removeExtensionMod({ params: { id: mod.id } })); await modActions.refetch() })}><Trash2 size={13} aria-hidden="true" /></button>
+          </Show>
+        </li>}</For></ul>
+        <p class="text-xs assistant-meta-text">{t("ai.extensions.modsAssistant")}</p>
       </section>
     </div>
   )

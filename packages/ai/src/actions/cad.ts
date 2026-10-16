@@ -3,7 +3,7 @@
  * libraries: inspection never provisions a project, a drawing or a default (the sidecar's handlers enforce that too),
  * which is what lets the read-only specialists have the whole tool.
  */
-import { CAD_ACTION_INPUTS, EmptyActionInput, CadInspectionElements, CadInspectionLayers, CadInspectionProperty, CadInspectionSearch, PARAMETRIC_ACTION_INPUTS } from "@cadcamfun/api"
+import { CAD_ACTION_INPUTS, EmptyActionInput, CadInspectionElements, CadInspectionLayers, CadInspectionOrigins, CadInspectionProperty, CadInspectionSearch, PARAMETRIC_ACTION_INPUTS } from "@cadcamfun/api"
 import { Schema } from "effect"
 import { ToolMediaResult } from "../tools/define.ts"
 import { defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
@@ -28,12 +28,14 @@ export type CadInspectionInput =
   | Extract<CadInspectionInputWire, { action: "layers" }>
   | (Extract<CadInspectionInputWire, { action: "search" }> & { limit: number })
   | (Extract<CadInspectionInputWire, { action: "property" }> & { offset: number; maxChars: number })
+  | (Extract<CadInspectionInputWire, { action: "origins" }> & { offset: number; limit: number })
 export type CadComponentRelationsInput = { firstId: string; secondId: string }
 
 /** The host's defaults (`offset` 0, `limit` 10/20, `maxChars` 10000) the handler reads; the wire schema stays free of transforms. */
 const withDefaults = (value: Record<string, unknown>): Record<string, unknown> => {
   switch (value["action"]) {
     case "elements": return { offset: 0, limit: 10, ...value }
+    case "origins": return { offset: 0, limit: 10, ...value }
     case "search": return { limit: 20, ...value }
     case "property": return { offset: 0, maxChars: 10_000, ...value }
     default: return value
@@ -104,6 +106,11 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cad.inspect_property", kind: "read", replaces: "cad_inspect",
     parameters: leaf(CadInspectionProperty),
     run: inspect("property")
+  }),
+  defineWireAction({
+    id: "cad.inspect_origins", kind: "read", replaces: "cad_inspect",
+    parameters: leaf(CadInspectionOrigins),
+    run: inspect("origins")
   }),
   defineWireAction({
     id: "cad.drawing", kind: "read",

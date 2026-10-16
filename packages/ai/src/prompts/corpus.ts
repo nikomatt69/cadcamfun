@@ -47,8 +47,8 @@ export const PROMPT_BUDGETS = {
   system: 13_000,
   /** One mode, one family style or one specialist prompt. */
   staticEntry: 10_000,
-  /** All tool descriptions together (they are sent as a set). */
-  descriptions: 27_000,
+  /** All tool descriptions together (they are sent as a set). Raised from 27 000 when the mods and mods_edit tools joined (RM-11): their two descriptions cost about 5 200 characters. */
+  descriptions: 34_000,
   /** One tool description. */
   description: 4_000,
   /** One skill body. */

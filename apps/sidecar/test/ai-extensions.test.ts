@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import { Context, Effect, Option } from "effect"
-import { ToolRegistry } from "@cadcamfun/ai"
+import { isolatedPaths, saveMod, ToolRegistry } from "@cadcamfun/ai"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { makeApp } from "./helpers.ts"
@@ -56,4 +56,64 @@ test("plugin uploads reject unsupported capabilities, path escapes without publi
     const response = await app.call("/api/ai/extensions/plugins", { method: "POST", json: { manifest: JSON.stringify(candidate), source: "export const aiTools = {}" } })
     expect(response.status).toBe(400)
   }
+})
+
+test("a plugin ships a mod and a mode: the upload carries its module, enabling declares both, disabling withdraws both", async () => {
+  const uuid = crypto.randomUUID().slice(0, 8)
+  const id = `com.example.extras-${uuid}`
+  const extras = JSON.stringify({
+    id, name: "Extras", version: "1.0.0", apiVersion: "1", entry: "index.js",
+    capabilities: ["ai:mod", "ai:mode"],
+    contributes: {
+      mods: [{ id: "audit", title: "Audit log", description: "Notes every tool call the assistant makes.", entry: "mod.js" }],
+      modes: [{ id: "feeds", title: "Feeds and speeds", description: "Cutting parameters, reasoned.", instructions: "You are focused on feeds and speeds. Quote the material and tool data behind every number, in metric." }]
+    }
+  })
+  const source = "export const aiTools = {}"
+  const modSource = "export const register = () => {}"
+  // The bundle must carry exactly the declared mod modules: nothing declared, nothing extra.
+  expect((await app.call("/api/ai/extensions/plugins", { method: "POST", json: { manifest: extras, source } })).status).toBe(400)
+  expect((await app.call("/api/ai/extensions/plugins", { method: "POST", json: { manifest: extras, source, files: { "mod.js": modSource, "other.js": modSource } } })).status).toBe(400)
+  const install = await app.call("/api/ai/extensions/plugins", { method: "POST", json: { manifest: extras, source, files: { "mod.js": modSource } } })
+  expect(install.status).toBe(200)
+  expect(install.body.plugins.find((plugin: { id: string }) => plugin.id === id)).toMatchObject({ enabled: false, mods: 1, modes: 1 })
+  // A plugin that is installed but not enabled contributes neither mods nor modes.
+  expect((await app.call("/api/ai/extensions/mods")).body.mods.filter((mod: { pluginId?: string }) => mod.pluginId === id)).toEqual([])
+  expect((await app.call("/api/ai/modes")).body.modes.filter((mode: { pluginId: string }) => mode.pluginId === id)).toEqual([])
+
+  const enabled = await app.call(`/api/ai/extensions/plugins/${id}`, { method: "PUT", json: { enabled: true } })
+  expect(enabled.status).toBe(200)
+  expect(enabled.body.plugins.find((plugin: { id: string }) => plugin.id === id).enabled).toBe(true)
+  // The mode is namespaced and carries its labels; the instructions stay server-side.
+  expect((await app.call("/api/ai/modes")).body.modes).toContainEqual({ id: `${id}:feeds`, title: "Feeds and speeds", description: "Cutting parameters, reasoned.", pluginId: id, pluginName: "Extras" })
+  // The mod is listed as host-managed, and its module really is inside the plugin folder the host loads from.
+  expect((await app.call("/api/ai/extensions/mods")).body.mods).toContainEqual({ id: `${id}.audit`, name: "Audit log", description: "Notes every tool call the assistant makes.", enabled: true, origin: "plugin", pluginId: id })
+  expect(await readFile(join(app.dataDir, "plugins", id, "mod.js"), "utf8")).toBe(modSource)
+
+  await app.call(`/api/ai/extensions/plugins/${id}`, { method: "PUT", json: { enabled: false } })
+  expect((await app.call("/api/ai/modes")).body.modes.filter((mode: { pluginId: string }) => mode.pluginId === id)).toEqual([])
+  expect((await app.call("/api/ai/extensions/mods")).body.mods.filter((mod: { pluginId?: string }) => mod.pluginId === id)).toEqual([])
+  expect((await app.call(`/api/ai/extensions/plugins/${id}`, { method: "DELETE" })).status).toBe(200)
+})
+
+test("a contribution without its capability is refused at install and at listing", async () => {
+  const base = JSON.parse(manifest)
+  const response = await app.call("/api/ai/extensions/plugins", { method: "POST", json: { manifest: JSON.stringify({ ...base, id: "com.example.incoherent", contributes: { mods: [{ id: "audit", title: "Audit log", description: "Notes every tool call.", entry: "mod.js" }] } }), source: "export const aiTools = {}" } })
+  expect(response.status).toBe(400)
+  expect(response.body.message).toContain("ai:mod")
+})
+
+test("the mods panel lists the app-owned store, toggles it and removes it; plugin mods stay host-managed", async () => {
+  const paths = isolatedPaths(app.dataDir)
+  saveMod(paths, { id: "run-notes", name: "Run notes", description: "Adds the day to every answer.", source: "export const register = () => {}", origin: "user" })
+  expect((await app.call("/api/ai/extensions/mods")).body.mods).toContainEqual({ id: "run-notes", name: "Run notes", description: "Adds the day to every answer.", enabled: false, origin: "user" })
+  const on = await app.call("/api/ai/extensions/mods/run-notes", { method: "PUT", json: { enabled: true } })
+  expect(on.status).toBe(200)
+  expect(on.body.mods.find((mod: { id: string }) => mod.id === "run-notes").enabled).toBe(true)
+  // An unknown id is refused with the store's own words; a plugin mod is absent from the store, so it lands here too.
+  expect((await app.call("/api/ai/extensions/mods/ghost", { method: "PUT", json: { enabled: false } })).status).toBe(400)
+  const removed = await app.call("/api/ai/extensions/mods/run-notes", { method: "DELETE" })
+  expect(removed.status).toBe(200)
+  expect(removed.body.mods.some((mod: { id: string }) => mod.id === "run-notes")).toBe(false)
+  expect((await app.call("/api/ai/extensions/mods/run-notes", { method: "DELETE" })).status).toBe(400)
 })

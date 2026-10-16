@@ -102,7 +102,8 @@ export interface IsolationOptions {
    * Load the mods the app itself declares in its isolated `nikcli.json` (spec 27 §4.3). Off by default, because the
    * pinned host bundle must first prove — `packages/ai/test/pinned-mod-compatibility.test.ts` — that with the flag off
    * it loads exactly those and nothing from the user's home or the project. While off, `NIKCLI_DISABLE_MODS` keeps the
-   * host from loading any mod from anywhere. Process-wide side effect: set it on the first `applyIsolation` call.
+   * host from loading any mod from anywhere; while on, an inherited flag is cleared too, because the bundle reads it
+   * when it loads. Process-wide side effect, applied on the first `applyIsolation` call of the process.
    */
   readonly mods?: boolean
 }
@@ -150,5 +151,9 @@ export const applyIsolation = (paths: IsolatedPaths, options?: IsolationOptions)
   // nikcli persists API keys here in plaintext; this app keeps keys in memory only.
   rmSync(join(paths.data, "auth.json"), { force: true })
   for (const key of SCRUBBED_ENV) delete process.env[key]
+  // `mods: true` must also *clear* an inherited flag: the ledger is read by the bundle when it loads, so a value left in
+  // this process by an earlier host (or by the shell that started it, which test children inherit) would keep every mod
+  // out even though the app asked for them. `isolationEnv` cannot express a delete, so it happens here.
+  if (options?.mods === true) delete process.env["NIKCLI_DISABLE_MODS"]
   Object.assign(process.env, isolationEnv(paths, options))
 }

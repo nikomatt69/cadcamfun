@@ -28,7 +28,7 @@ import { contextTokensOf } from "../lib/context-metrics.ts"
 import { appendTextEvent } from "../lib/timeline.ts"
 import { mirrorCamResult } from "../lib/cam-sync.ts"
 import { actionKey, captureEditorOwner, mirrorToolResult, reconcileCoalesced, reconcileFromStored, type EditorOwner } from "../lib/editor-sync.ts"
-import type { AiActivity, AiEvent, AiGoal, AiMessage, AiPermission, AiSession, AiTask, AiTodo, AiToolCalls, ChatModel, AiAgent, AiPendingQuestion, AiContextState } from "../lib/types.ts"
+import type { AiActivity, AiEvent, AiGoal, AiMessage, AiMode, AiPermission, AiSession, AiTask, AiTodo, AiToolCalls, ChatModel, AiAgent, AiPendingQuestion, AiContextState } from "../lib/types.ts"
 
 export type PendingDelivery = "queue" | "steer"
 export interface AiPending { readonly id: string; readonly text: string; readonly delivery: PendingDelivery }
@@ -88,8 +88,12 @@ export interface AiStore {
   readonly setPermissionMode: (mode: "auto" | "ask" | "approve") => void
   readonly agent: Accessor<string>
   readonly setAgent: (agent: string) => void
-  readonly mode: Accessor<"general" | "cad" | "cam" | "gcode" | "toolpath">
-  readonly setMode: (mode: "general" | "cad" | "cam" | "gcode" | "toolpath") => void
+  readonly mode: Accessor<string>
+  readonly setMode: (mode: string) => void
+  /** The modes enabled plugins contribute; the picker offers them beside the built-ins. */
+  readonly pluginModes: Accessor<ReadonlyArray<AiMode>>
+  /** Re-reads the contributed modes; the extensions panel calls it after a plugin is toggled. */
+  readonly refreshModes: () => void
   readonly questions: Accessor<ReadonlyArray<AiPendingQuestion>>
   readonly hostContext: Accessor<AiContextState | undefined>
   readonly controlBusy: Accessor<boolean>
@@ -155,9 +159,10 @@ export const createAiStore = (): AiStore => {
   const [stats, setStats] = createSignal<AiStats>(emptyStats())
   const [contextTokens, setContextTokens] = createSignal(0)
   const [agents, setAgents] = createSignal<ReadonlyArray<AiAgent>>([])
+  const [pluginModes, setPluginModes] = createSignal<ReadonlyArray<AiMode>>([])
   const [permissionMode, setPermissionMode] = createSignal<"auto" | "ask" | "approve">("ask")
   const [agent, setAgent] = createSignal("general")
-  const [mode, setMode] = createSignal<"general" | "cad" | "cam" | "gcode" | "toolpath">("general")
+  const [mode, setMode] = createSignal<string>("general")
   const [questions, setQuestions] = createSignal<ReadonlyArray<AiPendingQuestion>>([])
   const [hostContext, setHostContext] = createSignal<AiContextState>()
   const [controlBusy, setControlBusy] = createSignal(false)
@@ -774,6 +779,9 @@ export const createAiStore = (): AiStore => {
     } finally { if (!read && current()) setControlBusy(false) }
   }
   const refreshControls = () => control("status")
+  const refreshModes = (): void => {
+    void app.runtime.run(app.client.ai.modes()).then((reply) => { if (!disposed) setPluginModes(reply.modes) }).catch(() => undefined)
+  }
   const loadContextBreakdown = () => control("context")
   const consolidateMemory = () => control("consolidate_memory")
   const compact = () => control("compact")
@@ -813,6 +821,7 @@ export const createAiStore = (): AiStore => {
     setQuestions([]); setPermissions([]); setHostContext(undefined); setControlError(undefined); setControlBusy(false)
     if (sid) untrack(() => void refreshControls())
     void app.runtime.run(app.client.ai.agents()).then((list) => { if (!disposed && generation === controlsGeneration) setAgents(list) }).catch(() => undefined)
+    void app.runtime.run(app.client.ai.modes()).then((reply) => { if (!disposed && generation === controlsGeneration) setPluginModes(reply.modes) }).catch(() => undefined)
   })
 
   const suggestions = createMemo<ReadonlyArray<Suggestion>>(() => {
@@ -848,7 +857,7 @@ export const createAiStore = (): AiStore => {
     status, error, sessionId, sessions, messages, toolCalls, permissions, plan, goal, activity, tasks,
     model, setModel, includeContext, setIncludeContext, stats, contextTokens, suggestions, dismissSuggestion,
     projectId, send, pending, abort, clear, newSession, openSession, renameSession, deleteSession, replyPermission,
-    permissionMode, setPermissionMode, agents, agent, setAgent, mode, setMode, questions, hostContext, controlBusy, controlError, refreshControls, loadContextBreakdown, compact, consolidateMemory, cancelTask, replyQuestion
+    permissionMode, setPermissionMode, agents, agent, setAgent, mode, setMode, pluginModes, refreshModes, questions, hostContext, controlBusy, controlError, refreshControls, loadContextBreakdown, compact, consolidateMemory, cancelTask, replyQuestion
   }
   })
   onCleanup(() => disposeStore?.())

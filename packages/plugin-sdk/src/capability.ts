@@ -25,7 +25,17 @@ export const CAPABILITIES = [
    * Offer tools to the AI assistant (and to a standalone nikcli through the action bridge). A tool is code the assistant calls on
    * the user's behalf, so it is its own grant; a `write` tool is asked about before every call.
    */
-  "ai:tool"
+  "ai:tool",
+  /**
+   * Ship a nikcli mod the embedded host loads: code that hooks every tool call, the prompt and the session. The strongest grant
+   * a plugin can hold, because a mod sees the whole conversation; only granted plugins' mods are declared to the host.
+   */
+  "ai:mod",
+  /**
+   * Contribute an assistant mode: a named system-prompt block the person may pick for a conversation. Declarative (no code),
+   * but it steers the model, so it is its own grant.
+   */
+  "ai:mode"
 ] as const
 
 export const CapabilitySchema = Schema.Literals(CAPABILITIES)
@@ -41,7 +51,9 @@ const IMPLIES: Readonly<Record<Capability, ReadonlyArray<Capability>>> = {
   "toolpath:read": [],
   storage: [],
   "ui:panel": [],
-  "ai:tool": []
+  "ai:tool": [],
+  "ai:mod": [],
+  "ai:mode": []
 }
 
 /**

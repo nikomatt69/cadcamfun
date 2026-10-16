@@ -70,7 +70,8 @@ export interface StreamInput {
   readonly model?: { readonly provider: ProviderId; readonly model: string; readonly tier?: Tier; readonly variant?: string }
   readonly permissionMode?: "auto" | "ask" | "approve"
   readonly agent?: string
-  readonly mode?: "general" | "cad" | "cam" | "gcode" | "toolpath"
+  /** A built-in mode id or one an enabled plugin contributes (`<pluginId>:<id>`). */
+  readonly mode?: string
 }
 
 export interface StreamHandle {

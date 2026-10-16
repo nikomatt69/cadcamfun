@@ -17,6 +17,8 @@ import parts from "./parts.txt" with { type: "text" }
 import library_edit from "./library_edit.txt" with { type: "text" }
 import memory from "./memory.txt" with { type: "text" }
 import memory_edit from "./memory_edit.txt" with { type: "text" }
+import mods from "./mods.txt" with { type: "text" }
+import mods_edit from "./mods_edit.txt" with { type: "text" }
 import research from "./research.txt" with { type: "text" }
 import vcs from "./vcs.txt" with { type: "text" }
 import vcs_edit from "./vcs_edit.txt" with { type: "text" }
@@ -36,7 +38,9 @@ const PROMPTS = {
   research,
   vcs,
   vcs_edit,
-  agent
+  agent,
+  mods,
+  mods_edit
 } as const
 
 export type ToolPromptId = keyof typeof PROMPTS

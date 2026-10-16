@@ -75,7 +75,9 @@ export const ChatAttachment = Schema.Struct({
 })
 export const StreamChatBody = Schema.Struct({
   permissionMode: opt(Schema.Literals(["auto", "ask", "approve"])),
-  agent: opt(Schema.String), mode: opt(Schema.Literals(["general", "cad", "cam", "gcode", "toolpath"])),
+  agent: opt(Schema.String),
+  /** A built-in mode id or one an enabled plugin contributes (`<pluginId>:<id>`); an unknown id resolves to `general`. */
+  mode: opt(Schema.String),
   attachments: opt(Schema.Array(ChatAttachment)),
   message: opt(Schema.String), sessionId: opt(Schema.String), projectId: opt(Schema.String),
   /** The drawing this turn works on. Checked against the project before admission; the turn's tools act on it and on nothing else. */
@@ -161,9 +163,22 @@ export const AiMcpConfig = Schema.Union([
 export const AiMcpEntry = Schema.Struct({ name: Schema.String, config: AiMcpConfig, status: Schema.String })
 export const AiMcpList = Schema.Struct({ servers: Schema.Array(AiMcpEntry) })
 export const AiMcpSave = Schema.Struct({ projectId: Schema.String, name: Schema.String, config: AiMcpConfig })
-export const AiExtensionPlugin = Schema.Struct({ id: Schema.String, name: Schema.String, version: Schema.String, enabled: Schema.Boolean, tools: Schema.Number })
+export const AiExtensionPlugin = Schema.Struct({ id: Schema.String, name: Schema.String, version: Schema.String, enabled: Schema.Boolean, tools: Schema.Number, mods: Schema.Number, modes: Schema.Number })
 export const AiExtensionPlugins = Schema.Struct({ plugins: Schema.Array(AiExtensionPlugin) })
-export const AiPluginBundle = Schema.Struct({ manifest: Schema.String, source: Schema.String })
+/**
+ * One mod in the Extensions panel: a record of the app-owned store (`origin` assistant/user) or a mod an enabled plugin
+ * ships (`origin` plugin, host-managed: it follows the plugin and cannot be toggled here).
+ */
+export const AiExtensionMod = Schema.Struct({
+  id: Schema.String, name: Schema.String, description: Schema.String, enabled: Schema.Boolean,
+  origin: Schema.Literals(["assistant", "user", "plugin"]), pluginId: opt(Schema.String)
+})
+export const AiExtensionMods = Schema.Struct({ mods: Schema.Array(AiExtensionMod) })
+/** An assistant mode an enabled plugin contributes; conversations address it as `<pluginId>:<id>`. */
+export const AiModeInfo = Schema.Struct({ id: Schema.String, title: Schema.String, description: Schema.String, pluginId: Schema.String, pluginName: Schema.String })
+export const AiModesReply = Schema.Struct({ modes: Schema.Array(AiModeInfo) })
+/** Uploaded plugin bundle: the manifest, the worker module, and the mod modules the manifest declares (`entry` → source). */
+export const AiPluginBundle = Schema.Struct({ manifest: Schema.String, source: Schema.String, files: opt(Schema.Record(Schema.String, Schema.String)) })
 export const SkillList = Schema.Struct({ skills: Schema.Array(SkillInfo), max: Schema.Number })
 /** Either `markdown` (a whole SKILL.md) or `name` + `description` + `body`. */
 export const SkillBody = Schema.Struct({
@@ -248,6 +263,10 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.get("extensionPlugins", "/api/ai/extensions/plugins", { success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("installExtensionPlugin", "/api/ai/extensions/plugins", { payload: AiPluginBundle, success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.put("toggleExtensionPlugin", "/api/ai/extensions/plugins/:id", { params: { id: Schema.String }, payload: Schema.Struct({ enabled: Schema.Boolean }), success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.get("extensionMods", "/api/ai/extensions/mods", { success: AiExtensionMods, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.put("toggleExtensionMod", "/api/ai/extensions/mods/:id", { params: { id: Schema.String }, payload: Schema.Struct({ enabled: Schema.Boolean }), success: AiExtensionMods, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.delete("removeExtensionMod", "/api/ai/extensions/mods/:id", { params: { id: Schema.String }, success: AiExtensionMods, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.get("modes", "/api/ai/modes", { success: AiModesReply, error: [InternalError] }),
     HttpApiEndpoint.get("skills", "/api/ai/skills", { success: SkillList, error: [InternalError] }),
     HttpApiEndpoint.put("saveSkill", "/api/ai/skills", { payload: SkillBody, success: SkillSaved, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.delete("deleteSkill", "/api/ai/skills/:name", { params: skillParam, success: SkillList, error: [BadRequest, InternalError] }),

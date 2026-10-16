@@ -41,6 +41,7 @@ const stubAi = (overrides: Record<string, unknown> = {}): CommandHost["ai"] => {
     ],
     agent: () => "general",
     mode: () => "general",
+    pluginModes: () => [{ id: "com.example.shipping:feeds", title: "Feeds and speeds", description: "Cutting parameters, reasoned.", pluginId: "com.example.shipping", pluginName: "Extras" }],
     providers: () => [
       {
         id: "anthropic",
@@ -213,8 +214,11 @@ describe("running commands", () => {
     expect(await run("/mode cad", rec)).toEqual({ kind: "done" })
     expect(await run("/permissions auto", rec)).toEqual({ kind: "done" })
     expect(await run("/agent cad", rec)).toEqual({ kind: "done" })
-    expect(calls).toEqual(["mode:cad", "perm:auto", "agent:cad"])
+    // A plugin-contributed mode is set by its namespaced id, whatever the case the person types.
+    expect(await run("/mode com.example.shipping:feeds", rec)).toEqual({ kind: "done" })
+    expect(calls).toEqual(["mode:cad", "perm:auto", "agent:cad", "mode:com.example.shipping:feeds"])
     expect(await run("/mode sculpting", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.mode.unknown" })
+    expect(await run("/mode com.example.shipping:gone", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.mode.unknown" })
     expect(await run("/permissions maybe", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.permissions.unknown" })
     expect(await run("/agent architect", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.agent.unknown" })
   })

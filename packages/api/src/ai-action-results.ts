@@ -75,6 +75,15 @@ const inspectSearch = Schema.Struct({
 const inspectProperty = Schema.Struct({
   ok: Schema.Literal(true), elementId: str, path: strings, encoding: Schema.Literal("json"), content: str, totalChars: int, nextOffset: nullable(int), ...drawingRef
 })
+/** Origins: the CAD zero datum the answer is measured against, and one entry per element with its own origin. */
+const inspectOrigins = Schema.Struct({
+  ok: Schema.Literal(true), units: Schema.Literal("mm"), zero: vec3, axes: Schema.Struct({ x: str, y: str, z: str }),
+  total: int, offset: int, nextOffset: nullable(int),
+  elements: Schema.Array(Schema.StructWithRest(Schema.Struct({
+    id: str, type: str, origin: vec3, distanceFromZeroMm: num, bounds: Schema.Unknown
+  }), [record])),
+  missingIds: strings, ...drawingRef
+})
 /** A sheet is a derived artifact: `mutated` is always false. */
 const sheet = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false) })
 /** The rebuild report every parametric read returns: the rebuild succeeded (`ok`), its bodies, volume and problems. */
@@ -256,6 +265,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.inspect_layers": read(inspectLayers),
   "cad.inspect_search": read(inspectSearch),
   "cad.inspect_property": read(inspectProperty),
+  "cad.inspect_origins": read(inspectOrigins),
   "cad.drawing": read(sheet),
   "cad.parametric_validate": read(parametricValidate),
   "cad.parametric_inspect": read(parametricInspect),

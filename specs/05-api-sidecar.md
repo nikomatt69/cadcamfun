@@ -2,7 +2,7 @@
 
 ## Assistant extensions (2026-10-16)
 
-Owner-requested assistant extensions: add typed AI endpoints for project-owned MCP configuration/status and local Worker plugin installation/enablement. Reuse the native nikcli MCP client and existing AiPlugins host; reject external bridge grants for extension management. Regenerate clients. Status: in progress.
+Owner-requested assistant extensions: add typed AI endpoints for project-owned MCP configuration/status and local Worker plugin installation/enablement. Reuse the native nikcli MCP client and existing AiPlugins host; reject external bridge grants for extension management. Regenerate clients. Status: implemented and verified at source-runtime level.
 
 ## Assistant control integration (2026-10-10)
 
@@ -94,6 +94,10 @@ apps/sidecar/src/
 - `bunx tsc` clean for both packages; coverage of every endpoint by at least one in-process HTTP test.
 
 ## 5. Change log
+
+- 2026-10-16: Regression review: refreshed the OpenAPI snapshot for the assistant extension endpoints and contributed mode ids. The snapshot adds seven paths and removes none; contract assertions and generated-client freshness checks pass.
+
+- 2026-10-16: AI extension endpoints now manage owned-project MCP connections and authenticated local Worker plugin installation, activation and removal. External project bridge tokens cannot manage extensions or native mods. AI extension HTTP tests and the fresh-process native sidecar boot/MCP-config probe pass; API typecheck and generated-client freshness pass.
 
 - 2026-10-15: the existing AI bridge returns the complete structured tool value with normal JSON wire encoding, retaining
   text-only extension compatibility. Preview truncation is reserved for the model text. Shared outcome tags now preserve

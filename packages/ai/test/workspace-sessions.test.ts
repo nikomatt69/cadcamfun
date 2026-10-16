@@ -17,6 +17,7 @@ const fixture = () => {
     const cached = hosts.get(projectId)
     if (cached) return cached
     const directory = `/scratch/${projectId}`
+    const idleListeners = new Set<(sessionId: string) => void>()
     const value = { projectId, directory, client: {
       session: {
         get: async ({ sessionID }: { sessionID: string }) => {
@@ -29,9 +30,18 @@ const fixture = () => {
         abort: async ({ sessionID }: { sessionID: string }) => { aborts.push(sessionID); return true },
         messages: async () => []
       },
-      events: { subscribe: async function* () { yield { type: "server.connected", properties: {} } } },
+      events: { subscribe: async function* () {
+        const idle = Promise.withResolvers<string>()
+        idleListeners.add(idle.resolve)
+        try {
+          yield { type: "server.connected", properties: {} }
+          yield { type: "session.idle", properties: { sessionID: await idle.promise } }
+        } finally { idleListeners.delete(idle.resolve) }
+      } },
       "session-prompt": { prompt: async ({ sessionID }: { sessionID: string }) => {
         prompts.push(sessionID)
+        // A completed native turn emits idle; otherwise each fixture turn waits out the production event grace period.
+        for (const notify of idleListeners) notify(sessionID)
         return { info: { id: "answer", role: "assistant", finish: "stop" }, parts: [{ id: "text", type: "text", text: "Built and checked." }] }
       } }
     } } as unknown as ProjectHost

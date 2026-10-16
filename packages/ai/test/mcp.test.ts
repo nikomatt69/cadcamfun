@@ -55,7 +55,8 @@ test("native MCP connects, discovers and executes only after approval, isolates 
     await Effect.runPromise(runtime.saveMcpServer(projectId, "fixture", { type: "local", enabled: true, command: [process.execPath, new URL("./helpers/mcp-server.ts", import.meta.url).pathname, evidence] }))
     expect(await Effect.runPromise(runtime.mcpServers(projectId))).toMatchObject([{ name: "fixture", status: "connected" }])
     const other = await Effect.runPromise(runtime.host(`${projectId}-other`))
-    expect((await other.client.config.get()).mcp).toEqual({})
+    // Nothing configured means no `mcp` key at all, the same shape an empty mod list has (`plugin`).
+    expect((await other.client.config.get()).mcp).toBeUndefined()
     const host = await Effect.runPromise(runtime.host(projectId))
     await Effect.runPromise(runtime.setProviderKey("fake", "fixture-key"))
     const sessionId = await Effect.runPromise(createHostSession(host, "MCP approval"))

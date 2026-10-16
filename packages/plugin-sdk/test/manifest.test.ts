@@ -158,3 +158,47 @@ describe("AI tool contributions", () => {
     }
   })
 })
+
+describe("mod contributions", () => {
+  const mod = { id: "audit", title: "Audit log", description: "Notes every tool call the assistant makes.", entry: "mod.js" }
+  const withMods = (mods: ReadonlyArray<unknown>) => ({ ...valid, capabilities: ["ai:mod"], contributes: { mods } })
+
+  test("a manifest may ship mods, and `ai:mod` is a capability of its own", () => {
+    const manifest = Effect.runSync(decodeManifest(withMods([mod])))
+    expect(manifest.contributes?.mods?.[0]).toMatchObject({ id: "audit", entry: "mod.js" })
+    expect(ALL_CAPABILITIES).toContain("ai:mod")
+    expect(effectiveCapabilities(["ai:mod"])).toEqual(["ai:mod"])
+    expect(hasCapability(["ai:tool"], "ai:mod")).toBe(false)
+  })
+
+  test("rejects a mod id, title, description or entry that would not be safe to load", () => {
+    for (const bad of [
+      { ...mod, id: "Audit" }, { ...mod, id: "" }, { ...mod, title: "" },
+      { ...mod, description: "" }, { ...mod, entry: "mod.ts" }, { ...mod, entry: "../escape.js" }, { ...mod, entry: "" }
+    ]) {
+      expect(() => Effect.runSync(decodeManifest(withMods([bad]))), JSON.stringify(bad).slice(0, 60)).toThrow()
+    }
+  })
+})
+
+describe("mode contributions", () => {
+  const mode = { id: "feeds", title: "Feeds and speeds", description: "Reason about cutting parameters.", instructions: "You are focused on feeds and speeds. Quote the material and tool data behind every number." }
+  const withModes = (modes: ReadonlyArray<unknown>) => ({ ...valid, capabilities: ["ai:mode"], contributes: { modes } })
+
+  test("a manifest may contribute modes, and `ai:mode` is a capability of its own", () => {
+    const manifest = Effect.runSync(decodeManifest(withModes([mode])))
+    expect(manifest.contributes?.modes?.[0]).toMatchObject({ id: "feeds", title: "Feeds and speeds" })
+    expect(ALL_CAPABILITIES).toContain("ai:mode")
+    expect(effectiveCapabilities(["ai:mode"])).toEqual(["ai:mode"])
+    expect(hasCapability(["ai:mod"], "ai:mode")).toBe(false)
+  })
+
+  test("the instructions are bounded: a mode block rides on every turn", () => {
+    for (const bad of [
+      { ...mode, id: "Feeds" }, { ...mode, instructions: "" },
+      { ...mode, instructions: "x".repeat(4_001) }, { ...mode, description: "" }
+    ]) {
+      expect(() => Effect.runSync(decodeManifest(withModes([bad]))), JSON.stringify(bad).slice(0, 60)).toThrow()
+    }
+  })
+})

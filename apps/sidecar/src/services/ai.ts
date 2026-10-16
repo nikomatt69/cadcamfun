@@ -1,10 +1,10 @@
-import { inspectProperties, readProperty, componentParameters } from "./ai-inspection.ts"
+import { inspectProperties, readProperty, componentParameters, originEntry, ORIGIN_AXES } from "./ai-inspection.ts"
 import { createHash } from "node:crypto"
 import {
-  AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
+  AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiModes, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, ToolRegistry, makeToolRegistry, backgroundToolContributionsFor, defaultProviderSpecs, makeAiBackgroundLayer,
   searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, decodeHistory, parseHistory, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
-  CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
+  modToolContributions, modSpecs, isolatedPaths, CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel, type History } from "@cadcamfun/core"
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
@@ -431,9 +431,21 @@ const toolHandlers = Effect.gen(function*() {
           ...where(loaded)
         }
       }
+      if (input.action === "origins") {
+        const matched = loaded.elements.filter((e) => (input.ids === undefined || input.ids.includes(e.id)) && (input.layerId === undefined || e.layerId === input.layerId || e["layer"] === input.layerId))
+        const page = matched.slice(input.offset, input.offset + input.limit)
+        return {
+          ok: true, units: "mm", zero: { x: 0, y: 0, z: 0 }, axes: ORIGIN_AXES,
+          total: matched.length, offset: input.offset, nextOffset: input.offset + page.length < matched.length ? input.offset + page.length : null,
+          elements: page.map((element) => originEntry(element, (candidate) => elementBounds(candidate, loaded.elements))),
+          missingIds: input.ids?.filter((id) => !loaded.elements.some((e) => e.id === id)) ?? [],
+          note: "Origins are the stored placement points in drawing millimetres; the CAD zero is (0,0,0). Gizmo rotation (degrees, XYZ order) and scale act about the element's bounding-box centre; a child of a turned or scaled container reports no absolute position.",
+          ...where(loaded)
+        }
+      }
       const matched = loaded.elements.filter((e) => (input.ids === undefined || input.ids.includes(e.id)) && (input.layerId === undefined || e.layerId === input.layerId || e["layer"] === input.layerId))
       const page = matched.slice(input.offset, input.offset + input.limit)
-      return { ok: true, total: matched.length, offset: input.offset, nextOffset: input.offset + page.length < matched.length ? input.offset + page.length : null, elements: page.map((e) => ({ properties: inspectProperties(e), bounds: elementBounds(e, loaded.elements) ?? null })), missingIds: input.ids?.filter((id) => !loaded.elements.some((e) => e.id === id)) ?? [], ...where(loaded) }
+      return { ok: true, total: matched.length, offset: input.offset, nextOffset: input.offset + page.length < matched.length ? input.offset + page.length : null, elements: page.map((e) => ({ properties: inspectProperties(e), bounds: elementBounds(e, loaded.elements) ?? null })), missingIds: input.ids?.filter((id) => !loaded.elements.some((e) => e.id === id)) ?? [], note: input.offset + page.length < matched.length ? `More elements: call again with offset ${input.offset + page.length}.` : undefined, ...where(loaded) }
     },
     cadComponentRelations: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
@@ -1170,6 +1182,9 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const credentials = yield* AiCredentials
   const actingCell = yield* ActingUser
   const registry = yield* ToolRegistry
+  // The mods the host imports: the app-owned store's plus the ones enabled plugins ship, both only ever `file://` specs
+  // inside app-owned folders. Read again on every configuration publication, so a toggle reaches live hosts.
+  const plugins = yield* AiPlugins
   // Runtime-wide scheduler: instantiated before the host so `toolsFor` can
   // hand its four `agent_task*` tool specs to every project's host. The same
   // instance is passed to `AiBackgroundLive` below so the worker runner owns
@@ -1179,10 +1194,11 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   // Delegation is the host's to implement, for as long as the host lives; with it the registry holds every implementation
   // the catalogue names, and the guard keeps the two sides in step.
   yield* registry.contributeScoped(backgroundToolContributionsFor(scheduler))
-  contributionGuard(yield* registry.contributions)
   const policies = yield* readPolicyFile(policyFile(config.dataDir))
   const runtime = yield* makeNikCliRuntime({
     dataDir: config.dataDir,
+    isolation: { mods: true },
+    mods: () => [...new Set([...modSpecs(isolatedPaths(config.dataDir)), ...plugins.modSpecs()])],
     ...(policies.length > 0 ? { policies } : {}),
     providers: defaultProviderSpecs(config.aiMinimaxBaseUrl ? { minimax: config.aiMinimaxBaseUrl } : {}),
     systemPrompt: agentSystemPrompt(),
@@ -1199,6 +1215,8 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
       ...(spec.executeWithFiles ? { executeWithFiles: (input: unknown, ctx: { sessionId: string; projectId: string; signal: AbortSignal }) => actingCell.invoke(projectId, ctx.sessionId, () => spec.executeWithFiles!(input, ctx), ctx.signal).catch(() => ({ output: JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." }) })) } : {})
     }))
   })
+  yield* registry.contributeScoped(modToolContributions(runtime))
+  contributionGuard(yield* registry.contributions)
   yield* credentials.attach({
     apply: (change) => change._tag === "set"
       ? runtime.setProviderKey(change.provider, Redacted.value(change.credential.key))
@@ -1244,12 +1262,17 @@ export const AiLive = Layer.unwrap(Effect.gen(function*() {
   const withBackground = config.aiHost === "direct"
     ? withHost
     : AiBackgroundLive.pipe(Layer.provideMerge(withHost))
+  // The assistant modes enabled plugins contribute; read per chat, so enabling a plugin applies from the next turn.
+  const withModes = Layer.effect(AiModes, Effect.gen(function*() {
+    const plugins = yield* AiPlugins
+    return AiModes.of({ modes: () => plugins.modes() })
+  })).pipe(Layer.provideMerge(withBackground))
   // `ai/prompt` is the one step that needs the assistant, and the assistant is built on top of the
   // workflow runner (its own git tools use it), so the registration can only happen here — once the
   // service exists. Until this layer runs, a workflow naming `ai/prompt` fails as an unknown step
   // rather than quietly doing nothing. The registration consumes the service it publishes, so the
   // exported services are the very same instances (Effect memoises by layer reference).
-  return AiPromptStepLive.pipe(Layer.provideMerge(AiService.layer.pipe(Layer.provideMerge(withBackground))))
+  return AiPromptStepLive.pipe(Layer.provideMerge(AiService.layer.pipe(Layer.provideMerge(withModes))))
 }))
 
 export type { ProviderId }

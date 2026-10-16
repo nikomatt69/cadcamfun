@@ -423,9 +423,15 @@ export type AiSaveMcpServerPayload = {
       }
 }
 
-export type AiInstallExtensionPluginPayload = { readonly manifest: string; readonly source: string }
+export type AiInstallExtensionPluginPayload = {
+  readonly manifest: string
+  readonly source: string
+  readonly files?: { readonly [x: string]: string } | undefined
+}
 
 export type AiToggleExtensionPluginPayload = { readonly enabled: boolean }
+
+export type AiToggleExtensionModPayload = { readonly enabled: boolean }
 
 export type AiSaveSkillPayload = {
   readonly markdown?: string | undefined
@@ -519,7 +525,7 @@ export type AiChatPayload = {
 export type AiChatStreamPayload = {
   readonly permissionMode?: "auto" | "ask" | "approve" | undefined
   readonly agent?: string | undefined
-  readonly mode?: "general" | "cad" | "cam" | "gcode" | "toolpath" | undefined
+  readonly mode?: string | undefined
   readonly attachments?:
     | ReadonlyArray<{
         readonly name: string
@@ -2398,20 +2404,45 @@ export type AiDeleteMcpServerOutput = {
 export type AiRemoveExtensionPluginInput = { readonly id: { readonly id: string }["id"] }
 
 export type AiRemoveExtensionPluginOutput = {
-  plugins: Array<{ id: string; name: string; version: string; enabled: boolean; tools: number }>
+  plugins: Array<{
+    id: string
+    name: string
+    version: string
+    enabled: boolean
+    tools: number
+    mods: number
+    modes: number
+  }>
 }
 
 export type AiExtensionPluginsOutput = {
-  plugins: Array<{ id: string; name: string; version: string; enabled: boolean; tools: number }>
+  plugins: Array<{
+    id: string
+    name: string
+    version: string
+    enabled: boolean
+    tools: number
+    mods: number
+    modes: number
+  }>
 }
 
 export type AiInstallExtensionPluginInput = {
   readonly manifest: AiInstallExtensionPluginPayload["manifest"]
   readonly source: AiInstallExtensionPluginPayload["source"]
+  readonly files?: AiInstallExtensionPluginPayload["files"]
 }
 
 export type AiInstallExtensionPluginOutput = {
-  plugins: Array<{ id: string; name: string; version: string; enabled: boolean; tools: number }>
+  plugins: Array<{
+    id: string
+    name: string
+    version: string
+    enabled: boolean
+    tools: number
+    mods: number
+    modes: number
+  }>
 }
 
 export type AiToggleExtensionPluginInput = {
@@ -2420,7 +2451,59 @@ export type AiToggleExtensionPluginInput = {
 }
 
 export type AiToggleExtensionPluginOutput = {
-  plugins: Array<{ id: string; name: string; version: string; enabled: boolean; tools: number }>
+  plugins: Array<{
+    id: string
+    name: string
+    version: string
+    enabled: boolean
+    tools: number
+    mods: number
+    modes: number
+  }>
+}
+
+export type AiExtensionModsOutput = {
+  mods: Array<{
+    id: string
+    name: string
+    description: string
+    enabled: boolean
+    origin: "assistant" | "user" | "plugin"
+    pluginId?: string | undefined
+  }>
+}
+
+export type AiToggleExtensionModInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly enabled: AiToggleExtensionModPayload["enabled"]
+}
+
+export type AiToggleExtensionModOutput = {
+  mods: Array<{
+    id: string
+    name: string
+    description: string
+    enabled: boolean
+    origin: "assistant" | "user" | "plugin"
+    pluginId?: string | undefined
+  }>
+}
+
+export type AiRemoveExtensionModInput = { readonly id: { readonly id: string }["id"] }
+
+export type AiRemoveExtensionModOutput = {
+  mods: Array<{
+    id: string
+    name: string
+    description: string
+    enabled: boolean
+    origin: "assistant" | "user" | "plugin"
+    pluginId?: string | undefined
+  }>
+}
+
+export type AiModesOutput = {
+  modes: Array<{ id: string; title: string; description: string; pluginId: string; pluginName: string }>
 }
 
 export type AiSkillsOutput = {

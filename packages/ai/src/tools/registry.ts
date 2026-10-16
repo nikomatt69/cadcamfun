@@ -20,6 +20,8 @@ import { partsTool } from "./parts.ts"
 import { libraryEditTool } from "./library_edit.ts"
 import { memoryTool } from "./memory.ts"
 import { memoryEditTool } from "./memory_edit.ts"
+import { modsTool } from "./mods.ts"
+import { modsEditTool } from "./mods_edit.ts"
 import { researchTool } from "./research.ts"
 import { vcsTool } from "./vcs.ts"
 import { vcsEditTool } from "./vcs_edit.ts"
@@ -31,7 +33,7 @@ export const BUILT_IN_TOOLS: ReadonlyArray<ActionTool> = [
   libraryTool, partsTool, libraryEditTool,
   memoryTool, memoryEditTool, researchTool,
   vcsTool, vcsEditTool, agentTool,
-  camVerifyTool
+  camVerifyTool, modsTool, modsEditTool
 ] as const
 
 /** The built-in tool ids; derived from the catalogue (groups and exposures) so the two cannot drift. */

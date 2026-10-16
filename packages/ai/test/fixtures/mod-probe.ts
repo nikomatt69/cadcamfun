@@ -17,6 +17,8 @@ import { Effect, Scope } from "effect"
 import { makeNikCliRuntime } from "../../src/nikcli/runtime.ts"
 import { defaultProviderSpecs } from "../../src/nikcli/config.ts"
 import { isolatedPaths } from "../../src/nikcli/isolation.ts"
+import { modToolContributions } from "../../src/nikcli/mod-tools.ts"
+import { runAction } from "../../src/actions/catalogue.ts"
 import { modSpec, modSpecs, saveMod, setModEnabled } from "../../src/nikcli/mods.ts"
 
 const [fakeHome = "", dataDir = "", modsEnabled = "1"] = process.argv.slice(2)
@@ -75,6 +77,7 @@ saveMod(paths, { id: "probe_mod", name: "Probe mod", description: "Gate probe.",
 setModEnabled(paths, "probe_mod", true)
 const appSpec = modSpec(paths, "probe_mod")
 
+const hostWarnings: string[] = []
 const scope = Effect.runSync(Scope.make())
 const runtime = await Effect.runPromise(
   makeNikCliRuntime({
@@ -82,13 +85,27 @@ const runtime = await Effect.runPromise(
     providers: defaultProviderSpecs(),
     systemPrompt: "probe",
     toolsFor: () => [],
-    hostLogs: () => undefined,
+    hostLogs: (level, line) => { if (level === "warn" || level === "error") hostWarnings.push(line) },
     isolation: { overrideHome: false, mods: modsEnabled === "1" },
     mods: () => modSpecs(paths)
   }).pipe(Scope.provide(scope))
 )
 const host = await Effect.runPromise(runtime.host("probe"))
 const loaded = await host.client.mod.list()
+let liveLifecycle = false
+let liveLifecycleEvidence: unknown
+if (modsEnabled === "1") {
+  const contributions = modToolContributions(runtime)
+  const context = { projectId: "probe", sessionId: "probe", contributions, handlers: {} as import("../../src/tools/handlers.ts").ToolHandlersShape }
+  const saved = await runAction("mods_edit.save", { id: "late_mod", description: "Live lifecycle probe", source: MOD_MODULE, enable: true }, context)
+  const afterSave = await host.client.mod.list()
+  const present = afterSave.some((entry) => entry.id === modSpec(paths, "late_mod"))
+  const disabled = await runAction("mods_edit.set_enabled", { id: "late_mod", enabled: false }, context)
+  const absent = !(await host.client.mod.list()).some((entry) => entry.id === modSpec(paths, "late_mod"))
+  const removed = await runAction("mods_edit.remove", { id: "late_mod" }, context)
+  liveLifecycleEvidence = { hostWarnings, configPlugin: (await host.client.config.get()).plugin, saved, disabled, removed, afterSave, expectedId: modSpec(paths, "late_mod"), present, absent }
+  liveLifecycle = present && absent && [saved, disabled, removed].every((result) => typeof result === "object" && result !== null && "ok" in result && result.ok === true)
+}
 await Effect.runPromise(Scope.close(scope, { _tag: "Success", value: undefined } as never))
 
 const text = (info: (typeof loaded)[number]): string => JSON.stringify(info)
@@ -102,6 +119,8 @@ console.log(
     JSON.stringify({
       modsFlag: process.env["NIKCLI_DISABLE_MODS"],
       appSpec,
+      liveLifecycle,
+      liveLifecycleEvidence,
       loaded: loaded.map((info) => ({ id: info.id, name: info.name, events: info.events, tools: info.tools, commands: info.commands })),
       appLoaded: appMod !== undefined,
       appEvents: appMod?.events ?? [],

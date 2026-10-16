@@ -6,7 +6,7 @@ import { Effect, Scope, Semaphore } from "effect"
 import { mkdirSync, realpathSync } from "node:fs"
 import { rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import type { HostRegistration, NikCliHostInstance, ToolExecuteContext } from "@nikcli-ai/sdk-next"
+import type { HostModInfo, HostRegistration, NikCliHostInstance, ToolExecuteContext } from "@nikcli-ai/sdk-next"
 import { AiConfigError, AiProviderError } from "../errors.ts"
 import { installSkills } from "../skills/index.ts"
 import { createUserSkillStore } from "../skills/user.ts"
@@ -127,6 +127,12 @@ export interface NikCliRuntime {
    * created, edited, enabled or removed here applies to running conversations too (spec 27 §4.3).
    */
   reloadMods(): Effect.Effect<void, AiConfigError>
+  /**
+   * The mods the live host reports as loaded (`mod.list`), or the empty list when none runs for the project yet.
+   * Reading never *starts* a host: a mod's hooks are visible only once one is already there (spec 27 §4.3).
+   * A failed live inspection is an error, never evidence that no mods loaded.
+   */
+  loadedMods(projectId: string): Effect.Effect<ReadonlyArray<HostModInfo>, AiConfigError>
   /** Publish the current tool set to every live host (what `toolChanges` triggers): permission map, registrations, reload. */
   reloadTools(): Effect.Effect<void, AiConfigError>
   /**
@@ -504,6 +510,17 @@ export const makeNikCliRuntime = (
             }
           },
           catch: toConfigError("Failed to reload the mods")
+        }),
+      loadedMods: (projectId) =>
+        Effect.tryPromise({
+          try: async () => {
+            const promise = hosts.get(projectId)
+            if (promise === undefined) return []
+            const host = await promise.catch(() => undefined)
+            if (host === undefined) return []
+            return host.client.mod.list()
+          },
+          catch: toConfigError("Failed to inspect the loaded mods")
         }),
       reloadTools: () =>
         Effect.tryPromise({

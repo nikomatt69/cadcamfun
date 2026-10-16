@@ -177,8 +177,12 @@ export function AssistantControls(): JSX.Element {
         open={open() === "mode"}
         onToggle={() => setOpen((current) => current === "mode" ? undefined : "mode")}
         onClose={() => setOpen(undefined)}
-        onChange={(value) => ai.setMode(value as ReturnType<typeof ai.mode>)}
-        options={(["general", "cad", "cam", "gcode", "toolpath"] as const).map((mode) => ({ value: mode, label: t(`ai.controls.mode.${mode}`) }))}
+        onChange={(value) => ai.setMode(value)}
+        options={[
+          ...(["general", "cad", "cam", "gcode", "toolpath"] as const).map((mode) => ({ value: mode, label: t(`ai.controls.mode.${mode}`) })),
+          // Modes enabled plugins contribute, labelled with their plugin: the id is namespaced, the title is the friendly name.
+          ...ai.pluginModes().map((mode) => ({ value: mode.id, label: mode.title, description: `${mode.description} — ${mode.pluginName}` }))
+        ]}
       />
 
       <Show when={variants().length > 0}>

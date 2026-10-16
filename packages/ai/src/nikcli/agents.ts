@@ -40,8 +40,8 @@ export interface SubagentSpec {
 
 const MINUTE = 60_000
 
-/** Read-only view of the drawing, the machine, the libraries, the project history and the outside world. */
-const READS = ["cad", "cam", "library", "vcs", "memory", "research"] as const
+/** Read-only view of the drawing, the machine, the libraries, the project history, the stored mods and the outside world. */
+const READS = ["cad", "cam", "library", "vcs", "memory", "mods", "research"] as const
 
 export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
   researcher: {
@@ -105,7 +105,7 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     host: "cadcam-reviewer",
     description: "Reviews a pull request: reads the diff, the workflow runs and the verification reports, then writes a verdict. Read-only.",
     prompt: specialistPrompt("reviewer"),
-    tools: ["cad", "cam", "library", "vcs", "memory"],
+    tools: ["cad", "cam", "library", "vcs", "memory", "mods"],
     edits: false,
     background: true,
     steps: 40,

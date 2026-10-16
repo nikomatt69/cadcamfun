@@ -60,7 +60,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     }
     // Spec 26 §6.6: the model-visible catalogue must cost less than 24 000 characters (the per-verb tree cost 66 684).
     // Raised to 25 000 when the exact-kernel actions (cad exact / assembly) and the kernel route of cam manufacture were added.
-    expect(total).toBeLessThan(25_000)
+    // Raised to 31 000 when the mods and mods_edit tools joined (RM-11): every install carries them, not just some.
+    expect(total).toBeLessThan(31_000)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })
