@@ -1,5 +1,5 @@
 import type { AssistantPreferences } from "./assistant-preferences"
-import type { CompanionClient } from "./client"
+import { CompanionError, type CompanionClient } from "./client"
 
 export type AssistantMode = "general" | "cad" | "cam" | "gcode" | "toolpath"
 export interface OfflineAssistantOp {
@@ -18,6 +18,9 @@ export interface OfflineAssistantOp {
   /** Checkpointed before transport starts: an ambiguous delivery is only ever recovered. */
   readonly submitted?: boolean
 }
+
+/** `sessions/prompt` refused a prompt because the session already runs a turn: a certain "not sent". */
+export const isBusyRefusal = (error: unknown): boolean => error instanceof CompanionError && error.status === 409
 
 export const outboxKey = (op: OfflineAssistantOp): string => op.id ?? JSON.stringify([op.queuedAt, op.projectId, op.text])
 export const newMobileSessionId = (): string => `s-mobile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
@@ -59,7 +62,9 @@ export async function deliverOutbox(
       await deps.save(receipt, null)
       sent += 1
     } catch (error) {
-      if (deps.unsent?.(error)) await deps.save(receipt, { ...op })
+      // 409: the session is running a turn and the desktop refused this one before it started. Nothing ran, so the
+      // message stays queued for the next drain, after that turn ends.
+      if (deps.unsent?.(error) || isBusyRefusal(error)) await deps.save(receipt, { ...op })
       // Later messages must not overtake one whose delivery is still unknown.
       break
     }

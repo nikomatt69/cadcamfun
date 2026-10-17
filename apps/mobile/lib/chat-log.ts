@@ -212,6 +212,12 @@ export const settleOfflineRows = (log: readonly ChatRow[], waiting: readonly str
   return changed ? settled : log
 }
 
+/** The newest copy of a prompt becomes a steer: the desktop was already running a turn and takes it at the next step. */
+export const queueLastUserRow = (log: readonly ChatRow[], text: string): readonly ChatRow[] => {
+  const index = log.findLastIndex((row) => row.kind === "user" && row.text === text && !row.queued)
+  return index < 0 ? log : log.map((row, at) => at === index ? { kind: "user" as const, text, queued: true } : row)
+}
+
 /** Marks a permission request as answered so the button row collapses. */
 export const answerRequest = (log: readonly ChatRow[], requestId: string, accepted: boolean): readonly ChatRow[] =>
   log.map((row) => (row.kind === "request" && row.requestId === requestId ? { ...row, answered: true } : row))

@@ -10,11 +10,12 @@ import { useResource } from "@/lib/use-resource"
 import { useUIStore } from "@/lib/store"
 import { haptic } from "@/lib/haptics"
 import { toast } from "@/components/ui/ToastHost"
-import { appendChatEvent, answerRequest, emptyLog, lastUserPrompt, settleOfflineRows, transcriptText, type ChatRow, type LogEvent } from "@/lib/chat-log"
+import { appendChatEvent, answerRequest, emptyLog, lastUserPrompt, queueLastUserRow, settleOfflineRows, transcriptText, type ChatRow, type LogEvent } from "@/lib/chat-log"
 import { buildTranscript, type TranscriptItem } from "@/lib/transcript-rows"
 import { activityLabel, idleActivity, reduceTurnActivity, type TurnActivity } from "@/lib/turn-activity"
 import { enqueueAssistantOp, queuedTextsForProject } from "@/lib/offline-queue"
 import { CompanionError } from "@/lib/client"
+import { isBusyRefusal } from "@/lib/assistant-outbox"
 import { followSession } from "@/lib/session-stream"
 import { Composer, type AssistantMode } from "@/components/chat/Composer"
 import { TranscriptItemView, type ErrorRecovery, type TranscriptActions } from "@/components/chat/TranscriptItemView"
@@ -298,6 +299,23 @@ export default function AssistantScreen() {
       setFollowed(started.sessionId)
     } catch (error) {
       if (version !== generation.current) return
+      const running = sessionRef.current
+      if (isBusyRefusal(error) && running) {
+        // The desktop is already running a turn here (started on the desktop, or the phone missed its start) and
+        // refused this prompt before it ran. Steering it into that turn is what the user would have done seeing it.
+        setFollowed(running)
+        setLog((previous) => queueLastUserRow(previous, text))
+        try {
+          await client.queueChat(running, text, projectId, "steer")
+          if (version === generation.current) haptic("selection")
+        } catch (steerError) {
+          if (version !== generation.current) return
+          setBusy(false)
+          haptic("error")
+          apply({ type: "error", sessionId: running, code: "internal", message: steerError instanceof Error ? steerError.message : "Could not steer the desktop assistant" })
+        }
+        return
+      }
       setBusy(false)
       haptic("error")
       const uncertain = error instanceof CompanionError && error.status === 0

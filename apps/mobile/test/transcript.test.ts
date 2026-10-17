@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { appendChatEvent, emptyLog, settleOfflineRows, toolImages, transcriptText, type ChatRow, type LogEvent } from "../lib/chat-log"
+import { appendChatEvent, emptyLog, queueLastUserRow, settleOfflineRows, toolImages, transcriptText, type ChatRow, type LogEvent } from "../lib/chat-log"
 import { buildTranscript, toolRunSummary } from "../lib/transcript-rows"
 
 const fold = (events: readonly LogEvent[], from: readonly ChatRow[] = emptyLog) => events.reduce(appendChatEvent, from)
@@ -65,4 +65,13 @@ describe("transcript layout", () => {
     // The group is named after its first call, so it keeps its id as more calls finish.
     expect(buildTranscript([...rows, tool("c", true)])[0]?.id).toBe(buildTranscript([...rows, tool("c", true), tool("d", true)])[0]?.id)
   })
+})
+
+test("a prompt the desktop refused as busy turns into a steer of the running turn", () => {
+  const log = fold([{ type: "user", text: "Add a chamfer" }, { type: "delta", sessionId: "s", text: "Working" }, { type: "user", text: "Add a chamfer" }])
+  const steered = queueLastUserRow(log, "Add a chamfer")
+  expect(steered.map((row) => row.kind === "user" ? Boolean(row.queued) : null)).toEqual([false, null, true])
+  // When the desktop takes it into the conversation the row stops showing "queued".
+  expect(appendChatEvent(steered, { type: "user_message", sessionId: "s", text: "Add a chamfer" })[2]).toEqual({ kind: "user", text: "Add a chamfer" })
+  expect(queueLastUserRow(log, "missing")).toBe(log)
 })

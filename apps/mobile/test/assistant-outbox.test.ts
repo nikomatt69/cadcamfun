@@ -58,3 +58,12 @@ test("queued prompts for another paired desktop are never delivered", async () =
   })
   expect(sent).toBe(0)
 })
+
+test("a prompt refused because the session is busy (409) stays queued unsubmitted and holds back later ones", async () => {
+  const { state, deps } = harness([entry("first"), entry("second")])
+  const posts: string[] = []
+  const client = { promptSession: async (body: ChatRequest) => { posts.push(body.message ?? ""); throw new CompanionError(409, "The session is running a turn") } }
+  expect(await deliverOutbox([...state.queue], { ...deps, client })).toBe(0)
+  expect(posts).toEqual(["first"])
+  expect(state.queue.map((op) => [op.id, op.submitted])).toEqual([["first", undefined], ["second", undefined]])
+})
