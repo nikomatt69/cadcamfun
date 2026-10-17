@@ -197,7 +197,12 @@ export class ProjectVcs extends Context.Service<ProjectVcs, {
           yield* audit(actor, projectId, "vcs.commit", { commit: oid, message: input.message, branch: repo.currentBranch() })
           return oid
         }),
-        log: (projectId, rev = "HEAD", limit, path) => vcs(() => (path ? repoOf(projectId).fileLog(path, rev, limit) : repoOf(projectId).log(rev, limit))),
+        log: (projectId, rev = "HEAD", limit, path) => vcs(() => {
+          const repo = repoOf(projectId)
+          // A project nobody has committed yet has an empty history, not an unknown revision.
+          if (rev === "HEAD" && repo.head() === undefined) return []
+          return path ? repo.fileLog(path, rev, limit) : repo.log(rev, limit)
+        }),
         branches: (projectId) => vcs(() => {
           const repo = repoOf(projectId)
           return { current: repo.currentBranch(), branches: repo.branches() }

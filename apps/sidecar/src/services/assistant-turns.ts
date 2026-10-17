@@ -51,6 +51,14 @@ export class SessionJournal {
     return entry
   }
 
+  /**
+   * A turn this sidecar started is running from its first event: the host announces context before `turn start`,
+   * and a phone connecting in between must not be told the session is idle.
+   */
+  begin(sessionId: string): void {
+    this.touch(sessionId).busy = true
+  }
+
   /** The turn's fiber ended: whatever it last said, the session is no longer working. */
   settle(sessionId: string): void {
     const log = this.sessions.get(sessionId)
@@ -109,6 +117,7 @@ export class AssistantTurns extends Context.Service<AssistantTurns, {
               return
             }
             if (!sessionId) return
+            if (!started) journal.begin(sessionId)
             const entry = journal.record(sessionId, event)
             yield* PubSub.publish(bus, entry)
             if (!started) {

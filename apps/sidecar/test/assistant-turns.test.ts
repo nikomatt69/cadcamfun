@@ -61,6 +61,20 @@ describe("detached assistant turns", () => {
     expect(frames[0]).toMatchObject({ type: "server.connected", sessionId: "ses_1", busy: true })
   })
 
+  test("a phone connecting before the host's turn start is told the session is busy", async () => {
+    const hello = await run(Effect.gen(function*() {
+      const turns = yield* AssistantTurns
+      const gate = yield* Queue.unbounded<AiEvent>()
+      const snapshot: AiEvent = { type: "context_snapshot", sessionId: "ses_3", projectId: "p", source: "workspace", chars: 10 }
+      const started = yield* turns.start(Stream.concat(Stream.make(snapshot), Stream.fromQueue(gate).pipe(Stream.takeUntil((event) => event.type === "done"))))
+      const stream = yield* turns.follow("ses_3", started.seq, 60_000)
+      const frames = yield* Stream.runCollect(stream.pipe(Stream.take(1)))
+      yield* Queue.offer(gate, done("ses_3", "ok"))
+      return frames[0]
+    }))
+    expect(hello).toMatchObject({ type: "server.connected", busy: true })
+  })
+
   test("the turn finishes with nobody following it, and a later follower sees it settled", async () => {
     const hello = await run(Effect.gen(function*() {
       const turns = yield* AssistantTurns

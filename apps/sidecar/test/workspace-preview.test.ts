@@ -72,8 +72,8 @@ describe("companion workspace preview", () => {
 
     const path = await app.call(`/api/projects/${projectId}/workspace/toolpaths/${created.body.id}/preview`)
     expect(path.status).toBe(200)
+    // The first rapid only sets the start point: where the tool was before it is unknown.
     expect(path.body.segments.map((segment: { kind: string; line: number }) => [segment.kind, segment.line])).toEqual([
-      ["rapid", 2],
       ["linear", 3],
     ])
     expect(path.body.stock.min).toEqual(path.body.bounds.min)
