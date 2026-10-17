@@ -84,4 +84,50 @@ describe("companion workspace preview", () => {
     expect(library.body.materials).toEqual([])
     expect((await app.call(`/api/projects/${otherId}/workspace/toolpaths/${created.body.id}`)).status).toBe(404)
   })
+
+  test("previews carry an entity tag; a phone holding it gets a body-less 304, and an edit changes the tag", async () => {
+    const drawing = await app.call(`/api/projects/${projectId}/drawings`, {
+      method: "POST",
+      json: { name: "Tagged", data: { elements: [cube] } },
+    })
+    const url = `/api/projects/${projectId}/workspace/drawings/${drawing.body.id}/preview`
+    const first = await app.call(url)
+    const tag = first.headers.get("etag")
+    expect(tag).toMatch(/^"[A-Za-z0-9_-]{32}"$/)
+    expect(first.headers.get("cache-control")).toBe("private, no-cache")
+    expect(first.body.parts[0].id).toBe("box")
+
+    const again = await app.call(url, { headers: { "if-none-match": tag! } })
+    expect(again.status).toBe(304)
+    expect(again.bytes.byteLength).toBe(0)
+    expect(again.headers.get("etag")).toBe(tag)
+    // A weak form or a list that contains the tag also matches; another tag does not.
+    expect((await app.call(url, { headers: { "if-none-match": `"other", W/${tag}` } })).status).toBe(304)
+    const stale = await app.call(url, { headers: { "if-none-match": "\"stale\"" } })
+    expect(stale.status).toBe(200)
+    expect(stale.body).toEqual(first.body)
+
+    const edited = await app.call(`/api/drawings/${drawing.body.id}`, { method: "PUT", json: { data: { elements: [{ ...cube, width: 40 }] } } })
+    expect(edited.status).toBe(200)
+    const after = await app.call(url, { headers: { "if-none-match": tag! } })
+    expect(after.status).toBe(200)
+    expect(after.headers.get("etag")).not.toBe(tag)
+    expect(after.body.bounds.max[0] - after.body.bounds.min[0]).toBeCloseTo(40, 3)
+    // Access is still checked before any tag is compared: another project's route is a 404, never a 304.
+    expect((await app.call(`/api/projects/${otherId}/workspace/drawings/${drawing.body.id}/preview`, { headers: { "if-none-match": tag! } })).status).toBe(404)
+  })
+
+  test("toolpath review and path previews are conditional too", async () => {
+    const created = await app.call("/api/toolpaths", { method: "POST", json: { name: "Tagged path", projectId, operationType: "face", data: {}, gcode } })
+    for (const url of [`/api/projects/${projectId}/workspace/toolpaths/${created.body.id}`, `/api/projects/${projectId}/workspace/toolpaths/${created.body.id}/preview`]) {
+      const first = await app.call(url)
+      expect(first.status).toBe(200)
+      const tag = first.headers.get("etag")!
+      expect((await app.call(url, { headers: { "if-none-match": tag } })).status).toBe(304)
+    }
+    const review = await app.call(`/api/projects/${projectId}/workspace/toolpaths/${created.body.id}`)
+    const path = await app.call(`/api/projects/${projectId}/workspace/toolpaths/${created.body.id}/preview`)
+    // The review and the path are different payloads of one toolpath, so their tags differ.
+    expect(review.headers.get("etag")).not.toBe(path.headers.get("etag"))
+  })
 })

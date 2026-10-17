@@ -1,7 +1,9 @@
 import { Api, BadRequest, CurrentUser, InternalError, NotFound } from "@cadcamfun/api"
 import { cam, preview } from "@cadcamfun/core"
 import { Effect, Schema } from "effect"
+import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { createHash } from "node:crypto"
 import { ComponentRepo } from "../repos/component-repo.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { MachineConfigRepo } from "../repos/machine-config-repo.ts"
@@ -16,6 +18,33 @@ const fail = (message: string) => (error: unknown) =>
 const iso = (value: Date | string): string => (value instanceof Date ? value.toISOString() : value)
 
 const idsOf = (values: ReadonlyArray<string | null>): string[] => [...new Set(values.filter((id): id is string => !!id))]
+
+/** Encoded previews kept in memory: a phone reopening a part, or two phones on one project, do not tessellate again. */
+export const PREVIEW_CACHE_ENTRIES = 48
+export const PREVIEW_CACHE_BYTES = 64 * 1024 * 1024
+
+/**
+ * The entity tag of one preview: the route kind, the entity, the stored content and the payload format. The content
+ * is hashed rather than trusted to `updatedAt` alone, because two writes in one millisecond, or a checkout that
+ * restores an older snapshot, could otherwise pair one revision with two different documents.
+ */
+export const previewTag = (kind: string, id: string, revision: string, ...content: ReadonlyArray<unknown>): string => {
+  const hash = createHash("sha256").update(`${preview.PREVIEW_FORMAT}\0${kind}\0${id}\0${revision}`)
+  for (const part of content) hash.update("\0").update(typeof part === "string" ? part : JSON.stringify(part) ?? "null")
+  return `"${hash.digest("base64url").slice(0, 32)}"`
+}
+
+/** RFC 9110 §13.1.2: weak comparison, a list of tags or `*`. */
+export const matchesTag = (header: string | undefined, tag: string): boolean => {
+  if (!header) return false
+  const bare = tag.replace(/^W\//, "")
+  return header.split(",").some((candidate) => {
+    const value = candidate.trim()
+    return value === "*" || value.replace(/^W\//, "") === bare
+  })
+}
+
+const encoder = new TextEncoder()
 
 /**
  * Phone workspace. Every handler is a GET. The stored CAD document stays on the desktop; the response is a
@@ -35,6 +64,22 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
     if (!projectId) return yield* new BadRequest({ message: "Project ID is required" })
     if (!(yield* projects.find(user.id, projectId))) return yield* new NotFound({ message: "Project not found or access denied" })
     return user
+  })
+
+  const cache = new preview.PreviewCache<Uint8Array>({ maxEntries: PREVIEW_CACHE_ENTRIES, maxWeight: PREVIEW_CACHE_BYTES }, (bytes) => bytes.byteLength)
+
+  /**
+   * Answers a preview as JSON with its entity tag. A phone that already holds this tag (`If-None-Match`) gets a body-less
+   * 304 before anything is tessellated; otherwise the encoded payload comes from the cache or is built once.
+   */
+  const conditional = Effect.fn("workspace.conditional")(function*<E, R>(tag: string, build: Effect.Effect<unknown, E, R>) {
+    const request = yield* HttpServerRequest.HttpServerRequest
+    const headers = { etag: tag, "cache-control": "private, no-cache" }
+    if (matchesTag(request.headers["if-none-match"], tag)) return HttpServerResponse.empty({ status: 304, headers })
+    const cached = cache.get(tag)
+    const bytes = cached ?? encoder.encode(JSON.stringify(yield* build))
+    if (!cached) cache.set(tag, bytes)
+    return HttpServerResponse.uint8Array(bytes, { contentType: "application/json", headers })
   })
 
   const toolpathPreview = Effect.fn("workspace.toolpathPreview")(function*(data: unknown, gcode: string) {
@@ -58,7 +103,9 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
         const user = yield* projectAccess(params.id)
         const drawing = yield* drawings.find(user.id, params.drawingId)
         if (!drawing || drawing.projectId !== params.id) return yield* new NotFound({ message: "Drawing not found" })
-        return { ...preview.meshPreview(preview.elementsOfDocument(drawing.data)), revision: drawing.updatedAt }
+        return yield* conditional(previewTag("drawing", drawing.id, drawing.updatedAt, drawing.data), Effect.sync(() => ({
+          ...preview.meshPreview(preview.elementsOfDocument(drawing.data)), revision: drawing.updatedAt,
+        })))
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to preview drawing"))))
     .handle("components", ({ params }) =>
       Effect.gen(function*() {
@@ -71,11 +118,11 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
         const user = yield* projectAccess(params.id)
         const component = yield* components.find(user.id, params.componentId)
         if (!component || component.projectId !== params.id) return yield* new NotFound({ message: "Component not found" })
-        return {
+        return yield* conditional(previewTag("component", component.id, component.updatedAt, component.data), Effect.sync(() => ({
           ...preview.meshPreview(preview.elementsOfDocument(component.data)),
           parameters: preview.documentParameters(component.data),
           revision: component.updatedAt,
-        }
+        })))
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to preview component"))))
     .handle("toolpaths", ({ params }) =>
       Effect.gen(function*() {
@@ -88,25 +135,33 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
         const user = yield* projectAccess(params.id)
         const found = yield* toolpaths.find(user.id, params.toolpathId)
         if (!found || found.project.id !== params.id) return yield* new NotFound({ message: "Toolpath not found" })
-        const gcode = found.row.gcode ?? ""
-        const path = yield* toolpathPreview(found.row.data, gcode)
-        return {
-          id: found.row.id,
-          name: found.row.name,
-          operationType: found.row.operationType,
-          gcode,
-          stats: path.stats,
-          revision: found.row.updatedAt,
-          updatedAt: found.row.updatedAt,
-        }
+        const row = found.row
+        const gcode = row.gcode ?? ""
+        return yield* conditional(previewTag("toolpath", row.id, row.updatedAt, row.name, row.operationType, gcode, gcode.trim() ? null : row.data), Effect.gen(function*() {
+          const path = yield* toolpathPreview(row.data, gcode)
+          return {
+            id: row.id,
+            name: row.name,
+            operationType: row.operationType,
+            gcode,
+            stats: path.stats,
+            revision: row.updatedAt,
+            updatedAt: row.updatedAt,
+          }
+        }))
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to read toolpath"))))
     .handle("toolpathPreview", ({ params }) =>
       Effect.gen(function*() {
         const user = yield* projectAccess(params.id)
         const found = yield* toolpaths.find(user.id, params.toolpathId)
         if (!found || found.project.id !== params.id) return yield* new NotFound({ message: "Toolpath not found" })
-        const path = yield* toolpathPreview(found.row.data, found.row.gcode ?? "")
-        return { ...path, revision: found.row.updatedAt }
+        const row = found.row
+        const gcode = row.gcode ?? ""
+        // Stored G-code wins over the program, so the program only enters the tag when it is what gets drawn.
+        return yield* conditional(previewTag("toolpath-path", row.id, row.updatedAt, gcode, gcode.trim() ? null : row.data), Effect.gen(function*() {
+          const path = yield* toolpathPreview(row.data, gcode)
+          return { ...path, revision: row.updatedAt }
+        }))
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to preview toolpath"))))
     .handle("library", ({ params }) =>
       Effect.gen(function*() {
