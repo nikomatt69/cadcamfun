@@ -1,10 +1,11 @@
 import { useCallback } from "react"
-import { Text, View } from "react-native"
+import { RefreshControl, Text, View } from "react-native"
 import { Stack, useLocalSearchParams } from "expo-router"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
 import { useTheme } from "@/lib/theme"
 import { commitTime, commitTitle, relativeTime, shortOid } from "@/lib/format"
+import { commitBody } from "@/lib/workspace-filter"
 import { DiffView } from "@/components/DiffView"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { Skeleton } from "@/components/ui/Skeleton"
@@ -38,18 +39,28 @@ export default function CommitScreen() {
     <View collapsable={false} style={{ flex: 1, backgroundColor: palette.background }}>
       <Stack.Screen options={{ title: oid ? shortOid(oid) : "Commit" }} />
 
-      <PageScroll>
+      <PageScroll refreshControl={<RefreshControl refreshing={(log.loading || diff.loading) && Boolean(diff.data)} onRefresh={() => { void log.reload(); void diff.reload() }} tintColor={palette.accent} />}>
+          {log.loading && !log.data ? <Skeleton style={{ height: 120 }} /> : null}
+          {log.error ? <ErrorBanner message={log.error} actionLabel="Retry" onAction={() => void log.reload()} /> : null}
           {commit ? (
             <SurfaceCard eyebrow="COMMIT DETAILS">
               <Text selectable style={{ color: palette.ink, fontSize: 22, lineHeight: 27, fontWeight: "700", letterSpacing: -0.5 }}>{commitTitle(commit.message)}</Text>
-              <Text selectable style={{ marginTop: 8, color: palette.muted, fontSize: 13, lineHeight: 18 }}>
-                {commit.author.name} · {relativeTime(commitTime(commit.author.time))} ·{" "}
-                <Text style={{ fontFamily: "Menlo" }}>{shortOid(commit.oid)}</Text>
+              {commitBody(commit.message) ? <Text selectable style={{ marginTop: 10, color: palette.soft, fontSize: 14, lineHeight: 21 }}>{commitBody(commit.message)}</Text> : null}
+              <Text selectable style={{ marginTop: 10, color: palette.muted, fontSize: 13, lineHeight: 19 }}>
+                {commit.author.name} · {relativeTime(commitTime(commit.author.time))}
+                {commitTime(commit.author.time) ? ` · ${new Date(commitTime(commit.author.time)).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}` : ""}
+              </Text>
+              <Text selectable style={{ marginTop: 4, color: palette.muted, fontSize: 12, lineHeight: 18, fontFamily: "Menlo" }}>
+                {commit.oid}{parent ? `\nparent ${shortOid(parent)}` : "\nroot commit"}
               </Text>
             </SurfaceCard>
+          ) : log.data && !log.loading ? (
+            <Text selectable style={{ color: palette.muted, fontSize: 13, lineHeight: 19 }}>
+              Commit <Text style={{ fontFamily: "Menlo" }}>{shortOid(oid)}</Text> is older than the latest 100 commits; its changes are shown below.
+            </Text>
           ) : null}
 
-          {diff.loading ? <Skeleton style={{ height: 160 }} /> : null}
+          {diff.loading && !diff.data ? <Skeleton style={{ height: 160 }} /> : null}
           {diff.error ? <ErrorBanner message={diff.error} actionLabel="Retry" onAction={() => void diff.reload()} /> : null}
           {diff.data && diff.data.length > 0 ? <DiffView changes={diff.data} /> : diff.data ? (
             <Text style={{ color: palette.muted, fontSize: 14, lineHeight: 20, textAlign: "center", paddingTop: 24 }}>Empty commit</Text>

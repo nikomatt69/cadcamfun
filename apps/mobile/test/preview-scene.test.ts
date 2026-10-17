@@ -13,6 +13,9 @@ import {
   prepareMeshUpload,
   prepareToolpathLines,
   meshFeatureEdges,
+  progressRange,
+  toolMarkerLength,
+  PREVIEW_MAX_ACTIVE_VERTICES,
   prepareOverlayLines,
   sceneGuides,
   guideColor,
@@ -96,6 +99,7 @@ describe("preview upload", () => {
     expect(source).toContain("static let maxTriangles = 80_000")
     expect(source).toContain("static let maxSegments = 20_000")
     expect(source).toContain("static let maxStockEdges = 12")
+    expect(source).toContain(`static let maxActiveVertices = ${PREVIEW_MAX_ACTIVE_VERTICES}`)
     expect(source).toContain(`static let maxOverlaySegments = ${PREVIEW_MAX_OVERLAY_SEGMENTS.toLocaleString("en").replace(",", "_")}`)
     for (const message of Object.values(PREVIEW_MESSAGE)) expect(source).toContain(message)
   })
@@ -152,5 +156,31 @@ describe("CAD outline and scene guides", () => {
     expect(data.length).toBe(PREVIEW_MAX_OVERLAY_SEGMENTS * 12)
     expect(prepareOverlayLines([], [{ from: [0, 0, Number.NaN], to: [1, 0, 0] }])).toHaveLength(0)
     expect(guideColor("#000000", "#FFFFFF", 0.5)).toEqual([0.5, 0.5, 0.5])
+  })
+})
+
+describe("toolpath simulation upload", () => {
+  const move = { kind: "linear" as const, from: [0, 0, 0] as const, to: [10, 0, -1] as const }
+
+  test("the active move can carry a tool axis standing on the tool tip", () => {
+    expect(prepareActiveLine(move)).toHaveLength(12)
+    const withTool = prepareActiveLine(move, 5)
+    expect(withTool).toHaveLength(PREVIEW_MAX_ACTIVE_VERTICES * 6)
+    expect(Array.from(withTool.slice(12, 15))).toEqual([10, 0, -1])
+    expect(Array.from(withTool.slice(18, 21))).toEqual([10, 0, 4])
+    expect(prepareActiveLine(move, Number.NaN)).toHaveLength(12)
+  })
+
+  test("progress fades only path vertices after the playhead and never the stock box", () => {
+    expect(progressRange(0, 10, false)).toEqual({ travelled: 20, path: 20 })
+    expect(progressRange(0, 10, true)).toEqual({ travelled: 2, path: 20 })
+    expect(progressRange(4, 10, true)).toEqual({ travelled: 10, path: 20 })
+    expect(progressRange(99, 10, true)).toEqual({ travelled: 20, path: 20 })
+    expect(progressRange(-3, 10, true)).toEqual({ travelled: 2, path: 20 })
+    expect(progressRange(3, 0, true)).toEqual({ travelled: 0, path: 0 })
+  })
+
+  test("the tool marker scales with the part", () => {
+    expect(toolMarkerLength({ min: [0, 0, 0], max: [20, 0, 0] })).toBeCloseTo(2, 9)
   })
 })

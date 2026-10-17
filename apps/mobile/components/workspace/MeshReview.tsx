@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { FlatList, Text, View, useWindowDimensions } from "react-native"
 import { Box, Check, Sparkles } from "lucide-react-native"
 import type { MeshPart, MeshPreview, PreviewParameter } from "@cadcamfun/api"
@@ -5,6 +6,7 @@ import { SafeAreaView } from "react-native-screens/experimental"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { previewHeight, layout } from "@/lib/layout"
+import { formatSize, partBounds } from "@/lib/preview-sim"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { PreviewViewport } from "@/components/preview/PreviewViewport"
 import { ActionButton } from "@/components/ui/ActionButton"
@@ -16,7 +18,9 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { Skeleton } from "@/components/ui/Skeleton"
 
 /** One reading surface keeps preview, parameters and elements reachable on every phone size. */
-export function MeshReview({ mesh, loading, error, onRetry, parameters, selectedPartId, onSelectPart, actionLabel, onAction }: {
+export function MeshReview({ title, mesh, loading, error, onRetry, parameters, selectedPartId, onSelectPart, actionLabel, onAction }: {
+  /** Shown in the full-screen viewer. */
+  title?: string
   mesh: MeshPreview | undefined
   loading: boolean
   error: string | undefined
@@ -32,6 +36,12 @@ export function MeshReview({ mesh, loading, error, onRetry, parameters, selected
   const { gutter, fontScale, onLayout } = useContentLayout()
   const parts = mesh?.parts ?? []
   const triangles = mesh ? Math.floor(mesh.indices.length / 3) : 0
+  const selectedPart = parts.find((part) => part.id === selectedPartId)
+  const selectedSize = useMemo(() => {
+    if (!mesh || !selectedPart) return undefined
+    const bounds = partBounds(mesh.positions, mesh.indices, selectedPart)
+    return bounds ? formatSize(bounds) : undefined
+  }, [mesh, selectedPart])
 
   return <SafeAreaView edges={{ bottom: true }} onLayout={onLayout} style={{ flex: 1, backgroundColor: palette.background }}>
     <FlatList data={parts} keyExtractor={(item) => item.id} extraData={selectedPartId}
@@ -39,11 +49,17 @@ export function MeshReview({ mesh, loading, error, onRetry, parameters, selected
       contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 12, paddingBottom: 16 }}
       ListHeaderComponent={<View>
         {mesh || loading ? <View style={{ height: previewHeight(height, fontScale, "mesh"), borderRadius: layout.cardRadius, borderCurve: "continuous", overflow: "hidden", borderWidth: 0.5, borderColor: palette.border }}>
-          {mesh ? <PreviewViewport bounds={mesh.bounds} revision={mesh.revision} mesh={mesh} selectedPartId={selectedPartId}
-            accessibilityLabel="Design preview" accessibilityHint="Drag to orbit. Pinch to zoom. Camera controls and element selection are also available."
+          {mesh ? <PreviewViewport bounds={mesh.bounds} revision={mesh.revision} mesh={mesh} selectedPartId={selectedPartId} fullscreenTitle={title ?? "Design"}
+            fullscreenFooter={selectedPart ? <Text numberOfLines={2} style={{ color: palette.soft, fontSize: 13, lineHeight: 19 }}>
+              <Text style={{ color: palette.ink, fontWeight: "600" }}>{selectedPart.name || selectedPart.id}</Text>{selectedSize ? ` · ${selectedSize}` : ""}
+            </Text> : undefined}
+            accessibilityLabel="Design preview" accessibilityHint="Drag to orbit. Pinch to zoom. Tap an element to select it, double tap to frame it."
             onSelectPart={(id) => { haptic("selection"); onSelectPart(id) }} /> : <Skeleton style={{ flex: 1, borderRadius: 0 }} />}
         </View> : null}
-        {mesh ? <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, paddingTop: 10, fontVariant: ["tabular-nums"] }}>{parts.length.toLocaleString("en")} elements · {triangles.toLocaleString("en")} triangles</Text> : null}
+        {mesh ? <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, paddingTop: 10, fontVariant: ["tabular-nums"] }}>
+          <Text style={{ color: palette.ink, fontWeight: "600" }}>{formatSize(mesh.bounds)}</Text> · {parts.length.toLocaleString("en")} {parts.length === 1 ? "element" : "elements"} · {triangles.toLocaleString("en")} triangles
+          {selectedPart ? `\nSelected ${selectedPart.name || selectedPart.id}${selectedSize ? ` · ${selectedSize}` : ""}` : ""}
+        </Text> : null}
         {error ? <View style={{ paddingTop: 12 }}><ErrorBanner message={error} actionLabel="Retry" onAction={onRetry} /></View> : null}
         {mesh?.truncated ? <Text style={{ color: palette.warning, fontSize: 13, lineHeight: 20, paddingTop: 12 }}>Showing a simplified preview to keep navigation responsive.</Text> : null}
         {parameters?.length ? <>

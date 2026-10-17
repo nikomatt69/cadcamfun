@@ -7,6 +7,8 @@ import {
   dot,
   fitOrbit,
   hitMeshPart,
+  frameOrbit,
+  isDoubleTap,
   MAX_PITCH,
   niceStep,
   viewOrbit,
@@ -90,5 +92,22 @@ describe("standard views and grid spacing", () => {
     expect(niceStep(130, 10)).toBe(20)
     expect(niceStep(31, 10)).toBe(5)
     expect(niceStep(0.07, 10)).toBeCloseTo(0.01, 12)
+  })
+})
+
+describe("framing and taps", () => {
+  test("framing a part keeps the viewing direction and centres on the part", () => {
+    const orbit = { yaw: 1, pitch: 0.3, distance: 500, target: [0, 0, 0] as const }
+    const framed = frameOrbit(orbit, { min: [10, 10, 0], max: [12, 14, 2] })
+    expect([framed.yaw, framed.pitch]).toEqual([1, 0.3])
+    expect(framed.target).toEqual([11, 12, 1])
+    expect(framed.distance).toBeLessThan(orbit.distance)
+  })
+  test("a double tap is two near taps inside the window", () => {
+    const first = { x: 100, y: 100, at: 1_000 }
+    expect(isDoubleTap(undefined, first)).toBe(false)
+    expect(isDoubleTap(first, { x: 110, y: 104, at: 1_200 })).toBe(true)
+    expect(isDoubleTap(first, { x: 110, y: 104, at: 1_400 })).toBe(false)
+    expect(isDoubleTap(first, { x: 200, y: 100, at: 1_100 })).toBe(false)
   })
 })

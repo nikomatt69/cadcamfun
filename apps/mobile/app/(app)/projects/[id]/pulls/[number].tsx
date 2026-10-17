@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react"
-import { Platform, Text, View } from "react-native"
+import { Platform, RefreshControl, Text, View } from "react-native"
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { GitMerge, MessageSquare } from "lucide-react-native"
 import type { ReviewRow } from "@cadcamfun/api"
@@ -96,10 +96,11 @@ export default function PullRequestScreen() {
       <Stack.Screen options={{ title: `Pull request #${number}` }} />
       {Platform.OS === "ios" ? <Stack.Toolbar placement="right"><Stack.Toolbar.Button variant="done" onPress={() => router.back()}>Done</Stack.Toolbar.Button></Stack.Toolbar> : null}
 
-      <PageScroll>
-          {pull.loading ? (
+      <PageScroll refreshControl={<RefreshControl refreshing={pull.loading && Boolean(pull.data)} onRefresh={() => void pull.reload()} tintColor={palette.accent} />}>
+          {pull.error && pull.data ? <ErrorBanner message={pull.error} actionLabel="Retry" onAction={() => void pull.reload()} /> : null}
+          {pull.loading && !pull.data ? (
             <Skeleton style={{ height: 220 }} />
-          ) : pull.error ? (
+          ) : pull.error && !pull.data ? (
             <ErrorBanner message={pull.error} actionLabel="Retry" onAction={() => void pull.reload()} />
           ) : pullRequest ? (
             <>
@@ -116,10 +117,10 @@ export default function PullRequestScreen() {
                     {pullRequest.head} → {pullRequest.base}
                   </Text>
                   <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18 }}>
-                    {pullRequest.authorKind === "ai" ? "AI" : "You"} · {relativeTime(pullRequest.createdAt)}
+                    {pullRequest.authorKind === "ai" ? "Proposed by the AI" : "Opened by you"} · {relativeTime(pullRequest.createdAt)}
                   </Text>
                   {pullRequest.body ? (
-                    <Text style={{ color: palette.ink, fontSize: 14, lineHeight: 20, paddingTop: 4 }}>{pullRequest.body}</Text>
+                    <Text selectable style={{ color: palette.ink, fontSize: 14, lineHeight: 20, paddingTop: 4 }}>{pullRequest.body}</Text>
                   ) : null}
                 </View>
               </SurfaceCard>

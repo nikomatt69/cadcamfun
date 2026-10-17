@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from "react"
-import { Alert, Switch, Text, View } from "react-native"
+import { Alert, Platform, Switch, Text, View } from "react-native"
+import Constants from "expo-constants"
+import * as Clipboard from "expo-clipboard"
 import { useRouter } from "expo-router"
-import { MonitorSmartphone, Palette, Unplug, Vibrate, Lock, Info } from "lucide-react-native"
+import { Check, ClipboardCopy, EyeOff, Fingerprint, MonitorSmartphone, Palette, Sparkles, Unplug, Vibrate, Lock, Info } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useUIStore } from "@/lib/store"
@@ -16,6 +18,12 @@ import { usePrefersReducedMotion } from "@/lib/animation"
 import { PageScroll } from "@/components/layout/page-scroll"
 import { IconTile } from "@/components/ui/icon-tile"
 import { Divider } from "@/components/ui/SectionHeader"
+import { LOCK_AFTER_OPTIONS, lockAfterLabel } from "@/lib/app-lock"
+import { buildDiagnostics, formatFingerprint, originOnly } from "@/lib/diagnostics"
+import { PERMISSION_MODES } from "@/lib/assistant-preferences"
+
+const APP_VERSION = Constants.expoConfig?.version ?? "6.0.0"
+const BUILD_NUMBER = Constants.expoConfig?.ios?.buildNumber
 
 /**
  * Settings — grouped lists, toggles and one destructive action (Unpair) behind a confirmation.
@@ -23,10 +31,12 @@ import { Divider } from "@/components/ui/SectionHeader"
  * reason instead of pretending it works.
  */
 export default function SettingsScreen() {
-  const { config, connectivity, clear, recheck } = useServer()
+  const { config, connectivity, connectionError, ai, clear, recheck } = useServer()
   const { palette, colorScheme } = useTheme()
   const { themeMode, haptics, security, setThemeMode, setHaptics, setSecurity } = useUIStore()
   const offlineQueueCount = useUIStore((state) => state.offlineQueueCount)
+  const assistantDefaults = useUIStore((state) => state.assistantDefaults)
+  const setAssistantDefaults = useUIStore((state) => state.setAssistantDefaults)
   const router = useRouter()
   const reduced = usePrefersReducedMotion()
   const [biometricsBusy, setBiometricsBusy] = useState(false)
@@ -54,6 +64,23 @@ export default function SettingsScreen() {
       setBiometricsBusy(false)
     }
   }
+
+  const copy = async (text: string, done: string) => {
+    try {
+      await Clipboard.setStringAsync(text)
+      haptic("success")
+      toast(done, "success")
+    } catch {
+      toast("Could not copy", "error")
+    }
+  }
+
+  const diagnostics = () => buildDiagnostics({
+    appVersion: APP_VERSION, buildNumber: BUILD_NUMBER, platform: Platform.OS, osVersion: String(Platform.Version),
+    desktop: config ? { name: config.name, baseUrl: config.baseUrl, hosts: config.hosts, fingerprint: config.fingerprint } : undefined,
+    connectivity, connectionError, ai: ai ? { configured: ai.configured, host: (ai as { host?: string }).host, tools: ai.tools?.length } : null,
+    offlineQueueCount, security, now: new Date(),
+  })
 
   const unpair = () => {
     Alert.alert("Unpair this phone", "The scoped pairing token is deleted from the Keychain. Re-pair from the QR code on your Mac.", [
@@ -84,6 +111,13 @@ export default function SettingsScreen() {
         title={config?.name ?? "Not paired"} subtitle={config?.baseUrl} onPress={() => void recheck()}
         trailing={<Text style={{ color: palette.accent, fontSize: 13, fontWeight: "600" }}>Reconnect</Text>} />
       {offlineQueueCount > 0 ? <><Divider inset={16} /><ListRow title="Queued messages" subtitle={`${offlineQueueCount} messages will send when the desktop reconnects`} /></> : null}
+      {config ? <><Divider inset={16} />
+        <ListRow leading={<IconTile size={36}><Fingerprint size={18} color={palette.accent} /></IconTile>} title="Certificate fingerprint"
+          subtitle="Matches the fingerprint under the QR code on your Mac. Tap to copy." onPress={() => void copy(config.fingerprint, "Fingerprint copied")}
+/>
+        <Text selectable accessibilityLabel={`Fingerprint ${config.fingerprint.split("").join(" ")}`} style={{ color: palette.soft, fontSize: 12, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 14, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}>{formatFingerprint(config.fingerprint)}</Text>
+        {(config.hosts?.length ?? 0) > 1 ? <><Divider inset={16} /><ListRow title="Desktop addresses" subtitle={(config.hosts ?? []).map(originOnly).join("\n")} showChevron={false} /></> : null}
+      </> : null}
       <Divider inset={16} />
       <ListRow title="Unpair this phone" subtitle="Remove this desktop connection" leading={<IconTile color={palette.danger} size={36}><Unplug size={18} color={palette.danger} /></IconTile>} onPress={unpair} />
     </SettingsGroup>
@@ -112,13 +146,37 @@ export default function SettingsScreen() {
       <ListRow title="Biometric lock" subtitle="Unlock with Face ID or Touch ID" leading={<IconTile size={36}><Lock size={18} color={palette.accent} /></IconTile>}
         trailing={<Switch accessibilityLabel="Biometric lock" value={security.biometricsEnabled} disabled={biometricsBusy} trackColor={{ true: palette.accent }} onValueChange={(value) => void toggleBiometrics(value)} />} />
       {security.biometricsEnabled ? <><Divider inset={16} /><ListRow title="Lock on background" subtitle="Lock when you leave the app" trailing={<Switch accessibilityLabel="Lock on background" value={security.lockOnBackground} trackColor={{ true: palette.accent }} onValueChange={(value) => setSecurity({ lockOnBackground: value })} />} /></> : null}
+      {security.biometricsEnabled && security.lockOnBackground ? LOCK_AFTER_OPTIONS.map((option) => <View key={option.seconds}>
+        <Divider inset={16} />
+        <ListRow title={option.label} subtitle={option.seconds === 0 ? "Require Face ID every time you return" : undefined} selected={security.lockAfterSeconds === option.seconds}
+          trailing={security.lockAfterSeconds === option.seconds ? <Check size={18} color={palette.accent} /> : undefined}
+          accessibilityLabel={`Require unlock ${option.label.toLowerCase()}`} onPress={() => { haptic("selection"); setSecurity({ lockAfterSeconds: option.seconds }) }} />
+      </View>) : null}
+      <Divider inset={16} />
+      <ListRow title="Hide in app switcher" subtitle="Cover your projects while iOS shows recent apps" leading={<IconTile size={36}><EyeOff size={18} color={palette.accent} /></IconTile>}
+        trailing={<Switch accessibilityLabel="Hide in app switcher" value={security.privacyCover} trackColor={{ true: palette.accent }} onValueChange={(privacyCover) => setSecurity({ privacyCover })} />} />
+    </SettingsGroup>
+
+    <SettingsGroup title="Assistant defaults" description="Used by projects you have not configured yet. Each project keeps its own choices from the assistant controls.">
+      <ListRow title="Project context" subtitle="Include the desktop workspace, project rules and memory" leading={<IconTile size={36}><Sparkles size={18} color={palette.accent} /></IconTile>}
+        trailing={<Switch accessibilityLabel="Include project context by default" value={assistantDefaults.includeContext} trackColor={{ true: palette.accent }} onValueChange={(includeContext) => setAssistantDefaults({ includeContext })} />} />
+      {PERMISSION_MODES.map((mode) => <View key={mode.id}>
+        <Divider inset={16} />
+        <ListRow title={mode.title} subtitle={mode.description} selected={assistantDefaults.permissionMode === mode.id}
+          trailing={assistantDefaults.permissionMode === mode.id ? <Check size={18} color={palette.accent} /> : undefined}
+          accessibilityLabel={`Default permissions: ${mode.title}`} onPress={() => { haptic("selection"); setAssistantDefaults({ permissionMode: mode.id }) }} />
+      </View>)}
     </SettingsGroup>
 
     <SettingsGroup title="About">
-      <ListRow title="CADCAMFUN" subtitle="Version 6.0.0 · iOS companion" leading={<IconTile size={36}><Info size={18} color={palette.accent} /></IconTile>} />
+      <ListRow title="CADCAMFUN" subtitle={`Version ${APP_VERSION}${BUILD_NUMBER ? ` (${BUILD_NUMBER})` : ""} · iOS companion`} leading={<IconTile size={36}><Info size={18} color={palette.accent} /></IconTile>} />
       <Divider inset={16} />
       <ListRow title="Encrypted connection" subtitle="Certificate-pinned HTTPS to your paired desktop" />
       {reduced ? <><Divider inset={16} /><ListRow title="Reduce Motion" subtitle="Following your iOS accessibility preference" /></> : null}
+      {security.biometricsEnabled ? <><Divider inset={16} /><ListRow title="App lock" subtitle={security.lockOnBackground ? `Requires Face ID ${lockAfterLabel(security.lockAfterSeconds).toLowerCase()}` : "Locks when the app starts"} showChevron={false} /></> : null}
+      <Divider inset={16} />
+      <ListRow title="Copy diagnostics" subtitle="Version, connection and assistant status for support. Never includes your pairing token." leading={<IconTile size={36}><ClipboardCopy size={18} color={palette.accent} /></IconTile>}
+        onPress={() => void copy(diagnostics(), "Diagnostics copied")} />
     </SettingsGroup>
     <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 18, textAlign: "center", paddingVertical: 12 }}>Designed for the work you care about.</Text>
   </PageScroll>

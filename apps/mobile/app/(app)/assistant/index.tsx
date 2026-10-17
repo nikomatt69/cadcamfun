@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AppState, FlatList, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { Stack, useFocusEffect } from "expo-router"
@@ -11,7 +11,9 @@ import { useHostResource } from "@/hooks/use-host-resource"
 import { useUIStore } from "@/lib/store"
 import { haptic } from "@/lib/haptics"
 import { toast } from "@/components/ui/ToastHost"
-import { appendChatEvent, answerRequest, emptyLog, type ChatRow } from "@/lib/chat-log"
+import { appendChatEvent, answerRequest, emptyLog, lastUserPrompt, transcriptText, type ChatRow, type LogEvent } from "@/lib/chat-log"
+import { activityLabel, idleActivity, reduceTurnActivity, type TurnActivity } from "@/lib/turn-activity"
+import { PlanCard, NoticeRow } from "@/components/chat/PlanCard"
 import { enqueueAssistantOp } from "@/lib/offline-queue"
 import { Composer, type AssistantMode } from "@/components/chat/Composer"
 import { MessageBubble } from "@/components/chat/MessageBubble"
@@ -30,7 +32,7 @@ import { Skeleton } from "@/components/ui/Skeleton"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ModelPickerSheet } from "@/components/chat/model-picker-sheet"
 import { AssistantInspectorSheet } from "@/components/chat/assistant-inspector-sheet"
-import { assistantModels, DEFAULT_ASSISTANT_PREFERENCES, formatVariantLabel, PERMISSION_MODES, selectedAssistantModel, type AssistantPreferences } from "@/lib/assistant-preferences"
+import { assistantModels, formatVariantLabel, resolveAssistantPreferences, PERMISSION_MODES, selectedAssistantModel, type AssistantPreferences } from "@/lib/assistant-preferences"
 
 const QUICK_PROMPTS = [
   {
@@ -79,13 +81,22 @@ export default function AssistantScreen() {
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [agentPickerOpen, setAgentPickerOpen] = useState(false)
-  const preferences = useUIStore((state) => projectId ? state.assistantPreferences[projectId] ?? DEFAULT_ASSISTANT_PREFERENCES : DEFAULT_ASSISTANT_PREFERENCES)
+  const storedPreferences = useUIStore((state) => projectId ? state.assistantPreferences[projectId] : undefined)
+  const assistantDefaults = useUIStore((state) => state.assistantDefaults)
+  const preferences = useMemo(() => resolveAssistantPreferences(storedPreferences, assistantDefaults), [storedPreferences, assistantDefaults])
   const setPreferences = (patch: Partial<AssistantPreferences>) => { if (projectId) useUIStore.getState().setAssistantPreferences(projectId, patch) }
   const selectedAgentId = preferences.agent
   const setSelectedAgentId = (agent: string) => setPreferences({ agent })
   const [modelsOpen, setModelsOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
-  const [log, setLog] = useState<readonly ChatRow[]>(emptyLog)
+  const [log, setLogState] = useState<readonly ChatRow[]>(emptyLog)
+  const [activity, setActivity] = useState<TurnActivity>(idleActivity)
+  const setLog = setLogState
+  /** Every stream frame feeds both the transcript and the live status strip. */
+  const apply = (event: LogEvent) => {
+    setLogState((previous) => appendChatEvent(previous, event))
+    setActivity((previous) => reduceTurnActivity(previous, event))
+  }
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState<AssistantMode>("general")
   const [promptSeed, setPromptSeed] = useState<{ projectId: string; text: string; token: number } | null>(null)
@@ -127,6 +138,7 @@ export default function AssistantScreen() {
     const key = `${config?.fingerprint ?? ""}|${projectId ?? ""}`
     sessionRef.current = projectId ? useUIStore.getState().assistantSessions[projectId] : undefined
     setLog(logs.current.get(key) ?? emptyLog)
+    setActivity(idleActivity)
     setBusy(false)
     stopping.current = false
     return () => {
@@ -155,7 +167,7 @@ export default function AssistantScreen() {
   const send = async (text: string) => {
     if (!client || !projectId || runningRef.current || stopping.current) return
     if (connectivity !== "online") {
-      setLog((previous) => appendChatEvent(previous, { type: "user", text }))
+      apply({ type: "user", text })
       await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
       toast("Desktop offline — message queued", "info")
       haptic("selection")
@@ -167,7 +179,9 @@ export default function AssistantScreen() {
     const controller = new AbortController()
     runningRef.current = controller
     setBusy(true)
-    setLog((previous) => appendChatEvent(previous, { type: "user", text }))
+    // A new turn starts its own meter; steering (queue) keeps the running one.
+    setActivity(idleActivity)
+    apply({ type: "user", text })
 
     try {
       for await (const event of client.chat(
@@ -182,7 +196,7 @@ export default function AssistantScreen() {
         if (event.type === "permission_request") haptic("warning")
         if (event.type === "done") haptic("success")
         if (event.type === "error") haptic("error")
-        setLog((previous) => appendChatEvent(previous, event))
+        apply(event)
       }
     } catch (error) {
       if (version !== generation.current) return
@@ -191,7 +205,7 @@ export default function AssistantScreen() {
       } else {
         haptic("error")
         const message = error instanceof Error ? error.message : "The assistant did not answer"
-        setLog((previous) => appendChatEvent(previous, { type: "error", sessionId: sessionRef.current ?? "", code: "internal", message }))
+        apply({ type: "error", sessionId: sessionRef.current ?? "", code: "internal", message })
       }
     } finally {
       if (version === generation.current) { setBusy(false); runningRef.current = null }
@@ -208,11 +222,11 @@ export default function AssistantScreen() {
     try {
       for await (const event of client.resumeChat(sessionId, controller.signal)) {
         if (version !== generation.current || controller.signal.aborted) return
-        setLog((previous) => appendChatEvent(previous, event))
+        apply(event)
       }
     } catch (error) {
       if (version === generation.current && !controller.signal.aborted) {
-        setLog((previous) => appendChatEvent(previous, { type: "error", sessionId, code: "internal", message: error instanceof Error ? error.message : "Could not recover the desktop answer" }))
+        apply({ type: "error", sessionId, code: "internal", message: error instanceof Error ? error.message : "Could not recover the desktop answer" })
       }
     } finally {
       if (version === generation.current) { setBusy(false); runningRef.current = null }
@@ -258,7 +272,7 @@ export default function AssistantScreen() {
     const sessionId = sessionRef.current
     const version = generation.current
     if (!client || !projectId || !sessionId || connectivity !== "online") return
-    setLog((previous) => appendChatEvent(previous, { type: "user", text }))
+    apply({ type: "user", text, queued: true })
     try {
       await client.queueChat(sessionId, text, projectId, "steer")
     } catch (error) {
@@ -313,6 +327,7 @@ export default function AssistantScreen() {
     useUIStore.getState().startAssistantConversation(projectId)
     logs.current.delete(`${config?.fingerprint ?? ""}|${projectId}`)
     setLog(emptyLog)
+    setActivity(idleActivity)
     setBusy(false)
     stopping.current = false
     haptic("selection")
@@ -320,11 +335,21 @@ export default function AssistantScreen() {
 
   const aiReady = ai?.configured ?? false
 
+  /** Puts a previous prompt back in the composer; the user reviews it and sends it explicitly. */
+  const reuse = (text: string) => {
+    if (!projectId) return
+    setPromptSeed({ projectId, text, token: Date.now() })
+  }
+
   const renderRow = ({ item }: { item: ChatRow }) => {
     switch (item.kind) {
       case "user":
       case "assistant":
-        return <MessageBubble row={item} />
+        return <MessageBubble row={item} onReuse={reuse} />
+      case "plan":
+        return <PlanCard row={item} />
+      case "notice":
+        return <NoticeRow row={item} />
       case "tool":
         return <ToolCallRow row={item} />
       case "request":
@@ -334,8 +359,10 @@ export default function AssistantScreen() {
       case "error":
         return (
           <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-            <Text style={{ color: palette.danger, fontSize: 13, lineHeight: 18, textAlign: "center" }}>{item.message}</Text>
+            <Text selectable style={{ color: palette.danger, fontSize: 13, lineHeight: 18, textAlign: "center" }}>{item.message}</Text>
             {!busy && sessionRef.current ? <ActionButton label="Recover desktop answer" variant="ghost" onPress={() => void recover()} /> : null}
+            {/* Never resent automatically: the prompt may have already changed the model on the desktop. */}
+            {!busy && lastUserPrompt(log) ? <ActionButton label="Edit last message" variant="ghost" onPress={() => reuse(lastUserPrompt(log)!)} /> : null}
           </View>
         )
     }
@@ -456,12 +483,13 @@ export default function AssistantScreen() {
         onSend={(text) => void send(text)}
         onQueue={(text) => void queue(text)}
         onStop={stop}
+        status={activityLabel(activity)}
         seed={promptSeed?.projectId === projectId ? promptSeed.text : undefined}
         seedToken={promptSeed?.projectId === projectId ? promptSeed.token : undefined}
       />
 
       <ModelPickerSheet open={modelsOpen} onClose={() => setModelsOpen(false)} models={availableModels} selection={preferences.model} onSelect={(model) => setPreferences({ model })} loading={catalogue.loading} error={catalogue.error} reload={() => { void catalogue.reload(); void refreshBootstrap().catch(() => undefined) }} />
-      <AssistantInspectorSheet open={inspectorOpen} onClose={() => setInspectorOpen(false)} client={client} sessionId={sessionRef.current} preferences={preferences} onPreferences={setPreferences} ai={ai} onNewConversation={newConversation} />
+      <AssistantInspectorSheet open={inspectorOpen} onClose={() => setInspectorOpen(false)} client={client} sessionId={sessionRef.current} preferences={preferences} onPreferences={setPreferences} ai={ai} onNewConversation={newConversation} transcript={transcriptText(log)} activity={activity} />
 
       {/* Project picker */}
       <BottomSheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Assistant project">

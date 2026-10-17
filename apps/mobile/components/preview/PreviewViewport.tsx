@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Pressable, StyleSheet, Text, View } from "react-native"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native"
+import { SafeAreaView } from "react-native-safe-area-context"
 import { useTheme } from "@/lib/theme"
-import { Box, Minus, Plus, RotateCcw } from "lucide-react-native"
+import { Box, Focus, Grid3x3, Maximize2, Minus, PenLine, Plus, X } from "lucide-react-native"
 import { AdaptiveBlur } from "@/components/GlassView"
 import { haptic } from "@/lib/haptics"
 import { layout } from "@/lib/layout"
@@ -9,7 +10,9 @@ import { cadPreview, PreviewView, type PreviewScene } from "@/modules/preview"
 import {
   cameraBasis,
   fitOrbit,
+  frameOrbit,
   hitMeshPart,
+  isDoubleTap,
   mvpOf,
   orbitDrag,
   orbitPan,
@@ -25,19 +28,23 @@ import {
 import {
   MESH_COLOR,
   PREVIEW_MESSAGE,
+  REMAINING_PATH_FADE,
   SELECTED_COLOR,
   finiteMatrix,
   guideColor,
   highlightRange,
   meshFeatureEdges,
   prepareOverlayLines,
+  progressRange,
   sceneGuides,
   prepareActiveLine,
   prepareMeshUpload,
   prepareToolpathLines,
   rgbFromHex,
+  toolMarkerLength,
   type PreviewSegment,
 } from "@/lib/preview-scene"
+import { formatSize, partBounds } from "@/lib/preview-sim"
 import { type } from "@/lib/typography"
 
 export interface PreviewMesh {
@@ -50,33 +57,85 @@ export interface PreviewMesh {
 
 const PAYLOAD_MESSAGES = new Set<string>(Object.values(PREVIEW_MESSAGE))
 
-/**
- * Orbitable mesh and toolpath lines. One finger rotates, two fingers zoom and pan.
- * A tap reports the part under the finger. Drawing is the local `preview` Expo module (Metal).
- * Camera, picking and upload checks stay here so they can be tested without a device.
- */
-export function PreviewViewport({
-  bounds,
-  revision,
-  mesh,
-  segments,
-  stock,
-  playhead = 0,
-  selectedPartId,
-  onSelectPart,
-  accessibilityLabel = "3D preview",
-  accessibilityHint = "Drag to orbit. Pinch to zoom.",
-}: {
+/** Below this card width the zoom buttons give way: pinch and the accessibility actions still zoom. */
+const COMPACT_WIDTH = 340
+
+export interface PreviewViewportProps {
   bounds: Bounds
   revision: string
   mesh?: PreviewMesh
   segments?: readonly PreviewSegment[]
   stock?: Bounds
   playhead?: number
+  /** Fade the not-yet-cut path and show the tool at the playhead (toolpath simulation). */
+  simulating?: boolean
   selectedPartId?: string
   onSelectPart?: (id: string | undefined) => void
   accessibilityLabel?: string
   accessibilityHint?: string
+  /** Title of the full-screen viewer; omit `fullscreenTitle` to hide the expand control. */
+  fullscreenTitle?: string
+  /** Controls shown under the full-screen viewer, e.g. the simulation bar. */
+  fullscreenFooter?: ReactNode
+}
+
+/**
+ * Orbitable mesh and toolpath lines. One finger rotates, two fingers zoom and pan, a double tap frames
+ * the selection (or the whole scene). A tap reports the part under the finger. Drawing is the local
+ * `preview` Expo module (Metal). Camera, picking and upload checks stay in `lib/preview-*` so they can
+ * be tested without a device.
+ */
+export function PreviewViewport(props: PreviewViewportProps) {
+  const { fullscreenTitle, fullscreenFooter } = props
+  const { palette } = useTheme()
+  const [fullscreen, setFullscreen] = useState(false)
+  // Display toggles are shared by the inline and the full-screen viewer.
+  const [showEdges, setShowEdges] = useState(true)
+  const [showGrid, setShowGrid] = useState(true)
+  const display = { showEdges, showGrid, onToggleEdges: () => setShowEdges((value) => !value), onToggleGrid: () => setShowGrid((value) => !value) }
+
+  return <>
+    <Viewport {...props} {...display} onExpand={fullscreenTitle !== undefined ? () => setFullscreen(true) : undefined} />
+    {fullscreenTitle !== undefined ? <Modal visible={fullscreen} animationType="slide" presentationStyle="fullScreen" supportedOrientations={["portrait", "landscape"]}
+      onRequestClose={() => setFullscreen(false)}>
+      <SafeAreaView edges={["top", "bottom", "left", "right"]} style={{ flex: 1, backgroundColor: palette.background }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 20, paddingRight: 8, minHeight: layout.touchTarget + 8 }}>
+          <Text accessibilityRole="header" numberOfLines={1} style={{ flex: 1, color: palette.ink, fontSize: 17, fontWeight: "600" }}>{fullscreenTitle}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close full-screen viewer" onPress={() => { haptic("selection"); setFullscreen(false) }}
+            style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
+            <X size={22} color={palette.ink} />
+          </Pressable>
+        </View>
+        <View style={{ flex: 1 }}>{fullscreen ? <Viewport {...props} {...display} /> : null}</View>
+        {fullscreenFooter ? <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6, borderTopWidth: 0.5, borderTopColor: palette.border }}>{fullscreenFooter}</View> : null}
+      </SafeAreaView>
+    </Modal> : null}
+  </>
+}
+
+function Viewport({
+  bounds,
+  revision,
+  mesh,
+  segments,
+  stock,
+  playhead = 0,
+  simulating = false,
+  selectedPartId,
+  onSelectPart,
+  accessibilityLabel = "3D preview",
+  accessibilityHint = "Drag to orbit. Pinch to zoom. Double tap to frame.",
+  showEdges,
+  showGrid,
+  onToggleEdges,
+  onToggleGrid,
+  onExpand,
+}: PreviewViewportProps & {
+  showEdges: boolean
+  showGrid: boolean
+  onToggleEdges: () => void
+  onToggleGrid: () => void
+  onExpand?: () => void
 }) {
   const { palette, glass, isDark } = useTheme()
   const [orbit, setOrbit] = useState<Orbit>(() => fitOrbit(bounds))
@@ -89,8 +148,10 @@ export function PreviewViewport({
   const frame = useRef({ mesh, orbit, onSelectPart })
   frame.current = { mesh, orbit, onSelectPart }
   const gesture = useRef({ x: 0, y: 0, startX: 0, startY: 0, pinch: 0, two: false, moved: false })
+  const lastTap = useRef<{ x: number; y: number; at: number } | undefined>(undefined)
   const linesOk = useRef(true)
   const failed = meshError ?? lineError ?? gpuError
+  const compact = size.width < COMPACT_WIDTH
 
   useEffect(() => {
     setOrbit(fitOrbit(bounds))
@@ -175,18 +236,26 @@ export function PreviewViewport({
 
   useEffect(() => {
     if (!scene) return
-    scene.setOverlay(prepareOverlayLines(guides, edges))
-  }, [scene, guides, edges])
+    scene.setOverlay(prepareOverlayLines(showGrid ? guides : [], showEdges ? edges : []))
+  }, [scene, guides, edges, showGrid, showEdges])
 
+  const segmentCount = segments?.length ?? 0
+  useEffect(() => {
+    if (!scene) return
+    const range = progressRange(playhead, segmentCount, simulating)
+    scene.setProgress(simulating ? range.travelled : -1, range.path, REMAINING_PATH_FADE)
+  }, [scene, playhead, segmentCount, simulating])
+
+  const toolLength = useMemo(() => toolMarkerLength(bounds), [boundsKey])
   useEffect(() => {
     if (!scene || !linesOk.current) return
     const segment = segments?.[playhead]
     try {
-      scene.setActiveLine(prepareActiveLine(segment))
+      scene.setActiveLine(prepareActiveLine(segment, simulating ? toolLength : 0))
     } catch {
       scene.setActiveLine(new Float32Array())
     }
-  }, [scene, segments, playhead])
+  }, [scene, segments, playhead, simulating, toolLength])
 
   useEffect(() => {
     if (!scene) return
@@ -196,6 +265,11 @@ export function PreviewViewport({
     const { eye } = cameraBasis(orbit)
     scene.setCamera(Float32Array.from(mvp), rgb[0], rgb[1], rgb[2], eye[0], eye[1], eye[2])
   }, [scene, orbit, size.width, size.height, palette.background])
+
+  const selectedBounds = useMemo(() => {
+    const part = mesh?.parts.find((item) => item.id === selectedPartId)
+    return mesh && part ? partBounds(mesh.positions, mesh.indices, part) : undefined
+  }, [mesh, selectedPartId])
 
   const pick = (x: number, y: number) => {
     const current = frame.current
@@ -212,11 +286,15 @@ export function PreviewViewport({
   const nextView = STANDARD_VIEWS[(STANDARD_VIEWS.findIndex((item) => item.id === view) + 1) % STANDARD_VIEWS.length]!
   const viewLabel = STANDARD_VIEWS.find((item) => item.id === view)?.label
 
+  /** Frame the selected part when there is one, the whole scene otherwise; the viewing direction stays. */
+  const frameSelection = () => setOrbit((current) => frameOrbit(current, selectedBounds ?? bounds))
+
   const cameraAction = (action: string) => {
     if (failed) return
     if (action === "reset") showView("iso")
     else if (action === "view") showView(nextView.id)
     else if (action.startsWith("view:")) showView(action.slice(5) as StandardView)
+    else if (action === "frame") frameSelection()
     else if (action === "increment") setOrbit((current) => orbitZoom(current, 0.8))
     else if (action === "decrement") setOrbit((current) => orbitZoom(current, 1.25))
     else if (action === "rotateLeft") { setOrbit((current) => orbitDrag(current, -40, 0)); setView(undefined) }
@@ -224,6 +302,19 @@ export function PreviewViewport({
     else return
     haptic("selection")
   }
+
+  const frameLabel = selectedBounds ? "Frame selection" : "Fit all"
+  const tools: ReadonlyArray<{ action: string; label: string; Icon: typeof Box; hidden?: boolean }> = [
+    { action: "view", label: `Show ${nextView.label.toLowerCase()} view`, Icon: Box },
+    { action: "frame", label: frameLabel, Icon: Focus },
+    { action: "decrement", label: "Zoom out", Icon: Minus, hidden: compact },
+    { action: "increment", label: "Zoom in", Icon: Plus, hidden: compact },
+  ]
+  const toggles = [
+    ...(mesh ? [{ id: "edges", label: "Edges", Icon: PenLine, on: showEdges, toggle: onToggleEdges }] : []),
+    { id: "grid", label: "Grid", Icon: Grid3x3, on: showGrid, toggle: onToggleGrid },
+  ]
+  const sizeLabel = formatSize(selectedBounds ?? bounds)
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
@@ -233,12 +324,12 @@ export function PreviewViewport({
       accessibilityActions={failed ? [] : [
         { name: "increment", label: "Zoom in" }, { name: "decrement", label: "Zoom out" },
         { name: "rotateLeft", label: "Rotate left" }, { name: "rotateRight", label: "Rotate right" },
-        { name: "reset", label: "Reset camera" },
+        { name: "reset", label: "Reset camera" }, { name: "frame", label: frameLabel },
         ...STANDARD_VIEWS.map((item) => ({ name: `view:${item.id}`, label: `${item.label} view` })),
       ]}
       onAccessibilityAction={(event) => cameraAction(event.nativeEvent.actionName)}
       style={StyleSheet.absoluteFill}
-      accessibilityLabel={failed ? `${accessibilityLabel}. ${failed}` : accessibilityLabel}
+      accessibilityLabel={failed ? `${accessibilityLabel}. ${failed}` : `${accessibilityLabel}. ${selectedBounds ? "Selection" : "Size"} ${sizeLabel}`}
       accessibilityHint={accessibilityHint}
       accessibilityLiveRegion="polite"
       onLayout={(event) => setSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
@@ -284,7 +375,15 @@ export function PreviewViewport({
         gesture.current.y = event.nativeEvent.locationY
       }}
       onResponderRelease={(event) => {
-        if (!gesture.current.moved && !gesture.current.two) pick(event.nativeEvent.locationX, event.nativeEvent.locationY)
+        if (gesture.current.moved || gesture.current.two) return
+        const tap = { x: event.nativeEvent.locationX, y: event.nativeEvent.locationY, at: Date.now() }
+        if (isDoubleTap(lastTap.current, tap)) {
+          lastTap.current = undefined
+          cameraAction("frame")
+          return
+        }
+        lastTap.current = tap
+        pick(tap.x, tap.y)
       }}
       onResponderTerminate={() => {
         gesture.current.moved = true
@@ -298,9 +397,14 @@ export function PreviewViewport({
           onError={(event) => setGpuError(event.nativeEvent.message)}
         />
       ) : null}
-      <Text accessibilityElementsHidden numberOfLines={1} style={{ position: "absolute", left: 12, right: 12, bottom: 10, color: palette.muted, ...type(11) }} pointerEvents="none">
-        {viewLabel ? `${viewLabel} · ` : ""}Drag to orbit · pinch to zoom · two fingers to pan
-      </Text>
+      {!failed ? <View pointerEvents="none" accessibilityElementsHidden style={{ position: "absolute", left: 12, right: 12, bottom: 10, flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
+        <Text numberOfLines={2} style={{ flex: 1, color: palette.muted, ...type(11) }}>
+          {viewLabel ? `${viewLabel} · ` : ""}Drag to orbit · pinch to zoom · double tap to frame
+        </Text>
+        <Text numberOfLines={1} style={{ color: selectedBounds ? palette.accent : palette.soft, fontVariant: ["tabular-nums"], ...type(11), fontWeight: "600" }}>
+          {sizeLabel}
+        </Text>
+      </View> : null}
       {failed ? (
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", padding: 24 }]}>
           <Text accessibilityLiveRegion="polite" style={{ color: palette.soft, textAlign: "center" }}>
@@ -309,18 +413,22 @@ export function PreviewViewport({
         </View>
       ) : null}
     </View>
-    {!failed ? <AdaptiveBlur tint={isDark ? "dark" : "light"} fallbackColor={glass.shellStrong} opaqueFallbackColor={palette.surface}
-      style={{ position: "absolute", top: 10, right: 10, flexDirection: "row", borderRadius: layout.controlRadius, borderCurve: "continuous", overflow: "hidden" }}>
-      {[
-        { action: "view", label: `Show ${nextView.label.toLowerCase()} view`, Icon: Box },
-        { action: "reset", label: "Reset camera", Icon: RotateCcw },
-        { action: "decrement", label: "Zoom out", Icon: Minus },
-        { action: "increment", label: "Zoom in", Icon: Plus },
-      ].map(({ action, label, Icon }) => <Pressable key={action} accessibilityRole="button" accessibilityLabel={label}
-        onPress={() => cameraAction(action)} style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
-        <Icon size={18} color={palette.ink} />
-      </Pressable>)}
-    </AdaptiveBlur> : null}
+    {!failed ? <>
+      <AdaptiveBlur tint={isDark ? "dark" : "light"} fallbackColor={glass.shellStrong} opaqueFallbackColor={palette.surface}
+        style={{ position: "absolute", top: 10, left: 10, flexDirection: "row", borderRadius: layout.controlRadius, borderCurve: "continuous", overflow: "hidden" }}>
+        {toggles.map(({ id, label, Icon, on, toggle }) => <Pressable key={id} accessibilityRole="switch" accessibilityLabel={`Show ${label.toLowerCase()}`} accessibilityState={{ checked: on }}
+          onPress={() => { haptic("selection"); toggle() }} style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : on ? 1 : 0.45 })}>
+          <Icon size={18} color={on ? palette.accent : palette.ink} />
+        </Pressable>)}
+      </AdaptiveBlur>
+      <AdaptiveBlur tint={isDark ? "dark" : "light"} fallbackColor={glass.shellStrong} opaqueFallbackColor={palette.surface}
+        style={{ position: "absolute", top: 10, right: 10, flexDirection: "row", borderRadius: layout.controlRadius, borderCurve: "continuous", overflow: "hidden" }}>
+        {[...tools.filter((tool) => !tool.hidden), ...(onExpand ? [{ action: "expand", label: "Open full-screen viewer", Icon: Maximize2 }] : [])].map(({ action, label, Icon }) => <Pressable key={action} accessibilityRole="button" accessibilityLabel={label}
+          onPress={() => { if (action === "expand") { haptic("selection"); onExpand?.() } else cameraAction(action) }} style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
+          <Icon size={18} color={palette.ink} />
+        </Pressable>)}
+      </AdaptiveBlur>
+    </> : null}
     </View>
   )
 }

@@ -26,6 +26,7 @@ export default function DrawingsScreen() {
         load={loadDrawings}
         emptyTitle="No designs"
         emptyDescription="Designs saved on the desktop show up here as a 3D preview."
+        searchPlaceholder="Search designs"
         onOpen={(entry) => {
           router.push(`/projects/${id}/workspace/drawings/${entry.id}?name=${encodeURIComponent(entry.name)}`)
         }}

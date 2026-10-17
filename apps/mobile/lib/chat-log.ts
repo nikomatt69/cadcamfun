@@ -8,18 +8,26 @@ import type { ChatEvent } from "./sse"
  * (vcs_start_change, cad_*, cam_*…), and permission requests arrive as a `request` row the
  * composer can answer inline.
  */
+export type PlanItem = { readonly content: string; readonly status: "pending" | "in_progress" | "completed" | "cancelled" }
+
 export type ChatRow =
-  | { kind: "user"; text: string }
+  /** `queued`: sent while the desktop was busy and not yet taken into the conversation. */
+  | { kind: "user"; text: string; queued?: boolean }
   | { kind: "assistant"; text: string; sessionId: string }
   | { kind: "tool"; tool: string; rawTool?: string; ok: boolean | null; callId: string; input?: unknown; output?: string; agent?: string; diagnostic?: { message: string; severity: string; recovery?: string } }
   | { kind: "question"; sessionId: string; requestId: string; questions: Extract<ChatEvent, { type: "question_request" }>["questions"]; answered: boolean }
   | { kind: "request"; sessionId: string; requestId: string; permission: string; patterns: readonly string[]; answered: boolean }
   | { kind: "error"; message: string }
+  /** The agent's plan (todo list); one row per session, updated in place. */
+  | { kind: "plan"; sessionId: string; items: readonly PlanItem[] }
+  /** Host notices that are not part of the answer: provider retries, compaction, blocked permissions. */
+  | { kind: "notice"; tone: "info" | "warning"; text: string; retry?: boolean }
 
 /** The one non-server frame: the user's own message, appended before the stream starts. */
 export interface UserEvent {
   type: "user"
   text: string
+  queued?: boolean
 }
 
 export type LogEvent = ChatEvent | UserEvent
@@ -39,7 +47,40 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
       // The ChatEvent union has an index-signature fallback, so an unmatched literal narrows to it
       // ("user" → unknown). The explicit cast recovers the UserEvent shape.
       const user = event as UserEvent
-      return [...log, { kind: "user" as const, text: user.text }]
+      return [...log, { kind: "user" as const, text: user.text, ...(user.queued ? { queued: true } : {}) }]
+    }
+
+    case "user_message": {
+      // The desktop took a queued/steered message into the conversation; one typed on the desktop appears here too.
+      const text = String((event as { text?: unknown }).text ?? "").trim()
+      if (!text) return log
+      const queued = log.findIndex((row) => row.kind === "user" && row.queued === true && row.text.trim() === text)
+      if (queued >= 0) return log.map((row, index) => index === queued && row.kind === "user" ? { kind: "user", text: row.text } : row)
+      const latest = log.findLast((row) => row.kind === "user")
+      return latest?.kind === "user" && latest.text.trim() === text ? log : [...log, { kind: "user", text }]
+    }
+
+    case "todo": {
+      const todo = event as Extract<ChatEvent, { type: "todo" }>
+      const items = (Array.isArray(todo.todos) ? todo.todos : []).map((item) => ({ content: String(item.content), status: item.status }))
+      const index = log.findIndex((row) => row.kind === "plan" && row.sessionId === todo.sessionId)
+      if (index < 0) return items.length ? [...log, { kind: "plan", sessionId: todo.sessionId, items }] : log
+      return items.length ? log.map((row, at) => at === index ? { kind: "plan", sessionId: todo.sessionId, items } : row) : log.filter((_, at) => at !== index)
+    }
+
+    case "retry": {
+      const retry = event as Extract<ChatEvent, { type: "retry" }>
+      const row: ChatRow = { kind: "notice", tone: "warning", retry: true, text: `Provider retry ${retry.attempt}${retry.message ? ` — ${retry.message}` : ""}` }
+      const last = log[log.length - 1]
+      return last?.kind === "notice" && last.retry ? [...log.slice(0, -1), row] : [...log, row]
+    }
+
+    case "compacted":
+      return [...log, { kind: "notice", tone: "info", text: "Older messages were summarised to fit the model's context" }]
+
+    case "permission_blocked": {
+      const blocked = event as Extract<ChatEvent, { type: "permission_blocked" }>
+      return [...log, { kind: "notice", tone: "warning", text: `${blocked.permission} was blocked: ${blocked.reason}` }]
     }
 
     case "delta": {
@@ -101,10 +142,11 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
     }
     case "done": {
       const done = event as Extract<ChatEvent, { type: "done" }>
-      const settled = log.map((row) => (row.kind === "request" || row.kind === "question") && row.sessionId === done.sessionId ? { ...row, answered: true } : row)
+      // Retry notices describe a wait that is over once the turn finishes.
+      const settled = log.filter((row) => row.kind !== "notice" || !row.retry).map((row) => (row.kind === "request" || row.kind === "question") && row.sessionId === done.sessionId ? { ...row, answered: true } : row)
       if (!done.text) return settled
-      let start = log.length
-      while (start > 0 && log[start - 1]?.kind !== "user") start--
+      let start = settled.length
+      while (start > 0 && settled[start - 1]?.kind !== "user") start--
       const current = settled.slice(start).filter((row) => row.kind !== "error")
       const streamed = current.flatMap((row) => row.kind === "assistant" && row.sessionId === done.sessionId ? [row.text] : []).join("")
       if (streamed === done.text) return [...settled.slice(0, start), ...current]
@@ -113,7 +155,7 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
 
     case "error": {
       const failure = event as Extract<ChatEvent, { type: "error" }>
-      return [...log, { kind: "error" as const, message: failure.message }]
+      return [...log.filter((row) => row.kind !== "notice" || !row.retry), { kind: "error" as const, message: failure.message }]
     }
 
     default:
@@ -124,3 +166,14 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
 /** Marks a permission request as answered so the button row collapses. */
 export const answerRequest = (log: readonly ChatRow[], requestId: string, accepted: boolean): readonly ChatRow[] =>
   log.map((row) => (row.kind === "request" && row.requestId === requestId ? { ...row, answered: true } : row))
+
+/** The last prompt the user sent, for "edit and resend". Never resent automatically. */
+export const lastUserPrompt = (log: readonly ChatRow[]): string | undefined => {
+  const row = log.findLast((item) => item.kind === "user")
+  return row?.kind === "user" ? row.text : undefined
+}
+
+/** Plain text of the conversation for copy/share: prompts and answers, no tool noise. */
+export const transcriptText = (log: readonly ChatRow[]): string => log
+  .flatMap((row) => row.kind === "user" ? [`You: ${row.text}`] : row.kind === "assistant" ? [`Assistant: ${row.text}`] : [])
+  .join("\n\n")

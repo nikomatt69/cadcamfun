@@ -36,7 +36,7 @@ export function Composer({
   onStop,
   seed,
   seedToken,
-  modelLabel, permissionLabel, onOpenModels, onOpenControls,
+  modelLabel, permissionLabel, onOpenModels, onOpenControls, status,
 }: {
   busy: boolean
   disabled: boolean
@@ -53,6 +53,8 @@ export function Composer({
   permissionLabel: string
   onOpenModels(): void
   onOpenControls(): void
+  /** Live phase of the desktop turn (step, tool, retries, tokens); shown while busy. */
+  status?: string
 }) {
   const { palette, glass, isDark } = useTheme()
   const content = useContentLayout()
@@ -82,8 +84,8 @@ export function Composer({
       {busy ? (
         <View style={{ minHeight: 24, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingBottom: 6 }}>
           <View style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 3, backgroundColor: palette.warning }} />
-          <Text selectable style={{ flexShrink: 1, color: palette.muted, fontSize: 12, lineHeight: 17, fontWeight: "500" }}>
-            Desktop assistant working · send to steer
+          <Text accessibilityLiveRegion="polite" numberOfLines={stacked ? undefined : 1} style={{ flexShrink: 1, color: palette.muted, fontSize: 12, lineHeight: 17, fontWeight: "500", fontVariant: ["tabular-nums"] }}>
+            {status ?? "Desktop assistant working"} · send to steer
           </Text>
         </View>
       ) : null}

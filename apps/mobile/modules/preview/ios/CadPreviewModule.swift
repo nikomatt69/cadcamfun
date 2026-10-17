@@ -25,6 +25,10 @@ public final class PreviewScene: SharedObject {
   var activeVertices = 0
   var overlay: MTLBuffer?
   var overlayVertices = 0
+  /// Simulation progress over the line buffer; `travelledVertices < 0` draws the whole path at full colour.
+  var travelledVertices = -1
+  var pathVertices = 0
+  var remainingFade: Float = 0
   var eye = SIMD3<Float>(0, 0, 1)
   var mvp = matrix_identity_float4x4
   var clear = SIMD3<Float>(0.08, 0.09, 0.1)
@@ -116,7 +120,17 @@ public final class PreviewScene: SharedObject {
     guard let next = metalBuffer(line.rawPointer, line.byteLength, device, "com.cadcamfun.preview.active") else { return }
     lock.lock()
     active = next
-    activeVertices = 2
+    activeVertices = line.length / 6
+    lock.unlock()
+    redraw()
+  }
+
+  /// Fades path vertices `[travelled, path)` toward the background; stock edges after `path` stay untouched.
+  func replaceProgress(travelled: Int, path: Int, fade: Float) {
+    lock.lock()
+    travelledVertices = travelled < 0 ? -1 : travelled - travelled % 2
+    pathVertices = max(0, path - path % 2)
+    remainingFade = min(max(fade.isFinite ? fade : 0, 0), 1)
     lock.unlock()
     redraw()
   }
@@ -174,6 +188,9 @@ public final class PreviewScene: SharedObject {
       activeVertices: activeVertices,
       overlay: overlay,
       overlayVertices: overlayVertices,
+      travelledVertices: travelledVertices,
+      pathVertices: pathVertices,
+      remainingFade: remainingFade,
       eye: eye,
       mvp: mvp,
       clear: clear,
@@ -254,6 +271,9 @@ struct PreviewFrame {
   let activeVertices: Int
   let overlay: MTLBuffer?
   let overlayVertices: Int
+  let travelledVertices: Int
+  let pathVertices: Int
+  let remainingFade: Float
   let eye: SIMD3<Float>
   let mvp: simd_float4x4
   let clear: SIMD3<Float>
@@ -291,6 +311,9 @@ public class CadPreviewModule: Module {
       }
       Function("setLines") { (scene: PreviewScene, lines: Float32Array) in
         scene.replaceLines(lines)
+      }
+      Function("setProgress") { (scene: PreviewScene, travelled: Int, path: Int, fade: Double) in
+        scene.replaceProgress(travelled: travelled, path: path, fade: Float(fade))
       }
       Function("setOverlay") { (scene: PreviewScene, lines: Float32Array) in
         scene.replaceOverlay(lines)

@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import { Text, View, useWindowDimensions } from "react-native"
 import { ChevronRight, Minus, Plus, SquarePen } from "lucide-react-native"
 import type { EntityChange } from "@cadcamfun/api"
@@ -8,6 +8,8 @@ import { PressableScale } from "./ui/PressableScale"
 import { Pill, type PillTone } from "./ui/Pill"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
+import { diffSummary, filterChanges, formatDiffSummary, type ChangeFilter } from "@/lib/workspace-filter"
+import { FilterChips } from "./ui/FilterChips"
 
 type PropertyChange = EntityChange["changes"][number]
 const STATUS_PILL: Record<EntityChange["status"], { tone: PillTone; label: string }> = {
@@ -64,9 +66,25 @@ function EntityCard({ change, onOpen }: { change: EntityChange; onOpen: (propert
 export function DiffView({ changes }: { changes: readonly EntityChange[] }) {
   const { palette } = useTheme()
   const [selected, setSelected] = useState<PropertyChange | null>(null)
+  const [filter, setFilter] = useState<ChangeFilter>("all")
+  const summary = useMemo(() => diffSummary(changes), [changes])
+  const visible = filterChanges(changes, filter)
+  // Filters only help once a change touches more than one kind of file.
+  const kinds = [summary.added, summary.modified, summary.deleted].filter((count) => count > 0).length
+  const options = [
+    { id: "all" as const, label: "All" },
+    ...(summary.added ? [{ id: "added" as const, label: "Added" }] : []),
+    ...(summary.modified ? [{ id: "modified" as const, label: "Modified" }] : []),
+    ...(summary.deleted ? [{ id: "deleted" as const, label: "Deleted" }] : []),
+  ]
   return <>
-    <View style={{ gap: 12 }}>{changes.map((change, index) => <EntityCard key={`${change.path}-${index}`} change={change}
-      onOpen={(property) => { haptic("selection"); setSelected(property) }} />)}</View>
+    <View style={{ gap: 12 }}>
+      <Text selectable accessibilityRole="summary" style={{ color: palette.soft, fontSize: 13, lineHeight: 19, fontVariant: ["tabular-nums"] }}>{formatDiffSummary(summary)}</Text>
+      {kinds > 1 ? <FilterChips options={options} value={filter} onChange={setFilter}
+        counts={{ all: summary.files, added: summary.added, modified: summary.modified, deleted: summary.deleted }} accessibilityLabel="Filter changes" /> : null}
+      {visible.map((change, index) => <EntityCard key={`${change.path}-${index}`} change={change}
+        onOpen={(property) => { haptic("selection"); setSelected(property) }} />)}
+    </View>
     <BottomSheet open={selected !== null} onClose={() => setSelected(null)} title="Change details">
       {selected ? <View style={{ paddingHorizontal: 20, gap: 16 }}>
         <Text selectable style={{ color: palette.soft, fontSize: 15, lineHeight: 22 }}>{pointerLabel(selected.pointer)}</Text>

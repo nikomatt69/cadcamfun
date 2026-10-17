@@ -14,6 +14,19 @@ export interface AssistantPreferences {
   readonly includeContext: boolean
 }
 export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = { agent: "general", permissionMode: "approve", includeContext: true }
+
+/** Phone-wide defaults for projects that have no assistant settings of their own yet (Settings → Assistant). */
+export type AssistantDefaults = Pick<AssistantPreferences, "permissionMode" | "includeContext">
+export const DEFAULT_ASSISTANT_DEFAULTS: AssistantDefaults = { permissionMode: DEFAULT_ASSISTANT_PREFERENCES.permissionMode, includeContext: DEFAULT_ASSISTANT_PREFERENCES.includeContext }
+
+/** A project's own settings win; anything it never set comes from the phone defaults. */
+export const resolveAssistantPreferences = (stored: Partial<AssistantPreferences> | undefined, defaults: Partial<AssistantDefaults> | undefined): AssistantPreferences => ({
+  ...DEFAULT_ASSISTANT_PREFERENCES,
+  ...(defaults?.permissionMode && PERMISSION_IDS.has(defaults.permissionMode) ? { permissionMode: defaults.permissionMode } : {}),
+  ...(typeof defaults?.includeContext === "boolean" ? { includeContext: defaults.includeContext } : {}),
+  ...stored,
+})
+const PERMISSION_IDS = new Set<string>(["approve", "ask", "auto"])
 export const PERMISSION_MODES: readonly { id: AssistantPermissionMode; title: string; description: string }[] = [
   { id: "approve", title: "Standard", description: "Run routine tools. Ask before destructive changes and external tools." },
   { id: "ask", title: "Ask every time", description: "Ask for approval before each tool action." },

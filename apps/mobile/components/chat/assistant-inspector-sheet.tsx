@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { Switch, Text, View } from "react-native"
+import { Share, Switch, Text, View } from "react-native"
 import { Check } from "lucide-react-native"
 import type { CompanionClient, AiStatusInfo } from "@/lib/client"
 import { useResource } from "@/lib/use-resource"
@@ -10,8 +10,9 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ListRow } from "@/components/ui/ListRow"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
+import { formatTokens, type TurnActivity } from "@/lib/turn-activity"
 
-export function AssistantInspectorSheet({ open, onClose, client, sessionId, preferences, onPreferences, ai, onNewConversation }: {
+export function AssistantInspectorSheet({ open, onClose, client, sessionId, preferences, onPreferences, ai, onNewConversation, transcript, activity }: {
   open: boolean
   onClose(): void
   client: CompanionClient | null
@@ -20,6 +21,9 @@ export function AssistantInspectorSheet({ open, onClose, client, sessionId, pref
   onPreferences(patch: Partial<AssistantPreferences>): void
   ai: AiStatusInfo | null
   onNewConversation(): void
+  /** Prompts and answers as plain text, for sharing. */
+  transcript: string
+  activity: TurnActivity
 }) {
   const { palette } = useTheme()
   const [actionError, setActionError] = useState<string>()
@@ -46,6 +50,10 @@ export function AssistantInspectorSheet({ open, onClose, client, sessionId, pref
           <Text selectable style={{ color: palette.soft, fontSize: 13, lineHeight: 19 }}>{[state.data.context.provider, state.data.context.model].filter(Boolean).join(" / ") || "Desktop model"}</Text>
           {state.data.context.contextWindow ? <Text style={{ color: palette.muted, fontSize: 13 }}>{Math.round(state.data.context.contextWindow / 1000)}k context window{state.data.context.tokens !== undefined ? ` · ${state.data.context.tokens.toLocaleString()} tokens used` : ""}</Text> : null}
           {state.data.goal ? <Text selectable style={{ color: palette.soft, fontSize: 13, lineHeight: 19 }}>Goal · {state.data.goal.status}{"\n"}{state.data.goal.objective}</Text> : null}
+          {state.data.context.contextWindow && state.data.context.tokens !== undefined ? <View accessible accessibilityLabel={`Context ${Math.round((state.data.context.tokens / state.data.context.contextWindow) * 100)} percent used`} style={{ height: 4, borderRadius: 2, overflow: "hidden", backgroundColor: palette.panel }}>
+            <View style={{ width: `${Math.min(100, (state.data.context.tokens / state.data.context.contextWindow) * 100)}%`, height: 4, backgroundColor: state.data.context.tokens / state.data.context.contextWindow > 0.85 ? palette.warning : palette.accent }} />
+          </View> : null}
+          {activity.inputTokens + activity.outputTokens > 0 ? <Text style={{ color: palette.muted, fontSize: 13, fontVariant: ["tabular-nums"] }}>Last turn · {formatTokens(activity.inputTokens)} in · {formatTokens(activity.outputTokens)} out{activity.step > 0 ? ` · ${activity.step} steps` : ""}</Text> : null}
           <Text style={{ color: palette.muted, fontSize: 13 }}>{state.data.questions.length} pending questions · {state.data.permissions?.length ?? 0} approvals</Text>
           <ActionButton variant="secondary" small label="Compact conversation" disabled={state.data.busy || acting} onPress={() => { if (client && sessionId) void act(() => client.compactSession(sessionId)) }} />
           {state.data.tasks.map((task) => <View key={task.id} style={{ paddingTop: 8, gap: 5 }}>
@@ -60,6 +68,7 @@ export function AssistantInspectorSheet({ open, onClose, client, sessionId, pref
         <Text style={{ color: palette.muted, fontSize: 12, fontWeight: "700" }}>DESKTOP TOOLS · {ai?.tools?.length ?? 0}</Text>
         <SurfaceCard inset={false}>{(ai?.tools ?? []).map((tool) => <ListRow key={tool.id} title={tool.id} subtitle={tool.description} showChevron={false} />)}</SurfaceCard>
       </View>
+      {transcript ? <ActionButton variant="secondary" label="Share conversation" onPress={() => void Share.share({ message: transcript })} /> : null}
       <ActionButton variant="secondary" label="New conversation" onPress={() => { onNewConversation(); onClose() }} />
     </View>
   </BottomSheet>

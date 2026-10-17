@@ -43,6 +43,7 @@ export default function ComponentPreviewScreen() {
     <>
       <Stack.Screen options={{ title: name, headerLargeTitle: false }} />
       <MeshReview
+        title={name}
         mesh={preview.data}
         loading={preview.loading}
         error={preview.error}

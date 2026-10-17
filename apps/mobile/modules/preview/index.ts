@@ -6,8 +6,10 @@ import type { ViewProps } from "react-native"
 export type PreviewScene = {
   setMesh(positions: Float32Array, normals: Float32Array, indices: Uint32Array): void
   setLines(lines: Float32Array): void
-  /** One move, or an empty buffer. Kept off the path upload so scrubbing does not reallocate it. */
+  /** One move (2 vertices) plus an optional tool axis (2 more), or an empty buffer. Kept off the path upload so scrubbing does not reallocate it. */
   setActiveLine(line: Float32Array): void
+  /** Fades path vertices `[travelled, path)` toward the background by `fade`; `travelled < 0` shows the whole path. */
+  setProgress(travelled: number, path: number, fade: number): void
   /** Feature edges, floor grid and axes. Decoration only: a refused upload just hides them. */
   setOverlay(lines: Float32Array): void
   setHighlight(start: number, count: number, red: number, green: number, blue: number, selectedRed: number, selectedGreen: number, selectedBlue: number): void

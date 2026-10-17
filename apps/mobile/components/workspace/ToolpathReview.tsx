@@ -1,10 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { FlatList, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native"
-import { ChevronDown, ChevronUp, SkipBack, SkipForward } from "lucide-react-native"
+import { ChevronDown, ChevronUp, Pause, Play, SkipBack, SkipForward } from "lucide-react-native"
 import type { ToolpathPreview, ToolpathReview as ToolpathReviewPayload, ToolpathSegment } from "@cadcamfun/api"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { clampPlayhead, segmentIndexForLine } from "@/lib/preview-math"
+import {
+  PLAYBACK_SPEEDS,
+  cumulativeTimes,
+  formatDuration,
+  formatLength,
+  formatSize,
+  indexAtTime,
+  modalFeeds,
+  pathTotals,
+  segmentDurations,
+  startTimeOf,
+} from "@/lib/preview-sim"
 import { mono } from "@/lib/typography"
 import { PreviewViewport } from "@/components/preview/PreviewViewport"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
@@ -19,9 +31,13 @@ const KIND_COLOR = {
   circular: "#A875F0",
 } as const
 
+/** Playback publishes the block at most this often; the Metal view and the listing do not need 60 Hz. */
+const PLAYBACK_TICK_MS = 50
+
 /**
- * G-code review: the 3D path, a scrubber, and the NC listing stay on the same block.
- * This is the phone's stand-in for the desktop toolpath visualizer.
+ * G-code review: the 3D path, a simulation bar, and the NC listing stay on the same block.
+ * This is the phone's stand-in for the desktop toolpath visualizer. Playback runs on the program's own
+ * feeds (see `lib/preview-sim.ts`), so its clock is an estimate of the machine's.
  */
 export function ToolpathReview({
   review,
@@ -44,18 +60,28 @@ export function ToolpathReview({
   const expanded = previewExpanded ?? fontScale < 1.6
   const segments = preview?.segments ?? []
   const [playhead, setPlayhead] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const [speedIndex, setSpeedIndex] = useState(1)
   const listRef = useRef<FlatList<string>>(null)
+  const clock = useRef(0)
   const lines = useMemo(() => review?.gcode ? review.gcode.split(/\r?\n/) : [], [review?.gcode])
   const kindByLine = useMemo(() => {
     const kinds = new Map<number, ToolpathSegment["kind"]>()
     for (const segment of segments) kinds.set(segment.line, segment.kind)
     return kinds
   }, [segments])
+  const durations = useMemo(() => segmentDurations(segments, modalFeeds(review?.gcode ?? "")), [segments, review?.gcode])
+  const ends = useMemo(() => cumulativeTimes(durations), [durations])
+  const totals = useMemo(() => pathTotals(segments, durations), [segments, durations])
   const activeLine = segments[playhead]?.line ?? 0
   const stats = preview?.stats ?? review?.stats
+  const speed = PLAYBACK_SPEEDS[speedIndex] ?? 1
+  const simulating = playing || playhead > 0
 
   useEffect(() => {
     setPlayhead(0)
+    setPlaying(false)
+    clock.current = 0
   }, [preview?.revision])
 
   useEffect(() => {
@@ -63,27 +89,78 @@ export function ToolpathReview({
     listRef.current?.scrollToIndex({ index: Math.min(activeLine - 1, Math.max(lines.length - 1, 0)), viewPosition: 0.35, animated: false })
   }, [activeLine, lines.length])
 
+  // The simulated clock advances in real time × speed; the block shown is the one running at that time.
+  useEffect(() => {
+    if (!playing || ends.length === 0) return
+    let last = Date.now()
+    const timer = setInterval(() => {
+      const now = Date.now()
+      clock.current += ((now - last) / 1000) * speed
+      last = now
+      const total = ends[ends.length - 1]!
+      const next = indexAtTime(ends, clock.current)
+      setPlayhead(next)
+      if (clock.current >= total) {
+        setPlaying(false)
+        haptic("success")
+      }
+    }, PLAYBACK_TICK_MS)
+    return () => clearInterval(timer)
+  }, [playing, speed, ends])
+
+  /** Manual moves stop playback and put the clock at the start of the chosen block. */
+  const seek = (index: number) => {
+    const next = clampPlayhead(index, segments.length)
+    setPlaying(false)
+    clock.current = startTimeOf(ends, next)
+    setPlayhead(next)
+  }
+
+  const togglePlay = () => {
+    if (segments.length === 0) return
+    haptic("selection")
+    if (playing) {
+      setPlaying(false)
+      return
+    }
+    // Replay from the start once the end is reached.
+    if (playhead >= segments.length - 1) {
+      clock.current = 0
+      setPlayhead(0)
+    } else clock.current = Math.max(clock.current, startTimeOf(ends, playhead))
+    setPlaying(true)
+  }
+
+  const bar = <SimulationBar
+    count={segments.length}
+    playhead={playhead}
+    playing={playing}
+    speed={speed}
+    elapsed={Math.min(clock.current, totals.seconds)}
+    total={totals.seconds}
+    onSeek={seek}
+    onTogglePlay={togglePlay}
+    onCycleSpeed={() => { haptic("selection"); setSpeedIndex((index) => (index + 1) % PLAYBACK_SPEEDS.length) }}
+  />
+
   return (
     <SafeAreaView edges={{ bottom: true }} onLayout={(event) => { onLayout(event); setAvailableHeight(event.nativeEvent.layout.height) }} style={{ flex: 1, backgroundColor: palette.background }}>
-      <ScrollView contentInsetAdjustmentBehavior="never" style={{ flexGrow: 0, maxHeight: Math.max(140, availableHeight * 0.6) }}
+      <ScrollView contentInsetAdjustmentBehavior="never" style={{ flexGrow: 0, maxHeight: Math.max(160, availableHeight * 0.62) }}
         contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 10, paddingBottom: 12, gap: 10 }}>
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <View style={{ flex: 1, minWidth: 100, gap: 3 }}>
+        <View style={{ flex: 1, minWidth: 120, gap: 3 }}>
           <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 15, fontWeight: "600" }}>Simulation</Text>
-          <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>{segments.length ? `Block ${playhead + 1} of ${segments.length}` : "No motion blocks"}</Text>
+          <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>
+            {segments.length ? `Block ${(playhead + 1).toLocaleString("en")} of ${segments.length.toLocaleString("en")} · NC line ${activeLine}` : loading ? "Loading the program…" : "No motion blocks"}
+          </Text>
         </View>
-        <View style={{ flexDirection: "row", borderRadius: layout.controlRadius, backgroundColor: palette.surface, borderWidth: 0.5, borderColor: palette.border }}>
-          {[
-            { label: "Previous block", Icon: SkipBack, disabled: !segments.length || playhead <= 0, action: () => setPlayhead(clampPlayhead(playhead - 1, segments.length)) },
-            { label: "Next block", Icon: SkipForward, disabled: !segments.length || playhead >= segments.length - 1, action: () => setPlayhead(clampPlayhead(playhead + 1, segments.length)) },
-            { label: expanded ? "Hide 3D preview" : "Show 3D preview", Icon: expanded ? ChevronUp : ChevronDown, disabled: false, action: () => setPreviewExpanded(!expanded) },
-          ].map(({ label, Icon, disabled, action }) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled}
-            onPress={() => { haptic("selection"); action() }} style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: disabled ? 0.35 : pressed ? 0.55 : 1 })}>
-            <Icon size={18} color={palette.accent} />
-          </Pressable>)}
-        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={expanded ? "Hide 3D preview" : "Show 3D preview"}
+          onPress={() => { haptic("selection"); setPreviewExpanded(!expanded) }}
+          style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", borderRadius: layout.controlRadius, backgroundColor: palette.surface, borderWidth: 0.5, borderColor: palette.border, opacity: pressed ? 0.55 : 1 })}>
+          {expanded ? <ChevronUp size={18} color={palette.accent} /> : <ChevronDown size={18} color={palette.accent} />}
+        </Pressable>
       </View>
-      {expanded ? <View style={{ height: Math.min(previewHeight(height, fontScale, "toolpath"), availableHeight * 0.28), borderRadius: layout.cardRadius, borderCurve: "continuous", overflow: "hidden", borderWidth: 0.5, borderColor: palette.border }}>
+      {expanded ? <View style={{ height: Math.min(previewHeight(height, fontScale, "toolpath"), Math.max(180, availableHeight * 0.32)), borderRadius: layout.cardRadius, borderCurve: "continuous", overflow: "hidden", borderWidth: 0.5, borderColor: palette.border }}>
         {preview ? (
           <PreviewViewport
             bounds={preview.bounds}
@@ -91,6 +168,9 @@ export function ToolpathReview({
             segments={segments}
             stock={preview.stock}
             playhead={playhead}
+            simulating={simulating}
+            fullscreenTitle={review?.name ?? "Toolpath"}
+            fullscreenFooter={bar}
             accessibilityLabel="Toolpath preview"
             accessibilityHint="Drag to orbit. Pinch to zoom. The listing follows the current block."
           />
@@ -105,26 +185,33 @@ export function ToolpathReview({
         </View>
       ) : null}
 
-      <View style={{ gap: 6 }}>
+      <View style={{ gap: 8 }}>
         {stats ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+          <View accessibilityRole="summary" style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             {[
               { label: "Rapid", count: stats.rapidMoves, color: KIND_COLOR.rapid },
               { label: "Linear", count: stats.linearMoves, color: KIND_COLOR.linear },
               { label: "Arcs", count: stats.circularMoves, color: KIND_COLOR.circular },
             ].map(({ label, count, color }) => <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+              <View style={{ width: 8, height: 3, borderRadius: 1.5, backgroundColor: color }} />
               <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>{label} {count.toLocaleString("en")}</Text>
             </View>)}
           </View>
         ) : null}
+        {segments.length > 0 && preview ? <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: 16, rowGap: 4 }}>
+          {[
+            { label: "Cycle", value: `≈ ${formatDuration(totals.seconds)}` },
+            { label: "Cutting", value: `${formatLength(totals.cutLength)} mm` },
+            { label: "Rapid", value: `${formatLength(totals.rapidLength)} mm` },
+            { label: "Stock", value: formatSize(preview.stock) },
+          ].map(({ label, value }) => <Text key={label} selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>
+            {label} <Text style={{ color: palette.ink, fontWeight: "600" }}>{value}</Text>
+          </Text>)}
+        </View> : null}
         {preview?.truncated ? (
           <Text style={{ color: palette.warning, fontSize: 12, lineHeight: 16 }}>Path truncated so it fits on the phone. The G-code listing is complete.</Text>
         ) : null}
-        <Scrubber count={segments.length} value={playhead} onChange={setPlayhead} />
-        <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 16 }}>
-          {segments.length === 0 ? "No motion in this program" : `NC line ${activeLine}` }
-        </Text>
+        {bar}
       </View>
       </ScrollView>
       <View style={{ paddingHorizontal: gutter, paddingVertical: 10, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: palette.border }}>
@@ -138,6 +225,8 @@ export function ToolpathReview({
         keyExtractor={(_, index) => String(index)}
         extraData={activeLine}
         contentInsetAdjustmentBehavior="never"
+        initialNumToRender={30}
+        windowSize={9}
         contentContainerStyle={{ paddingHorizontal: Math.max(0, gutter - 12), paddingBottom: 16 }}
         ListEmptyComponent={loading ? <View style={{ padding: 16, gap: 8 }}><Skeleton style={{ height: 44 }} /><Skeleton style={{ height: 44 }} /></View> : <Text style={{ color: palette.muted, fontSize: 14, lineHeight: 21, padding: 20 }}>No G-code in this program yet.</Text>}
         onScrollToIndexFailed={(info) => {
@@ -155,7 +244,7 @@ export function ToolpathReview({
               disabled={segments.length === 0 || loading}
               onPress={() => {
                 haptic("selection")
-                setPlayhead(clampPlayhead(segmentIndexForLine(segments, lineNumber), segments.length))
+                seek(segmentIndexForLine(segments, lineNumber))
               }}
             />
           )
@@ -163,6 +252,47 @@ export function ToolpathReview({
       />
     </SafeAreaView>
   )
+}
+
+/** Transport controls and scrubber. Rendered under the inline preview and in the full-screen viewer. */
+function SimulationBar({ count, playhead, playing, speed, elapsed, total, onSeek, onTogglePlay, onCycleSpeed }: {
+  count: number
+  playhead: number
+  playing: boolean
+  speed: number
+  elapsed: number
+  total: number
+  onSeek: (index: number) => void
+  onTogglePlay: () => void
+  onCycleSpeed: () => void
+}) {
+  const { palette } = useTheme()
+  const button = { width: layout.touchTarget, height: layout.touchTarget, alignItems: "center" as const, justifyContent: "center" as const }
+  return <View style={{ gap: 4 }}>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Previous block" accessibilityState={{ disabled: !count || playhead <= 0 }} disabled={!count || playhead <= 0}
+        onPress={() => { haptic("selection"); onSeek(playhead - 1) }} style={({ pressed }) => ({ ...button, opacity: !count || playhead <= 0 ? 0.35 : pressed ? 0.55 : 1 })}>
+        <SkipBack size={18} color={palette.accent} />
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={playing ? "Pause simulation" : "Play simulation"} accessibilityState={{ disabled: !count }} disabled={!count}
+        onPress={onTogglePlay} style={({ pressed }) => ({ ...button, borderRadius: layout.touchTarget / 2, backgroundColor: palette.accent, opacity: !count ? 0.35 : pressed ? 0.75 : 1 })}>
+        {playing ? <Pause size={18} color={palette.onAccent} /> : <Play size={18} color={palette.onAccent} />}
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Next block" accessibilityState={{ disabled: !count || playhead >= count - 1 }} disabled={!count || playhead >= count - 1}
+        onPress={() => { haptic("selection"); onSeek(playhead + 1) }} style={({ pressed }) => ({ ...button, opacity: !count || playhead >= count - 1 ? 0.35 : pressed ? 0.55 : 1 })}>
+        <SkipForward size={18} color={palette.accent} />
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Playback speed ${speed} times. Change speed`} disabled={!count} onPress={onCycleSpeed}
+        style={({ pressed }) => ({ minWidth: 52, height: 32, paddingHorizontal: 10, marginLeft: 4, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 0.5, borderColor: palette.border, backgroundColor: palette.surface, opacity: !count ? 0.35 : pressed ? 0.6 : 1 })}>
+        <Text style={{ color: palette.ink, fontSize: 13, fontWeight: "600", fontVariant: ["tabular-nums"] }}>{speed}×</Text>
+      </Pressable>
+      <Text accessibilityLabel={`Elapsed ${formatDuration(elapsed)} of about ${formatDuration(total)}`} numberOfLines={1}
+        style={{ flex: 1, textAlign: "right", color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>
+        {formatDuration(elapsed)} / ≈ {formatDuration(total)}
+      </Text>
+    </View>
+    <Scrubber count={count} value={playhead} onChange={onSeek} />
+  </View>
 }
 
 function Scrubber({ count, value, onChange }: { count: number; value: number; onChange: (index: number) => void }) {
@@ -198,6 +328,7 @@ function Scrubber({ count, value, onChange }: { count: number; value: number; on
       }}
       onStartShouldSetResponder={() => count > 0}
       onMoveShouldSetResponder={() => count > 0}
+      onResponderTerminationRequest={() => false}
       onResponderGrant={(event) => move(event.nativeEvent.locationX)}
       onResponderMove={(event) => move(event.nativeEvent.locationX)}
     >

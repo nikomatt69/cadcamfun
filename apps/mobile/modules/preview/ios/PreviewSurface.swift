@@ -119,31 +119,45 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
         )
       }
     }
+    // Line draws read `color` as a tint: rgb is the target, alpha how far to move toward it (0 = vertex colour).
+    var lineUniforms = PreviewUniforms(mvp: frame.mvp, color: SIMD4<Float>(0, 0, 0, 0), eye: SIMD4<Float>(frame.eye, 1))
     if linesAreDrawable(frame), let lines = frame.lines, let linePipeline, let depthLess {
       encoder.setRenderPipelineState(linePipeline)
       encoder.setDepthStencilState(depthLess)
       // Negative bias pulls the path toward the camera so it stays visible on the mesh.
       encoder.setDepthBias(-1, slopeScale: -1, clamp: 0)
       encoder.setVertexBuffer(lines, offset: 0, index: 0)
-      encoder.setVertexBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
-      encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: frame.lineVertices)
+      let total = frame.lineVertices
+      let path = min(frame.pathVertices, total)
+      let travelled = frame.travelledVertices < 0 ? path : min(frame.travelledVertices, path)
+      let ranges: [(start: Int, count: Int, faded: Bool)] = [
+        (start: 0, count: travelled, faded: false),
+        (start: travelled, count: path - travelled, faded: true),
+        (start: path, count: total - path, faded: false),
+      ]
+      for range in ranges where range.count >= 2 {
+        lineUniforms.color = range.faded ? SIMD4<Float>(frame.clear, frame.remainingFade) : SIMD4<Float>(0, 0, 0, 0)
+        encoder.setVertexBytes(&lineUniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
+        encoder.drawPrimitives(type: .line, vertexStart: range.start, vertexCount: range.count)
+      }
     }
+    lineUniforms.color = SIMD4<Float>(0, 0, 0, 0)
     if frame.overlayVertices >= 2, frame.overlayVertices % 2 == 0, let overlay = frame.overlay, overlay.length >= frame.overlayVertices * 24, let linePipeline, let depthLess {
       encoder.setRenderPipelineState(linePipeline)
       encoder.setDepthStencilState(depthLess)
       // Outline sits on the faces it bounds: pull it forward like the path.
       encoder.setDepthBias(-1, slopeScale: -1, clamp: 0)
       encoder.setVertexBuffer(overlay, offset: 0, index: 0)
-      encoder.setVertexBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
+      encoder.setVertexBytes(&lineUniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
       encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: frame.overlayVertices)
     }
-    if frame.activeVertices == 2, let active = frame.active, active.length >= 48, let linePipeline, let depthEqual {
+    if (frame.activeVertices == 2 || frame.activeVertices == 4), let active = frame.active, active.length >= frame.activeVertices * 24, let linePipeline, let depthEqual {
       encoder.setRenderPipelineState(linePipeline)
       encoder.setDepthStencilState(depthEqual)
       encoder.setDepthBias(-2, slopeScale: -1, clamp: 0)
       encoder.setVertexBuffer(active, offset: 0, index: 0)
-      encoder.setVertexBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
-      encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: 2)
+      encoder.setVertexBytes(&lineUniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
+      encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: frame.activeVertices)
     }
     encoder.endEncoding()
     command.present(drawable)
@@ -321,7 +335,7 @@ vertex LineOut lineVertex(uint vid [[vertex_id]],
   LineOut out;
   LineVertex item = vertices[vid];
   out.position = uniforms.mvp * float4(float3(item.position), 1.0);
-  out.color = float3(item.color);
+  out.color = mix(float3(item.color), uniforms.color.rgb, uniforms.color.a);
   return out;
 }
 

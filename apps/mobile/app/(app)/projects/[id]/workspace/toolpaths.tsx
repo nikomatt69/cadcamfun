@@ -26,6 +26,7 @@ export default function ToolpathsScreen() {
         load={loadToolpaths}
         emptyTitle="No toolpaths"
         emptyDescription="Toolpaths saved on the desktop open here with the path and the G-code."
+        searchPlaceholder="Search toolpaths"
         onOpen={(entry) => {
           router.push(`/projects/${id}/workspace/toolpaths/${entry.id}?name=${encodeURIComponent(entry.name)}`)
         }}

@@ -45,6 +45,7 @@ export const LINE_COLOR = {
   circular: [0.66, 0.46, 0.94],
   stock: [0.48, 0.5, 0.55],
   active: [1, 0.86, 0.32],
+  tool: [0.98, 0.98, 1],
   edge: [0.1, 0.12, 0.16],
   axisX: [0.9, 0.3, 0.3],
   axisY: [0.35, 0.78, 0.4],
@@ -172,15 +173,47 @@ export const prepareToolpathLines = (segments: readonly PreviewSegment[], stock:
   return data
 }
 
-/** Two vertices, or an empty buffer when no move is current. */
-export const prepareActiveLine = (segment: PreviewSegment | undefined): Float32Array => {
+/** Up to two lines: the current move, and the tool axis standing on its end point. */
+export const PREVIEW_MAX_ACTIVE_VERTICES = 4
+
+/** How strongly the not-yet-cut path fades toward the background while simulating (0 = no fade). */
+export const REMAINING_PATH_FADE = 0.72
+
+/**
+ * The current move, plus a vertical tool axis of `toolLength` at the tool tip when it is positive.
+ * Empty when no move is current.
+ */
+export const prepareActiveLine = (segment: PreviewSegment | undefined, toolLength = 0): Float32Array => {
   if (!segment) return new Float32Array()
   assertPoint(segment.from)
   assertPoint(segment.to)
-  const data = new Float32Array(SEGMENT_FLOATS)
+  const tool = Number.isFinite(toolLength) && toolLength > 0
+  const data = new Float32Array(tool ? SEGMENT_FLOATS * 2 : SEGMENT_FLOATS)
   let cursor = writeVertex(data, 0, segment.from, LINE_COLOR.active)
-  writeVertex(data, cursor, segment.to, LINE_COLOR.active)
+  cursor = writeVertex(data, cursor, segment.to, LINE_COLOR.active)
+  if (tool) {
+    cursor = writeVertex(data, cursor, segment.to, LINE_COLOR.tool)
+    writeVertex(data, cursor, [segment.to[0], segment.to[1], segment.to[2] + toolLength], LINE_COLOR.tool)
+  }
   return data
+}
+
+/**
+ * Line vertices drawn at full colour vs faded. The path buffer is `segments` first, stock edges after,
+ * so `pathVertices` bounds the faded range and the stock box always stays at full colour.
+ * Not simulating: everything is "travelled", i.e. the whole path at full colour.
+ */
+export const progressRange = (playhead: number, segmentCount: number, simulating: boolean): { travelled: number; path: number } => {
+  const count = Math.max(0, Math.trunc(segmentCount))
+  if (!simulating || count === 0) return { travelled: count * 2, path: count * 2 }
+  const done = Math.min(count, Math.max(0, Math.trunc(playhead)) + 1)
+  return { travelled: done * 2, path: count * 2 }
+}
+
+/** Tool marker length: a tenth of the part's size, so it reads at every zoom of a fitted view. */
+export const toolMarkerLength = (bounds: Bounds): number => {
+  const radius = boundsRadius(bounds)
+  return Number.isFinite(radius) ? radius * 0.2 : 0
 }
 
 export const finiteMatrix = (mvp: readonly number[]): boolean => mvp.length === 16 && mvp.every((value) => Number.isFinite(value))

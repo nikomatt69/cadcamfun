@@ -1,5 +1,5 @@
-import { useCallback } from "react"
-import { View } from "react-native"
+import { useCallback, useMemo, useState } from "react"
+import { RefreshControl, Text, View } from "react-native"
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import type { WorkspaceEntry } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
@@ -15,6 +15,8 @@ import { SectionHeader } from "@/components/ui/SectionHeader"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { PageScroll } from "@/components/layout/page-scroll"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
+import { Library, Search } from "lucide-react-native"
+import { filterEntries } from "@/lib/workspace-filter"
 
 export default function LibraryScreen() {
   const params = useLocalSearchParams<{ id: string }>()
@@ -37,28 +39,41 @@ export default function LibraryScreen() {
     router.push(`/projects/${id}/workspace/components/${entry.id}?name=${encodeURIComponent(entry.name)}`)
   }
 
-  const catalogue = library.data
-  const empty =
-    catalogue &&
-    catalogue.materials.length === 0 &&
-    catalogue.tools.length === 0 &&
-    catalogue.machines.length === 0 &&
-    catalogue.components.length === 0
+  const [query, setQuery] = useState("")
+  const searching = query.trim() !== ""
+  const catalogue = useMemo(() => library.data ? {
+    materials: filterEntries(library.data.materials, query),
+    tools: filterEntries(library.data.tools, query),
+    machines: filterEntries(library.data.machines, query),
+    components: filterEntries(library.data.components, query),
+  } : undefined, [library.data, query])
+  const count = (value: typeof catalogue) => value ? value.materials.length + value.tools.length + value.machines.length + value.components.length : 0
+  const total = library.data ? library.data.materials.length + library.data.tools.length + library.data.machines.length + library.data.components.length : 0
+  const empty = catalogue && count(catalogue) === 0
 
   return (
     <View collapsable={false} style={{ flex: 1, backgroundColor: palette.background }}>
-      <Stack.Screen options={{ title: "Library", headerLargeTitle: false }} />
-      <PageScroll>
+      <Stack.Screen options={{ title: "Library", headerLargeTitle: false, headerSearchBarOptions: {
+        placeholder: "Search tools, materials, machines", hideWhenScrolling: false, tintColor: palette.accent,
+        onChangeText: (event) => setQuery(event.nativeEvent.text), onCancelButtonPress: () => setQuery(""),
+      } }} />
+      <PageScroll refreshControl={<RefreshControl refreshing={library.loading && Boolean(library.data)} onRefresh={() => void library.reload()} tintColor={palette.accent} />}>
+      {library.error && catalogue ? <ErrorBanner message={library.error} actionLabel="Retry" onAction={() => void library.reload()} /> : null}
+      {catalogue && total > 0 ? <Text style={{ color: palette.muted, fontSize: 13, fontVariant: ["tabular-nums"] }}>
+        {searching ? `${count(catalogue)} of ${total}` : `${total} ${total === 1 ? "entry" : "entries"}`} · Synced from your desktop
+      </Text> : null}
       {library.loading && !catalogue ? (
         <View style={{ gap: 12 }}>
           {[0, 1, 2, 3].map((index) => (
             <Skeleton key={index} style={{ height: 58 }} />
           ))}
         </View>
-      ) : library.error ? (
+      ) : library.error && !catalogue ? (
         <ErrorBanner message={library.error} actionLabel="Retry" onAction={() => void library.reload()} />
       ) : empty ? (
-        <EmptyState title="Library is empty" description="Materials, tools, machines and components used by this project show up here." />
+        searching && total > 0
+          ? <EmptyState title="No matches" description={`Nothing in the library matches “${query.trim()}”.`} icon={<Search size={25} color={palette.accent} />} />
+          : <EmptyState title="Library is empty" description="Materials, tools, machines and components used by this project show up here." icon={<Library size={25} color={palette.accent} />} />
       ) : catalogue ? (
         <>
           <Catalogue title="Materials" entries={catalogue.materials} />
@@ -85,7 +100,7 @@ function Catalogue({
   if (entries.length === 0) return null
   return (
     <View>
-      <SectionHeader>{title}</SectionHeader>
+      <SectionHeader>{title} · {entries.length}</SectionHeader>
       <SurfaceCard inset={false}>{entries.map((entry, index) => (
         <View key={entry.id}>
           {index > 0 ? <View style={{ height: 0.5, marginLeft: 16, backgroundColor: palette.border }} /> : null}

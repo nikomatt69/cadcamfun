@@ -110,6 +110,20 @@ export const viewOrbit = (bounds: Bounds, view: StandardView, fovY = DEFAULT_FOV
   }
 }
 
+/** Re-centre and re-distance on `bounds` while keeping the current viewing direction. */
+export const frameOrbit = (orbit: Orbit, bounds: Bounds, fovY = DEFAULT_FOV): Orbit => {
+  const fit = fitOrbit(bounds, fovY)
+  return { ...orbit, target: fit.target, distance: fit.distance }
+}
+
+/** Second tap of a double tap: close in time and place to the previous tap. */
+export const isDoubleTap = (
+  previous: { readonly x: number; readonly y: number; readonly at: number } | undefined,
+  next: { readonly x: number; readonly y: number; readonly at: number },
+  windowMs = 300,
+  slop = 30,
+): boolean => previous !== undefined && next.at - previous.at >= 0 && next.at - previous.at <= windowMs && Math.hypot(next.x - previous.x, next.y - previous.y) <= slop
+
 /** 1, 2 or 5 times a power of ten: grid spacing that reads as a round number of millimetres. */
 export const niceStep = (span: number, cells = 10): number => {
   const raw = Math.max(span, 1e-6) / Math.max(cells, 1)

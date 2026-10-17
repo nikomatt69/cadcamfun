@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { answerRequest, appendChatEvent, emptyLog } from "../lib/chat-log"
+import { answerRequest, appendChatEvent, emptyLog, lastUserPrompt, transcriptText } from "../lib/chat-log"
 import type { ChatEvent } from "../lib/sse"
 
 const ev = (e: ChatEvent | { type: "user"; text: string }) => e
@@ -78,4 +78,35 @@ test("polling recovery does not duplicate tools or reopen answered approvals", (
   expect(log).toHaveLength(2)
   expect(log[0]).toMatchObject({ kind: "tool", ok: true, output: "Saved" })
   expect(log[1]).toMatchObject({ kind: "request", answered: true })
+})
+
+test("queued prompts settle when the desktop takes them, and desktop-typed messages appear once", () => {
+  let log = appendChatEvent(emptyLog, { type: "user", text: "Build the plate" })
+  log = appendChatEvent(log, { type: "user", text: "Use 6 mm stock", queued: true })
+  expect(log[1]).toMatchObject({ kind: "user", queued: true })
+  log = appendChatEvent(log, { type: "user_message", sessionId: "s", text: "Use 6 mm stock" })
+  expect(log[1]).toEqual({ kind: "user", text: "Use 6 mm stock" })
+  log = appendChatEvent(log, { type: "user_message", sessionId: "s", text: "Use 6 mm stock" })
+  expect(log).toHaveLength(2)
+  log = appendChatEvent(log, { type: "user_message", sessionId: "s", text: "From the desktop" })
+  expect(log.at(-1)).toEqual({ kind: "user", text: "From the desktop" })
+  expect(lastUserPrompt(log)).toBe("From the desktop")
+})
+
+test("the plan updates in place, retries collapse and clear when the turn ends", () => {
+  let log = appendChatEvent(emptyLog, { type: "user", text: "Mill it" })
+  log = appendChatEvent(log, { type: "todo", sessionId: "s", todos: [{ content: "Model", status: "in_progress" }, { content: "CAM", status: "pending" }] })
+  log = appendChatEvent(log, { type: "retry", sessionId: "s", attempt: 1, message: "rate limited" })
+  log = appendChatEvent(log, { type: "retry", sessionId: "s", attempt: 2, message: "rate limited" })
+  log = appendChatEvent(log, { type: "todo", sessionId: "s", todos: [{ content: "Model", status: "completed" }, { content: "CAM", status: "in_progress" }] })
+  expect(log.filter((row) => row.kind === "plan")).toHaveLength(1)
+  expect(log.filter((row) => row.kind === "notice")).toEqual([{ kind: "notice", tone: "warning", retry: true, text: "Provider retry 2 — rate limited" }])
+  expect(log.find((row) => row.kind === "plan")).toMatchObject({ items: [{ status: "completed" }, { status: "in_progress" }] })
+  log = appendChatEvent(log, { type: "compacted", sessionId: "s" })
+  log = appendChatEvent(log, { type: "permission_blocked", sessionId: "s", permission: "vcs_merge", patterns: [], reason: "a person merges" })
+  log = appendChatEvent(log, { type: "done", sessionId: "s", text: "Done" })
+  expect(log.some((row) => row.kind === "notice" && row.retry)).toBe(false)
+  expect(log.filter((row) => row.kind === "notice").map((row) => row.kind === "notice" && row.tone)).toEqual(["info", "warning"])
+  expect(log.at(-1)).toEqual({ kind: "assistant", sessionId: "s", text: "Done" })
+  expect(transcriptText(log)).toBe("You: Mill it\n\nAssistant: Done")
 })

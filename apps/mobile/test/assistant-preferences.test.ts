@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { assistantModels, filterAssistantModels, formatVariantLabel, rememberedSelection, selectedAssistantModel, type AssistantProvider } from "../lib/assistant-preferences"
+import { assistantModels, filterAssistantModels, formatVariantLabel, rememberedSelection, resolveAssistantPreferences, selectedAssistantModel, type AssistantProvider } from "../lib/assistant-preferences"
 
 const provider = (id: string, configured = true): AssistantProvider => ({ id, name: id, source: "config", auth: ["api"], configured, models: [
   { id: "family/model", name: "Model Pro", provider: id, contextWindow: 100_000, maxOutput: 4096, tools: true, vision: true, variants: ["low", "high"], cost: { input: 1, output: 2 } },
@@ -35,4 +35,11 @@ test("thinking levels are ordered and labelled like nikcli, and the last level p
   expect(formatVariantLabel("very_low")).toBe("Very Low")
   expect(rememberedSelection(pro!, { [pro!.key]: "max" })).toEqual({ provider: "first", model: "pro", variant: "max" })
   expect(rememberedSelection(pro!, { [pro!.key]: "removed" })).toEqual({ provider: "first", model: "pro" })
+})
+
+test("projects without their own settings follow the phone defaults; a project's choice wins", () => {
+  expect(resolveAssistantPreferences(undefined, { permissionMode: "ask", includeContext: false })).toEqual({ agent: "general", permissionMode: "ask", includeContext: false })
+  expect(resolveAssistantPreferences({ agent: "machinist", permissionMode: "auto", includeContext: true }, { permissionMode: "ask", includeContext: false })).toEqual({ agent: "machinist", permissionMode: "auto", includeContext: true })
+  // A corrupt stored default never becomes a permission mode the desktop does not know.
+  expect(resolveAssistantPreferences(undefined, { permissionMode: "everything" as never }).permissionMode).toBe("approve")
 })
