@@ -1652,7 +1652,7 @@ export function make(options: ClientOptions) {
               model: input?.["model"],
             },
             successStatus: 200,
-            declaredStatuses: [400, 500, 401],
+            declaredStatuses: [400, 409, 500, 401],
             empty: false,
           },
           requestOptions,

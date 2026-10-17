@@ -102,6 +102,10 @@ export type AiFailure = { readonly _tag: "AiFailure"; readonly error: string }
 export const isAiFailure = (value: unknown): value is AiFailure =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "AiFailure"
 
+export type Conflict = { readonly _tag: "Conflict"; readonly message: string }
+export const isConflict = (value: unknown): value is Conflict =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "Conflict"
+
 export type GcodeActionError = {
   readonly _tag: "GcodeActionError"
   readonly success: false
@@ -232,10 +236,6 @@ export const isDesktopNotFound = (value: unknown): value is DesktopNotFound =>
 export type Forbidden = { readonly _tag: "Forbidden"; readonly message: string }
 export const isForbidden = (value: unknown): value is Forbidden =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "Forbidden"
-
-export type Conflict = { readonly _tag: "Conflict"; readonly message: string }
-export const isConflict = (value: unknown): value is Conflict =>
-  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "Conflict"
 
 export type PluginBadRequest = {
   readonly _tag: "PluginBadRequest"
@@ -2854,7 +2854,7 @@ export type AiSessionPromptInput = {
   readonly model?: AiSessionPromptPayload["model"]
 }
 
-export type AiSessionPromptOutput = { sessionId: string }
+export type AiSessionPromptOutput = { sessionId: string; seq: number }
 
 export type AiSessionStreamInput = {
   readonly sessionId: { readonly sessionId: string }["sessionId"]

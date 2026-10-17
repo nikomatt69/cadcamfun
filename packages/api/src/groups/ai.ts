@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi"
-import { BadRequest, InternalError, NotFound } from "../errors.ts"
+import { BadRequest, Conflict, InternalError, NotFound } from "../errors.ts"
 import { AiStreamEventSchema, ToolCallEvent, ToolResultEvent, TodoEvent, ToolDiagnosticEvent, UsageSchema } from "../ai-events.ts"
 
 const opt = Schema.optional
@@ -309,7 +309,7 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.post("chatStream", "/api/ai/chat/stream", {
       payload: StreamChatBody, success: HttpApiSchema.StreamSse({ data: chatEvents }), error: [BadRequest, InternalError]
     }),
-    HttpApiEndpoint.post("sessionPrompt", "/api/ai/sessions/prompt", { payload: StreamChatBody, success: SessionPromptReply, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("sessionPrompt", "/api/ai/sessions/prompt", { payload: StreamChatBody, success: SessionPromptReply, error: [BadRequest, Conflict, InternalError] }),
     HttpApiEndpoint.get("sessionStream", "/api/ai/sessions/:sessionId/stream", {
       params: { sessionId: Schema.String }, query: { after: Schema.optional(Schema.NumberFromString) },
       success: HttpApiSchema.StreamSse({ data: SessionStreamFrame }), error: [BadRequest, InternalError]
