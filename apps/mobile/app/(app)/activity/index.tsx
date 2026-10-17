@@ -9,7 +9,7 @@ import { useResource } from "@/lib/use-resource"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { relativeTime } from "@/lib/format"
-import { activityCategory, activityTarget, groupActivity, markLocally, type ActivityTone } from "@/lib/activity-feed"
+import { activityCategory, activityTarget, appendFeedPage, firstFeedPage, groupActivity, markAllInFeed, markLocally, removeFromFeed, type ActivityTone, type FeedPages } from "@/lib/activity-feed"
 import { toast } from "@/components/ui/ToastHost"
 import { PressableScale } from "@/components/ui/PressableScale"
 import { EmptyState } from "@/components/ui/EmptyState"
@@ -21,13 +21,13 @@ import { IconTile } from "@/components/ui/icon-tile"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 
 const PAGE = 50
-type Feed = { notifications: readonly NotificationRow[]; unreadCount: number }
 
 /**
  * The Activity feed — the same notification stream the desktop shows: pull requests opened,
  * workflows passed or failed, the AI committing on an ai/ branch. Rows are grouped by day; a tap
  * marks the row read (optimistically) and opens the pull request, component or project it is about;
- * a long press offers read/unread and deletion. Older updates load in pages.
+ * a long press offers read/unread and deletion. Older updates load page by page from the server
+ * offset, so loading more never refetches what is already on screen.
  */
 export default function ActivityScreen() {
   const { client } = useServer()
@@ -36,30 +36,60 @@ export default function ActivityScreen() {
   const { gutter, fontScale, onLayout } = useContentLayout()
   const [filter, setFilter] = useState<"all" | "unread">("all")
   const [marking, setMarking] = useState(false)
-  const [limit, setLimit] = useState(PAGE)
-  const [local, setLocal] = useState<Feed | undefined>()
+  const [pages, setPages] = useState<FeedPages | undefined>()
+  const [older, setOlder] = useState<{ loading: boolean; error?: string }>({ loading: false })
+  const olderRequest = useRef<AbortController | null>(null)
 
   const feed = useResource(
-    useCallback((signal) => (client ? client.notifications({ limit }, signal) : Promise.reject(new Error("Not connected"))), [client, limit]),
+    useCallback((signal) => (client ? client.notifications({ limit: PAGE }, signal) : Promise.reject(new Error("Not connected"))), [client]),
     "notifications",
   )
-  // The server's answer always replaces optimistic edits.
-  useEffect(() => { setLocal(undefined) }, [feed.data])
-  // Loading an older page refetches from scratch: keep the rows on screen meanwhile.
-  const lastFeed = useRef<Feed | undefined>(undefined)
-  if (feed.data) lastFeed.current = feed.data
-  if (!client) lastFeed.current = undefined
-  const data: Feed | undefined = local ?? feed.data ?? lastFeed.current
+  // The newest page from the server replaces everything loaded before it, optimistic edits included.
+  useEffect(() => {
+    olderRequest.current?.abort()
+    setOlder({ loading: false })
+    if (feed.data) setPages(firstFeedPage(feed.data, PAGE))
+  }, [feed.data])
+  useEffect(() => { if (!client) setPages(undefined) }, [client])
+  useEffect(() => () => olderRequest.current?.abort(), [])
+  const data = pages
+
+  const loadOlder = async () => {
+    if (!client || !pages || pages.exhausted || older.loading) return
+    const request = new AbortController()
+    olderRequest.current?.abort()
+    olderRequest.current = request
+    setOlder({ loading: true })
+    try {
+      const page = await client.notifications({ limit: PAGE, offset: pages.offset }, request.signal)
+      if (request.signal.aborted) return
+      setPages((current) => current ? appendFeedPage(current, page, PAGE) : current)
+      setOlder({ loading: false })
+    } catch (error) {
+      if (!request.signal.aborted) setOlder({ loading: false, error: error instanceof Error ? error.message : "Could not load older updates" })
+    } finally {
+      if (olderRequest.current === request) olderRequest.current = null
+    }
+  }
+
+  /** Applies an edit at once and puts the previous feed back if the desktop refuses it. */
+  const optimistic = async (edit: (feed: FeedPages) => FeedPages, work: () => Promise<unknown>, failure: string) => {
+    const before = pages
+    if (!before) return false
+    setPages(edit(before))
+    try {
+      await work()
+      return true
+    } catch (error) {
+      setPages((current) => current === undefined ? current : before)
+      toast(error instanceof Error ? error.message : failure, "error")
+      return false
+    }
+  }
 
   const setRead = async (row: NotificationRow, isRead: boolean) => {
-    if (!client || !data) return
-    setLocal(markLocally(data, row.id, isRead))
-    try {
-      await client.markNotificationRead(row.id, isRead)
-    } catch (error) {
-      setLocal(undefined)
-      toast(error instanceof Error ? error.message : "Could not update", "error")
-    }
+    if (!client) return
+    await optimistic((current) => markLocally(current, row.id, isRead), () => client.markNotificationRead(row.id, isRead), "Could not update")
   }
 
   const open = (row: NotificationRow) => {
@@ -76,12 +106,9 @@ export default function ActivityScreen() {
         text: "Delete",
         style: "destructive",
         onPress: () => {
-          if (!client || !data) return
-          setLocal({ notifications: data.notifications.filter((item) => item.id !== row.id), unreadCount: Math.max(0, data.unreadCount - (row.isRead ? 0 : 1)) })
-          void client.removeNotification(row.id).then(() => feed.reload()).catch((error: unknown) => {
-            setLocal(undefined)
-            toast(error instanceof Error ? error.message : "Could not delete", "error")
-          })
+          if (!client) return
+          void optimistic((current) => removeFromFeed(current, row.id), () => client.removeNotification(row.id), "Could not delete")
+            .then((removed) => { if (removed) haptic("success") })
         },
       },
     ])
@@ -107,20 +134,14 @@ export default function ActivityScreen() {
   const markAll = async () => {
     if (!client || marking || !data) return
     setMarking(true)
-    setLocal({ notifications: data.notifications.map((row) => ({ ...row, isRead: true })), unreadCount: 0 })
     try {
-      await client.markAllNotificationsRead()
-      haptic("success")
-      await feed.reload()
-    } catch (error) {
-      setLocal(undefined)
-      toast(error instanceof Error ? error.message : "Could not update", "error")
+      if (await optimistic(markAllInFeed, () => client.markAllNotificationsRead(), "Could not update")) haptic("success")
     } finally { setMarking(false) }
   }
 
   const items = useMemo(() => groupActivity((data?.notifications ?? []).filter((row) => filter === "all" || !row.isRead), Date.now()), [data, filter])
   const unreadCount = data?.unreadCount ?? 0
-  const mayHaveMore = (data?.notifications.length ?? 0) >= limit
+  const mayHaveMore = data !== undefined && !data.exhausted
   const toneColor = (tone: ActivityTone) => tone === "success" ? palette.success : tone === "danger" ? palette.danger : tone === "accent" ? palette.accent : palette.muted
 
   return <FlashList data={items} keyExtractor={(item) => item.key} getItemType={(item) => item.kind} onLayout={onLayout} style={{ flex: 1, backgroundColor: palette.background }}
@@ -141,7 +162,12 @@ export default function ActivityScreen() {
     </View>}
     ListEmptyComponent={feed.loading && !data ? <View accessible accessibilityLabel="Loading updates" style={{ gap: 12 }}>{[0, 1, 2].map((key) => <Skeleton key={key} style={{ height: 104 }} />)}</View> : !feed.error ?
       <EmptyState icon={<BellOff size={26} color={palette.accent} />} title={filter === "unread" ? "All caught up" : "No updates yet"} description={filter === "unread" ? "You've read every update. New activity will appear here." : "Project reviews, workflow results and assistant changes will appear here."} /> : null}
-    ListFooterComponent={mayHaveMore && filter === "all" ? <View style={{ paddingTop: 16 }}><ActionButton label="Load older updates" variant="ghost" loading={feed.loading} onPress={() => setLimit((current) => current + PAGE)} /></View> : null}
+    ListFooterComponent={mayHaveMore && filter === "all" ? <View style={{ paddingTop: 16, gap: 10 }}>
+      {older.error ? <ErrorBanner message={older.error} actionLabel="Try again" onAction={() => void loadOlder()} /> : null}
+      {older.error ? null : <ActionButton label="Load older updates" variant="ghost" loading={older.loading} onPress={() => void loadOlder()} />}
+    </View> : null}
+    onEndReachedThreshold={0.4}
+    onEndReached={() => { if (filter === "all" && mayHaveMore && !older.error) void loadOlder() }}
     renderItem={({ item }) => {
       if (item.kind === "section") {
         return <View accessibilityRole="header" style={{ flexDirection: "row", alignItems: "baseline", gap: 8, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 4 }}>

@@ -78,11 +78,55 @@ export const activityTarget = (row: Pick<NotificationRow, "type" | "title" | "pr
 }
 
 /** Optimistic local update while the desktop confirms; the next reload replaces it. */
-export const markLocally = (feed: { notifications: readonly NotificationRow[]; unreadCount: number }, id: string, isRead: boolean) => {
+export const markLocally = <F extends { readonly notifications: readonly NotificationRow[]; readonly unreadCount: number }>(feed: F, id: string, isRead: boolean): F => {
   const row = feed.notifications.find((item) => item.id === id)
   if (!row || row.isRead === isRead) return feed
   return {
+    ...feed,
     notifications: feed.notifications.map((item) => item.id === id ? { ...item, isRead } : item),
     unreadCount: Math.max(0, feed.unreadCount + (isRead ? -1 : 1)),
   }
 }
+
+/**
+ * The loaded part of the feed, page by page (`GET /api/notifications?limit&offset`, newest first). `offset` counts the
+ * server rows consumed, minus rows deleted here, so the next page starts right after the last one shown. A row that
+ * arrived on the desktop meanwhile shifts the server's order by one: the overlap is dropped by id, nothing is skipped.
+ */
+export interface FeedPages {
+  readonly notifications: readonly NotificationRow[]
+  readonly unreadCount: number
+  readonly offset: number
+  /** The last page came back short: there is nothing older to load. */
+  readonly exhausted: boolean
+}
+
+type FeedPage = { readonly notifications: readonly NotificationRow[]; readonly unreadCount: number }
+
+export const firstFeedPage = (page: FeedPage, pageSize: number): FeedPages => appendFeedPage(undefined, page, pageSize)
+
+export const appendFeedPage = (feed: FeedPages | undefined, page: FeedPage, pageSize: number): FeedPages => {
+  const known = new Set((feed?.notifications ?? []).map((row) => row.id))
+  const fresh = page.notifications.filter((row) => !known.has(row.id))
+  return {
+    notifications: [...(feed?.notifications ?? []), ...fresh],
+    // The newest page carries the newest count.
+    unreadCount: page.unreadCount,
+    offset: (feed?.offset ?? 0) + page.notifications.length,
+    exhausted: page.notifications.length < pageSize,
+  }
+}
+
+/** A row deleted here is gone from the server too: the next page starts one row earlier. */
+export const removeFromFeed = (feed: FeedPages, id: string): FeedPages => {
+  const row = feed.notifications.find((item) => item.id === id)
+  if (!row) return feed
+  return {
+    ...feed,
+    notifications: feed.notifications.filter((item) => item.id !== id),
+    unreadCount: Math.max(0, feed.unreadCount - (row.isRead ? 0 : 1)),
+    offset: Math.max(0, feed.offset - 1),
+  }
+}
+
+export const markAllInFeed = (feed: FeedPages): FeedPages => ({ ...feed, notifications: feed.notifications.map((row) => row.isRead ? row : { ...row, isRead: true }), unreadCount: 0 })

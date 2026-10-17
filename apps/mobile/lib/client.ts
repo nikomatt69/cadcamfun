@@ -1,16 +1,44 @@
-import type { SessionStreamFrame } from "@cadcamfun/api"
+import type { AiStatus, SessionStreamFrame } from "@cadcamfun/api"
 import type { ComponentPreview, EntityChange, LibraryCatalogue, LiveEvent, MeshPreview, NotificationRow, PullRequestRow, ReviewRow, SessionControlReply, SessionStateReply, ToolpathPreview, ToolpathReview, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow, WorkspaceEntry } from "@cadcamfun/api"
 import type { Pairing } from "./pairing"
 import type { AssistantPreferences, AssistantProvider } from "./assistant-preferences"
 import type { ChatEvent } from "./sse"
 import { sseParser } from "./sse"
 
-/** `GET /api/ai/status` payload, declared locally — importing the schema const would drag Effect into the bundle. */
+/**
+ * `GET /api/ai/status` as the phone can rely on it. The current API always sends `providers` and `host`; `host` stays
+ * optional here because a phone also pairs with desktops built before it existed, and `aiStatus` fills `providers`
+ * instead of trusting it. Types only: the schema const would drag Effect into the bundle.
+ */
 export interface AiStatusInfo {
-  providers?: Readonly<Record<string, string>>
-  configured: boolean
-  tools?: ReadonlyArray<{ id: string; description: string }>
-  host?: "nikcli" | "direct"
+  readonly providers: Readonly<Record<string, "configured" | "missing">>
+  readonly configured: boolean
+  readonly tools?: ReadonlyArray<{ readonly id: string; readonly description: string }>
+  readonly host?: "nikcli" | "direct"
+}
+
+/** Compile-time contract: every status the desktop API can send fits the phone's type. */
+const _aiStatusFits = (status: typeof AiStatus.Type): AiStatusInfo => status
+void _aiStatusFits
+
+const AI_HOSTS: ReadonlySet<string> = new Set(["nikcli", "direct"])
+
+/** Keeps the fields the screens read and refuses a reply without the one they cannot guess (`configured`). */
+export const normalizeAiStatus = (raw: unknown): AiStatusInfo => {
+  const value = (raw ?? {}) as { providers?: unknown; configured?: unknown; tools?: unknown; host?: unknown }
+  if (typeof value.configured !== "boolean") throw new CompanionError(502, "The desktop returned an invalid assistant status")
+  const providers = value.providers && typeof value.providers === "object" && !Array.isArray(value.providers)
+    ? Object.fromEntries(Object.entries(value.providers).filter((entry): entry is [string, "configured" | "missing"] => entry[1] === "configured" || entry[1] === "missing"))
+    : {}
+  const tools = Array.isArray(value.tools)
+    ? value.tools.filter((tool): tool is { id: string; description: string } => Boolean(tool) && typeof tool.id === "string" && typeof tool.description === "string").map((tool) => ({ id: tool.id, description: tool.description }))
+    : undefined
+  return {
+    providers,
+    configured: value.configured,
+    ...(tools ? { tools } : {}),
+    ...(typeof value.host === "string" && AI_HOSTS.has(value.host) ? { host: value.host as "nikcli" | "direct" } : {}),
+  }
 }
 
 export interface AssistantAgentInfo {
@@ -146,7 +174,7 @@ export class CompanionClient {
   // ── Assistant ───────────────────────────────────────────────────────────
 
   /** Whether the paired desktop has a model key; checked before the user types. */
-  aiStatus = (signal?: AbortSignal) => this.request<AiStatusInfo>("GET", "/api/ai/status", undefined, signal)
+  aiStatus = async (signal?: AbortSignal): Promise<AiStatusInfo> => normalizeAiStatus(await this.request<unknown>("GET", "/api/ai/status", undefined, signal))
   agents = (signal?: AbortSignal) => this.request<AssistantAgentInfo[]>("GET", "/api/ai/agents", undefined, signal)
   sessionState = async (sessionId: string, signal?: AbortSignal) => {
     const state = await this.request<typeof SessionStateReply.Type>("POST", "/api/ai/sessions/state", { sessionId }, signal)
@@ -252,9 +280,11 @@ export class CompanionClient {
 
   // ── Notifications: the user's activity feed, shared with the desktop ────
 
-  notifications = (options: { readonly limit?: number; readonly onlyUnread?: boolean } = {}, signal?: AbortSignal) => {
+  /** One page, newest first: `offset` skips the rows already shown, so an older page never refetches the newer ones. */
+  notifications = (options: { readonly limit?: number; readonly offset?: number; readonly onlyUnread?: boolean } = {}, signal?: AbortSignal) => {
     const query = new URLSearchParams()
     if (options.limit !== undefined) query.set("limit", String(options.limit))
+    if (options.offset !== undefined && options.offset > 0) query.set("offset", String(Math.floor(options.offset)))
     if (options.onlyUnread) query.set("onlyUnread", "true")
     const suffix = query.size > 0 ? `?${query.toString()}` : ""
     return this.request<{ notifications: ReadonlyArray<NotificationRow>; unreadCount: number }>("GET", `/api/notifications${suffix}`, undefined, signal)

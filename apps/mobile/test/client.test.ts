@@ -202,3 +202,24 @@ test("the mobile model picker reads the desktop catalogue and sends the exact mo
     { method: "POST", path: "/api/ai/chat/stream", body },
   ])
 })
+
+describe("assistant status and notification paging", () => {
+  test("the status keeps what the screens read and refuses a reply without `configured`", async () => {
+    const t = new FakeTransport()
+    t.handler = () => ({ status: 200, body: JSON.stringify({ providers: { openai: "configured", bad: 3 }, configured: true, host: "nikcli", tools: [{ id: "cad_edit", description: "Edit" }, { id: 4 }] }) })
+    expect(await client(t).aiStatus()).toEqual({ providers: { openai: "configured" }, configured: true, host: "nikcli", tools: [{ id: "cad_edit", description: "Edit" }] })
+    // An older desktop without `host` or `providers` still pairs; nothing is invented for it.
+    t.handler = () => ({ status: 200, body: JSON.stringify({ configured: false }) })
+    expect(await client(t).aiStatus()).toEqual({ providers: {}, configured: false })
+    t.handler = () => ({ status: 200, body: JSON.stringify({ providers: {} }) })
+    await expect(client(t).aiStatus()).rejects.toMatchObject({ status: 502 })
+  })
+
+  test("older notification pages ask for the server offset; the first page sends none", async () => {
+    const t = new FakeTransport()
+    t.handler = () => ({ status: 200, body: JSON.stringify({ notifications: [], unreadCount: 0 }) })
+    await client(t).notifications({ limit: 50 })
+    await client(t).notifications({ limit: 50, offset: 50 })
+    expect(t.calls.map((call) => call.path)).toEqual(["/api/notifications?limit=50", "/api/notifications?limit=50&offset=50"])
+  })
+})

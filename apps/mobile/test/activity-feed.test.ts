@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import type { NotificationRow } from "@cadcamfun/api"
-import { activityCategory, activityTarget, daySection, groupActivity, markLocally } from "../lib/activity-feed"
+import { activityCategory, activityTarget, appendFeedPage, daySection, firstFeedPage, groupActivity, markAllInFeed, markLocally, removeFromFeed } from "../lib/activity-feed"
 
 const now = new Date(2026, 9, 17, 15, 0).getTime()
 const at = (days: number, hour = 10) => new Date(2026, 9, 17 - days, hour).toISOString()
@@ -33,4 +33,30 @@ test("read toggles update the feed optimistically and keep the unread count cons
   expect(markLocally(read, "a", true)).toBe(read)
   expect(markLocally(read, "b", false).unreadCount).toBe(1)
   expect(markLocally(feed, "missing", true)).toBe(feed)
+})
+
+test("older pages continue at the server offset, drop rows that shifted in, and stop on a short page", () => {
+  const first = firstFeedPage({ notifications: [row("n5", at(0)), row("n4", at(0))], unreadCount: 2 }, 2)
+  expect(first.offset).toBe(2)
+  expect(first.exhausted).toBe(false)
+  // A new row arrived on the desktop: the server's page at offset 2 now starts with n4 again.
+  const second = appendFeedPage(first, { notifications: [row("n4", at(0)), row("n3", at(1))], unreadCount: 3 }, 2)
+  expect(second.notifications.map((item) => item.id)).toEqual(["n5", "n4", "n3"])
+  expect(second.offset).toBe(4)
+  expect(second.unreadCount).toBe(3)
+  const last = appendFeedPage(second, { notifications: [row("n2", at(2))], unreadCount: 3 }, 2)
+  expect(last.exhausted).toBe(true)
+  expect(last.offset).toBe(5)
+})
+
+test("a deletion here moves the next page back by one; read edits keep the paging state", () => {
+  const feed = firstFeedPage({ notifications: [row("a", at(0)), row("b", at(0), { isRead: true })], unreadCount: 1 }, 2)
+  const removed = removeFromFeed(feed, "a")
+  expect(removed.offset).toBe(1)
+  expect(removed.unreadCount).toBe(0)
+  expect(removeFromFeed(feed, "missing")).toBe(feed)
+  const read = markLocally(feed, "a", true)
+  expect(read.offset).toBe(2)
+  expect(read.unreadCount).toBe(0)
+  expect(markAllInFeed(feed).notifications.every((item) => item.isRead)).toBe(true)
 })
