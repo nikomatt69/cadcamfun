@@ -1,43 +1,64 @@
 import type { ChatRow } from "./chat-log"
 
 /**
- * Transcript layout rows (nikcli: transcript-rows + session-queue, CADCAMFUN domain).
+ * Transcript layout (nikcli: transcript-rows + ToolRunGroup, CADCAMFUN domain).
  *
- * The raw ChatRow list cannot express time breaks or whether the assistant is
- * still processing; both are decided here so screens only render what handed.
+ * The folded ChatRow list says what happened; this decides how it is laid out: every item gets an id that stays the
+ * same while the conversation grows (list rows are recycled and memoized by it), and a run of finished tool calls
+ * collapses into one group row so a long CAD/CAM turn reads as its answer, not as forty tool cards.
  */
 
-export type TranscriptRow =
-  | { kind: "time"; id: string; label: string; at: number }
-  | { kind: "row"; id: string; row: ChatRow }
+export type ToolRow = Extract<ChatRow, { kind: "tool" }>
 
-/** A pause longer than this earns a timestamp between messages. */
-export const TIME_GAP_MS = 30 * 60 * 1000
+export type TranscriptItem =
+  | { readonly kind: "row"; readonly id: string; readonly row: ChatRow }
+  | { readonly kind: "tools"; readonly id: string; readonly rows: readonly ToolRow[] }
 
-export function clockLabel(at: number): string {
-  const date = new Date(at)
-  const hours = date.getHours()
-  const minutes = date.getMinutes().toString().padStart(2, "0")
-  return `${hours}:${minutes}`
+/** Below this a run is short enough to read in place (nikcli `COLLAPSE_FROM`). */
+export const TOOL_RUN_COLLAPSE_FROM = 3
+
+/** Stable per conversation: rows only ever append, or change in place, so the log index names a row for its life. */
+const rowId = (row: ChatRow, index: number): string => {
+  switch (row.kind) {
+    case "tool": return `tool:${row.callId}`
+    case "request": return `request:${row.requestId}`
+    case "question": return `question:${row.requestId}`
+    case "plan": return `plan:${row.sessionId}`
+    default: return `${row.kind}:${index}`
+  }
 }
 
-/** Time breaks only; ChatRows already carry their own order. */
-export function buildTranscriptRows(rows: readonly ChatRow[], now = Date.now(), gapMs = TIME_GAP_MS): TranscriptRow[] {
-  const out: TranscriptRow[] = []
-  let previousAt: number | undefined
+/**
+ * A running tool stays visible on its own, so the user watches the step in progress; settled neighbours group.
+ * A group is named after its first call, so it keeps its id while later calls join it.
+ */
+export function buildTranscript(rows: readonly ChatRow[], collapseFrom = TOOL_RUN_COLLAPSE_FROM): TranscriptItem[] {
+  const items: TranscriptItem[] = []
+  let run: { start: number; rows: ToolRow[] } | undefined
+  const flush = () => {
+    if (!run) return
+    if (run.rows.length >= collapseFrom) items.push({ kind: "tools", id: `tools:${run.rows[0]!.callId}`, rows: run.rows })
+    else run.rows.forEach((row, offset) => items.push({ kind: "row", id: rowId(row, run!.start + offset), row }))
+    run = undefined
+  }
   rows.forEach((row, index) => {
-    // ChatRows carry no timestamps, so time breaks are derived from tool/error
-    // boundaries: a finished tool group earns no extra row, but an error after a
-    // long assistant run is separated visually by the caller. Keep the first-row
-    // timestamp so the transcript has a stable anchor.
-    const at = now
-    if (previousAt === undefined || at - previousAt >= gapMs) {
-      if (index === 0) out.push({ kind: "time", id: `time_0`, label: clockLabel(at), at })
-      previousAt = at
+    if (row.kind === "tool" && row.ok !== null) {
+      run ??= { start: index, rows: [] }
+      run.rows.push(row)
+      return
     }
-    out.push({ kind: "row", id: `row_${index}`, row })
+    flush()
+    items.push({ kind: "row", id: rowId(row, index), row })
   })
-  return out
+  flush()
+  return items
+}
+
+/** One line for a collapsed run: how many calls, which domains, and whether any failed. */
+export function toolRunSummary(rows: readonly ToolRow[]): { readonly title: string; readonly failed: number; readonly images: number } {
+  const failed = rows.filter((row) => row.ok === false).length
+  const images = rows.reduce((count, row) => count + (row.images?.length ?? 0), 0)
+  return { title: `${rows.length} tool calls`, failed, images }
 }
 
 /** Last assistant bubble that has not failed — user messages after it are queued server-side while busy. */
@@ -55,8 +76,4 @@ export function getPendingAssistantIndex(rows: readonly ChatRow[]): number | nul
 export function countQueuedUserMessages(rows: readonly ChatRow[], pendingIndex: number | null): number {
   if (pendingIndex === null) return 0
   return rows.slice(pendingIndex + 1).filter((row) => row.kind === "user").length
-}
-
-export function transcriptIsProcessing(busy: boolean): boolean {
-  return busy
 }

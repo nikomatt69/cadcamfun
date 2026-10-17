@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { memo, useState } from "react"
 import { Keyboard, Pressable, Share, Text, View, useWindowDimensions } from "react-native"
 import * as Clipboard from "expo-clipboard"
 import { Copy, CornerUpLeft, Share2, X } from "lucide-react-native"
@@ -17,12 +17,13 @@ import type { ChatRow } from "@/lib/chat-log"
  * A long press shows the message actions (nikcli: Copy / Reuse). Reuse only fills the composer:
  * the user decides whether to send it again, so a CAD/CAM mutation is never replayed silently.
  */
-export function MessageBubble({ row, onReuse }: { row: Extract<ChatRow, { kind: "user" | "assistant" }>; onReuse?: (text: string) => void }) {
+export const MessageBubble = memo(function MessageBubble({ row, onReuse }: { row: Extract<ChatRow, { kind: "user" | "assistant" }>; onReuse?: (text: string) => void }) {
   const { palette, isDark } = useTheme()
   const { fontScale } = useWindowDimensions()
   const [active, setActive] = useState(false)
   const isUser = row.kind === "user"
   const queued = row.kind === "user" && row.queued === true
+  const offline = row.kind === "user" && row.offline === true
 
   const copy = async () => {
     try {
@@ -41,7 +42,7 @@ export function MessageBubble({ row, onReuse }: { row: Extract<ChatRow, { kind: 
       onLongPress={() => { haptic("selection"); setActive(true) }}
       delayLongPress={220}
       accessibilityRole="text"
-      accessibilityLabel={`${isUser ? queued ? "Your queued message" : "Your message" : "Assistant"}: ${row.text}`}
+      accessibilityLabel={`${isUser ? offline ? "Your message, waiting for the desktop" : queued ? "Your queued message" : "Your message" : "Assistant"}: ${row.text}`}
       accessibilityHint="Long press for copy, share and reuse"
       accessibilityActions={[{ name: "copy", label: "Copy" }, { name: "share", label: "Share" }, ...(isUser && onReuse ? [{ name: "reuse", label: "Reuse in composer" }] : [])]}
       onAccessibilityAction={(event) => {
@@ -63,10 +64,11 @@ export function MessageBubble({ row, onReuse }: { row: Extract<ChatRow, { kind: 
           backgroundColor: isUser ? hexToRgba(palette.ink, isDark ? 0.14 : 0.075) : "transparent",
           borderWidth: active ? 1 : 0,
           borderColor: hexToRgba(palette.accent, 0.5),
-          opacity: queued ? 0.72 : 1,
+          opacity: queued || offline ? 0.72 : 1,
         }}
       >
-        {queued ? <Text style={{ color: palette.muted, fontSize: 11, fontWeight: "600", marginBottom: 6 }}>Queued · the desktop takes it at the next step</Text> : null}
+        {offline ? <Text style={{ color: palette.muted, fontSize: 11, fontWeight: "600", marginBottom: 6 }}>Waiting for the desktop · sends when it reconnects</Text>
+          : queued ? <Text style={{ color: palette.muted, fontSize: 11, fontWeight: "600", marginBottom: 6 }}>Queued · the desktop takes it at the next step</Text> : null}
         <Text
           selectable={!active}
           style={{
@@ -87,7 +89,7 @@ export function MessageBubble({ row, onReuse }: { row: Extract<ChatRow, { kind: 
       ) : null}
     </Pressable>
   )
-}
+})
 
 function ActionChip({ label, Icon, onPress, muted }: { label: string; Icon: typeof Copy; onPress(): void; muted?: boolean }) {
   const { palette } = useTheme()

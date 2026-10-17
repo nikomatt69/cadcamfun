@@ -1,4 +1,4 @@
-import { useReducer, useRef, useState } from "react"
+import { memo, useReducer, useRef, useState } from "react"
 import { Text, View } from "react-native"
 import { CheckCircle2, Circle, MessageSquare, Square, SquareCheck } from "lucide-react-native"
 import type { ChatRow } from "@/lib/chat-log"
@@ -13,7 +13,7 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { PressableScale } from "@/components/ui/PressableScale"
 
-export function QuestionCard({ row, onReply, onReject }: {
+export const QuestionCard = memo(function QuestionCard({ row, onReply, onReject }: {
   row: Extract<ChatRow, { kind: "question" }>
   onReply: (requestId: string, answers: string[][]) => Promise<void>
   onReject: (requestId: string) => Promise<void>
@@ -80,4 +80,4 @@ export function QuestionCard({ row, onReply, onReject }: {
       </> : null}
     </View>
   </SurfaceCard>
-}
+})

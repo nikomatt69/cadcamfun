@@ -1,10 +1,11 @@
+import { memo } from "react"
 import { Text, View } from "react-native"
 import { Check, Circle, CircleDot, ListChecks, X } from "lucide-react-native"
 import type { ChatRow } from "@/lib/chat-log"
 import { hexToRgba, useTheme } from "@/lib/theme"
 
 /** The agent's todo list as it stands (nikcli: plan panel), updated in place while the turn runs. */
-export function PlanCard({ row }: { row: Extract<ChatRow, { kind: "plan" }> }) {
+export const PlanCard = memo(function PlanCard({ row }: { row: Extract<ChatRow, { kind: "plan" }> }) {
   const { palette } = useTheme()
   const done = row.items.filter((item) => item.status === "completed").length
   return (
@@ -30,10 +31,10 @@ export function PlanCard({ row }: { row: Extract<ChatRow, { kind: "plan" }> }) {
       })}
     </View>
   )
-}
+})
 
 /** Host notices: provider retries, compaction and blocked permissions. Not part of the answer. */
-export function NoticeRow({ row }: { row: Extract<ChatRow, { kind: "notice" }> }) {
+export const NoticeRow = memo(function NoticeRow({ row }: { row: Extract<ChatRow, { kind: "notice" }> }) {
   const { palette } = useTheme()
   const color = row.tone === "warning" ? palette.warning : palette.muted
   return (
@@ -42,4 +43,4 @@ export function NoticeRow({ row }: { row: Extract<ChatRow, { kind: "notice" }> }
       <Text selectable style={{ flexShrink: 1, color, fontSize: 12, lineHeight: 17, textAlign: "center" }}>{row.text}</Text>
     </View>
   )
-}
+})

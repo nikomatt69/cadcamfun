@@ -1,5 +1,6 @@
-import { useState } from "react"
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native"
+import { memo, useState } from "react"
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native"
+import { SafeAreaView } from "react-native-safe-area-context"
 import { Box, Check, ChevronDown, ChevronRight, CircleGauge, Copy, GitPullRequest, Route, Workflow, Wrench, X, type LucideIcon } from "lucide-react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
@@ -35,7 +36,42 @@ function stringify(value: unknown): string {
   }
 }
 
-export function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }) {
+/**
+ * What a tool rendered (the model from the desktop's viewport). Thumbnails stay visible even when the card is collapsed:
+ * seeing the part change is how the user follows a CAD turn from the phone. A tap opens a zoomable full-screen view.
+ */
+export function ToolImages({ images, tool }: { images: readonly string[]; tool: string }) {
+  const { palette } = useTheme()
+  const { width, height } = useWindowDimensions()
+  const [shown, setShown] = useState<string | null>(null)
+  const name = tool.replaceAll("_", " ")
+  return <>
+    <View style={{ flexDirection: "row", gap: 8 }}>
+      {images.map((uri, index) => <Pressable key={index} onPress={() => { haptic("selection"); setShown(uri) }}
+        accessibilityRole="imagebutton" accessibilityLabel={`Render from ${name}${images.length > 1 ? `, ${index + 1} of ${images.length}` : ""}`} accessibilityHint="Opens the image full screen"
+        style={({ pressed }) => ({ flex: 1, maxWidth: images.length === 1 ? 320 : undefined, aspectRatio: 4 / 3, borderRadius: 12, borderCurve: "continuous", overflow: "hidden", borderWidth: StyleSheet.hairlineWidth, borderColor: palette.border, backgroundColor: palette.panel, opacity: pressed ? 0.85 : 1 })}>
+        <Image source={{ uri }} resizeMode="cover" style={{ width: "100%", height: "100%" }} />
+      </Pressable>)}
+    </View>
+    <Modal visible={shown !== null} animationType="fade" presentationStyle="fullScreen" supportedOrientations={["portrait", "landscape"]} onRequestClose={() => setShown(null)}>
+      <SafeAreaView edges={["top", "bottom", "left", "right"]} style={{ flex: 1, backgroundColor: "#000" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", minHeight: layout.touchTarget + 8, paddingLeft: 20, paddingRight: 8 }}>
+          <Text accessibilityRole="header" numberOfLines={1} style={{ flex: 1, color: "#fff", fontSize: 17, fontWeight: "600" }}>{name}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close image" onPress={() => setShown(null)}
+            style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
+            <X size={22} color="#fff" />
+          </Pressable>
+        </View>
+        {/* iOS pinch-zooms a ScrollView natively; a double tap is not needed to read a render. */}
+        <ScrollView maximumZoomScale={4} minimumZoomScale={1} centerContent showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center" }}>
+          {shown ? <Image source={{ uri: shown }} resizeMode="contain" accessibilityLabel={`Render from ${name}`} style={{ width, height: height * 0.8 }} /> : null}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  </>
+}
+
+export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }) {
   const { palette, isDark } = useTheme()
   const [open, setOpen] = useState(false)
   const { copied, error: copyError, copy } = useCopiedFeedback()
@@ -89,6 +125,8 @@ export function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }
         {hasDetails ? open ? <ChevronDown size={15} color={palette.muted} /> : <ChevronRight size={15} color={palette.muted} /> : null}
       </PressableScale>
 
+      {row.images?.length ? <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}><ToolImages images={row.images} tool={row.tool} /></View> : null}
+
       {open ? (
         <View style={{ gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hexToRgba(palette.ink, 0.09), padding: 12 }}>
           {row.diagnostic ? (
@@ -124,4 +162,4 @@ export function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }
       ) : null}
     </View>
   )
-}
+})

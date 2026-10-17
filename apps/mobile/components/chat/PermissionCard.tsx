@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { memo, useRef, useState } from "react"
 import { Text, View } from "react-native"
 import { CheckCircle2, ShieldAlert } from "lucide-react-native"
 import { ActionButton } from "@/components/ui/ActionButton"
@@ -12,7 +12,7 @@ import type { ChatRow } from "@/lib/chat-log"
 type Decision = "once" | "always" | "reject"
 
 /** Approval names its scope explicitly, with full paths visible before the user decides. */
-export function PermissionCard({ row, onReply }: {
+export const PermissionCard = memo(function PermissionCard({ row, onReply }: {
   row: Extract<ChatRow, { kind: "request" }>
   onReply: (requestId: string, decision: Decision) => Promise<void>
 }) {
@@ -55,4 +55,4 @@ export function PermissionCard({ row, onReply }: {
       </> : null}
     </View>
   </SurfaceCard>
-}
+})
