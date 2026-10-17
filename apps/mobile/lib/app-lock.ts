@@ -28,6 +28,14 @@ export const lockWhenBackgrounded = (policy: LockPolicy): boolean =>
   policy.biometricsEnabled && policy.lockOnBackground && graceOf(policy) === 0
 
 /**
+ * Whether leaving the foreground (`inactive`: app switcher, Control Center) hides the app. iOS snapshots the screen
+ * for the app switcher before JavaScript hears `background`, so an immediate lock covers on `inactive` too: otherwise
+ * the snapshot would show the projects the lock is meant to hide.
+ */
+export const coverWhenInactive = (policy: LockPolicy & { readonly privacyCover: boolean }): boolean =>
+  policy.privacyCover || lockWhenBackgrounded(policy)
+
+/**
  * Lock on return when the app spent at least the grace period in the background.
  * A clock that went backwards (time zone or manual change) locks: the elapsed time is unknown.
  */

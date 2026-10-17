@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { lockAfterLabel, lockOnResume, lockWhenBackgrounded, unlockFailureMessage } from "../lib/app-lock"
+import { coverWhenInactive, lockAfterLabel, lockOnResume, lockWhenBackgrounded, unlockFailureMessage } from "../lib/app-lock"
 
 const policy = { biometricsEnabled: true, lockOnBackground: true, lockAfterSeconds: 60 }
 
@@ -25,4 +25,11 @@ test("unlock failures are actionable and cancellations are silent", () => {
   expect(unlockFailureMessage("lockout")).toContain("passcode")
   expect(lockAfterLabel(300)).toBe("After 5 minutes")
   expect(lockAfterLabel(1200)).toBe("After 20 minutes")
+})
+
+test("the app switcher snapshot is covered by the privacy cover or by an immediate lock", () => {
+  expect(coverWhenInactive({ ...policy, privacyCover: true, biometricsEnabled: false })).toBe(true)
+  expect(coverWhenInactive({ ...policy, privacyCover: false })).toBe(false)
+  expect(coverWhenInactive({ ...policy, privacyCover: false, lockAfterSeconds: 0 })).toBe(true)
+  expect(coverWhenInactive({ ...policy, privacyCover: false, lockAfterSeconds: 0, lockOnBackground: false })).toBe(false)
 })

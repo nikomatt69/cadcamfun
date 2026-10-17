@@ -7,7 +7,7 @@ import { useUIStore } from "@/lib/store"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { biometricLabel, getBiometricCapability, type BiometricLabel } from "@/lib/biometrics"
-import { lockOnResume, lockWhenBackgrounded, unlockFailureMessage } from "@/lib/app-lock"
+import { coverWhenInactive, lockOnResume, lockWhenBackgrounded, unlockFailureMessage } from "@/lib/app-lock"
 import { haptic } from "@/lib/haptics"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { PageScroll } from "./page-scroll"
@@ -18,7 +18,9 @@ import { SafeAreaView } from "react-native-safe-area-context"
  * the background after the chosen grace period (opt-in, Settings). The system Face ID sheet opens by
  * itself once per lock; the overlay behind it is a plain mark so nothing sensitive is visible.
  *
- * Independently of the lock, the privacy cover hides the app while iOS shows the app switcher.
+ * Independently of the lock, the privacy cover hides the app while iOS shows the app switcher. Both are native
+ * full-screen modals: a plain overlay view would sit under an open sheet or the full-screen 3D viewer, which iOS
+ * presents above the root view, and the snapshot would show them.
  */
 export function AppLockCoordinator() {
   const { config, booting, clear } = useServer()
@@ -87,7 +89,7 @@ export function AppLockCoordinator() {
         return
       }
       // `inactive` is the app switcher, Control Center or a system sheet (including Face ID itself).
-      if (policy.privacyCover && !authenticating.current) setCovered(true)
+      if (coverWhenInactive(policy) && !authenticating.current) setCovered(true)
       if (state !== "background" || skipLock) return
       backgroundedAt.current ??= Date.now()
       prompted.current = false
@@ -111,9 +113,11 @@ export function AppLockCoordinator() {
   }
 
   if (covered && !(locked && !skipLock)) {
-    return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { zIndex: 20000, alignItems: "center", justifyContent: "center", backgroundColor: palette.background }]}>
-      <View style={{ width: 64, height: 64, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: `${palette.accent}14` }}><Lock size={28} color={palette.accent} /></View>
-    </View>
+    return <Modal visible transparent={false} animationType="none" presentationStyle="fullScreen" onRequestClose={() => undefined}>
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: palette.background }]}>
+        <View style={{ width: 64, height: 64, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: `${palette.accent}14` }}><Lock size={28} color={palette.accent} /></View>
+      </View>
+    </Modal>
   }
 
   if (!locked || skipLock) return null
