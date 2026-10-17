@@ -128,7 +128,7 @@ describe("phone endpoints on the real HTTP server", () => {
       expect(feed.notifications).toEqual([])
       expect((feed as { nextCursor?: unknown }).nextCursor).toBeNull()
       // The AI status says honestly which assistant answers: the embedded nikcli host or the direct model path.
-      expect(["nikcli", "direct"]).toContain((await phone.aiStatus()).host)
+      expect(["nikcli", "direct"]).toContain((await phone.aiStatus()).host ?? "missing")
 
       // Routes the phone can adopt before its client calls them: conversation list and history, through the gateway.
       const sessions = await transport.request(`/api/ai/sessions?projectId=${encodeURIComponent(project.id)}`, "GET")
