@@ -30,6 +30,13 @@ export const apiGroups: readonly ApiGroupCopy[] = [
     "guide": "/docs/history"
   },
   {
+    "tag": "workspace",
+    "slug": "workspace",
+    "title": "Workspace",
+    "summary": "Read-only project drawings, components, toolpaths, library resources, and bounded previews for companion clients.",
+    "guide": "/docs/mobile"
+  },
+  {
     "tag": "drawings",
     "slug": "drawings",
     "title": "Drawings",

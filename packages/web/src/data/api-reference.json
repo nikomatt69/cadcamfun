@@ -25757,6 +25757,138 @@
                               }
                             ]
                           },
+                          "cornerRadius": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "tipAngle": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "threadPitch": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "holderDiameter": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "holderLength": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stickout": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "notes": {
                             "anyOf": [
                               {
@@ -26177,6 +26309,138 @@
                           ]
                         },
                         "shankDiameter": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cornerRadius": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "tipAngle": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "threadPitch": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "holderDiameter": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "holderLength": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "stickout": {
                           "anyOf": [
                             {
                               "anyOf": [
@@ -26702,6 +26966,138 @@
                                 }
                               ]
                             },
+                            "cornerRadius": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "tipAngle": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "threadPitch": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "holderDiameter": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "holderLength": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "stickout": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "notes": {
                               "anyOf": [
                                 {
@@ -27155,6 +27551,138 @@
                           ]
                         },
                         "shankDiameter": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cornerRadius": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "tipAngle": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "threadPitch": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "holderDiameter": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "holderLength": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "stickout": {
                           "anyOf": [
                             {
                               "anyOf": [
@@ -37434,6 +37962,138 @@
                           }
                         ]
                       },
+                      "cornerRadius": {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "tipAngle": {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "threadPitch": {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "holderDiameter": {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "holderLength": {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "stickout": {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "notes": {
                         "anyOf": [
                           {
@@ -37666,6 +38326,138 @@
                       ]
                     },
                     "shankDiameter": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "cornerRadius": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tipAngle": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "threadPitch": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "holderDiameter": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "holderLength": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stickout": {
                       "anyOf": [
                         {
                           "anyOf": [
@@ -38012,6 +38804,180 @@
                       }
                     ]
                   },
+                  "cornerRadius": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "tipAngle": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "threadPitch": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "holderDiameter": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "holderLength": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "stickout": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "notes": {
                     "anyOf": [
                       {
@@ -38220,6 +39186,138 @@
                       ]
                     },
                     "shankDiameter": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "cornerRadius": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tipAngle": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "threadPitch": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "holderDiameter": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "holderLength": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stickout": {
                       "anyOf": [
                         {
                           "anyOf": [
@@ -38588,6 +39686,138 @@
                         }
                       ]
                     },
+                    "cornerRadius": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "tipAngle": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "threadPitch": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "holderDiameter": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "holderLength": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "stickout": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "notes": {
                       "anyOf": [
                         {
@@ -38895,6 +40125,180 @@
                     ]
                   },
                   "shankDiameter": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "cornerRadius": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "tipAngle": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "threadPitch": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "holderDiameter": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "holderLength": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "stickout": {
                     "anyOf": [
                       {
                         "anyOf": [
@@ -50516,6 +51920,80 @@
                       "applyToolCompensation": {
                         "type": "boolean"
                       },
+                      "workholding": {
+                        "type": "string",
+                        "enum": [
+                          "vise",
+                          "clamps",
+                          "plate",
+                          "none"
+                        ]
+                      },
+                      "viseJawAxis": {
+                        "type": "string",
+                        "enum": [
+                          "x",
+                          "y"
+                        ]
+                      },
+                      "clampDepth": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "viseJawHeight": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "parallelsHeight": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "workholdingConfigured": {
+                        "type": "boolean"
+                      },
+                      "latheTurret": {
+                        "type": "string",
+                        "enum": [
+                          "rear",
+                          "front"
+                        ]
+                      },
+                      "chuckType": {
+                        "type": "string",
+                        "enum": [
+                          "3-jaw",
+                          "4-jaw",
+                          "collet"
+                        ]
+                      },
+                      "noseRadius": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "gripLength": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "tailstock": {
+                        "type": "boolean"
+                      },
+                      "stockBore": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "printerKinematics": {
+                        "type": "string",
+                        "enum": [
+                          "cartesian",
+                          "corexy",
+                          "bed-slinger",
+                          "delta"
+                        ]
+                      },
+                      "buildHeight": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
                       "originType": {
                         "type": "string",
                         "enum": [
@@ -51385,6 +52863,80 @@
                       "applyToolCompensation": {
                         "type": "boolean"
                       },
+                      "workholding": {
+                        "type": "string",
+                        "enum": [
+                          "vise",
+                          "clamps",
+                          "plate",
+                          "none"
+                        ]
+                      },
+                      "viseJawAxis": {
+                        "type": "string",
+                        "enum": [
+                          "x",
+                          "y"
+                        ]
+                      },
+                      "clampDepth": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "viseJawHeight": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "parallelsHeight": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "workholdingConfigured": {
+                        "type": "boolean"
+                      },
+                      "latheTurret": {
+                        "type": "string",
+                        "enum": [
+                          "rear",
+                          "front"
+                        ]
+                      },
+                      "chuckType": {
+                        "type": "string",
+                        "enum": [
+                          "3-jaw",
+                          "4-jaw",
+                          "collet"
+                        ]
+                      },
+                      "noseRadius": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "gripLength": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "tailstock": {
+                        "type": "boolean"
+                      },
+                      "stockBore": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "printerKinematics": {
+                        "type": "string",
+                        "enum": [
+                          "cartesian",
+                          "corexy",
+                          "bed-slinger",
+                          "delta"
+                        ]
+                      },
+                      "buildHeight": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
                       "originType": {
                         "type": "string",
                         "enum": [
@@ -52010,6 +53562,159 @@
                         "units",
                         "workOffset",
                         "toolpaths"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "motion": {
+                      "type": "object",
+                      "properties": {
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "runs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "start": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "spindle": {
+                                      "type": "string",
+                                      "enum": [
+                                        "cw",
+                                        "ccw",
+                                        "off"
+                                      ]
+                                    },
+                                    "rpm": {
+                                      "type": "number"
+                                    },
+                                    "css": {
+                                      "type": "boolean"
+                                    },
+                                    "plane": {
+                                      "type": "number",
+                                      "enum": [
+                                        17,
+                                        18,
+                                        19
+                                      ]
+                                    },
+                                    "xMode": {
+                                      "type": "string",
+                                      "enum": [
+                                        "diameter",
+                                        "radius"
+                                      ]
+                                    },
+                                    "tool": {
+                                      "type": "integer"
+                                    },
+                                    "coolant": {
+                                      "type": "string",
+                                      "enum": [
+                                        "off",
+                                        "flood",
+                                        "mist"
+                                      ]
+                                    },
+                                    "feedMode": {
+                                      "type": "string",
+                                      "enum": [
+                                        "min",
+                                        "rev"
+                                      ]
+                                    },
+                                    "probe": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "start",
+                                    "spindle",
+                                    "rpm",
+                                    "css",
+                                    "plane",
+                                    "xMode",
+                                    "coolant",
+                                    "feedMode"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "extrude": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              },
+                              "lines": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              },
+                              "rpm": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              },
+                              "retracts": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              },
+                              "homes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              }
+                            },
+                            "required": [
+                              "count",
+                              "runs"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "unsupported": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "line": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "word": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "line",
+                              "word"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "paths",
+                        "unsupported"
                       ],
                       "additionalProperties": false
                     }
@@ -56145,6 +57850,138 @@
                             ]
                           },
                           "shankDiameter": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "cornerRadius": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "tipAngle": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "threadPitch": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "holderDiameter": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "holderLength": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "stickout": {
                             "anyOf": [
                               {
                                 "anyOf": [

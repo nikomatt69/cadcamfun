@@ -77,6 +77,13 @@ private final class PinnedDelegate: NSObject, URLSessionDelegate, URLSessionData
 }
 
 enum PinnedTransport {
+  static func sessionConfiguration() -> URLSessionConfiguration {
+    let configuration = URLSessionConfiguration.ephemeral
+    // iOS may deny the first LAN attempt before the user answers its permission alert.
+    configuration.waitsForConnectivity = true
+    return configuration
+  }
+
   /**
    * One-shot request. Implemented on the data-delegate path rather than
    * `URLSession.data(for:)` so the pin evaluator always owns the challenge.
@@ -88,7 +95,9 @@ enum PinnedTransport {
     request.timeoutInterval = 30
 
     let delegate = PinnedDelegate(fingerprint: fingerprint)
-    let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+    let configuration = sessionConfiguration()
+    configuration.timeoutIntervalForResource = 30
+    let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     defer { session.finishTasksAndInvalidate() }
 
     return try await withCheckedThrowingContinuation { continuation in
@@ -173,7 +182,7 @@ public class CompanionStreamHandle: SharedObject {
     }
 
     let delegate = PinnedDelegate(fingerprint: fingerprint)
-    let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+    let session = URLSession(configuration: PinnedTransport.sessionConfiguration(), delegate: delegate, delegateQueue: nil)
     self.session = session
 
     delegate.onData = { [weak self] data in
@@ -304,9 +313,8 @@ public class CompanionNetModule: Module {
   public func definition() -> ModuleDefinition {
     Name("CompanionNet")
 
-    // SDK 57 AsyncFunction closures are `throws -> R`, not async: an awaited operation runs in a
-    // Task and settles the injected `Promise` (the classic Expo Modules pattern).
-    AsyncFunction("request") { (promise: Promise, baseUrl: String, path: String, method: String, headers: [String: String], body: String?, fingerprint: String) in
+    // Expo injects Promise only in the last position; placing it first makes JS calls expect seven arguments.
+    AsyncFunction("request") { (baseUrl: String, path: String, method: String, headers: [String: String], body: String?, fingerprint: String, promise: Promise) in
       Task {
         do {
           let result = try await PinnedTransport.request(baseUrl: baseUrl, path: path, method: method, headers: headers, body: body, fingerprint: fingerprint)
@@ -331,8 +339,7 @@ public class CompanionNetModule: Module {
       return args[index + 1]
     }
 
-    // First LAN/hotspot HTTPS never triggers the local-network prompt on its own.
-    // A Bonjour browse of our unused service type is enough; iOS shows the dialog.
+    // Warm the local-network prompt; HTTPS also waits for connectivity while the user answers.
     Function("warmLocalNetwork") {
       LocalNetworkWarmup.shared.start()
     }

@@ -32,12 +32,16 @@ cd apps/mobile && bun ios --device         # build + install on the connected iP
 ## First run on your own iPhone
 
 1. Connect the iPhone (developer mode on, unlocked, trusted by this Mac).
-2. `cd apps/mobile && bun run ios --configuration Release --device` — Xcode signs with your personal team; set `APPLE_DEVELOPMENT_TEAM` if you have more than one.
+2. `cd apps/mobile && bun run ios:release --device` — builds and installs a standalone Release with embedded JavaScript; no running Metro server is required. Xcode uses the configured signing team.
 3. On the desktop: **Settings → Mobile companion → Turn on** (port 8443 by default), then **Show QR code**.
 4. On the phone: **Scan the pairing QR code** (or paste the link). The phone pins the certificate fingerprint from the code; iOS asks once for local-network access — allow it.
 5. Open a project → **✦** jumps the Assistant tab to it. The assistant works on an `ai/*` branch and opens pull requests; review and merge them from the project's Pulls tab. Add a model key first on the desktop (Settings → AI).
 
 Outside the home network the pairing address is whatever the phone can route to the desktop as (Tailscale, WireGuard, a VPN) — the transport stays the same pinned TLS stream.
+
+If pairing fails, check **Settings → Apps → CADCAMFUN → Local Network** on the iPhone and keep the desktop's companion gateway enabled. Scan, paste and deep links report the underlying connection error. Changes to `modules/companion-net/ios` require rebuilding and reinstalling the native app; refreshing JavaScript cannot update an installed Release's Swift bridge. Expo injects a native `Promise` only as the last `AsyncFunction` argument.
+
+Tauri capabilities apply to desktop WebView IPC, so adding HTTP or remote-window capabilities does not open this gateway. A sandboxed macOS distribution separately needs the incoming-network server entitlement. The current direct-distribution desktop uses the Bun HTTPS listener on port 8443 and the iOS app's local-network permission.
 
 ## Design system
 

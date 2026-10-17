@@ -101,6 +101,8 @@ apps/sidecar/src/
 
 ## 5. Change log
 
+- 2026-10-17: Web API documentation synchronization complete for the current contract: regenerated `packages/web/src/data/api-reference.json` and added the workspace resource page to API navigation. Web typecheck, documentation freshness checks, and all 31 web tests pass.
+
 - 2026-10-16: Added application-only OAuth authorize/complete endpoints, regenerated clients and OpenAPI snapshot. Wired subscription credential changes and OpenCode Zen/Go declarations into the native host. Provider tests exercise real handlers and native plugins against simulated external services.
 
 - 2026-10-16: Regression review: refreshed the OpenAPI snapshot for the assistant extension endpoints and contributed mode ids. The snapshot adds seven paths and removes none; contract assertions and generated-client freshness checks pass.

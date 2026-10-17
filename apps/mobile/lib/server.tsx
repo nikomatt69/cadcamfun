@@ -38,6 +38,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const probeGeneration = useRef(0)
   const probeController = useRef<AbortController | null>(null)
   const failures = useRef(0)
+  const probeError = useRef<Error | null>(null)
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storage = useRef<Promise<void>>(Promise.resolve())
   const configRef = useRef<Pairing | null>(null)
@@ -87,6 +88,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
       const current = () => mounted.current && version === generation.current && probeVersion === probeGeneration.current
       setConnectivity((previous) => (previous === "online" ? previous : "connecting"))
       setConnectionError(null)
+      probeError.current = null
       setBootstrapLoading(true)
       warmLocalNetwork()
       const timeout = setTimeout(() => controller.abort(), 15_000)
@@ -118,13 +120,14 @@ export function ServerProvider({ children }: PropsWithChildren) {
         setBootstrap(null)
         const auth = error instanceof CompanionError && (error.status === 401 || error.status === 403)
         setConnectivity(auth ? "auth-required" : "offline")
-        setConnectionError(
+        const message =
           controller.signal.aborted
-            ? `The desktop at ${desktopLabel(pairing)} did not respond within 15 seconds. Join the same Wi-Fi or Personal Hotspot as the Mac, or type a Tailscale address.`
+            ? `The desktop at ${desktopLabel(pairing)} did not respond within 15 seconds. Allow Local Network access in iPhone Settings → Apps → CADCAMFUN, and join the same Wi-Fi or Personal Hotspot as the Mac, or use Tailscale.`
             : error instanceof Error
               ? error.message
-              : "Cannot reach the desktop",
-        )
+              : "Cannot reach the desktop"
+        probeError.current = new Error(message)
+        setConnectionError(message)
         scheduleRetry(pairing)
         return null
       } finally {
@@ -209,7 +212,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
       setAi(null)
       setBootstrap(null)
       const reached = await check(pairing)
-      if (!reached || !mounted.current || version !== generation.current) return false
+      if (!mounted.current || version !== generation.current) return false
+      if (!reached) throw probeError.current ?? new Error("Cannot reach the desktop")
       await storePairing(() => pairingStore.save(reached))
       if (!mounted.current || version !== generation.current) return false
       activate(reached)

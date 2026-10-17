@@ -29,6 +29,7 @@ export interface ServerValue {
   bootstrap: DesktopBootstrap | null
   bootstrapLoading: boolean
   booting: boolean
+  /** Rejects with the connection error; false means a newer pairing operation superseded this one. */
   save(pairing: Pairing): Promise<boolean>
   clear(): Promise<void>
   recheck(): Promise<void>

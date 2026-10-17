@@ -158,6 +158,46 @@ describe("mobile pairing provider lifecycle", () => {
     } finally { await view.dispose() }
   })
 
+  test("scan and deep-link callers receive the actual bridge, certificate and authentication failure", async () => {
+    load = async () => undefined
+    for (const failure of [
+      { status: 0, message: "Received 6 arguments, but 7 was expected" },
+      { status: 0, message: "Certificate does not match the pairing QR code" },
+      { status: 401, message: "Unauthorized" },
+      { status: 403, message: "Not available to a companion device" },
+    ]) {
+      health = async () => {
+        if (failure.status === 0) throw new Error(failure.message)
+        return { status: failure.status, body: JSON.stringify({ message: failure.message }) }
+      }
+      const view = await provider()
+      try {
+        await act(async () => {
+          await expect(view.read().save(pairing)).rejects.toThrow(failure.message)
+        })
+        expect(view.read().config).toBeNull()
+        expect(view.read().connectionError).toBe(failure.message)
+        expect(view.read().connectivity).toBe(failure.status === 0 ? "offline" : "auth-required")
+      } finally { await view.dispose() }
+    }
+  })
+
+  test("pairing can succeed on retry after a native connection failure", async () => {
+    load = async () => undefined
+    health = async () => { throw new Error("Local network permission pending") }
+    const view = await provider()
+    try {
+      await act(async () => {
+        await expect(view.read().save(pairing)).rejects.toThrow("Local network permission pending")
+      })
+      health = async () => ({ status: 200, body: "{}" })
+      await act(async () => { expect(await view.read().save(pairing)).toBe(true) })
+      expect(view.read().config).toEqual({ ...pairing, hosts: [pairing.baseUrl] })
+      expect(view.read().connectivity).toBe("online")
+      expect(view.read().connectionError).toBeNull()
+    } finally { await view.dispose() }
+  })
+
   test("clearing a pairing invalidates an in-flight health response", async () => {
     load = async () => pairing
     health = async () => ({ status: 200, body: "{}" })

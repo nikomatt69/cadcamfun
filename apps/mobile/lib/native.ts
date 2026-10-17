@@ -28,10 +28,9 @@ export const launchPairLink = async (): Promise<string | null> => {
 }
 
 /**
- * iOS only prompts for local-network access on the first Bonjour/LAN socket.
- * Pairing against a private IPv4 never does Bonjour, so the prompt never
- * appears and the health check is silently dropped. A no-op `_cadcamfun._tcp`
- * browse is enough to surface it; failures are ignored.
+ * Start a Bonjour browse alongside the first LAN connection to warm the local-network prompt.
+ * The native URLSession also waits for connectivity while the user answers; failures here
+ * do not prevent the pinned HTTPS request from requesting access itself.
  */
 export const warmLocalNetwork = (): void => {
   if (!nativeAvailable) return
