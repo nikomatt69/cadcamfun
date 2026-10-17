@@ -32,7 +32,7 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
 }) {
   const { palette } = useTheme()
   const { width, fontScale, gutter, onLayout } = useContentLayout()
-  const { ai } = useServer()
+  const { ai, connectivity } = useServer()
   const router = useRouter()
   const status = useResource(useCallback((signal) => client.status(projectId, signal), [client, projectId]), `status:${projectId}:${refreshKey}`)
   const branches = useResource(useCallback((signal) => client.branches(projectId, signal), [client, projectId]), `branches:${projectId}:${refreshKey}`)
@@ -86,8 +86,8 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
 
     <SurfaceCard inset={false}>
       <ListRow leading={<IconTile size={40}><Sparkles size={20} color={palette.accent} /></IconTile>} title="Desktop assistant"
-        subtitle={ai?.configured ? "Ready to help with this project" : ai ? "Add a model key on your Mac to get started" : "Checking desktop configuration…"}
-        trailing={<Pill tone={ai?.configured ? "success" : "neutral"}>{ai?.configured ? "Ready" : "Setup"}</Pill>} />
+        subtitle={ai?.configured ? "Ready to help with this project" : ai ? "Add a model key on your Mac to get started" : connectivity === "online" ? "Checking desktop configuration…" : "Reconnect to the desktop to use the assistant"}
+        trailing={<Pill tone={ai?.configured ? "success" : "neutral"}>{ai?.configured ? "Ready" : ai || connectivity === "online" ? "Setup" : "Offline"}</Pill>} />
     </SurfaceCard>
   </PageScroll>
 }

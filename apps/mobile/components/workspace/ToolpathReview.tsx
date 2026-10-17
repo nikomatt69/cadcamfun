@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FlatList, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native"
 import { ChevronDown, ChevronUp, Pause, Play, SkipBack, SkipForward } from "lucide-react-native"
 import type { ToolpathPreview, ToolpathReview as ToolpathReviewPayload, ToolpathSegment } from "@cadcamfun/api"
@@ -53,7 +53,9 @@ export function ToolpathReview({
   onRetry: () => void
 }) {
   const { palette } = useTheme()
-  const { height } = useWindowDimensions()
+  const { width: windowWidth, height } = useWindowDimensions()
+  // Landscape phones and iPads: the viewer and transport take the left, the summary and listing the right.
+  const split = windowWidth >= 700 && windowWidth > height
   const { gutter, fontScale, onLayout } = useContentLayout()
   const [availableHeight, setAvailableHeight] = useState(height)
   const [previewExpanded, setPreviewExpanded] = useState<boolean | undefined>()
@@ -131,6 +133,17 @@ export function ToolpathReview({
     setPlaying(true)
   }
 
+  // One stable handler for every listing row, so a playback tick re-renders only the rows whose highlight changed.
+  const seekRef = useRef(seek)
+  seekRef.current = seek
+  const segmentsRef = useRef(segments)
+  segmentsRef.current = segments
+  const seekLine = useCallback((lineNumber: number) => {
+    haptic("selection")
+    seekRef.current(segmentIndexForLine(segmentsRef.current, lineNumber))
+  }, [])
+  const listingDisabled = segments.length === 0 || loading
+
   const bar = <SimulationBar
     count={segments.length}
     playhead={playhead}
@@ -143,42 +156,24 @@ export function ToolpathReview({
     onCycleSpeed={() => { haptic("selection"); setSpeedIndex((index) => (index + 1) % PLAYBACK_SPEEDS.length) }}
   />
 
-  return (
-    <SafeAreaView edges={{ bottom: true }} onLayout={(event) => { onLayout(event); setAvailableHeight(event.nativeEvent.layout.height) }} style={{ flex: 1, backgroundColor: palette.background }}>
-      <ScrollView contentInsetAdjustmentBehavior="never" style={{ flexGrow: 0, maxHeight: Math.max(160, availableHeight * 0.62) }}
-        contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 10, paddingBottom: 12, gap: 10 }}>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <View style={{ flex: 1, minWidth: 120, gap: 3 }}>
-          <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 15, fontWeight: "600" }}>Simulation</Text>
-          <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>
-            {segments.length ? `Block ${(playhead + 1).toLocaleString("en")} of ${segments.length.toLocaleString("en")} · NC line ${activeLine}` : loading ? "Loading the program…" : "No motion blocks"}
-          </Text>
-        </View>
-        <Pressable accessibilityRole="button" accessibilityLabel={expanded ? "Hide 3D preview" : "Show 3D preview"}
-          onPress={() => { haptic("selection"); setPreviewExpanded(!expanded) }}
-          style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", borderRadius: layout.controlRadius, backgroundColor: palette.surface, borderWidth: 0.5, borderColor: palette.border, opacity: pressed ? 0.55 : 1 })}>
-          {expanded ? <ChevronUp size={18} color={palette.accent} /> : <ChevronDown size={18} color={palette.accent} />}
-        </Pressable>
-      </View>
-      {expanded ? <View style={{ height: Math.min(previewHeight(height, fontScale, "toolpath"), Math.max(180, availableHeight * 0.32)), borderRadius: layout.cardRadius, borderCurve: "continuous", overflow: "hidden", borderWidth: 0.5, borderColor: palette.border }}>
-        {preview ? (
-          <PreviewViewport
-            bounds={preview.bounds}
-            revision={preview.revision}
-            segments={segments}
-            stock={preview.stock}
-            playhead={playhead}
-            simulating={simulating}
-            fullscreenTitle={review?.name ?? "Toolpath"}
-            fullscreenFooter={bar}
-            accessibilityLabel="Toolpath preview"
-            accessibilityHint="Drag to orbit. Pinch to zoom. The listing follows the current block."
-          />
-        ) : (
-          <Skeleton style={{ flex: 1, borderRadius: 0 }} />
-        )}
-      </View> : null}
-
+  const viewer = preview ? (
+    <PreviewViewport
+      bounds={preview.bounds}
+      revision={preview.revision}
+      segments={segments}
+      stock={preview.stock}
+      playhead={playhead}
+      simulating={simulating}
+      fullscreenTitle={review?.name ?? "Toolpath"}
+      fullscreenFooter={bar}
+      accessibilityLabel="Toolpath preview"
+      accessibilityHint="Drag to orbit. Pinch to zoom. The listing follows the current block."
+    />
+  ) : (
+    <Skeleton style={{ flex: 1, borderRadius: 0 }} />
+  )
+  const frame = { borderRadius: layout.cardRadius, borderCurve: "continuous" as const, overflow: "hidden" as const, borderWidth: 0.5, borderColor: palette.border }
+  const summary = <>
       {error ? (
         <View>
           <ErrorBanner message={error} actionLabel="Retry" onAction={onRetry} />
@@ -211,9 +206,10 @@ export function ToolpathReview({
         {preview?.truncated ? (
           <Text style={{ color: palette.warning, fontSize: 12, lineHeight: 16 }}>Path truncated so it fits on the phone. The G-code listing is complete.</Text>
         ) : null}
-        {bar}
+        {split ? null : bar}
       </View>
-      </ScrollView>
+  </>
+  const listing = <>
       <View style={{ paddingHorizontal: gutter, paddingVertical: 10, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: palette.border }}>
         <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 14, fontWeight: "600" }}>G-code</Text>
         <Text style={{ color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>{lines.length.toLocaleString("en")} lines</Text>
@@ -232,24 +228,58 @@ export function ToolpathReview({
         onScrollToIndexFailed={(info) => {
           listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false })
         }}
-        renderItem={({ item, index }) => {
-          const lineNumber = index + 1
-          const active = lineNumber === activeLine
-          return (
-            <GcodeRow
-              lineNumber={lineNumber}
-              text={item}
-              kind={kindByLine.get(lineNumber)}
-              active={active}
-              disabled={segments.length === 0 || loading}
-              onPress={() => {
-                haptic("selection")
-                seek(segmentIndexForLine(segments, lineNumber))
-              }}
-            />
-          )
-        }}
+        renderItem={({ item, index }) => (
+          <GcodeRow lineNumber={index + 1} text={item} kind={kindByLine.get(index + 1)} active={index + 1 === activeLine} disabled={listingDisabled} onSeekLine={seekLine} />
+        )}
       />
+  </>
+
+  if (split) {
+    return (
+      <SafeAreaView edges={{ bottom: true, left: true, right: true }} onLayout={(event) => { onLayout(event); setAvailableHeight(event.nativeEvent.layout.height) }} style={{ flex: 1, flexDirection: "row", backgroundColor: palette.background }}>
+        <View style={{ flex: 1.35, padding: 12, paddingRight: 0, gap: 10 }}>
+          <View style={{ flex: 1, ...frame }}>{viewer}</View>
+          {bar}
+        </View>
+        <View style={{ flex: 1, maxWidth: 460 }}>
+          <ScrollView contentInsetAdjustmentBehavior="never" style={{ flexGrow: 0, maxHeight: Math.max(140, availableHeight * 0.45) }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, gap: 10 }}>
+            <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 15, fontWeight: "600" }}>Simulation</Text>
+            <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>
+              {segments.length ? `Block ${(playhead + 1).toLocaleString("en")} of ${segments.length.toLocaleString("en")} · NC line ${activeLine}` : loading ? "Loading the program…" : "No motion blocks"}
+            </Text>
+            {summary}
+          </ScrollView>
+          {listing}
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  return (
+    <SafeAreaView edges={{ bottom: true }} onLayout={(event) => { onLayout(event); setAvailableHeight(event.nativeEvent.layout.height) }} style={{ flex: 1, backgroundColor: palette.background }}>
+      <ScrollView contentInsetAdjustmentBehavior="never" style={{ flexGrow: 0, maxHeight: Math.max(160, availableHeight * 0.62) }}
+        contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 10, paddingBottom: 12, gap: 10 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <View style={{ flex: 1, minWidth: 120, gap: 3 }}>
+          <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 15, fontWeight: "600" }}>Simulation</Text>
+          <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>
+            {segments.length ? `Block ${(playhead + 1).toLocaleString("en")} of ${segments.length.toLocaleString("en")} · NC line ${activeLine}` : loading ? "Loading the program…" : "No motion blocks"}
+          </Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={expanded ? "Hide 3D preview" : "Show 3D preview"}
+          onPress={() => { haptic("selection"); setPreviewExpanded(!expanded) }}
+          style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", borderRadius: layout.controlRadius, backgroundColor: palette.surface, borderWidth: 0.5, borderColor: palette.border, opacity: pressed ? 0.55 : 1 })}>
+          {expanded ? <ChevronUp size={18} color={palette.accent} /> : <ChevronDown size={18} color={palette.accent} />}
+        </Pressable>
+      </View>
+      {expanded ? <View style={{ height: Math.min(previewHeight(height, fontScale, "toolpath"), Math.max(180, availableHeight * 0.32)), ...frame }}>
+        {viewer}
+      </View> : null}
+
+      {summary}
+      </ScrollView>
+      {listing}
     </SafeAreaView>
   )
 }
@@ -340,20 +370,20 @@ function Scrubber({ count, value, onChange }: { count: number; value: number; on
   )
 }
 
-function GcodeRow({
+const GcodeRow = memo(function GcodeRow({
   lineNumber,
   text,
   kind,
   active,
   disabled,
-  onPress,
+  onSeekLine,
 }: {
   lineNumber: number
   text: string
   kind: ToolpathSegment["kind"] | undefined
   active: boolean
   disabled: boolean
-  onPress: () => void
+  onSeekLine: (lineNumber: number) => void
 }) {
   const { palette } = useTheme()
   return (
@@ -362,7 +392,7 @@ function GcodeRow({
       accessibilityLabel={`Line ${lineNumber}${text.trim() ? `, ${text.trim()}` : ""}`}
       accessibilityState={{ selected: active, disabled }}
       disabled={disabled}
-      onPress={onPress}
+      onPress={() => onSeekLine(lineNumber)}
       style={{
         flexDirection: "row",
         alignItems: "center",
@@ -378,4 +408,4 @@ function GcodeRow({
       <Text style={{ flex: 1, color: active ? palette.ink : palette.soft, ...mono(13) }}>{text || " "}</Text>
     </Pressable>
   )
-}
+})

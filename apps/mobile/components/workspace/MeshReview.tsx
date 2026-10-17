@@ -1,5 +1,5 @@
-import { useMemo } from "react"
-import { FlatList, Text, View, useWindowDimensions } from "react-native"
+import { useEffect, useMemo, useRef } from "react"
+import { AccessibilityInfo, FlatList, Text, View, useWindowDimensions } from "react-native"
 import { Box, Check, Sparkles } from "lucide-react-native"
 import type { MeshPart, MeshPreview, PreviewParameter } from "@cadcamfun/api"
 import { SafeAreaView } from "react-native-screens/experimental"
@@ -32,7 +32,9 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, s
   onAction: () => void
 }) {
   const { palette } = useTheme()
-  const { height } = useWindowDimensions()
+  const { width: windowWidth, height } = useWindowDimensions()
+  // Landscape phones and iPads: the viewer takes the full height beside the element list instead of a short strip.
+  const split = windowWidth >= 700 && windowWidth > height
   const { gutter, fontScale, onLayout } = useContentLayout()
   const parts = mesh?.parts ?? []
   const triangles = mesh ? Math.floor(mesh.indices.length / 3) : 0
@@ -43,20 +45,39 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, s
     return bounds ? formatSize(bounds) : undefined
   }, [mesh, selectedPart])
 
-  return <SafeAreaView edges={{ bottom: true }} onLayout={onLayout} style={{ flex: 1, backgroundColor: palette.background }}>
-    <FlatList data={parts} keyExtractor={(item) => item.id} extraData={selectedPartId}
+  // A part picked in the 3D view is brought into the element list (and announced); a pick from the list stays put.
+  const listRef = useRef<FlatList<MeshPart>>(null)
+  const pickedInView = useRef(false)
+  useEffect(() => {
+    if (!pickedInView.current) return
+    pickedInView.current = false
+    const index = selectedPartId ? parts.findIndex((part) => part.id === selectedPartId) : -1
+    if (index >= 0) listRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true })
+    AccessibilityInfo.announceForAccessibility(selectedPart ? `Selected ${selectedPart.name || selectedPart.id}${selectedSize ? `, ${selectedSize}` : ""}` : "Selection cleared")
+  }, [selectedPartId])
+
+  const viewport = mesh ? <PreviewViewport bounds={mesh.bounds} revision={mesh.revision} mesh={mesh} selectedPartId={selectedPartId} fullscreenTitle={title ?? "Design"}
+    fullscreenFooter={selectedPart ? <Text numberOfLines={2} style={{ color: palette.soft, fontSize: 13, lineHeight: 19 }}>
+      <Text style={{ color: palette.ink, fontWeight: "600" }}>{selectedPart.name || selectedPart.id}</Text>{selectedSize ? ` · ${selectedSize}` : ""}
+    </Text> : undefined}
+    accessibilityLabel="Design preview" accessibilityHint="Drag to orbit. Pinch to zoom. Tap an element to select it, double tap to frame it."
+    onSelectPart={(id) => { haptic("selection"); pickedInView.current = true; onSelectPart(id) }} /> : <Skeleton style={{ flex: 1, borderRadius: 0 }} />
+  const frame = { borderRadius: layout.cardRadius, borderCurve: "continuous" as const, overflow: "hidden" as const, borderWidth: 0.5, borderColor: palette.border }
+
+  return <SafeAreaView edges={{ bottom: true, left: true, right: true }} onLayout={onLayout} style={{ flex: 1, backgroundColor: palette.background }}>
+    <View style={{ flex: 1, flexDirection: split ? "row" : "column" }}>
+    {split && (mesh || loading) ? <View style={{ flex: 1.35, padding: 12, paddingRight: 0 }}><View style={{ flex: 1, ...frame }}>{viewport}</View></View> : null}
+    <FlatList ref={listRef} style={split ? { flex: 1, maxWidth: 440 } : undefined} data={parts} keyExtractor={(item) => item.id} extraData={selectedPartId}
+      // Rows above the target are not measured yet: jump near it by the average row height, then land exactly.
+      onScrollToIndexFailed={(info) => {
+        listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false })
+        setTimeout(() => listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 120)
+      }}
       contentInsetAdjustmentBehavior="never"
-      contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 12, paddingBottom: 16 }}
+      contentContainerStyle={{ paddingHorizontal: split ? 16 : gutter, paddingTop: 12, paddingBottom: 16 }}
       ListHeaderComponent={<View>
-        {mesh || loading ? <View style={{ height: previewHeight(height, fontScale, "mesh"), borderRadius: layout.cardRadius, borderCurve: "continuous", overflow: "hidden", borderWidth: 0.5, borderColor: palette.border }}>
-          {mesh ? <PreviewViewport bounds={mesh.bounds} revision={mesh.revision} mesh={mesh} selectedPartId={selectedPartId} fullscreenTitle={title ?? "Design"}
-            fullscreenFooter={selectedPart ? <Text numberOfLines={2} style={{ color: palette.soft, fontSize: 13, lineHeight: 19 }}>
-              <Text style={{ color: palette.ink, fontWeight: "600" }}>{selectedPart.name || selectedPart.id}</Text>{selectedSize ? ` · ${selectedSize}` : ""}
-            </Text> : undefined}
-            accessibilityLabel="Design preview" accessibilityHint="Drag to orbit. Pinch to zoom. Tap an element to select it, double tap to frame it."
-            onSelectPart={(id) => { haptic("selection"); onSelectPart(id) }} /> : <Skeleton style={{ flex: 1, borderRadius: 0 }} />}
-        </View> : null}
-        {mesh ? <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, paddingTop: 10, fontVariant: ["tabular-nums"] }}>
+        {!split && (mesh || loading) ? <View style={{ height: previewHeight(height, fontScale, "mesh"), ...frame }}>{viewport}</View> : null}
+        {mesh ? <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, paddingTop: split ? 0 : 10, fontVariant: ["tabular-nums"] }}>
           <Text style={{ color: palette.ink, fontWeight: "600" }}>{formatSize(mesh.bounds)}</Text> · {parts.length.toLocaleString("en")} {parts.length === 1 ? "element" : "elements"} · {triangles.toLocaleString("en")} triangles
           {selectedPart ? `\nSelected ${selectedPart.name || selectedPart.id}${selectedSize ? ` · ${selectedSize}` : ""}` : ""}
         </Text> : null}
@@ -78,6 +99,7 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, s
         <PartRow part={item} selected={item.id === selectedPartId} onPress={() => { haptic("selection"); onSelectPart(item.id === selectedPartId ? undefined : item.id) }} />
       </SurfaceCard>}
     />
+    </View>
     <View style={{ paddingHorizontal: gutter, paddingTop: 12, paddingBottom: 12, borderTopWidth: 0.5, borderTopColor: palette.border, backgroundColor: palette.background }}>
       <ActionButton label={actionLabel} icon={<Sparkles size={18} color={palette.onAccent} />} disabled={!mesh} onPress={onAction} />
     </View>
