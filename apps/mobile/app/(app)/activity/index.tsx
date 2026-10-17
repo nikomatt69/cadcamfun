@@ -9,7 +9,7 @@ import { useResource } from "@/lib/use-resource"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { relativeTime } from "@/lib/format"
-import { activityCategory, activityTarget, appendFeedPage, firstFeedPage, groupActivity, markAllInFeed, markLocally, removeFromFeed, type ActivityTone, type FeedPages } from "@/lib/activity-feed"
+import { activityCategory, activityTarget, appendFeedPage, firstFeedPage, nextPageQuery, groupActivity, markAllInFeed, markLocally, removeFromFeed, type ActivityTone, type FeedPages } from "@/lib/activity-feed"
 import { toast } from "@/components/ui/ToastHost"
 import { PressableScale } from "@/components/ui/PressableScale"
 import { EmptyState } from "@/components/ui/EmptyState"
@@ -61,7 +61,7 @@ export default function ActivityScreen() {
     olderRequest.current = request
     setOlder({ loading: true })
     try {
-      const page = await client.notifications({ limit: PAGE, offset: pages.offset }, request.signal)
+      const page = await client.notifications({ limit: PAGE, ...nextPageQuery(pages) }, request.signal)
       if (request.signal.aborted) return
       setPages((current) => current ? appendFeedPage(current, page, PAGE) : current)
       setOlder({ loading: false })

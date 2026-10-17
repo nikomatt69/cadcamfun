@@ -280,14 +280,19 @@ export class CompanionClient {
 
   // ── Notifications: the user's activity feed, shared with the desktop ────
 
-  /** One page, newest first: `offset` skips the rows already shown, so an older page never refetches the newer ones. */
-  notifications = (options: { readonly limit?: number; readonly offset?: number; readonly onlyUnread?: boolean } = {}, signal?: AbortSignal) => {
+  /**
+   * One page, newest first. `cursor` (the previous page's `nextCursor`) continues exactly after the last row shown;
+   * `offset` is the fallback for desktops that predate cursors and send no `nextCursor`.
+   */
+  notifications = (options: { readonly limit?: number; readonly offset?: number; readonly cursor?: string; readonly onlyUnread?: boolean } = {}, signal?: AbortSignal) => {
     const query = new URLSearchParams()
     if (options.limit !== undefined) query.set("limit", String(options.limit))
-    if (options.offset !== undefined && options.offset > 0) query.set("offset", String(Math.floor(options.offset)))
+    if (options.cursor) query.set("cursor", options.cursor)
+    else if (options.offset !== undefined && options.offset > 0) query.set("offset", String(Math.floor(options.offset)))
     if (options.onlyUnread) query.set("onlyUnread", "true")
     const suffix = query.size > 0 ? `?${query.toString()}` : ""
-    return this.request<{ notifications: ReadonlyArray<NotificationRow>; unreadCount: number }>("GET", `/api/notifications${suffix}`, undefined, signal)
+    // `nextCursor` is optional here: older desktops page by offset only.
+    return this.request<{ notifications: ReadonlyArray<NotificationRow>; unreadCount: number; nextCursor?: string | null }>("GET", `/api/notifications${suffix}`, undefined, signal)
   }
   markNotificationRead = (id: string, isRead = true) => this.request<NotificationRow>("PUT", `/api/notifications/${encodeURIComponent(id)}`, { isRead })
   markAllNotificationsRead = () => this.request<{ message: string; count: number }>("POST", "/api/notifications/mark-all-read")

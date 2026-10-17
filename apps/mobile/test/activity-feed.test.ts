@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import type { NotificationRow } from "@cadcamfun/api"
-import { activityCategory, activityTarget, appendFeedPage, daySection, firstFeedPage, groupActivity, markAllInFeed, markLocally, removeFromFeed } from "../lib/activity-feed"
+import { activityCategory, activityTarget, appendFeedPage, daySection, firstFeedPage, nextPageQuery, groupActivity, markAllInFeed, markLocally, removeFromFeed } from "../lib/activity-feed"
 
 const now = new Date(2026, 9, 17, 15, 0).getTime()
 const at = (days: number, hour = 10) => new Date(2026, 9, 17 - days, hour).toISOString()
@@ -59,4 +59,16 @@ test("a deletion here moves the next page back by one; read edits keep the pagin
   expect(read.offset).toBe(2)
   expect(read.unreadCount).toBe(0)
   expect(markAllInFeed(feed).notifications.every((item) => item.isRead)).toBe(true)
+})
+
+test("a desktop with cursors is followed by cursor until it says the feed ended", () => {
+  const first = firstFeedPage({ notifications: [row("n3", at(0)), row("n2", at(0))], unreadCount: 2, nextCursor: "c1" }, 2)
+  expect(nextPageQuery(first)).toEqual({ cursor: "c1" })
+  expect(first.exhausted).toBe(false)
+  const last = appendFeedPage(first, { notifications: [row("n1", at(1)), row("n0", at(1))], unreadCount: 2, nextCursor: null }, 2)
+  // A full page can still be the last one: the cursor decides, not the length.
+  expect(last.exhausted).toBe(true)
+  expect(last.cursor).toBeUndefined()
+  // Older desktops send no cursor and keep paging by offset.
+  expect(nextPageQuery(firstFeedPage({ notifications: [row("a", at(0))], unreadCount: 0 }, 1))).toEqual({ offset: 1 })
 })

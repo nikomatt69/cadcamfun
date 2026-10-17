@@ -89,19 +89,26 @@ export const markLocally = <F extends { readonly notifications: readonly Notific
 }
 
 /**
- * The loaded part of the feed, page by page (`GET /api/notifications?limit&offset`, newest first). `offset` counts the
- * server rows consumed, minus rows deleted here, so the next page starts right after the last one shown. A row that
- * arrived on the desktop meanwhile shifts the server's order by one: the overlap is dropped by id, nothing is skipped.
+ * The loaded part of the feed, page by page (`GET /api/notifications`, newest first). A desktop that sends `nextCursor`
+ * is followed by cursor, which neither repeats nor skips a row. An older one pages by `offset`: it counts the server rows
+ * consumed, minus rows deleted here, and a row that arrived meanwhile shifts the order by one, so the overlap is
+ * dropped by id.
  */
 export interface FeedPages {
   readonly notifications: readonly NotificationRow[]
   readonly unreadCount: number
   readonly offset: number
-  /** The last page came back short: there is nothing older to load. */
+  /** The desktop's continuation token; `undefined` when it pages by offset only. */
+  readonly cursor?: string
+  /** Nothing older to load: the desktop said so (`nextCursor: null`) or, without cursors, the last page came back short. */
   readonly exhausted: boolean
 }
 
-type FeedPage = { readonly notifications: readonly NotificationRow[]; readonly unreadCount: number }
+type FeedPage = { readonly notifications: readonly NotificationRow[]; readonly unreadCount: number; readonly nextCursor?: string | null }
+
+/** Query for the page after `feed`. */
+export const nextPageQuery = (feed: FeedPages): { readonly cursor: string } | { readonly offset: number } =>
+  feed.cursor ? { cursor: feed.cursor } : { offset: feed.offset }
 
 export const firstFeedPage = (page: FeedPage, pageSize: number): FeedPages => appendFeedPage(undefined, page, pageSize)
 
@@ -113,7 +120,8 @@ export const appendFeedPage = (feed: FeedPages | undefined, page: FeedPage, page
     // The newest page carries the newest count.
     unreadCount: page.unreadCount,
     offset: (feed?.offset ?? 0) + page.notifications.length,
-    exhausted: page.notifications.length < pageSize,
+    ...(typeof page.nextCursor === "string" && page.nextCursor ? { cursor: page.nextCursor } : {}),
+    exhausted: page.nextCursor === undefined ? page.notifications.length < pageSize : !page.nextCursor,
   }
 }
 

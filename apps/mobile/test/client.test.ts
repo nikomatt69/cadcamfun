@@ -220,6 +220,7 @@ describe("assistant status and notification paging", () => {
     t.handler = () => ({ status: 200, body: JSON.stringify({ notifications: [], unreadCount: 0 }) })
     await client(t).notifications({ limit: 50 })
     await client(t).notifications({ limit: 50, offset: 50 })
-    expect(t.calls.map((call) => call.path)).toEqual(["/api/notifications?limit=50", "/api/notifications?limit=50&offset=50"])
+    await client(t).notifications({ limit: 50, offset: 50, cursor: "abc" })
+    expect(t.calls.map((call) => call.path)).toEqual(["/api/notifications?limit=50", "/api/notifications?limit=50&offset=50", "/api/notifications?limit=50&cursor=abc"])
   })
 })
