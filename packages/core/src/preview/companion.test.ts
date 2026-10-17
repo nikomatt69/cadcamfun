@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { makeProgram } from "../cam/ir.ts"
 import { previewPath } from "../cam/viewer/lines.ts"
 import {
+  arcChordPoints,
   documentParameters,
   elementsOfDocument,
   meshPreview,
@@ -30,6 +31,22 @@ describe("companion mesh preview", () => {
     expect(both.parts.map((part) => part.id)).toEqual(["a", "b"])
     expect(both.parts[1]?.triangleCount).toBe(0)
     expect(both.indices).toHaveLength(first.indices.length)
+  })
+
+  test("a malformed element is listed without triangles instead of failing or poisoning the preview", () => {
+    // A corrupt stored element: reading it throws inside the kernel.
+    const corrupt = { id: "bad", name: "Bad", type: "cube", height: 10, depth: 10, get width(): number { throw new Error("corrupt") } }
+    const preview = meshPreview([
+      corrupt,
+      { id: "box", name: "Box", type: "cube", width: 10, height: 10, depth: 10 },
+    ])
+    expect(preview.parts.map((part) => [part.id, part.triangleCount > 0])).toEqual([["bad", false], ["box", true]])
+    expect([...preview.positions, ...preview.normals].every(Number.isFinite)).toBe(true)
+  })
+
+  test("coordinates travel rounded to 1e-5 mm", () => {
+    const preview = meshPreview([{ id: "box", type: "cube", width: 10 / 3, height: 10, depth: 10 }])
+    for (const value of [...preview.positions, ...preview.normals]) expect(Math.abs(value * 1e5 - Math.round(value * 1e5))).toBeLessThan(1e-6)
   })
 
   test("documents yield elements from an array or from geometry", () => {
@@ -105,5 +122,45 @@ describe("companion toolpath preview", () => {
     expect(preview.segments.map((segment) => segment.kind)).toEqual(["linear"])
     expect(preview.segments[0]).toMatchObject({ from: [10, 0, 5], to: [20, 0, -1] })
     expect(preview.stats.machineFunctions).toBe(0)
+  })
+
+  test("a program arc follows its centre like the G-code path, not a straight chord", () => {
+    const program = makeProgram("job", [{
+      id: "tp",
+      name: "contour",
+      toolId: "t1",
+      spindleRpm: 1000,
+      coolant: "off",
+      moves: [
+        { _tag: "Rapid", to: { x: 20, y: 0, z: 2 } },
+        { _tag: "Linear", to: { x: 20, y: 0, z: -1 }, feed: 200 },
+        { _tag: "Arc", to: { x: 20, y: 10, z: -1 }, center: { x: 20, y: 5 }, clockwise: true, feed: 200 },
+      ],
+    }])
+    const preview = toolpathPreviewFromProgram(program)
+    const arc = preview.segments.filter((segment) => segment.kind === "circular")
+    // Half a turn of radius 5 is ~15.7 mm: one chord per millimetre at most.
+    expect(arc.length).toBeGreaterThanOrEqual(16)
+    expect(new Set(arc.map((segment) => segment.line))).toEqual(new Set([3]))
+    for (const segment of arc) expect(Math.hypot(segment.to[0] - 20, segment.to[1] - 5)).toBeCloseTo(5, 6)
+    expect(arc.at(-1)?.to).toEqual([20, 10, -1])
+    // Clockwise from (20, 0) to (20, 10) about (20, 5) swings through X15, exactly as the G-code preview draws it.
+    expect(Math.min(...arc.map((segment) => segment.to[0]))).toBeCloseTo(15, 1)
+    expect(preview.bounds.min[0]).toBeCloseTo(15, 1)
+    expect(preview.stats).toMatchObject({ rapidMoves: 1, linearMoves: 1, circularMoves: 1 })
+  })
+
+  test("a helical arc rises evenly and a full circle closes on its start", () => {
+    const points = arcChordPoints({ x: 10, y: 0, z: 0 }, { x: 10, y: 0, z: -2 }, { x: 0, y: 0 }, false)
+    expect(points.length).toBeGreaterThan(60)
+    expect(points.at(-1)).toEqual({ x: 10, y: 0, z: -2 })
+    const zs = points.map((point) => point.z)
+    expect(zs.every((z, index) => index === 0 || z <= zs[index - 1]!)).toBe(true)
+    expect(Math.max(...points.map((point) => point.y))).toBeCloseTo(10, 1)
+  })
+
+  test("non-finite G-code coordinates are dropped instead of reaching the phone", () => {
+    const preview = toolpathPreviewFromGcode(["G0 X0 Y0 Z5", "G1 X1e999 F100", "G1 X5 Y5 Z0"].join("\n"))
+    for (const segment of preview.segments) expect([...segment.from, ...segment.to].every(Number.isFinite)).toBe(true)
   })
 })

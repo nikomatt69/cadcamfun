@@ -6,7 +6,7 @@
  * It never receives the stored CAD document and it never runs this module.
  */
 import type { Vec3 } from "../cad/vec.ts"
-import { expandMoves, moveTarget, type Program } from "../cam/ir.ts"
+import { arcSweepBetween, expandMoves, moveTarget, type Program } from "../cam/ir.ts"
 import { elementMesh, type Element } from "../cam/model/element-mesh.ts"
 import { parseToolpath, type ToolpathPoint } from "../cam/viewer/toolpath.ts"
 import { tokenize, valuesOf } from "../cam/viewer/words.ts"
@@ -15,6 +15,18 @@ import { tokenize, valuesOf } from "../cam/viewer/words.ts"
 export const MAX_PREVIEW_TRIANGLES = 80_000
 /** One segment per motion block, capped the same way. */
 export const MAX_PREVIEW_SEGMENTS = 20_000
+/**
+ * Bump when the payload a given revision produces changes (rounding, caps, arc expansion), so a phone holding an
+ * entity tag of the old shape fetches the new one instead of being told nothing changed.
+ */
+export const PREVIEW_FORMAT = 2
+
+/**
+ * Mesh coordinates and normals travel rounded to 1e-5. The phone uploads them as float32, whose spacing is already
+ * coarser than that above 64 mm, so the rounding is invisible; it roughly halves the JSON a dense part costs on Wi-Fi.
+ */
+const MESH_PRECISION = 1e5
+const round = (value: number, scale: number): number => Math.round(value * scale) / scale
 
 export interface PreviewBounds {
   readonly min: readonly [number, number, number]
@@ -148,7 +160,7 @@ const vertexNormal = (positions: Float64Array, indices: Uint32Array): number[] =
     let nx = acc[v]!, ny = acc[v + 1]!, nz = acc[v + 2]!
     const len = Math.hypot(nx, ny, nz)
     if (len < 1e-12) normals.push(0, 0, 1)
-    else normals.push(nx / len, ny / len, nz / len)
+    else normals.push(round(nx / len, MESH_PRECISION), round(ny / len, MESH_PRECISION), round(nz / len, MESH_PRECISION))
   }
   return normals
 }
@@ -156,6 +168,25 @@ const vertexNormal = (positions: Float64Array, indices: Uint32Array): number[] =
 export interface MeshPreviewOptions {
   readonly maxTriangles?: number
   readonly tolerance?: number
+}
+
+const finiteMesh = (positions: ArrayLike<number>): boolean => {
+  for (let i = 0; i < positions.length; i++) if (!Number.isFinite(positions[i]!)) return false
+  return true
+}
+
+/**
+ * The element's mesh, or undefined when it has none or the kernel cannot build one. One malformed element (a NaN
+ * width, a profile the tessellator rejects) must not fail the whole preview, and a non-finite vertex would make the
+ * phone refuse the entire payload, so such an element is listed with no triangles instead.
+ */
+const safeMesh = (element: Element, tolerance: number): ReturnType<typeof elementMesh> => {
+  try {
+    const mesh = elementMesh(element, tolerance)
+    return mesh && finiteMesh(mesh.positions) ? mesh : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** Tessellate solid elements. 2D elements stay in `parts` with a zero triangle count so the phone can still name them. */
@@ -174,7 +205,7 @@ export const meshPreview = (elements: readonly Element[], options: MeshPreviewOp
     const element = elements[n]!
     const id = label(element.id, `element-${n}`)
     const name = label(element.name, label(element.type, id))
-    const mesh = elementMesh(element, tolerance)
+    const mesh = safeMesh(element, tolerance)
     const count = mesh ? Math.floor(mesh.indices.length / 3) : 0
     if (!mesh || count === 0) {
       parts.push({ id, name, triangleStart: triangles, triangleCount: 0 })
@@ -187,7 +218,7 @@ export const meshPreview = (elements: readonly Element[], options: MeshPreviewOp
     }
     const base = positions.length / 3
     for (let i = 0; i < mesh.positions.length; i += 3) {
-      const x = mesh.positions[i]!, y = mesh.positions[i + 1]!, z = mesh.positions[i + 2]!
+      const x = round(mesh.positions[i]!, MESH_PRECISION), y = round(mesh.positions[i + 1]!, MESH_PRECISION), z = round(mesh.positions[i + 2]!, MESH_PRECISION)
       positions.push(x, y, z)
       grow(bounds, x, y, z)
     }
@@ -252,6 +283,8 @@ export const toolpathPreviewFromGcode = (gcode: string, options: ToolpathPreview
     const from = points[index - 1]!
     const to = points[index]!
     if (from.x === to.x && from.y === to.y && from.z === to.z) continue
+    // A malformed word (`X1e999`) must not poison the payload: the phone refuses non-finite geometry outright.
+    if (!finitePoint(from) || !finitePoint(to)) continue
     if (segments.length >= maxSegments) {
       truncated = true
       break
@@ -289,7 +322,38 @@ const blockStats = (gcode: string): ToolpathStats => {
 
 const xyz = (v: Vec3): readonly [number, number, number] => [v.x, v.y, v.z]
 
-/** Fallback when a toolpath has a program and no stored G-code. Line numbers are then the segment order. */
+const finitePoint = (v: { readonly x: number; readonly y: number; readonly z: number }): boolean =>
+  Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z)
+
+/** Hard ceiling on chords per arc, so a huge radius cannot turn one move into the whole segment budget. */
+const MAX_ARC_CHORDS = 720
+
+/**
+ * The points after `from` along an XY arc (helical when Z changes), at most `PREVIEW_ARC_RESOLUTION` mm apart: the same
+ * chord length the G-code preview uses, so a program-only toolpath and its posted G-code draw the same curve.
+ */
+export const arcChordPoints = (from: Vec3, to: Vec3, center: { readonly x: number; readonly y: number }, clockwise: boolean): Vec3[] => {
+  const radius = Math.hypot(from.x - center.x, from.y - center.y)
+  if (!(radius > 1e-9)) return [to]
+  const sweep = arcSweepBetween(from, to, center, clockwise)
+  const chords = Math.min(MAX_ARC_CHORDS, Math.max(1, Math.ceil((radius * sweep) / PREVIEW_ARC_RESOLUTION)))
+  const start = Math.atan2(from.y - center.y, from.x - center.x)
+  const direction = clockwise ? -1 : 1
+  const points: Vec3[] = []
+  for (let i = 1; i < chords; i++) {
+    const t = i / chords
+    const angle = start + direction * sweep * t
+    points.push({ x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle), z: from.z + (to.z - from.z) * t })
+  }
+  // The programmed end point exactly, not a trigonometric approximation of it.
+  points.push(to)
+  return points
+}
+
+/**
+ * Fallback when a toolpath has a program and no stored G-code. `line` is the 1-based order of the motion move (every
+ * chord of one arc shares it), the counterpart of the G-code row. Cycles are expanded and arcs follow their centre.
+ */
 export const toolpathPreviewFromProgram = (program: Program, options: ToolpathPreviewOptions = {}): ToolpathPreview => {
   const maxSegments = options.maxSegments ?? MAX_PREVIEW_SEGMENTS
   const segments: ToolpathSegment[] = []
@@ -299,21 +363,37 @@ export const toolpathPreviewFromProgram = (program: Program, options: ToolpathPr
   let rapidMoves = 0
   let linearMoves = 0
   let circularMoves = 0
+  let block = 0
   let truncated = false
+
+  const draw = (kind: SegmentKind, from: Vec3, points: readonly Vec3[]): void => {
+    let previous = from
+    for (const point of points) {
+      if (truncated) return
+      if (!finitePoint(point)) return
+      if (point.x !== previous.x || point.y !== previous.y || point.z !== previous.z) {
+        if (segments.length >= maxSegments) {
+          truncated = true
+          return
+        }
+        segments.push({ kind, line: block, from: xyz(previous), to: xyz(point) })
+      }
+      previous = point
+    }
+  }
 
   for (const toolpath of program.toolpaths) {
     for (const move of expandMoves(toolpath.moves, at)) {
       const target = moveTarget(move)
       if (move._tag === "Rapid" || move._tag === "Linear" || move._tag === "Arc") {
-        const kind: SegmentKind = move._tag === "Rapid" ? "rapid" : move._tag === "Arc" ? "circular" : "linear"
-        if (kind === "rapid") rapidMoves++
-        else if (kind === "linear") linearMoves++
+        block++
+        if (move._tag === "Rapid") rapidMoves++
+        else if (move._tag === "Linear") linearMoves++
         else circularMoves++
-        if (!known || !target) {
-          // Nothing to draw yet.
-        } else if (segments.length < maxSegments) {
-          segments.push({ kind, line: segments.length + 1, from: xyz(at), to: xyz(target) })
-        } else truncated = true
+        if (known && target && finitePoint(at)) {
+          if (move._tag === "Arc") draw("circular", at, arcChordPoints(at, target, move.center, move.clockwise))
+          else draw(move._tag === "Rapid" ? "rapid" : "linear", at, [target])
+        }
       }
       if (target) {
         at = target
@@ -327,3 +407,5 @@ export const toolpathPreviewFromProgram = (program: Program, options: ToolpathPr
 }
 
 export const emptyToolpathPreview = (): ToolpathPreview => pack([], EMPTY_STATS, false)
+
+export { PreviewCache, type PreviewCacheOptions } from "./cache.ts"
