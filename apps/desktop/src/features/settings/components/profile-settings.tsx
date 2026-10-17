@@ -18,6 +18,7 @@ import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { useRead } from "../../../app/queries.ts"
 import { toast } from "../../../shared/ui/feedback.tsx"
+import { GitProfileSettings } from "./git-profile-settings.tsx"
 
 interface ProfileData {
   name: string
@@ -722,6 +723,8 @@ export function ProfileSettings(): JSX.Element {
           </div>
         </div>
       </div>
+
+      <GitProfileSettings />
 
       {/* Save Button */}
       <Presence>

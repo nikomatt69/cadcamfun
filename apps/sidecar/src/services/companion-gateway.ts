@@ -117,7 +117,7 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   // GitHub sync (`vcs/remote|push|pull`) needs the owner's GitHub token and stays on the desktop.
   // Commit, branch, checkout, restore, review and merge are phone features (spec 13 §6) and stay allowed: none of them
   // loses data (git keeps every commit, restore is a new commit, checkout refuses a dirty working copy, an AI actor
-  // cannot touch `main`). What the gateway adds is a per-device write budget and attribution: the device id travels to
+  // cannot merge into `main`). What the gateway adds is a per-device write budget and attribution: the device id travels to
   // the sidecar so the `ActivityLog` row of every history-changing action names the phone that asked for it.
   { methods: ["GET", "POST"], path: /^\/api\/projects\/[^/]+\/(vcs\/(?!remote$|push$|pull$)[^/]+|pulls|actions)(\/.*)?$/ },
   // Live SSE stream of vcs / workflow / AI activity; the only push channel the phone has.

@@ -15,7 +15,7 @@ Result (JSON)
 
 Do not use it
 - To record work: vcs_edit starts a change, commits, restores, opens the pull request and runs the workflows.
-- A specialist never commits: the agent that owns the change does, on an ai/* branch, and a person merges.
+- A specialist never commits: the agent that owns the change does, on the checked-out branch, and a person merges pull requests.
 
 After it
 - Read the diff before writing a pull-request body; cite what changed by name.

@@ -1,9 +1,9 @@
-Record the work as a reviewable change on an ai/* branch. The assistant can never write to main or merge.
+Record the work in the project's history. Edit and commit on the checked-out branch, main included; no branch is required. The assistant never merges.
 
 Actions
-- start_change: create an ai/<topic> branch from main and check it out. Do this BEFORE editing geometry.
+- start_change: optional. Create an ai/<topic> branch from main and check it out, only when the user wants a reviewable change or a pull request.
 - commit: record the current edits with a short imperative message that says what changed and why.
-- restore: roll the named ids back to an earlier commit. Destructive: send confirm true only after the user asked for it; the host still asks before the tool runs, and it is refused on main.
+- restore: roll the named ids back to an earlier commit. Destructive: send confirm true only after the user asked for it; the host still asks before the tool runs.
 - open_pull_request: open the pull request from the checked-out branch into main, with a title and a body.
 - run_workflows: run the project's .cadcamfun/workflows on the checked-out branch and report the runs.
 
@@ -19,7 +19,7 @@ Result (JSON)
 
 Do not use it
 - To read the repository: vcs is read-only.
-- Never commit on main, never merge, never push to GitHub: a person does that.
+- Never merge a pull request and never push to GitHub: a person does that.
 
 After it
-- Check what you wrote with vcs.diff, then open the pull request.
+- Check what you wrote with vcs.diff. Open a pull request only when you are on an ai/* branch.

@@ -453,7 +453,7 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
     title: "ai.cmd.commit",
     description: "ai.cmd.commit.desc",
     keywords: ["save", "record", "change", "git"],
-    run: prompt("Start a change on an ai/* branch for the work so far and commit it with a message that says what changed and why.")
+    run: prompt("Commit the work so far on the checked-out branch with a message that says what changed and why.")
   },
   {
     name: "pr",

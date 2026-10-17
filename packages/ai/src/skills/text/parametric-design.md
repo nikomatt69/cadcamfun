@@ -24,7 +24,7 @@ Send it to `cad` with `{"action":"parametric_validate","history":{...}}`. Change
 3. Extrude with `operation: "new"`, `direction: "up"`, `depth` set to a parameter name.
 4. Add features that reference parameter names, then call cad action parametric_validate validate. Repair the reported paths and rebuild errors before create; switching to cad_edit action add cannot bypass the same history schema.
 5. End with cad action check. On `RebuildFailed`, read the cause, fix it, repeat.
-6. Save on an `ai/<topic>` branch with vcs_edit action commit (see the version-control-cadcam skill).
+6. Save with vcs_edit action commit on the checked-out branch (see the version-control-cadcam skill).
 
 ## Standard parts and design rules
 

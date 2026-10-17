@@ -47,6 +47,8 @@ export const ApiToken = Schema.Struct({
 export const TokenCreate = Schema.Struct({ name: opt(Schema.String), permissions: opt(Schema.Unknown), expiresIn: opt(Schema.Number) })
 export class TokenBadRequest extends Schema.TaggedError<TokenBadRequest>()("TokenBadRequest", { error: Schema.String }, { httpApiStatus: 400 }) {}
 const id = { id: Schema.String }
+/** The user's local git identity (`user.name` / `user.email`) that signs their version-control commits. */
+export const GitProfile = Schema.Struct({ name: Schema.String, email: Schema.String })
 
 export class UserGroup extends HttpApiGroup.make("user")
   .add(
@@ -74,6 +76,8 @@ export class UserGroup extends HttpApiGroup.make("user")
       query: { token: opt(Schema.String), type: opt(Schema.String), password: opt(Schema.String) },
       success: message, error: [BadRequest, NotFound, InternalError]
     }),
+    HttpApiEndpoint.get("gitProfile", "/api/user/git-profile", { success: GitProfile, error: [NotFound, InternalError] }),
+    HttpApiEndpoint.put("updateGitProfile", "/api/user/git-profile", { payload: GitProfile, success: GitProfile, error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.get("byId", "/api/user/:id", { params: id, success: PublicUser, error: [BadRequest, NotFound, InternalError] })
   )
 {}

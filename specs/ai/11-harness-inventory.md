@@ -34,8 +34,8 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `memory` | read | 2 | primary:general, primary:cad, primary:cam, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 789 |
 | `memory_edit` | write | 2 | primary:general, primary:cad, primary:cam | 998 |
 | `research` | read | 2 | primary:general, primary:cad, primary:cam, researcher, editor, modeler, machinist, planner, diagnostician, optimizer | 1070 |
-| `vcs` | read | 3 | primary:general, primary:cad, primary:cam, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1049 |
-| `vcs_edit` | destructive | 5 | primary:general, primary:cad, primary:cam | 1479 |
+| `vcs` | read | 3 | primary:general, primary:cad, primary:cam, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1071 |
+| `vcs_edit` | destructive | 5 | primary:general, primary:cad, primary:cam | 1563 |
 | `agent` | write | 4 | primary:general, primary:cad, primary:cam | 1639 |
 | `mods` | read | 2 | primary:general, primary:cad, primary:cam, researcher, reviewer, planner, diagnostician | 1624 |
 | `mods_edit` | destructive | 3 | primary:general, primary:cad, primary:cam | 3735 |
@@ -72,7 +72,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `cad_edit.add` (was `cad_add_elements`) | write | drawing | elements* | handler `addElements` → `apps/sidecar/src/services/ai.ts:572` | yes | declared, partial on `skipped` | action-contracts.test.ts, action-outcome.test.ts, bridge.test.ts, nikcli-host.test.ts, program-calls.test.ts, ai-actions.test.ts, ai-bridge-policy.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-fusion-governance.test.ts, ai-stock-inspection.test.ts, nikcli-plugin.test.ts, ai-chat-loop.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-timeline.test.ts, ai-tool-facts.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
+| `cad_edit.add` (was `cad_add_elements`) | write | drawing | elements* | handler `addElements` → `apps/sidecar/src/services/ai.ts:572` | yes | declared, partial on `skipped` | action-contracts.test.ts, action-outcome.test.ts, bridge.test.ts, nikcli-host.test.ts, program-calls.test.ts, ai-actions.test.ts, ai-bridge-policy.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-fusion-governance.test.ts, ai-stock-inspection.test.ts, assistant-history.test.ts, nikcli-plugin.test.ts, ai-chat-loop.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-timeline.test.ts, ai-tool-facts.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
 | `cad_edit.add_entities` (was `cad_add_entities`) | write | drawing | entities* | handler `addEntities` → `apps/sidecar/src/services/ai.ts:566` | yes | declared | action-inputs-cad.test.ts, service.test.ts, ai-cam-tools.test.ts, companion-chat-e2e.test.ts, ai-editor-sync.test.ts, ai-workspace.test.ts, ai.test.ts |
 | `cad_edit.modify` (was `cad_modify_entities`) | write | drawing | changes* | handler `modifyEntities` → `apps/sidecar/src/services/ai.ts:596` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, agents.test.ts, bridge.test.ts, ai-bridge-policy.test.ts, ai-cam-tools.test.ts, ai-editor-sync.test.ts, ai-tool-views.test.ts |
 | `cad_edit.transform` (was `cad_transform_entities`) | write | drawing | ids*, dx, dy, dz, rotateAxis, rotateDegrees, scale, about, copies | handler `transformEntities` → `apps/sidecar/src/services/ai.ts:625` | yes | declared | action-inputs-cad.test.ts, ai-stock-inspection.test.ts, ai-workspace.test.ts |
@@ -168,19 +168,19 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `vcs.status` (was `vcs_status`) | read | — | — | contribution `vcs.status` → `apps/sidecar/src/services/ai-vcs-tools.ts:51` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, project-vcs.test.ts, ai-tool-facts.test.ts |
-| `vcs.diff` (was `vcs_diff`) | read | — | from, to | contribution `vcs.diff` → `apps/sidecar/src/services/ai-vcs-tools.ts:56` | yes | declared | action-inputs.test.ts, project-vcs.test.ts |
-| `vcs.list_pull_requests` (was `vcs_list_pull_requests`) | read | — | state | contribution `vcs.list_pull_requests` → `apps/sidecar/src/services/ai-vcs-tools.ts:58` | yes | declared | action-inputs.test.ts, project-vcs.test.ts |
+| `vcs.status` (was `vcs_status`) | read | — | — | contribution `vcs.status` → `apps/sidecar/src/services/ai-vcs-tools.ts:54` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, project-vcs.test.ts, ai-tool-facts.test.ts |
+| `vcs.diff` (was `vcs_diff`) | read | — | from, to | contribution `vcs.diff` → `apps/sidecar/src/services/ai-vcs-tools.ts:59` | yes | declared | action-inputs.test.ts, project-vcs.test.ts |
+| `vcs.list_pull_requests` (was `vcs_list_pull_requests`) | read | — | state | contribution `vcs.list_pull_requests` → `apps/sidecar/src/services/ai-vcs-tools.ts:61` | yes | declared | action-inputs.test.ts, project-vcs.test.ts |
 
 ### `vcs_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `vcs_edit.start_change` (was `vcs_start_change`) | write | history | topic* | contribution `vcs_edit.start_change` → `apps/sidecar/src/services/ai-vcs-tools.ts:63` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
-| `vcs_edit.commit` (was `vcs_commit`) | write | history | message* | contribution `vcs_edit.commit` → `apps/sidecar/src/services/ai-vcs-tools.ts:70` | yes | declared | action-inputs.test.ts, bridge.test.ts, ai-bridge-policy.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-tool-facts.test.ts |
-| `vcs_edit.restore` (was `vcs_restore_paths`) | destructive | history, drawing | paths*, from*, confirm* | contribution `vcs_edit.restore` → `apps/sidecar/src/services/ai-vcs-tools.ts:72` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts |
-| `vcs_edit.open_pull_request` (was `vcs_open_pull_request`) | write | history | title*, body | contribution `vcs_edit.open_pull_request` → `apps/sidecar/src/services/ai-vcs-tools.ts:78` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
-| `vcs_edit.run_workflows` (was `actions_run`) | write | workflow | trigger | contribution `vcs_edit.run_workflows` → `apps/sidecar/src/services/ai-vcs-tools.ts:85` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
+| `vcs_edit.start_change` (was `vcs_start_change`) | write | history | topic* | contribution `vcs_edit.start_change` → `apps/sidecar/src/services/ai-vcs-tools.ts:66` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
+| `vcs_edit.commit` (was `vcs_commit`) | write | history | message* | contribution `vcs_edit.commit` → `apps/sidecar/src/services/ai-vcs-tools.ts:75` | yes | declared | action-inputs.test.ts, bridge.test.ts, ai-bridge-policy.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-tool-facts.test.ts |
+| `vcs_edit.restore` (was `vcs_restore_paths`) | destructive | history, drawing | paths*, from*, confirm* | contribution `vcs_edit.restore` → `apps/sidecar/src/services/ai-vcs-tools.ts:77` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts |
+| `vcs_edit.open_pull_request` (was `vcs_open_pull_request`) | write | history | title*, body | contribution `vcs_edit.open_pull_request` → `apps/sidecar/src/services/ai-vcs-tools.ts:83` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
+| `vcs_edit.run_workflows` (was `actions_run`) | write | workflow | trigger | contribution `vcs_edit.run_workflows` → `apps/sidecar/src/services/ai-vcs-tools.ts:90` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
 
 ### `agent`
 
@@ -250,8 +250,8 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/tools/prompts/mods_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3735 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/parts.txt` | tool description | tools/prompts/index.ts toolPrompt | 1270 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/research.txt` | tool description | tools/prompts/index.ts toolPrompt | 1070 | prompt-corpus.test.ts |
-| `packages/ai/src/tools/prompts/vcs.txt` | tool description | tools/prompts/index.ts toolPrompt | 1049 | prompt-corpus.test.ts |
-| `packages/ai/src/tools/prompts/vcs_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1479 | ai-specialists.test.ts, prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/vcs.txt` | tool description | tools/prompts/index.ts toolPrompt | 1071 | prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/vcs_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1563 | ai-specialists.test.ts, prompt-corpus.test.ts |
 | `packages/ai/src/prompts/family/autonomous.txt` | model-family style | prompts/system.ts modelFamilyPrompt | 637 | modes.test.ts, prompt-corpus.test.ts |
 | `packages/ai/src/prompts/family/codex.txt` | model-family style | prompts/system.ts modelFamilyPrompt | 306 | modes.test.ts, prompt-corpus.test.ts |
 | `packages/ai/src/prompts/family/gemini.txt` | model-family style | prompts/system.ts modelFamilyPrompt | 247 | modes.test.ts, prompt-corpus.test.ts |
@@ -288,13 +288,13 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `drilling-and-holes` | cam | 788 | — |
 | `precision-and-tolerances` | cam | 2197 | cam_edit |
 | `industrial-standards` | cad | 5993 | cad, library, parts |
-| `machines-and-axes` | cam | 4957 | cam, cam_edit, parts |
+| `machines-and-axes` | cam | 6596 | cam, cam_edit, parts |
 | `drawings-and-images` | cad | 2381 | cad, cad_edit, parts |
 | `plugin-authoring` | dev | 1659 | — |
 | `parametric-design` | cad | 6710 | cad, cad_edit, parts, vcs_edit |
 | `fusion-360-modelling` | cad | 8072 | cad, cad_edit, cam |
 | `composed-cam-programs` | cam | 2514 | cam, cam_edit, library |
-| `version-control-cadcam` | vcs | 1008 | vcs, vcs_edit, agent |
+| `version-control-cadcam` | vcs | 1170 | vcs, vcs_edit, agent |
 | `workflows-cadcam` | workflows | 1468 | cam, vcs_edit |
 | `machining-cycle-presets` | cam | 1320 | cam, cam_edit, library |
 | `project-auto-memory` | general | 904 | memory, memory_edit |

@@ -19,7 +19,8 @@ const failureMessage = (e: unknown): string => e instanceof Error ? e.message : 
 /**
  * The implementations of the version-control actions (`vcs.*` and `vcs_edit.*` in the catalogue). The catalogue owns their
  * ids, effects and validation; this module supplies only what needs the repositories. Every write is attributed to the
- * acting human as an AI actor, and `ProjectVcs` refuses AI actors on `main`, so a person always reviews and merges.
+ * acting human as an AI actor. The assistant edits and commits on the checked-out branch, `main` included; an `ai/*`
+ * branch and a pull request are there when the user wants a reviewable change, and only a person merges one.
  */
 export const vcsContributions = (deps: VcsToolDeps): Readonly<Record<string, ActionContribution>> => {
   const { vcs, runner } = deps
@@ -34,7 +35,9 @@ export const vcsContributions = (deps: VcsToolDeps): Readonly<Record<string, Act
         return Effect.succeed(found.project.id)
       })
     )
-  /** One Promise crossing: the Effect runs here, with the call's signal, and a failure carries its message to the model. */
+  /**
+   * One Promise crossing: the Effect runs here, with the call's signal, and a failure carries its message to the model.
+   */
   const contribute = <I, A>(write: boolean, body: (projectId: string, input: I, actor: Actor) => Effect.Effect<A, unknown>): ActionContribution =>
     (async (input: I, context: ToolContext) => {
       const actor: Actor = Object.freeze({ ...deps.actor, kind: "ai" })
@@ -62,6 +65,8 @@ export const vcsContributions = (deps: VcsToolDeps): Readonly<Record<string, Act
       })),
     "vcs_edit.start_change": contribute(true, (id, input: { topic: string }, actor) =>
       Effect.gen(function*() {
+        // Legacy projects without history need `main` before an optional branch can be created.
+        yield* vcs.initialize(id, actor)
         const name = `ai/${slug(input.topic)}`
         yield* vcs.createBranch(id, name, "main").pipe(Effect.catchIf((e) => e instanceof Error && /already exists/.test(e.message), () => Effect.void))
         yield* vcs.checkout(id, name, actor)

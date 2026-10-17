@@ -18,9 +18,11 @@ import {
   type Oid,
   type Signature,
 } from "@cadcamfun/vcs"
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, notExists } from "drizzle-orm"
 import { Context, Data, Effect, Layer } from "effect"
-import { ProjectVcsRepo } from "../repos/project-vcs-repo.ts"
+import { ProjectVcsRepo, type GitIdentity } from "../repos/project-vcs-repo.ts"
+
+export type { GitIdentity }
 
 export class VcsFailure extends Data.TaggedError("VcsFailure")<{
   readonly code: "not-found" | "invalid" | "dirty" | "conflict" | "blocked" | "nothing-to-commit" | "remote"
@@ -59,12 +61,17 @@ const MAIN = "main"
 
 const isEntityPath = (p: string): boolean => p === "project.json" || ENTITY_DIRECTORIES.some((dir) => p.startsWith(`${dir}/`))
 
-/** An AI actor (mobile companion, agents) proposes changes on its own branches; a human merges them. */
+/**
+ * An AI actor (mobile companion, agents) commits and restores on whatever branch is checked out, `main` included;
+ * an `ai/*` branch is an option, not an obligation. Merging a pull request into `main` stays a person's call.
+ */
 const PROTECTED = new Set([MAIN])
 const forbidAiOnProtected = (actor: Actor, branch: string, action: string): Effect.Effect<void, VcsFailure> =>
   actor.kind === "ai" && PROTECTED.has(branch)
-    ? Effect.fail(new VcsFailure({ code: "blocked", message: `AI actors cannot ${action} on ${branch}; use an ai/* branch and open a pull request` }))
+    ? Effect.fail(new VcsFailure({ code: "blocked", message: `AI actors cannot ${action} on ${branch}; a person merges` }))
     : Effect.void
+
+const INITIAL_MESSAGE = "Initial commit"
 
 const toFailure = (e: unknown): VcsFailure => {
   if (e instanceof VcsError) {
@@ -80,6 +87,16 @@ const vcs = <A>(run: () => A): Effect.Effect<A, VcsFailure> => Effect.try({ try:
 export class ProjectVcs extends Context.Service<ProjectVcs, {
   /** Working-copy changes (database vs HEAD), as paths. Empty = clean. */
   status(projectId: string): Effect.Effect<readonly string[], VcsFailure | DatabaseError>
+  /**
+   * Gives a project without history its first commit on `main` (the project as it is now), so branches, diffs
+   * against `main` and pull requests work from the start. Returns the new commit, or undefined when there already is one.
+   */
+  initialize(projectId: string, actor: Actor): Effect.Effect<Oid | undefined, VcsFailure | DatabaseError>
+  /** Creates every user's missing git profile, then runs `initialize` for every project that has no commit yet, signed by its owner; returns how many projects were initialised. */
+  initializeAll(): Effect.Effect<number, VcsFailure | DatabaseError>
+  /** The user's local git identity (`user.name` / `user.email`) that signs their commits; created from the account on first use. */
+  gitProfile(userId: string): Effect.Effect<GitIdentity, VcsFailure | DatabaseError>
+  setGitProfile(userId: string, identity: GitIdentity): Effect.Effect<GitIdentity, VcsFailure | DatabaseError>
   commit(projectId: string, input: { message: string }, actor: Actor, extra?: Readonly<Record<string, string>>): Effect.Effect<Oid, VcsFailure | DatabaseError>
   /** History of the whole project, or only of one file (`drawings/<id>.json`…) when `path` is given. */
   log(projectId: string, rev?: string, limit?: number, path?: string): Effect.Effect<LogEntry[], VcsFailure>
@@ -111,7 +128,12 @@ export class ProjectVcs extends Context.Service<ProjectVcs, {
       const store = yield* ProjectVcsRepo
       const transports = yield* GitHubTransports
       const repoOf = (projectId: string) => new Repository(store.backend(projectId))
-      const sign = (a: Actor): Signature => ({ name: a.kind === "ai" ? `${a.name} (AI)` : a.name, email: a.email, time: Math.floor(Date.now() / 1000), tz: "+0000" })
+      /** Signs as the user's git profile (created on first use); an AI commit on their behalf as `<name> (AI)`. */
+      const signOf = Effect.fn("ProjectVcs.sign")(function*(a: Actor) {
+        const identity = (yield* store.gitProfile(a.userId)) ?? { name: a.name, email: a.email }
+        const signature: Signature = { name: a.kind === "ai" ? `${identity.name} (AI)` : identity.name, email: identity.email, time: Math.floor(Date.now() / 1000), tz: "+0000" }
+        return signature
+      })
 
       const workingFiles = (projectId: string) =>
         Effect.gen(function*() {
@@ -156,6 +178,18 @@ export class ProjectVcs extends Context.Service<ProjectVcs, {
         return store.audit(actor.userId, projectId, action, { ...details, actor: actor.kind ?? "user", ...(citation !== undefined ? { citation } : {}), ...(actor.via !== undefined ? { via: actor.via } : {}) }).pipe(Effect.ignore)
       }
 
+      const initialize = Effect.fn("ProjectVcs.initialize")(function*(projectId: string, actor: Actor) {
+        const repo = repoOf(projectId)
+        if (Object.keys(repo.branches()).length > 0) return undefined
+        const files = yield* workingFiles(projectId)
+        // A repository whose HEAD was moved off `main` before any commit still starts on `main`.
+        if (repo.currentBranch() !== MAIN) yield* vcs(() => repo.backend.setHead(`refs/heads/${MAIN}`))
+        const author = yield* signOf(actor)
+        const oid = yield* vcs(() => repo.commit(files, { message: INITIAL_MESSAGE, author, allowEmpty: true }))
+        yield* audit(actor, projectId, "vcs.commit", { commit: oid, message: INITIAL_MESSAGE, branch: MAIN })
+        return oid
+      })
+
       const remoteOf = Effect.fn("ProjectVcs.remoteOf")(function*(projectId: string) {
         const remote = yield* store.remote(projectId)
         if (!remote) return yield* new VcsFailure({ code: "invalid", message: "This project has no GitHub remote" })
@@ -182,20 +216,51 @@ export class ProjectVcs extends Context.Service<ProjectVcs, {
           const remote = yield* remoteOf(projectId)
           yield* requireClean(projectId)
           const repo = repoOf(projectId)
-          const result = yield* network(() => pullRemote(repo, transports.make(remote, token), branch ?? repo.currentBranch(), sign(actor)))
+          const author = yield* signOf(actor)
+          const result = yield* network(() => pullRemote(repo, transports.make(remote, token), branch ?? repo.currentBranch(), author))
           if (result.kind === "conflict") return yield* new VcsFailure({ code: "conflict", message: "Merge conflicts", conflicts: result.conflicts })
           if (result.kind !== "up-to-date") yield* applyHead(projectId, actor)
           return { kind: result.kind, oid: result.oid }
         }),
         status,
+        initialize,
+        gitProfile: Effect.fn("ProjectVcs.gitProfile")(function*(userId) {
+          const identity = yield* store.gitProfile(userId)
+          if (!identity) return yield* new VcsFailure({ code: "not-found", message: "User not found" })
+          return identity
+        }),
+        setGitProfile: Effect.fn("ProjectVcs.setGitProfile")(function*(userId, input) {
+          const name = input.name.trim()
+          const email = input.email.trim()
+          // The same limits git puts on an ident: no angle brackets or line breaks, which would corrupt the commit header.
+          if (!name || name.length > 100 || /[<>\n\r]/.test(name)) return yield* new VcsFailure({ code: "invalid", message: "Name must be 1-100 characters without < > or line breaks" })
+          if (email.length > 254 || !/^[^\s<>@]+@[^\s<>@]+$/.test(email)) return yield* new VcsFailure({ code: "invalid", message: "Email must look like name@host" })
+          if (!(yield* store.gitProfile(userId))) return yield* new VcsFailure({ code: "not-found", message: "User not found" })
+          return yield* store.setGitProfile(userId, { name, email })
+        }),
+        initializeAll: Effect.fn("ProjectVcs.initializeAll")(function*() {
+          yield* store.ensureGitProfiles()
+          const empty = yield* query("vcs.uninitialized", (db) =>
+            db.select({ projectId: schema.projectTable.id, userId: schema.userTable.id, name: schema.userTable.name, email: schema.userTable.email })
+              .from(schema.projectTable)
+              .innerJoin(schema.userTable, eq(schema.userTable.id, schema.projectTable.ownerId))
+              .where(notExists(db.select({ oid: schema.gitRefTable.oid }).from(schema.gitRefTable).where(eq(schema.gitRefTable.projectId, schema.projectTable.id))))
+              .all())
+          let count = 0
+          for (const row of empty) {
+            const owner: Actor = { userId: row.userId, name: row.name ?? row.email ?? "User", email: row.email ?? "unknown@cadcamfun.local" }
+            if (yield* initialize(row.projectId, owner)) count++
+          }
+          return count
+        }),
         commit: Effect.fn("ProjectVcs.commit")(function*(projectId, input, actor, extra) {
-          yield* forbidAiOnProtected(actor, repoOf(projectId).currentBranch(), "commit")
           const files = yield* workingFiles(projectId)
           // Non-entity files (workflows, README…) are not in the database; they ride along from the previous commit.
           const repo = repoOf(projectId)
           const head = repo.head()
           const carried = head ? yield* vcs(() => Object.fromEntries(Object.entries(repo.readFiles(repo.readCommit(head).tree)).filter(([p]) => !isEntityPath(p)).map(([p, b]) => [p, toText(b)]))) : {}
-          const oid = yield* vcs(() => repo.commit({ ...carried, ...extra, ...files }, { message: input.message, author: sign(actor) }))
+          const author = yield* signOf(actor)
+          const oid = yield* vcs(() => repo.commit({ ...carried, ...extra, ...files }, { message: input.message, author }))
           yield* audit(actor, projectId, "vcs.commit", { commit: oid, message: input.message, branch: repo.currentBranch() })
           return oid
         }),
@@ -221,9 +286,9 @@ export class ProjectVcs extends Context.Service<ProjectVcs, {
           return describeDiff(repo, from ? repo.resolve(from) : undefined, repo.resolve(to))
         }),
         restore: Effect.fn("ProjectVcs.restore")(function*(projectId, rev, actor, paths) {
-          yield* forbidAiOnProtected(actor, repoOf(projectId).currentBranch(), "restore a revision")
           yield* requireClean(projectId)
-          const oid = yield* vcs(() => (paths && paths.length > 0 ? repoOf(projectId).restorePaths(rev, paths, sign(actor)) : repoOf(projectId).revertTo(rev, sign(actor))))
+          const author = yield* signOf(actor)
+          const oid = yield* vcs(() => (paths && paths.length > 0 ? repoOf(projectId).restorePaths(rev, paths, author) : repoOf(projectId).revertTo(rev, author)))
           yield* applyHead(projectId, actor)
           yield* audit(actor, projectId, "vcs.restore", { rev, paths: paths ?? null, commit: oid })
           return oid
@@ -277,7 +342,8 @@ export class ProjectVcs extends Context.Service<ProjectVcs, {
           const repo = repoOf(projectId)
           const onBase = repo.currentBranch() === pr.base
           if (onBase) yield* requireClean(projectId)
-          const result: MergeResult = yield* vcs(() => repo.mergeInto(pr.base, pr.head, sign(actor), `Merge pull request #${pr.number}: ${pr.title}`))
+          const author = yield* signOf(actor)
+          const result: MergeResult = yield* vcs(() => repo.mergeInto(pr.base, pr.head, author, `Merge pull request #${pr.number}: ${pr.title}`))
           if (result.kind === "conflict") return yield* new VcsFailure({ code: "conflict", message: "Merge conflicts", conflicts: result.conflicts })
           if (onBase) yield* applyHead(projectId, actor)
           const merged = yield* query("vcs.pr.merged", (db) =>

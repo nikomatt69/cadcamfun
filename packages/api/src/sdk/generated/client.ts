@@ -66,6 +66,9 @@ import type {
   UserCreateTokenOutput,
   UserVerifyChangeInput,
   UserVerifyChangeOutput,
+  UserGitProfileOutput,
+  UserUpdateGitProfileInput,
+  UserUpdateGitProfileOutput,
   UserByIdInput,
   UserByIdOutput,
   AiActionsOutput,
@@ -1179,6 +1182,29 @@ export function make(options: ClientOptions) {
             method: "GET",
             path: `/api/user/verify-change`,
             query: { token: input?.["token"], type: input?.["type"], password: input?.["password"] },
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      gitProfile: (requestOptions?: RequestOptions) =>
+        request<UserGitProfileOutput>(
+          {
+            method: "GET",
+            path: `/api/user/git-profile`,
+            successStatus: 200,
+            declaredStatuses: [404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      updateGitProfile: (input: UserUpdateGitProfileInput, requestOptions?: RequestOptions) =>
+        request<UserUpdateGitProfileOutput>(
+          {
+            method: "PUT",
+            path: `/api/user/git-profile`,
+            body: { name: input["name"], email: input["email"] },
             successStatus: 200,
             declaredStatuses: [400, 404, 500, 401],
             empty: false,

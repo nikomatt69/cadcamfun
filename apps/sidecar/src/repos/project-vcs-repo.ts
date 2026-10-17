@@ -1,6 +1,6 @@
 import { Database, DatabaseError, schema, type Db } from "@cadcamfun/db"
 import type { Backend, Entity, ProjectSnapshot } from "@cadcamfun/vcs"
-import { and, eq, inArray, like } from "drizzle-orm"
+import { and, eq, inArray, like, notExists } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 
 /**
@@ -32,6 +32,18 @@ export const sqliteBackend = (db: Db, projectId: string): Backend => {
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null)
 
+/** `user.name` / `user.email` of a commit signature. */
+export interface GitIdentity {
+  readonly name: string
+  readonly email: string
+}
+
+/** A user's default identity, from their account: the local desktop user has a placeholder address. */
+const defaultIdentity = (user: { name: string | null; email: string | null }): GitIdentity => ({
+  name: user.name?.trim() || user.email?.split("@")[0] || "User",
+  email: user.email?.trim() || "unknown@cadcamfun.local",
+})
+
 export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
   backend(projectId: string): Backend
   /** Current database state of a project as a repository snapshot (thumbnails are derived data and excluded). */
@@ -42,12 +54,18 @@ export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
   audit(userId: string, projectId: string, action: string, details: Record<string, unknown>): Effect.Effect<void, DatabaseError>
   remote(projectId: string): Effect.Effect<string | null, DatabaseError>
   setRemote(projectId: string, remote: string | null): Effect.Effect<void, DatabaseError>
+  /** The user's git identity; created from their account name and email the first time it is asked for. Undefined for an unknown user. */
+  gitProfile(userId: string): Effect.Effect<GitIdentity | undefined, DatabaseError>
+  setGitProfile(userId: string, identity: GitIdentity): Effect.Effect<GitIdentity, DatabaseError>
+  /** Creates the git identity of every user that has none yet; returns how many were created. */
+  ensureGitProfiles(): Effect.Effect<number, DatabaseError>
 }>()("cadcamfun/ProjectVcsRepo") {
   static readonly layer = Layer.effect(
     ProjectVcsRepo,
     Effect.gen(function*() {
       const { db, query } = yield* Database
       const P = schema.projectTable
+      const G = schema.gitProfileTable
       return ProjectVcsRepo.of({
         backend: (projectId) => sqliteBackend(db, projectId),
         snapshot: (projectId) =>
@@ -163,6 +181,28 @@ export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
           query("vcs.setRemote", (db) => {
             db.insert(schema.gitRepoTable).values({ projectId }).onConflictDoNothing().run()
             db.update(schema.gitRepoTable).set({ remote }).where(eq(schema.gitRepoTable.projectId, projectId)).run()
+          }),
+        gitProfile: (userId) =>
+          query("vcs.gitProfile", (db) => {
+            const row = db.select().from(G).where(eq(G.userId, userId)).get()
+            if (row) return { name: row.name, email: row.email }
+            const user = db.select({ name: schema.userTable.name, email: schema.userTable.email }).from(schema.userTable).where(eq(schema.userTable.id, userId)).get()
+            if (!user) return undefined
+            const identity = defaultIdentity(user)
+            db.insert(G).values({ userId, ...identity }).onConflictDoNothing().run()
+            return identity
+          }),
+        setGitProfile: (userId, identity) =>
+          query("vcs.setGitProfile", (db) => {
+            db.insert(G).values({ userId, ...identity }).onConflictDoUpdate({ target: G.userId, set: { ...identity, updatedAt: new Date() } }).run()
+            return identity
+          }),
+        ensureGitProfiles: () =>
+          query("vcs.ensureGitProfiles", (db) => {
+            const missing = db.select({ id: schema.userTable.id, name: schema.userTable.name, email: schema.userTable.email }).from(schema.userTable)
+              .where(notExists(db.select({ userId: G.userId }).from(G).where(eq(G.userId, schema.userTable.id)))).all()
+            for (const user of missing) db.insert(G).values({ userId: user.id, ...defaultIdentity(user) }).onConflictDoNothing().run()
+            return missing.length
           }),
       })
     }),

@@ -61,5 +61,13 @@
   "vcs.workflows.savePrompt": "Commit message",
   "vcs.workflows.invalid": "This file does not parse",
   "vcs.workflows.saved": "Committed",
-  "vcs.workflows.stepsHint": "Steps must be registered names; an unknown one fails the run before it starts."
+  "vcs.workflows.stepsHint": "Steps must be registered names; an unknown one fails the run before it starts.",
+  "vcs.profile.title": "Version control identity",
+  "vcs.profile.description": "The name and email that sign your commits, restores and merges in every project's history. The assistant's commits for you are signed as “<name> (AI)”.",
+  "vcs.profile.name": "Name",
+  "vcs.profile.email": "Email",
+  "vcs.profile.save": "Save identity",
+  "vcs.profile.saved": "Version control identity saved",
+  "vcs.profile.saveFailed": "Could not save the version control identity",
+  "vcs.profile.loadFailed": "Could not load the version control identity"
 }

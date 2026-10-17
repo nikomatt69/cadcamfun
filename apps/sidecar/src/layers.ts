@@ -1,6 +1,6 @@
 import { Api } from "@cadcamfun/api"
 import { Database } from "@cadcamfun/db"
-import { Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { HttpMiddleware, HttpRouter } from "effect/unstable/http"
 import { HttpApi, HttpApiBuilder } from "effect/unstable/httpapi"
 import { AppConfigService } from "./config.ts"
@@ -99,8 +99,19 @@ const VcsCore = Layer.mergeAll(ProjectVcs.layer, WorkflowRunner.layer()).pipe(
  * cannot express — siblings do not satisfy each other. `vcs/commit` and `notify/push` live here;
  * `ai/prompt` is registered by the AI layer instead, since the assistant is built on top of the runner
  * and that dependency can only go the other way.
+ *
+ * Every user has a git profile and every project a repository: at startup a user without an identity gets one
+ * from their account, and a project without history gets its first commit on `main`, signed by its owner, so
+ * branches, diffs and pull requests work on projects created before this existed.
  */
-const VcsServices = WorkflowServiceStepsLive.pipe(
+const VcsBackfill = Layer.effectDiscard(
+  ProjectVcs.use((vcs) => vcs.initializeAll()).pipe(
+    Effect.tap((count) => (count > 0 ? Effect.logInfo(`Version control initialised for ${count} project(s)`) : Effect.void)),
+    Effect.catchCause((cause) => Effect.logWarning("Version control backfill failed", cause)),
+  ),
+)
+
+const VcsServices = Layer.mergeAll(WorkflowServiceStepsLive, VcsBackfill).pipe(
   Layer.provideMerge(VcsCore),
   Layer.provideMerge(NotificationService.layer),
 )

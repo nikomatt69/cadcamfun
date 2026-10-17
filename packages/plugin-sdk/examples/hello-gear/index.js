@@ -7614,7 +7614,8 @@ var MotionRunSchema = Struct({
   xMode: Literals(["diameter", "radius"]),
   tool: optionalKey2(Int),
   coolant: Literals(["off", "flood", "mist"]),
-  feedMode: Literals(["min", "rev"])
+  feedMode: Literals(["min", "rev"]),
+  probe: optionalKey2(Boolean3)
 });
 var MotionPathTrackSchema = Struct({
   count: Index,
@@ -7897,6 +7898,7 @@ var ToolpathSettingsSchema = Struct({
   workholdingConfigured: withDefault2(Boolean3, false),
   latheTurret: withDefault2(Literals(["rear", "front"]), "rear"),
   chuckType: withDefault2(Literals(["3-jaw", "4-jaw", "collet"]), "3-jaw"),
+  noseRadius: withDefault2(NonNegative3, 0.4),
   gripLength: withDefault2(Positive3, 20),
   tailstock: withDefault2(Boolean3, false),
   stockBore: withDefault2(NonNegative3, 0),

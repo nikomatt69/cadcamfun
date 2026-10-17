@@ -40,6 +40,31 @@ test("AI VCS tools deny visible read-only members before workflow or branch muta
     }
     expect(triggers).toBe(0)
     expect(db.select().from(schema.gitRefTable).all()).toEqual([])
+    // Reading a legacy project must not silently create history with the reader as its author.
+    yield* Effect.promise(() => contributions["vcs.status"]!({} as never, ctx))
+    expect(db.select().from(schema.gitRefTable).all()).toEqual([])
+    expect(db.select().from(schema.gitObjectTable).all()).toEqual([])
+  }).pipe(Effect.provide(Live), Effect.scoped))
+})
+
+test("AI's first commit on a legacy project succeeds on main without a branch", async () => {
+  await Effect.runPromise(Effect.gen(function*() {
+    const { db } = yield* Database
+    const projects = yield* ProjectRepo
+    const vcs = yield* ProjectVcs
+    const owner = db.insert(schema.userTable).values({ name: "Owner", email: "owner@test.local" }).returning().get()
+    const project = db.insert(schema.projectTable).values({ name: "Legacy", ownerId: owner.id }).returning().get()
+    const actor: Actor = { userId: owner.id, name: "Owner", email: "owner@test.local" }
+    const tools = vcsContributions({ vcs, projects, runner: {} as WorkflowRunner["Service"], actor })
+    const ctx = { projectId: project.id, sessionId: "s", signal: new AbortController().signal, handlers: {} as never }
+    const result = yield* Effect.promise(() => tools["vcs_edit.commit"]!({ message: "Record current model" } as never, ctx))
+    const history = yield* vcs.log(project.id)
+    expect(history).toHaveLength(1)
+    expect(result).toEqual({ commit: history[0]?.oid })
+    expect(history[0]?.message.trim()).toBe("Record current model")
+    expect(history[0]?.author.name).toBe("Owner (AI)")
+    expect((yield* vcs.branches(project.id)).current).toBe("main")
+    expect(yield* vcs.status(project.id)).toEqual([])
   }).pipe(Effect.provide(Live), Effect.scoped))
 })
 

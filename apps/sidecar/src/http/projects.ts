@@ -2,12 +2,14 @@ import { Api, BadRequest, CurrentUser, Forbidden, InternalError, NotFound } from
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ProjectRepo } from "../repos/project-repo.ts"
+import { ProjectVcs } from "../services/project-vcs.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
 
 export const ProjectsHandlers = HttpApiBuilder.group(Api, "projects", Effect.fn(function*(handlers) {
   const repo = yield* ProjectRepo
+  const vcs = yield* ProjectVcs
   return handlers
     .handle("list", () =>
       Effect.gen(function*() {
@@ -21,7 +23,12 @@ export const ProjectsHandlers = HttpApiBuilder.group(Api, "projects", Effect.fn(
         if (payload.organizationId && !(yield* repo.isMember(user.id, payload.organizationId))) {
           return yield* new Forbidden({ message: "User does not belong to the specified organization" })
         }
-        return yield* repo.create(user.id, { ...payload, name: payload.name })
+        const project = yield* repo.create(user.id, { ...payload, name: payload.name })
+        // Every project starts with a repository: its first commit on `main` (see `ProjectVcs.initialize`).
+        yield* vcs.initialize(project.id, { userId: user.id, name: user.name ?? user.email ?? "User", email: user.email ?? "unknown@cadcamfun.local" }).pipe(
+          Effect.catchCause((cause) => Effect.logWarning("Version control initialisation failed", cause)),
+        )
+        return project
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create project"))))
     .handle("get", ({ params }) =>
       Effect.gen(function*() {

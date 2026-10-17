@@ -340,9 +340,21 @@ const Endpoint5_13 = (raw: RawClient["user"]) => (input?: Endpoint5_13Input) =>
     query: { token: input?.["token"], type: input?.["type"], password: input?.["password"] },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint5_14Request = Parameters<RawClient["user"]["byId"]>[0]
-type Endpoint5_14Input = { readonly id: Endpoint5_14Request["params"]["id"] }
-const Endpoint5_14 = (raw: RawClient["user"]) => (input: Endpoint5_14Input) =>
+const Endpoint5_14 = (raw: RawClient["user"]) => () => raw["gitProfile"]({}).pipe(Effect.mapError(mapClientError))
+
+type Endpoint5_15Request = Parameters<RawClient["user"]["updateGitProfile"]>[0]
+type Endpoint5_15Input = {
+  readonly name: Endpoint5_15Request["payload"]["name"]
+  readonly email: Endpoint5_15Request["payload"]["email"]
+}
+const Endpoint5_15 = (raw: RawClient["user"]) => (input: Endpoint5_15Input) =>
+  raw["updateGitProfile"]({ payload: { name: input["name"], email: input["email"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint5_16Request = Parameters<RawClient["user"]["byId"]>[0]
+type Endpoint5_16Input = { readonly id: Endpoint5_16Request["params"]["id"] }
+const Endpoint5_16 = (raw: RawClient["user"]) => (input: Endpoint5_16Input) =>
   raw["byId"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
 const adaptGroup5 = (raw: RawClient["user"]) => ({
@@ -360,7 +372,9 @@ const adaptGroup5 = (raw: RawClient["user"]) => ({
   tokens: Endpoint5_11(raw),
   createToken: Endpoint5_12(raw),
   verifyChange: Endpoint5_13(raw),
-  byId: Endpoint5_14(raw),
+  gitProfile: Endpoint5_14(raw),
+  updateGitProfile: Endpoint5_15(raw),
+  byId: Endpoint5_16(raw),
 })
 
 const Endpoint6_0 = (raw: RawClient["ai"]) => () => raw["actions"]({}).pipe(Effect.mapError(mapClientError))

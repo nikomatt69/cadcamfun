@@ -168,16 +168,50 @@ describe("everything linked to the project is tracked", () => {
 })
 
 describe("AI actor guard", () => {
-  test("the companion cannot write to main, only propose via ai/* branches", () =>
-    withProject(({ projectId, owner, companion, vcs }) =>
+  test("the companion commits and restores on main without a branch; only a person merges", () =>
+    withProject(({ projectId, owner, companion, sql, vcs }) =>
       Effect.gen(function*() {
-        yield* vcs.commit(projectId, { message: "init" }, owner)
-        expect((yield* failure(vcs.commit(projectId, { message: "sneaky" }, companion, {}))).code).toBe("blocked")
+        const first = yield* vcs.commit(projectId, { message: "init" }, owner)
+        sql.update(schema.drawingTable).set({ data: { w: 80, h: 50 } }).where(eq(schema.drawingTable.id, "d1")).run()
+        yield* vcs.commit(projectId, { message: "Narrow plate" }, companion)
+        const [head] = yield* vcs.log(projectId)
+        expect([head!.message.trim(), head!.author.name]).toEqual(["Narrow plate", "Ada (AI)"])
+        yield* vcs.restore(projectId, first, companion)
+        expect(sql.select().from(schema.drawingTable).get()!.data).toEqual({ w: 100, h: 50 })
+
         yield* vcs.createBranch(projectId, "ai/x")
         yield* vcs.checkout(projectId, "ai/x", companion)
-        yield* vcs.openPullRequest(projectId, { title: "t", head: "ai/x" }, companion).pipe(Effect.flip) // nothing to merge yet
-        yield* vcs.checkout(projectId, "main", owner)
-        expect((yield* failure(vcs.restore(projectId, "ai/x", companion))).code).toBe("blocked")
+        sql.update(schema.drawingTable).set({ data: { w: 90, h: 50 } }).where(eq(schema.drawingTable.id, "d1")).run()
+        yield* vcs.commit(projectId, { message: "Plate 90" }, companion)
+        yield* vcs.openPullRequest(projectId, { title: "t", head: "ai/x" }, companion)
+        expect((yield* failure(vcs.mergePullRequest(projectId, 1, companion))).code).toBe("blocked")
+      })))
+})
+
+describe("initialize", () => {
+  test("a project without history gets one first commit on main; a second call is a no-op", () =>
+    withProject(({ projectId, owner, vcs }) =>
+      Effect.gen(function*() {
+        const oid = yield* vcs.initialize(projectId, owner)
+        expect(oid).toBeDefined()
+        expect(yield* vcs.initialize(projectId, owner)).toBeUndefined()
+        expect((yield* vcs.log(projectId)).map((c) => c.message.trim())).toEqual(["Initial commit"])
+        expect(yield* vcs.status(projectId)).toEqual([])
+        expect((yield* vcs.branches(projectId)).branches).toEqual({ main: oid! })
+        // `main` resolves, so a branch and a diff against it work straight away.
+        yield* vcs.createBranch(projectId, "ai/lamp", "main")
+        expect(yield* vcs.diff(projectId, "main", "ai/lamp")).toEqual([])
+      })))
+
+  test("initializeAll signs each uninitialised project with its owner and skips the rest", () =>
+    withProject(({ projectId, sql, vcs }) =>
+      Effect.gen(function*() {
+        const owner = sql.select().from(schema.projectTable).where(eq(schema.projectTable.id, projectId)).get()!.ownerId
+        const other = sql.insert(schema.projectTable).values({ name: "Empty", ownerId: owner }).returning().get()
+        expect(yield* vcs.initializeAll()).toBe(2)
+        expect(yield* vcs.initializeAll()).toBe(0)
+        const [first] = yield* vcs.log(other.id)
+        expect([first!.message.trim(), first!.author.name, first!.author.email]).toEqual(["Initial commit", "Ada", "ada@x.io"])
       })))
 })
 
@@ -294,5 +328,40 @@ describe("GitHub mirror", () => {
         expect(sql.select().from(schema.toolpathTable).get()!.gcode).toBe("G0 X1")
         expect((yield* vcs.push(projectId, "tok")).oid).toBe(github.resolve("main"))
         void tip
+      })))
+})
+
+describe("git profile", () => {
+  test("identities stay separate per user and cascade when their account is deleted", () =>
+    withProject(({ owner, reviewer, sql, vcs }) =>
+      Effect.gen(function*() {
+        yield* vcs.gitProfile(owner.userId)
+        yield* vcs.gitProfile(reviewer.userId)
+        yield* vcs.setGitProfile(owner.userId, { name: "Git Ada", email: "git-ada@x.io" })
+        expect(yield* vcs.gitProfile(reviewer.userId)).toEqual({ name: "Rev", email: "rev@x.io" })
+        expect(sql.select().from(schema.gitProfileTable).where(eq(schema.gitProfileTable.userId, owner.userId)).get()).toMatchObject({ name: "Git Ada", email: "git-ada@x.io" })
+        sql.delete(schema.userTable).where(eq(schema.userTable.id, reviewer.userId)).run()
+        expect(sql.select().from(schema.gitProfileTable).where(eq(schema.gitProfileTable.userId, reviewer.userId)).get()).toBeUndefined()
+      })))
+
+  test("every user gets an identity from their account, edits sign later commits, invalid ones are refused", () =>
+    withProject(({ projectId, owner, companion, sql, vcs }) =>
+      Effect.gen(function*() {
+        expect(yield* vcs.gitProfile(owner.userId)).toEqual({ name: "Ada", email: "ada@x.io" })
+        yield* vcs.setGitProfile(owner.userId, { name: " Ada Lovelace ", email: "ada@engines.io" })
+        yield* vcs.commit(projectId, { message: "init" }, owner)
+        sql.update(schema.drawingTable).set({ data: { w: 70, h: 50 } }).where(eq(schema.drawingTable.id, "d1")).run()
+        yield* vcs.commit(projectId, { message: "Narrow" }, companion)
+        expect((yield* vcs.log(projectId)).map((c) => [c.author.name, c.author.email])).toEqual([["Ada Lovelace (AI)", "ada@engines.io"], ["Ada Lovelace", "ada@engines.io"]])
+        expect((yield* failure(vcs.setGitProfile(owner.userId, { name: "Ada <x>", email: "ada@x.io" }))).code).toBe("invalid")
+        expect((yield* failure(vcs.setGitProfile(owner.userId, { name: "Ada", email: "not-an-email" }))).code).toBe("invalid")
+        expect((yield* failure(vcs.gitProfile("nobody"))).code).toBe("not-found")
+      })))
+
+  test("initializeAll creates the profile of every user, including ones without a project", () =>
+    withProject(({ sql, vcs }) =>
+      Effect.gen(function*() {
+        yield* vcs.initializeAll()
+        expect(sql.select().from(schema.gitProfileTable).all().map((p) => p.email).sort()).toEqual(["ada@x.io", "rev@x.io"])
       })))
 })

@@ -852,6 +852,23 @@ export const gitRefTable = sqliteTable(
 
 export type GitRef = typeof gitRefTable.$inferSelect
 
+/**
+ * Each user's local git identity (`user.name` / `user.email`): every commit, merge and restore that user
+ * makes is signed with it, and an AI commit on their behalf as `<name> (AI)`. Created on first use.
+ */
+export const gitProfileTable = sqliteTable(
+  "GitProfile",
+  {
+  userId: text("userId").primaryKey().references((): AnySQLiteColumn => userTable.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
+  }
+)
+
+export type GitProfile = typeof gitProfileTable.$inferSelect
+
 export const pullRequestTable = sqliteTable(
   "PullRequest",
   {

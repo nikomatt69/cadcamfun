@@ -13,6 +13,8 @@ export type PinnedChunk = {
   readonly data?: string
   readonly status?: number
   readonly error?: string
+  /** On the terminal chunk of a refused stream: the exposed response headers (`retry-after`). */
+  readonly headers?: Record<string, string>
 }
 
 export type CompanionStreamHandle = SharedObject & {

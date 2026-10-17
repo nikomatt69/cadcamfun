@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { extname, join } from "node:path"
 import { AppConfigService } from "../config.ts"
 import { UserRepo } from "../repos/user-repo.ts"
+import { ProjectVcs, VcsFailure } from "../services/project-vcs.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -17,7 +18,15 @@ const DAY = 24 * 60 * 60 * 1000
 export const UserHandlers = HttpApiBuilder.group(Api, "user", Effect.fn(function*(handlers) {
   const repo = yield* UserRepo
   const config = yield* AppConfigService
+  const vcs = yield* ProjectVcs
+  const vcsError = (e: VcsFailure) => (e.code === "not-found" ? new NotFound({ message: e.message }) : new BadRequest({ message: e.message }))
   return handlers
+    .handle("gitProfile", () => Effect.gen(function*() {
+      return yield* vcs.gitProfile((yield* CurrentUser).id)
+    }).pipe(Effect.catchTag("VcsFailure", (e) => Effect.fail(new NotFound({ message: e.message }))), Effect.catchTag("DatabaseError", fail("Internal server error"))))
+    .handle("updateGitProfile", ({ payload }) => Effect.gen(function*() {
+      return yield* vcs.setGitProfile((yield* CurrentUser).id, payload)
+    }).pipe(Effect.catchTag("VcsFailure", (e) => Effect.fail(vcsError(e))), Effect.catchTag("DatabaseError", fail("Internal server error"))))
     .handle("profile", () => Effect.gen(function*() {
       const user = yield* CurrentUser
       const row = yield* repo.profile(user.id)

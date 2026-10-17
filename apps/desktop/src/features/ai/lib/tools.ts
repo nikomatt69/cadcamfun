@@ -61,7 +61,7 @@ export interface ExtraToolSummary {
 export const EXTRA_TOOL_SUMMARIES: ReadonlyArray<ExtraToolSummary> = [
   { id: "code_mode", category: "program", title: "Run a program", description: "Write a short program in a confined JavaScript subset that calls the CAD/CAM tools in loops (patterns, lattices, many operations) and returns one value." },
   { id: "vcs", category: "vcs", title: "Read the history", description: "Branch, uncommitted files, entity-level diff between two revisions and the pull requests of the project." },
-  { id: "vcs_edit", category: "vcs", title: "Record the work", description: "Start an ai/* branch, commit, roll named ids back, open a pull request and run the project's workflows." }
+  { id: "vcs_edit", category: "vcs", title: "Record the work", description: "Commit on the checked-out branch, optionally start an ai/* branch, roll named ids back, open a pull request and run the project's workflows." }
 ]
 
 const BY_ID = new Map<string, string>([...TOOL_SUMMARIES, ...EXTRA_TOOL_SUMMARIES].map((tool) => [tool.id, tool.title]))

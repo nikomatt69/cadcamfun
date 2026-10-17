@@ -362,6 +362,8 @@ export type UserCreateTokenPayload = {
   readonly expiresIn?: number | undefined
 }
 
+export type UserUpdateGitProfilePayload = { readonly name: string; readonly email: string }
+
 export type AiInvokeActionPayload = {
   readonly projectId: string
   readonly drawingId?: string | undefined
@@ -2164,6 +2166,15 @@ export type UserVerifyChangeInput = {
 }
 
 export type UserVerifyChangeOutput = { message: string }
+
+export type UserGitProfileOutput = { name: string; email: string }
+
+export type UserUpdateGitProfileInput = {
+  readonly name: UserUpdateGitProfilePayload["name"]
+  readonly email: UserUpdateGitProfilePayload["email"]
+}
+
+export type UserUpdateGitProfileOutput = { name: string; email: string }
 
 export type UserByIdInput = { readonly id: { readonly id: string }["id"] }
 

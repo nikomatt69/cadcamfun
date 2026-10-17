@@ -30,7 +30,7 @@ const SAFE_PATH = /^\.cadcamfun\/[A-Za-z0-9._/-]+\.(ya?ml|md|json|txt)$/
  * `vcs/commit` — records files produced by earlier steps as a new commit on the branch being checked, so
  * a workflow can publish an artefact into history (a verification report, a regenerated program).
  * Fails when the working copy is dirty: an automated commit must never swallow someone's unfinished
- * edits, and an AI actor is refused on `main` exactly as everywhere else.
+ * edits, and the commit uses the acting user’s Git identity on the checked-out branch, including `main`.
  */
 export const vcsCommitStep = (deps: { readonly vcs: ProjectVcs["Service"] }): Step =>
   ({ ctx, with: w }) => {
