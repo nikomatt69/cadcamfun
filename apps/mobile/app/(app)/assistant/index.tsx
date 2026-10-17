@@ -7,7 +7,6 @@ import { Bot, Check, ChevronDown, CircleGauge, GitPullRequest, Plus, Route, Slid
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useResource } from "@/lib/use-resource"
-import { useHostResource } from "@/hooks/use-host-resource"
 import { useUIStore } from "@/lib/store"
 import { haptic } from "@/lib/haptics"
 import { toast } from "@/components/ui/ToastHost"
@@ -126,9 +125,10 @@ export default function AssistantScreen() {
     "assistant:projects",
   )
 
-  const agents = useHostResource(
-    useCallback(() => (client ? client.agents() : undefined), [client]),
-    [client],
+  // Cancelled on unmount and when the pairing changes, so another desktop's roster never lands here.
+  const agents = useResource(
+    useCallback((signal) => (client ? client.agents(signal) : Promise.reject(new Error("Not connected"))), [client]),
+    "assistant:agents",
   )
 
   const catalogue = useResource(useCallback((signal) => client ? client.aiProviders(signal) : Promise.reject(new Error("Not connected")), [client, connectivity]), "assistant:models")
