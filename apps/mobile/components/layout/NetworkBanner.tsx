@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native"
 import { WifiOff } from "lucide-react-native"
 import { useServer, type Connectivity } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
+import { useUIStore } from "@/lib/store"
 
 /**
  * Connection state lives in the native tab accessory on iOS 26+, clear of titles and controls.
@@ -10,12 +11,14 @@ import { useTheme } from "@/lib/theme"
 export function NetworkBanner({ accessory = false }: { accessory?: boolean }) {
   const { connectivity, connectionError, recheck } = useServer()
   const { palette } = useTheme()
+  const waiting = useUIStore((state) => state.offlineQueueCount)
 
   if (connectivity === "online" || connectivity === "disconnected") return null
 
   const config: Record<Exclude<Connectivity, "online" | "disconnected" | "background">, { color: string; label: string }> = {
     connecting: { color: palette.warning, label: "Connecting…" },
-    offline: { color: palette.muted, label: "Desktop offline" },
+    // Messages written meanwhile wait in the outbox; saying so here keeps them from looking lost.
+    offline: { color: palette.muted, label: waiting > 0 ? `Desktop offline · ${waiting} ${waiting === 1 ? "message" : "messages"} waiting` : "Desktop offline" },
     error: { color: palette.danger, label: connectionError ?? "Connection failed" },
     "auth-required": { color: palette.danger, label: "Desktop revoked this phone — pair again" },
   }
