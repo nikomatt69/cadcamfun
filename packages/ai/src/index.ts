@@ -28,7 +28,7 @@ export {
   replyHostPermission,
   sessionExists
 } from "./nikcli/chat.ts"
-export { flattenCatalog, hostCatalog, type HostModelInfo, type HostProviderInfo } from "./nikcli/catalog.ts"
+export { automaticModel, flattenCatalog, hostCatalog, type HostModelInfo, type HostProviderInfo } from "./nikcli/catalog.ts"
 export { defaultProviderSpecs } from "./nikcli/config.ts"
 export { childAgent, adoptChildSession } from "./nikcli/agents.ts"
 export { SUBAGENTS, SUBAGENT_IDS, type SubagentId, type SubagentSpec } from "./nikcli/agents.ts"

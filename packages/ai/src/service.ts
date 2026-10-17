@@ -19,7 +19,7 @@ import {
   type ModelSelector,
   type ProviderId
 } from "./models.ts"
-import { flattenCatalog, hostCatalog, type HostModelInfo, type HostProviderInfo } from "./nikcli/catalog.ts"
+import { automaticModel, flattenCatalog, hostCatalog, type HostModelInfo, type HostProviderInfo } from "./nikcli/catalog.ts"
 import { prepareAttachments, type Attachment } from "./attachments.ts"
 import { abortHostSession, createHostSession, hostChatStream, queueHostMessage, readHostSessionState, sessionExists, taskInfos, type HostSessionState, type PendingDelivery } from "./nikcli/chat.ts"
 import type { NikCliRuntime, ProjectHost } from "./nikcli/runtime.ts"
@@ -196,6 +196,15 @@ export class AiService extends Context.Service<AiService, {
         }
         const resolved = resolveModel(selected, { configured: ok, forceGateway: config.forceGateway, ...(config.policies ? { policies: config.policies } : {}) })
         if (resolved instanceof AiConfigError) return yield* resolved
+        // A catalogue provider (OpenRouter, …) with a saved key has no built-in default, and `resolveModel` names the
+        // provider itself as the model: "Automatic" from the phone must run a model the host actually lists.
+        if (selected?.model === undefined && !resolved.viaGateway && !isBuiltinProviderId(resolved.provider)) {
+          if (Option.isNone(host)) return yield* new AiConfigError({ message: `Choose a model for ${resolved.provider}: it has no default model.`, provider: resolved.provider })
+          const provider = (yield* catalogOf(host.value.runtime)).find((entry) => entry.id === resolved.provider)
+          const model = provider ? automaticModel(provider) : undefined
+          if (!model) return yield* new AiConfigError({ message: `Choose a model for ${resolved.provider}: the desktop lists no model that can use tools.`, provider: resolved.provider })
+          return { ...resolved, modelId: model.id }
+        }
         return resolved
       })
       const completeText = Effect.fn("AiService.completeText")(function*(input: { prompt: string; system?: string; model?: ModelSelector }) {

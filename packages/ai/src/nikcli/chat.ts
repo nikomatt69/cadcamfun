@@ -425,8 +425,9 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           }
           const ranTools = state.toolCalls > 0 || current?.events?.some((event) => event.type === "tool_call")
           if ((state.reportedUser.size > 0 || ranTools) && await finishFromSession(answers)) return "finished"
-          // A missing record cannot establish that resending a mutation is safe.
-          if (beforePromptKnown && messages !== undefined && !ranTools && attempt < resumes && !controller.signal.aborted) {
+          // A missing record cannot establish that resending a mutation is safe. A saved user message means the host
+          // took this prompt: resending would only stack copies of it in the conversation (six per phone message).
+          if (beforePromptKnown && messages !== undefined && !progressed && !ranTools && attempt < resumes && !controller.signal.aborted) {
             attempt += 1
             offer({ type: "retry", sessionId, attempt, message: `The previous answer was still finishing. Sending your message again (${attempt}/${resumes}).` })
             await new Promise((resolve) => setTimeout(resolve, INTERRUPT_BACKOFF_MS * attempt))
@@ -435,7 +436,9 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             return "retry"
           }
           controller.abort()
-          offer({ type: "error", sessionId, code: "aborted", message: INTERRUPTED_MESSAGE })
+          // The host's own reason (an unknown model, a rejected key) when it gave one; the message stays saved, never resent.
+          const reason = current?.error ?? (state.sessionError && !isInterruption(state.sessionError) ? state.sessionError : undefined)
+          offer({ type: "error", sessionId, code: reason ? "provider" : "aborted", message: reason ?? INTERRUPTED_MESSAGE })
           return "finished"
         }
         // `/goal`: the host's own command sets, pauses, resumes, clears or reads the goal; the application only parses the line

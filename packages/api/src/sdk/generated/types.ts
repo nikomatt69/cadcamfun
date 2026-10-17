@@ -2618,6 +2618,7 @@ export type AiProvidersOutput = Array<{
   auth: Array<string>
   configured: boolean
   baseUrl?: string | undefined
+  defaultModel?: string | undefined
   models: Array<{
     id: string
     name: string

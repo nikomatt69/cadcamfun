@@ -36,7 +36,18 @@ export interface HostProviderInfo {
   readonly source: string
   /** How this provider can be authenticated, e.g. `api`, `oauth`. */
   readonly auth: ReadonlyArray<string>
+  /** The model the host itself picks for this provider (`provider.list().default`), when it lists one. */
+  readonly defaultModel?: string
   readonly models: ReadonlyArray<HostModelInfo>
+}
+
+/**
+ * The model "Automatic" runs on a provider the app has no built-in default for: the host's own default when it can
+ * take tools, else the first tool-capable model. Undefined when the provider offers no model that can run the agent.
+ */
+export const automaticModel = (provider: HostProviderInfo): HostModelInfo | undefined => {
+  const preferred = provider.models.find((model) => model.id === provider.defaultModel)
+  return preferred?.tools ? preferred : provider.models.find((model) => model.tools)
 }
 
 const number = (value: unknown, fallback = 0): number =>
@@ -71,10 +82,11 @@ export const hostCatalog = (
     // `provider.list()` only sees models.dev once `<cache>/models.json` exists.
     yield* Effect.promise(() => runtime.catalogueReady)
     const host = yield* runtime.host(projectId)
-    const list = yield* Effect.tryPromise({
-      try: async () => (await host.client.provider.list()).all as ReadonlyArray<HostProvider>,
+    const listed = yield* Effect.tryPromise({
+      try: async () => (await host.client.provider.list()) as { all: ReadonlyArray<HostProvider>; default?: Readonly<Record<string, string>> },
       catch: toCatalogError
     })
+    const list = listed.all
     // Authentication methods are decoration (the UI shows how to sign in): a host
     // that cannot list them must not fail the whole catalogue read.
     const authByProvider = yield* Effect.tryPromise({
@@ -87,6 +99,7 @@ export const hostCatalog = (
       name: provider.name ?? provider.id,
       source: provider.source ?? "config",
       auth: (authByProvider[provider.id] ?? []).map((option) => option.type).filter((type) => type !== undefined),
+      ...(listed.default?.[provider.id] && provider.models?.[listed.default[provider.id]!] ? { defaultModel: listed.default[provider.id]! } : {}),
       models: Object.entries(provider.models ?? {})
         .map(([id, raw]) => toModel(provider.id, id, raw))
         .sort((a, b) => a.id.localeCompare(b.id))

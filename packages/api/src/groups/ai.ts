@@ -69,6 +69,8 @@ export const AiProviderEntry = Schema.Struct({
   configured: Schema.Boolean,
   /** Present when the user overrode the base URL (OpenAI-compatible endpoints). */
   baseUrl: opt(Schema.String),
+  /** The host's own default model for this provider, when it lists one ("Automatic" prefers it). */
+  defaultModel: opt(Schema.String),
   models: Schema.Array(AiHostModel)
 })
 
