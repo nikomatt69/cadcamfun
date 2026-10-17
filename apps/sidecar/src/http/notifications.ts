@@ -1,22 +1,32 @@
-import { Api, CurrentUser, InternalError, NotFound } from "@cadcamfun/api"
+import { Api, BadRequest, CurrentUser, InternalError, MAX_NOTIFICATION_PAGE, NotFound } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
-import { NotificationRepo } from "../repos/notification-repo.ts"
+import { decodeCursor, NotificationRepo } from "../repos/notification-repo.ts"
 
 const fail = (message: string) => (error: unknown) =>
   Effect.logError(message, error).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
+
+/** A non-negative decimal integer; `parseInt` would accept `"5abc"` and `"1e3"`. */
+const integer = (value: string | undefined, fallback: number): number | undefined =>
+  value === undefined ? fallback : /^\d{1,9}$/.test(value) ? Number(value) : undefined
+
+/** Largest offset accepted; a deeper page is reached with `cursor`, which does not rescan every skipped row. */
+const MAX_OFFSET = 10_000
 
 export const NotificationsHandlers = HttpApiBuilder.group(Api, "notifications", Effect.fn(function*(handlers) {
   const repo = yield* NotificationRepo
   return handlers
     .handle("list", ({ query }) => Effect.gen(function*() {
       const user = yield* CurrentUser
-      const limit = Number.parseInt(query.limit ?? "20", 10)
-      const offset = Number.parseInt(query.offset ?? "0", 10)
-      if (!Number.isSafeInteger(limit) || limit < 0 || !Number.isSafeInteger(offset) || offset < 0) {
-        return yield* new InternalError({ message: "Failed to fetch notifications" })
-      }
-      return yield* repo.list(user.id, { limit, offset, onlyUnread: query.onlyUnread === "true" })
+      const limit = integer(query.limit, 20)
+      const offset = integer(query.offset, 0)
+      if (limit === undefined || limit < 1 || limit > MAX_NOTIFICATION_PAGE) return yield* new BadRequest({ message: `limit must be an integer from 1 to ${MAX_NOTIFICATION_PAGE}` })
+      if (offset === undefined || offset > MAX_OFFSET) return yield* new BadRequest({ message: `offset must be an integer from 0 to ${MAX_OFFSET}` })
+      if (query.onlyUnread !== undefined && query.onlyUnread !== "true" && query.onlyUnread !== "false") return yield* new BadRequest({ message: "onlyUnread must be true or false" })
+      const after = query.cursor === undefined ? undefined : decodeCursor(query.cursor)
+      if (query.cursor !== undefined && !after) return yield* new BadRequest({ message: "cursor is not one this server issued" })
+      if (after && offset > 0) return yield* new BadRequest({ message: "Use either cursor or offset, not both" })
+      return yield* repo.list(user.id, { limit, offset, onlyUnread: query.onlyUnread === "true", after })
     }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch notifications"))))
     .handle("update", ({ params, payload }) => Effect.gen(function*() {
       const user = yield* CurrentUser

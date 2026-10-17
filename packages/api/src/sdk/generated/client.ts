@@ -2789,9 +2789,14 @@ export function make(options: ClientOptions) {
           {
             method: "GET",
             path: `/api/notifications`,
-            query: { limit: input?.["limit"], offset: input?.["offset"], onlyUnread: input?.["onlyUnread"] },
+            query: {
+              limit: input?.["limit"],
+              offset: input?.["offset"],
+              cursor: input?.["cursor"],
+              onlyUnread: input?.["onlyUnread"],
+            },
             successStatus: 200,
-            declaredStatuses: [500, 401],
+            declaredStatuses: [400, 500, 401],
             empty: false,
           },
           requestOptions,

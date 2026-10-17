@@ -1741,11 +1741,17 @@ type Endpoint15_0Request = Parameters<RawClient["notifications"]["list"]>[0]
 type Endpoint15_0Input = {
   readonly limit?: Endpoint15_0Request["query"]["limit"]
   readonly offset?: Endpoint15_0Request["query"]["offset"]
+  readonly cursor?: Endpoint15_0Request["query"]["cursor"]
   readonly onlyUnread?: Endpoint15_0Request["query"]["onlyUnread"]
 }
 const Endpoint15_0 = (raw: RawClient["notifications"]) => (input?: Endpoint15_0Input) =>
   raw["list"]({
-    query: { limit: input?.["limit"], offset: input?.["offset"], onlyUnread: input?.["onlyUnread"] },
+    query: {
+      limit: input?.["limit"],
+      offset: input?.["offset"],
+      cursor: input?.["cursor"],
+      onlyUnread: input?.["onlyUnread"],
+    },
   }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint15_1Request = Parameters<RawClient["notifications"]["update"]>[0]

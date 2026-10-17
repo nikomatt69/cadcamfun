@@ -26581,6 +26581,21 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
           },
           {
             "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+          {
+            "in": "query",
             "name": "onlyUnread",
             "required": false,
             "schema": {
@@ -26602,6 +26617,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
                     "notifications": {
                       "items": {
                         "additionalProperties": false,
@@ -26728,12 +26753,23 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "required": [
                     "notifications",
                     "unreadCount",
+                    "nextCursor",
                   ],
                   "type": "object",
                 },
               },
             },
             "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
           },
           "401": {
             "content": {

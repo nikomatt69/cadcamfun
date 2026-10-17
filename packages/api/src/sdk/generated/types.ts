@@ -4650,16 +4650,25 @@ export type NotificationsListInput = {
   readonly limit?: {
     readonly limit?: string | undefined
     readonly offset?: string | undefined
+    readonly cursor?: string | undefined
     readonly onlyUnread?: string | undefined
   }["limit"]
   readonly offset?: {
     readonly limit?: string | undefined
     readonly offset?: string | undefined
+    readonly cursor?: string | undefined
     readonly onlyUnread?: string | undefined
   }["offset"]
+  readonly cursor?: {
+    readonly limit?: string | undefined
+    readonly offset?: string | undefined
+    readonly cursor?: string | undefined
+    readonly onlyUnread?: string | undefined
+  }["cursor"]
   readonly onlyUnread?: {
     readonly limit?: string | undefined
     readonly offset?: string | undefined
+    readonly cursor?: string | undefined
     readonly onlyUnread?: string | undefined
   }["onlyUnread"]
 }
@@ -4691,6 +4700,7 @@ export type NotificationsListOutput = {
     linkUrl: string | null
   }>
   unreadCount: number
+  nextCursor: string | null
 }
 
 export type NotificationsUpdateInput = {
