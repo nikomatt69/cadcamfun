@@ -57,6 +57,22 @@ export interface PreviewMesh {
 
 const PAYLOAD_MESSAGES = new Set<string>(Object.values(PREVIEW_MESSAGE))
 
+/** A validated GPU payload or the sentence explaining why it was refused. */
+type Prepared<T> = { readonly value: T; readonly error?: undefined } | { readonly value?: undefined; readonly error: string }
+const prepare = <T,>(build: () => T, fallback: string): Prepared<T> => {
+  try { return { value: build() } } catch (error) { return { error: error instanceof Error ? error.message : fallback } }
+}
+
+/**
+ * Everything derived from the payload, computed once per mesh/path and shared by the inline and the full-screen
+ * viewer: validating and packing a large mesh, and finding its crease edges, are the expensive steps.
+ */
+interface PreparedScene {
+  readonly mesh?: Prepared<ReturnType<typeof prepareMeshUpload>>
+  readonly lines: Prepared<Float32Array>
+  readonly edges: ReturnType<typeof meshFeatureEdges>
+}
+
 /** Below this card width the zoom buttons give way: pinch and the accessibility actions still zoom. */
 const COMPACT_WIDTH = 340
 
@@ -93,9 +109,18 @@ export function PreviewViewport(props: PreviewViewportProps) {
   const [showEdges, setShowEdges] = useState(true)
   const [showGrid, setShowGrid] = useState(true)
   const display = { showEdges, showGrid, onToggleEdges: () => setShowEdges((value) => !value), onToggleGrid: () => setShowGrid((value) => !value) }
+  const { mesh, segments, stock } = props
+  const meshUpload = useMemo(() => mesh ? prepare(() => prepareMeshUpload(mesh), PREVIEW_MESSAGE.meshInvalid) : undefined, [mesh])
+  const lines = useMemo(() => prepare(() => prepareToolpathLines(segments ?? [], stock), PREVIEW_MESSAGE.pathInvalid), [segments, stock])
+  const edges = useMemo(() => {
+    if (!mesh) return []
+    try { return meshFeatureEdges(mesh.positions, mesh.indices) } catch { return [] }
+  }, [mesh])
+  const prepared = useMemo<PreparedScene>(() => ({ ...(meshUpload ? { mesh: meshUpload } : {}), lines, edges }), [meshUpload, lines, edges])
 
   return <>
-    <Viewport {...props} {...display} onExpand={fullscreenTitle !== undefined ? () => setFullscreen(true) : undefined} />
+    {/* Covered by the full-screen viewer, the inline one stops following the playhead and the camera: no hidden redraws. */}
+    <Viewport {...props} {...display} prepared={prepared} active={!fullscreen} onExpand={fullscreenTitle !== undefined ? () => setFullscreen(true) : undefined} />
     {fullscreenTitle !== undefined ? <Modal visible={fullscreen} animationType="slide" presentationStyle="fullScreen" supportedOrientations={["portrait", "landscape"]}
       onRequestClose={() => setFullscreen(false)}>
       <SafeAreaView edges={["top", "bottom", "left", "right"]} style={{ flex: 1, backgroundColor: palette.background }}>
@@ -106,7 +131,7 @@ export function PreviewViewport(props: PreviewViewportProps) {
             <X size={22} color={palette.ink} />
           </Pressable>
         </View>
-        <View style={{ flex: 1 }}>{fullscreen ? <Viewport {...props} {...display} /> : null}</View>
+        <View style={{ flex: 1 }}>{fullscreen ? <Viewport {...props} {...display} prepared={prepared} /> : null}</View>
         {fullscreenFooter ? <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6, borderTopWidth: 0.5, borderTopColor: palette.border }}>{fullscreenFooter}</View> : null}
       </SafeAreaView>
     </Modal> : null}
@@ -118,7 +143,6 @@ function Viewport({
   revision,
   mesh,
   segments,
-  stock,
   playhead = 0,
   simulating = false,
   selectedPartId,
@@ -130,7 +154,12 @@ function Viewport({
   onToggleEdges,
   onToggleGrid,
   onExpand,
+  active = true,
+  prepared,
 }: PreviewViewportProps & {
+  prepared: PreparedScene
+  /** False while another viewer covers this one: per-frame updates (playhead, camera) wait until it is visible again. */
+  active?: boolean
   showEdges: boolean
   showGrid: boolean
   onToggleEdges: () => void
@@ -188,21 +217,16 @@ function Viewport({
 
   useEffect(() => {
     if (!scene) return
-    if (!mesh) {
-      scene.setMesh(new Float32Array(), new Float32Array(), new Uint32Array())
-      setMeshError(undefined)
-      return
-    }
-    try {
-      const upload = prepareMeshUpload(mesh)
-      scene.setMesh(upload.positions, upload.normals, upload.indices)
+    const upload = prepared.mesh
+    if (upload?.value) {
+      scene.setMesh(upload.value.positions, upload.value.normals, upload.value.indices)
       setMeshError(undefined)
       setGpuError((current) => (current && PAYLOAD_MESSAGES.has(current) ? undefined : current))
-    } catch (error) {
-      scene.setMesh(new Float32Array(), new Float32Array(), new Uint32Array())
-      setMeshError(error instanceof Error ? error.message : PREVIEW_MESSAGE.meshInvalid)
+      return
     }
-  }, [scene, mesh])
+    scene.setMesh(new Float32Array(), new Float32Array(), new Uint32Array())
+    setMeshError(upload?.error)
+  }, [scene, prepared.mesh])
 
   useEffect(() => {
     if (!scene) return
@@ -223,24 +247,22 @@ function Viewport({
 
   useEffect(() => {
     if (!scene) return
-    try {
-      scene.setLines(prepareToolpathLines(segments ?? [], stock))
+    const lines = prepared.lines
+    if (lines.value) {
+      scene.setLines(lines.value)
       linesOk.current = true
       setLineError(undefined)
       setGpuError((current) => (current && PAYLOAD_MESSAGES.has(current) ? undefined : current))
-    } catch (error) {
-      linesOk.current = false
-      scene.setLines(new Float32Array())
-      scene.setActiveLine(new Float32Array())
-      setLineError(error instanceof Error ? error.message : PREVIEW_MESSAGE.pathInvalid)
+      return
     }
-  }, [scene, segments, stock])
+    linesOk.current = false
+    scene.setLines(new Float32Array())
+    scene.setActiveLine(new Float32Array())
+    setLineError(lines.error)
+  }, [scene, prepared.lines])
 
-  // Crease outline is a pure function of the mesh: computed once per revision, not per frame.
-  const edges = useMemo(() => {
-    if (!mesh) return []
-    try { return meshFeatureEdges(mesh.positions, mesh.indices) } catch { return [] }
-  }, [mesh])
+  // Crease outline is a pure function of the mesh: computed once per mesh by the owner, not per viewer or frame.
+  const edges = prepared.edges
   const boundsKey = `${bounds.min.join(",")}|${bounds.max.join(",")}`
   const guides = useMemo(() => sceneGuides(bounds, guideColor(palette.background, palette.ink)), [boundsKey, palette.background, palette.ink])
 
@@ -251,30 +273,30 @@ function Viewport({
 
   const segmentCount = segments?.length ?? 0
   useEffect(() => {
-    if (!scene) return
+    if (!scene || !active) return
     const range = progressRange(playhead, segmentCount, simulating)
     scene.setProgress(simulating ? range.travelled : -1, range.path, REMAINING_PATH_FADE)
-  }, [scene, playhead, segmentCount, simulating])
+  }, [scene, active, playhead, segmentCount, simulating])
 
   const toolLength = useMemo(() => toolMarkerLength(bounds), [boundsKey])
   useEffect(() => {
-    if (!scene || !linesOk.current) return
+    if (!scene || !active || !linesOk.current) return
     const segment = segments?.[playhead]
     try {
       scene.setActiveLine(prepareActiveLine(segment, simulating ? toolLength : 0, rgbFromHex(palette.ink)))
     } catch {
       scene.setActiveLine(new Float32Array())
     }
-  }, [scene, segments, playhead, simulating, toolLength, palette.ink])
+  }, [scene, active, segments, playhead, simulating, toolLength, palette.ink])
 
   useEffect(() => {
-    if (!scene) return
+    if (!scene || !active) return
     const mvp = mvpOf(orbit, size.width / Math.max(size.height, 1))
     if (!finiteMatrix(mvp)) return
     const rgb = palette.background.startsWith("#") ? rgbFromHex(palette.background) : rgbFromHex("")
     const { eye } = cameraBasis(orbit)
     scene.setCamera(Float32Array.from(mvp), rgb[0], rgb[1], rgb[2], eye[0], eye[1], eye[2])
-  }, [scene, orbit, size.width, size.height, palette.background])
+  }, [scene, active, orbit, size.width, size.height, palette.background])
 
   const selectedBounds = useMemo(() => {
     const part = mesh?.parts.find((item) => item.id === selectedPartId)
