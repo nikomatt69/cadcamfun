@@ -7625,6 +7625,132 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/ai/sessions": {
+      "get": {
+        "operationId": "ai.sessionList",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "busy": {
+                        "type": "boolean",
+                      },
+                      "createdAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "id": {
+                        "type": "string",
+                      },
+                      "projectId": {
+                        "type": "string",
+                      },
+                      "title": {
+                        "type": "string",
+                      },
+                      "updatedAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "projectId",
+                      "title",
+                      "createdAt",
+                      "updatedAt",
+                      "busy",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
     "/api/ai/sessions/control": {
       "post": {
         "operationId": "ai.sessionControl",
@@ -9367,6 +9493,243 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "required": [
                     "busy",
                     "text",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
+    "/api/ai/sessions/{sessionId}/messages": {
+      "get": {
+        "operationId": "ai.sessionMessages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "before": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "messages": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "agent": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "createdAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "error": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "id": {
+                            "type": "string",
+                          },
+                          "model": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "role": {
+                            "enum": [
+                              "user",
+                              "assistant",
+                            ],
+                            "type": "string",
+                          },
+                          "text": {
+                            "type": "string",
+                          },
+                          "tools": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "callId": {
+                                  "type": "string",
+                                },
+                                "input": {
+                                  "anyOf": [
+                                    {},
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                                "output": {
+                                  "type": "string",
+                                },
+                                "status": {
+                                  "enum": [
+                                    "pending",
+                                    "running",
+                                    "completed",
+                                    "error",
+                                  ],
+                                  "type": "string",
+                                },
+                                "tool": {
+                                  "type": "string",
+                                },
+                                "truncated": {
+                                  "type": "boolean",
+                                },
+                              },
+                              "required": [
+                                "callId",
+                                "tool",
+                                "status",
+                                "output",
+                                "truncated",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
+                          "truncated": {
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "role",
+                          "text",
+                          "createdAt",
+                          "agent",
+                          "model",
+                          "error",
+                          "truncated",
+                          "tools",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "sessionId": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "sessionId",
+                    "messages",
+                    "before",
                   ],
                   "type": "object",
                 },

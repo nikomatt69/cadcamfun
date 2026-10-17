@@ -134,6 +134,9 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["POST"], path: /^\/api\/ai\/(chat\/stream|chat\/abort|chat\/queue|permission\/reply|sessions\/state|sessions\/control|sessions\/prompt)$/ },
   // The phone's per-session SSE stream (spec 13 §5); the handler checks the session owner and project.
   { methods: ["GET"], path: /^\/api\/ai\/sessions\/[^/]+\/stream$/ },
+  // The phone's conversation list and one conversation's bounded history (nikcli mobile session list / detail).
+  { methods: ["GET"], path: /^\/api\/ai\/sessions$/ },
+  { methods: ["GET"], path: /^\/api\/ai\/sessions\/[^/]+\/messages$/ },
 ]
 
 export const isCompanionRoute = (method: string, pathname: string): boolean =>

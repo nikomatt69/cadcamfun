@@ -159,6 +159,12 @@ describe("companion gateway", () => {
     expect(isCompanionRoute("DELETE", "/api/notifications/n1")).toBe(true)
     expect(isCompanionRoute("GET", "/api/ai/agents")).toBe(true)
     expect(isCompanionRoute("PUT", "/api/ai/agents")).toBe(false)
+    // The conversation list and history are read-only for the phone.
+    expect(isCompanionRoute("GET", "/api/ai/sessions")).toBe(true)
+    expect(isCompanionRoute("GET", "/api/ai/sessions/ses_1/messages")).toBe(true)
+    expect(isCompanionRoute("POST", "/api/ai/sessions/ses_1/messages")).toBe(false)
+    expect(isCompanionRoute("DELETE", "/api/ai/sessions")).toBe(false)
+    expect(isCompanionRoute("POST", "/api/ai/sessions/remove")).toBe(false)
     // Creating a notification is the desktop's job, never the phone's.
     expect(isCompanionRoute("POST", "/api/notifications")).toBe(false)
     // The gateway's own admin surface stays unreachable.

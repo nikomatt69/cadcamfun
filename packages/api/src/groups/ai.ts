@@ -269,6 +269,44 @@ export const SessionStreamFrame = Schema.Union([
 ])
 export type SessionStreamFrame = typeof SessionStreamFrame.Type
 
+/**
+ * One conversation the caller owns in a project (`GET /api/ai/sessions`), newest first. `busy` is true while a turn this
+ * desktop started (the phone's `sessions/prompt`) is running; a turn typed on the desktop shows as busy in `sessions/state`.
+ */
+export const AiSessionSummary = Schema.Struct({
+  id: Schema.String, projectId: Schema.String, title: Schema.String,
+  createdAt: Schema.NullOr(Schema.String), updatedAt: Schema.NullOr(Schema.String), busy: Schema.Boolean
+})
+export type AiSessionSummary = typeof AiSessionSummary.Type
+/** Largest page of `GET /api/ai/sessions` and `…/messages`. */
+export const MAX_SESSION_PAGE = 100
+/** A tool the assistant ran in a message: the evidence a transcript shows, bounded. */
+export const AiSessionTool = Schema.Struct({
+  callId: Schema.String, tool: Schema.String,
+  status: Schema.Literals(["pending", "running", "completed", "error"]),
+  /** The call's arguments; absent when they are larger than the history carries (`truncated`). */
+  input: opt(Schema.Unknown),
+  /** The tool's answer, or its error message. */
+  output: Schema.String,
+  truncated: Schema.Boolean
+})
+export type AiSessionTool = typeof AiSessionTool.Type
+export const AiSessionMessage = Schema.Struct({
+  id: Schema.String, role: Schema.Literals(["user", "assistant"]),
+  text: Schema.String, createdAt: Schema.NullOr(Schema.String),
+  agent: Schema.NullOr(Schema.String), model: Schema.NullOr(Schema.String), error: Schema.NullOr(Schema.String),
+  /** Some text or tool evidence was cut to the history's bounds. */
+  truncated: Schema.Boolean,
+  tools: Schema.Array(AiSessionTool)
+})
+export type AiSessionMessage = typeof AiSessionMessage.Type
+/**
+ * One page of a conversation, oldest first. `before` continues with older messages (pass it as `?before=`); null when this
+ * page starts at the beginning of the conversation.
+ */
+export const AiSessionMessages = Schema.Struct({ sessionId: Schema.String, messages: Schema.Array(AiSessionMessage), before: Schema.NullOr(Schema.String) })
+export type AiSessionMessages = typeof AiSessionMessages.Type
+
 export class AiGroup extends HttpApiGroup.make("ai")
   .add(
     HttpApiEndpoint.get("actions", "/api/ai/actions", { success: BridgeTools, error: [InternalError] }),
@@ -313,6 +351,12 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.get("sessionStream", "/api/ai/sessions/:sessionId/stream", {
       params: { sessionId: Schema.String }, query: { after: Schema.optional(Schema.NumberFromString) },
       success: HttpApiSchema.StreamSse({ data: SessionStreamFrame }), error: [BadRequest, InternalError]
+    }),
+    HttpApiEndpoint.get("sessionList", "/api/ai/sessions", {
+      query: { projectId: Schema.String, limit: opt(Schema.String) }, success: Schema.Array(AiSessionSummary), error: [BadRequest, InternalError]
+    }),
+    HttpApiEndpoint.get("sessionMessages", "/api/ai/sessions/:sessionId/messages", {
+      params: { sessionId: Schema.String }, query: { before: opt(Schema.String), limit: opt(Schema.String) }, success: AiSessionMessages, error: [BadRequest, InternalError]
     }),
     HttpApiEndpoint.post("chatQueue", "/api/ai/chat/queue", { payload: QueueBody, success: message, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("chatAbort", "/api/ai/chat/abort", { payload: AbortBody, success: message, error: [BadRequest, InternalError] }),

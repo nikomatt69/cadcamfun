@@ -9,7 +9,7 @@ import { Context, Layer } from "effect"
 import { AsyncLocalStorage } from "node:async_hooks"
 import { childAgent } from "@cadcamfun/ai"
 import { createHash } from "node:crypto"
-import { mkdir, open, unlink } from "node:fs/promises"
+import { mkdir, open, readdir, unlink } from "node:fs/promises"
 import { join } from "node:path"
 
 interface SessionOwner {
@@ -34,6 +34,8 @@ export class ActingUser extends Context.Service<ActingUser, {
   readonly lastPrompt: () => string | undefined
   readonly configureDirectory: (directory: string) => void
   readonly owner: (sessionId: string) => Promise<SessionOwner | undefined>
+  /** The top-level sessions `userId` owns in `projectId`, with when their owner record was written (epoch ms). */
+  readonly sessions: (userId: string, projectId: string) => Promise<ReadonlyArray<{ readonly sessionId: string; readonly createdAt: number }>>
   readonly canControl: (sessionId: string, user: SessionUser, projectId?: string) => Promise<boolean>
   readonly forget: (sessionId: string) => Promise<void>
   /**
@@ -73,7 +75,40 @@ export class ActingUser extends Context.Service<ActingUser, {
         return { projectId: value.projectId, userId: value.userId }
       } finally { await handle.close() }
     }
+    /** Owner files read per listing; a desktop with more conversations than this lists the most recent ones. */
+    const MAX_LISTED_OWNERS = 2_000
+    const sessionsOf = async (userId: string, projectId: string) => {
+      if (directory === undefined) return []
+      const names = await readdir(directory).catch((error: unknown) => {
+        if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return [] as string[]
+        throw error
+      })
+      const out: Array<{ sessionId: string; createdAt: number }> = []
+      const files = names.filter((name) => /^[0-9a-f]{64}\.json$/.test(name))
+      const read = async (name: string) => {
+        const handle = await open(join(directory!, name), "r").catch(() => undefined)
+        if (!handle) return undefined
+        try {
+          const stat = await handle.stat()
+          if (stat.size > 4096) return undefined
+          const value: unknown = JSON.parse(await handle.readFile("utf8"))
+          if (typeof value !== "object" || value === null || !("sessionId" in value) || typeof value.sessionId !== "string" || !("projectId" in value) || !("userId" in value)) return undefined
+          // The file name is the hash of the session id: a record copied under another name is not trusted.
+          if (`${createHash("sha256").update(value.sessionId).digest("hex")}.json` !== name) return undefined
+          return value.userId === userId && value.projectId === projectId ? { sessionId: value.sessionId, createdAt: stat.mtimeMs } : undefined
+        } catch {
+          return undefined
+        } finally { await handle.close() }
+      }
+      // A bounded number of open files at a time, however many conversations the desktop has.
+      for (let index = 0; index < files.length; index += 64) {
+        for (const entry of await Promise.all(files.slice(index, index + 64).map(read))) if (entry) out.push(entry)
+      }
+      out.sort((a, b) => b.createdAt - a.createdAt)
+      return out.slice(0, MAX_LISTED_OWNERS)
+    }
     return ActingUser.of({
+      sessions: sessionsOf,
       configureDirectory: (path) => {
         if (directory !== undefined && directory !== path) throw new Error("AI owner directory cannot change")
         directory = path

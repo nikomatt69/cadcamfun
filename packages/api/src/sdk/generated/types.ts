@@ -2962,6 +2962,49 @@ export type AiSessionStreamOutput =
         | { type: "error"; sessionId: string; code: "provider" | "config" | "aborted" | "internal"; message: string }
     }
 
+export type AiSessionListInput = {
+  readonly projectId: { readonly projectId: string; readonly limit?: string | undefined }["projectId"]
+  readonly limit?: { readonly projectId: string; readonly limit?: string | undefined }["limit"]
+}
+
+export type AiSessionListOutput = Array<{
+  id: string
+  projectId: string
+  title: string
+  createdAt: string | null
+  updatedAt: string | null
+  busy: boolean
+}>
+
+export type AiSessionMessagesInput = {
+  readonly sessionId: { readonly sessionId: string }["sessionId"]
+  readonly before?: { readonly before?: string | undefined; readonly limit?: string | undefined }["before"]
+  readonly limit?: { readonly before?: string | undefined; readonly limit?: string | undefined }["limit"]
+}
+
+export type AiSessionMessagesOutput = {
+  sessionId: string
+  messages: Array<{
+    id: string
+    role: "user" | "assistant"
+    text: string
+    createdAt: string | null
+    agent: string | null
+    model: string | null
+    error: string | null
+    truncated: boolean
+    tools: Array<{
+      callId: string
+      tool: string
+      status: "pending" | "running" | "completed" | "error"
+      input?: unknown | undefined
+      output: string
+      truncated: boolean
+    }>
+  }>
+  before: string | null
+}
+
 export type AiChatQueueInput = {
   readonly sessionId: AiChatQueuePayload["sessionId"]
   readonly message: AiChatQueuePayload["message"]

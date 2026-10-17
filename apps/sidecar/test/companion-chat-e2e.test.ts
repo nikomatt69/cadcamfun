@@ -20,7 +20,9 @@ let dataDir: string
 let port: number
 let toolsCalled: string[] = []
 let phone: CompanionClient
+let raw: ReturnType<typeof createFetchTransport>
 let plateProjectId: string
+let plateSessionId = ""
 
 const local = (path: string, init: RequestInit = {}) =>
   fetch(`http://127.0.0.1:${port}${path}`, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers } })
@@ -88,7 +90,8 @@ describe("the assistant from the phone", () => {
     const pairing = parsePairingLink(paired.link)
     const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
     const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
-    phone = new CompanionClient(createFetchTransport(pairing, pinned))
+    raw = createFetchTransport(pairing, pinned)
+    phone = new CompanionClient(raw)
 
     // Phone side: ask the assistant, exactly as the app's chat does, and read the streamed events.
     const events: ChatEvent[] = []
@@ -113,6 +116,7 @@ describe("the assistant from the phone", () => {
     const done = events.findLast((event): event is Extract<(typeof events)[number], { type: "done" }> => event.type === "done")
     if (!done) throw new Error("Missing completed host turn")
     expect(typeof done?.sessionId).toBe("string")
+    plateSessionId = String(done.sessionId)
     const recovered = await phone.sessionState(String(done?.sessionId))
     expect(recovered.busy).toBe(false)
     expect(recovered.text).toBe(done?.text)
@@ -238,5 +242,47 @@ describe("the assistant from the phone", () => {
     expect(replay.every((frame) => frame.seq > cursor)).toBe(true)
     expect(replay.some((frame) => frame.type === "question_request")).toBe(false)
     expect(replay.at(-1)).toMatchObject({ type: "done", text: "Stock confirmed after the phone reconnected." })
+  })
+
+  test("the phone lists its conversations and pages one's history through the gateway", async () => {
+    const get = async (path: string) => {
+      const res = await raw.request(path, "GET")
+      return { status: res.status, body: res.body ? JSON.parse(res.body) : undefined }
+    }
+    const list = await get(`/api/ai/sessions?projectId=${encodeURIComponent(plateProjectId)}`)
+    expect(list.status).toBe(200)
+    const row = (list.body as Array<{ id: string; projectId: string; title: string; updatedAt: string | null; busy: boolean }>).find((entry) => entry.id === plateSessionId)
+    expect(row).toMatchObject({ projectId: plateProjectId, busy: false })
+    expect(typeof row?.title).toBe("string")
+    expect(row?.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+
+    const all = await get(`/api/ai/sessions/${plateSessionId}/messages?limit=100`)
+    expect(all.status).toBe(200)
+    const messages = all.body.messages as Array<{ id: string; role: string; text: string; tools: Array<{ tool: string; status: string }> }>
+    expect(messages[0]).toMatchObject({ role: "user", text: "Make the plate 140 mm wide and open a pull request for it" })
+    expect(messages.at(-1)).toMatchObject({ role: "assistant", text: "I opened a pull request with the wider plate for you to review." })
+    expect(messages.flatMap((message) => message.tools.map((tool) => tool.tool))).toEqual(["vcs_edit", "cad_edit", "vcs_edit", "vcs_edit"])
+    expect(messages.flatMap((message) => message.tools).every((tool) => tool.status === "completed")).toBe(true)
+    expect(all.body.before).toBeNull()
+
+    // Paging backwards one message at a time walks the same conversation.
+    const walked: string[] = []
+    let before: string | null = null
+    for (let page = 0; page < 50; page++) {
+      const next = await get(`/api/ai/sessions/${plateSessionId}/messages?limit=1${before ? `&before=${before}` : ""}`)
+      expect(next.status).toBe(200)
+      walked.unshift(...(next.body.messages as Array<{ id: string }>).map((message) => message.id))
+      before = next.body.before
+      if (before === null) break
+    }
+    expect(walked).toEqual(messages.map((message) => message.id))
+
+    // Another project's list does not show it; a malformed request is a 400, an unknown session too (never 403/404).
+    const other = await (await local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Other" }) })).json()
+    expect((await get(`/api/ai/sessions?projectId=${other.id}`)).body).toEqual([])
+    expect((await get(`/api/ai/sessions?projectId=${plateProjectId}&limit=0`)).status).toBe(400)
+    expect((await get(`/api/ai/sessions/${plateSessionId}/messages?before=bad%20id`)).status).toBe(400)
+    expect((await get(`/api/ai/sessions/${plateSessionId}/messages?before=msg_unknown`)).status).toBe(400)
+    expect((await get("/api/ai/sessions/ses_unknown/messages")).status).toBe(400)
   })
 })

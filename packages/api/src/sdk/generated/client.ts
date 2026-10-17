@@ -135,6 +135,10 @@ import type {
   AiSessionPromptOutput,
   AiSessionStreamInput,
   AiSessionStreamOutput,
+  AiSessionListInput,
+  AiSessionListOutput,
+  AiSessionMessagesInput,
+  AiSessionMessagesOutput,
   AiChatQueueInput,
   AiChatQueueOutput,
   AiChatAbortInput,
@@ -1666,6 +1670,30 @@ export function make(options: ClientOptions) {
             method: "GET",
             path: `/api/ai/sessions/${encodeURIComponent(input.sessionId)}/stream`,
             query: { after: input["after"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      sessionList: (input: AiSessionListInput, requestOptions?: RequestOptions) =>
+        request<AiSessionListOutput>(
+          {
+            method: "GET",
+            path: `/api/ai/sessions`,
+            query: { projectId: input["projectId"], limit: input["limit"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      sessionMessages: (input: AiSessionMessagesInput, requestOptions?: RequestOptions) =>
+        request<AiSessionMessagesOutput>(
+          {
+            method: "GET",
+            path: `/api/ai/sessions/${encodeURIComponent(input.sessionId)}/messages`,
+            query: { before: input["before"], limit: input["limit"] },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
             empty: false,

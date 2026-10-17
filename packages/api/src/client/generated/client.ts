@@ -752,14 +752,36 @@ const Endpoint6_37 = (raw: RawClient["ai"]) => (input: Endpoint6_37Input) =>
     ),
   )
 
-type Endpoint6_38Request = Parameters<RawClient["ai"]["chatQueue"]>[0]
+type Endpoint6_38Request = Parameters<RawClient["ai"]["sessionList"]>[0]
 type Endpoint6_38Input = {
-  readonly sessionId: Endpoint6_38Request["payload"]["sessionId"]
-  readonly message: Endpoint6_38Request["payload"]["message"]
-  readonly projectId?: Endpoint6_38Request["payload"]["projectId"]
-  readonly delivery?: Endpoint6_38Request["payload"]["delivery"]
+  readonly projectId: Endpoint6_38Request["query"]["projectId"]
+  readonly limit?: Endpoint6_38Request["query"]["limit"]
 }
 const Endpoint6_38 = (raw: RawClient["ai"]) => (input: Endpoint6_38Input) =>
+  raw["sessionList"]({ query: { projectId: input["projectId"], limit: input["limit"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint6_39Request = Parameters<RawClient["ai"]["sessionMessages"]>[0]
+type Endpoint6_39Input = {
+  readonly sessionId: Endpoint6_39Request["params"]["sessionId"]
+  readonly before?: Endpoint6_39Request["query"]["before"]
+  readonly limit?: Endpoint6_39Request["query"]["limit"]
+}
+const Endpoint6_39 = (raw: RawClient["ai"]) => (input: Endpoint6_39Input) =>
+  raw["sessionMessages"]({
+    params: { sessionId: input["sessionId"] },
+    query: { before: input["before"], limit: input["limit"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint6_40Request = Parameters<RawClient["ai"]["chatQueue"]>[0]
+type Endpoint6_40Input = {
+  readonly sessionId: Endpoint6_40Request["payload"]["sessionId"]
+  readonly message: Endpoint6_40Request["payload"]["message"]
+  readonly projectId?: Endpoint6_40Request["payload"]["projectId"]
+  readonly delivery?: Endpoint6_40Request["payload"]["delivery"]
+}
+const Endpoint6_40 = (raw: RawClient["ai"]) => (input: Endpoint6_40Input) =>
   raw["chatQueue"]({
     payload: {
       sessionId: input["sessionId"],
@@ -769,24 +791,24 @@ const Endpoint6_38 = (raw: RawClient["ai"]) => (input: Endpoint6_38Input) =>
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint6_39Request = Parameters<RawClient["ai"]["chatAbort"]>[0]
-type Endpoint6_39Input = {
-  readonly sessionId?: Endpoint6_39Request["payload"]["sessionId"]
-  readonly projectId?: Endpoint6_39Request["payload"]["projectId"]
+type Endpoint6_41Request = Parameters<RawClient["ai"]["chatAbort"]>[0]
+type Endpoint6_41Input = {
+  readonly sessionId?: Endpoint6_41Request["payload"]["sessionId"]
+  readonly projectId?: Endpoint6_41Request["payload"]["projectId"]
 }
-const Endpoint6_39 = (raw: RawClient["ai"]) => (input?: Endpoint6_39Input) =>
+const Endpoint6_41 = (raw: RawClient["ai"]) => (input?: Endpoint6_41Input) =>
   raw["chatAbort"]({ payload: { sessionId: input?.["sessionId"], projectId: input?.["projectId"] } }).pipe(
     Effect.mapError(mapClientError),
   )
 
-type Endpoint6_40Request = Parameters<RawClient["ai"]["permissionReply"]>[0]
-type Endpoint6_40Input = {
-  readonly sessionId: Endpoint6_40Request["payload"]["sessionId"]
-  readonly projectId?: Endpoint6_40Request["payload"]["projectId"]
-  readonly requestId: Endpoint6_40Request["payload"]["requestId"]
-  readonly decision: Endpoint6_40Request["payload"]["decision"]
+type Endpoint6_42Request = Parameters<RawClient["ai"]["permissionReply"]>[0]
+type Endpoint6_42Input = {
+  readonly sessionId: Endpoint6_42Request["payload"]["sessionId"]
+  readonly projectId?: Endpoint6_42Request["payload"]["projectId"]
+  readonly requestId: Endpoint6_42Request["payload"]["requestId"]
+  readonly decision: Endpoint6_42Request["payload"]["decision"]
 }
-const Endpoint6_40 = (raw: RawClient["ai"]) => (input: Endpoint6_40Input) =>
+const Endpoint6_42 = (raw: RawClient["ai"]) => (input: Endpoint6_42Input) =>
   raw["permissionReply"]({
     payload: {
       sessionId: input["sessionId"],
@@ -796,14 +818,14 @@ const Endpoint6_40 = (raw: RawClient["ai"]) => (input: Endpoint6_40Input) =>
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint6_41Request = Parameters<RawClient["ai"]["completion"]>[0]
-type Endpoint6_41Input = {
-  readonly prompt?: Endpoint6_41Request["payload"]["prompt"]
-  readonly systemPrompt?: Endpoint6_41Request["payload"]["systemPrompt"]
-  readonly model?: Endpoint6_41Request["payload"]["model"]
-  readonly temperature?: Endpoint6_41Request["payload"]["temperature"]
+type Endpoint6_43Request = Parameters<RawClient["ai"]["completion"]>[0]
+type Endpoint6_43Input = {
+  readonly prompt?: Endpoint6_43Request["payload"]["prompt"]
+  readonly systemPrompt?: Endpoint6_43Request["payload"]["systemPrompt"]
+  readonly model?: Endpoint6_43Request["payload"]["model"]
+  readonly temperature?: Endpoint6_43Request["payload"]["temperature"]
 }
-const Endpoint6_41 = (raw: RawClient["ai"]) => (input?: Endpoint6_41Input) =>
+const Endpoint6_43 = (raw: RawClient["ai"]) => (input?: Endpoint6_43Input) =>
   raw["completion"]({
     payload: {
       prompt: input?.["prompt"],
@@ -813,29 +835,29 @@ const Endpoint6_41 = (raw: RawClient["ai"]) => (input?: Endpoint6_41Input) =>
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint6_42Request = Parameters<RawClient["ai"]["analyzeGcode"]>[0]
-type Endpoint6_42Input = {
-  readonly gcode?: Endpoint6_42Request["payload"]["gcode"]
-  readonly model?: Endpoint6_42Request["payload"]["model"]
+type Endpoint6_44Request = Parameters<RawClient["ai"]["analyzeGcode"]>[0]
+type Endpoint6_44Input = {
+  readonly gcode?: Endpoint6_44Request["payload"]["gcode"]
+  readonly model?: Endpoint6_44Request["payload"]["model"]
 }
-const Endpoint6_42 = (raw: RawClient["ai"]) => (input?: Endpoint6_42Input) =>
+const Endpoint6_44 = (raw: RawClient["ai"]) => (input?: Endpoint6_44Input) =>
   raw["analyzeGcode"]({ payload: { gcode: input?.["gcode"], model: input?.["model"] } }).pipe(
     Effect.mapError(mapClientError),
   )
 
-type Endpoint6_43Request = Parameters<RawClient["ai"]["gcode"]>[0]
-type Endpoint6_43Input = {
-  readonly action?: Endpoint6_43Request["payload"]["action"]
-  readonly gcode?: Endpoint6_43Request["payload"]["gcode"]
-  readonly partialCode?: Endpoint6_43Request["payload"]["partialCode"]
-  readonly machineType?: Endpoint6_43Request["payload"]["machineType"]
-  readonly material?: Endpoint6_43Request["payload"]["material"]
-  readonly model?: Endpoint6_43Request["payload"]["model"]
-  readonly options?: Endpoint6_43Request["payload"]["options"]
-  readonly description?: Endpoint6_43Request["payload"]["description"]
-  readonly toolpathType?: Endpoint6_43Request["payload"]["toolpathType"]
+type Endpoint6_45Request = Parameters<RawClient["ai"]["gcode"]>[0]
+type Endpoint6_45Input = {
+  readonly action?: Endpoint6_45Request["payload"]["action"]
+  readonly gcode?: Endpoint6_45Request["payload"]["gcode"]
+  readonly partialCode?: Endpoint6_45Request["payload"]["partialCode"]
+  readonly machineType?: Endpoint6_45Request["payload"]["machineType"]
+  readonly material?: Endpoint6_45Request["payload"]["material"]
+  readonly model?: Endpoint6_45Request["payload"]["model"]
+  readonly options?: Endpoint6_45Request["payload"]["options"]
+  readonly description?: Endpoint6_45Request["payload"]["description"]
+  readonly toolpathType?: Endpoint6_45Request["payload"]["toolpathType"]
 }
-const Endpoint6_43 = (raw: RawClient["ai"]) => (input?: Endpoint6_43Input) =>
+const Endpoint6_45 = (raw: RawClient["ai"]) => (input?: Endpoint6_45Input) =>
   raw["gcode"]({
     payload: {
       action: input?.["action"],
@@ -850,38 +872,38 @@ const Endpoint6_43 = (raw: RawClient["ai"]) => (input?: Endpoint6_43Input) =>
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint6_44Request = Parameters<RawClient["ai"]["toolpathAnalysis"]>[0]
-type Endpoint6_44Input = {
-  readonly gcode?: Endpoint6_44Request["payload"]["gcode"]
-  readonly model?: Endpoint6_44Request["payload"]["model"]
-  readonly max_tokens?: Endpoint6_44Request["payload"]["max_tokens"]
+type Endpoint6_46Request = Parameters<RawClient["ai"]["toolpathAnalysis"]>[0]
+type Endpoint6_46Input = {
+  readonly gcode?: Endpoint6_46Request["payload"]["gcode"]
+  readonly model?: Endpoint6_46Request["payload"]["model"]
+  readonly max_tokens?: Endpoint6_46Request["payload"]["max_tokens"]
 }
-const Endpoint6_44 = (raw: RawClient["ai"]) => (input?: Endpoint6_44Input) =>
+const Endpoint6_46 = (raw: RawClient["ai"]) => (input?: Endpoint6_46Input) =>
   raw["toolpathAnalysis"]({
     payload: { gcode: input?.["gcode"], model: input?.["model"], max_tokens: input?.["max_tokens"] },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint6_45Request = Parameters<RawClient["ai"]["feedback"]>[0]
-type Endpoint6_45Input = {
-  readonly messageId?: Endpoint6_45Request["payload"]["messageId"]
-  readonly rating?: Endpoint6_45Request["payload"]["rating"]
-  readonly comment?: Endpoint6_45Request["payload"]["comment"]
+type Endpoint6_47Request = Parameters<RawClient["ai"]["feedback"]>[0]
+type Endpoint6_47Input = {
+  readonly messageId?: Endpoint6_47Request["payload"]["messageId"]
+  readonly rating?: Endpoint6_47Request["payload"]["rating"]
+  readonly comment?: Endpoint6_47Request["payload"]["comment"]
 }
-const Endpoint6_45 = (raw: RawClient["ai"]) => (input?: Endpoint6_45Input) =>
+const Endpoint6_47 = (raw: RawClient["ai"]) => (input?: Endpoint6_47Input) =>
   raw["feedback"]({
     payload: { messageId: input?.["messageId"], rating: input?.["rating"], comment: input?.["comment"] },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint6_46Request = Parameters<RawClient["ai"]["proxy"]>[0]
-type Endpoint6_46Input = {
-  readonly model?: Endpoint6_46Request["payload"]["model"]
-  readonly messages?: Endpoint6_46Request["payload"]["messages"]
-  readonly max_tokens?: Endpoint6_46Request["payload"]["max_tokens"]
-  readonly temperature?: Endpoint6_46Request["payload"]["temperature"]
-  readonly system?: Endpoint6_46Request["payload"]["system"]
-  readonly reasoning?: Endpoint6_46Request["payload"]["reasoning"]
+type Endpoint6_48Request = Parameters<RawClient["ai"]["proxy"]>[0]
+type Endpoint6_48Input = {
+  readonly model?: Endpoint6_48Request["payload"]["model"]
+  readonly messages?: Endpoint6_48Request["payload"]["messages"]
+  readonly max_tokens?: Endpoint6_48Request["payload"]["max_tokens"]
+  readonly temperature?: Endpoint6_48Request["payload"]["temperature"]
+  readonly system?: Endpoint6_48Request["payload"]["system"]
+  readonly reasoning?: Endpoint6_48Request["payload"]["reasoning"]
 }
-const Endpoint6_46 = (raw: RawClient["ai"]) => (input?: Endpoint6_46Input) =>
+const Endpoint6_48 = (raw: RawClient["ai"]) => (input?: Endpoint6_48Input) =>
   raw["proxy"]({
     payload: {
       model: input?.["model"],
@@ -893,18 +915,18 @@ const Endpoint6_46 = (raw: RawClient["ai"]) => (input?: Endpoint6_46Input) =>
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint6_47Request = Parameters<RawClient["ai"]["oauthAuthorize"]>[0]
-type Endpoint6_47Input = { readonly provider: Endpoint6_47Request["payload"]["provider"] }
-const Endpoint6_47 = (raw: RawClient["ai"]) => (input: Endpoint6_47Input) =>
+type Endpoint6_49Request = Parameters<RawClient["ai"]["oauthAuthorize"]>[0]
+type Endpoint6_49Input = { readonly provider: Endpoint6_49Request["payload"]["provider"] }
+const Endpoint6_49 = (raw: RawClient["ai"]) => (input: Endpoint6_49Input) =>
   raw["oauthAuthorize"]({ payload: { provider: input["provider"] } }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint6_48Request = Parameters<RawClient["ai"]["oauthComplete"]>[0]
-type Endpoint6_48Input = {
-  readonly provider: Endpoint6_48Request["payload"]["provider"]
-  readonly attemptId: Endpoint6_48Request["payload"]["attemptId"]
-  readonly code?: Endpoint6_48Request["payload"]["code"]
+type Endpoint6_50Request = Parameters<RawClient["ai"]["oauthComplete"]>[0]
+type Endpoint6_50Input = {
+  readonly provider: Endpoint6_50Request["payload"]["provider"]
+  readonly attemptId: Endpoint6_50Request["payload"]["attemptId"]
+  readonly code?: Endpoint6_50Request["payload"]["code"]
 }
-const Endpoint6_48 = (raw: RawClient["ai"]) => (input: Endpoint6_48Input) =>
+const Endpoint6_50 = (raw: RawClient["ai"]) => (input: Endpoint6_50Input) =>
   raw["oauthComplete"]({
     payload: { provider: input["provider"], attemptId: input["attemptId"], code: input["code"] },
   }).pipe(Effect.mapError(mapClientError))
@@ -948,17 +970,19 @@ const adaptGroup6 = (raw: RawClient["ai"]) => ({
   chatStream: Endpoint6_35(raw),
   sessionPrompt: Endpoint6_36(raw),
   sessionStream: Endpoint6_37(raw),
-  chatQueue: Endpoint6_38(raw),
-  chatAbort: Endpoint6_39(raw),
-  permissionReply: Endpoint6_40(raw),
-  completion: Endpoint6_41(raw),
-  analyzeGcode: Endpoint6_42(raw),
-  gcode: Endpoint6_43(raw),
-  toolpathAnalysis: Endpoint6_44(raw),
-  feedback: Endpoint6_45(raw),
-  proxy: Endpoint6_46(raw),
-  oauthAuthorize: Endpoint6_47(raw),
-  oauthComplete: Endpoint6_48(raw),
+  sessionList: Endpoint6_38(raw),
+  sessionMessages: Endpoint6_39(raw),
+  chatQueue: Endpoint6_40(raw),
+  chatAbort: Endpoint6_41(raw),
+  permissionReply: Endpoint6_42(raw),
+  completion: Endpoint6_43(raw),
+  analyzeGcode: Endpoint6_44(raw),
+  gcode: Endpoint6_45(raw),
+  toolpathAnalysis: Endpoint6_46(raw),
+  feedback: Endpoint6_47(raw),
+  proxy: Endpoint6_48(raw),
+  oauthAuthorize: Endpoint6_49(raw),
+  oauthComplete: Endpoint6_50(raw),
 })
 
 type Endpoint7_0Request = Parameters<RawClient["mcp"]["listConfig"]>[0]

@@ -97,7 +97,8 @@ describe("phone endpoints on the real HTTP server", () => {
       const pairing = parsePairingLink(paired.link)
       const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
       const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
-      const phone = new CompanionClient(createFetchTransport(pairing, pinned))
+      const transport = createFetchTransport(pairing, pinned)
+      const phone = new CompanionClient(transport)
 
       const project = await (await local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Bracket" }) })).json()
       const drawing = await (await local(`/api/projects/${project.id}/drawings`, {
@@ -123,7 +124,26 @@ describe("phone endpoints on the real HTTP server", () => {
       expect(Array.isArray(await phone.agents())).toBe(true)
       expect(Array.isArray(await phone.aiProviders())).toBe(true)
       expect(Array.isArray(await phone.aiModels())).toBe(true)
-      expect((await phone.notifications()).notifications).toEqual([])
+      const feed = await phone.notifications()
+      expect(feed.notifications).toEqual([])
+      expect((feed as { nextCursor?: unknown }).nextCursor).toBeNull()
+      // The AI status says honestly which assistant answers: the embedded nikcli host or the direct model path.
+      expect(["nikcli", "direct"]).toContain((await phone.aiStatus()).host)
+
+      // Routes the phone can adopt before its client calls them: conversation list and history, through the gateway.
+      const sessions = await transport.request(`/api/ai/sessions?projectId=${encodeURIComponent(project.id)}`, "GET")
+      expect(sessions.status).toBe(200)
+      expect(JSON.parse(sessions.body)).toEqual([])
+      const history = await transport.request("/api/ai/sessions/ses_unknown/messages", "GET")
+      expect(history.status).toBe(400)
+
+      // Workspace previews answer conditionally through the gateway: the tag survives the hop and a match is a 304.
+      const previewPath = `/api/projects/${project.id}/workspace/drawings/${drawing.id}/preview`
+      const tagged = await pinned(`${pairing.baseUrl}${previewPath}`, { headers: { authorization: `Bearer ${pairing.token}` } })
+      const tag = tagged.headers.get("etag")
+      expect(tag).toBeTruthy()
+      await tagged.arrayBuffer()
+      expect((await pinned(`${pairing.baseUrl}${previewPath}`, { headers: { authorization: `Bearer ${pairing.token}`, "if-none-match": tag! } })).status).toBe(304)
 
       // The live activity stream opens through the gateway.
       const live = new AbortController()

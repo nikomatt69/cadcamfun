@@ -1,6 +1,6 @@
 import { withHeartbeat, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, isolatedPaths, readModIndex, removeMod, replyHostPermission, setModEnabled, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
-  AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError, StreamChatBody
+  AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError, MAX_SESSION_PAGE, StreamChatBody
 } from "@cadcamfun/api"
 import { Effect, Option, Redacted, Stream } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -19,6 +19,7 @@ import { HttpServerRequest } from "effect/unstable/http"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { makeAiContext } from "../services/ai-context.ts"
+import { HISTORY_SCAN_LIMIT, historyPage, sessionSummaries, type HostHistoryMessage, type HostHistorySession } from "../services/assistant-history.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -32,6 +33,11 @@ const knownProvider = (value: string | undefined, catalogue: ReadonlyArray<Provi
 const text = (content: unknown): string =>
   typeof content === "string" ? content
     : Array.isArray(content) ? content.map((p) => (typeof p === "string" ? p : (p as { text?: string }).text ?? "")).join("") : ""
+/** `limit` of a history route: a decimal integer from 1 to `MAX_SESSION_PAGE`, or the default. */
+const pageSize = (value: string | undefined, fallback: number): number | undefined =>
+  value === undefined ? fallback : /^\d{1,3}$/.test(value) && Number(value) >= 1 && Number(value) <= MAX_SESSION_PAGE ? Number(value) : undefined
+/** Host message and session ids are short url-safe tokens (`msg_…`, `ses_…`). */
+const HOST_ID = /^[A-Za-z0-9_-]{1,128}$/
 const aiError = (e: { _tag: string; message?: string }) =>
   e._tag === "AiAborted" ? "The request was cancelled." : (e.message ?? "AI request failed")
 
@@ -346,6 +352,49 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     .handle("sessionStream", ({ params, query }) => Effect.gen(function*() {
       yield* controlProject(params.sessionId)
       return yield* turns.follow(params.sessionId, query.after)
+    }))
+    // nikcli mobile session list / detail (spec 13 §5): the conversations the caller owns in a project, and one's history.
+    .handle("sessionList", ({ query }) => Effect.gen(function*() {
+      const actor = yield* CurrentUser
+      const projectId = query.projectId.trim()
+      if (projectId === "") return yield* new BadRequest({ message: "projectId is required" })
+      const limit = pageSize(query.limit, 50)
+      if (limit === undefined) return yield* new BadRequest({ message: `limit must be an integer from 1 to ${MAX_SESSION_PAGE}` })
+      yield* checkProject(projectId)
+      const owned = yield* Effect.tryPromise({ try: () => actingUser.sessions(actor.id, projectId), catch: () => new InternalError({ message: "Unable to read the conversations" }) })
+      if (owned.length === 0) return []
+      const hosted = Option.isNone(host) ? undefined : yield* host.value.runtime.host(projectId).pipe(
+        Effect.flatMap((projectHost) => Effect.tryPromise(() => projectHost.client.session.list({ limit: HISTORY_SCAN_LIMIT }))),
+        // The SDK types only some fields; the host's records also carry `time`, which the mapper reads defensively.
+        Effect.map((list) => list as unknown as ReadonlyArray<HostHistorySession>),
+        Effect.mapError(() => new InternalError({ message: "The assistant host could not list the conversations" }))
+      )
+      const busy = new Set<string>()
+      for (const entry of owned) if (yield* turns.busy(entry.sessionId)) busy.add(entry.sessionId)
+      return sessionSummaries({ projectId, owned, hosted, busy: (id) => busy.has(id), limit })
+    }))
+    .handle("sessionMessages", ({ params, query }) => Effect.gen(function*() {
+      const limit = pageSize(query.limit, 30)
+      if (limit === undefined) return yield* new BadRequest({ message: `limit must be an integer from 1 to ${MAX_SESSION_PAGE}` })
+      if (query.before !== undefined && !HOST_ID.test(query.before)) return yield* new BadRequest({ message: "before must be a message id from an earlier page" })
+      const projectId = yield* controlProject(params.sessionId)
+      const empty = { sessionId: params.sessionId, messages: [], before: null }
+      if (Option.isNone(host)) return empty
+      const projectHost = yield* host.value.runtime.host(projectId).pipe(Effect.mapError(() => new InternalError({ message: "The assistant host is not available" })))
+      const read = (count: number) => Effect.tryPromise({
+        try: () => projectHost.client.session.messages({ sessionID: params.sessionId, limit: count }) as unknown as Promise<ReadonlyArray<HostHistoryMessage>>,
+        catch: () => new InternalError({ message: "The assistant host could not read this conversation" })
+      })
+      // Read the newest messages, widening the window until it holds the anchor (or the whole conversation).
+      let window = Math.min(HISTORY_SCAN_LIMIT, query.before === undefined ? limit * 2 + 1 : limit * 4 + 1)
+      for (;;) {
+        const messages = yield* read(window)
+        const complete = messages.length < window
+        const page = historyPage(messages, complete, limit, query.before)
+        if (page.ok && (complete || page.messages.length === limit || window >= HISTORY_SCAN_LIMIT)) return { sessionId: params.sessionId, messages: page.messages, before: page.before }
+        if (!page.ok && (page.exhausted || window >= HISTORY_SCAN_LIMIT)) return yield* new BadRequest({ message: "before is not a message of this conversation (or is older than the history the desktop serves)" })
+        window = Math.min(HISTORY_SCAN_LIMIT, window * 2)
+      }
     }))
     .handle("sessionState", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
