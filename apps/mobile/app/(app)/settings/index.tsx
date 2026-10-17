@@ -21,6 +21,7 @@ import { Divider } from "@/components/ui/SectionHeader"
 import { LOCK_AFTER_OPTIONS, lockAfterLabel } from "@/lib/app-lock"
 import { buildDiagnostics, formatFingerprint, originOnly } from "@/lib/diagnostics"
 import { PERMISSION_MODES } from "@/lib/assistant-preferences"
+import { clearOfflineQueue } from "@/lib/offline-queue"
 
 const APP_VERSION = Constants.expoConfig?.version ?? "6.0.0"
 const BUILD_NUMBER = Constants.expoConfig?.ios?.buildNumber
@@ -78,9 +79,29 @@ export default function SettingsScreen() {
   const diagnostics = () => buildDiagnostics({
     appVersion: APP_VERSION, buildNumber: BUILD_NUMBER, platform: Platform.OS, osVersion: String(Platform.Version),
     desktop: config ? { name: config.name, baseUrl: config.baseUrl, hosts: config.hosts, fingerprint: config.fingerprint } : undefined,
-    connectivity, connectionError, ai: ai ? { configured: ai.configured, host: (ai as { host?: string }).host, tools: ai.tools?.length } : null,
+    connectivity, connectionError, ai: ai ? { configured: ai.configured, host: ai.host, tools: ai.tools?.length } : null,
     offlineQueueCount, security, now: new Date(),
   })
+
+  const clearQueue = () => {
+    Alert.alert(
+      offlineQueueCount === 1 ? "Discard the queued message?" : `Discard ${offlineQueueCount} queued messages?`,
+      "They were written while the desktop was offline and have not been sent. This cannot be undone.",
+      [
+        { text: "Keep", style: "cancel" },
+        {
+          text: "Discard",
+          style: "destructive",
+          onPress: () => {
+            void clearOfflineQueue().then(() => {
+              haptic("success")
+              toast("Queued messages discarded", "success")
+            }).catch((error: unknown) => toast(error instanceof Error ? error.message : "Could not clear the queue", "error"))
+          },
+        },
+      ],
+    )
+  }
 
   const unpair = () => {
     Alert.alert("Unpair this phone", "The scoped pairing token is deleted from the Keychain. Re-pair from the QR code on your Mac.", [
@@ -110,7 +131,9 @@ export default function SettingsScreen() {
       <ListRow leading={<IconTile size={36}><MonitorSmartphone size={18} color={palette.accent} /></IconTile>}
         title={config?.name ?? "Not paired"} subtitle={config?.baseUrl} onPress={() => void recheck()}
         trailing={<Text style={{ color: palette.accent, fontSize: 13, fontWeight: "600" }}>Reconnect</Text>} />
-      {offlineQueueCount > 0 ? <><Divider inset={16} /><ListRow title="Queued messages" subtitle={`${offlineQueueCount} messages will send when the desktop reconnects`} /></> : null}
+      {offlineQueueCount > 0 ? <><Divider inset={16} /><ListRow title="Queued messages" subtitle={`${offlineQueueCount === 1 ? "1 message sends" : `${offlineQueueCount} messages send`} when the desktop reconnects`} showChevron={false}
+        accessibilityHint="Discards the messages waiting for the desktop" onPress={clearQueue}
+        trailing={<Text style={{ color: palette.danger, fontSize: 13, fontWeight: "600" }}>Discard</Text>} /></> : null}
       {config ? <><Divider inset={16} />
         <ListRow leading={<IconTile size={36}><Fingerprint size={18} color={palette.accent} /></IconTile>} title="Certificate fingerprint"
           subtitle="Matches the fingerprint under the QR code on your Mac. Tap to copy." onPress={() => void copy(config.fingerprint, "Fingerprint copied")}

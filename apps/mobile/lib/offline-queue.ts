@@ -56,6 +56,17 @@ export async function enqueueAssistantOp(op: Omit<OfflineAssistantOp, "type" | "
   syncQueueCount(next)
 }
 
+/**
+ * Discards every queued message (Settings). A message the outbox is delivering right now is not recalled: its
+ * checkpoint is dropped with the rest, and the conversation on the desktop shows whether it ran.
+ */
+export async function clearOfflineQueue(): Promise<number> {
+  let removed = 0
+  const next = await mutateStored(readQueue, writeOfflineQueueRaw, (queue) => { removed = queue.length; return [] })
+  syncQueueCount(next)
+  return removed
+}
+
 /** Drain with a pairing supplied by the caller (provider owns the live client). */
 let draining: Promise<void> | undefined
 export function drainQueueWith(pairing: Pairing, onSent?: (sent: number) => void): Promise<void> {
