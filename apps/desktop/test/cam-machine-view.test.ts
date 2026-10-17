@@ -8,6 +8,7 @@ import * as THREE from "three"
 import { cam } from "@cadcamfun/core"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, machineSpatial } from "../src/viewport/view3d/machine-scene.ts"
 import { buildPlayback } from "../src/viewport/view3d/playback.ts"
+import { toolObject } from "../src/viewport/view3d/tool-object.ts"
 import { previewSetup, resolveMachineKind } from "../src/features/cam/lib/machine-view.ts"
 
 const g = cam.generator
@@ -194,7 +195,6 @@ describe("what the assistant reads from a CAM frame", () => {
 })
 
 describe("one 3D object per tool (spec 31): Resources page, CAM preview and machine scene", () => {
-  const { toolObject } = await import("../src/viewport/view3d/tool-object.ts")
   test("every mill type of the Resources: cutting, shank, holder and its flutes", () => {
     for (const type of cam.TOOL_TYPES.mill.filter((t) => t !== "probe" && t !== "toolsetter")) {
       const model = cam.toolModelOf({ type, diameter: 10, numberOfFlutes: 4 }, "mill")

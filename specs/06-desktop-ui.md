@@ -65,6 +65,7 @@ Legacy reference (behaviour/layout inspiration only): `.reference/src/components
 - Three.js scene with orbit/pan/zoom, view presets (perspective, top, front, right, isometric, four-view), axes gizmo, grid plane, stock box, workpiece origin marker.
 - Renders `meshOf(solid)` output from WP1 and tessellated drawing entities extruded on demand.
 - Toolpath preview: draws the WP2 IR as line segments (rapids dashed/colour-coded, cuts solid, arcs tessellated), with a scrub slider and play/pause animating a tool marker along the path; no material-removal simulation in v6.0.
+- CAM mini player: a compact footer immediately before Fullscreen, with play/pause, ±5-second seeking, an accessible scrub slider and elapsed/total time. It uses the existing CAM playback state and clock, restarts at the end, and pauses while scrubbing. WP6 owns the player and state wiring; WP7 exposes an optional footer slot so CAD controls remain unchanged.
 - All geometry buffers built off the main thread when > 50 000 vertices (Worker with transferable `Float32Array`).
 
 Performance budget: first interactive paint < 1.5 s after sidecar ready on a 2020 laptop; no frame over 16 ms during pan/zoom with the reference drawing in `apps/desktop/test/fixtures/large-drawing.json` (WP7 creates it).
@@ -83,6 +84,8 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 - Keyboard-only workflow for create project → draw → generate → export works.
 
 ## 5. Change log
+
+- 2026-10-17: added the compact CAM simulation player immediately before Fullscreen (play/pause, ±5 seconds, scrub position and time). Uses the shared CAM state in Preview and Toolpath, including fullscreen. Mini-player, viewport DOM and real-sidecar CAM page checks: 12 pass; desktop typecheck clean.
 
 - 2026-10-16: Added ChatGPT/Codex and SuperGrok browser connections with xAI manual-code completion, plus OpenCode Zen/Go console links and account-key instructions. Provider settings tests cover all connection forms and clear entered secrets after success.
 

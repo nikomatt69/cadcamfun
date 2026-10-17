@@ -1,7 +1,7 @@
 import { FrameScheduler } from "../../features/cad/lib/frame-scheduler.ts"
 import { MeshWorkerQueue } from "./mesh-jobs.ts"
 import { registerViewportCapture } from "../../features/ai/lib/viewport-capture.ts"
-import { Show, createEffect, createSignal, onCleanup, onMount, untrack } from "solid-js"
+import { Show, createEffect, createSignal, onCleanup, onMount, untrack, type JSX } from "solid-js"
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { TransformControls } from "three/addons/controls/TransformControls.js"
@@ -73,6 +73,8 @@ export interface View3DProps {
   readonly origin?: { readonly x: number; readonly y: number; readonly z: number }
   readonly stock?: { readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }
   readonly showControls?: boolean
+  /** Optional screen controls placed immediately before Fullscreen, including in fullscreen mode. */
+  readonly controlsFooter?: JSX.Element
   readonly onPresetChange?: (preset: ViewPreset) => void
   readonly onRenderModeChange?: (mode: RenderMode) => void
   readonly onSolidSelect?: (index: number | undefined) => void
@@ -602,7 +604,7 @@ export function View3D(props: View3DProps) {
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />
-    <Show when={props.showControls !== false}><ViewportControls preset={preset()} mode={mode()} grid={gridVisible()} axes={axesVisible()} enabled={!noWebGl()} transform={transformMode()} canTransform={selected() !== undefined && !!props.onTransformCommit && preset() !== "four-view"} onPreset={value => { updatePreset(value); props.onPresetChange?.(value) }} onMode={value => { updateMode(value); props.onRenderModeChange?.(value) }} onGrid={() => setGridVisible(v => !v)} onAxes={() => setAxesVisible(v => !v)} onFit={() => fit()} onTransform={setTransformMode} onFullscreen={() => { const root = host?.parentElement; if (document.fullscreenElement) void document.exitFullscreen(); else if (root?.requestFullscreen) void root.requestFullscreen() }} /></Show>
+    <Show when={props.showControls !== false}><ViewportControls footer={props.controlsFooter} preset={preset()} mode={mode()} grid={gridVisible()} axes={axesVisible()} enabled={!noWebGl()} transform={transformMode()} canTransform={selected() !== undefined && !!props.onTransformCommit && preset() !== "four-view"} onPreset={value => { updatePreset(value); props.onPresetChange?.(value) }} onMode={value => { updateMode(value); props.onRenderModeChange?.(value) }} onGrid={() => setGridVisible(v => !v)} onAxes={() => setAxesVisible(v => !v)} onFit={() => fit()} onTransform={setTransformMode} onFullscreen={() => { const root = host?.parentElement; if (document.fullscreenElement) void document.exitFullscreen(); else if (root?.requestFullscreen) void root.requestFullscreen() }} /></Show>
     <Show when={preset() === "four-view"}><div class="vp3-quadrants"><span>{viewportLabels.top}</span><span>{viewportLabels.front}</span><span>{viewportLabels.right}</span><span>{viewportLabels.perspective}</span></div></Show>
     <Show when={meshError()}>{message => <p role="alert" class="vp3-alert">{message()}</p>}</Show>
     <Show when={noWebGl()}><p role="alert" class="vp3-alert">{t("viewport.noWebgl")}</p></Show>

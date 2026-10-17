@@ -15,6 +15,7 @@ import { View3D, toolpathOverlayModel, type MachineInfo, type RenderMode, type T
 import { MACHINE_LABELS, SOURCE_LABELS, type MachineChoice } from "../lib/machine-view.ts"
 import { t } from "../../../i18n/index.ts"
 import type { Workpiece } from "../store/camStore.ts"
+import { SimulationMiniPlayer } from "./SimulationMiniPlayer.tsx"
 
 export interface ToolpathVisualizerProps {
   readonly program: cam.Program
@@ -23,6 +24,8 @@ export interface ToolpathVisualizerProps {
   readonly playing: boolean
   readonly playbackTime: number
   readonly playbackRate: number
+  readonly playbackDuration?: number
+  readonly onPlayingChange?: (playing: boolean) => void
   readonly onPlaybackTimeChange: (seconds: number) => void
   /** Cutters by the toolpaths' `toolId` (the kernel's tool library); playback draws the one in the spindle in 3D. */
   readonly tools?: ReadonlyMap<string, cam.kernel.Cutter>
@@ -172,6 +175,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             playbackTime={props.playbackTime}
             playbackRate={props.playbackRate}
             onPlaybackTimeChange={props.onPlaybackTimeChange}
+            controlsFooter={<Show when={props.onPlayingChange}>{(onPlayingChange) => <SimulationMiniPlayer playing={props.playing} time={props.playbackTime} duration={props.playbackDuration ?? 0} onPlayingChange={onPlayingChange()} onSeek={props.onPlaybackTimeChange} />}</Show>}
             stock={stock()}
             toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder() }}
             {...(props.machine !== undefined ? { machine: props.machine, machineDisplay: machineDisplay(), onMachineInfo: setMachineInfo } : {})}
@@ -257,7 +261,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           <Settings size={18} />
         </button>
         <Show when={showStats()}>
-          <div class="absolute bottom-4 left-4 z-20 rounded-lg bg-black/65 px-3 py-2 text-[11px] leading-5 text-slate-200 backdrop-blur pointer-events-none">
+          <div class="absolute bottom-16 left-4 z-20 rounded-lg bg-black/65 px-3 py-2 text-[11px] leading-5 text-slate-200 backdrop-blur pointer-events-none">
             <div>{t("cam.visualizer.moves")}: <span class="text-white">{overlay().moveCount}</span></div>
             <div>{t("cam.visualizer.points")}: <span class="text-white">{overlay().points.length}</span></div>
             <div>{t("cam.visualizer.arcs")}: <span class="text-white">{overlay().arcs.length}</span></div>

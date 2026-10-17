@@ -505,5 +505,11 @@
   "cam.visualizer.rotaryFrame": "Rotary view",
   "cam.visualizer.framePart": "Part still, the tool leans",
   "cam.visualizer.frameMachine": "Tool vertical, the table turns",
-  "cam.visualizer.assumed": "assumed"
+  "cam.visualizer.assumed": "assumed",
+  "cam.player.label": "Simulation player",
+  "cam.player.play": "Play simulation",
+  "cam.player.pause": "Pause simulation",
+  "cam.player.back": "Back 5 seconds",
+  "cam.player.forward": "Forward 5 seconds",
+  "cam.player.seek": "Simulation position"
 }

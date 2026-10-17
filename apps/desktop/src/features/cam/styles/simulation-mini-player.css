@@ -1,0 +1,58 @@
+.cam-mini-player {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: clamp(220px, 30vw, 340px);
+  height: 30px;
+  padding: 2px 7px 2px 3px;
+  border: 1px solid #ffffff14;
+  border-radius: 6px;
+  background: #171717d9;
+  color: #eee;
+  box-shadow: 0 2px 10px #0002;
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+.vp3-root .cam-mini-player button {
+  display: inline-flex;
+  flex: 0 0 25px;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  color: #d4d4d4;
+  background: transparent;
+  box-shadow: none;
+}
+.vp3-root .cam-mini-player .cam-mini-player__toggle { color: #93c5fd; }
+.cam-mini-player input[type=range] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1;
+  min-width: 40px;
+  width: 0;
+  height: 20px;
+  margin: 0 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  touch-action: none;
+}
+.cam-mini-player input[type=range]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 9px;
+  height: 9px;
+  border: 0;
+  border-radius: 50%;
+  background: #dbeafe;
+  box-shadow: 0 0 0 2px #17171770;
+}
+.cam-mini-player input[type=range]::-moz-range-thumb { width: 9px; height: 9px; border: 0; border-radius: 50%; background: #dbeafe; }
+.cam-mini-player input[type=range]:focus-visible { outline: 2px solid #60a5fa; outline-offset: 5px; }
+.cam-mini-player input[type=range]:disabled { opacity: .4; cursor: not-allowed; }
+.cam-mini-player__time { flex-shrink: 0; font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; color: #ddd; }
+.cam-mini-player__time span { color: #999; }
+@media (max-width: 540px) { .cam-mini-player { width: 200px; } .cam-mini-player__time span { display: none; } }
+@media (prefers-reduced-transparency: reduce) { .cam-mini-player { backdrop-filter: none; background: #171717; } }
+@media (prefers-contrast: more) { .cam-mini-player { border-color: currentColor; } }

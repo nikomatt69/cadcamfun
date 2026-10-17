@@ -4,6 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { bootLiveApp } from "./helpers/live-app.ts"
+import { useCamStore } from "../src/features/cam/store/camStore.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
 const errors: string[] = []
@@ -176,6 +177,16 @@ describe("CAM page", () => {
       await clickText("button", "Preview")
       const badge = await app.wait(() => document.querySelector<HTMLElement>('[data-testid="machine-badge"]'), 30000)
       await app.wait(() => (badge.textContent === "Lathe" ? badge : undefined), 30000)
+      const player = await find('[data-testid="simulation-mini-player"]')
+      const seek = player.querySelector<HTMLInputElement>('input[type="range"]')!
+      expect(Number(seek.max)).toBeGreaterThan(0)
+      player.querySelector<HTMLButtonElement>('[aria-label="Play simulation"]')!.click()
+      expect(useCamStore.getState().playing).toBe(true)
+      player.querySelector<HTMLButtonElement>('[aria-label="Pause simulation"]')!.click()
+      expect(useCamStore.getState().playing).toBe(false)
+      seek.value = "1"
+      seek.dispatchEvent(new window.Event("input", { bubbles: true }))
+      expect(useCamStore.getState().playbackTime).toBe(1)
       await app.wait(() => document.querySelector('[data-testid="partial-preview"]'), 30000)
       expect(document.querySelector('[data-testid="partial-preview"]')!.textContent).toContain("1 lines")
       expect(document.querySelector('[data-testid="machine-mismatch"]')).toBeNull()

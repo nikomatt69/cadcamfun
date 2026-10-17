@@ -27,6 +27,7 @@ interface ControlsProps {
   readonly onFit: () => void
   readonly onFullscreen: () => void
   readonly onTransform: (mode: TransformMode) => void
+  readonly footer?: JSX.Element
 }
 
 export function ViewportControls(props: ControlsProps): JSX.Element {
@@ -54,6 +55,9 @@ export function ViewportControls(props: ControlsProps): JSX.Element {
         <For each={["none", "translate", "rotate", "scale"] as TransformMode[]}>{mode => <button type="button" aria-pressed={props.transform === mode} onClick={() => props.onTransform(mode)}>{viewportLabels[mode]}</button>}</For>
       </div>
     </Show>
-    <div class="vp3-footer"><span>{viewportLabels.shortcuts}</span><button type="button" disabled={!props.enabled} onClick={props.onFullscreen}>{viewportLabels.fullscreen}</button></div>
+    <div class="vp3-footer" classList={{ "vp3-footer--player": !!props.footer }}>
+      <span>{viewportLabels.shortcuts}</span>
+      <div class="vp3-footer-actions">{props.footer}<button type="button" disabled={!props.enabled} onClick={props.onFullscreen}>{viewportLabels.fullscreen}</button></div>
+    </div>
   </>
 }
