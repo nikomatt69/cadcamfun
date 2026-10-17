@@ -152,11 +152,21 @@ function Viewport({
   const linesOk = useRef(true)
   const failed = meshError ?? lineError ?? gpuError
   const compact = size.width < COMPACT_WIDTH
+  const aspect = size.width / Math.max(size.height, 1)
+  // True while the camera is at a fitted view: a resize or rotation re-fits it. Any orbit, zoom or pan clears it.
+  const autoFit = useRef(true)
+  const viewRef = useRef(view)
+  viewRef.current = view
 
   useEffect(() => {
-    setOrbit(fitOrbit(bounds))
+    autoFit.current = true
+    setOrbit(fitOrbit(bounds, aspect))
     setView("iso")
   }, [revision, bounds.min[0], bounds.min[1], bounds.min[2], bounds.max[0], bounds.max[1], bounds.max[2]])
+
+  useEffect(() => {
+    if (autoFit.current) setOrbit(viewOrbit(bounds, viewRef.current ?? "iso", aspect))
+  }, [aspect])
 
   useEffect(() => {
     if (!cadPreview) {
@@ -280,25 +290,34 @@ function Viewport({
   }
 
   const showView = (next: StandardView) => {
-    setOrbit(viewOrbit(bounds, next))
+    autoFit.current = true
+    setOrbit(viewOrbit(bounds, next, aspect))
     setView(next)
   }
   const nextView = STANDARD_VIEWS[(STANDARD_VIEWS.findIndex((item) => item.id === view) + 1) % STANDARD_VIEWS.length]!
   const viewLabel = STANDARD_VIEWS.find((item) => item.id === view)?.label
 
   /** Frame the selected part when there is one, the whole scene otherwise; the viewing direction stays. */
-  const frameSelection = () => setOrbit((current) => frameOrbit(current, selectedBounds ?? bounds))
+  const frameSelection = () => {
+    autoFit.current = false
+    setOrbit((current) => frameOrbit(current, selectedBounds ?? bounds, aspect))
+  }
 
   const cameraAction = (action: string) => {
     if (failed) return
+    const manual = (change: (current: Orbit) => Orbit, keepView = true) => {
+      autoFit.current = false
+      setOrbit(change)
+      if (!keepView) setView(undefined)
+    }
     if (action === "reset") showView("iso")
     else if (action === "view") showView(nextView.id)
     else if (action.startsWith("view:")) showView(action.slice(5) as StandardView)
     else if (action === "frame") frameSelection()
-    else if (action === "increment") setOrbit((current) => orbitZoom(current, 0.8))
-    else if (action === "decrement") setOrbit((current) => orbitZoom(current, 1.25))
-    else if (action === "rotateLeft") { setOrbit((current) => orbitDrag(current, -40, 0)); setView(undefined) }
-    else if (action === "rotateRight") { setOrbit((current) => orbitDrag(current, 40, 0)); setView(undefined) }
+    else if (action === "increment") manual((current) => orbitZoom(current, 0.8))
+    else if (action === "decrement") manual((current) => orbitZoom(current, 1.25))
+    else if (action === "rotateLeft") manual((current) => orbitDrag(current, -40, 0), false)
+    else if (action === "rotateRight") manual((current) => orbitDrag(current, 40, 0), false)
     else return
     haptic("selection")
   }
@@ -357,6 +376,7 @@ function Viewport({
           const midX = (touches[0]!.locationX + touches[1]!.locationX) / 2
           const midY = (touches[0]!.locationY + touches[1]!.locationY) / 2
           if (previous.two && previous.pinch > 0) {
+            autoFit.current = false
             setOrbit((current) => orbitPan(orbitZoom(current, previous.pinch / Math.max(pinch, 1)), midX - previous.x, midY - previous.y, size.height))
           }
           gesture.current = { ...previous, x: midX, y: midY, pinch, two: true, moved: true }
@@ -369,6 +389,7 @@ function Viewport({
         const dx = event.nativeEvent.locationX - previous.x
         const dy = event.nativeEvent.locationY - previous.y
         if (Math.hypot(event.nativeEvent.locationX - previous.startX, event.nativeEvent.locationY - previous.startY) > 6) gesture.current.moved = true
+        if (dx !== 0 || dy !== 0) autoFit.current = false
         setOrbit((current) => orbitDrag(current, dx, dy))
         if (dx !== 0 || dy !== 0) setView(undefined)
         gesture.current.x = event.nativeEvent.locationX
