@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
+/**
+ * The newest value of one thing (`scope`, e.g. a drawing id) across its revisions: while a new commit's payload loads,
+ * the previous one stays on screen instead of a skeleton, so a model the assistant is changing updates in place.
+ * Another scope never inherits it, so a project or drawing switch still starts empty.
+ */
+export function useRetained<T>(value: T | undefined, scope: string): T | undefined {
+  const kept = useRef<{ scope: string; value: T } | undefined>(undefined)
+  if (value !== undefined) kept.current = { scope, value }
+  else if (kept.current?.scope !== scope) kept.current = undefined
+  return value ?? kept.current?.value
+}
+
 /** Initial data and explicit refreshes share one cancellable request owner. */
 export function useResource<T>(fetcher: (signal: AbortSignal) => Promise<T>, key: string): {
   data: T | undefined

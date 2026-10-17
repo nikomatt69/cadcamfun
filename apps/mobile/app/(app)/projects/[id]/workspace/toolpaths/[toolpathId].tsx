@@ -1,7 +1,7 @@
 import { useCallback } from "react"
 import { Stack, useLocalSearchParams } from "expo-router"
 import { useServer } from "@/lib/server"
-import { useResource } from "@/lib/use-resource"
+import { useResource, useRetained } from "@/lib/use-resource"
 import { useCommitRevision } from "@/lib/use-commit-revision"
 import { ToolpathReview } from "@/components/workspace/ToolpathReview"
 import { routeParam } from "@/components/workspace/route"
@@ -29,12 +29,16 @@ export default function ToolpathScreen() {
     `toolpath-preview:${id}:${toolpathId}:${revision}`,
   )
 
+  const scope = `toolpath:${id}:${toolpathId}`
+  const reviewData = useRetained(review.data, scope)
+  const previewData = useRetained(preview.data, scope)
+
   return (
     <>
-      <Stack.Screen options={{ title: review.data?.name || name, headerLargeTitle: false }} />
+      <Stack.Screen options={{ title: reviewData?.name || name, headerLargeTitle: false }} />
       <ToolpathReview
-        review={review.data}
-        preview={preview.data}
+        review={reviewData}
+        preview={previewData}
         loading={review.loading || preview.loading}
         error={review.error ?? preview.error}
         onRetry={() => {

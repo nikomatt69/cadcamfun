@@ -4,7 +4,7 @@ import { createRequire } from "node:module"
 interface TestRoot { render(node: ReactNode): void; unmount(): void }
 const { createRoot } = createRequire(import.meta.url)("react-dom/client") as { createRoot: (container: Element) => TestRoot }
 import { Window } from "../../desktop/node_modules/happy-dom/lib/index.js"
-import { useResource } from "../lib/use-resource"
+import { useResource, useRetained } from "../lib/use-resource"
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void
@@ -100,6 +100,29 @@ describe("mobile resource request ownership", () => {
   })
 })
 
+
+describe("retained revisions", () => {
+  test("a new revision keeps the previous payload until it loads; another scope starts empty", async () => {
+    const container = document.createElement("div")
+    document.body.appendChild(container)
+    const root: TestRoot = createRoot(container)
+    let shown: string | undefined
+    function Probe({ value, scope }: { value: string | undefined; scope: string }) {
+      shown = useRetained(value, scope)
+      return null
+    }
+    const render = async (value: string | undefined, scope: string) => { await act(async () => root.render(createElement(Probe, { value, scope }))) }
+    try {
+      await render("rev 1", "drawing-a")
+      await render(undefined, "drawing-a")
+      expect(shown).toBe("rev 1")
+      await render("rev 2", "drawing-a")
+      expect(shown).toBe("rev 2")
+      await render(undefined, "drawing-b")
+      expect(shown).toBeUndefined()
+    } finally { await act(async () => root.unmount()); container.remove() }
+  })
+})
 
 describe("mobile pairing provider lifecycle", () => {
   const pairing = { baseUrl: "https://desktop.local", token: "0123456789abcdef", fingerprint: "a".repeat(64), name: "Desktop" }

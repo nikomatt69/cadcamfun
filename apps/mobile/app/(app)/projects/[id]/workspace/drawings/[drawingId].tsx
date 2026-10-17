@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react"
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { useServer } from "@/lib/server"
-import { useResource } from "@/lib/use-resource"
+import { useResource, useRetained } from "@/lib/use-resource"
 import { useUIStore } from "@/lib/store"
 import { useCommitRevision } from "@/lib/use-commit-revision"
 import { haptic } from "@/lib/haptics"
@@ -28,8 +28,10 @@ export default function DrawingPreviewScreen() {
     `drawing:${id}:${drawingId}:${revision}`,
   )
 
+  const mesh = useRetained(preview.data, `drawing:${id}:${drawingId}`)
+
   const defineWithAssistant = () => {
-    if (!preview.data) return
+    if (!mesh) return
     haptic("selection")
     setAssistantDraft({
       projectId: id,
@@ -44,7 +46,7 @@ export default function DrawingPreviewScreen() {
       <Stack.Screen options={{ title: name, headerLargeTitle: false }} />
       <MeshReview
         title={name}
-        mesh={preview.data}
+        mesh={mesh}
         loading={preview.loading}
         error={preview.error}
         onRetry={() => void preview.reload()}
