@@ -75,6 +75,7 @@ import { AnalyticsRepo } from "./repos/analytics-repo.ts"
 import { EventsHandlers } from "./http/events.ts"
 import { WorkspaceHandlers } from "./http/workspace.ts"
 import { LiveEvents } from "./services/live-events.ts"
+import { AssistantTurns } from "./services/assistant-turns.ts"
 
 /** Every group handler; add new route families here as they are implemented. */
 export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CadExactHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers, WorkspaceHandlers)
@@ -109,7 +110,7 @@ const VcsServices = WorkflowServiceStepsLive.pipe(
  * `LocalProfile` are absent on purpose: `VcsServices` provides them, because `WorkflowRunner` and the
  * steps it registers need them, and a service provided twice would be built twice.
  */
-const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, LibraryRepo.layer, MachineConfigRepo.layer, StorageService.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, IdentityOAuth.layer, Identity.layer.pipe(Layer.provide(AuthRepo.layer)), FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, PaymentProvider.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, LiveEvents.layer, Companion.layer.pipe(Layer.provide(KvStore.layer)))
+const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, LibraryRepo.layer, MachineConfigRepo.layer, StorageService.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, IdentityOAuth.layer, Identity.layer.pipe(Layer.provide(AuthRepo.layer)), FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, PaymentProvider.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, LiveEvents.layer, AssistantTurns.layer, Companion.layer.pipe(Layer.provide(KvStore.layer)))
 
 /** Repositories plus the AI layer (credentials, direct model, optional nikcli host, tool handlers). */
 export const Services = AiLive.pipe(Layer.provideMerge(BridgeTokens.layer.pipe(Layer.provideMerge(RepoServices))))

@@ -253,6 +253,21 @@ const bridgeTokenParam = { id: Schema.String }
 const message = Schema.Struct({ message: Schema.String })
 const providerParam = { provider: Schema.String }
 const chatEvents = Schema.Union([AiStreamEventSchema, Schema.Struct({ type: Schema.Literal("heartbeat") })])
+/** `POST /api/ai/sessions/prompt`: the turn runs on the desktop; the phone follows it on the session stream. */
+export const SessionPromptReply = Schema.Struct({ sessionId: Schema.String, /** Journal cursor just before this turn: follow the session stream with `after` = seq. */ seq: Schema.Number })
+/** One frame of `GET /api/ai/sessions/:sessionId/stream` (spec 13 §5, nikcli mobile session stream). */
+export const SessionStreamFrame = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("server.connected"), sessionId: Schema.String, busy: Schema.Boolean,
+    /** Last journal sequence number; the next `after` to resume from. */
+    seq: Schema.Number,
+    /** The journal no longer covers the requested `after`: re-read `sessions/state` instead of resuming. */
+    reset: opt(Schema.Boolean)
+  }),
+  Schema.Struct({ type: Schema.Literal("server.heartbeat") }),
+  Schema.Struct({ type: Schema.Literal("event"), seq: Schema.Number, event: AiStreamEventSchema })
+])
+export type SessionStreamFrame = typeof SessionStreamFrame.Type
 
 export class AiGroup extends HttpApiGroup.make("ai")
   .add(
@@ -293,6 +308,11 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.post("chat", "/api/ai/chat", { payload: LegacyChatBody, success: LegacyChatReply, error: [AiBadRequest, AiNotFound, AiFailure] }),
     HttpApiEndpoint.post("chatStream", "/api/ai/chat/stream", {
       payload: StreamChatBody, success: HttpApiSchema.StreamSse({ data: chatEvents }), error: [BadRequest, InternalError]
+    }),
+    HttpApiEndpoint.post("sessionPrompt", "/api/ai/sessions/prompt", { payload: StreamChatBody, success: SessionPromptReply, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.get("sessionStream", "/api/ai/sessions/:sessionId/stream", {
+      params: { sessionId: Schema.String }, query: { after: Schema.optional(Schema.NumberFromString) },
+      success: HttpApiSchema.StreamSse({ data: SessionStreamFrame }), error: [BadRequest, InternalError]
     }),
     HttpApiEndpoint.post("chatQueue", "/api/ai/chat/queue", { payload: QueueBody, success: message, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("chatAbort", "/api/ai/chat/abort", { payload: AbortBody, success: message, error: [BadRequest, InternalError] }),

@@ -22,47 +22,45 @@ export interface OfflineAssistantOp {
 export const outboxKey = (op: OfflineAssistantOp): string => op.id ?? JSON.stringify([op.queuedAt, op.projectId, op.text])
 export const newMobileSessionId = (): string => `s-mobile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 
-/** Serial delivery preserves conversation order; checkpoints survive suspension or process death. */
+/**
+ * Serial delivery preserves conversation order; checkpoints survive suspension or process death.
+ * nikcli mobile architecture: a queued message is delivered by `sessions/prompt`, which returns as soon as the desktop
+ * owns the turn, and the conversation shows it from the session stream. A checkpointed (`submitted`) message whose
+ * delivery is uncertain is never posted again: it may already be running on the desktop.
+ */
 export async function deliverOutbox(
   queue: readonly OfflineAssistantOp[],
   deps: {
-    client: Pick<CompanionClient, "chat" | "resumeChat">
+    client: Pick<CompanionClient, "promptSession">
     fingerprint: string
     active(): boolean
     save(previous: OfflineAssistantOp, next: OfflineAssistantOp | null): Promise<void>
     session(projectId: string): string | undefined
     remember(projectId: string, sessionId: string): void
+    /** True when the request certainly never reached the desktop (no route, radio off). */
+    unsent?(error: unknown): boolean
   },
 ): Promise<number> {
   let sent = 0
   for (const op of queue) {
     if (!deps.active()) break
     if (op.desktopFingerprint && op.desktopFingerprint !== deps.fingerprint) continue
-    const sessionId = (op.submitted ? op.sessionId : deps.session(op.projectId) ?? op.sessionId) ?? newMobileSessionId()
-    let receipt: OfflineAssistantOp = { ...op, submitted: true, sessionId }
+    if (op.submitted) {
+      // Uncertain delivery: the session read shows whether it ran; resending could repeat a CAD/CAM change.
+      await deps.save(op, null)
+      continue
+    }
+    const sessionId = deps.session(op.projectId) ?? op.sessionId
+    const receipt: OfflineAssistantOp = { ...op, submitted: true, ...(sessionId ? { sessionId } : {}) }
     await deps.save(op, receipt)
     try {
-      const events = op.submitted
-        ? deps.client.resumeChat(sessionId)
-        : deps.client.chat({ projectId: op.projectId, message: op.text, sessionId: receipt.sessionId, agent: op.agent, mode: op.mode ?? "general", model: op.model, permissionMode: op.permissionMode, includeContext: op.includeContext })
-      let completed = false
-      for await (const event of events) {
-        if (typeof event.sessionId === "string" && event.sessionId) {
-          deps.remember(op.projectId, event.sessionId)
-          if (receipt.sessionId !== event.sessionId) {
-            const next = { ...receipt, sessionId: event.sessionId }
-            await deps.save(receipt, next)
-            receipt = next
-          }
-        }
-        if (event.type === "error") throw new Error(typeof event.message === "string" ? event.message : "Assistant failed")
-        if (event.type === "done") { completed = true; break }
-      }
-      if (!completed) break
+      const started = await deps.client.promptSession({ projectId: op.projectId, message: op.text, ...(sessionId ? { sessionId } : {}), agent: op.agent, mode: op.mode ?? "general", model: op.model, permissionMode: op.permissionMode, includeContext: op.includeContext })
+      deps.remember(op.projectId, started.sessionId)
       await deps.save(receipt, null)
       sent += 1
-    } catch {
-      // Later messages must not overtake a turn whose result is still unknown.
+    } catch (error) {
+      if (deps.unsent?.(error)) await deps.save(receipt, { ...op })
+      // Later messages must not overtake one whose delivery is still unknown.
       break
     }
   }

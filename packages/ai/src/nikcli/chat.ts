@@ -411,10 +411,12 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           { type: "text", text: input.message },
           ...(input.files ?? []).map((f) => ({ type: "file" as const, mime: f.mime, filename: f.filename, url: f.url }))
         ]
+        // Evidence only: a host without the read (or one that throws synchronously) must not turn a healthy prompt into an error.
+        const readMessages = (limit: number) => Promise.resolve().then(() => host.client.session.messages({ sessionID: sessionId, limit })).catch(() => undefined)
         let beforePrompt: string | undefined
         let beforePromptKnown = false
         const recoverInterruption = async (): Promise<"retry" | "finished"> => {
-          const messages = await host.client.session.messages({ sessionID: sessionId, limit: 40 }).catch(() => undefined)
+          const messages = await readMessages(40)
           const progressed = beforePromptKnown && messages !== undefined && messages.at(-1)?.info.id !== beforePrompt
           const current = progressed ? await Effect.runPromise(readHostSessionState(host, sessionId)).catch(() => undefined) : undefined
           // Prompt waiters can be rejected after the host already saved a complete answer.
@@ -476,7 +478,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         for (;;) {
           let result: HostPromptResult
           try {
-            const snapshot = await host.client.session.messages({ sessionID: sessionId, limit: 1 }).catch(() => undefined)
+            const snapshot = await readMessages(1)
             beforePromptKnown = snapshot !== undefined
             beforePrompt = snapshot?.at(-1)?.info.id
             usedGoalCommand = false

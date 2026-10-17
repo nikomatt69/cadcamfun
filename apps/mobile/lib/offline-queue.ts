@@ -77,6 +77,7 @@ async function drainQueue(pairing: Pairing, onSent?: (sent: number) => void): Pr
     active: () => AppState.currentState === "active",
     session: (projectId) => useUIStore.getState().assistantSessions[projectId],
     remember: (projectId, sessionId) => useUIStore.getState().setAssistantSession(projectId, sessionId),
+    unsent: isOfflineSendError,
     save: async (previous, next) => {
       await mutateStored(readQueue, writeOfflineQueueRaw, (current) => current.flatMap((entry) => outboxKey(entry) === outboxKey(previous) ? next ? [next] : [] : [entry]))
     },

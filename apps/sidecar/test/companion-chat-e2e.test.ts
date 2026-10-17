@@ -30,6 +30,9 @@ beforeAll(async () => {
   // drawing: it opens a branch, edits, commits and opens a pull request, then reports. Turns without tools are helper calls.
   fake = startFakeOpenAi((request) => {
     if (JSON.stringify(request.messages.findLast((message) => message.role === "user")?.content).includes("Mobile greeting regression")) return { text: "Hello from the desktop assistant." }
+    if (JSON.stringify(request.messages).includes("Mobile stream regression")) return request.messages.some((message) => message.role === "tool")
+      ? { text: "Stock confirmed after the phone reconnected." }
+      : { toolCalls: [{ name: "question", args: { questions: [{ header: "Stock", question: "Choose stock", options: [{ label: "Aluminium", description: "Use aluminium stock" }] }] } }] }
     if (JSON.stringify(request.messages).includes("Mobile question regression")) return request.messages.some((message) => message.role === "tool")
       ? { text: "Stock confirmed from the phone." }
       : { toolCalls: [{ name: "question", args: { questions: [{ header: "Stock", question: "Choose stock", options: [{ label: "Aluminium", description: "Use aluminium stock" }] }] } }] }
@@ -192,5 +195,48 @@ describe("the assistant from the phone", () => {
     }
     expect(events.filter((event) => event.type === "question_request")).toHaveLength(1)
     expect(events.at(-1)).toMatchObject({ type: "done", text: "Stock confirmed from the phone.", recovered: true })
+  })
+
+  test("nikcli mobile architecture: the prompt returns at once, the turn outlives the phone's stream, and a reconnect replays exactly what was missed", async () => {
+    const project = await (await local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Session stream" }) })).json()
+    const started = await phone.promptSession({ projectId: project.id, message: "Mobile stream regression: choose stock", agent: "general" })
+    expect(started.sessionId).toMatch(/^ses_/)
+
+    // First connection: follow until the agent asks a question, then the phone goes away mid-turn.
+    const first = new AbortController()
+    let cursor = started.seq
+    let requestId = ""
+    const seen: string[] = []
+    for await (const frame of phone.sessionStream(started.sessionId, started.seq, first.signal)) {
+      if (frame.type === "server.connected") { expect(frame.busy).toBe(true); continue }
+      if (frame.type !== "event") continue
+      expect(frame.seq).toBeGreaterThan(cursor)
+      cursor = frame.seq
+      seen.push(frame.event.type)
+      if (frame.event.type === "question_request") { requestId = String((frame.event as { requestId: string }).requestId); first.abort(); break }
+    }
+    expect(seen[0]).toBe("turn")
+    expect(requestId).not.toBe("")
+
+    // With no stream open, the phone answers; the desktop finishes the turn on its own.
+    await phone.questionReply(started.sessionId, requestId, [["Aluminium"]])
+    for (let attempt = 0; attempt < 100 && (await phone.sessionState(started.sessionId)).busy; attempt += 1) await Bun.sleep(100)
+
+    // Reconnect from the cursor: only the missed frames, in order, ending with the answer; nothing replayed twice.
+    const second = new AbortController()
+    const replay: Array<{ seq: number; type: string; text?: string }> = []
+    let greeting: { busy: boolean; reset?: boolean } | undefined
+    for await (const frame of phone.sessionStream(started.sessionId, cursor, second.signal)) {
+      if (frame.type === "server.connected") { greeting = frame; continue }
+      if (frame.type !== "event") continue
+      replay.push({ seq: frame.seq, type: frame.event.type, ...("text" in frame.event ? { text: String(frame.event.text) } : {}) })
+      if (frame.event.type === "done" || frame.event.type === "error") { second.abort(); break }
+    }
+    // The journal still owns the turn (the host may look idle between the answer and the next step); the end arrives live.
+    expect(greeting).toBeDefined()
+    expect(greeting?.reset).toBeUndefined()
+    expect(replay.every((frame) => frame.seq > cursor)).toBe(true)
+    expect(replay.some((frame) => frame.type === "question_request")).toBe(false)
+    expect(replay.at(-1)).toMatchObject({ type: "done", text: "Stock confirmed after the phone reconnected." })
   })
 })

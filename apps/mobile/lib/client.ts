@@ -1,3 +1,4 @@
+import type { SessionStreamFrame } from "@cadcamfun/api"
 import type { ComponentPreview, EntityChange, LibraryCatalogue, LiveEvent, MeshPreview, NotificationRow, PullRequestRow, ReviewRow, SessionControlReply, SessionStateReply, ToolpathPreview, ToolpathReview, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow, WorkspaceEntry } from "@cadcamfun/api"
 import type { Pairing } from "./pairing"
 import type { AssistantPreferences, AssistantProvider } from "./assistant-preferences"
@@ -61,6 +62,18 @@ export interface PullRequestDetail {
  * in the phone bundle — types only from `@cadcamfun/api`), through the pinned transport. Only the
  * companion-gateway allow-list routes are reachable; everything else answers 403.
  */
+/** One assistant message as the desktop's chat endpoints take it. */
+export interface ChatRequest {
+  projectId: string
+  message?: string
+  sessionId?: string
+  agent?: string
+  mode?: "general" | "cad" | "cam" | "gcode" | "toolpath"
+  model?: AssistantPreferences["model"]
+  permissionMode?: AssistantPreferences["permissionMode"]
+  includeContext?: boolean
+}
+
 export class CompanionClient {
   constructor(private readonly transport: Transport) {}
 
@@ -162,7 +175,7 @@ export class CompanionClient {
    * never touching `main`. Passing a `sessionId` continues the same conversation as the desktop.
    */
   async *chat(
-    body: { projectId: string; message?: string; sessionId?: string; agent?: string; mode?: "general" | "cad" | "cam" | "gcode" | "toolpath"; model?: AssistantPreferences["model"]; permissionMode?: AssistantPreferences["permissionMode"]; includeContext?: boolean },
+    body: ChatRequest,
     signal?: AbortSignal,
   ): AsyncGenerator<ChatEvent> {
     const parse = sseParser<ChatEvent>()
@@ -185,6 +198,25 @@ export class CompanionClient {
       if (!sessionId) throw error
       // Read the desktop's existing turn. Replaying the POST could repeat CAD/CAM changes.
       yield* this.resumeChat(sessionId, signal)
+    }
+  }
+
+  /**
+   * nikcli mobile architecture (spec 13 §5): start the turn on the desktop and return at once. The desktop runs it
+   * whatever happens to this connection; follow it with `sessionStream`. Never retried: an uncertain delivery is
+   * recovered by reading the session, not by sending the message again.
+   */
+  promptSession = (body: ChatRequest) => this.request<{ sessionId: string; seq: number }>("POST", "/api/ai/sessions/prompt", body)
+
+  /** The long-lived per-session SSE stream: `server.connected`, the events after `after`, then live events and heartbeats. */
+  async *sessionStream(sessionId: string, after: number | undefined, signal?: AbortSignal): AsyncGenerator<SessionStreamFrame> {
+    const parse = sseParser<SessionStreamFrame>()
+    const query = after === undefined ? "" : `?after=${encodeURIComponent(String(after))}`
+    for await (const chunk of this.transport.stream(`/api/ai/sessions/${encodeURIComponent(sessionId)}/stream${query}`, "GET", undefined, signal)) {
+      if (signal?.aborted) return
+      for (const frame of parse(chunk)) {
+        if (frame && typeof frame === "object" && typeof frame.type === "string") yield frame
+      }
     }
   }
 

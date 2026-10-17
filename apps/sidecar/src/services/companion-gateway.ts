@@ -130,7 +130,9 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["GET"], path: /^\/api\/ai\/models$/ },
   { methods: ["GET"], path: /^\/api\/ai\/providers$/ },
   { methods: ["GET"], path: /^\/api\/ai\/agents$/ },
-  { methods: ["POST"], path: /^\/api\/ai\/(chat\/stream|chat\/abort|chat\/queue|permission\/reply|sessions\/state|sessions\/control)$/ },
+  { methods: ["POST"], path: /^\/api\/ai\/(chat\/stream|chat\/abort|chat\/queue|permission\/reply|sessions\/state|sessions\/control|sessions\/prompt)$/ },
+  // The phone's per-session SSE stream (spec 13 §5); the handler checks the session owner and project.
+  { methods: ["GET"], path: /^\/api\/ai\/sessions\/[^/]+\/stream$/ },
 ]
 
 export const isCompanionRoute = (method: string, pathname: string): boolean =>

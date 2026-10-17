@@ -15,6 +15,8 @@ import { appendChatEvent, answerRequest, emptyLog, lastUserPrompt, transcriptTex
 import { activityLabel, idleActivity, reduceTurnActivity, type TurnActivity } from "@/lib/turn-activity"
 import { PlanCard, NoticeRow } from "@/components/chat/PlanCard"
 import { enqueueAssistantOp } from "@/lib/offline-queue"
+import { CompanionError } from "@/lib/client"
+import { followSession } from "@/lib/session-stream"
 import { Composer, type AssistantMode } from "@/components/chat/Composer"
 import { MessageBubble } from "@/components/chat/MessageBubble"
 import { ToolCallRow } from "@/components/chat/ToolCallRow"
@@ -104,7 +106,14 @@ export default function AssistantScreen() {
   draftRef.current = draft
 
   const sessionRef = useRef<string | undefined>(undefined)
-  const runningRef = useRef<AbortController | null>(null)
+  /** A prompt POST in flight; the turn itself is owned by the desktop and followed on the session stream. */
+  const posting = useRef(false)
+  /** Last journal sequence seen per session: a new follower resumes from it instead of replaying the conversation. */
+  const cursors = useRef(new Map<string, number>())
+  const [followed, setFollowed] = useState<string | undefined>()
+  const [link, setLink] = useState<"idle" | "connecting" | "live" | "reconnecting">("idle")
+  const [screenFocused, setScreenFocused] = useState(false)
+  const [appActive, setAppActive] = useState(AppState.currentState === "active")
   const listRef = useRef<FlatList<ChatRow>>(null)
   const generation = useRef(0)
   const stopping = useRef(false)
@@ -141,13 +150,11 @@ export default function AssistantScreen() {
     setActivity(idleActivity)
     setBusy(false)
     stopping.current = false
+    // Opening a conversation follows its desktop session; leaving it only closes the stream, never the turn.
+    setFollowed(sessionRef.current)
     return () => {
       logs.current.set(key, logRef.current)
       generation.current += 1
-      if (runningRef.current) {
-        runningRef.current.abort()
-        runningRef.current = null
-      }
     }
   }, [projectId, client])
 
@@ -164,8 +171,75 @@ export default function AssistantScreen() {
     clearAssistantDraft()
   }, [draft, projectId, clearAssistantDraft])
 
+  /**
+   * Re-reads the desktop session once (nikcli `onReconnect`): stored tool results, the final answer of a finished turn
+   * and pending approvals/questions. Used when the stream cannot prove nothing was missed.
+   */
+  const syncSession = useCallback(async (sessionId: string, signal?: AbortSignal) => {
+    if (!client) return
+    const version = generation.current
+    try {
+      const [state, controls] = await Promise.all([client.sessionState(sessionId, signal), client.sessionControls(sessionId, signal)])
+      if (signal?.aborted || version !== generation.current || sessionRef.current !== sessionId) return
+      for (const event of state.events ?? []) apply(event)
+      for (const permission of controls.permissions ?? []) apply({ type: "permission_request", ...permission })
+      for (const question of controls.questions) apply({ type: "question_request", sessionId, ...question })
+      setBusy(state.busy)
+      if (!state.busy && (state.text || state.error)) {
+        apply(state.error
+          ? { type: "error", sessionId, code: "provider", message: state.error }
+          : { type: "done", sessionId, text: state.text, recovered: true, ...(state.usage ? { usage: state.usage } : {}) })
+      }
+    } catch (error) {
+      if (!signal?.aborted && version === generation.current) toast(error instanceof Error ? error.message : "Could not read the desktop conversation", "error")
+    }
+  }, [client])
+
+  // Focus and foreground decide whether a stream is open; the desktop turn runs regardless.
+  useFocusEffect(useCallback(() => {
+    setScreenFocused(true)
+    return () => setScreenFocused(false)
+  }, []))
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"))
+    return () => subscription.remove()
+  }, [])
+
+  // The session stream: one per open conversation, like nikcli mobile's `useSessionStream`.
+  useEffect(() => {
+    const sessionId = followed
+    if (!client || !sessionId || !screenFocused || !appActive || connectivity !== "online") { setLink("idle"); return }
+    const controller = new AbortController()
+    setLink("connecting")
+    void followSession({
+      after: cursors.current.get(sessionId),
+      signal: controller.signal,
+      open: (after, signal) => client.sessionStream(sessionId, after, signal),
+      onConnected: (frame, reconnected) => {
+        setLink("live")
+        setBusy(frame.busy)
+        const known = cursors.current.has(sessionId)
+        if (frame.reset || !known) cursors.current.set(sessionId, frame.seq)
+        // No cursor (app restarted, conversation reopened) or a gap the desktop can no longer replay: read the session.
+        if (frame.reset || !known) void syncSession(sessionId, controller.signal)
+        else if (reconnected) haptic("selection")
+      },
+      onEvent: (event, seq) => {
+        cursors.current.set(sessionId, seq)
+        if (sessionRef.current !== sessionId) return
+        if (event.type === "turn" && event.phase === "start") setBusy(true)
+        if (event.type === "permission_request") haptic("warning")
+        if (event.type === "done") { haptic("success"); setBusy(false) }
+        if (event.type === "error") { haptic("error"); setBusy(false) }
+        apply(event as LogEvent)
+      },
+      onDisconnected: () => { if (!controller.signal.aborted) setLink("reconnecting") },
+    }).finally(() => { if (!controller.signal.aborted) setLink("idle") })
+    return () => controller.abort()
+  }, [client, followed, screenFocused, appActive, connectivity, syncSession])
+
   const send = async (text: string) => {
-    if (!client || !projectId || runningRef.current || stopping.current) return
+    if (!client || !projectId || posting.current || stopping.current) return
     if (connectivity !== "online") {
       apply({ type: "user", text })
       await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
@@ -174,97 +248,48 @@ export default function AssistantScreen() {
       return
     }
     const version = ++generation.current
-    sessionRef.current ??= `s-mobile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-    setAssistantSession(projectId, sessionRef.current)
-    const controller = new AbortController()
-    runningRef.current = controller
+    posting.current = true
     setBusy(true)
     // A new turn starts its own meter; steering (queue) keeps the running one.
     setActivity(idleActivity)
     apply({ type: "user", text })
-
     try {
-      for await (const event of client.chat(
-        { projectId, message: text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext },
-        controller.signal,
-      )) {
-        if (controller.signal.aborted || version !== generation.current) break
-        if ("sessionId" in event && typeof event.sessionId === "string" && event.sessionId) {
-          sessionRef.current = event.sessionId
-          setAssistantSession(projectId, event.sessionId)
-        }
-        if (event.type === "permission_request") haptic("warning")
-        if (event.type === "done") haptic("success")
-        if (event.type === "error") haptic("error")
-        apply(event)
-      }
+      // The desktop owns the turn from here; this answers as soon as the host session exists.
+      const started = await client.promptSession({ projectId, message: text, ...(sessionRef.current ? { sessionId: sessionRef.current } : {}), agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
+      if (version !== generation.current) return
+      sessionRef.current = started.sessionId
+      setAssistantSession(projectId, started.sessionId)
+      // A follower already on this session keeps its own cursor; a new one replays the turn from its first event.
+      if (followed !== started.sessionId) cursors.current.set(started.sessionId, started.seq)
+      setFollowed(started.sessionId)
     } catch (error) {
       if (version !== generation.current) return
-      if (controller.signal.aborted) {
-        haptic("selection")
-      } else {
-        haptic("error")
-        const message = error instanceof Error ? error.message : "The assistant did not answer"
-        apply({ type: "error", sessionId: sessionRef.current ?? "", code: "internal", message })
-      }
+      setBusy(false)
+      haptic("error")
+      const uncertain = error instanceof CompanionError && error.status === 0
+      const message = uncertain
+        ? "The desktop did not confirm this message. It was not sent again: the conversation will show whether it ran."
+        : error instanceof Error ? error.message : "The assistant did not start"
+      apply({ type: "error", sessionId: sessionRef.current ?? "", code: "internal", message })
+      if (uncertain && sessionRef.current) void syncSession(sessionRef.current)
     } finally {
-      if (version === generation.current) { setBusy(false); runningRef.current = null }
+      posting.current = false
     }
   }
-
-  const recover = useCallback(async () => {
-    const sessionId = sessionRef.current
-    if (!client || !projectId || !sessionId || runningRef.current || stopping.current) return
-    const version = ++generation.current
-    const controller = new AbortController()
-    runningRef.current = controller
-    setBusy(true)
-    try {
-      for await (const event of client.resumeChat(sessionId, controller.signal)) {
-        if (version !== generation.current || controller.signal.aborted) return
-        apply(event)
-      }
-    } catch (error) {
-      if (version === generation.current && !controller.signal.aborted) {
-        apply({ type: "error", sessionId, code: "internal", message: error instanceof Error ? error.message : "Could not recover the desktop answer" })
-      }
-    } finally {
-      if (version === generation.current) { setBusy(false); runningRef.current = null }
-    }
-  }, [client, projectId])
-
-  useFocusEffect(useCallback(() => {
-    void recover()
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void recover()
-      else {
-        generation.current += 1
-        runningRef.current?.abort()
-        runningRef.current = null
-        setBusy(false)
-      }
-    })
-    return () => {
-      subscription.remove()
-      generation.current += 1
-      runningRef.current?.abort()
-      runningRef.current = null
-    }
-  }, [recover]))
 
   const stop = () => {
     if (stopping.current) return
     haptic("selection")
-    const version = ++generation.current
-    runningRef.current?.abort()
-    runningRef.current = null
+    const version = generation.current
     stopping.current = true
     const sessionId = sessionRef.current
+    // The session stream delivers the turn's end; only this request stops the desktop.
     const stopped = sessionId && client ? client.abortChat(sessionId) : Promise.resolve()
     void stopped.catch((error: unknown) => {
       if (version === generation.current) toast(error instanceof Error ? error.message : "Could not stop the desktop turn", "error")
     }).finally(() => {
-      if (version === generation.current) { stopping.current = false; setBusy(false) }
+      stopping.current = false
+      if (!sessionId) setBusy(false)
     })
   }
 
@@ -321,9 +346,8 @@ export default function AssistantScreen() {
   const newConversation = () => {
     if (!projectId) return
     generation.current += 1
-    runningRef.current?.abort()
-    runningRef.current = null
     sessionRef.current = undefined
+    setFollowed(undefined)
     useUIStore.getState().startAssistantConversation(projectId)
     logs.current.delete(`${config?.fingerprint ?? ""}|${projectId}`)
     setLog(emptyLog)
@@ -360,7 +384,7 @@ export default function AssistantScreen() {
         return (
           <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
             <Text selectable style={{ color: palette.danger, fontSize: 13, lineHeight: 18, textAlign: "center" }}>{item.message}</Text>
-            {!busy && sessionRef.current ? <ActionButton label="Recover desktop answer" variant="ghost" onPress={() => void recover()} /> : null}
+            {!busy && sessionRef.current ? <ActionButton label="Refresh conversation" variant="ghost" onPress={() => void syncSession(sessionRef.current!)} /> : null}
             {/* Never resent automatically: the prompt may have already changed the model on the desktop. */}
             {!busy && lastUserPrompt(log) ? <ActionButton label="Edit last message" variant="ghost" onPress={() => reuse(lastUserPrompt(log)!)} /> : null}
           </View>
@@ -483,7 +507,7 @@ export default function AssistantScreen() {
         onSend={(text) => void send(text)}
         onQueue={(text) => void queue(text)}
         onStop={stop}
-        status={activityLabel(activity)}
+        status={link === "reconnecting" ? "Reconnecting to the desktop… the turn keeps running there" : link === "connecting" && busy ? "Connecting to the desktop…" : activityLabel(activity)}
         seed={promptSeed?.projectId === projectId ? promptSeed.text : undefined}
         seedToken={promptSeed?.projectId === projectId ? promptSeed.token : undefined}
       />

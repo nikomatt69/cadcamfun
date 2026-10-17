@@ -1,6 +1,6 @@
 import { withHeartbeat, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, isolatedPaths, readModIndex, removeMod, replyHostPermission, setModEnabled, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
-  AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError
+  AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError, StreamChatBody
 } from "@cadcamfun/api"
 import { Effect, Option, Redacted, Stream } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -10,6 +10,7 @@ import { join } from "node:path"
 import { AppConfigService } from "../config.ts"
 import { KvStore } from "../services/kv.ts"
 import { ActingUser } from "../services/acting-user.ts"
+import { AssistantTurns } from "../services/assistant-turns.ts"
 import { AiActions } from "../services/ai.ts"
 import { ToolRegistry } from "@cadcamfun/ai"
 import { AiPlugins } from "../services/ai-plugins.ts"
@@ -43,6 +44,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const registry = yield* ToolRegistry
   const actions = yield* AiActions
   const bridgeTokens = yield* BridgeTokens
+  const turns = yield* AssistantTurns
   /** The scoped grant of the bearer on this request, or undefined for the application's own token. */
   const bridgeGrant = Effect.gen(function*() {
     const request = yield* HttpServerRequest.HttpServerRequest
@@ -78,6 +80,34 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     }
     yield* checkProject(owner.projectId)
     return owner.projectId
+  })
+  /** One chat turn exactly as `chat/stream` runs it: checks, context, model, failures as an `error` event. */
+  const turnOf = Effect.fn("AiHttp.turnOf")(function*(payload: typeof StreamChatBody.Type) {
+    if (!payload.message || !payload.message.trim()) return yield* new BadRequest({ message: "Message is required" })
+    // The tools of this turn act as the account that sent it (the signed-in user, or the local profile).
+    const actor = yield* CurrentUser
+    yield* checkProject(payload.projectId)
+    yield* checkDrawing(payload.projectId, payload.drawingId)
+    if (payload.sessionId) {
+      const owner = yield* Effect.tryPromise({ try: () => actingUser.owner(payload.sessionId!), catch: () => new BadRequest({ message: "Unable to verify session owner" }) })
+      if (owner && (owner.userId !== actor.id || owner.projectId !== (payload.projectId ?? "default"))) return yield* new BadRequest({ message: "Session not found or inaccessible" })
+    }
+    const context = yield* contextFor(payload)
+    return ai.chat({
+      message: payload.message,
+      admitSession: (projectId, sessionId) => actingUser.bind(projectId, sessionId, actor, payload.message, payload.drawingId),
+      ...(payload.permissionMode ? { permissionMode: payload.permissionMode } : {}),
+      ...(payload.agent ? { agent: payload.agent } : {}),
+      ...(payload.mode ? { mode: payload.mode } : {}),
+      ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
+      ...(payload.projectId ? { projectId: payload.projectId } : {}),
+      ...(context ? { context } : {}),
+      ...(payload.model ? { model: payload.model } : {}),
+      ...(payload.attachments && payload.attachments.length > 0 ? { attachments: payload.attachments } : {})
+    }).pipe(Stream.catch((e) => Stream.succeed({
+      type: "error" as const, sessionId: payload.sessionId ?? "", code: e._tag === "AiConfigError" ? "config" as const : e._tag === "AiAborted" ? "aborted" as const : "provider" as const,
+      message: aiError(e)
+    })))
   })
   const skillStore = createUserSkillStore(join(appConfig.dataDir, "ai", "skills"))
   const skillInfos = Effect.promise(async () => {
@@ -307,32 +337,15 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       if (!revoked) return yield* new BadRequest({ message: "No such bridge token" })
       return { message: "Revoked" }
     }))
-    .handle("chatStream", ({ payload }) => Effect.gen(function*() {
-      if (!payload.message || !payload.message.trim()) return yield* new BadRequest({ message: "Message is required" })
-      // The tools of this turn act as the account that sent it (the signed-in user, or the local profile).
-      const actor = yield* CurrentUser
-      yield* checkProject(payload.projectId)
-      yield* checkDrawing(payload.projectId, payload.drawingId)
-      if (payload.sessionId) {
-        const owner = yield* Effect.tryPromise({ try: () => actingUser.owner(payload.sessionId!), catch: () => new BadRequest({ message: "Unable to verify session owner" }) })
-        if (owner && (owner.userId !== actor.id || owner.projectId !== (payload.projectId ?? "default"))) return yield* new BadRequest({ message: "Session not found or inaccessible" })
-      }
-      const context = yield* contextFor(payload)
-      return withHeartbeat(ai.chat({
-        message: payload.message,
-        admitSession: (projectId, sessionId) => actingUser.bind(projectId, sessionId, actor, payload.message, payload.drawingId),
-        ...(payload.permissionMode ? { permissionMode: payload.permissionMode } : {}),
-        ...(payload.agent ? { agent: payload.agent } : {}),
-        ...(payload.mode ? { mode: payload.mode } : {}),
-        ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
-        ...(payload.projectId ? { projectId: payload.projectId } : {}),
-        ...(context ? { context } : {}),
-        ...(payload.model ? { model: payload.model } : {}),
-        ...(payload.attachments && payload.attachments.length > 0 ? { attachments: payload.attachments } : {})
-      }).pipe(Stream.catch((e) => Stream.succeed({
-        type: "error" as const, sessionId: payload.sessionId ?? "", code: e._tag === "AiConfigError" ? "config" as const : e._tag === "AiAborted" ? "aborted" as const : "provider" as const,
-        message: aiError(e)
-      }))))
+    .handle("chatStream", ({ payload }) => Effect.map(turnOf(payload), (turn) => withHeartbeat(turn)))
+    // nikcli mobile architecture (spec 13 §5): the prompt starts a detached turn, the phone follows the session stream.
+    .handle("sessionPrompt", ({ payload }) => Effect.gen(function*() {
+      const turn = yield* turnOf(payload)
+      return yield* turns.start(turn, payload.sessionId)
+    }))
+    .handle("sessionStream", ({ params, query }) => Effect.gen(function*() {
+      yield* controlProject(params.sessionId)
+      return yield* turns.follow(params.sessionId, query.after)
     }))
     .handle("sessionState", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })

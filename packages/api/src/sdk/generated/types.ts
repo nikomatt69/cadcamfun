@@ -554,6 +554,34 @@ export type AiChatStreamPayload = {
     | undefined
 }
 
+export type AiSessionPromptPayload = {
+  readonly permissionMode?: "auto" | "ask" | "approve" | undefined
+  readonly agent?: string | undefined
+  readonly mode?: string | undefined
+  readonly attachments?:
+    | ReadonlyArray<{
+        readonly name: string
+        readonly mime?: string | undefined
+        readonly data: string
+        readonly encoding?: "base64" | "text" | undefined
+      }>
+    | undefined
+  readonly message?: string | undefined
+  readonly sessionId?: string | undefined
+  readonly projectId?: string | undefined
+  readonly drawingId?: string | undefined
+  readonly context?: string | undefined
+  readonly includeContext?: boolean | undefined
+  readonly model?:
+    | {
+        readonly provider?: string | undefined
+        readonly model?: string | undefined
+        readonly tier?: "fast" | "balanced" | "best" | undefined
+        readonly variant?: string | undefined
+      }
+    | undefined
+}
+
 export type AiChatQueuePayload = {
   readonly sessionId: string
   readonly message: string
@@ -2811,6 +2839,128 @@ export type AiChatStreamOutput =
     }
   | { type: "error"; sessionId: string; code: "provider" | "config" | "aborted" | "internal"; message: string }
   | { type: "heartbeat" }
+
+export type AiSessionPromptInput = {
+  readonly permissionMode?: AiSessionPromptPayload["permissionMode"]
+  readonly agent?: AiSessionPromptPayload["agent"]
+  readonly mode?: AiSessionPromptPayload["mode"]
+  readonly attachments?: AiSessionPromptPayload["attachments"]
+  readonly message?: AiSessionPromptPayload["message"]
+  readonly sessionId?: AiSessionPromptPayload["sessionId"]
+  readonly projectId?: AiSessionPromptPayload["projectId"]
+  readonly drawingId?: AiSessionPromptPayload["drawingId"]
+  readonly context?: AiSessionPromptPayload["context"]
+  readonly includeContext?: AiSessionPromptPayload["includeContext"]
+  readonly model?: AiSessionPromptPayload["model"]
+}
+
+export type AiSessionPromptOutput = { sessionId: string }
+
+export type AiSessionStreamInput = {
+  readonly sessionId: { readonly sessionId: string }["sessionId"]
+  readonly after?: { readonly after?: number | undefined }["after"]
+}
+
+export type AiSessionStreamOutput =
+  | { type: "server.connected"; sessionId: string; busy: boolean; seq: number; reset?: boolean | undefined }
+  | { type: "server.heartbeat" }
+  | {
+      type: "event"
+      seq: number
+      event:
+        | { type: "turn"; sessionId: string; phase: "start" | "recovering" | "continuing" | "finish"; reason?: string }
+        | { type: "session_status"; sessionId: string; status: "busy" | "idle" | "retry" }
+        | { type: "permission_resolved"; sessionId: string; requestId: string; reply: "once" | "always" | "reject" }
+        | { type: "permission_blocked"; sessionId: string; permission: string; patterns: Array<string>; reason: string }
+        | { type: "compaction"; sessionId: string; phase: "start" | "finish" }
+        | { type: "context_snapshot"; sessionId: string; projectId: string; source: "workspace"; chars: number }
+        | {
+            type: "tool_diagnostic"
+            sessionId: string
+            agent?: string
+            callId: string
+            tool: string
+            kind: "argument" | "execution" | "partial" | "verification"
+            severity: "error" | "warning" | "info"
+            message: string
+            recovery?: string
+            mutationApplied?: boolean
+          }
+        | { type: "user_message"; sessionId: string; text: string }
+        | {
+            type: "goal"
+            sessionId: string
+            goal: {
+              objective: string
+              status: "active" | "paused" | "blocked" | "usage_limited" | "budget_limited" | "complete"
+              iteration: number
+              tokensUsed: number
+              tokenBudget?: number
+            } | null
+          }
+        | { type: "delta"; sessionId: string; text: string }
+        | { type: "reasoning"; sessionId: string; text: string }
+        | { type: "tool_progress"; sessionId: string; agent?: string; callId: string; tool: string; chars: number }
+        | {
+            type: "step"
+            sessionId: string
+            phase: "start" | "finish"
+            index: number
+            reason?: string
+            usage?: { inputTokens: number; outputTokens: number }
+          }
+        | {
+            type: "todo"
+            sessionId: string
+            todos: Array<{
+              id?: string
+              content: string
+              status: "pending" | "in_progress" | "completed" | "cancelled"
+              priority?: string
+            }>
+          }
+        | { type: "retry"; sessionId: string; attempt: number; message: string }
+        | { type: "compacted"; sessionId: string }
+        | { type: "tool_call"; sessionId: string; agent?: string; callId: string; tool: string; input: unknown }
+        | {
+            type: "tool_result"
+            sessionId: string
+            agent?: string
+            callId: string
+            tool: string
+            ok: boolean
+            output: string
+            images?: Array<string>
+          }
+        | {
+            type: "permission_request"
+            sessionId: string
+            requestId: string
+            permission: string
+            patterns: Array<string>
+          }
+        | {
+            type: "question_request"
+            sessionId: string
+            requestId: string
+            questions: Array<{
+              header: string
+              question: string
+              options: Array<{ label: string; description: string }>
+              multiple?: boolean
+              custom?: boolean
+            }>
+          }
+        | { type: "question_resolved"; sessionId: string; requestId: string }
+        | {
+            type: "done"
+            sessionId: string
+            text: string
+            usage?: { inputTokens: number; outputTokens: number }
+            recovered?: boolean
+          }
+        | { type: "error"; sessionId: string; code: "provider" | "config" | "aborted" | "internal"; message: string }
+    }
 
 export type AiChatQueueInput = {
   readonly sessionId: AiChatQueuePayload["sessionId"]
