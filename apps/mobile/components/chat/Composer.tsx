@@ -6,6 +6,8 @@ import { AdaptiveBlur } from "@/components/GlassView"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { usePressScale } from "@/lib/animation"
+import { layout } from "@/lib/layout"
+import { useContentLayout } from "@/components/layout/use-content-layout"
 
 export type AssistantMode = "general" | "cad" | "cam" | "gcode" | "toolpath"
 
@@ -48,11 +50,13 @@ export function Composer({
   seedToken?: number
 }) {
   const { palette, glass, isDark } = useTheme()
+  const content = useContentLayout()
   const [text, setText] = useState("")
   const inputRef = useRef<TextInput>(null)
   const sendScale = usePressScale()
   const stopScale = usePressScale()
   const canSubmit = text.trim().length > 0 && !disabled
+  const stacked = content.fontScale > 1.3
 
   useEffect(() => {
     if (seedToken === undefined || !seed) return
@@ -69,11 +73,11 @@ export function Composer({
   }
 
   return (
-    <View style={{ paddingHorizontal: 12, paddingTop: 7, paddingBottom: 10, backgroundColor: "transparent" }}>
+    <View onLayout={content.onLayout} style={{ paddingHorizontal: content.gutter, paddingTop: 8, paddingBottom: 10, backgroundColor: "transparent" }}>
       {busy ? (
         <View style={{ minHeight: 24, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingBottom: 6 }}>
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: palette.warning }} />
-          <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 16, fontWeight: "500" }}>
+          <View style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 3, backgroundColor: palette.warning }} />
+          <Text selectable style={{ flexShrink: 1, color: palette.muted, fontSize: 12, lineHeight: 17, fontWeight: "500" }}>
             Desktop assistant working · send to steer
           </Text>
         </View>
@@ -96,8 +100,8 @@ export function Composer({
           opaqueFallbackColor={palette.surface}
           style={{ paddingTop: 5 }}
         >
-          <View style={{ minHeight: 52, flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 10, paddingTop: 7, paddingBottom: 7 }}>
-            <View style={{ flex: 1, justifyContent: "center", paddingLeft: 6, paddingVertical: 5 }}>
+          <View style={{ minHeight: 52, flexDirection: stacked ? "column" : "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 10, paddingTop: 7, paddingBottom: 7 }}>
+            <View style={{ flex: stacked ? undefined : 1, alignSelf: stacked ? "stretch" : undefined, minWidth: 0, justifyContent: "center", paddingLeft: 6, paddingVertical: 5 }}>
               {disabled ? (
                 <Text selectable style={{ color: palette.muted, fontSize: 15, lineHeight: 21 }}>
                   {disabledNote ?? "Configure the assistant on the desktop"}
@@ -112,13 +116,16 @@ export function Composer({
                   multiline
                   editable
                   accessibilityLabel="Message to CADCAMFUN assistant"
-                  style={{ color: palette.ink, fontSize: 16, lineHeight: 21, maxHeight: 112, padding: 0 }}
+                  selectionColor={palette.accent}
+                  keyboardAppearance={isDark ? "dark" : "light"}
+                  style={{ color: palette.ink, fontSize: 16, lineHeight: 22, maxHeight: Math.max(112, 66 * content.fontScale), padding: 0 }}
                   onSubmitEditing={submit}
                   blurOnSubmit={false}
                 />
               )}
             </View>
 
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {busy ? (
               <Pressable
                 onPressIn={stopScale.onPressIn}
@@ -126,9 +133,9 @@ export function Composer({
                 onPress={onStop}
                 accessibilityRole="button"
                 accessibilityLabel="Stop the desktop assistant"
-                hitSlop={6}
+                style={{ width: layout.touchTarget, height: layout.touchTarget, flexShrink: 0, alignItems: "center", justifyContent: "center" }}
               >
-                <Animated.View style={[{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.danger, 0.14) }, stopScale.style]}>
+                <Animated.View style={[{ width: layout.touchTarget, height: layout.touchTarget, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.danger, 0.14) }, stopScale.style]}>
                   <Square size={13} color={palette.danger} fill={palette.danger} />
                 </Animated.View>
               </Pressable>
@@ -140,16 +147,16 @@ export function Composer({
               onPress={submit}
               accessibilityRole="button"
               accessibilityLabel={busy ? "Steer current assistant turn" : "Send message"}
-              accessibilityState={{ disabled: !canSubmit, busy }}
+              accessibilityState={{ disabled: !canSubmit }}
               disabled={!canSubmit}
-              hitSlop={6}
+              style={{ width: layout.touchTarget, height: layout.touchTarget, flexShrink: 0, alignItems: "center", justifyContent: "center" }}
             >
               <Animated.View
                 style={[
                   {
-                    width: 38,
-                    height: 38,
-                    borderRadius: 19,
+                    width: layout.touchTarget,
+                    height: layout.touchTarget,
+                    borderRadius: 22,
                     alignItems: "center",
                     justifyContent: "center",
                     backgroundColor: palette.accent,
@@ -161,6 +168,7 @@ export function Composer({
                 <ArrowUp size={19} color={palette.onAccent} strokeWidth={2.6} />
               </Animated.View>
             </Pressable>
+            </View>
           </View>
 
           <View style={{ height: StyleSheet.hairlineWidth, marginHorizontal: 12, backgroundColor: hexToRgba(palette.ink, 0.08) }} />
@@ -178,18 +186,19 @@ export function Composer({
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   onPress={() => {
+                    if (active) return
                     haptic("selection")
                     onModeChange(item.value)
                   }}
                   style={({ pressed }) => ({
-                    minHeight: 30,
+                    minHeight: 44,
                     justifyContent: "center",
                     paddingHorizontal: 11,
                     borderRadius: 999,
                     backgroundColor: active ? hexToRgba(palette.accent, 0.14) : pressed ? hexToRgba(palette.ink, 0.06) : "transparent",
                   })}
                 >
-                  <Text style={{ color: active ? palette.accent : palette.soft, fontSize: 12, lineHeight: 16, fontWeight: active ? "700" : "500" }}>{item.label}</Text>
+                  <Text style={{ color: active ? palette.accentStrong : palette.soft, fontSize: 12, lineHeight: 16, fontWeight: active ? "700" : "500" }}>{item.label}</Text>
                 </Pressable>
               )
             })}

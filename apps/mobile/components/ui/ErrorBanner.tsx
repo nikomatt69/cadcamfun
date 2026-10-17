@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react"
 import { Pressable, Text, View } from "react-native"
 import { AlertTriangle } from "lucide-react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
@@ -14,13 +13,6 @@ import { usePrefersReducedMotion } from "@/lib/animation"
 export function ErrorBanner({ message, actionLabel, onAction }: { message: string; actionLabel?: string; onAction?: () => void }) {
   const { palette } = useTheme()
   const reduced = usePrefersReducedMotion()
-  const [visible, setVisible] = useState(false)
-
-  useEffect(() => {
-    // Mount-then-show so the entering animation has a starting frame.
-    const frame = requestAnimationFrame(() => setVisible(true))
-    return () => cancelAnimationFrame(frame)
-  }, [])
 
   const content = (
     <View
@@ -35,7 +27,7 @@ export function ErrorBanner({ message, actionLabel, onAction }: { message: strin
     >
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
         <AlertTriangle size={16} color={palette.danger} strokeWidth={2.1} style={{ marginTop: 2 }} />
-        <View style={{ flex: 1, gap: 4 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
           <Text style={{ color: palette.danger, ...type(13, { weight: "600" }) }}>Needs attention</Text>
           <Text selectable accessibilityRole="alert" style={{ color: palette.soft, ...type(14) }}>
             {message}
@@ -55,6 +47,5 @@ export function ErrorBanner({ message, actionLabel, onAction }: { message: strin
     </View>
   )
 
-  if (!visible) return null
   return reduced ? <>{content}</> : <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)}>{content}</Animated.View>
 }

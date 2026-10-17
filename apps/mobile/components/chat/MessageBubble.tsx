@@ -1,4 +1,4 @@
-import { Text, View } from "react-native"
+import { Text, View, useWindowDimensions } from "react-native"
 import { useTheme } from "@/lib/theme"
 import { hexToRgba } from "@/lib/theme"
 import { type as typeStyle } from "@/lib/typography"
@@ -11,6 +11,7 @@ import type { ChatRow } from "@/lib/chat-log"
  */
 export function MessageBubble({ row }: { row: Extract<ChatRow, { kind: "user" | "assistant" }> }) {
   const { palette, isDark } = useTheme()
+  const { fontScale } = useWindowDimensions()
   const isUser = row.kind === "user"
 
   return (
@@ -18,7 +19,8 @@ export function MessageBubble({ row }: { row: Extract<ChatRow, { kind: "user" | 
       <View
         style={{
           width: isUser ? undefined : "100%",
-          maxWidth: isUser ? "82%" : "100%",
+          maxWidth: isUser && fontScale <= 1.3 ? "82%" : "100%",
+          minWidth: 0,
           borderRadius: isUser ? 18 : 0,
           borderCurve: "continuous",
           paddingHorizontal: isUser ? 16 : 0,

@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState } from "react"
-import { Text, View } from "react-native"
+import { Platform, Text, View, useWindowDimensions } from "react-native"
+import { SafeAreaView } from "react-native-safe-area-context"
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { Sparkles } from "lucide-react-native"
 import type { LiveEvent } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
+import { contentGutter } from "@/lib/layout"
 import { useLiveEvents } from "@/lib/live-events"
 import { useResource } from "@/lib/use-resource"
 import { useUIStore } from "@/lib/store"
@@ -56,6 +58,7 @@ export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { client } = useServer()
   const { palette } = useTheme()
+  const { width, fontScale } = useWindowDimensions()
   const router = useRouter()
   const setAssistantProject = useUIStore((state) => state.setAssistantProject)
 
@@ -158,21 +161,27 @@ export default function ProjectScreen() {
   if (!client) return null
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.background }}>
+    <View collapsable={false} style={{ flex: 1, backgroundColor: palette.background }}>
       <Stack.Screen
         options={{
           title,
-          headerRight: () => (
-            <PressableScale onPress={openAssistant} subtle>
+          headerRight: Platform.OS === "ios" ? undefined : () => (
+            <PressableScale onPress={openAssistant} subtle accessibilityLabel="Open project assistant" style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
               <Sparkles size={22} color={palette.accent} />
             </PressableScale>
           ),
         }}
       />
 
-      <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+      {Platform.OS === "ios" ? <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button icon="sparkles" accessibilityLabel="Open project assistant" onPress={openAssistant} tintColor={palette.accent} />
+      </Stack.Toolbar> : null}
+
+      <SafeAreaView edges={["left", "right"]}>
+      <View style={{ paddingHorizontal: contentGutter(width), paddingTop: 8, paddingBottom: 12 }}>
         <SegmentedControl segments={TABS} value={tab} onChange={setTab} />
       </View>
+      </SafeAreaView>
 
       <View style={{ flex: 1 }}>
         {tab === "overview" ? (
@@ -219,11 +228,11 @@ export default function ProjectScreen() {
           <Text style={{ color: palette.soft, fontSize: 15, lineHeight: 21, textAlign: "center" }}>
             Check out <Text style={{ fontFamily: "Menlo", color: palette.ink }}>{checkoutBranch}</Text>? Commit your changes first; switching branches requires a clean working copy.
           </Text>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: fontScale > 1.2 || width < 375 ? "column" : "row", gap: 10 }}>
+            <View style={{ flex: fontScale > 1.2 || width < 375 ? undefined : 1 }}>
               <ActionButton label="Cancel" fullWidth variant="secondary" onPress={() => setCheckoutBranch(null)} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: fontScale > 1.2 || width < 375 ? undefined : 1 }}>
               <ActionButton label="Check out" fullWidth onPress={() => void doCheckout()} loading={checkingOut} />
             </View>
           </View>

@@ -1,12 +1,13 @@
 import { useState } from "react"
-import { ActivityIndicator, LayoutAnimation, ScrollView, StyleSheet, Text, View } from "react-native"
-import * as Clipboard from "expo-clipboard"
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native"
 import { Box, Check, ChevronDown, ChevronRight, CircleGauge, Copy, GitPullRequest, Route, Workflow, Wrench, X, type LucideIcon } from "lucide-react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
-import { usePrefersReducedMotion } from "@/lib/animation"
 import { haptic } from "@/lib/haptics"
 import { PressableScale } from "@/components/ui/PressableScale"
 import type { ChatRow } from "@/lib/chat-log"
+import { useCopiedFeedback } from "@/hooks/use-copied-feedback"
+import { layout } from "@/lib/layout"
+import { ErrorBanner } from "@/components/ui/ErrorBanner"
 
 /**
  * A muted row showing the assistant working — vcs_start_change, cad_*, cam_* tool calls. Watching
@@ -36,9 +37,8 @@ function stringify(value: unknown): string {
 
 export function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }) {
   const { palette, isDark } = useTheme()
-  const reduced = usePrefersReducedMotion()
   const [open, setOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const { copied, error: copyError, copy } = useCopiedFeedback()
   const identity = toolIdentity(row.rawTool, row.tool)
   const Icon = identity.icon
   const hasDetails = row.input !== undefined || Boolean(row.output) || Boolean(row.diagnostic)
@@ -47,16 +47,13 @@ export function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }
   const toggle = () => {
     if (!hasDetails) return
     haptic("selection")
-    if (!reduced) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     setOpen((value) => !value)
   }
 
   const copyOutput = async () => {
     if (!row.output) return
-    await Clipboard.setStringAsync(row.output)
-    haptic("success")
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1_500)
+    const success = await copy(row.output)
+    if (success) haptic("success")
   }
 
   return (
@@ -65,7 +62,7 @@ export function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }
         marginHorizontal: 16,
         marginVertical: 4,
         overflow: "hidden",
-        borderRadius: 18,
+        borderRadius: layout.cardRadius,
         borderCurve: "continuous",
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: hexToRgba(palette.ink, isDark ? 0.13 : 0.09),
@@ -73,8 +70,7 @@ export function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }
       }}
     >
       <PressableScale
-        onPress={toggle}
-        disabled={!hasDetails}
+        onPress={hasDetails ? toggle : undefined}
         subtle
         tint
         accessibilityRole={hasDetails ? "button" : undefined}
@@ -82,12 +78,12 @@ export function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }
         accessibilityLabel={`${identity.title}, ${row.ok === null ? "running" : row.ok ? "completed" : "failed"}${hasDetails ? ", tool details" : ""}`}
         style={{ minHeight: 58, flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 12, paddingVertical: 10 }}
       >
-        <View style={{ width: 34, height: 34, borderRadius: 11, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(statusColor, 0.12) }}>
+        <View style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 11, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(statusColor, 0.12) }}>
           <Icon size={17} color={statusColor} strokeWidth={2.1} />
         </View>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text style={{ color: palette.muted, fontSize: 10, lineHeight: 13, fontWeight: "700", letterSpacing: 0.8 }}>{row.agent ? `${identity.category} · ${row.agent.toUpperCase()}` : identity.category}</Text>
-          <Text style={{ color: palette.ink, fontSize: 14, lineHeight: 18, fontWeight: "600" }} numberOfLines={1}>{identity.title}</Text>
+          <Text style={{ color: palette.muted, fontSize: 11, lineHeight: 16, fontWeight: "700", letterSpacing: 0.8 }}>{row.agent ? `${identity.category} · ${row.agent.toUpperCase()}` : identity.category}</Text>
+          <Text style={{ color: palette.ink, fontSize: 15, lineHeight: 21, fontWeight: "600" }} >{identity.title}</Text>
         </View>
         {row.ok === null ? <ActivityIndicator size="small" color={statusColor} /> : row.ok ? <Check size={16} color={statusColor} /> : <X size={16} color={statusColor} />}
         {hasDetails ? open ? <ChevronDown size={15} color={palette.muted} /> : <ChevronRight size={15} color={palette.muted} /> : null}
@@ -97,29 +93,30 @@ export function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }
         <View style={{ gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hexToRgba(palette.ink, 0.09), padding: 12 }}>
           {row.diagnostic ? (
             <View style={{ gap: 4, borderRadius: 13, borderCurve: "continuous", backgroundColor: hexToRgba(row.diagnostic.severity === "error" ? palette.danger : palette.warning, 0.1), padding: 11 }}>
-              <Text selectable style={{ color: row.diagnostic.severity === "error" ? palette.danger : palette.warning, fontSize: 13, lineHeight: 18, fontWeight: "600" }}>{row.diagnostic.message}</Text>
+              <Text selectable style={{ color: palette.ink, fontSize: 14, lineHeight: 21, fontWeight: "600" }}>{row.diagnostic.message}</Text>
               {row.diagnostic.recovery ? <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 17 }}>{row.diagnostic.recovery}</Text> : null}
             </View>
           ) : null}
           {row.input !== undefined ? (
             <View style={{ gap: 6 }}>
-              <Text style={{ color: palette.muted, fontSize: 10, lineHeight: 13, fontWeight: "700", letterSpacing: 0.8 }}>INPUT</Text>
+              <Text style={{ color: palette.muted, fontSize: 11, lineHeight: 16, fontWeight: "700", letterSpacing: 0.8 }}>INPUT</Text>
               <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false}>
-                <Text selectable style={{ color: palette.soft, fontFamily: "Menlo", fontSize: 11, lineHeight: 17 }}>{stringify(row.input)}</Text>
+                <Text selectable style={{ color: palette.soft, fontFamily: "Menlo", fontSize: 12, lineHeight: 19 }}>{stringify(row.input)}</Text>
               </ScrollView>
             </View>
           ) : null}
           {row.output ? (
             <View style={{ gap: 6 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <Text style={{ color: palette.muted, fontSize: 10, lineHeight: 13, fontWeight: "700", letterSpacing: 0.8 }}>OUTPUT</Text>
-                <PressableScale onPress={() => void copyOutput()} subtle accessibilityRole="button" accessibilityLabel="Copy tool output" style={{ minHeight: 32, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8 }}>
+              {copyError ? <ErrorBanner message={copyError} /> : null}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+                <Text style={{ flexShrink: 1, color: palette.muted, fontSize: 11, lineHeight: 16, fontWeight: "700", letterSpacing: 0.8 }}>OUTPUT</Text>
+                <PressableScale onPress={() => void copyOutput()} subtle accessibilityRole="button" accessibilityLabel={copied ? "Tool output copied" : "Copy tool output"} style={{ minHeight: layout.touchTarget, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8 }}>
                   <Copy size={12} color={palette.muted} />
-                  <Text style={{ color: palette.soft, fontSize: 11, fontWeight: "600" }}>{copied ? "Copied" : "Copy"}</Text>
+                  <Text style={{ color: palette.soft, fontSize: 12, lineHeight: 18, fontWeight: "600" }}>{copied ? "Copied" : "Copy"}</Text>
                 </PressableScale>
               </View>
               <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false}>
-                <Text selectable style={{ color: row.ok === false ? palette.danger : palette.soft, fontFamily: "Menlo", fontSize: 11, lineHeight: 17 }}>{row.output}</Text>
+                <Text selectable style={{ color: row.ok === false ? palette.ink : palette.soft, fontFamily: "Menlo", fontSize: 12, lineHeight: 19 }}>{row.output}</Text>
               </ScrollView>
             </View>
           ) : null}

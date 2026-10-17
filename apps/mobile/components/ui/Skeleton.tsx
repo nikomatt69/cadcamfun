@@ -1,46 +1,21 @@
-import { Animated, Easing, View, type ViewStyle } from "react-native"
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
+import { View, type ViewStyle } from "react-native"
+import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming, Easing } from "react-native-reanimated"
+import { usePrefersReducedMotion } from "@/lib/animation"
 import { useTheme } from "@/lib/theme"
 
-/**
- * A shimmering placeholder block for list content while it loads. A faster shimmer makes the app
- * feel faster than it is (Emil: perceived performance). The sweep animates only `transform` on the
- * native driver, and stops entirely under Reduce Motion (AccessibilityInfo gate in the caller).
- */
+/** Loading never steals attention or ignores the user's Reduce Motion preference. */
 export function Skeleton({ style }: { style?: ViewStyle | ViewStyle[] }) {
   const { palette } = useTheme()
-  const progress = useRef(new Animated.Value(0)).current
-
+  const reduced = usePrefersReducedMotion()
+  const opacity = useSharedValue(0.35)
   useEffect(() => {
-    const animation = Animated.loop(
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: 1200,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }),
-    )
-    animation.start()
-    return () => animation.stop()
-  }, [progress])
-
-  return (
-    <View style={[{ backgroundColor: palette.panel, borderRadius: 8, overflow: "hidden" }, style]}>
-      <Animated.View
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: `${palette.muted}22`,
-          transform: [
-            {
-              translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [-400, 400] }),
-            },
-          ],
-        }}
-      />
-    </View>
-  )
+    if (reduced) { opacity.set(0.35); return }
+    opacity.set(withRepeat(withTiming(0.7, { duration: 900, easing: Easing.inOut(Easing.ease) }), -1, true))
+    return () => cancelAnimation(opacity)
+  }, [reduced, opacity])
+  const pulse = useAnimatedStyle(() => ({ opacity: opacity.get() }))
+  return <View accessibilityLabel="Loading" style={[{ backgroundColor: palette.panel, borderRadius: 20, overflow: "hidden" }, style]}>
+    <Animated.View style={[{ position: "absolute", inset: 0, backgroundColor: palette.border }, pulse]} />
+  </View>
 }

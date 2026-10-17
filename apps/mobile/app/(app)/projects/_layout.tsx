@@ -16,14 +16,15 @@ export default function ProjectsLayout() {
         headerShadowVisible: false,
         headerStyle: { backgroundColor: palette.background },
         headerTitleStyle: { color: palette.ink },
+        headerLargeTitleStyle: { color: palette.ink, fontWeight: "700" },
         contentStyle: { backgroundColor: palette.background },
         headerBackButtonDisplayMode: "minimal",
       }}
     >
       <Stack.Screen name="index" options={{ title: "Projects" }} />
-      <Stack.Screen name="[id]" />
+      <Stack.Screen name="[id]" options={{ headerLargeTitle: false }} />
       <Stack.Screen name="[id]/commit/[oid]" options={{ title: "Commit", headerLargeTitle: false }} />
-      <Stack.Screen name="[id]/pulls/[number]" options={{ title: "Pull Request", presentation: "formSheet", headerLargeTitle: false }} />
+      <Stack.Screen name="[id]/pulls/[number]" options={{ title: "Pull Request", presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.9, 1], headerLargeTitle: false }} />
       <Stack.Screen name="[id]/workspace/drawings" options={{ title: "Designs", headerLargeTitle: false }} />
       <Stack.Screen name="[id]/workspace/drawings/[drawingId]" options={{ title: "Design", headerLargeTitle: false }} />
       <Stack.Screen name="[id]/workspace/components" options={{ title: "Components", headerLargeTitle: false }} />

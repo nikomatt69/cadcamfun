@@ -1,7 +1,9 @@
-import { View } from "react-native"
+import { Platform, View } from "react-native"
 import { NativeTabs } from "expo-router/unstable-native-tabs"
+import { SafeAreaView } from "react-native-safe-area-context"
 import { NetworkBanner } from "@/components/layout/NetworkBanner"
 import { useTheme } from "@/lib/theme"
+import { useServer } from "@/lib/server"
 
 /**
  * The signed-in shell: four native tabs (the platform's real tab bar — its materials, transitions
@@ -15,19 +17,22 @@ import { useTheme } from "@/lib/theme"
  */
 export default function AppLayout() {
   const { palette } = useTheme()
+  const { connectivity } = useServer()
+  const showConnection = !["online", "disconnected", "background"].includes(connectivity)
+  const nativeAccessory = Platform.OS === "ios" && Number.parseInt(String(Platform.Version), 10) >= 26
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
-      <NetworkBanner />
       <NativeTabs
         tintColor={palette.accent}
         iconColor={{ default: palette.muted, selected: palette.accent }}
+        backgroundColor={palette.background}
       >
-        <NativeTabs.Trigger name="projects">
+        <NativeTabs.Trigger name="projects" disableAutomaticContentInsets={Platform.OS === "ios"}>
           <NativeTabs.Trigger.Icon sf={{ default: "square.stack.3d.up", selected: "square.stack.3d.up.fill" }} md="folder" />
           <NativeTabs.Trigger.Label>Projects</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="assistant">
+        <NativeTabs.Trigger name="assistant" disableAutomaticContentInsets>
           <NativeTabs.Trigger.Icon sf={{ default: "sparkles", selected: "sparkles" }} md="auto_awesome" />
           <NativeTabs.Trigger.Label>Assistant</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
@@ -39,7 +44,9 @@ export default function AppLayout() {
           <NativeTabs.Trigger.Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} md="settings" />
           <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
+        {showConnection && nativeAccessory ? <NativeTabs.BottomAccessory><NetworkBanner accessory /></NativeTabs.BottomAccessory> : null}
       </NativeTabs>
+      {showConnection && !nativeAccessory ? <SafeAreaView edges={["bottom", "left", "right"]} style={{ backgroundColor: palette.surface }}><NetworkBanner /></SafeAreaView> : null}
     </View>
   )
 }

@@ -2,107 +2,14 @@ import { createContext, useContext, useMemo, type PropsWithChildren } from "reac
 import { View, useColorScheme } from "react-native"
 import { vars } from "nativewind"
 import { useUIStore } from "./store"
+import { PALETTES, GLASS, type ColorScheme, type Palette, type GlassTokens } from "./palette"
+export type { ColorScheme, Palette, GlassTokens } from "./palette"
 
 /**
- * The CADCAMFUN mobile theme — the iOS system palette, so the app reads as native on every
- * iOS release. Colors adapt to light/dark through CSS variables consumed by NativeWind
+ * The companion theme shares semantic colors across content and native navigation. Colors adapt to light/dark through CSS variables consumed by NativeWind
  * (`bg-surface`, `text-ink`, `border-border`…), and are also exposed as a typed palette for
  * StyleSheet code and native component props (tab tint, blur layers).
  */
-
-export type ColorScheme = "light" | "dark"
-
-export interface Palette {
-  background: string
-  surface: string
-  panel: string
-  border: string
-  ink: string
-  soft: string
-  muted: string
-  accent: string
-  accentStrong: string
-  accentSoft: string
-  onAccent: string
-  success: string
-  danger: string
-  warning: string
-  info: string
-  userBubble: string
-  assistantBubble: string
-  focusRing: string
-  overlay: string
-}
-
-export interface GlassTokens {
-  shell: string
-  shellStrong: string
-  panel: string
-  border: string
-  scrim: string
-}
-
-const PALETTES: Record<ColorScheme, Palette> = {
-  light: {
-    background: "#F2F2F7",
-    surface: "#FFFFFF",
-    panel: "#ECECF1",
-    border: "#D7D7DC",
-    ink: "#000000",
-    soft: "#3A3A3C",
-    muted: "#8E8E93",
-    accent: "#0A84FF",
-    accentStrong: "#0055D4",
-    accentSoft: "#5AC8FA",
-    onAccent: "#FFFFFF",
-    success: "#34C759",
-    danger: "#FF3B30",
-    warning: "#FF9500",
-    info: "#5AC8FA",
-    userBubble: "#0A84FF",
-    assistantBubble: "#FFFFFF",
-    focusRing: "#0A84FF",
-    overlay: "#000000",
-  },
-  dark: {
-    background: "#000000",
-    surface: "#1C1C1E",
-    panel: "#2C2C2E",
-    border: "#3A3A3C",
-    ink: "#FFFFFF",
-    soft: "#C6C6C8",
-    muted: "#8E8E93",
-    accent: "#0A84FF",
-    accentStrong: "#6FB4FF",
-    accentSoft: "#0A84FF",
-    onAccent: "#FFFFFF",
-    success: "#30D158",
-    danger: "#FF453A",
-    warning: "#FFB340",
-    info: "#64D2FF",
-    userBubble: "#0A84FF",
-    assistantBubble: "#1C1C1E",
-    focusRing: "#0A84FF",
-    overlay: "#000000",
-  },
-}
-
-const GLASS: Record<ColorScheme, GlassTokens> = {
-  light: {
-    shell: "rgba(255, 255, 255, 0.72)",
-    shellStrong: "rgba(255, 255, 255, 0.85)",
-    panel: "rgba(242, 242, 247, 0.68)",
-    border: "rgba(0, 0, 0, 0.1)",
-    scrim: "rgba(0, 0, 0, 0.025)",
-  },
-  dark: {
-    shell: "rgba(28, 28, 30, 0.72)",
-    shellStrong: "rgba(36, 36, 40, 0.85)",
-    panel: "rgba(36, 36, 40, 0.68)",
-    border: "rgba(255, 255, 255, 0.1)",
-    scrim: "rgba(0, 0, 0, 0.18)",
-  },
-}
 
 const channels = (color: string): string => {
   const hex = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color)

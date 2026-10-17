@@ -1,10 +1,11 @@
 import { useCallback, useRef, useState } from "react"
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native"
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import * as Clipboard from "expo-clipboard"
-import { Link2, ScanLine, X } from "lucide-react-native"
-import Animated, { FadeIn, FadeInDown, FadeOut } from "react-native-reanimated"
+import { StatusBar } from "expo-status-bar"
+import { Link2, MonitorSmartphone, ScanLine, ShieldCheck, X } from "lucide-react-native"
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import { nativeAvailable } from "@/lib/native"
 import { useServer } from "@/lib/server"
 import { desktopLabel, parsePairingLink, type Pairing } from "@/lib/pairing"
@@ -14,6 +15,10 @@ import { ActionButton } from "@/components/ui/ActionButton"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { TextField } from "@/components/ui/TextField"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
+import { SurfaceCard } from "@/components/ui/SurfaceCard"
+import { IconTile } from "@/components/ui/icon-tile"
+import { contentGutter } from "@/lib/layout"
+import { usePrefersReducedMotion } from "@/lib/animation"
 
 /**
  * The Pair screen — the phone's front door. Scan the QR shown on the desktop (Settings → Mobile
@@ -23,6 +28,7 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner"
 export default function ConnectScreen() {
   const { palette } = useTheme()
   const insets = useSafeAreaInsets()
+  const { width } = useWindowDimensions()
   const { save, connectionError } = useServer()
   const supported = Platform.OS === "web" || nativeAvailable
   const pairingBusy = useRef(false)
@@ -100,36 +106,51 @@ export default function ConnectScreen() {
           onClose={() => setScanning(false)}
         />
       ) : (
-        <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ paddingHorizontal: 24, paddingTop: insets.top + 56, paddingBottom: insets.bottom + 24 }}>
-          <Animated.View entering={FadeInDown.duration(420)} style={{ alignItems: "center", gap: 8 }}>
-            <Text style={{ color: palette.ink, fontSize: 34, fontWeight: "800", letterSpacing: -0.03, lineHeight: 37 }}>CADCAMFUN</Text>
-            <Text style={{ color: palette.soft, fontSize: 17, lineHeight: 23, textAlign: "center", letterSpacing: -0.004 }}>
-              Your projects, pull requests and workflows live on your Mac. Pair this phone to work with them anywhere on your network.
-            </Text>
-          </Animated.View>
+        <ScrollView contentInsetAdjustmentBehavior="never" keyboardShouldPersistTaps="handled" style={{ flex: 1 }}
+          contentContainerStyle={{ paddingLeft: Math.max(contentGutter(width), insets.left + 16), paddingRight: Math.max(contentGutter(width), insets.right + 16), paddingTop: insets.top + 28, paddingBottom: insets.bottom + 28, gap: 24 }}>
+          <View style={{ gap: 24 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <IconTile size={36}><MonitorSmartphone size={20} color={palette.accent} /></IconTile>
+              <Text style={{ color: palette.ink, fontSize: 15, fontWeight: "700", letterSpacing: 1 }}>CADCAMFUN</Text>
+            </View>
+            <View style={{ gap: 12, paddingTop: 12 }}>
+              <Text style={{ color: palette.accent, fontSize: 12, fontWeight: "700", letterSpacing: 1.2 }}>YOUR WORK. WITH YOU.</Text>
+              <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: width < 375 ? 34 : 38, fontWeight: "700", letterSpacing: -1.1, lineHeight: width < 375 ? 40 : 44 }}>A closer connection to your workspace.</Text>
+              <Text style={{ color: palette.soft, fontSize: 17, lineHeight: 25 }}>Review designs, check toolpaths and work with your assistant. Start by pairing with CADCAMFUN on your Mac.</Text>
+            </View>
+          </View>
 
-          <Animated.View entering={FadeInDown.delay(90).duration(420)} style={{ gap: 12, marginTop: 40 }}>
-            <ActionButton label="Scan the pairing QR code" icon={<ScanLine size={19} color={palette.onAccent} />} fullWidth disabled={busy} onPress={() => void openScanner()} />
+          <SurfaceCard>
+            <View style={{ gap: 20 }}>
+              {[
+                ["1", "Open your desktop", "Go to Settings → Mobile companion on your Mac."],
+                ["2", "Show the pairing code", "Turn on the companion and display its QR code."],
+                ["3", "Connect your iPhone", "Scan the code below while on the same network."],
+              ].map(([step, title, detail]) => <View key={step} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+                <IconTile size={30}><Text style={{ color: palette.accent, fontSize: 13, fontWeight: "700" }}>{step}</Text></IconTile>
+                <View style={{ flex: 1, gap: 4 }}><Text style={{ color: palette.ink, fontSize: 15, fontWeight: "600" }}>{title}</Text><Text style={{ color: palette.muted, fontSize: 13, lineHeight: 19 }}>{detail}</Text></View>
+              </View>)}
+            </View>
+          </SurfaceCard>
+
+          <View style={{ gap: 10 }}>
+            <ActionButton label={busy ? "Connecting to your desktop…" : "Scan pairing code"} icon={<ScanLine size={20} color={palette.onAccent} />} fullWidth loading={busy} onPress={() => void openScanner()} />
             <ActionButton label="Paste a pairing link" icon={<Link2 size={19} color={palette.accent} />} fullWidth variant="secondary" disabled={busy} onPress={() => void paste()} />
-            <Pressable disabled={busy} onPress={() => {
+            <Pressable disabled={busy} accessibilityRole="button" onPress={() => {
               haptic("selection")
-              if (!supported) {
-                setError("Open the installed CADCAMFUN app to pair securely. Expo Go cannot use the CompanionNet module.")
-                return
-              }
+              if (!supported) { setError("Open the installed CADCAMFUN app to pair securely."); return }
               setManualOpen(true)
-            }} hitSlop={8} style={{ alignSelf: "center", paddingVertical: 12 }}>
-              <Text style={{ color: palette.accent, fontSize: 15, fontWeight: "500" }}>Enter the address manually</Text>
+            }} style={({ pressed }) => ({ minHeight: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.6 : 1 })}>
+              <Text style={{ color: palette.accent, fontSize: 14, fontWeight: "600" }}>Enter connection details</Text>
             </Pressable>
-          </Animated.View>
+          </View>
 
-          <Animated.View entering={FadeInDown.delay(180).duration(420)} style={{ marginTop: 28 }}>
-            {!supported ? <ErrorBanner message="Secure desktop pairing requires the CADCAMFUN development build. Expo Go does not include CompanionNet. Install the development build with bun run ios from apps/mobile, then open it instead of Expo Go." /> : null}
-            {error || connectionError ? <ErrorBanner message={error ?? connectionError!} /> : null}
-            <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textAlign: "center", marginTop: 24 }}>
-              On your Mac: Settings → Mobile companion → turn it on and show the QR code. The phone and the Mac must share Wi-Fi, Personal Hotspot, or Tailscale — cellular 5G cannot reach the desktop.
-            </Text>
-          </Animated.View>
+          {!supported ? <ErrorBanner message="Secure pairing requires the installed CADCAMFUN app. Expo Go does not include the native connection module." /> : null}
+          {error || connectionError ? <ErrorBanner message={error ?? connectionError!} /> : null}
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 4 }}>
+            <ShieldCheck size={20} color={palette.success} />
+            <Text style={{ flex: 1, color: palette.muted, fontSize: 12, lineHeight: 19 }}>A private, encrypted connection to your Mac. Use the same Wi-Fi, Personal Hotspot or a private network such as Tailscale.</Text>
+          </View>
         </ScrollView>
       )}
 
@@ -140,12 +161,16 @@ export default function ConnectScreen() {
 
 /** Full-bleed camera with a rounded viewfinder; a QR hit goes straight to pairing. */
 function ScannerOverlay({ busy, error, onScanned, onClose }: { busy: boolean; error: string | null; onScanned: (link: string) => Promise<void>; onClose: () => void }) {
-  const { palette } = useTheme()
   const insets = useSafeAreaInsets()
+  const { width } = useWindowDimensions()
+  const reduced = usePrefersReducedMotion()
   const [handled, setHandled] = useState(false)
+  const [viewfinderSpace, setViewfinderSpace] = useState(0)
+  const frameSize = Math.max(0, Math.min(260, width - insets.left - insets.right - 64, viewfinderSpace))
 
   return (
-    <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(150)} style={{ flex: 1 }}>
+    <Animated.View entering={reduced ? undefined : FadeIn.duration(220)} exiting={reduced ? undefined : FadeOut.duration(150)} style={{ flex: 1, backgroundColor: "#000000" }}>
+      <StatusBar style="light" />
       <CameraView
         style={StyleSheet.absoluteFill}
         barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
@@ -155,30 +180,36 @@ function ScannerOverlay({ busy, error, onScanned, onClose }: { busy: boolean; er
           void onScanned(result.data).finally(() => setHandled(false))
         }}
       />
-      {/* Viewfinder: a rounded rect with corner brackets drawn as a border frame. */}
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center" }]}>
-        <View style={{ width: 260, height: 260, borderRadius: 24, borderWidth: 2.5, borderColor: "#FFFFFFCC", backgroundColor: "transparent" }} />
-      </View>
-      <View style={{ position: "absolute", top: insets.top + 12, right: 16 }}>
+      <SafeAreaView style={{ flex: 1, paddingHorizontal: 20, paddingVertical: 12, gap: 16 }}>
+      <View style={{ alignItems: "flex-end" }}>
         <Pressable
           onPress={onClose}
-          hitSlop={10}
-          style={{ width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.4)" }}
+          accessibilityRole="button"
+          accessibilityLabel="Close scanner"
+          style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.6)", opacity: pressed ? 0.65 : 1 })}
         >
           <X size={18} color="#FFFFFF" />
         </Pressable>
       </View>
-      {error ? <View style={{ position: "absolute", bottom: insets.bottom + 90, left: 16, right: 16 }}><ErrorBanner message={error} /></View> : null}
-      <Text style={{ position: "absolute", bottom: insets.bottom + 48, left: 0, right: 0, textAlign: "center", color: "#FFFFFF", fontSize: 15, fontWeight: "600" }}>
-        Point at the QR code on your Mac
-      </Text>
+      <View pointerEvents="none" onLayout={(event) => setViewfinderSpace(event.nativeEvent.layout.height)} style={{ flex: 1, minHeight: 0, alignItems: "center", justifyContent: "center" }}>
+        <View style={{ width: frameSize, height: frameSize, borderRadius: 24, borderCurve: "continuous", borderWidth: 2.5, borderColor: "#FFFFFFCC" }} />
+      </View>
+      <ScrollView contentInsetAdjustmentBehavior="never" style={{ flexGrow: 0, maxHeight: "38%" }} contentContainerStyle={{ gap: 12 }}>
+        {error ? <ErrorBanner message={error} /> : null}
+        <View style={{ backgroundColor: "rgba(0,0,0,0.72)", borderRadius: 18, borderCurve: "continuous", padding: 16, gap: 10, alignItems: "center" }}>
+          {busy ? <ActivityIndicator color="#FFFFFF" accessibilityLabel="Connecting to desktop" /> : null}
+          <Text accessibilityLiveRegion="polite" style={{ textAlign: "center", color: "#FFFFFF", fontSize: 15, lineHeight: 22, fontWeight: "600" }}>
+            {busy ? "Connecting to your desktop…" : "Point at the QR code on your Mac"}
+          </Text>
+        </View>
+      </ScrollView>
+      </SafeAreaView>
     </Animated.View>
   )
 }
 
 /** Advanced pairing: type the gateway address, scoped token and certificate fingerprint. */
 function ManualSheet({ open, busy, onClose, onPair }: { open: boolean; busy: boolean; onClose: () => void; onPair: (link: string) => void }) {
-  const { palette } = useTheme()
   const [host, setHost] = useState("")
   const [token, setToken] = useState("")
   const [fingerprint, setFingerprint] = useState("")
@@ -191,10 +222,10 @@ function ManualSheet({ open, busy, onClose, onPair }: { open: boolean; busy: boo
   return (
     <BottomSheet open={open} onClose={onClose} title="Manual pairing">
       <View style={{ paddingHorizontal: 20, gap: 12 }}>
-        <TextField value={host} onChangeText={setHost} placeholder="https://192.168.1.10:8443" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
-        <TextField value={token} onChangeText={setToken} placeholder="Pairing token (shown once, inside the QR)" autoCapitalize="none" autoCorrect={false} secureTextEntry />
-        <TextField value={fingerprint} onChangeText={setFingerprint} placeholder="Certificate fingerprint (64 hex chars)" autoCapitalize="none" autoCorrect={false} />
-        <ActionButton label="Pair" fullWidth disabled={busy || !host.trim() || !token.trim() || !fingerprint.trim()} onPress={submit} />
+        <TextField label="Desktop address" value={host} onChangeText={setHost} placeholder="https://192.168.1.10:8443" autoCapitalize="none" autoCorrect={false} keyboardType="url" editable={!busy} />
+        <TextField label="Pairing token" value={token} onChangeText={setToken} placeholder="Token from your desktop" autoCapitalize="none" autoCorrect={false} secureTextEntry editable={!busy} />
+        <TextField label="Certificate fingerprint" value={fingerprint} onChangeText={setFingerprint} placeholder="64 hexadecimal characters" autoCapitalize="none" autoCorrect={false} editable={!busy} />
+        <ActionButton label="Pair" fullWidth loading={busy} disabled={busy || !host.trim() || !token.trim() || !fingerprint.trim()} onPress={submit} />
       </View>
     </BottomSheet>
   )

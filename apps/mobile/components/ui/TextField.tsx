@@ -1,3 +1,4 @@
+import { layout } from "@/lib/layout"
 import { forwardRef, useState } from "react"
 import { Text, TextInput, View, type TextInputProps } from "react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
@@ -8,8 +9,8 @@ type TextFieldProps = TextInputProps & {
 }
 
 /**
- * The app's single text field (nikcli-grade). Single-line fields are pills, multiline fields are
- * 20px rounded cards — both continuous curves on a raised surface with a hairline ink border
+ * The app's single text field (nikcli-grade). Fields use continuous corners and
+ * multiline editors grow with their content — both continuous curves on a raised surface with a hairline ink border
  * that strengthens on focus (border color only, so layout never shifts). The label is a quiet
  * caption above the field; Dynamic Type carries the min-height with it.
  */
@@ -32,7 +33,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
       ) : null}
       <View
         style={{
-          borderRadius: multiline ? 20 : 999,
+          borderRadius: layout.controlRadius,
           borderCurve: "continuous",
           borderWidth: 1,
           borderColor: focused ? borderFocused : borderIdle,
@@ -47,6 +48,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           editable={editable}
           placeholderTextColor={placeholderTextColor ?? palette.muted}
           selectionColor={palette.accent}
+          cursorColor={palette.accent}
           keyboardAppearance={colorScheme === "light" ? "light" : "dark"}
           onFocus={(event) => {
             setFocused(true)
@@ -59,12 +61,12 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           accessibilityLabel={accessibilityLabel ?? label ?? props.placeholder}
           style={[
             {
-              minHeight: multiline ? 120 : 44,
+              minHeight: multiline ? 120 : 52,
               paddingHorizontal: 16,
               paddingVertical: multiline ? 14 : 12,
               color: palette.ink,
               textAlignVertical: multiline ? "top" : "center",
-              ...type(15, { leadingScale: multiline ? 1.05 : 1 }),
+              ...type(16, { leadingScale: multiline ? 1.05 : 1 }),
             },
             style,
           ]}

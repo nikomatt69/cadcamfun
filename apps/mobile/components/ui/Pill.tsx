@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { Text, View } from "react-native"
-import { useTheme } from "@/lib/theme"
+import { hexToRgba, useTheme } from "@/lib/theme"
+import { STATUS_FILL_ALPHA } from "@/lib/palette"
 
 type Tone = "neutral" | "accent" | "success" | "danger" | "warning" | "info"
 
@@ -35,12 +36,13 @@ export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone
     <View
       style={{
         alignSelf: "flex-start",
+        maxWidth: "100%",
         paddingHorizontal: 8,
         paddingVertical: 2.5,
         borderRadius: 999,
         borderWidth: 0.5,
         borderColor: color,
-        backgroundColor: `${color}1F`,
+        backgroundColor: hexToRgba(color, STATUS_FILL_ALPHA),
       }}
     >
       <Text style={{ color, fontSize: 11, lineHeight: 15, fontWeight: "600", letterSpacing: 0.03 }}>{children}</Text>

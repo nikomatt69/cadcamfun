@@ -12,8 +12,8 @@ export function Divider({ inset = 0 }: { inset?: number }) {
 export function SectionHeader({ children, padded = true }: { children: ReactNode; padded?: boolean }) {
   const { palette } = useTheme()
   return (
-    <View style={{ paddingHorizontal: padded ? 16 : 0, paddingTop: 22, paddingBottom: 7 }}>
-      <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18, letterSpacing: 0.13, textTransform: "uppercase", fontWeight: "600" }}>{children}</Text>
+    <View style={{ paddingHorizontal: padded ? 4 : 0, paddingTop: 24, paddingBottom: 10 }}>
+      <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 18, lineHeight: 24, letterSpacing: -0.3, fontWeight: "600" }}>{children}</Text>
     </View>
   )
 }

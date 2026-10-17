@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react"
-import { ScrollView, Text, View } from "react-native"
-import { Stack, useLocalSearchParams } from "expo-router"
+import { Platform, Text, View } from "react-native"
+import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { GitMerge, MessageSquare } from "lucide-react-native"
 import type { ReviewRow } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
@@ -17,6 +17,8 @@ import { Skeleton } from "@/components/ui/Skeleton"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { TextField } from "@/components/ui/TextField"
+import { PageScroll } from "@/components/layout/page-scroll"
+import { useContentLayout } from "@/components/layout/use-content-layout"
 
 const STATE_TONE: Record<string, PillTone> = { open: "accent", merged: "success", closed: "neutral" }
 
@@ -41,6 +43,9 @@ export default function PullRequestScreen() {
   const { id, number } = useLocalSearchParams<{ id: string; number: string }>()
   const { client } = useServer()
   const { palette } = useTheme()
+  const { fontScale, width, onLayout } = useContentLayout()
+  const router = useRouter()
+  const stacked = fontScale > 1.2 || width < 375
 
   const [busy, setBusy] = useState<string | null>(null)
   const [commentOpen, setCommentOpen] = useState(false)
@@ -87,11 +92,11 @@ export default function PullRequestScreen() {
   const stateTone: PillTone = pullRequest ? (STATE_TONE[pullRequest.state] ?? "neutral") : "neutral"
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.background }}>
+    <View onLayout={onLayout} collapsable={false} style={{ flex: 1, backgroundColor: palette.background }}>
       <Stack.Screen options={{ title: `Pull request #${number}` }} />
+      {Platform.OS === "ios" ? <Stack.Toolbar placement="right"><Stack.Toolbar.Button variant="done" onPress={() => router.back()}>Done</Stack.Toolbar.Button></Stack.Toolbar> : null}
 
-      <ScrollView contentInsetAdjustmentBehavior="automatic">
-        <View style={{ padding: 16, gap: 14 }}>
+      <PageScroll>
           {pull.loading ? (
             <Skeleton style={{ height: 220 }} />
           ) : pull.error ? (
@@ -99,15 +104,15 @@ export default function PullRequestScreen() {
           ) : pullRequest ? (
             <>
               {/* Header */}
-              <SurfaceCard>
-                <View style={{ padding: 14, gap: 8 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <Text style={{ color: palette.ink, fontSize: 18, lineHeight: 24, fontWeight: "700", letterSpacing: -0.01, flex: 1 }} numberOfLines={2}>
+              <SurfaceCard inset={false}>
+                <View style={{ padding: 18, gap: 10 }}>
+                  <View style={{ flexDirection: stacked ? "column" : "row", alignItems: stacked ? "flex-start" : "center", gap: 10 }}>
+                    <Text selectable style={{ color: palette.ink, fontSize: 22, lineHeight: 28, fontWeight: "700", letterSpacing: -0.5, flexShrink: 1, minWidth: 0 }} >
                       {pullRequest.title}
                     </Text>
                     <Pill tone={stateTone}>{pullRequest.state}</Pill>
                   </View>
-                  <Text style={{ color: palette.soft, fontSize: 13, lineHeight: 18, fontFamily: "Menlo" }}>
+                  <Text selectable style={{ color: palette.soft, fontSize: 13, lineHeight: 18, fontFamily: "Menlo" }}>
                     {pullRequest.head} → {pullRequest.base}
                   </Text>
                   <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18 }}>
@@ -121,7 +126,7 @@ export default function PullRequestScreen() {
 
               {/* Reviews */}
               {(pull.data?.reviews ?? []).length > 0 ? (
-                <SurfaceCard>
+                <SurfaceCard inset={false}>
                   <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 }}>
                     <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textTransform: "uppercase", fontWeight: "600", letterSpacing: 0.08 }}>
                       Reviews
@@ -131,10 +136,7 @@ export default function PullRequestScreen() {
                     <View key={review.id}>
                       {index > 0 ? <View style={{ height: 0.5, marginLeft: 14, backgroundColor: palette.border }} /> : null}
                       <View style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 3 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                          <Text style={{ color: palette.ink, fontSize: 14, lineHeight: 19, fontWeight: "600" }}>{VERDICT_LABEL[review.verdict]}</Text>
-                          <Pill tone={VERDICT_TONE[review.verdict]}>{review.verdict}</Pill>
-                        </View>
+                        <Pill tone={VERDICT_TONE[review.verdict]}>{VERDICT_LABEL[review.verdict]}</Pill>
                         {review.body ? <Text style={{ color: palette.soft, fontSize: 13, lineHeight: 18 }}>{review.body}</Text> : null}
                         <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 16 }}>{relativeTime(review.createdAt)}</Text>
                       </View>
@@ -150,8 +152,8 @@ export default function PullRequestScreen() {
                     loading={busy === "Approve"}
                     disabled={busy !== null}
                     onPress={() => void act("Approve", () => client.review(id, Number(number), "approve"))} />
-                  <View style={{ flexDirection: "row", gap: 10 }}>
-                    <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: stacked ? "column" : "row", gap: 10 }}>
+                    <View style={{ flex: stacked ? undefined : 1 }}>
                       <ActionButton label="Comment" fullWidth
                         variant="secondary"
                         loading={busy === "Comment"}
@@ -163,7 +165,7 @@ export default function PullRequestScreen() {
                           setCommentOpen(true)
                         }} />
                     </View>
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: stacked ? undefined : 1 }}>
                       <ActionButton label="Request changes" fullWidth
                         variant="danger"
                         loading={busy === "Changes"}
@@ -202,15 +204,14 @@ export default function PullRequestScreen() {
               </View>
             </>
           ) : null}
-        </View>
-      </ScrollView>
+      </PageScroll>
 
       {/* Comment / request-changes sheet */}
       <BottomSheet open={commentOpen} onClose={() => setCommentOpen(false)} title={commentVerdict === "request-changes" ? "Request changes" : "Comment"}>
         <View style={{ paddingHorizontal: 20, gap: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <MessageSquare size={15} color={palette.muted} />
-            <Text style={{ color: palette.soft, fontSize: 13, lineHeight: 18 }}>Shown to everyone who can review this pull request</Text>
+            <Text style={{ flex: 1, color: palette.soft, fontSize: 13, lineHeight: 18 }}>Shown to everyone who can review this pull request</Text>
           </View>
           <TextField
             value={commentBody}
@@ -220,7 +221,7 @@ export default function PullRequestScreen() {
             multiline
             style={{ minHeight: 80, alignItems: "flex-start" }}
           />
-          <ActionButton label="Submit" fullWidth
+          <ActionButton label="Submit" fullWidth disabled={commentBody.trim().length === 0 || busy !== null}
             variant={commentVerdict === "request-changes" ? "danger" : "primary"}
             loading={busy === "Comment"}
             onPress={() => {

@@ -1,19 +1,15 @@
 import { ActivityIndicator, Pressable, Text, View } from "react-native"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
-import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated"
 import { WifiOff } from "lucide-react-native"
 import { useServer, type Connectivity } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 
 /**
- * The connection strip under the tab bar: amber while connecting, grey offline, red on error.
- * It appears above content (it must never push content — layout stability), and tapping an error
- * retries the health check. When the phone is online the banner is nothing at all.
+ * Connection state lives in the native tab accessory on iOS 26+, clear of titles and controls.
+ * Older platforms reserve a footer row. No navigation target is covered by the status.
  */
-export function NetworkBanner() {
+export function NetworkBanner({ accessory = false }: { accessory?: boolean }) {
   const { connectivity, connectionError, recheck } = useServer()
   const { palette } = useTheme()
-  const insets = useSafeAreaInsets()
 
   if (connectivity === "online" || connectivity === "disconnected") return null
 
@@ -27,35 +23,27 @@ export function NetworkBanner() {
   const { color, label } = config[connectivity]
 
   return (
-    <Animated.View
-      entering={FadeInDown.duration(220)}
-      exiting={FadeOutUp.duration(150)}
+    <View
       style={{
-        position: "absolute",
-        top: insets.top + 4,
-        left: 12,
-        right: 12,
-        zIndex: 500,
-        borderRadius: 999,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
+        minHeight: 44,
+        flex: accessory ? 1 : undefined,
+        paddingHorizontal: 16,
+        paddingVertical: accessory ? 0 : 6,
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
-        backgroundColor: palette.surface,
-        borderWidth: 0.5,
-        borderColor: color,
+        backgroundColor: accessory ? "transparent" : palette.surface,
       }}
     >
       {connectivity === "connecting" ? <ActivityIndicator size="small" color={color} /> : <WifiOff size={15} color={color} />}
-      <Text style={{ flex: 1, color: palette.ink, fontSize: 13, lineHeight: 18, fontWeight: "500" }} numberOfLines={1}>
+      <Text accessibilityLiveRegion="polite" style={{ flex: 1, minWidth: 0, color: palette.ink, fontSize: 13, lineHeight: 18, fontWeight: "500" }} numberOfLines={accessory ? 1 : undefined}>
         {label}
       </Text>
       {connectivity !== "connecting" ? (
-        <Pressable onPress={() => void recheck()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retry the desktop connection">
+        <Pressable style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, opacity: pressed ? 0.55 : 1 })} onPress={() => void recheck()} accessibilityRole="button" accessibilityLabel="Retry the desktop connection">
           <Text style={{ color, fontSize: 13, fontWeight: "600" }}>Retry</Text>
         </Pressable>
       ) : null}
-    </Animated.View>
+    </View>
   )
 }

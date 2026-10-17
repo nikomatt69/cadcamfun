@@ -1,5 +1,5 @@
 import { useCallback } from "react"
-import { ScrollView, View } from "react-native"
+import { View } from "react-native"
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import type { WorkspaceEntry } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
@@ -13,6 +13,8 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { ListRow } from "@/components/ui/ListRow"
 import { SectionHeader } from "@/components/ui/SectionHeader"
 import { Skeleton } from "@/components/ui/Skeleton"
+import { PageScroll } from "@/components/layout/page-scroll"
+import { SurfaceCard } from "@/components/ui/SurfaceCard"
 
 export default function LibraryScreen() {
   const params = useLocalSearchParams<{ id: string }>()
@@ -44,30 +46,28 @@ export default function LibraryScreen() {
     catalogue.components.length === 0
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.background }}>
+    <View collapsable={false} style={{ flex: 1, backgroundColor: palette.background }}>
       <Stack.Screen options={{ title: "Library", headerLargeTitle: false }} />
+      <PageScroll>
       {library.loading && !catalogue ? (
-        <View style={{ padding: 16, gap: 10 }}>
+        <View style={{ gap: 12 }}>
           {[0, 1, 2, 3].map((index) => (
             <Skeleton key={index} style={{ height: 58 }} />
           ))}
         </View>
       ) : library.error ? (
-        <View style={{ padding: 16 }}>
-          <ErrorBanner message={library.error} actionLabel="Retry" onAction={() => void library.reload()} />
-        </View>
+        <ErrorBanner message={library.error} actionLabel="Retry" onAction={() => void library.reload()} />
       ) : empty ? (
-        <View style={{ padding: 16 }}>
-          <EmptyState title="Library is empty" description="Materials, tools, machines and components used by this project show up here." />
-        </View>
+        <EmptyState title="Library is empty" description="Materials, tools, machines and components used by this project show up here." />
       ) : catalogue ? (
-        <ScrollView contentInsetAdjustmentBehavior="automatic">
+        <>
           <Catalogue title="Materials" entries={catalogue.materials} />
           <Catalogue title="Tools" entries={catalogue.tools} />
           <Catalogue title="Machines" entries={catalogue.machines} />
           <Catalogue title="Components" entries={catalogue.components} onOpen={openComponent} />
-        </ScrollView>
+        </>
       ) : null}
+      </PageScroll>
     </View>
   )
 }
@@ -86,7 +86,7 @@ function Catalogue({
   return (
     <View>
       <SectionHeader>{title}</SectionHeader>
-      {entries.map((entry, index) => (
+      <SurfaceCard inset={false}>{entries.map((entry, index) => (
         <View key={entry.id}>
           {index > 0 ? <View style={{ height: 0.5, marginLeft: 16, backgroundColor: palette.border }} /> : null}
           <ListRow
@@ -96,7 +96,7 @@ function Catalogue({
             onPress={onOpen ? () => onOpen(entry) : undefined}
           />
         </View>
-      ))}
+      ))}</SurfaceCard>
     </View>
   )
 }

@@ -1,3 +1,4 @@
+import { layout } from "@/lib/layout"
 import type { PropsWithChildren, ReactNode } from "react"
 import { Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from "react-native"
 import { cn } from "@/lib/cn"
@@ -12,15 +13,16 @@ type SurfaceCardProps = PropsWithChildren<{
   className?: string
   style?: StyleProp<ViewStyle>
   tone?: "surface" | "panel" | "background"
+  inset?: boolean
 }>
 
 /**
- * The grouped card (nikcli-grade): 18px continuous-curve radius, hairline ink border, and the
+ * The grouped card (nikcli-grade): 22pt continuous-curve radius, hairline ink border, and the
  * eyebrow/title/description/footer slots so a card's hierarchy is built from one vocabulary.
  * `tone` picks the material weight — raised surface by default, panel and translucent background
  * for nested content.
  */
-export function SurfaceCard({ eyebrow, title, description, footer, className, style, tone = "surface", children }: SurfaceCardProps) {
+export function SurfaceCard({ eyebrow, title, description, footer, className, style, tone = "surface", inset = true, children }: SurfaceCardProps) {
   const { width } = useWindowDimensions()
   const { palette } = useTheme()
   const compact = width < 390
@@ -35,11 +37,10 @@ export function SurfaceCard({ eyebrow, title, description, footer, className, st
       style={[
         {
           overflow: "hidden",
-          paddingHorizontal: 16,
-          paddingVertical: 16,
-          borderRadius: 18,
+          padding: inset ? 18 : 0,
+          borderRadius: layout.cardRadius,
           borderCurve: "continuous",
-          borderWidth: 1,
+          borderWidth: 0.5,
           borderColor,
           backgroundColor,
         },

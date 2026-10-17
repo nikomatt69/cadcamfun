@@ -1,6 +1,6 @@
 import { useState, type PropsWithChildren } from "react"
-import { Pressable, type PressableProps, type ViewStyle } from "react-native"
-import Animated, { useSharedValue, withSpring } from "react-native-reanimated"
+import { Pressable, StyleSheet, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native"
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 import { PRESS_SPRING, spring, usePrefersReducedMotion, useStable } from "@/lib/animation"
 import { hexToRgba, useTheme } from "@/lib/theme"
 
@@ -12,9 +12,9 @@ import { hexToRgba, useTheme } from "@/lib/theme"
  * row, the chip and the big button all share, so anything pressable feels identical. Under
  * Reduce Motion the scale is skipped and only the tint remains.
  */
-export type PressableScaleProps = PressableProps &
+export type PressableScaleProps = Omit<PressableProps, "style" | "children"> &
   PropsWithChildren<{
-    style?: ViewStyle | ViewStyle[]
+    style?: StyleProp<ViewStyle>
     /** Paint an ink tint over the pressed surface (rows, list items, cards). */
     tint?: boolean
     /** Pressed tint strength; defaults to 4% ink. */
@@ -26,6 +26,8 @@ export type PressableScaleProps = PressableProps &
     /** Dim the whole surface on press (buttons); rows only tint. */
     dim?: boolean
   }>
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
 
 export function PressableScale({
   children,
@@ -46,17 +48,22 @@ export function PressableScale({
   const opacity = useSharedValue(1)
   const pressSpring = useStable(() => spring(PRESS_SPRING))
   const [pressed, setPressed] = useState(false)
+  const interactive = Boolean(rest.onPress || rest.onLongPress || onPressIn || onPressOut)
 
-  const animatedStyle = useStable(() => ({
-    transform: [{ scale }],
-    opacity,
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.get() }],
+    opacity: disabled ? 0.45 : opacity.get(),
   }))
 
   return (
-    <Pressable
+    <AnimatedPressable
+      accessibilityRole={rest.onPress ? "button" : undefined}
+      pressRetentionOffset={12}
+      hitSlop={4}
       disabled={disabled}
       onPressIn={(event) => {
         onPressIn?.(event)
+        if (!interactive) return
         setPressed(true)
         if (!noScale) scale.set(reduced ? 1 : withSpring(subtle ? 0.985 : 0.97, pressSpring))
         if (dim) opacity.set(0.72)
@@ -64,20 +71,22 @@ export function PressableScale({
       onPressOut={(event) => {
         onPressOut?.(event)
         setPressed(false)
-        if (!noScale) scale.set(withSpring(1, pressSpring))
+        if (!noScale) scale.set(reduced ? 1 : withSpring(1, pressSpring))
         opacity.set(1)
       }}
       {...rest}
+      style={[style, animatedStyle]}
     >
-      <Animated.View
-        style={[
-          style,
-          { backgroundColor: tint && pressed ? hexToRgba(palette.ink, tintStrength) : undefined },
-          animatedStyle,
-        ]}
-      >
-        {children}
-      </Animated.View>
-    </Pressable>
+      {tint && pressed ? (
+        <View pointerEvents="none" style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: StyleSheet.flatten(style)?.borderRadius,
+          borderCurve: "continuous",
+          backgroundColor: hexToRgba(palette.ink, tintStrength),
+        }} />
+      ) : null}
+      {children}
+    </AnimatedPressable>
   )
 }

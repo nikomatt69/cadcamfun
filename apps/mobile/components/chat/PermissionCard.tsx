@@ -1,66 +1,58 @@
 import { useRef, useState } from "react"
 import { Text, View } from "react-native"
-import { ShieldAlert } from "lucide-react-native"
+import { CheckCircle2, ShieldAlert } from "lucide-react-native"
 import { ActionButton } from "@/components/ui/ActionButton"
+import { SurfaceCard } from "@/components/ui/SurfaceCard"
+import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { useTheme } from "@/lib/theme"
+import { haptic } from "@/lib/haptics"
+import { layout } from "@/lib/layout"
 import type { ChatRow } from "@/lib/chat-log"
 
-/**
- * A `permission_request` frame, answered inline (Apple §16 — Agency: the person stays in control;
- * unanswered, the assistant's tool call stalls until the model gives up). One tap allows once,
- * `Always` stores the decision for the session, `No` rejects.
- */
-export function PermissionCard({
-  row,
-  onReply,
-}: {
+type Decision = "once" | "always" | "reject"
+
+/** Approval names its scope explicitly, with full paths visible before the user decides. */
+export function PermissionCard({ row, onReply }: {
   row: Extract<ChatRow, { kind: "request" }>
-  onReply: (requestId: string, decision: "once" | "always" | "reject") => Promise<void>
+  onReply: (requestId: string, decision: Decision) => Promise<void>
 }) {
   const { palette } = useTheme()
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<Decision | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const submitting = useRef(false)
-  const reply = async (decision: "once" | "always" | "reject") => {
-    if (submitting.current) return
+  const reply = async (decision: Decision) => {
+    if (submitting.current || row.answered) return
     submitting.current = true
-    setBusy(true)
+    setBusy(decision)
+    setError(null)
     try { await onReply(row.requestId, decision) }
-    finally { submitting.current = false; setBusy(false) }
+    catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not record your decision. Try again.")
+      haptic("error")
+    } finally { submitting.current = false; setBusy(null) }
   }
-
-  return (
-    <View
-      style={{
-        marginHorizontal: 16,
-        marginVertical: 6,
-        borderRadius: 14,
-        borderWidth: 0.5,
-        borderColor: `${palette.warning}66`,
-        backgroundColor: `${palette.warning}12`,
-        padding: 14,
-        gap: 8,
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <ShieldAlert size={16} color={palette.warning} />
-        <Text style={{ flex: 1, color: palette.ink, fontSize: 15, fontWeight: "600", lineHeight: 20 }}>
-          {row.permission.replaceAll("_", " ")}
-        </Text>
-      </View>
-      {row.patterns.length > 0 ? (
-        <Text style={{ color: palette.soft, fontSize: 13, lineHeight: 18, fontFamily: "Menlo" }} numberOfLines={3}>
-          {row.patterns.join("  ")}
-        </Text>
-      ) : null}
-      {row.answered ? (
-        <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18 }}>Answered</Text>
-      ) : (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-          <ActionButton label="Allow once" variant="secondary" small disabled={busy} onPress={() => void reply("once")} />
-          <ActionButton label="Always" variant="secondary" small disabled={busy} onPress={() => void reply("always")} />
-          <ActionButton label="No" variant="danger" small disabled={busy} onPress={() => void reply("reject")} />
+  return <SurfaceCard style={{ marginHorizontal: 16, marginVertical: 8 }}>
+    <View style={{ gap: layout.gap }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+        {row.answered ? <CheckCircle2 size={21} color={palette.success} /> : <ShieldAlert size={21} color={palette.warning} />}
+        <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+          <Text style={{ color: palette.muted, fontSize: 12, fontWeight: "600" }}>{row.answered ? "Decision recorded" : "Permission required"}</Text>
+          <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 17, lineHeight: 24, fontWeight: "600" }}>{row.permission.replaceAll("_", " ")}</Text>
         </View>
-      )}
+      </View>
+      {row.patterns.length ? <View style={{ gap: 6, padding: 12, borderRadius: 12, backgroundColor: palette.background }}>
+        <Text style={{ color: palette.muted, fontSize: 12, fontWeight: "600" }}>Requested access</Text>
+        {row.patterns.map((pattern, index) => <Text key={index} selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 19, fontFamily: "Menlo" }}>{pattern}</Text>)}
+      </View> : null}
+      {!row.answered ? <>
+        <Text style={{ color: palette.soft, fontSize: 14, lineHeight: 21 }}>Allow this action once, allow matching actions for this session, or deny access.</Text>
+        {error ? <ErrorBanner message={error} /> : null}
+        <View style={{ gap: 8 }}>
+          <ActionButton label="Allow once" disabled={busy !== null} loading={busy === "once"} onPress={() => void reply("once")} />
+          <ActionButton label="Allow for this session" variant="secondary" disabled={busy !== null} loading={busy === "always"} onPress={() => void reply("always")} />
+          <ActionButton label="Deny access" variant="danger" disabled={busy !== null} loading={busy === "reject"} onPress={() => void reply("reject")} />
+        </View>
+      </> : null}
     </View>
-  )
+  </SurfaceCard>
 }

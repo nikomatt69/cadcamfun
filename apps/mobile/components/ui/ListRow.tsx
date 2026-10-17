@@ -8,7 +8,7 @@ import { type } from "@/lib/typography"
 type ListRowProps = {
   /** Leading element: status dot, icon tile, avatar. */
   leading?: ReactNode
-  /** One-line title; a string renders in the row's title style, a node keeps its own. */
+  /** A string renders in the row's title style, a node keeps its own. */
   title: ReactNode
   /** Meta line under the title. */
   subtitle?: string
@@ -24,7 +24,7 @@ type ListRowProps = {
 }
 
 /**
- * Flat themable list row (nikcli-grade): leading element, one-line title, quiet meta line.
+ * Flat themable list row: leading element, a readable title and quiet metadata.
  * The pressed state is a 4% ink tint plus the app-wide scale — it works with every theme in
  * both modes. Pair rows with `<Divider inset={...} />`. Row height follows Dynamic Type: the
  * subtitle may wrap to two lines at larger font scales instead of truncating.
@@ -32,14 +32,16 @@ type ListRowProps = {
 export function ListRow({ leading, title, subtitle, trailing, showChevron, disabled, onPress, onLongPress, accessibilityLabel, selected }: ListRowProps) {
   const { palette } = useTheme()
   const { fontScale } = useWindowDimensions()
+  const interactive = Boolean(onPress || onLongPress)
+  const Container = interactive ? PressableScale : View
 
   return (
-    <PressableScale
+    <Container
       onPress={onPress}
       onLongPress={onLongPress}
-      disabled={disabled || !onPress}
-      tint={Boolean(onPress)}
-      subtle
+      disabled={disabled}
+      accessible={interactive ? true : undefined}
+      {...(interactive ? { tint: true, subtle: true } : {})}
       style={{
         alignSelf: "stretch",
         flexDirection: "row",
@@ -50,11 +52,11 @@ export function ListRow({ leading, title, subtitle, trailing, showChevron, disab
         minHeight: 64,
         opacity: disabled ? 0.5 : 1,
       }}
-      accessibilityRole={onPress ? "button" : undefined}
-      accessibilityLabel={accessibilityLabel ?? (typeof title === "string" ? (subtitle ? `${title}, ${subtitle}` : title) : undefined)}
-      accessibilityState={{ disabled: Boolean(disabled), ...(selected === undefined ? {} : { selected }) }}
+      accessibilityRole={interactive ? "button" : undefined}
+      accessibilityLabel={interactive ? accessibilityLabel ?? (typeof title === "string" ? (subtitle ? `${title}, ${subtitle}` : title) : undefined) : undefined}
+      accessibilityState={interactive ? { disabled: Boolean(disabled), ...(selected === undefined ? {} : { selected }) } : undefined}
     >
-      {leading ? <View style={{ alignSelf: "flex-start", marginTop: 4 }}>{leading}</View> : null}
+      {leading ? <View style={{ flexShrink: 0 }}>{leading}</View> : null}
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <Text style={{ color: palette.ink, ...type(15, { weight: "600" }) }} numberOfLines={fontScale > 1 ? undefined : 1}>
           {title}
@@ -65,8 +67,8 @@ export function ListRow({ leading, title, subtitle, trailing, showChevron, disab
           </Text>
         ) : null}
       </View>
-      {trailing ?? (showChevron ?? Boolean(onPress) ? <ChevronRight size={16} color={palette.muted} strokeWidth={2} /> : null)}
-    </PressableScale>
+      {trailing ? <View style={{ flexShrink: 0, maxWidth: "42%" }}>{trailing}</View> : (showChevron ?? Boolean(onPress) ? <ChevronRight size={16} color={palette.muted} strokeWidth={2} /> : null)}
+    </Container>
   )
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { FlatList, Pressable, Text, View } from "react-native"
+import { FlatList, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native"
+import { ChevronDown, ChevronUp, SkipBack, SkipForward } from "lucide-react-native"
 import type { ToolpathPreview, ToolpathReview as ToolpathReviewPayload, ToolpathSegment } from "@cadcamfun/api"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
@@ -8,6 +9,9 @@ import { mono } from "@/lib/typography"
 import { PreviewViewport } from "@/components/preview/PreviewViewport"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { Skeleton } from "@/components/ui/Skeleton"
+import { previewHeight, layout } from "@/lib/layout"
+import { useContentLayout } from "@/components/layout/use-content-layout"
+import { SafeAreaView } from "react-native-screens/experimental"
 
 const KIND_COLOR = {
   rapid: "#6194F5",
@@ -33,10 +37,15 @@ export function ToolpathReview({
   onRetry: () => void
 }) {
   const { palette } = useTheme()
+  const { height } = useWindowDimensions()
+  const { gutter, fontScale, onLayout } = useContentLayout()
+  const [availableHeight, setAvailableHeight] = useState(height)
+  const [previewExpanded, setPreviewExpanded] = useState<boolean | undefined>()
+  const expanded = previewExpanded ?? fontScale < 1.6
   const segments = preview?.segments ?? []
   const [playhead, setPlayhead] = useState(0)
   const listRef = useRef<FlatList<string>>(null)
-  const lines = useMemo(() => (review?.gcode ?? "").split(/\r?\n/), [review?.gcode])
+  const lines = useMemo(() => review?.gcode ? review.gcode.split(/\r?\n/) : [], [review?.gcode])
   const kindByLine = useMemo(() => {
     const kinds = new Map<number, ToolpathSegment["kind"]>()
     for (const segment of segments) kinds.set(segment.line, segment.kind)
@@ -55,8 +64,26 @@ export function ToolpathReview({
   }, [activeLine, lines.length])
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.background }}>
-      <View style={{ height: 240 }}>
+    <SafeAreaView edges={{ bottom: true }} onLayout={(event) => { onLayout(event); setAvailableHeight(event.nativeEvent.layout.height) }} style={{ flex: 1, backgroundColor: palette.background }}>
+      <ScrollView contentInsetAdjustmentBehavior="never" style={{ flexGrow: 0, maxHeight: Math.max(140, availableHeight * 0.6) }}
+        contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 10, paddingBottom: 12, gap: 10 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <View style={{ flex: 1, minWidth: 100, gap: 3 }}>
+          <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 15, fontWeight: "600" }}>Simulation</Text>
+          <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>{segments.length ? `Block ${playhead + 1} of ${segments.length}` : "No motion blocks"}</Text>
+        </View>
+        <View style={{ flexDirection: "row", borderRadius: layout.controlRadius, backgroundColor: palette.surface, borderWidth: 0.5, borderColor: palette.border }}>
+          {[
+            { label: "Previous block", Icon: SkipBack, disabled: !segments.length || playhead <= 0, action: () => setPlayhead(clampPlayhead(playhead - 1, segments.length)) },
+            { label: "Next block", Icon: SkipForward, disabled: !segments.length || playhead >= segments.length - 1, action: () => setPlayhead(clampPlayhead(playhead + 1, segments.length)) },
+            { label: expanded ? "Hide 3D preview" : "Show 3D preview", Icon: expanded ? ChevronUp : ChevronDown, disabled: false, action: () => setPreviewExpanded(!expanded) },
+          ].map(({ label, Icon, disabled, action }) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled}
+            onPress={() => { haptic("selection"); action() }} style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: disabled ? 0.35 : pressed ? 0.55 : 1 })}>
+            <Icon size={18} color={palette.accent} />
+          </Pressable>)}
+        </View>
+      </View>
+      {expanded ? <View style={{ height: Math.min(previewHeight(height, fontScale, "toolpath"), availableHeight * 0.28), borderRadius: layout.cardRadius, borderCurve: "continuous", overflow: "hidden", borderWidth: 0.5, borderColor: palette.border }}>
         {preview ? (
           <PreviewViewport
             bounds={preview.bounds}
@@ -70,37 +97,49 @@ export function ToolpathReview({
         ) : (
           <Skeleton style={{ flex: 1, borderRadius: 0 }} />
         )}
-      </View>
+      </View> : null}
 
       {error ? (
-        <View style={{ padding: 16 }}>
+        <View>
           <ErrorBanner message={error} actionLabel="Retry" onAction={onRetry} />
         </View>
       ) : null}
 
-      <View style={{ paddingHorizontal: 16, paddingTop: 10, gap: 8 }}>
+      <View style={{ gap: 6 }}>
         {stats ? (
-          <Text style={{ color: palette.soft, fontSize: 13, lineHeight: 18 }}>
-            Rapid {stats.rapidMoves} · Linear {stats.linearMoves} · Arcs {stats.circularMoves}
-            {stats.machineFunctions > 0 ? ` · M${stats.machineFunctions}` : ""}
-          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+            {[
+              { label: "Rapid", count: stats.rapidMoves, color: KIND_COLOR.rapid },
+              { label: "Linear", count: stats.linearMoves, color: KIND_COLOR.linear },
+              { label: "Arcs", count: stats.circularMoves, color: KIND_COLOR.circular },
+            ].map(({ label, count, color }) => <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+              <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>{label} {count.toLocaleString("en")}</Text>
+            </View>)}
+          </View>
         ) : null}
         {preview?.truncated ? (
           <Text style={{ color: palette.warning, fontSize: 12, lineHeight: 16 }}>Path truncated so it fits on the phone. The G-code listing is complete.</Text>
         ) : null}
         <Scrubber count={segments.length} value={playhead} onChange={setPlayhead} />
         <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 16 }}>
-          {segments.length === 0 ? "No motion in this program" : `Block ${playhead + 1} of ${segments.length}${activeLine > 0 ? ` · NC ${activeLine}` : ""}`}
+          {segments.length === 0 ? "No motion in this program" : `NC line ${activeLine}` }
         </Text>
       </View>
-
+      </ScrollView>
+      <View style={{ paddingHorizontal: gutter, paddingVertical: 10, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: palette.border }}>
+        <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 14, fontWeight: "600" }}>G-code</Text>
+        <Text style={{ color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>{lines.length.toLocaleString("en")} lines</Text>
+      </View>
       <FlatList
         ref={listRef}
-        style={{ flex: 1, marginTop: 8 }}
+        style={{ flex: 1, backgroundColor: palette.surface }}
         data={lines}
         keyExtractor={(_, index) => String(index)}
         extraData={activeLine}
-        contentInsetAdjustmentBehavior="automatic"
+        contentInsetAdjustmentBehavior="never"
+        contentContainerStyle={{ paddingHorizontal: Math.max(0, gutter - 12), paddingBottom: 16 }}
+        ListEmptyComponent={loading ? <View style={{ padding: 16, gap: 8 }}><Skeleton style={{ height: 44 }} /><Skeleton style={{ height: 44 }} /></View> : <Text style={{ color: palette.muted, fontSize: 14, lineHeight: 21, padding: 20 }}>No G-code in this program yet.</Text>}
         onScrollToIndexFailed={(info) => {
           listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false })
         }}
@@ -122,7 +161,7 @@ export function ToolpathReview({
           )
         }}
       />
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -143,16 +182,17 @@ function Scrubber({ count, value, onChange }: { count: number; value: number; on
     <View
       accessibilityRole="adjustable"
       accessibilityLabel="Toolpath playback"
+      accessibilityState={{ disabled: count === 0 }}
       accessibilityValue={{ min: count === 0 ? 0 : 1, max: Math.max(count, 1), now: count === 0 ? 0 : value + 1, text: count === 0 ? "No motion" : `Block ${value + 1} of ${count}` }}
-      accessibilityActions={[
+      accessibilityActions={count ? [
         { name: "increment", label: "Next block" },
         { name: "decrement", label: "Previous block" },
-      ]}
+      ] : []}
       onAccessibilityAction={(event) => {
         if (event.nativeEvent.actionName === "increment") onChange(clampPlayhead(value + 1, count))
         if (event.nativeEvent.actionName === "decrement") onChange(clampPlayhead(value - 1, count))
       }}
-      style={{ height: 28, justifyContent: "center" }}
+      style={{ height: layout.touchTarget, justifyContent: "center", opacity: count ? 1 : 0.4 }}
       onLayout={(event) => {
         width.current = event.nativeEvent.layout.width
       }}
@@ -164,6 +204,7 @@ function Scrubber({ count, value, onChange }: { count: number; value: number; on
       <View style={{ height: 4, borderRadius: 2, backgroundColor: palette.panel, overflow: "hidden" }}>
         <View style={{ width: `${fraction * 100}%`, height: 4, backgroundColor: palette.accent }} />
       </View>
+      <View pointerEvents="none" style={{ position: "absolute", left: `${fraction * 100}%`, top: 13, width: 18, height: 18, borderRadius: 9, backgroundColor: palette.accent, transform: [{ translateX: -9 }] }} />
     </View>
   )
 }
@@ -196,7 +237,8 @@ function GcodeRow({
         alignItems: "center",
         gap: 8,
         paddingHorizontal: 12,
-        paddingVertical: 6,
+        paddingVertical: 10,
+        minHeight: 44,
         backgroundColor: active ? `${palette.accent}18` : "transparent",
       }}
     >

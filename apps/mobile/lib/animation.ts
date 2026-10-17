@@ -4,6 +4,7 @@ import {
   Easing,
   ReduceMotion,
   useReducedMotion,
+  useAnimatedStyle,
   useSharedValue,
   withSpring,
   type SharedValue,
@@ -33,14 +34,17 @@ export const SPRING_MOMENTUM: SpringDescriptor = { duration: 400, dampingRatio: 
 export const SHEET_SPRING: SpringDescriptor = { duration: 300, dampingRatio: 0.8 }
 
 /** Press feedback — fast and dead-flat so it catches up with the finger. */
-export const PRESS_SPRING: SpringDescriptor = { duration: 160, dampingRatio: 1 }
+export const PRESS_SPRING: SpringDescriptor = { duration: 140, dampingRatio: 1 }
 
 /** Reanimated 4 takes Apple's two designer parameters directly. */
-export const spring = (d: SpringDescriptor): WithSpringConfig => ({
-  duration: d.duration,
-  dampingRatio: d.dampingRatio,
-  ...(d.velocity !== undefined ? { velocity: d.velocity } : {}),
-})
+export const spring = (d: SpringDescriptor): WithSpringConfig => {
+  "worklet"
+  return {
+    duration: d.duration,
+    dampingRatio: d.dampingRatio,
+    ...(d.velocity !== undefined ? { velocity: d.velocity } : {}),
+  }
+}
 
 /** Strong ease-out for UI; Reanimated's built-ins are as weak as CSS's. */
 export const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1)
@@ -54,6 +58,7 @@ export const EASE_SHEET = Easing.bezier(0.32, 0.72, 0, 1)
  * A hard stop reads as frozen; this reads as "responsive, but there is nothing more here".
  */
 export function rubberband(overshoot: number, dimension: number, constant = 0.55): number {
+  "worklet"
   return (overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot))
 }
 
@@ -63,6 +68,7 @@ export function rubberband(overshoot: number, dimension: number, constant = 0.55
  * still throws the surface all the way (Apple §6 — momentum projection).
  */
 export function projectMomentum(velocityPxPerSecond: number, decelerationRate = 0.998): number {
+  "worklet"
   return ((velocityPxPerSecond / 1000) * decelerationRate) / (1 - decelerationRate)
 }
 
@@ -97,17 +103,18 @@ export function withReduce(target: number, config: SpringDescriptor, reduceMotio
 export function usePressScale() {
   const scale = useSharedValue(1)
   const reduced = usePrefersReducedMotion()
+  useEffect(() => { if (reduced) scale.set(1) }, [reduced, scale])
 
   const onPressIn = () => {
     if (reduced) return
     scale.set(withSpring(0.97, spring(PRESS_SPRING)))
   }
   const onPressOut = () => {
-    if (reduced) return
-    scale.set(withSpring(1, spring(PRESS_SPRING)))
+    scale.set(reduced ? 1 : withSpring(1, spring(PRESS_SPRING)))
   }
 
-  return { style: { transform: [{ scale }] }, onPressIn, onPressOut }
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }))
+  return { style, onPressIn, onPressOut }
 }
 
 /** A value created once for the component's lifetime — shared values must not be created per render. */

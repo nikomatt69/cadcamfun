@@ -1,16 +1,18 @@
 import { useState, type ReactNode } from "react"
-import { Pressable, type PressableProps, type ViewStyle } from "react-native"
+import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from "react-native"
 import Animated from "react-native-reanimated"
 import { usePressScale } from "@/lib/animation"
 import { hexToRgba, useTheme } from "@/lib/theme"
 
-type IconCircleButtonProps = PressableProps & {
+type IconCircleButtonProps = Omit<PressableProps, "style"> & {
   children: ReactNode
   size?: number
   accessibilityLabel: string
   tone?: "surface" | "warm" | "inverse"
-  style?: ViewStyle | ViewStyle[]
+  style?: StyleProp<ViewStyle>
 }
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
 
 /** Circular header icon button (nikcli: IconCircleButton). 44pt hit target, theme-derived tones. */
 export function IconCircleButton({ children, size = 44, accessibilityLabel, tone = "surface", style, onPressIn, onPressOut, ...props }: IconCircleButtonProps) {
@@ -19,15 +21,15 @@ export function IconCircleButton({ children, size = 44, accessibilityLabel, tone
   const press = usePressScale()
   const inverse = tone === "inverse"
   const warm = tone === "warm"
+  const dimension = Math.max(44, size)
 
   return (
-    <Animated.View style={[{ width: size, height: size }, press.style]}>
-      <Pressable
+      <AnimatedPressable
         {...props}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         accessibilityState={{ ...props.accessibilityState, disabled: Boolean(props.disabled) }}
-        hitSlop={props.hitSlop ?? Math.max(8, (44 - size) / 2)}
+        hitSlop={props.hitSlop ?? 4}
         onPressIn={(event) => {
           setPressed(true)
           press.onPressIn()
@@ -40,9 +42,10 @@ export function IconCircleButton({ children, size = 44, accessibilityLabel, tone
         }}
         style={[
           {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
+            width: dimension,
+            height: dimension,
+            flexShrink: 0,
+            borderRadius: dimension / 2,
             borderCurve: "continuous",
             alignItems: "center",
             justifyContent: "center",
@@ -51,11 +54,11 @@ export function IconCircleButton({ children, size = 44, accessibilityLabel, tone
             borderColor: inverse ? "rgba(255,255,255,0.22)" : hexToRgba(palette.ink, warm ? 0.06 : 0.12),
             opacity: props.disabled ? 0.45 : pressed ? 0.72 : 1,
           },
-          ...(Array.isArray(style) ? style : style ? [style] : []),
+          style,
+          press.style,
         ]}
       >
         {children}
-      </Pressable>
-    </Animated.View>
+      </AnimatedPressable>
   )
 }

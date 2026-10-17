@@ -2,6 +2,7 @@ import { Text, View } from "react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { type } from "@/lib/typography"
 import type { Connectivity } from "@/lib/server-context"
+import { STATUS_FILL_ALPHA } from "@/lib/palette"
 
 /**
  * Connectivity pill (nikcli: ConnectionStatus, CADCAMFUN connectivity).
@@ -21,17 +22,19 @@ export function ConnectionStatus({ connectivity, label }: { connectivity: Connec
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
+        alignSelf: "flex-start",
+        maxWidth: "100%",
         borderRadius: 999,
         borderCurve: "continuous",
         borderWidth: 1,
         borderColor: hexToRgba(color, 0.28),
-        backgroundColor: hexToRgba(color, 0.12),
+        backgroundColor: hexToRgba(color, STATUS_FILL_ALPHA),
         paddingHorizontal: 12,
         paddingVertical: 8,
       }}
     >
       <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: color }} />
-      <Text selectable style={{ color, fontWeight: "600", ...type(12) }}>
+      <Text selectable style={{ flexShrink: 1, color, fontWeight: "600", ...type(12) }}>
         {text}
       </Text>
     </View>

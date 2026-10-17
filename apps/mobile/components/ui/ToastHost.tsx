@@ -1,189 +1,64 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Pressable, Text, View } from "react-native"
-import { Gesture, GestureDetector } from "react-native-gesture-handler"
+import { useEffect, useState } from "react"
+import { AccessibilityInfo, Pressable, Text, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated"
-import { scheduleOnRN } from "react-native-worklets"
-import { CheckCircle2, Info, XCircle } from "lucide-react-native"
-import { EASE_OUT, SPRING_MOMENTUM, projectMomentum, rubberband, spring, usePrefersReducedMotion } from "@/lib/animation"
+import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated"
+import { CheckCircle2, Info, X, XCircle } from "lucide-react-native"
+import { usePrefersReducedMotion } from "@/lib/animation"
 import { hexToRgba, useTheme } from "@/lib/theme"
-import { type } from "@/lib/typography"
-
-/**
- * Global toasts (nikcli-grade): stacked at the top edge, newest in front, older ones falling back
- * with a 12pt offset and a 5% scale step. Each toast knows how long it takes to read and holds
- * while touched; a swipe up dismisses with the finger's momentum — velocity or distance, a flick
- * is enough. Every tone is a theme token at a tint, so a toast belongs to the active palette.
- */
+import { useContentLayout } from "@/components/layout/use-content-layout"
 
 export type ToastKind = "info" | "success" | "error"
-
-interface ToastEntry {
-  id: number
-  kind: ToastKind
-  message: string
-}
-
-type Listener = (toasts: readonly ToastEntry[]) => void
-
+interface ToastEntry { id: number; kind: ToastKind; message: string }
+type Listener = (entries: readonly ToastEntry[]) => void
 let queue: ToastEntry[] = []
 let nextId = 1
 const listeners = new Set<Listener>()
-
-const emit = () => {
-  for (const listener of listeners) listener(queue)
-}
-
+const emit = () => { for (const listener of listeners) listener(queue) }
 export function toast(message: string, kind: ToastKind = "info"): void {
   queue = [...queue.slice(-2), { id: nextId++, kind, message }]
   emit()
 }
+function dismiss(id: number) { queue = queue.filter((entry) => entry.id !== id); emit() }
 
-const dismiss = (id: number) => {
-  queue = queue.filter((entry) => entry.id !== id)
-  emit()
-}
-
-/** Long messages need longer on screen; a fixed dwell rushes a sentence or leaves "Copied" hanging. */
-function readingTimeMs(message: string): number {
-  const words = message.trim().split(/\s+/).length
-  return Math.min(6500, Math.max(2400, 1100 + words * 300))
-}
-
+/** A readable, dismissible status surface. No gesture worklet calls React state setters. */
 export function ToastHost() {
-  const { palette, isDark, glass } = useTheme()
   const { top } = useSafeAreaInsets()
-  const [toasts, setToasts] = useState<readonly ToastEntry[]>([])
-
-  useEffect(() => {
-    const listener: Listener = setToasts
-    listeners.add(listener)
-    return () => {
-      listeners.delete(listener)
-    }
-  }, [])
-
-  // Newest in front; older ones fall back into the stack behind it.
-  const ordered = useMemo(() => [...toasts].reverse(), [toasts])
-
-  return (
-    <View pointerEvents="box-none" style={{ position: "absolute", left: 16, right: 16, top: Math.max(top, 12) + 8, zIndex: 9999 }}>
-      {ordered.map((entry, index) => (
-        <ToastItem key={entry.id} toast={entry} depth={index} onDismiss={() => dismiss(entry.id)} />
-      ))}
-    </View>
-  )
+  const content = useContentLayout()
+  const [entries, setEntries] = useState<readonly ToastEntry[]>(queue)
+  useEffect(() => { listeners.add(setEntries); return () => { listeners.delete(setEntries) } }, [])
+  return <View onLayout={content.onLayout} pointerEvents="box-none" style={{ position: "absolute", top: Math.max(top, 12) + 8, left: 0, right: 0, paddingHorizontal: content.gutter, zIndex: 9999, gap: 8 }}>
+    {entries.map((entry) => <ToastItem key={entry.id} entry={entry} />)}
+  </View>
 }
-
-function ToastItem({ toast, depth, onDismiss }: { toast: ToastEntry; depth: number; onDismiss: () => void }) {
-  const { palette, isDark } = useTheme()
+function ToastItem({ entry }: { entry: ToastEntry }) {
+  const { palette } = useTheme()
   const reduced = usePrefersReducedMotion()
-  const [height, setHeight] = useState(56)
   const [held, setHeld] = useState(false)
-  const dismissed = useRef(false)
-
-  const drag = useSharedValue(0)
-  const dragOrigin = useRef(0)
-
-  const close = useCallback(
-    (velocity = 0) => {
-      if (dismissed.current) return
-      dismissed.current = true
-      // Toasts live at the top edge, so they leave toward it — the same path they arrived on.
-      if (reduced) {
-        drag.set(0)
-        onDismiss()
-      } else {
-        drag.set(
-          withTiming(-height - 40, { duration: 220, easing: EASE_OUT }, (finished) => {
-            "worklet"
-            if (finished) scheduleOnRN(onDismiss)
-          }),
-        )
-      }
-    },
-    [drag, height, onDismiss, reduced],
-  )
-
+  const [screenReader, setScreenReader] = useState(false)
   useEffect(() => {
-    if (held) return
-    const timer = setTimeout(() => close(), readingTimeMs(toast.message))
+    let mounted = true
+    void AccessibilityInfo.isScreenReaderEnabled().then((enabled) => { if (mounted) setScreenReader(enabled) }).catch(() => undefined)
+    const subscription = AccessibilityInfo.addEventListener("screenReaderChanged", setScreenReader)
+    return () => { mounted = false; subscription.remove() }
+  }, [])
+  useEffect(() => {
+    if (held || screenReader) return
+    const dwell = Math.min(10000, Math.max(3500, 1500 + entry.message.split(/\s+/).length * 350))
+    const timer = setTimeout(() => dismiss(entry.id), dwell)
     return () => clearTimeout(timer)
-  }, [close, held, toast.message])
-
-  const pan = Gesture.Pan()
-    .onStart(() => {
-      dragOrigin.current = drag.get()
-      setHeld(true)
-    })
-    .onUpdate((event) => {
-      const raw = dragOrigin.current + event.translationY
-      // Free upward — that is the way out. Resisted downward, where there is nowhere to go.
-      drag.set(raw <= 0 ? raw : rubberband(raw, height))
-    })
-    .onEnd((event) => {
-      setHeld(false)
-      const velocity = event.velocityY
-      const projected = dragOrigin.current + event.translationY + projectMomentum(velocity)
-      if (projected < -height * 0.4 || velocity < -600) {
-        close(Math.min(velocity, 0))
-        return
-      }
-      drag.set(withSpring(0, { ...spring(SPRING_MOMENTUM), velocity }))
-    })
-    .onFinalize(() => {
-      setHeld(false)
-      if (!dismissed.current) drag.set(withSpring(0, spring(SPRING_MOMENTUM)))
-    })
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: drag.get() + depth * 12 },
-      { scale: 1 - depth * 0.05 },
-    ],
-    opacity: drag.get() === 0 ? 1 : 1 - Math.min(1, -drag.get() / (height + 40)),
-  }))
-
-  const tone = toast.kind === "success" ? palette.success : toast.kind === "error" ? palette.danger : palette.ink
-  const Icon = toast.kind === "success" ? CheckCircle2 : toast.kind === "error" ? XCircle : Info
-
-  return (
-    <GestureDetector gesture={pan}>
-      <Animated.View
-        onLayout={(event) => setHeight(event.nativeEvent.layout.height || 56)}
-        style={[
-          {
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: 0,
-            zIndex: 10 - depth,
-            borderRadius: 14,
-            borderCurve: "continuous",
-            borderWidth: 1,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            overflow: "hidden",
-            backgroundColor: hexToRgba(tone, isDark ? 0.18 : 0.11),
-            borderColor: hexToRgba(tone, isDark ? 0.28 : 0.22),
-            boxShadow: isDark ? "0 6px 22px rgba(0,0,0,0.38)" : "0 6px 22px rgba(0,0,0,0.14)",
-          },
-          animatedStyle,
-        ]}
-      >
-        <Pressable
-          onPress={() => close()}
-          accessibilityRole="button"
-          accessibilityLabel={toast.message}
-          accessibilityHint="Tap or swipe up to dismiss"
-          style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-        >
-          <Icon size={17} color={tone} />
-          <Text style={{ flex: 1, color: toast.kind === "info" ? palette.ink : tone, ...type(14, { weight: "500" }) }} numberOfLines={2}>
-            {toast.message}
-          </Text>
-        </Pressable>
-      </Animated.View>
-    </GestureDetector>
-  )
+  }, [entry.id, entry.message, held, screenReader])
+  const color = entry.kind === "success" ? palette.success : entry.kind === "error" ? palette.danger : palette.accent
+  const Icon = entry.kind === "success" ? CheckCircle2 : entry.kind === "error" ? XCircle : Info
+  return <Animated.View entering={reduced ? undefined : FadeIn.duration(150)} exiting={reduced ? undefined : FadeOut.duration(100)}
+    layout={reduced ? undefined : LinearTransition.duration(150)}
+    style={{ backgroundColor: palette.surface, borderRadius: 18, borderCurve: "continuous", borderWidth: 0.5, borderColor: hexToRgba(color, 0.3), boxShadow: "0 4px 20px rgba(0,0,0,0.14)" }}>
+    <Pressable onPress={() => dismiss(entry.id)} onPressIn={() => setHeld(true)} onPressOut={() => setHeld(false)}
+      accessibilityRole="button" accessibilityLabel={entry.message} accessibilityHint="Dismiss notification"
+      accessibilityLiveRegion="polite"
+      style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 56 }}>
+      <Icon size={20} color={color} />
+      <Text style={{ flex: 1, minWidth: 0, color: palette.ink, fontSize: 14, lineHeight: 21, fontWeight: "500" }}>{entry.message}</Text>
+      <X size={17} color={palette.muted} />
+    </Pressable>
+  </Animated.View>
 }

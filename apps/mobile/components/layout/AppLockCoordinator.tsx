@@ -7,6 +7,8 @@ import { useUIStore } from "@/lib/store"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { PressableScale } from "@/components/ui/PressableScale"
+import { PageScroll } from "./page-scroll"
+import { SafeAreaView } from "react-native-safe-area-context"
 
 /**
  * The Face ID lock — a full-screen overlay that appears when a paired app returns from the
@@ -70,8 +72,8 @@ export function AppLockCoordinator() {
 
   return (
     <Modal visible transparent={false} animationType="none" presentationStyle="fullScreen" onRequestClose={() => undefined}>
-    <View accessibilityViewIsModal style={{ flex: 1, backgroundColor: palette.background }}>
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 20 }}>
+    <SafeAreaView accessibilityViewIsModal style={{ flex: 1, backgroundColor: palette.background }}>
+      <PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", gap: 20 }}>
         <View style={{ width: 64, height: 64, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: `${palette.accent}14` }}>
           <Lock size={28} color={palette.accent} />
         </View>
@@ -87,9 +89,9 @@ export function AppLockCoordinator() {
             <Text style={{ color: palette.onAccent, fontSize: 17, fontWeight: "600" }}>{checking ? "Unlocking…" : "Unlock"}</Text>
           </View>
         </PressableScale>
-        {error ? <Text style={{ color: palette.danger, textAlign: "center", paddingHorizontal: 24 }}>{error}</Text> : null}
-      </View>
-    </View>
+        {error ? <Text selectable style={{ color: palette.danger, fontSize: 15, lineHeight: 22, textAlign: "center" }}>{error}</Text> : null}
+      </PageScroll>
+    </SafeAreaView>
     </Modal>
   )
 }

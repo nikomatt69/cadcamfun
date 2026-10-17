@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 import { StatusBar } from "expo-status-bar"
 import { Stack } from "expo-router"
+import { ThemeProvider as NavigationThemeProvider, DarkTheme, DefaultTheme } from "expo-router/react-navigation"
 import { ThemeProvider, useTheme } from "@/lib/theme"
 import { ServerProvider, useServer } from "@/lib/server"
 import { setupOfflineDrainOnForeground } from "@/lib/offline-queue"
@@ -42,8 +43,10 @@ function OfflineDrain() {
 
 function ThemedStack() {
   const { palette, colorScheme } = useTheme()
+  const baseTheme = colorScheme === "dark" ? DarkTheme : DefaultTheme
+  const navigationTheme = { ...baseTheme, colors: { ...baseTheme.colors, primary: palette.accent, background: palette.background, card: palette.surface, text: palette.ink, border: palette.border, notification: palette.danger } }
   return (
-    <>
+    <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       <Gate />
       <OfflineDrain />
@@ -71,7 +74,7 @@ function ThemedStack() {
       </Stack>
       <ToastHost />
       <AppLockCoordinator />
-    </>
+    </NavigationThemeProvider>
   )
 }
 

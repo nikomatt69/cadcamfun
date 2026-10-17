@@ -1,7 +1,7 @@
 import { useCallback } from "react"
-import { ScrollView, Text, View } from "react-native"
+import { RefreshControl, Text, View } from "react-native"
 import { useRouter } from "expo-router"
-import { Box, Boxes, GitBranch, Library, Route, Sparkles } from "lucide-react-native"
+import { ArrowUpRight, Box, Boxes, CheckCircle2, GitBranch, Library, Route, Sparkles } from "lucide-react-native"
 import type { CompanionClient } from "@/lib/client"
 import { useResource } from "@/lib/use-resource"
 import { useServer } from "@/lib/server"
@@ -12,147 +12,82 @@ import { ListRow } from "@/components/ui/ListRow"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { Skeleton } from "@/components/ui/Skeleton"
+import { PageScroll } from "@/components/layout/page-scroll"
+import { IconTile } from "@/components/ui/icon-tile"
+import { Pill } from "@/components/ui/Pill"
+import { PressableScale } from "@/components/ui/PressableScale"
+import { Divider } from "@/components/ui/SectionHeader"
+import { useContentLayout } from "@/components/layout/use-content-layout"
+import { layout } from "@/lib/layout"
 
-/**
- * The Overview panel: where the project stands — branch, HEAD, dirty working copy, the branches
- * it has and whether the AI companion is ready. Commit and branch actions are the only writes;
- * they live here, at the top of the project, where the state they change is visible.
- */
-export function OverviewPanel({
-  client,
-  projectId,
-  onCommit,
-  refreshKey,
-  onCheckout,
-}: {
-  client: CompanionClient
-  projectId: string
-  refreshKey: number
-  onCommit: () => void
-  onCheckout: (branch: string) => void
+const WORKSPACE = [
+  { screen: "drawings", title: "Designs", detail: "Explore your geometry", Icon: Box },
+  { screen: "components", title: "Components", detail: "Parts & parameters", Icon: Boxes },
+  { screen: "toolpaths", title: "Toolpaths", detail: "Preview paths & G-code", Icon: Route },
+  { screen: "library", title: "Library", detail: "Tools, materials & machines", Icon: Library },
+] as const
+
+export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheckout }: {
+  client: CompanionClient; projectId: string; refreshKey: number; onCommit: () => void; onCheckout: (branch: string) => void
 }) {
   const { palette } = useTheme()
+  const { width, fontScale, gutter, onLayout } = useContentLayout()
   const { ai } = useServer()
   const router = useRouter()
-  const openWorkspace = (screen: "drawings" | "components" | "toolpaths" | "library") => {
-    router.push(`/projects/${projectId}/workspace/${screen}`)
-  }
-
   const status = useResource(useCallback((signal) => client.status(projectId, signal), [client, projectId]), `status:${projectId}:${refreshKey}`)
   const branches = useResource(useCallback((signal) => client.branches(projectId, signal), [client, projectId]), `branches:${projectId}:${refreshKey}`)
-
-  if (status.loading) {
-    return (
-      <View style={{ padding: 16, gap: 12 }}>
-        <Skeleton style={{ height: 110 }} />
-        <Skeleton style={{ height: 200 }} />
-      </View>
-    )
-  }
-
   const vcs = status.data
   const branchList = Object.entries(branches.data?.branches ?? {}).sort(([a], [b]) => a.localeCompare(b))
+  const dirtyCount = vcs?.dirty.length ?? 0
+  const stacked = width - gutter * 2 < 320 || fontScale > 1.3
+  const reload = () => { void status.reload(); void branches.reload() }
 
-  return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" style={{ flex: 1 }}>
-      <View style={{ padding: 16, gap: 14 }}>
-        {status.error ? <ErrorBanner message={status.error} actionLabel="Retry" onAction={() => void status.reload()} /> : null}
-
-        {branches.error ? <ErrorBanner message={branches.error} actionLabel="Retry" onAction={() => void branches.reload()} /> : null}
-        {/* Working copy state */}
-        <SurfaceCard>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 12 }}>
-            <GitBranch size={17} color={palette.accent} />
-            <View style={{ flex: 1, gap: 1 }}>
-              <Text style={{ color: palette.ink, fontSize: 16, lineHeight: 21, fontWeight: "600" }}>{vcs?.branch ?? "—"}</Text>
-              <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 16 }} numberOfLines={1}>
-                {vcs?.head ? `HEAD ${shortOid(vcs.head)}` : "No commits yet"}
-              </Text>
-            </View>
-            {vcs && vcs.dirty.length > 0 ? (
-              <Text style={{ color: palette.warning, fontSize: 13, fontWeight: "600" }}>
-                {vcs.dirty.length} file{vcs.dirty.length === 1 ? "" : "s"} changed
-              </Text>
-            ) : null}
-          </View>
-          {vcs && vcs.dirty.length > 0 ? (
-            <View>
-              <View style={{ height: 0.5, marginLeft: 14, backgroundColor: palette.border }} />
-              <View style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 3 }}>
-                {vcs.dirty.slice(0, 5).map((path) => (
-                  <Text key={path} style={{ color: palette.soft, fontSize: 13, lineHeight: 18, fontFamily: "Menlo" }} numberOfLines={1}>
-                    {path}
-                  </Text>
-                ))}
-                {vcs.dirty.length > 5 ? (
-                  <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 16 }}>+{vcs.dirty.length - 5} more</Text>
-                ) : null}
-              </View>
-            </View>
-          ) : null}
-          <View style={{ padding: 14, paddingTop: 0 }}>
-            <ActionButton label="Commit changes" fullWidth small variant="secondary" disabled={!vcs || vcs.dirty.length === 0} onPress={onCommit} />
-          </View>
-        </SurfaceCard>
-
-        <SurfaceCard>
-          <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 }}>
-            <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textTransform: "uppercase", fontWeight: "600", letterSpacing: 0.08 }}>
-              Workspace
-            </Text>
-          </View>
-          <ListRow leading={<Box size={16} color={palette.accent} />} title="Designs" subtitle="3D preview" onPress={() => openWorkspace("drawings")} />
-          <View style={{ height: 0.5, marginLeft: 14, backgroundColor: palette.border }} />
-          <ListRow leading={<Boxes size={16} color={palette.accent} />} title="Components" subtitle="3D preview and parameters" onPress={() => openWorkspace("components")} />
-          <View style={{ height: 0.5, marginLeft: 14, backgroundColor: palette.border }} />
-          <ListRow leading={<Route size={16} color={palette.accent} />} title="Toolpaths" subtitle="Path and G-code" onPress={() => openWorkspace("toolpaths")} />
-          <View style={{ height: 0.5, marginLeft: 14, backgroundColor: palette.border }} />
-          <ListRow leading={<Library size={16} color={palette.accent} />} title="Library" subtitle="Materials, tools, machines" onPress={() => openWorkspace("library")} />
-        </SurfaceCard>
-
-        {/* Branches */}
-        {branchList.length > 0 ? (
-          <SurfaceCard>
-            <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 }}>
-              <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textTransform: "uppercase", fontWeight: "600", letterSpacing: 0.08 }}>
-                Branches
-              </Text>
-            </View>
-            {branchList.map(([name, oid], index) => (
-              <View key={name}>
-                {index > 0 ? <View style={{ height: 0.5, marginLeft: 14, backgroundColor: palette.border }} /> : null}
-                <ListRow
-                  title={
-                    <Text style={{ color: palette.ink, fontSize: 15, lineHeight: 20, fontFamily: "Menlo" }}>
-                      {name}
-                      {name === vcs?.branch ? "  ·" : ""}
-                    </Text>
-                  }
-                  subtitle={`${shortOid(oid)}`}
-                  trailing={name === vcs?.branch ? <Text style={{ color: palette.soft, fontSize: 13 }}>Current</Text> : undefined}
-                  onPress={name === vcs?.branch ? undefined : () => onCheckout(name)}
-                />
-              </View>
-            ))}
-          </SurfaceCard>
-        ) : null}
-
-        {/* AI companion */}
-        <SurfaceCard>
-          <ListRow
-            leading={<Sparkles size={16} color={palette.accent} />}
-            title="AI companion"
-            subtitle={
-              ai
-                ? ai.configured
-                  ? `Ready — the ${ai.host} host is configured on the desktop`
-                  : "No model key yet — add one in CADCAMFUN on your Mac"
-                : "Checking the desktop…"
-            }
-            trailing={<Text style={{ color: palette.soft, fontSize: 13 }}>{ai?.configured ? "On" : "Off"}</Text>}
-          />
-        </SurfaceCard>
+  return <PageScroll onLayout={onLayout} refreshControl={<RefreshControl refreshing={status.loading && Boolean(vcs)} onRefresh={reload} tintColor={palette.accent} />}>
+    {status.error ? <ErrorBanner message={status.error} actionLabel="Retry" onAction={reload} /> : null}
+    {branches.error ? <ErrorBanner message={branches.error} actionLabel="Retry" onAction={() => void branches.reload()} /> : null}
+    {status.loading && !vcs ? <Skeleton style={{ height: 160 }} /> : <SurfaceCard>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <IconTile><GitBranch size={22} color={palette.accent} /></IconTile>
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+          <Text style={{ color: palette.muted, fontSize: 12, fontWeight: "600", letterSpacing: 0.6 }}>WORKING BRANCH</Text>
+          <Text selectable style={{ color: palette.ink, fontSize: 21, lineHeight: 27, fontWeight: "700" }}>{vcs?.branch ?? "Unavailable"}</Text>
+        </View>
       </View>
-    </ScrollView>
-  )
+      <View style={{ marginVertical: 16, gap: 8 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+          {vcs && dirtyCount === 0 ? <CheckCircle2 size={16} color={palette.success} /> : null}
+          <Text style={{ flex: 1, minWidth: 0, color: dirtyCount ? palette.warning : palette.soft, fontSize: 14, lineHeight: 21 }}>{!vcs ? "Could not load working copy" : dirtyCount ? `${dirtyCount} ${dirtyCount === 1 ? "file has" : "files have"} uncommitted changes` : "All changes committed"}</Text>
+        </View>
+        {vcs?.head ? <Text selectable style={{ color: palette.muted, fontSize: 12, fontFamily: "Menlo" }}>Latest commit {shortOid(vcs.head)}</Text> : null}
+        {vcs?.dirty.slice(0, 4).map((path) => <Text key={path} selectable style={{ color: palette.soft, fontFamily: "Menlo", fontSize: 12, lineHeight: 18 }}>{path}</Text>)}
+        {dirtyCount > 4 ? <Text style={{ color: palette.muted, fontSize: 12 }}>+{dirtyCount - 4} more files</Text> : null}
+      </View>
+      <ActionButton label="Commit changes" variant={dirtyCount ? "primary" : "secondary"} disabled={!vcs || !dirtyCount} onPress={onCommit} />
+    </SurfaceCard>}
+
+    <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 19, fontWeight: "700", marginTop: 6 }}>Explore workspace</Text>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+      {WORKSPACE.map(({ screen, title, detail, Icon }) => <PressableScale key={screen} subtle tint accessibilityLabel={`Open ${title.toLowerCase()}`} onPress={() => router.push(`/projects/${projectId}/workspace/${screen}`)}
+        style={{ width: stacked ? "100%" : "48%", flexGrow: 1, minHeight: 140, padding: 16, borderRadius: layout.cardRadius, borderCurve: "continuous", backgroundColor: palette.surface, borderWidth: 0.5, borderColor: palette.border, gap: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}><IconTile size={40}><Icon size={21} color={palette.accent} /></IconTile><ArrowUpRight size={16} color={palette.muted} /></View>
+        <View style={{ gap: 3 }}><Text style={{ color: palette.ink, fontSize: 17, fontWeight: "600" }}>{title}</Text><Text style={{ color: palette.muted, fontSize: 12, lineHeight: 18 }}>{detail}</Text></View>
+      </PressableScale>)}
+    </View>
+
+    {branchList.length ? <View style={{ gap: 10 }}>
+      <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 19, fontWeight: "700", marginTop: 6 }}>Branches</Text>
+      <SurfaceCard inset={false}>{branchList.map(([name, oid], index) => <View key={name}>
+        {index ? <Divider inset={16} /> : null}
+        <ListRow title={name} subtitle={shortOid(oid)} leading={<GitBranch size={18} color={palette.muted} />}
+          trailing={name === vcs?.branch ? <Pill tone="accent">Current</Pill> : undefined}
+          onPress={name === vcs?.branch ? undefined : () => onCheckout(name)} />
+      </View>)}</SurfaceCard>
+    </View> : null}
+
+    <SurfaceCard inset={false}>
+      <ListRow leading={<IconTile size={40}><Sparkles size={20} color={palette.accent} /></IconTile>} title="Desktop assistant"
+        subtitle={ai?.configured ? "Ready to help with this project" : ai ? "Add a model key on your Mac to get started" : "Checking desktop configuration…"}
+        trailing={<Pill tone={ai?.configured ? "success" : "neutral"}>{ai?.configured ? "Ready" : "Setup"}</Pill>} />
+    </SurfaceCard>
+  </PageScroll>
 }

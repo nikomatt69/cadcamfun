@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react"
-import { StyleSheet, Text, View } from "react-native"
+import { Pressable, StyleSheet, Text, View } from "react-native"
 import { useTheme } from "@/lib/theme"
+import { Minus, Plus, RotateCcw } from "lucide-react-native"
+import { AdaptiveBlur } from "@/components/GlassView"
+import { haptic } from "@/lib/haptics"
+import { layout } from "@/lib/layout"
 import { cadPreview, PreviewView, type PreviewScene } from "@/modules/preview"
 import {
   fitOrbit,
@@ -66,7 +70,7 @@ export function PreviewViewport({
   accessibilityLabel?: string
   accessibilityHint?: string
 }) {
-  const { palette } = useTheme()
+  const { palette, glass, isDark } = useTheme()
   const [orbit, setOrbit] = useState<Orbit>(() => fitOrbit(bounds))
   const [meshError, setMeshError] = useState<string | undefined>()
   const [lineError, setLineError] = useState<string | undefined>()
@@ -75,7 +79,7 @@ export function PreviewViewport({
   const [size, setSize] = useState({ width: 1, height: 1 })
   const frame = useRef({ mesh, orbit, onSelectPart })
   frame.current = { mesh, orbit, onSelectPart }
-  const gesture = useRef({ x: 0, y: 0, pinch: 0, two: false, moved: false })
+  const gesture = useRef({ x: 0, y: 0, startX: 0, startY: 0, pinch: 0, two: false, moved: false })
   const linesOk = useRef(true)
   const failed = meshError ?? lineError ?? gpuError
 
@@ -177,22 +181,44 @@ export function PreviewViewport({
     current.onSelectPart(hitMeshPart(ray, current.mesh.positions, current.mesh.indices, current.mesh.parts))
   }
 
+  const cameraAction = (action: string) => {
+    if (failed) return
+    if (action === "reset") setOrbit(fitOrbit(bounds))
+    else if (action === "increment") setOrbit((current) => orbitZoom(current, 0.8))
+    else if (action === "decrement") setOrbit((current) => orbitZoom(current, 1.25))
+    else if (action === "rotateLeft") setOrbit((current) => orbitDrag(current, -40, 0))
+    else if (action === "rotateRight") setOrbit((current) => orbitDrag(current, 40, 0))
+    else return
+    haptic("selection")
+  }
+
   return (
+    <View style={{ flex: 1, backgroundColor: palette.background }}>
     <View
-      style={{ flex: 1, backgroundColor: palette.background }}
+      accessible
+      accessibilityRole={failed ? "image" : "adjustable"}
+      accessibilityActions={failed ? [] : [
+        { name: "increment", label: "Zoom in" }, { name: "decrement", label: "Zoom out" },
+        { name: "rotateLeft", label: "Rotate left" }, { name: "rotateRight", label: "Rotate right" },
+        { name: "reset", label: "Reset camera" },
+      ]}
+      onAccessibilityAction={(event) => cameraAction(event.nativeEvent.actionName)}
+      style={StyleSheet.absoluteFill}
       accessibilityLabel={failed ? `${accessibilityLabel}. ${failed}` : accessibilityLabel}
       accessibilityHint={accessibilityHint}
       accessibilityLiveRegion="polite"
       onLayout={(event) => setSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
-      onStartShouldSetResponder={() => true}
-      onMoveShouldSetResponder={() => true}
+      onStartShouldSetResponder={() => !failed}
+      onMoveShouldSetResponder={() => !failed}
       onResponderTerminationRequest={() => false}
       onResponderGrant={(event) => {
         const touches = event.nativeEvent.touches
         const two = touches.length >= 2
         gesture.current = {
-          x: event.nativeEvent.locationX,
-          y: event.nativeEvent.locationY,
+          x: two ? (touches[0]!.locationX + touches[1]!.locationX) / 2 : event.nativeEvent.locationX,
+          y: two ? (touches[0]!.locationY + touches[1]!.locationY) / 2 : event.nativeEvent.locationY,
+          startX: event.nativeEvent.locationX,
+          startY: event.nativeEvent.locationY,
           pinch: two ? distance(touches[0]!, touches[1]!) : 0,
           two,
           moved: false,
@@ -206,15 +232,18 @@ export function PreviewViewport({
           const midX = (touches[0]!.locationX + touches[1]!.locationX) / 2
           const midY = (touches[0]!.locationY + touches[1]!.locationY) / 2
           if (previous.two && previous.pinch > 0) {
-            setOrbit((current) => orbitPan(orbitZoom(current, previous.pinch / pinch), midX - previous.x, midY - previous.y, size.height))
+            setOrbit((current) => orbitPan(orbitZoom(current, previous.pinch / Math.max(pinch, 1)), midX - previous.x, midY - previous.y, size.height))
           }
-          gesture.current = { x: midX, y: midY, pinch, two: true, moved: true }
+          gesture.current = { ...previous, x: midX, y: midY, pinch, two: true, moved: true }
           return
         }
-        if (previous.two) return
+        if (previous.two) {
+          gesture.current = { ...previous, x: event.nativeEvent.locationX, y: event.nativeEvent.locationY, two: false, moved: true }
+          return
+        }
         const dx = event.nativeEvent.locationX - previous.x
         const dy = event.nativeEvent.locationY - previous.y
-        if (Math.hypot(dx, dy) > 2) gesture.current.moved = true
+        if (Math.hypot(event.nativeEvent.locationX - previous.startX, event.nativeEvent.locationY - previous.startY) > 6) gesture.current.moved = true
         setOrbit((current) => orbitDrag(current, dx, dy))
         gesture.current.x = event.nativeEvent.locationX
         gesture.current.y = event.nativeEvent.locationY
@@ -234,7 +263,7 @@ export function PreviewViewport({
           onError={(event) => setGpuError(event.nativeEvent.message)}
         />
       ) : null}
-      <Text accessibilityElementsHidden style={{ position: "absolute", left: 12, bottom: 8, color: palette.muted, ...type(11) }} pointerEvents="none">
+      <Text accessibilityElementsHidden numberOfLines={1} style={{ position: "absolute", left: 12, right: 12, bottom: 10, color: palette.muted, ...type(11) }} pointerEvents="none">
         Drag to orbit · pinch to zoom
       </Text>
       {failed ? (
@@ -244,6 +273,18 @@ export function PreviewViewport({
           </Text>
         </View>
       ) : null}
+    </View>
+    {!failed ? <AdaptiveBlur tint={isDark ? "dark" : "light"} fallbackColor={glass.shellStrong} opaqueFallbackColor={palette.surface}
+      style={{ position: "absolute", top: 10, right: 10, flexDirection: "row", borderRadius: layout.controlRadius, borderCurve: "continuous", overflow: "hidden" }}>
+      {[
+        { action: "reset", label: "Reset camera", Icon: RotateCcw },
+        { action: "decrement", label: "Zoom out", Icon: Minus },
+        { action: "increment", label: "Zoom in", Icon: Plus },
+      ].map(({ action, label, Icon }) => <Pressable key={action} accessibilityRole="button" accessibilityLabel={label}
+        onPress={() => cameraAction(action)} style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
+        <Icon size={18} color={palette.ink} />
+      </Pressable>)}
+    </AdaptiveBlur> : null}
     </View>
   )
 }

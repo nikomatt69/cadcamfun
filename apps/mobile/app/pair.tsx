@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator, Platform, Text, View } from "react-native"
+import { ActivityIndicator, Platform, Text } from "react-native"
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { parsePairingLink } from "@/lib/pairing"
 import { nativeAvailable } from "@/lib/native"
@@ -7,6 +7,8 @@ import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
+import { PageScroll } from "@/components/layout/page-scroll"
+import { SafeAreaView } from "react-native-safe-area-context"
 
 /** Pairing URLs share the scanner's validation and never render their credentials. */
 export default function PairLinkScreen() {
@@ -37,14 +39,14 @@ export default function PairLinkScreen() {
     }).finally(() => { if (active) setBusy(false) })
     return () => { active = false }
   }, [connect, attempt, booting, router])
-  return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 16, backgroundColor: palette.background }}>
+  return <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}><PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center" }}>
     <Stack.Screen options={{ headerShown: false }} />
-    <Text style={{ color: palette.ink, fontSize: 24, fontWeight: "700" }}>Pair with your desktop</Text>
+    <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 24, lineHeight: 30, fontWeight: "700", textAlign: "center" }}>Pair with your desktop</Text>
     {busy || booting ? <ActivityIndicator color={palette.accent} /> : null}
     {error ? <>
       <ErrorBanner message={error} />
-      {supported ? <ActionButton label="Retry" onPress={() => setAttempt((previous) => previous + 1)} /> : null}
-      <ActionButton label="Back to pairing" variant="secondary" onPress={() => router.replace("/connect")} />
-    </> : <Text style={{ color: palette.soft }}>Checking the secure connection…</Text>}
-  </View>
+      {supported ? <ActionButton label="Retry" fullWidth onPress={() => setAttempt((previous) => previous + 1)} /> : null}
+      <ActionButton label="Back to pairing" fullWidth variant="secondary" onPress={() => router.replace("/connect")} />
+    </> : <Text style={{ color: palette.soft, fontSize: 15, lineHeight: 22, textAlign: "center" }}>Checking the secure connection…</Text>}
+  </PageScroll></SafeAreaView>
 }

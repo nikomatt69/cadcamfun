@@ -1,5 +1,7 @@
-import { ActivityIndicator, Text, View } from "react-native"
+import { ActivityIndicator, Text } from "react-native"
 import { useTheme } from "@/lib/theme"
+import { PageScroll } from "@/components/layout/page-scroll"
+import { SafeAreaView } from "react-native-safe-area-context"
 
 /**
  * The boot screen. It lives for the few hundred milliseconds the stored pairing is being tried:
@@ -9,9 +11,11 @@ import { useTheme } from "@/lib/theme"
 export default function IndexScreen() {
   const { palette } = useTheme()
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 14, backgroundColor: palette.background }}>
-      <Text style={{ color: palette.ink, fontSize: 30, fontWeight: "800", letterSpacing: -0.03, lineHeight: 33 }}>CADCAMFUN</Text>
-      <ActivityIndicator color={palette.accent} />
-    </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
+      <PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", gap: 14 }}>
+        <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 30, fontWeight: "800", letterSpacing: -0.6, lineHeight: 36, textAlign: "center" }}>CADCAMFUN</Text>
+        <ActivityIndicator color={palette.accent} accessibilityLabel="Loading your workspace" />
+      </PageScroll>
+    </SafeAreaView>
   )
 }
