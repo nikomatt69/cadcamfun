@@ -128,7 +128,7 @@ describe("phone endpoints on the real HTTP server", () => {
       // The live activity stream opens through the gateway.
       const live = new AbortController()
       const events = phone.events(project.id, live.signal)[Symbol.asyncIterator]()
-      const first = await Promise.race([events.next().then(() => "frame"), new Promise((resolve) => setTimeout(() => resolve("open"), 1_500))])
+      const first = await Promise.race([events.next().then(() => "frame"), new Promise<string>((resolve) => setTimeout(() => resolve("open"), 1_500))])
       expect(["frame", "open"]).toContain(first)
       live.abort()
 
