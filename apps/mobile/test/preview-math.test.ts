@@ -38,6 +38,32 @@ describe("preview camera", () => {
     expect(Math.abs(projected.y)).toBeLessThan(1e-5)
   })
 
+  test("depth uses Metal's 0..1 range: the target sits inside it, near and far planes at its ends", () => {
+    const orbit = fitOrbit(bounds)
+    const mvp = mvpOf(orbit, 1)
+    const { eye, forward } = cameraBasis(orbit)
+    const at = (distance: number) => transformPoint(mvp, [eye[0] + forward[0] * distance, eye[1] + forward[1] * distance, eye[2] + forward[2] * distance]).z
+    expect(at(orbit.distance * 0.01)).toBeCloseTo(0, 5)
+    expect(at(orbit.distance * 50)).toBeCloseTo(1, 5)
+    expect(at(orbit.distance)).toBeGreaterThan(0)
+    expect(at(orbit.distance)).toBeLessThan(1)
+  })
+
+  test("fit keeps every corner of the bounds on screen at any aspect, and uses most of the view", () => {
+    const flat = { min: [-40, -10, 0] as const, max: [40, 10, 6] as const }
+    for (const aspect of [0.45, 1, 2.2]) {
+      const orbit = fitOrbit(flat, aspect)
+      const mvp = mvpOf(orbit, aspect)
+      let reach = 0
+      for (const x of [flat.min[0], flat.max[0]]) for (const y of [flat.min[1], flat.max[1]]) for (const z of [flat.min[2], flat.max[2]]) {
+        const p = transformPoint(mvp, [x, y, z])
+        reach = Math.max(reach, Math.abs(p.x), Math.abs(p.y))
+      }
+      expect(reach).toBeLessThan(1)
+      expect(reach).toBeGreaterThan(0.6)
+    }
+  })
+
   test("drag clamps the pitch", () => {
     const orbit = fitOrbit(bounds)
     expect(orbitDrag(orbit, 0, 10_000).pitch).toBeLessThanOrEqual(MAX_PITCH)

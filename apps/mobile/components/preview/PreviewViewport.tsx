@@ -251,11 +251,11 @@ function Viewport({
     if (!scene || !linesOk.current) return
     const segment = segments?.[playhead]
     try {
-      scene.setActiveLine(prepareActiveLine(segment, simulating ? toolLength : 0))
+      scene.setActiveLine(prepareActiveLine(segment, simulating ? toolLength : 0, rgbFromHex(palette.ink)))
     } catch {
       scene.setActiveLine(new Float32Array())
     }
-  }, [scene, segments, playhead, simulating, toolLength])
+  }, [scene, segments, playhead, simulating, toolLength, palette.ink])
 
   useEffect(() => {
     if (!scene) return

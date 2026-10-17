@@ -162,12 +162,18 @@ describe("CAD outline and scene guides", () => {
 describe("toolpath simulation upload", () => {
   const move = { kind: "linear" as const, from: [0, 0, 0] as const, to: [10, 0, -1] as const }
 
-  test("the active move can carry a tool axis standing on the tool tip", () => {
+  test("the active move can carry a wireframe tool standing on the tool tip", () => {
     expect(prepareActiveLine(move)).toHaveLength(12)
-    const withTool = prepareActiveLine(move, 5)
+    const withTool = prepareActiveLine(move, 5, [0.1, 0.2, 0.3])
     expect(withTool).toHaveLength(PREVIEW_MAX_ACTIVE_VERTICES * 6)
-    expect(Array.from(withTool.slice(12, 15))).toEqual([10, 0, -1])
-    expect(Array.from(withTool.slice(18, 21))).toEqual([10, 0, 4])
+    const points = Array.from({ length: PREVIEW_MAX_ACTIVE_VERTICES - 2 }, (_, index) => Array.from(withTool.slice((index + 2) * 6, (index + 2) * 6 + 6)))
+    // Every tool vertex is on a cylinder of radius 1 around the tip, between the tip and 5 mm above it, in the given colour.
+    for (const [x, y, z, ...rgb] of points) {
+      expect(Math.hypot(x! - 10, y!)).toBeCloseTo(1, 5)
+      expect(z!).toBeGreaterThanOrEqual(-1 - 1e-6)
+      expect(z!).toBeLessThanOrEqual(4 + 1e-6)
+      expect(rgb).toEqual(float32([0.1, 0.2, 0.3]))
+    }
     expect(prepareActiveLine(move, Number.NaN)).toHaveLength(12)
   })
 
@@ -181,6 +187,6 @@ describe("toolpath simulation upload", () => {
   })
 
   test("the tool marker scales with the part", () => {
-    expect(toolMarkerLength({ min: [0, 0, 0], max: [20, 0, 0] })).toBeCloseTo(2, 9)
+    expect(toolMarkerLength({ min: [0, 0, 0], max: [20, 0, 0] })).toBeCloseTo(3, 9)
   })
 })

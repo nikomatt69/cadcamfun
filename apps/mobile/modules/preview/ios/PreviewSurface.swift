@@ -9,6 +9,25 @@ struct PreviewUniforms {
   var eye: SIMD4<Float>
 }
 
+/// Matches the Metal `LineParams` struct: drawable size in pixels, line width in pixels, clip-space depth pull.
+struct PreviewLineParams {
+  var viewport: SIMD2<Float>
+  var width: Float
+  var depthPull: Float
+}
+
+/// Line widths in points; the surface multiplies by the screen scale.
+enum PreviewLineStyle {
+  /// Dense programs (3D surfacing) thin out so passes stay distinguishable instead of merging into a block.
+  static func path(segments: Int) -> (width: Float, pull: Float) {
+    (width: segments > 6_000 ? 0.9 : segments > 1_500 ? 1.25 : 1.75, pull: 2e-5)
+  }
+  static let stock = (width: Float(1.1), pull: Float(2e-5))
+  static let overlay = (width: Float(1.1), pull: Float(4e-5))
+  static let active = (width: Float(3.5), pull: Float(8e-5))
+  static let tool = (width: Float(1.5), pull: Float(8e-5))
+}
+
 /**
  * On-demand Metal view. Touches stay in JavaScript.
  * Shaders are compiled from source so the pod does not ship a separate metallib.
@@ -138,7 +157,7 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
       for range in ranges where range.count >= 2 {
         lineUniforms.color = range.faded ? SIMD4<Float>(frame.clear, frame.remainingFade) : SIMD4<Float>(0, 0, 0, 0)
         encoder.setVertexBytes(&lineUniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
-        encoder.drawPrimitives(type: .line, vertexStart: range.start, vertexCount: range.count)
+        drawLines(encoder, view, start: range.start, count: range.count, style: range.start >= path ? PreviewLineStyle.stock : PreviewLineStyle.path(segments: path / 2))
       }
     }
     lineUniforms.color = SIMD4<Float>(0, 0, 0, 0)
@@ -149,15 +168,17 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
       encoder.setDepthBias(-1, slopeScale: -1, clamp: 0)
       encoder.setVertexBuffer(overlay, offset: 0, index: 0)
       encoder.setVertexBytes(&lineUniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
-      encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: frame.overlayVertices)
+      drawLines(encoder, view, start: 0, count: frame.overlayVertices, style: PreviewLineStyle.overlay)
     }
-    if (frame.activeVertices == 2 || frame.activeVertices == 4), let active = frame.active, active.length >= frame.activeVertices * 24, let linePipeline, let depthEqual {
+    if frame.activeVertices >= 2, frame.activeVertices % 2 == 0, let active = frame.active, active.length >= frame.activeVertices * 24, let linePipeline, let depthEqual {
       encoder.setRenderPipelineState(linePipeline)
       encoder.setDepthStencilState(depthEqual)
       encoder.setDepthBias(-2, slopeScale: -1, clamp: 0)
       encoder.setVertexBuffer(active, offset: 0, index: 0)
       encoder.setVertexBytes(&lineUniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
-      encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: frame.activeVertices)
+      // The move first, then the wireframe tool in a finer stroke.
+      drawLines(encoder, view, start: 0, count: 2, style: PreviewLineStyle.active)
+      drawLines(encoder, view, start: 2, count: frame.activeVertices - 2, style: PreviewLineStyle.tool)
     }
     encoder.endEncoding()
     command.present(drawable)
@@ -167,6 +188,20 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
       DispatchQueue.main.async { self?.report("The preview could not be displayed") }
     }
     command.commit()
+  }
+
+  /// `start`/`count` are line vertices (two per segment); each segment becomes six quad vertices.
+  private func drawLines(_ encoder: MTLRenderCommandEncoder, _ view: MTKView, start: Int, count: Int, style: (width: Float, pull: Float)) {
+    let segments = count / 2
+    guard segments > 0 else { return }
+    let scale = Float(view.contentScaleFactor > 0 ? view.contentScaleFactor : 1)
+    var params = PreviewLineParams(
+      viewport: SIMD2(Float(view.drawableSize.width), Float(view.drawableSize.height)),
+      width: style.width * scale,
+      depthPull: style.pull
+    )
+    encoder.setVertexBytes(&params, length: MemoryLayout<PreviewLineParams>.stride, index: 2)
+    encoder.drawPrimitives(type: .triangle, vertexStart: (start / 2) * 6, vertexCount: segments * 6)
   }
 
   private func meshIsDrawable(_ frame: PreviewFrame) -> Bool {
@@ -329,13 +364,49 @@ struct LineVertex {
   packed_float3 color;
 };
 
+struct LineParams {
+  float2 viewport;
+  float width;
+  float depthPull;
+};
+
+// Hardware lines are one pixel wide, a third of a point on a 3x screen. Each segment (two LineVertex
+// entries) is drawn as a screen-space quad instead: six vertices, two triangles, square caps so a
+// polyline has no gaps at its corners. The quad is pulled slightly toward the camera so it wins
+// against the faces it outlines.
 vertex LineOut lineVertex(uint vid [[vertex_id]],
                           constant LineVertex* vertices [[buffer(0)]],
-                          constant Uniforms& uniforms [[buffer(1)]]) {
+                          constant Uniforms& uniforms [[buffer(1)]],
+                          constant LineParams& params [[buffer(2)]]) {
+  const uint segment = vid / 6;
+  const uint corner = vid % 6;
+  // (end, side) per corner: triangles (a-, b-, a+) and (a+, b-, b+).
+  const bool atEnd = corner == 1 || corner == 4 || corner == 5;
+  const float side = (corner == 2 || corner == 3 || corner == 5) ? 1.0 : -1.0;
+  LineVertex a = vertices[segment * 2];
+  LineVertex b = vertices[segment * 2 + 1];
+  float4 pa = uniforms.mvp * float4(float3(a.position), 1.0);
+  float4 pb = uniforms.mvp * float4(float3(b.position), 1.0);
+  // Clip against the near plane (z = 0 in Metal clip space) so a segment through the camera keeps a direction.
+  if (pa.z < 0.0 && pb.z >= 0.0) pa = mix(pa, pb, pa.z / (pa.z - pb.z));
+  else if (pb.z < 0.0 && pa.z >= 0.0) pb = mix(pb, pa, pb.z / (pb.z - pa.z));
   LineOut out;
-  LineVertex item = vertices[vid];
-  out.position = uniforms.mvp * float4(float3(item.position), 1.0);
-  out.color = mix(float3(item.color), uniforms.color.rgb, uniforms.color.a);
+  out.color = mix(float3(atEnd ? b.color : a.color), uniforms.color.rgb, uniforms.color.a);
+  if (pa.z < 0.0 && pb.z < 0.0) {
+    out.position = float4(0.0, 0.0, -1.0, 1.0);
+    return out;
+  }
+  float2 sa = pa.xy / max(pa.w, 1e-6) * params.viewport * 0.5;
+  float2 sb = pb.xy / max(pb.w, 1e-6) * params.viewport * 0.5;
+  float2 along = sb - sa;
+  float len = length(along);
+  along = len < 1e-4 ? float2(1.0, 0.0) : along / len;
+  float2 across = float2(-along.y, along.x);
+  float2 offset = (across * side + along * (atEnd ? 1.0 : -1.0)) * params.width * 0.5;
+  float4 p = atEnd ? pb : pa;
+  p.xy += offset / (params.viewport * 0.5) * p.w;
+  p.z = max(p.z - params.depthPull * p.w, 0.0);
+  out.position = p;
   return out;
 }
 

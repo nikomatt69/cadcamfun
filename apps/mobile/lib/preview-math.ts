@@ -71,16 +71,39 @@ export const boundsRadius = (bounds: Bounds): number => {
   return Math.max(length(half), 1e-3)
 }
 
-/** Frame the bounds with Z up and a slight top view. */
-export const fitOrbit = (bounds: Bounds, fovY = DEFAULT_FOV): Orbit => {
-  const radius = boundsRadius(bounds)
-  return {
-    yaw: Math.PI / 4,
-    pitch: 0.55,
-    distance: (radius / Math.tan(fovY / 2)) * 1.6,
-    target: boundsCenter(bounds),
+/** Breathing room around the projected bounds. */
+export const FIT_MARGIN = 1.1
+
+/**
+ * Smallest distance at which all eight corners of `bounds` are inside the view seen from `yaw`/`pitch`, plus the
+ * margin. Exact for the box, so a long flat part fills the screen instead of its bounding sphere.
+ */
+export const fitDistance = (bounds: Bounds, yaw: number, pitch: number, aspect = 1, fovY = DEFAULT_FOV): number => {
+  const safeAspect = Number.isFinite(aspect) && aspect > 1e-3 ? aspect : 1
+  const tanY = Math.tan(fovY / 2)
+  const tanX = tanY * safeAspect
+  const center = boundsCenter(bounds)
+  const { forward, right, up } = cameraBasis({ yaw, pitch, distance: 1, target: center })
+  let distance = 0
+  for (const x of [bounds.min[0], bounds.max[0]]) for (const y of [bounds.min[1], bounds.max[1]]) for (const z of [bounds.min[2], bounds.max[2]]) {
+    const offset = sub([x, y, z], center)
+    const depth = dot(offset, forward)
+    distance = Math.max(distance, Math.abs(dot(offset, right)) / tanX - depth, Math.abs(dot(offset, up)) / tanY - depth)
   }
+  // Never inside the part, and never a zero distance for a point-sized one.
+  return Math.max(distance * FIT_MARGIN, boundsRadius(bounds) * 1.2)
 }
+
+const ISO_YAW = Math.PI / 4
+const ISO_PITCH = 0.55
+
+/** Frame the bounds with Z up and a slight top view. `aspect` is width / height of the viewport. */
+export const fitOrbit = (bounds: Bounds, aspect = 1, fovY = DEFAULT_FOV): Orbit => ({
+  yaw: ISO_YAW,
+  pitch: ISO_PITCH,
+  distance: fitDistance(bounds, ISO_YAW, ISO_PITCH, aspect, fovY),
+  target: boundsCenter(bounds),
+})
 
 /** Just short of straight down, so a top view keeps a stable screen-right axis. */
 export const MAX_PITCH = Math.PI / 2 - 0.02
@@ -100,20 +123,20 @@ export const STANDARD_VIEWS: readonly { readonly id: StandardView; readonly labe
 ]
 
 /** Desktop view-cube faces, Z up: front looks along +Y, right along -X, top shows X to the right and Y up. */
-export const viewOrbit = (bounds: Bounds, view: StandardView, fovY = DEFAULT_FOV): Orbit => {
-  const fit = fitOrbit(bounds, fovY)
+export const viewOrbit = (bounds: Bounds, view: StandardView, aspect = 1, fovY = DEFAULT_FOV): Orbit => {
+  const fit = fitOrbit(bounds, aspect, fovY)
+  const facing = (yaw: number, pitch: number): Orbit => ({ ...fit, yaw, pitch, distance: fitDistance(bounds, yaw, pitch, aspect, fovY) })
   switch (view) {
     case "iso": return fit
-    case "top": return { ...fit, yaw: -Math.PI / 2, pitch: MAX_PITCH }
-    case "front": return { ...fit, yaw: -Math.PI / 2, pitch: 0 }
-    case "right": return { ...fit, yaw: 0, pitch: 0 }
+    case "top": return facing(-Math.PI / 2, MAX_PITCH)
+    case "front": return facing(-Math.PI / 2, 0)
+    case "right": return facing(0, 0)
   }
 }
 
 /** Re-centre and re-distance on `bounds` while keeping the current viewing direction. */
-export const frameOrbit = (orbit: Orbit, bounds: Bounds, fovY = DEFAULT_FOV): Orbit => {
-  const fit = fitOrbit(bounds, fovY)
-  return { ...orbit, target: fit.target, distance: fit.distance }
+export const frameOrbit = (orbit: Orbit, bounds: Bounds, aspect = 1, fovY = DEFAULT_FOV): Orbit => {
+  return { ...orbit, target: boundsCenter(bounds), distance: fitDistance(bounds, orbit.yaw, orbit.pitch, aspect, fovY) }
 }
 
 /** Second tap of a double tap: close in time and place to the previous tap. */
@@ -194,6 +217,7 @@ const lookAt = (eye: readonly [number, number, number], target: readonly [number
   ]
 }
 
+/** Metal clip space: depth runs 0 (near) to 1 (far), not GL's -1..1, so no half of the depth range is wasted. */
 const perspective = (fovY: number, aspect: number, near: number, far: number): number[] => {
   const f = 1 / Math.tan(fovY / 2)
   const nf = 1 / (near - far)
@@ -201,8 +225,8 @@ const perspective = (fovY: number, aspect: number, near: number, far: number): n
   return [
     f / safeAspect, 0, 0, 0,
     0, f, 0, 0,
-    0, 0, (far + near) * nf, -1,
-    0, 0, 2 * far * near * nf, 0,
+    0, 0, far * nf, -1,
+    0, 0, far * near * nf, 0,
   ]
 }
 
@@ -218,7 +242,7 @@ export const multiplyMat4 = (a: readonly number[], b: readonly number[]): number
   return out
 }
 
-/** Column-major projection-view matrix for the GL uniform. */
+/** Column-major projection-view matrix for the Metal uniform. */
 export const mvpOf = (orbit: Orbit, aspect: number, fovY = DEFAULT_FOV): number[] => {
   const { eye, up } = cameraBasis(orbit)
   const near = Math.max(orbit.distance * 0.01, 1e-3)

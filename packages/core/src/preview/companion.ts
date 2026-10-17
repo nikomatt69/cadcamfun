@@ -8,7 +8,8 @@
 import type { Vec3 } from "../cad/vec.ts"
 import { expandMoves, moveTarget, type Program } from "../cam/ir.ts"
 import { elementMesh, type Element } from "../cam/model/element-mesh.ts"
-import { hasG, tokenize, valuesOf } from "../cam/viewer/words.ts"
+import { parseToolpath, type ToolpathPoint } from "../cam/viewer/toolpath.ts"
+import { tokenize, valuesOf } from "../cam/viewer/words.ts"
 
 /** Hard cap so one part cannot fill the local network. */
 export const MAX_PREVIEW_TRIANGLES = 80_000
@@ -234,62 +235,56 @@ export interface ToolpathPreviewOptions {
   readonly maxSegments?: number
 }
 
+/** Longest chord, in mm, an arc, fixed cycle or shape block is split into on the phone. */
+export const PREVIEW_ARC_RESOLUTION = 1
+
 /**
- * One segment per motion block. Arcs are the chord from the current point to the end point; every point of that
- * block shares the source line so the G-code list and the 3D path stay locked together.
+ * The desktop visualizer's parse (`parseToolpath`): arcs follow their centre, fixed cycles and G12/G13 shapes are
+ * expanded, and the path starts at the first programmed point instead of an assumed origin. Every point of a block
+ * keeps the source line so the G-code list and the 3D path stay locked together. Stats count motion blocks.
  */
 export const toolpathPreviewFromGcode = (gcode: string, options: ToolpathPreviewOptions = {}): ToolpathPreview => {
   const maxSegments = options.maxSegments ?? MAX_PREVIEW_SEGMENTS
-  const lines = gcode.split("\n")
   const segments: ToolpathSegment[] = []
+  let truncated = false
+  const { points } = parseToolpath(gcode, PREVIEW_ARC_RESOLUTION)
+  for (let index = 1; index < points.length; index++) {
+    const from = points[index - 1]!
+    const to = points[index]!
+    if (from.x === to.x && from.y === to.y && from.z === to.z) continue
+    if (segments.length >= maxSegments) {
+      truncated = true
+      break
+    }
+    segments.push({ kind: pointKind(to), line: to.line ?? 0, from: [from.x, from.y, from.z], to: [to.x, to.y, to.z] })
+  }
+  return pack(segments, blockStats(gcode), truncated)
+}
+
+const pointKind = (point: ToolpathPoint): SegmentKind =>
+  point.isRapid ? "rapid" : point.isArc || point.isShape || point.type === "G2" || point.type === "G3" ? "circular" : "linear"
+
+/** One count per motion block, modal blocks included (`X10` after `G1` is a linear move). */
+const blockStats = (gcode: string): ToolpathStats => {
   let rapidMoves = 0
   let linearMoves = 0
   let circularMoves = 0
   let machineFunctions = 0
   let motion: Motion | undefined
-  let absolute = true
-  let x = 0
-  let y = 0
-  let z = 0
-  let truncated = false
-
-  for (let index = 0; index < lines.length; index++) {
-    const block = tokenize(lines[index]!)
+  for (const line of gcode.split("\n")) {
+    const block = tokenize(line)
     if (block.words.length === 0) continue
     if (valuesOf(block, "M").length > 0) machineFunctions++
-    if (hasG(block, 90)) absolute = true
-    if (hasG(block, 91)) absolute = false
     const explicit = motionOf(block)
     if (explicit !== undefined) motion = explicit
     const hasCoordinate = block.words.some((word) => word.letter === "X" || word.letter === "Y" || word.letter === "Z")
     if (motion === undefined || (explicit === undefined && !hasCoordinate)) continue
     if (explicit === undefined && valuesOf(block, "G").length > 0) continue
-
-    let nx = x
-    let ny = y
-    let nz = z
-    for (const word of block.words) {
-      if (word.letter === "X") nx = absolute ? word.value : x + word.value
-      else if (word.letter === "Y") ny = absolute ? word.value : y + word.value
-      else if (word.letter === "Z") nz = absolute ? word.value : z + word.value
-    }
     if (motion === "rapid") rapidMoves++
     else if (motion === "linear") linearMoves++
     else circularMoves++
-    if (segments.length >= maxSegments) {
-      truncated = true
-      x = nx
-      y = ny
-      z = nz
-      continue
-    }
-    segments.push({ kind: motion, line: index + 1, from: [x, y, z], to: [nx, ny, nz] })
-    x = nx
-    y = ny
-    z = nz
   }
-
-  return pack(segments, { rapidMoves, linearMoves, circularMoves, machineFunctions }, truncated)
+  return { rapidMoves, linearMoves, circularMoves, machineFunctions }
 }
 
 const xyz = (v: Vec3): readonly [number, number, number] => [v.x, v.y, v.z]
@@ -299,6 +294,8 @@ export const toolpathPreviewFromProgram = (program: Program, options: ToolpathPr
   const maxSegments = options.maxSegments ?? MAX_PREVIEW_SEGMENTS
   const segments: ToolpathSegment[] = []
   let at: Vec3 = { x: 0, y: 0, z: 0 }
+  // The machine's position before the first move is unknown: that move only sets the start.
+  let known = false
   let rapidMoves = 0
   let linearMoves = 0
   let circularMoves = 0
@@ -312,11 +309,16 @@ export const toolpathPreviewFromProgram = (program: Program, options: ToolpathPr
         if (kind === "rapid") rapidMoves++
         else if (kind === "linear") linearMoves++
         else circularMoves++
-        if (segments.length < maxSegments && target) {
+        if (!known || !target) {
+          // Nothing to draw yet.
+        } else if (segments.length < maxSegments) {
           segments.push({ kind, line: segments.length + 1, from: xyz(at), to: xyz(target) })
         } else truncated = true
       }
-      if (target) at = target
+      if (target) {
+        at = target
+        known = true
+      }
     }
     if (truncated) break
   }

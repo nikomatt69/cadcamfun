@@ -13,7 +13,7 @@ enum PreviewLimits {
   static let maxSegments = 20_000
   static let maxStockEdges = 12
   static let maxOverlaySegments = 40_000
-  static let maxActiveVertices = 4
+  static let maxActiveVertices = 74
   static var maxIndices: Int { maxTriangles * 3 }
   static var maxVertices: Int { maxTriangles * 3 }
   static var maxLineVertices: Int { (maxSegments + maxStockEdges) * 2 }
@@ -73,10 +73,10 @@ enum PreviewUpload {
 
   private static var maxOverlayVertices: Int { PreviewLimits.maxOverlaySegments * 2 }
 
-  /// The highlighted move (two vertices), optionally followed by the tool axis (two more).
+  /// The highlighted move (two vertices), optionally followed by the wireframe tool.
   static func activeLine(_ values: Float32Array) -> PreviewRejection? {
     if values.length == 0 { return nil }
-    guard aligned(values), values.length == 12 || values.length == 24 else { return .pathInvalid }
+    guard aligned(values), values.length % 12 == 0, values.length / 6 <= PreviewLimits.maxActiveVertices else { return .pathInvalid }
     return finite(values) ? nil : .pathInvalid
   }
 

@@ -49,12 +49,16 @@ describe("companion toolpath preview", () => {
   test("segments point at the G-code line that moved, and stats match the 2D preview", () => {
     const preview = toolpathPreviewFromGcode(gcode)
     const classic = previewPath(gcode)
-    expect(preview.segments.map((segment) => [segment.kind, segment.line])).toEqual([
-      ["rapid", 2],
-      ["linear", 3],
-      ["circular", 5],
-    ])
-    expect(preview.segments[0]?.to).toEqual([10, 0, 5])
+    // The first rapid only sets the start: where the tool was before it is unknown.
+    expect(preview.segments[0]).toMatchObject({ kind: "linear", line: 3, from: [10, 0, 5], to: [20, 0, -1] })
+    // The arc follows its centre (20, 5): every chord is on line 5 and stays on the 5 mm radius.
+    const arc = preview.segments.slice(1)
+    expect(arc.length).toBeGreaterThan(4)
+    expect(arc.every((segment) => segment.kind === "circular" && segment.line === 5)).toBe(true)
+    for (const segment of arc) expect(Math.hypot(segment.to[0] - 20, segment.to[1] - 5)).toBeCloseTo(5, 6)
+    expect(arc.at(-1)?.to.map((value) => Number(value.toFixed(6)))).toEqual([20, 10, -1])
+    // Clockwise from (20, 0) to (20, 10) about (20, 5) swings through X15.
+    expect(Math.min(...arc.map((segment) => segment.to[0]))).toBeCloseTo(15, 1)
     expect(preview.stats).toMatchObject({
       rapidMoves: classic.rapidMoves,
       linearMoves: classic.linearMoves,
@@ -72,6 +76,19 @@ describe("companion toolpath preview", () => {
     expect(preview.stats.linearMoves).toBe(1)
   })
 
+  test("the path starts at the first programmed point, so the stock is not stretched to an assumed origin", () => {
+    const preview = toolpathPreviewFromGcode(["G90", "G0 Z85", "G0 X-3 Y-3 Z80", "G1 Z74 F300", "G1 X3"].join("\n"))
+    expect(preview.segments[0]?.from).toEqual([0, 0, 85])
+    expect(preview.bounds.min[2]).toBe(74)
+  })
+
+  test("a fixed drilling cycle is drawn down to its depth and back to the retract plane", () => {
+    const preview = toolpathPreviewFromGcode(["G0 X0 Y0 Z10", "G81 X5 Y5 Z-4 R2 F100", "X15", "G80"].join("\n"))
+    const plunges = preview.segments.filter((segment) => segment.kind === "linear")
+    expect(plunges.map((segment) => [segment.line, segment.to])).toEqual([[2, [5, 5, -4]], [3, [15, 5, -4]]])
+    expect(preview.bounds.min[2]).toBe(-4)
+  })
+
   test("a program without G-code still yields rapid and linear segments", () => {
     const program = makeProgram("job", [{
       id: "tp",
@@ -85,8 +102,8 @@ describe("companion toolpath preview", () => {
       ],
     }])
     const preview = toolpathPreviewFromProgram(program)
-    expect(preview.segments.map((segment) => segment.kind)).toEqual(["rapid", "linear"])
-    expect(preview.segments[1]?.to).toEqual([20, 0, -1])
+    expect(preview.segments.map((segment) => segment.kind)).toEqual(["linear"])
+    expect(preview.segments[0]).toMatchObject({ from: [10, 0, 5], to: [20, 0, -1] })
     expect(preview.stats.machineFunctions).toBe(0)
   })
 })

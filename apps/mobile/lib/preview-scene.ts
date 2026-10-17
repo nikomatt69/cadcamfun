@@ -44,7 +44,8 @@ export const LINE_COLOR = {
   linear: [0.28, 0.78, 0.46],
   circular: [0.66, 0.46, 0.94],
   stock: [0.48, 0.5, 0.55],
-  active: [1, 0.86, 0.32],
+  // Amber reads on both the dark and the light background; the old pale yellow vanished on light.
+  active: [1, 0.62, 0.12],
   tool: [0.98, 0.98, 1],
   edge: [0.1, 0.12, 0.16],
   axisX: [0.9, 0.3, 0.3],
@@ -173,27 +174,47 @@ export const prepareToolpathLines = (segments: readonly PreviewSegment[], stock:
   return data
 }
 
-/** Up to two lines: the current move, and the tool axis standing on its end point. */
-export const PREVIEW_MAX_ACTIVE_VERTICES = 4
+/** Facets of the wireframe tool drawn at the playhead. */
+export const TOOL_GLYPH_SIDES = 16
+
+/** The current move, plus a wireframe tool: a ring at the tip, a ring at the top and four flutes between them. */
+export const PREVIEW_MAX_ACTIVE_VERTICES = 2 + TOOL_GLYPH_SIDES * 2 * 2 + 4 * 2
 
 /** How strongly the not-yet-cut path fades toward the background while simulating (0 = no fade). */
 export const REMAINING_PATH_FADE = 0.72
 
+/** Tool radius relative to its drawn height: a stubby end mill, wide enough to read at a glance. */
+const TOOL_GLYPH_RADIUS = 0.2
+
 /**
- * The current move, plus a vertical tool axis of `toolLength` at the tool tip when it is positive.
- * Empty when no move is current.
+ * The current move, plus a wireframe tool of height `toolLength` standing on the tool tip when it is positive.
+ * `toolColor` is the theme ink so the tool reads on light and dark. Empty when no move is current.
  */
-export const prepareActiveLine = (segment: PreviewSegment | undefined, toolLength = 0): Float32Array => {
+export const prepareActiveLine = (segment: PreviewSegment | undefined, toolLength = 0, toolColor: Rgb = LINE_COLOR.tool): Float32Array => {
   if (!segment) return new Float32Array()
   assertPoint(segment.from)
   assertPoint(segment.to)
   const tool = Number.isFinite(toolLength) && toolLength > 0
-  const data = new Float32Array(tool ? SEGMENT_FLOATS * 2 : SEGMENT_FLOATS)
+  const data = new Float32Array(tool ? PREVIEW_MAX_ACTIVE_VERTICES * LINE_VERTEX_FLOATS : SEGMENT_FLOATS)
   let cursor = writeVertex(data, 0, segment.from, LINE_COLOR.active)
   cursor = writeVertex(data, cursor, segment.to, LINE_COLOR.active)
-  if (tool) {
-    cursor = writeVertex(data, cursor, segment.to, LINE_COLOR.tool)
-    writeVertex(data, cursor, [segment.to[0], segment.to[1], segment.to[2] + toolLength], LINE_COLOR.tool)
+  if (!tool) return data
+  const x = segment.to[0], y = segment.to[1], z = segment.to[2]
+  const radius = toolLength * TOOL_GLYPH_RADIUS
+  const at = (side: number, height: number): PreviewPoint => {
+    const angle = (side / TOOL_GLYPH_SIDES) * Math.PI * 2
+    return [x + Math.cos(angle) * radius, y + Math.sin(angle) * radius, z + height]
+  }
+  for (const height of [0, toolLength]) {
+    for (let side = 0; side < TOOL_GLYPH_SIDES; side++) {
+      cursor = writeVertex(data, cursor, at(side, height), toolColor)
+      cursor = writeVertex(data, cursor, at(side + 1, height), toolColor)
+    }
+  }
+  for (let flute = 0; flute < 4; flute++) {
+    const side = (flute * TOOL_GLYPH_SIDES) / 4
+    cursor = writeVertex(data, cursor, at(side, 0), toolColor)
+    cursor = writeVertex(data, cursor, at(side, toolLength), toolColor)
   }
   return data
 }
@@ -210,10 +231,10 @@ export const progressRange = (playhead: number, segmentCount: number, simulating
   return { travelled: done * 2, path: count * 2 }
 }
 
-/** Tool marker length: a tenth of the part's size, so it reads at every zoom of a fitted view. */
+/** Tool marker height: a sixth of the part's size, so it reads at every zoom of a fitted view. */
 export const toolMarkerLength = (bounds: Bounds): number => {
   const radius = boundsRadius(bounds)
-  return Number.isFinite(radius) ? radius * 0.2 : 0
+  return Number.isFinite(radius) ? radius * 0.3 : 0
 }
 
 export const finiteMatrix = (mvp: readonly number[]): boolean => mvp.length === 16 && mvp.every((value) => Number.isFinite(value))
@@ -331,7 +352,7 @@ export const prepareOverlayLines = (
 }
 
 /** Grid ink: the background moved a little toward the theme's ink so it reads in light and dark. */
-export const guideColor = (background: string, ink: string, amount = 0.14): Rgb => {
+export const guideColor = (background: string, ink: string, amount = 0.1): Rgb => {
   const a = rgbFromHex(background), b = rgbFromHex(ink)
   return [a[0] + (b[0] - a[0]) * amount, a[1] + (b[1] - a[1]) * amount, a[2] + (b[2] - a[2]) * amount]
 }
