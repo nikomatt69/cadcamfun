@@ -1,26 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { AppState, FlatList, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native"
+import { ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { Stack, useFocusEffect } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
-import { Bot, Check, ChevronDown, CircleGauge, GitPullRequest, Plus, Route, SlidersHorizontal, Sparkles } from "lucide-react-native"
+import { Bot, Check, ChevronDown, CircleGauge, CloudOff, GitPullRequest, Plus, Route, SlidersHorizontal, Sparkles } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useResource } from "@/lib/use-resource"
 import { useUIStore } from "@/lib/store"
 import { haptic } from "@/lib/haptics"
 import { toast } from "@/components/ui/ToastHost"
-import { appendChatEvent, answerRequest, emptyLog, lastUserPrompt, transcriptText, type ChatRow, type LogEvent } from "@/lib/chat-log"
+import { appendChatEvent, answerRequest, emptyLog, lastUserPrompt, settleOfflineRows, transcriptText, type ChatRow, type LogEvent } from "@/lib/chat-log"
+import { buildTranscript, type TranscriptItem } from "@/lib/transcript-rows"
 import { activityLabel, idleActivity, reduceTurnActivity, type TurnActivity } from "@/lib/turn-activity"
-import { PlanCard, NoticeRow } from "@/components/chat/PlanCard"
-import { enqueueAssistantOp } from "@/lib/offline-queue"
+import { enqueueAssistantOp, queuedTextsForProject } from "@/lib/offline-queue"
 import { CompanionError } from "@/lib/client"
 import { followSession } from "@/lib/session-stream"
 import { Composer, type AssistantMode } from "@/components/chat/Composer"
-import { MessageBubble } from "@/components/chat/MessageBubble"
-import { ToolCallRow } from "@/components/chat/ToolCallRow"
-import { QuestionCard } from "@/components/chat/QuestionCard"
-import { PermissionCard } from "@/components/chat/PermissionCard"
+import { TranscriptItemView, type ErrorRecovery, type TranscriptActions } from "@/components/chat/TranscriptItemView"
+import { JumpToLatestPill } from "@/components/chat/JumpToLatestPill"
+import { hexToRgba } from "@/lib/theme"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { PressableScale } from "@/components/ui/PressableScale"
 import { EmptyState } from "@/components/ui/EmptyState"
@@ -113,12 +112,18 @@ export default function AssistantScreen() {
   const [link, setLink] = useState<"idle" | "connecting" | "live" | "reconnecting">("idle")
   const [screenFocused, setScreenFocused] = useState(false)
   const [appActive, setAppActive] = useState(AppState.currentState === "active")
-  const listRef = useRef<FlatList<ChatRow>>(null)
+  const listRef = useRef<FlatList<TranscriptItem>>(null)
   const generation = useRef(0)
   const stopping = useRef(false)
   const logs = useRef(new Map<string, readonly ChatRow[]>())
   const logRef = useRef(log)
   logRef.current = log
+  /** Stop was pressed and the desktop has not ended the turn yet. */
+  const [stopRequested, setStopRequested] = useState(false)
+  /** Transcript length when the user scrolled up to read; `null` while following the newest row. */
+  const [readingFrom, setReadingFrom] = useState<number | null>(null)
+  const readingRef = useRef<number | null>(null)
+  const online = connectivity === "online"
 
   const projects = useResource(
     useCallback((signal) => (client ? client.projects(signal) : Promise.reject(new Error("Not connected"))), [client]),
@@ -150,6 +155,8 @@ export default function AssistantScreen() {
     setActivity(idleActivity)
     setBusy(false)
     stopping.current = false
+    readingRef.current = null
+    setReadingFrom(null)
     // Opening a conversation follows its desktop session; leaving it only closes the stream, never the turn.
     setFollowed(sessionRef.current)
     return () => {
@@ -170,6 +177,25 @@ export default function AssistantScreen() {
     setPromptSeed({ projectId: draft.projectId, text: draft.text, token: Date.now() })
     clearAssistantDraft()
   }, [draft, projectId, clearAssistantDraft])
+
+  // The outbox delivered a message written offline and the desktop opened a session for it: follow that session.
+  const storedSession = useUIStore((state) => projectId ? state.assistantSessions[projectId] : undefined)
+  useEffect(() => {
+    if (!storedSession || storedSession === sessionRef.current || posting.current) return
+    sessionRef.current = storedSession
+    setFollowed(storedSession)
+  }, [storedSession])
+
+  // Rows written offline stop showing "waiting" once the outbox no longer holds their text.
+  const queueRevision = useUIStore((state) => state.offlineQueueRevision)
+  useEffect(() => {
+    if (!projectId || !logRef.current.some((row) => row.kind === "user" && row.offline)) return
+    let cancelled = false
+    void queuedTextsForProject(projectId).then((texts) => { if (!cancelled) setLog((previous) => settleOfflineRows(previous, texts)) }).catch(() => undefined)
+    return () => { cancelled = true }
+  }, [queueRevision, projectId])
+
+  useEffect(() => { if (!busy) setStopRequested(false) }, [busy])
 
   /**
    * Re-reads the desktop session once (nikcli `onReconnect`): stored tool results, the final answer of a finished turn
@@ -241,10 +267,17 @@ export default function AssistantScreen() {
   const send = async (text: string) => {
     if (!client || !projectId || posting.current || stopping.current) return
     if (connectivity !== "online") {
-      apply({ type: "user", text })
-      await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
-      toast("Desktop offline — message queued", "info")
-      haptic("selection")
+      // nikcli offline outbox: the message waits on this iPhone and is delivered once, in order, when the desktop is back.
+      try {
+        await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
+        apply({ type: "user", text, offline: true })
+        toast("Desktop offline · message saved and sent when it reconnects", "info")
+        haptic("selection")
+      } catch (error) {
+        haptic("error")
+        toast(error instanceof Error ? error.message : "Could not save the message for later", "error")
+        reuse(text)
+      }
       return
     }
     const version = ++generation.current
@@ -253,6 +286,7 @@ export default function AssistantScreen() {
     // A new turn starts its own meter; steering (queue) keeps the running one.
     setActivity(idleActivity)
     apply({ type: "user", text })
+    jumpToLatest(false)
     try {
       // The desktop owns the turn from here; this answers as soon as the host session exists.
       const started = await client.promptSession({ projectId, message: text, ...(sessionRef.current ? { sessionId: sessionRef.current } : {}), agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
@@ -285,8 +319,12 @@ export default function AssistantScreen() {
     const sessionId = sessionRef.current
     // The session stream delivers the turn's end; only this request stops the desktop.
     const stopped = sessionId && client ? client.abortChat(sessionId) : Promise.resolve()
+    setStopRequested(Boolean(sessionId))
     void stopped.catch((error: unknown) => {
-      if (version === generation.current) toast(error instanceof Error ? error.message : "Could not stop the desktop turn", "error")
+      if (version === generation.current) {
+        setStopRequested(false)
+        toast(error instanceof Error ? error.message : "Could not stop the desktop turn", "error")
+      }
     }).finally(() => {
       stopping.current = false
       if (!sessionId) setBusy(false)
@@ -296,8 +334,9 @@ export default function AssistantScreen() {
   const queue = async (text: string) => {
     const sessionId = sessionRef.current
     const version = generation.current
-    if (!client || !projectId || !sessionId || connectivity !== "online") return
+    if (!client || !projectId || !sessionId || connectivity !== "online") { reuse(text); return }
     apply({ type: "user", text, queued: true })
+    jumpToLatest(false)
     try {
       await client.queueChat(sessionId, text, projectId, "steer")
     } catch (error) {
@@ -365,32 +404,50 @@ export default function AssistantScreen() {
     setPromptSeed({ projectId, text, token: Date.now() })
   }
 
-  const renderRow = ({ item }: { item: ChatRow }) => {
-    switch (item.kind) {
-      case "user":
-      case "assistant":
-        return <MessageBubble row={item} onReuse={reuse} />
-      case "plan":
-        return <PlanCard row={item} />
-      case "notice":
-        return <NoticeRow row={item} />
-      case "tool":
-        return <ToolCallRow row={item} />
-      case "request":
-        return <PermissionCard key={item.requestId} row={item} onReply={replyPermission} />
-      case "question":
-        return <QuestionCard key={item.requestId} row={item} onReply={replyQuestion} onReject={(requestId) => replyQuestion(requestId)} />
-      case "error":
-        return (
-          <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-            <Text selectable style={{ color: palette.danger, fontSize: 13, lineHeight: 18, textAlign: "center" }}>{item.message}</Text>
-            {!busy && sessionRef.current ? <ActionButton label="Refresh conversation" variant="ghost" onPress={() => void syncSession(sessionRef.current!)} /> : null}
-            {/* Never resent automatically: the prompt may have already changed the model on the desktop. */}
-            {!busy && lastUserPrompt(log) ? <ActionButton label="Edit last message" variant="ghost" onPress={() => reuse(lastUserPrompt(log)!)} /> : null}
-          </View>
-        )
+  // Rows are memoized by id; the handlers they receive never change identity, so a streaming delta re-renders one row.
+  const handlers = useRef({ reuse, replyPermission, replyQuestion, refresh: () => { if (sessionRef.current) void syncSession(sessionRef.current) } })
+  handlers.current = { reuse, replyPermission, replyQuestion, refresh: () => { if (sessionRef.current) void syncSession(sessionRef.current) } }
+  const actions = useMemo<TranscriptActions>(() => ({
+    reuse: (text) => handlers.current.reuse(text),
+    replyPermission: (requestId, decision) => handlers.current.replyPermission(requestId, decision),
+    replyQuestion: (requestId, answers) => handlers.current.replyQuestion(requestId, answers),
+    refresh: () => handlers.current.refresh(),
+  }), [])
+
+  const transcript = useMemo(() => buildTranscript(log), [log])
+  const reversed = useMemo(() => [...transcript].reverse(), [transcript])
+  const transcriptLength = useRef(0)
+  transcriptLength.current = transcript.length
+  const lastErrorId = useMemo(() => transcript.findLast((item) => item.kind === "row" && item.row.kind === "error")?.id, [transcript])
+  const newest = transcript[transcript.length - 1]
+  const liveReasoningId = busy && newest?.kind === "row" && newest.row.kind === "reasoning" ? newest.id : undefined
+  const lastPrompt = useMemo(() => lastUserPrompt(log), [log])
+  const recovery = useMemo<ErrorRecovery | undefined>(() => busy ? undefined : { refresh: Boolean(followed), ...(lastPrompt ? { lastPrompt } : {}) }, [busy, followed, lastPrompt])
+  const renderItem = useCallback(({ item }: { item: TranscriptItem }) => (
+    <TranscriptItemView item={item} actions={actions} live={item.id === liveReasoningId} recovery={item.id === lastErrorId ? recovery : undefined} />
+  ), [actions, liveReasoningId, lastErrorId, recovery])
+
+  // Inverted list: offset 0 is the newest row. Hysteresis keeps the pill from flickering at the threshold.
+  const onTranscriptScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offset = event.nativeEvent.contentOffset.y
+    if (offset > 160 && readingRef.current === null) {
+      readingRef.current = transcriptLength.current
+      setReadingFrom(transcriptLength.current)
+    } else if (offset < 48 && readingRef.current !== null) {
+      readingRef.current = null
+      setReadingFrom(null)
     }
+  }, [])
+  function jumpToLatest(animated = true) {
+    readingRef.current = null
+    setReadingFrom(null)
+    listRef.current?.scrollToOffset({ offset: 0, animated })
   }
+
+  const composeReady = Boolean(currentProject) && !modelUnavailable && (online ? aiReady : true)
+  const composeNote = modelUnavailable ? "Choose an available desktop model"
+    : !currentProject ? "Choose a project to chat"
+      : ai === null ? "Checking the desktop AI configuration…" : "Add a model key on the desktop to chat"
 
   return (
     <SafeAreaView edges={{ bottom: true, left: true, right: true }} style={{ flex: 1, backgroundColor: palette.background }}>
@@ -430,6 +487,9 @@ export default function AssistantScreen() {
           <ChevronDown size={14} color={palette.muted} />
         </PressableScale>
       </View>
+
+      {!online ? <LinkStrip offline text="Desktop offline. New messages wait on this iPhone and send when it reconnects." />
+        : link === "reconnecting" && !busy ? <LinkStrip text="Reconnecting to the conversation…" /> : null}
 
       {/* Transcript */}
       {log.length === 0 ? (
@@ -480,24 +540,35 @@ export default function AssistantScreen() {
           )}
         </ScrollView>
       ) : (
-        <FlatList
-          ref={listRef}
-          data={[...log].reverse()}
-          keyExtractor={(_, index) => String(log.length - 1 - index)}
-          inverted
-          contentInsetAdjustmentBehavior="never"
-          contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: Math.max(0, contentGutter(width) - 16) }}
-          renderItem={renderRow}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 80 }}
-          keyboardDismissMode="interactive"
-        />
+        <View style={{ flex: 1 }}>
+          <FlatList
+            ref={listRef}
+            data={reversed}
+            keyExtractor={(item) => item.id}
+            inverted
+            contentInsetAdjustmentBehavior="never"
+            contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: Math.max(0, contentGutter(width) - 16) }}
+            renderItem={renderItem}
+            maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 80 }}
+            keyboardDismissMode="interactive"
+            onScroll={onTranscriptScroll}
+            scrollEventThrottle={64}
+            // Long CAD/CAM turns hold hundreds of rows: render a screenful at a time.
+            initialNumToRender={14}
+            maxToRenderPerBatch={10}
+            windowSize={11}
+          />
+          <JumpToLatestPill visible={readingFrom !== null} count={readingFrom === null ? 0 : Math.max(0, transcript.length - readingFrom)} onPress={() => jumpToLatest()} />
+        </View>
       )}
 
       <Composer
         key={projectId ?? "no-project"}
-        busy={busy}
-        disabled={!currentProject || !aiReady || connectivity !== "online" || modelUnavailable}
-        disabledNote={modelUnavailable ? "Choose an available desktop model" : !currentProject ? "Choose a project to chat" : connectivity !== "online" ? "Reconnect to the desktop to chat" : ai === null ? "Checking the desktop AI configuration…" : "Add a model key on the desktop to chat"}
+        busy={busy && online}
+        offline={!online}
+        stopping={stopRequested}
+        disabled={!composeReady}
+        disabledNote={composeNote}
         modelLabel={`${modelLabel}${thinkingLabel ? ` · ${thinkingLabel}` : ""}`}
         permissionLabel={permissionLabel}
         onOpenModels={() => projectId ? setModelsOpen(true) : setPickerOpen(true)}
@@ -507,7 +578,7 @@ export default function AssistantScreen() {
         onSend={(text) => void send(text)}
         onQueue={(text) => void queue(text)}
         onStop={stop}
-        status={link === "reconnecting" ? "Reconnecting to the desktop… the turn keeps running there" : link === "connecting" && busy ? "Connecting to the desktop…" : activityLabel(activity)}
+        status={stopRequested ? "Stopping the desktop turn…" : link === "reconnecting" ? "Reconnecting to the desktop… the turn keeps running there" : link === "connecting" && busy ? "Connecting to the desktop…" : activityLabel(activity)}
         seed={promptSeed?.projectId === projectId ? promptSeed.text : undefined}
         seedToken={promptSeed?.projectId === projectId ? promptSeed.token : undefined}
       />
@@ -578,5 +649,18 @@ export default function AssistantScreen() {
       </BottomSheet>
     </KeyboardAvoidingView>
     </SafeAreaView>
+  )
+}
+
+/** One quiet line under the context bar: the conversation is not live, and what that means for a message sent now. */
+function LinkStrip({ text, offline = false }: { text: string; offline?: boolean }) {
+  const { palette } = useTheme()
+  const color = offline ? palette.warning : palette.muted
+  return (
+    <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={text}
+      style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginHorizontal: 16, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, borderCurve: "continuous", backgroundColor: hexToRgba(color, 0.1) }}>
+      {offline ? <CloudOff size={14} color={color} /> : <ActivityIndicator size="small" color={color} />}
+      <Text style={{ flexShrink: 1, color: offline ? palette.ink : palette.soft, fontSize: 12, lineHeight: 17, fontWeight: "500" }}>{text}</Text>
+    </View>
   )
 }

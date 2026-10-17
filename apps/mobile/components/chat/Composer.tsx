@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native"
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native"
 import { ArrowUp, ChevronDown, Plus, Shield, Square } from "lucide-react-native"
 import Animated from "react-native-reanimated"
 import { AdaptiveBlur } from "@/components/GlassView"
@@ -27,6 +27,8 @@ const MODES: ReadonlyArray<{ value: AssistantMode; label: string }> = [
  */
 export function Composer({
   busy,
+  offline = false,
+  stopping = false,
   disabled,
   disabledNote,
   mode,
@@ -39,6 +41,10 @@ export function Composer({
   modelLabel, permissionLabel, onOpenModels, onOpenControls, status,
 }: {
   busy: boolean
+  /** The desktop is unreachable: a message is saved to the outbox instead of starting a turn. */
+  offline?: boolean
+  /** Stop was sent; the desktop has not ended the turn yet. */
+  stopping?: boolean
   disabled: boolean
   disabledNote?: string
   mode: AssistantMode
@@ -83,9 +89,9 @@ export function Composer({
     <View onLayout={content.onLayout} style={{ paddingHorizontal: content.gutter, paddingTop: 8, paddingBottom: 10, backgroundColor: "transparent" }}>
       {busy ? (
         <View style={{ minHeight: 24, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingBottom: 6 }}>
-          <View style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 3, backgroundColor: palette.warning }} />
+          <View style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 3, backgroundColor: stopping ? palette.danger : palette.warning }} />
           <Text accessibilityLiveRegion="polite" numberOfLines={stacked ? undefined : 1} style={{ flexShrink: 1, color: palette.muted, fontSize: 12, lineHeight: 17, fontWeight: "500", fontVariant: ["tabular-nums"] }}>
-            {status ?? "Desktop assistant working"} · send to steer
+            {status ?? "Desktop assistant working"}{stopping ? "" : " · send to steer"}
           </Text>
         </View>
       ) : null}
@@ -118,7 +124,7 @@ export function Composer({
                   ref={inputRef}
                   value={text}
                   onChangeText={setText}
-                  placeholder={busy ? "Steer the current turn…" : "Ask CADCAMFUN…"}
+                  placeholder={offline ? "Desktop offline · message waits to send" : busy ? "Steer the current turn…" : "Ask CADCAMFUN…"}
                   placeholderTextColor={palette.muted}
                   multiline
                   editable
@@ -138,12 +144,14 @@ export function Composer({
                 onPressIn={stopScale.onPressIn}
                 onPressOut={stopScale.onPressOut}
                 onPress={onStop}
+                disabled={stopping}
                 accessibilityRole="button"
-                accessibilityLabel="Stop the desktop assistant"
+                accessibilityLabel={stopping ? "Stopping the desktop assistant" : "Stop the desktop assistant"}
+                accessibilityState={{ disabled: stopping, busy: stopping }}
                 style={{ width: layout.touchTarget, height: layout.touchTarget, flexShrink: 0, alignItems: "center", justifyContent: "center" }}
               >
                 <Animated.View style={[{ width: layout.touchTarget, height: layout.touchTarget, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.danger, 0.14) }, stopScale.style]}>
-                  <Square size={13} color={palette.danger} fill={palette.danger} />
+                  {stopping ? <ActivityIndicator size="small" color={palette.danger} /> : <Square size={13} color={palette.danger} fill={palette.danger} />}
                 </Animated.View>
               </Pressable>
             ) : null}
@@ -153,7 +161,7 @@ export function Composer({
               onPressOut={sendScale.onPressOut}
               onPress={submit}
               accessibilityRole="button"
-              accessibilityLabel={busy ? "Steer current assistant turn" : "Send message"}
+              accessibilityLabel={offline ? "Save message to send when the desktop reconnects" : busy ? "Steer current assistant turn" : "Send message"}
               accessibilityState={{ disabled: !canSubmit }}
               disabled={!canSubmit}
               style={{ width: layout.touchTarget, height: layout.touchTarget, flexShrink: 0, alignItems: "center", justifyContent: "center" }}
@@ -198,6 +206,8 @@ export function Composer({
                 <Pressable
                   key={item.value}
                   accessibilityRole="button"
+                  accessibilityLabel={`${item.label} mode`}
+                  accessibilityHint="Focuses the assistant on this kind of work for your next message"
                   accessibilityState={{ selected: active }}
                   onPress={() => {
                     if (active) return

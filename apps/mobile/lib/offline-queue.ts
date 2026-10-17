@@ -47,6 +47,12 @@ export async function countOfflineQueueForProject(projectId: string): Promise<nu
   return queue.filter((op) => op.projectId === projectId).length
 }
 
+/** Texts still waiting for one project, oldest first: the assistant marks exactly those rows as waiting. */
+export async function queuedTextsForProject(projectId: string): Promise<string[]> {
+  const queue = await readQueue()
+  return queue.filter((op) => op.projectId === projectId).map((op) => op.text)
+}
+
 export async function enqueueAssistantOp(op: Omit<OfflineAssistantOp, "type" | "queuedAt">): Promise<void> {
   const entry: OfflineAssistantOp = { ...op, id: newMobileSessionId(), desktopFingerprint: useUIStore.getState().assistantDesktopId ?? undefined, type: "assistant-message", queuedAt: Date.now() }
   const next = await mutateStored(readQueue, writeOfflineQueueRaw, (queue) => {
