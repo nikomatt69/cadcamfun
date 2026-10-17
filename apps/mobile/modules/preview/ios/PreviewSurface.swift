@@ -319,9 +319,9 @@ vertex LineOut lineVertex(uint vid [[vertex_id]],
                           constant LineVertex* vertices [[buffer(0)]],
                           constant Uniforms& uniforms [[buffer(1)]]) {
   LineOut out;
-  LineVertex vertex = vertices[vid];
-  out.position = uniforms.mvp * float4(float3(vertex.position), 1.0);
-  out.color = float3(vertex.color);
+  LineVertex item = vertices[vid];
+  out.position = uniforms.mvp * float4(float3(item.position), 1.0);
+  out.color = float3(item.color);
   return out;
 }
 
