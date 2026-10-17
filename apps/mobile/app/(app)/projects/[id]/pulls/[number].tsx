@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react"
-import { Platform, RefreshControl, Text, View } from "react-native"
+import { Alert, Platform, RefreshControl, Text, View } from "react-native"
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { GitMerge, MessageSquare } from "lucide-react-native"
 import type { ReviewRow } from "@cadcamfun/api"
@@ -86,6 +86,26 @@ export default function PullRequestScreen() {
     }
   }
 
+  /** Merging lands the branch on its base and closing ends the review: both say exactly what happens first. */
+  const confirmMerge = () => {
+    const pr = pull.data?.pullRequest
+    if (!pr || !client) return
+    haptic("selection")
+    Alert.alert(`Merge into ${pr.base}?`, `${pr.head} lands on ${pr.base} on your desktop. The branch history is kept.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Merge", onPress: () => void act("Merge", () => client.merge(id, Number(number))) },
+    ])
+  }
+  const confirmClose = () => {
+    const pr = pull.data?.pullRequest
+    if (!pr || !client) return
+    haptic("selection")
+    Alert.alert("Close without merging?", `${pr.head} stays on the desktop and nothing changes on ${pr.base}.`, [
+      { text: "Keep open", style: "cancel" },
+      { text: "Close pull request", style: "destructive", onPress: () => void act("Close", () => client.close(id, Number(number))) },
+    ])
+  }
+
   if (!client) return null
 
   const pullRequest = pull.data?.pullRequest
@@ -129,7 +149,7 @@ export default function PullRequestScreen() {
               {(pull.data?.reviews ?? []).length > 0 ? (
                 <SurfaceCard inset={false}>
                   <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 }}>
-                    <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textTransform: "uppercase", fontWeight: "600", letterSpacing: 0.08 }}>
+                    <Text accessibilityRole="header" style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textTransform: "uppercase", fontWeight: "600", letterSpacing: 0.6 }}>
                       Reviews
                     </Text>
                   </View>
@@ -183,18 +203,19 @@ export default function PullRequestScreen() {
                     variant={blocked ? "secondary" : "primary"}
                     loading={busy === "Merge"}
                     disabled={busy !== null || blocked}
-                    onPress={() => void act("Merge", () => client.merge(id, Number(number)))} />
+                    onPress={confirmMerge} />
                   {blocked ? (
                     <Text style={{ color: palette.danger, fontSize: 13, lineHeight: 18, textAlign: "center" }}>
                       A review requested changes — the merge stays blocked until a new review approves.
                     </Text>
                   ) : null}
+                  <ActionButton label="Close pull request" fullWidth variant="ghost" loading={busy === "Close"} disabled={busy !== null} onPress={confirmClose} />
                 </View>
               ) : null}
 
               {/* Changes */}
               <View style={{ gap: 8 }}>
-                <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textTransform: "uppercase", fontWeight: "600", letterSpacing: 0.08 }}>
+                <Text accessibilityRole="header" style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textTransform: "uppercase", fontWeight: "600", letterSpacing: 0.6 }}>
                   Changes
                 </Text>
                 {pull.data && pull.data.changes.length > 0 ? (
