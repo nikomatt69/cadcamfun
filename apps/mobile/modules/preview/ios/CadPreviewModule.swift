@@ -23,6 +23,9 @@ public final class PreviewScene: SharedObject {
   var lineVertices = 0
   var active: MTLBuffer?
   var activeVertices = 0
+  var overlay: MTLBuffer?
+  var overlayVertices = 0
+  var eye = SIMD3<Float>(0, 0, 1)
   var mvp = matrix_identity_float4x4
   var clear = SIMD3<Float>(0.08, 0.09, 0.1)
   var baseColor = SIMD4<Float>(0.72, 0.75, 0.8, 1)
@@ -39,6 +42,7 @@ public final class PreviewScene: SharedObject {
     indices = nil
     lines = nil
     active = nil
+    overlay = nil
     surface = nil
     lock.unlock()
   }
@@ -117,6 +121,23 @@ public final class PreviewScene: SharedObject {
     redraw()
   }
 
+  /// Outline and guides are decoration: a refused upload drops them and keeps the frame.
+  func replaceOverlay(_ values: Float32Array) {
+    var next: MTLBuffer?
+    if values.length > 0, let device {
+      if PreviewUpload.overlay(values) {
+        next = metalBuffer(values.rawPointer, values.byteLength, device, "com.cadcamfun.preview.overlay")
+      } else {
+        previewLog.error("Rejected overlay upload")
+      }
+    }
+    lock.lock()
+    overlay = next
+    overlayVertices = next == nil ? 0 : values.length / 6
+    lock.unlock()
+    redraw()
+  }
+
   func replaceHighlight(start: Int, count: Int, base: SIMD3<Float>, selected: SIMD3<Float>) {
     lock.lock()
     let triangles = indexCount / 3
@@ -129,9 +150,10 @@ public final class PreviewScene: SharedObject {
     redraw()
   }
 
-  func replaceCamera(_ mvp: simd_float4x4?, clear: SIMD3<Float>) {
+  func replaceCamera(_ mvp: simd_float4x4?, clear: SIMD3<Float>, eye: SIMD3<Float>?) {
     lock.lock()
     if let mvp { self.mvp = mvp }
+    if let eye { self.eye = eye }
     self.clear = clear
     lock.unlock()
     redraw()
@@ -150,6 +172,9 @@ public final class PreviewScene: SharedObject {
       lineVertices: lineVertices,
       active: active,
       activeVertices: activeVertices,
+      overlay: overlay,
+      overlayVertices: overlayVertices,
+      eye: eye,
       mvp: mvp,
       clear: clear,
       baseColor: baseColor,
@@ -227,6 +252,9 @@ struct PreviewFrame {
   let lineVertices: Int
   let active: MTLBuffer?
   let activeVertices: Int
+  let overlay: MTLBuffer?
+  let overlayVertices: Int
+  let eye: SIMD3<Float>
   let mvp: simd_float4x4
   let clear: SIMD3<Float>
   let baseColor: SIMD4<Float>
@@ -264,6 +292,9 @@ public class CadPreviewModule: Module {
       Function("setLines") { (scene: PreviewScene, lines: Float32Array) in
         scene.replaceLines(lines)
       }
+      Function("setOverlay") { (scene: PreviewScene, lines: Float32Array) in
+        scene.replaceOverlay(lines)
+      }
       Function("setActiveLine") { (scene: PreviewScene, line: Float32Array) in
         scene.replaceActiveLine(line)
       }
@@ -275,10 +306,12 @@ public class CadPreviewModule: Module {
           selected: SIMD3(PreviewUpload.channel(selectedRed), PreviewUpload.channel(selectedGreen), PreviewUpload.channel(selectedBlue))
         )
       }
-      Function("setCamera") { (scene: PreviewScene, mvp: Float32Array, red: Double, green: Double, blue: Double) in
+      Function("setCamera") { (scene: PreviewScene, mvp: Float32Array, red: Double, green: Double, blue: Double, eyeX: Double, eyeY: Double, eyeZ: Double) in
+        let eye = eyeX.isFinite && eyeY.isFinite && eyeZ.isFinite ? SIMD3(Float(eyeX), Float(eyeY), Float(eyeZ)) : nil
         scene.replaceCamera(
           PreviewUpload.matrix(mvp),
-          clear: SIMD3(PreviewUpload.channel(red), PreviewUpload.channel(green), PreviewUpload.channel(blue))
+          clear: SIMD3(PreviewUpload.channel(red), PreviewUpload.channel(green), PreviewUpload.channel(blue)),
+          eye: eye
         )
       }
     }

@@ -5,6 +5,8 @@ import { validatePairing, type Pairing } from "./pairing"
 import { mutateStored, readOfflineQueueRaw, writeOfflineQueueRaw } from "./storage"
 import { isOfflineSendError } from "./offline-errors"
 import { useUIStore } from "./store"
+import { deliverOutbox, newMobileSessionId, outboxKey, type OfflineAssistantOp } from "./assistant-outbox"
+export type { AssistantMode, OfflineAssistantOp } from "./assistant-outbox"
 
 export { isOfflineSendError }
 
@@ -16,18 +18,6 @@ export { isOfflineSendError }
  * connectivity returns to online; each op opens a fresh turn (server owns session
  * continuity via sessionId). A process kill never loses the queue.
  */
-
-export type AssistantMode = "general" | "cad" | "cam" | "gcode" | "toolpath"
-
-export interface OfflineAssistantOp {
-  readonly type: "assistant-message"
-  readonly projectId: string
-  readonly text: string
-  readonly sessionId?: string
-  readonly agent?: string
-  readonly mode?: AssistantMode
-  readonly queuedAt: number
-}
 
 const MAX_ENTRIES = 50
 
@@ -58,7 +48,7 @@ export async function countOfflineQueueForProject(projectId: string): Promise<nu
 }
 
 export async function enqueueAssistantOp(op: Omit<OfflineAssistantOp, "type" | "queuedAt">): Promise<void> {
-  const entry: OfflineAssistantOp = { ...op, type: "assistant-message", queuedAt: Date.now() }
+  const entry: OfflineAssistantOp = { ...op, id: newMobileSessionId(), desktopFingerprint: useUIStore.getState().assistantDesktopId ?? undefined, type: "assistant-message", queuedAt: Date.now() }
   const next = await mutateStored(readQueue, writeOfflineQueueRaw, (queue) => {
     const grown = [...queue, entry]
     return grown.length > MAX_ENTRIES ? grown.slice(grown.length - MAX_ENTRIES) : grown
@@ -67,7 +57,14 @@ export async function enqueueAssistantOp(op: Omit<OfflineAssistantOp, "type" | "
 }
 
 /** Drain with a pairing supplied by the caller (provider owns the live client). */
-export async function drainQueueWith(pairing: Pairing, onSent?: (sent: number) => void): Promise<void> {
+let draining: Promise<void> | undefined
+export function drainQueueWith(pairing: Pairing, onSent?: (sent: number) => void): Promise<void> {
+  if (draining) return draining
+  draining = drainQueue(pairing, onSent).finally(() => { draining = undefined })
+  return draining
+}
+
+async function drainQueue(pairing: Pairing, onSent?: (sent: number) => void): Promise<void> {
   const validated = validatePairing(pairing)
   const queue = await readQueue()
   if (queue.length === 0) {
@@ -75,27 +72,17 @@ export async function drainQueueWith(pairing: Pairing, onSent?: (sent: number) =
     return
   }
   const client = new CompanionClient(pinnedTransport(validated))
-  const results = await Promise.allSettled(
-    queue.map(async (op) => {
-      if (AppState.currentState !== "active") throw new Error("App is not active")
-      for await (const event of client.chat(
-        {
-          projectId: op.projectId,
-          message: op.text,
-          sessionId: op.sessionId,
-          agent: op.agent,
-          mode: op.mode ?? "general",
-        },
-      )) {
-        if (event.type === "error") throw new Error(typeof event.message === "string" ? event.message : "Assistant failed")
-        if (event.type === "done") break
-      }
-    }),
-  )
-  const remaining = queue.filter((_, index) => results[index]?.status === "rejected")
-  await writeOfflineQueueRaw(remaining)
+  const sent = await deliverOutbox(queue, {
+    client, fingerprint: validated.fingerprint,
+    active: () => AppState.currentState === "active",
+    session: (projectId) => useUIStore.getState().assistantSessions[projectId],
+    remember: (projectId, sessionId) => useUIStore.getState().setAssistantSession(projectId, sessionId),
+    save: async (previous, next) => {
+      await mutateStored(readQueue, writeOfflineQueueRaw, (current) => current.flatMap((entry) => outboxKey(entry) === outboxKey(previous) ? next ? [next] : [] : [entry]))
+    },
+  })
+  const remaining = await readQueue()
   syncQueueCount(remaining)
-  const sent = queue.length - remaining.length
   if (sent > 0) onSent?.(sent)
 }
 

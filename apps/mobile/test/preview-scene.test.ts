@@ -12,6 +12,11 @@ import {
   prepareActiveLine,
   prepareMeshUpload,
   prepareToolpathLines,
+  meshFeatureEdges,
+  prepareOverlayLines,
+  sceneGuides,
+  guideColor,
+  PREVIEW_MAX_OVERLAY_SEGMENTS,
   rgbFromHex,
 } from "../lib/preview-scene"
 
@@ -91,6 +96,61 @@ describe("preview upload", () => {
     expect(source).toContain("static let maxTriangles = 80_000")
     expect(source).toContain("static let maxSegments = 20_000")
     expect(source).toContain("static let maxStockEdges = 12")
+    expect(source).toContain(`static let maxOverlaySegments = ${PREVIEW_MAX_OVERLAY_SEGMENTS.toLocaleString("en").replace(",", "_")}`)
     for (const message of Object.values(PREVIEW_MESSAGE)) expect(source).toContain(message)
+  })
+})
+
+describe("CAD outline and scene guides", () => {
+  // Unit cube with split (per-face) vertices, as the desktop sends crease-normal meshes.
+  const cube = () => {
+    const corners = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]]
+    const quads = [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
+    const positions: number[] = []
+    const indices: number[] = []
+    for (const quad of quads) {
+      const base = positions.length / 3
+      for (const corner of quad) positions.push(...corners[corner]!)
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3)
+    }
+    return { positions, indices }
+  }
+
+  test("a split-vertex cube outlines its twelve edges and not its face diagonals", () => {
+    const { positions, indices } = cube()
+    const edges = meshFeatureEdges(positions, indices)
+    expect(edges).toHaveLength(12)
+    for (const edge of edges) {
+      const length = Math.hypot(edge.to[0] - edge.from[0], edge.to[1] - edge.from[1], edge.to[2] - edge.from[2])
+      expect(length).toBeCloseTo(1, 9)
+    }
+  })
+
+  test("a flat open sheet outlines only its boundary; a smooth fold is not outlined", () => {
+    expect(meshFeatureEdges([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0], [0, 1, 2, 0, 2, 3])).toHaveLength(4)
+    // Two triangles meeting at 10 degrees: below the crease angle, so the shared edge is hidden.
+    const tilt = Math.tan((10 * Math.PI) / 180)
+    expect(meshFeatureEdges([0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0, tilt], [0, 1, 2, 0, 2, 3])).toHaveLength(4)
+    expect(meshFeatureEdges([], [])).toEqual([])
+  })
+
+  test("the grid sits under the part with round spacing and the axes start at the origin", () => {
+    const guides = sceneGuides({ min: [-10, -5, 2], max: [30, 25, 12] }, [0.5, 0.5, 0.5])
+    const axes = guides.slice(-3)
+    expect(axes.map((axis) => axis.from)).toEqual([[0, 0, axes[0]!.from[2]], [0, 0, axes[0]!.from[2]], [0, 0, axes[0]!.from[2]]])
+    expect(axes[2]!.to[2]).toBeGreaterThan(axes[2]!.from[2])
+    for (const line of guides.slice(0, -3)) {
+      expect(line.from[2]).toBeLessThan(2)
+      expect(Math.abs(line.from[0] / 5 - Math.round(line.from[0] / 5))).toBeLessThan(1e-9)
+    }
+    expect(sceneGuides({ min: [0, 0, Number.NaN], max: [1, 1, 1] }, [0, 0, 0])).toEqual([])
+  })
+
+  test("overlay drops edges past the cap instead of refusing the frame", () => {
+    const edge = { from: [0, 0, 0] as const, to: [1, 0, 0] as const }
+    const data = prepareOverlayLines([], Array.from({ length: PREVIEW_MAX_OVERLAY_SEGMENTS + 5 }, () => edge))
+    expect(data.length).toBe(PREVIEW_MAX_OVERLAY_SEGMENTS * 12)
+    expect(prepareOverlayLines([], [{ from: [0, 0, Number.NaN], to: [1, 0, 0] }])).toHaveLength(0)
+    expect(guideColor("#000000", "#FFFFFF", 0.5)).toEqual([0.5, 0.5, 0.5])
   })
 })

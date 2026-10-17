@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native"
-import { ArrowUp, Square } from "lucide-react-native"
+import { ArrowUp, ChevronDown, Plus, Shield, Square } from "lucide-react-native"
 import Animated from "react-native-reanimated"
 import { AdaptiveBlur } from "@/components/GlassView"
 import { hexToRgba, useTheme } from "@/lib/theme"
@@ -36,6 +36,7 @@ export function Composer({
   onStop,
   seed,
   seedToken,
+  modelLabel, permissionLabel, onOpenModels, onOpenControls,
 }: {
   busy: boolean
   disabled: boolean
@@ -48,6 +49,10 @@ export function Composer({
   /** Fills the field when `seedToken` changes. The user still sends it. */
   seed?: string
   seedToken?: number
+  modelLabel: string
+  permissionLabel: string
+  onOpenModels(): void
+  onOpenControls(): void
 }) {
   const { palette, glass, isDark } = useTheme()
   const content = useContentLayout()
@@ -171,6 +176,13 @@ export function Composer({
             </View>
           </View>
 
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingBottom: 5 }}>
+            <Pressable onPress={onOpenControls} accessibilityRole="button" accessibilityLabel="Tools, permissions and session controls" style={({ pressed }) => ({ minWidth: 44, minHeight: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.ink, pressed ? 0.13 : 0.06) })}><Plus size={20} color={palette.soft} /></Pressable>
+            <Pressable onPress={onOpenModels} accessibilityRole="button" accessibilityLabel={`Model: ${modelLabel}. Change provider, model or thinking effort`} style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 44, paddingHorizontal: 10, gap: 6, flexDirection: "row", alignItems: "center", borderRadius: 16, backgroundColor: pressed ? hexToRgba(palette.ink, 0.06) : "transparent" })}>
+              <Text numberOfLines={stacked ? undefined : 1} style={{ flexShrink: 1, color: palette.soft, fontSize: 12, fontWeight: "600" }}>{modelLabel}</Text><ChevronDown size={13} color={palette.muted} />
+            </Pressable>
+            <Pressable onPress={onOpenControls} accessibilityRole="button" accessibilityLabel={`Permissions: ${permissionLabel}`} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><Shield size={17} color={palette.muted} /></Pressable>
+          </View>
           <View style={{ height: StyleSheet.hairlineWidth, marginHorizontal: 12, backgroundColor: hexToRgba(palette.ink, 0.08) }} />
           <ScrollView
             horizontal

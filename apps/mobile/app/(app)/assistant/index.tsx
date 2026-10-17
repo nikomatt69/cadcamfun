@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { FlatList, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native"
+import { AppState, FlatList, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-screens/experimental"
+import { Stack, useFocusEffect } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
-import { Bot, Check, ChevronDown, CircleGauge, GitPullRequest, Route, Sparkles } from "lucide-react-native"
+import { Bot, Check, ChevronDown, CircleGauge, GitPullRequest, Plus, Route, SlidersHorizontal, Sparkles } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useResource } from "@/lib/use-resource"
@@ -11,8 +12,7 @@ import { useUIStore } from "@/lib/store"
 import { haptic } from "@/lib/haptics"
 import { toast } from "@/components/ui/ToastHost"
 import { appendChatEvent, answerRequest, emptyLog, type ChatRow } from "@/lib/chat-log"
-import { CompanionError } from "@/lib/client"
-import { enqueueAssistantOp, isOfflineSendError } from "@/lib/offline-queue"
+import { enqueueAssistantOp } from "@/lib/offline-queue"
 import { Composer, type AssistantMode } from "@/components/chat/Composer"
 import { MessageBubble } from "@/components/chat/MessageBubble"
 import { ToolCallRow } from "@/components/chat/ToolCallRow"
@@ -28,6 +28,9 @@ import { useContentLayout } from "@/components/layout/use-content-layout"
 import { ListRow } from "@/components/ui/ListRow"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
+import { ModelPickerSheet } from "@/components/chat/model-picker-sheet"
+import { AssistantInspectorSheet } from "@/components/chat/assistant-inspector-sheet"
+import { assistantModels, DEFAULT_ASSISTANT_PREFERENCES, formatVariantLabel, PERMISSION_MODES, selectedAssistantModel, type AssistantPreferences } from "@/lib/assistant-preferences"
 
 const QUICK_PROMPTS = [
   {
@@ -61,7 +64,7 @@ const QUICK_PROMPTS = [
  * - Stop aborts the turn server-side.
  */
 export default function AssistantScreen() {
-  const { client, ai, config, connectivity } = useServer()
+  const { client, ai, config, connectivity, refreshBootstrap } = useServer()
   const { palette } = useTheme()
   const headerHeight = useHeaderHeight()
   const content = useContentLayout()
@@ -76,7 +79,12 @@ export default function AssistantScreen() {
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [agentPickerOpen, setAgentPickerOpen] = useState(false)
-  const [selectedAgentId, setSelectedAgentId] = useState("general")
+  const preferences = useUIStore((state) => projectId ? state.assistantPreferences[projectId] ?? DEFAULT_ASSISTANT_PREFERENCES : DEFAULT_ASSISTANT_PREFERENCES)
+  const setPreferences = (patch: Partial<AssistantPreferences>) => { if (projectId) useUIStore.getState().setAssistantPreferences(projectId, patch) }
+  const selectedAgentId = preferences.agent
+  const setSelectedAgentId = (agent: string) => setPreferences({ agent })
+  const [modelsOpen, setModelsOpen] = useState(false)
+  const [inspectorOpen, setInspectorOpen] = useState(false)
   const [log, setLog] = useState<readonly ChatRow[]>(emptyLog)
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState<AssistantMode>("general")
@@ -103,12 +111,20 @@ export default function AssistantScreen() {
     [client],
   )
 
+  const catalogue = useResource(useCallback((signal) => client ? client.aiProviders(signal) : Promise.reject(new Error("Not connected")), [client, connectivity]), "assistant:models")
+  const availableModels = assistantModels(catalogue.data ?? [])
+  const activeModel = selectedAssistantModel(availableModels, preferences.model)
+  const modelUnavailable = Boolean(preferences.model && catalogue.data && !catalogue.loading && !activeModel)
+  const modelLabel = activeModel?.name ?? preferences.model?.model ?? "Automatic model"
+  const thinkingLabel = preferences.model?.variant ? formatVariantLabel(preferences.model.variant) : undefined
+  const permissionLabel = PERMISSION_MODES.find((item) => item.id === preferences.permissionMode)?.title ?? "Standard"
+
   const currentProject = (projects.data ?? []).find((project) => project.id === projectId) ?? null
   const currentAgent = (agents.data ?? []).find((agent) => agent.id === selectedAgentId) ?? agents.data?.[0] ?? null
 
   useEffect(() => {
     generation.current += 1
-    const key = `${config?.baseUrl ?? ""}|${config?.fingerprint ?? ""}|${projectId ?? ""}`
+    const key = `${config?.fingerprint ?? ""}|${projectId ?? ""}`
     sessionRef.current = projectId ? useUIStore.getState().assistantSessions[projectId] : undefined
     setLog(logs.current.get(key) ?? emptyLog)
     setBusy(false)
@@ -119,7 +135,6 @@ export default function AssistantScreen() {
       if (runningRef.current) {
         runningRef.current.abort()
         runningRef.current = null
-        if (sessionRef.current && client) void client.abortChat(sessionRef.current).catch(() => undefined)
       }
     }
   }, [projectId, client])
@@ -141,7 +156,7 @@ export default function AssistantScreen() {
     if (!client || !projectId || runningRef.current || stopping.current) return
     if (connectivity !== "online") {
       setLog((previous) => appendChatEvent(previous, { type: "user", text }))
-      await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode })
+      await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
       toast("Desktop offline — message queued", "info")
       haptic("selection")
       return
@@ -153,11 +168,10 @@ export default function AssistantScreen() {
     runningRef.current = controller
     setBusy(true)
     setLog((previous) => appendChatEvent(previous, { type: "user", text }))
-    let unconfirmed = false
 
     try {
       for await (const event of client.chat(
-        { projectId, message: text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode },
+        { projectId, message: text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext },
         controller.signal,
       )) {
         if (controller.signal.aborted || version !== generation.current) break
@@ -175,48 +189,54 @@ export default function AssistantScreen() {
       if (controller.signal.aborted) {
         haptic("selection")
       } else {
-        let failure = error
-        if (error instanceof CompanionError && error.status === 0 && sessionRef.current) {
-          unconfirmed = true
-          try {
-            // Reconnect through stored evidence; never replay the user's geometry/CAM mutation.
-            for (let attempt = 0; attempt < 60; attempt += 1) {
-              const state = await client.sessionState(sessionRef.current, controller.signal)
-              if (controller.signal.aborted || version !== generation.current) return
-              setLog((previous) => (state.events ?? []).reduce((rows, event) => event.type === "tool_call" && rows.some((row) => row.kind === "tool" && row.callId === event.callId) ? rows : appendChatEvent(rows, event), previous))
-              if (!state.busy) {
-                unconfirmed = false
-                if (state.error) throw new Error(state.error)
-                setLog((previous) => appendChatEvent(previous, { type: "done", sessionId: sessionRef.current!, text: state.text, recovered: true, ...(state.usage ? { usage: state.usage } : {}) }))
-                haptic("success")
-                return
-              }
-              await new Promise<void>((resolve) => {
-                const finish = () => { clearTimeout(timer); controller.signal.removeEventListener("abort", finish); resolve() }
-                const timer = setTimeout(finish, 2_000)
-                controller.signal.addEventListener("abort", finish, { once: true })
-                if (controller.signal.aborted) finish()
-              })
-              if (controller.signal.aborted || version !== generation.current) return
-            }
-            throw new Error("The desktop is still working. Reconnect before starting another turn.")
-          } catch (cause) { failure = cause }
-        }
-        if (controller.signal.aborted || version !== generation.current) return
-        if (isOfflineSendError(failure)) {
-          await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode })
-          haptic("selection")
-          setLog((previous) => appendChatEvent(previous, { type: "error", sessionId: sessionRef.current ?? "", code: "internal", message: "Desktop unreachable — message queued and will send on reconnect" }))
-          return
-        }
         haptic("error")
-        const message = failure instanceof Error ? failure.message : "The assistant did not answer"
+        const message = error instanceof Error ? error.message : "The assistant did not answer"
         setLog((previous) => appendChatEvent(previous, { type: "error", sessionId: sessionRef.current ?? "", code: "internal", message }))
       }
     } finally {
-      if (version === generation.current) { setBusy(unconfirmed); if (!unconfirmed) runningRef.current = null }
+      if (version === generation.current) { setBusy(false); runningRef.current = null }
     }
   }
+
+  const recover = useCallback(async () => {
+    const sessionId = sessionRef.current
+    if (!client || !projectId || !sessionId || runningRef.current || stopping.current) return
+    const version = ++generation.current
+    const controller = new AbortController()
+    runningRef.current = controller
+    setBusy(true)
+    try {
+      for await (const event of client.resumeChat(sessionId, controller.signal)) {
+        if (version !== generation.current || controller.signal.aborted) return
+        setLog((previous) => appendChatEvent(previous, event))
+      }
+    } catch (error) {
+      if (version === generation.current && !controller.signal.aborted) {
+        setLog((previous) => appendChatEvent(previous, { type: "error", sessionId, code: "internal", message: error instanceof Error ? error.message : "Could not recover the desktop answer" }))
+      }
+    } finally {
+      if (version === generation.current) { setBusy(false); runningRef.current = null }
+    }
+  }, [client, projectId])
+
+  useFocusEffect(useCallback(() => {
+    void recover()
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void recover()
+      else {
+        generation.current += 1
+        runningRef.current?.abort()
+        runningRef.current = null
+        setBusy(false)
+      }
+    })
+    return () => {
+      subscription.remove()
+      generation.current += 1
+      runningRef.current?.abort()
+      runningRef.current = null
+    }
+  }, [recover]))
 
   const stop = () => {
     if (stopping.current) return
@@ -284,6 +304,20 @@ export default function AssistantScreen() {
     setPickerOpen(false)
   }
 
+  const newConversation = () => {
+    if (!projectId) return
+    generation.current += 1
+    runningRef.current?.abort()
+    runningRef.current = null
+    sessionRef.current = undefined
+    useUIStore.getState().startAssistantConversation(projectId)
+    logs.current.delete(`${config?.fingerprint ?? ""}|${projectId}`)
+    setLog(emptyLog)
+    setBusy(false)
+    stopping.current = false
+    haptic("selection")
+  }
+
   const aiReady = ai?.configured ?? false
 
   const renderRow = ({ item }: { item: ChatRow }) => {
@@ -301,6 +335,7 @@ export default function AssistantScreen() {
         return (
           <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
             <Text style={{ color: palette.danger, fontSize: 13, lineHeight: 18, textAlign: "center" }}>{item.message}</Text>
+            {!busy && sessionRef.current ? <ActionButton label="Recover desktop answer" variant="ghost" onPress={() => void recover()} /> : null}
           </View>
         )
     }
@@ -308,6 +343,10 @@ export default function AssistantScreen() {
 
   return (
     <SafeAreaView edges={{ bottom: true, left: true, right: true }} style={{ flex: 1, backgroundColor: palette.background }}>
+    <Stack.Screen options={{ headerRight: () => <View style={{ flexDirection: "row", gap: 4 }}>
+      <PressableScale accessibilityRole="button" accessibilityLabel="New conversation" onPress={newConversation} disabled={!projectId} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><Plus size={21} color={palette.accent} /></PressableScale>
+      <PressableScale accessibilityRole="button" accessibilityLabel="Assistant controls" onPress={() => setInspectorOpen(true)} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><SlidersHorizontal size={20} color={palette.accent} /></PressableScale>
+    </View> }} />
     <KeyboardAvoidingView onLayout={content.onLayout} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={headerHeight} style={{ flex: 1 }}>
       {/* Project + agent context: the two things that determine where and how the turn runs. */}
       <View style={{ minHeight: 56, marginHorizontal: content.gutter, marginTop: 8, marginBottom: 8, borderRadius: 18, borderCurve: "continuous", overflow: "hidden", backgroundColor: palette.surface, flexDirection: stackedContext ? "column" : "row", alignItems: "stretch", borderWidth: 0.5, borderColor: palette.border }}>
@@ -406,8 +445,12 @@ export default function AssistantScreen() {
       <Composer
         key={projectId ?? "no-project"}
         busy={busy}
-        disabled={!currentProject || !aiReady || connectivity !== "online"}
-        disabledNote={!currentProject ? "Choose a project to chat" : connectivity !== "online" ? "Reconnect to the desktop to chat" : ai === null ? "Checking the desktop AI configuration…" : "Add a model key on the desktop to chat"}
+        disabled={!currentProject || !aiReady || connectivity !== "online" || modelUnavailable}
+        disabledNote={modelUnavailable ? "Choose an available desktop model" : !currentProject ? "Choose a project to chat" : connectivity !== "online" ? "Reconnect to the desktop to chat" : ai === null ? "Checking the desktop AI configuration…" : "Add a model key on the desktop to chat"}
+        modelLabel={`${modelLabel}${thinkingLabel ? ` · ${thinkingLabel}` : ""}`}
+        permissionLabel={permissionLabel}
+        onOpenModels={() => projectId ? setModelsOpen(true) : setPickerOpen(true)}
+        onOpenControls={() => setInspectorOpen(true)}
         mode={mode}
         onModeChange={setMode}
         onSend={(text) => void send(text)}
@@ -416,6 +459,9 @@ export default function AssistantScreen() {
         seed={promptSeed?.projectId === projectId ? promptSeed.text : undefined}
         seedToken={promptSeed?.projectId === projectId ? promptSeed.token : undefined}
       />
+
+      <ModelPickerSheet open={modelsOpen} onClose={() => setModelsOpen(false)} models={availableModels} selection={preferences.model} onSelect={(model) => setPreferences({ model })} loading={catalogue.loading} error={catalogue.error} reload={() => { void catalogue.reload(); void refreshBootstrap().catch(() => undefined) }} />
+      <AssistantInspectorSheet open={inspectorOpen} onClose={() => setInspectorOpen(false)} client={client} sessionId={sessionRef.current} preferences={preferences} onPreferences={setPreferences} ai={ai} onNewConversation={newConversation} />
 
       {/* Project picker */}
       <BottomSheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Assistant project">

@@ -1,5 +1,7 @@
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
+import type { AssistantPreferences } from "./assistant-preferences"
+import { DEFAULT_ASSISTANT_PREFERENCES } from "./assistant-preferences"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 
 /**
@@ -24,6 +26,9 @@ export interface UIState {
   assistantProjectId: string | null
   /** Last chat session per project — resuming it continues the same desktop conversation. */
   assistantSessions: Record<string, string>
+  assistantPreferences: Record<string, AssistantPreferences>
+  /** Last thinking level per provider-qualified model key, across projects. */
+  assistantModelVariants: Record<string, string>
   /** Queued assistant prompts waiting for the desktop to come back (SecureStore-backed). */
   offlineQueueCount: number
   offlineQueueRevision: number
@@ -38,6 +43,9 @@ export interface UIState {
   setAssistantDesktop: (desktopId: string | null) => void
   setAssistantProject: (projectId: string | null) => void
   setAssistantSession: (projectId: string, sessionId: string) => void
+  setAssistantPreferences: (projectId: string, preferences: Partial<AssistantPreferences>) => void
+  rememberModelVariant: (modelKey: string, variant: string | undefined) => void
+  startAssistantConversation: (projectId: string) => void
   setAssistantDraft: (draft: AssistantDraft) => void
   clearAssistantDraft: () => void
   setOfflineQueue: (count: number) => void
@@ -64,16 +72,24 @@ export const useUIStore = create<UIState>()(
       assistantDesktopId: null,
       assistantProjectId: null,
       assistantSessions: {},
+      assistantPreferences: {},
+      assistantModelVariants: {},
       offlineQueueCount: 0,
       offlineQueueRevision: 0,
       assistantDraft: null,
       setThemeMode: (themeMode) => set({ themeMode }),
       setHaptics: (patch) => set((s) => ({ haptics: { ...s.haptics, ...patch } })),
       setSecurity: (patch) => set((s) => ({ security: { ...s.security, ...patch } })),
-      setAssistantDesktop: (assistantDesktopId) => set((state) => state.assistantDesktopId === assistantDesktopId ? {} : { assistantDesktopId, assistantProjectId: null, assistantSessions: {} }),
+      setAssistantDesktop: (assistantDesktopId) => set((state) => state.assistantDesktopId === assistantDesktopId || (assistantDesktopId !== null && state.assistantDesktopId?.endsWith(`|${assistantDesktopId}`)) ? { assistantDesktopId } : { assistantDesktopId, assistantProjectId: null, assistantSessions: {}, assistantPreferences: {} }),
       setAssistantProject: (assistantProjectId) => set({ assistantProjectId }),
       setAssistantSession: (projectId, sessionId) =>
         set((s) => ({ assistantSessions: { ...s.assistantSessions, [projectId]: sessionId } })),
+      setAssistantPreferences: (projectId, preferences) => set((state) => ({ assistantPreferences: { ...state.assistantPreferences, [projectId]: { ...DEFAULT_ASSISTANT_PREFERENCES, ...state.assistantPreferences[projectId], ...preferences } } })),
+      rememberModelVariant: (modelKey, variant) => set((state) => {
+        const { [modelKey]: _previous, ...rest } = state.assistantModelVariants
+        return { assistantModelVariants: variant ? { ...rest, [modelKey]: variant } : rest }
+      }),
+      startAssistantConversation: (projectId) => set((state) => ({ assistantSessions: Object.fromEntries(Object.entries(state.assistantSessions).filter(([id]) => id !== projectId)) })),
       setAssistantDraft: (assistantDraft) => set({ assistantDraft, assistantProjectId: assistantDraft.projectId }),
       clearAssistantDraft: () => set({ assistantDraft: null }),
       setOfflineQueue: (offlineQueueCount) =>
@@ -93,6 +109,8 @@ export const useUIStore = create<UIState>()(
         assistantDesktopId: state.assistantDesktopId,
         assistantProjectId: state.assistantProjectId,
         assistantSessions: state.assistantSessions,
+        assistantPreferences: state.assistantPreferences,
+        assistantModelVariants: state.assistantModelVariants,
       }),
       onRehydrateStorage: () => () => finishHydration(),
     },

@@ -19,6 +19,8 @@ let child: ReturnType<typeof Bun.spawn>
 let dataDir: string
 let port: number
 let toolsCalled: string[] = []
+let phone: CompanionClient
+let plateProjectId: string
 
 const local = (path: string, init: RequestInit = {}) =>
   fetch(`http://127.0.0.1:${port}${path}`, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers } })
@@ -27,6 +29,10 @@ beforeAll(async () => {
   // The "model": a scripted OpenAI-compatible server. It plays the part of an LLM that is asked, from the phone, to change the
   // drawing: it opens a branch, edits, commits and opens a pull request, then reports. Turns without tools are helper calls.
   fake = startFakeOpenAi((request) => {
+    if (JSON.stringify(request.messages.findLast((message) => message.role === "user")?.content).includes("Mobile greeting regression")) return { text: "Hello from the desktop assistant." }
+    if (JSON.stringify(request.messages).includes("Mobile question regression")) return request.messages.some((message) => message.role === "tool")
+      ? { text: "Stock confirmed from the phone." }
+      : { toolCalls: [{ name: "question", args: { questions: [{ header: "Stock", question: "Choose stock", options: [{ label: "Aluminium", description: "Use aluminium stock" }] }] } }] }
     if ((request.tools ?? []).length === 0) return { text: "Widen the plate" }
     const results = request.messages.filter((m) => m.role === "tool").length
     switch (results) {
@@ -69,6 +75,7 @@ describe("the assistant from the phone", () => {
     // Desktop side: a key for the (fake) provider, a project with one committed drawing, the gateway on, a paired phone.
     expect((await local("/api/ai/credentials", { method: "PUT", body: JSON.stringify({ provider: "minimax", key: "sk-fake-test-key" }) })).status).toBe(200)
     const project = await (await local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Bracket" }) })).json()
+    plateProjectId = project.id
     await local(`/api/projects/${project.id}/drawings`, { method: "POST", body: JSON.stringify({ name: "Plate", data: { elements: [], version: "1.0" } }) })
     expect((await local(`/api/projects/${project.id}/vcs/commit`, { method: "POST", body: JSON.stringify({ message: "Initial import" }) })).status).toBe(201)
 
@@ -78,7 +85,7 @@ describe("the assistant from the phone", () => {
     const pairing = parsePairingLink(paired.link)
     const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
     const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
-    const phone = new CompanionClient(createFetchTransport(pairing, pinned))
+    phone = new CompanionClient(createFetchTransport(pairing, pinned))
 
     // Phone side: ask the assistant, exactly as the app's chat does, and read the streamed events.
     const events: ChatEvent[] = []
@@ -135,9 +142,30 @@ describe("the assistant from the phone", () => {
     expect(main.length).toBeGreaterThanOrEqual(2) // the checked-out ai branch carries the AI's commit on top
   })
 
+  test("the exact mobile greeting payload answers and continues the same native session", async () => {
+    const project = await (await local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Mobile greeting" }) })).json()
+    const providers = await phone.aiProviders()
+    const provider = providers.find((provider) => provider.id === "minimax" && provider.configured)
+    const model = provider?.models.find((model) => model.tools)
+    if (!provider || !model) throw new Error("The phone cannot discover its connected desktop model")
+    let sessionId = "s-mobile-greeting-regression"
+    for (const message of ["Mobile greeting regression: Hi", "Mobile greeting regression: continue"]) {
+      const events: ChatEvent[] = []
+      for await (const event of phone.chat({ projectId: project.id, sessionId, agent: "general", mode: "general", message, model: { provider: provider.id, model: model.id }, permissionMode: "ask", includeContext: false })) events.push(event)
+      expect(events.filter((event) => event.type === "error")).toEqual([])
+      const done = events.at(-1)
+      expect(done).toMatchObject({ type: "done", text: "Hello from the desktop assistant." })
+      expect(String(done?.sessionId)).toMatch(/^ses_/)
+      if (sessionId.startsWith("ses_")) expect(done?.sessionId).toBe(sessionId)
+      sessionId = String(done?.sessionId)
+      const recovered = []
+      for await (const event of phone.resumeChat(sessionId)) recovered.push(event)
+      expect(recovered.at(-1)).toMatchObject({ type: "done", text: "Hello from the desktop assistant.", recovered: true })
+    }
+  })
+
   test("the AI cannot merge: a merge needs a person, and the AI's own request to commit on main is refused", async () => {
-    const projects = (await (await local("/api/projects")).json()) as Array<{ id: string }>
-    const id = projects[0]!.id
+    const id = plateProjectId
     // A person (the desktop) merges; before that, main is still the human commit only.
     const checkout = await local(`/api/projects/${id}/vcs/checkout`, { method: "POST", body: JSON.stringify({ branch: "main" }) })
     expect(checkout.status).toBe(200)
@@ -146,5 +174,23 @@ describe("the assistant from the phone", () => {
     expect((await merged.json()).state).toBe("merged")
     const log = await (await local(`/api/projects/${id}/vcs/log?rev=main`)).json()
     expect(log.map((c: { message: string }) => c.message.trim())).toContain("Add the 140 x 50 plate outline")
+  })
+
+  test("a detached phone restores a native question and answers without replaying the prompt", async () => {
+    const project = await (await local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Question recovery" }) })).json()
+    const controller = new AbortController()
+    let sessionId = ""
+    for await (const event of phone.chat({ projectId: project.id, message: "Mobile question regression: choose stock", agent: "general" }, controller.signal)) {
+      if (typeof event.sessionId === "string") sessionId = event.sessionId
+      if (event.type === "question_request") { controller.abort(); break }
+    }
+    expect(sessionId).toMatch(/^ses_/)
+    const events: ChatEvent[] = []
+    for await (const event of phone.resumeChat(sessionId)) {
+      events.push(event)
+      if (event.type === "question_request" && typeof event.requestId === "string") await phone.questionReply(sessionId, event.requestId, [["Aluminium"]])
+    }
+    expect(events.filter((event) => event.type === "question_request")).toHaveLength(1)
+    expect(events.at(-1)).toMatchObject({ type: "done", text: "Stock confirmed from the phone.", recovered: true })
   })
 })

@@ -19,7 +19,7 @@ class FakeTransport implements Transport {
   }
 }
 
-const client = (transport: FakeTransport) => new CompanionClient(transport)
+const client = (transport: Transport) => new CompanionClient(transport)
 
 describe("CompanionClient", () => {
   test("health hits /api/health", async () => {
@@ -120,6 +120,7 @@ test("successful invalid JSON and redirects are errors rather than undefined dat
 
 test("questions and session recovery use the shared desktop API", async () => {
   const t = new FakeTransport()
+  t.handler = () => ({ status: 200, body: JSON.stringify({ busy: false, text: "Recovered" }) })
   await client(t).questionReply("s", "q", [["Aluminum"]])
   await client(t).questionReject("s", "q")
   await client(t).sessionState("s")
@@ -130,9 +131,74 @@ test("questions and session recovery use the shared desktop API", async () => {
   ])
 })
 
-test("an incomplete assistant stream is a recoverable connection failure", async () => {
+test("an incomplete assistant stream recovers the stored answer without resending", async () => {
   const t = new FakeTransport()
   t.streams.push(['data: {"type":"delta","sessionId":"s1","text":"partial"}\n\n'])
-  const consume = async () => { for await (const event of client(t).chat({ projectId: "p1", message: "Build" })) void event }
-  await expect(consume()).rejects.toMatchObject({ status: 0, message: "The assistant connection ended before the turn finished" })
+  t.handler = () => ({ status: 200, body: JSON.stringify({ busy: false, text: "Built and checked" }) })
+  const events = []
+  for await (const event of client(t).chat({ projectId: "p1", message: "Build" })) events.push(event)
+  expect(events.at(-1)).toMatchObject({ type: "done", text: "Built and checked", recovered: true })
+  expect(t.calls.map((call) => call.path)).toEqual(["/api/ai/chat/stream", "/api/ai/sessions/state"])
+})
+
+test("native network failures recover with the observed native session id", async () => {
+  let posts = 0
+  const transport: Transport = {
+    request: async (_path, _method, body) => {
+      expect(body).toEqual({ sessionId: "ses_native" })
+      return { status: 200, body: JSON.stringify({ busy: false, text: "Finished" }) }
+    },
+    async *stream() {
+      posts += 1
+      yield 'data: {"type":"turn","phase":"start","sessionId":"ses_native"}\n\n'
+      throw new Error("The network connection was lost")
+    },
+  }
+  const events = []
+  for await (const event of client(transport).chat({ projectId: "p", sessionId: "mobile-alias", message: "Build" })) events.push(event)
+  expect(events.at(-1)).toMatchObject({ type: "done", text: "Finished" })
+  expect(posts).toBe(1)
+})
+
+test("recovery restores pending approvals and questions and can be cancelled", async () => {
+  const t = new FakeTransport()
+  t.handler = (path) => ({ status: 200, body: JSON.stringify(path === "/api/ai/sessions/state"
+    ? { busy: true, text: "", events: [{ type: "tool_call", sessionId: "s", callId: "c", tool: "cad_edit", input: {} }] }
+    : { permissions: [{ sessionId: "s", requestId: "p", permission: "cad_edit", patterns: [] }], questions: [{ requestId: "q", questions: [] }] }) })
+  const controller = new AbortController()
+  const events = []
+  for await (const event of client(t).resumeChat("s", controller.signal)) {
+    events.push(event.type)
+    if (event.type === "question_request") controller.abort()
+  }
+  expect(events).toEqual(["tool_call", "permission_request", "question_request"])
+  expect(t.calls.every((call) => call.path !== "/api/ai/chat/stream")).toBe(true)
+})
+
+test("a terminal frame releases the transport without waiting for another chunk", async () => {
+  let released = false
+  const transport: Transport = {
+    request: async () => { throw new Error("No recovery needed") },
+    async *stream() {
+      try {
+        yield 'data: {"type":"done","sessionId":"s","text":"Done"}\n\n'
+        throw new Error("Must not read past the terminal event")
+      } finally { released = true }
+    },
+  }
+  for await (const event of client(transport).chat({ projectId: "p", message: "Hi" })) expect(event.type).toBe("done")
+  expect(released).toBe(true)
+})
+
+test("the mobile model picker reads the desktop catalogue and sends the exact model and thinking settings", async () => {
+  const t = new FakeTransport()
+  t.handler = () => ({ status: 200, body: "[]" })
+  await client(t).aiProviders()
+  t.streams.push(['data: {"type":"done","sessionId":"s","text":"Ready"}\n\n'])
+  const body = { projectId: "p", message: "Hi", model: { provider: "openai", model: "family/model", variant: "high" }, permissionMode: "ask", includeContext: false } as const
+  for await (const event of client(t).chat(body)) expect(event.type).toBe("done")
+  expect(t.calls).toEqual([
+    { method: "GET", path: "/api/ai/providers", body: undefined },
+    { method: "POST", path: "/api/ai/chat/stream", body },
+  ])
 })

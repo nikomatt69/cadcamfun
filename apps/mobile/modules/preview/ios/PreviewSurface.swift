@@ -2,10 +2,11 @@ import ExpoModulesCore
 import MetalKit
 import UIKit
 
-/// Column-major MVP plus a colour. Layout matches the Metal `Uniforms` struct (80 bytes).
+/// Column-major MVP, a colour and the world-space eye. Layout matches the Metal `Uniforms` struct (96 bytes).
 struct PreviewUniforms {
   var mvp: simd_float4x4
   var color: SIMD4<Float>
+  var eye: SIMD4<Float>
 }
 
 /**
@@ -91,7 +92,7 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
       return
     }
     command.label = "com.cadcamfun.preview.frame"
-    var uniforms = PreviewUniforms(mvp: frame.mvp, color: frame.baseColor)
+    var uniforms = PreviewUniforms(mvp: frame.mvp, color: frame.baseColor, eye: SIMD4(frame.eye, 1))
     encoder.setDepthBias(0, slopeScale: 0, clamp: 0)
     if meshIsDrawable(frame), let positions = frame.positions, let normals = frame.normals, let indices = frame.indices, let meshPipeline, let depthLess {
       encoder.setRenderPipelineState(meshPipeline)
@@ -126,6 +127,15 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
       encoder.setVertexBuffer(lines, offset: 0, index: 0)
       encoder.setVertexBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
       encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: frame.lineVertices)
+    }
+    if frame.overlayVertices >= 2, frame.overlayVertices % 2 == 0, let overlay = frame.overlay, overlay.length >= frame.overlayVertices * 24, let linePipeline, let depthLess {
+      encoder.setRenderPipelineState(linePipeline)
+      encoder.setDepthStencilState(depthLess)
+      // Outline sits on the faces it bounds: pull it forward like the path.
+      encoder.setDepthBias(-1, slopeScale: -1, clamp: 0)
+      encoder.setVertexBuffer(overlay, offset: 0, index: 0)
+      encoder.setVertexBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
+      encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: frame.overlayVertices)
     }
     if frame.activeVertices == 2, let active = frame.active, active.length >= 48, let linePipeline, let depthEqual {
       encoder.setRenderPipelineState(linePipeline)
@@ -249,12 +259,15 @@ using namespace metal;
 struct Uniforms {
   float4x4 mvp;
   float4 color;
+  float4 eye;
 };
 
 struct MeshOut {
   float4 position [[position]];
   float3 normal;
+  float3 world;
   float4 color;
+  float3 eye;
 };
 
 vertex MeshOut meshVertex(uint vid [[vertex_id]],
@@ -264,16 +277,32 @@ vertex MeshOut meshVertex(uint vid [[vertex_id]],
   MeshOut out;
   out.position = uniforms.mvp * float4(float3(positions[vid]), 1.0);
   out.normal = float3(normals[vid]);
+  out.world = float3(positions[vid]);
   out.color = uniforms.color;
+  out.eye = uniforms.eye.xyz;
   return out;
 }
 
+// CAD studio shading: a headlight that follows the camera, a fixed sky key, a sky/ground
+// ambient and a faint rim, so faces stay readable from every orbit angle.
 fragment float4 meshFragment(MeshOut in [[stage_in]]) {
   float3 normal = in.normal;
   float len = length(normal);
   normal = len < 1e-4 ? float3(0.0, 0.0, 1.0) : normal / len;
-  float shade = max(dot(normal, normalize(float3(0.3, 0.5, 0.8))), 0.22);
-  return float4(in.color.rgb * shade, 1.0);
+  float3 view = in.eye - in.world;
+  float viewLen = length(view);
+  view = viewLen < 1e-6 ? float3(0.0, 0.0, 1.0) : view / viewLen;
+  // Open or inverted shells: light the side the camera sees.
+  if (dot(normal, view) < 0.0) normal = -normal;
+  float3 key = normalize(float3(0.35, 0.45, 0.82));
+  float head = max(dot(normal, view), 0.0);
+  float sky = max(dot(normal, key), 0.0);
+  float ambient = mix(0.16, 0.3, normal.z * 0.5 + 0.5);
+  float3 halfway = normalize(key + view);
+  float specular = pow(max(dot(normal, halfway), 0.0), 56.0) * 0.22 + pow(head, 24.0) * 0.08;
+  float rim = pow(1.0 - head, 3.0) * 0.1;
+  float3 rgb = in.color.rgb * (ambient + head * 0.58 + sky * 0.24) + specular + rim;
+  return float4(min(rgb, float3(1.0)), 1.0);
 }
 
 struct LineOut {

@@ -12,6 +12,7 @@ enum PreviewLimits {
   static let maxTriangles = 80_000
   static let maxSegments = 20_000
   static let maxStockEdges = 12
+  static let maxOverlaySegments = 40_000
   static var maxIndices: Int { maxTriangles * 3 }
   static var maxVertices: Int { maxTriangles * 3 }
   static var maxLineVertices: Int { (maxSegments + maxStockEdges) * 2 }
@@ -61,6 +62,15 @@ enum PreviewUpload {
     if vertices > PreviewLimits.maxLineVertices { return .pathTooLarge }
     return finite(values) ? nil : .pathInvalid
   }
+
+  /// Feature edges, grid and axes: pairs of xyzrgb vertices, capped separately from the path.
+  static func overlay(_ values: Float32Array) -> Bool {
+    if values.length == 0 { return true }
+    guard aligned(values), values.length % 12 == 0, values.length / 6 <= maxOverlayVertices else { return false }
+    return finite(values)
+  }
+
+  private static var maxOverlayVertices: Int { PreviewLimits.maxOverlaySegments * 2 }
 
   /// One highlighted move: exactly two vertices.
   static func activeLine(_ values: Float32Array) -> PreviewRejection? {

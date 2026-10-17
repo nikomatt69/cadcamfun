@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
 import { useTheme } from "@/lib/theme"
-import { Minus, Plus, RotateCcw } from "lucide-react-native"
+import { Box, Minus, Plus, RotateCcw } from "lucide-react-native"
 import { AdaptiveBlur } from "@/components/GlassView"
 import { haptic } from "@/lib/haptics"
 import { layout } from "@/lib/layout"
 import { cadPreview, PreviewView, type PreviewScene } from "@/modules/preview"
 import {
+  cameraBasis,
   fitOrbit,
   hitMeshPart,
   mvpOf,
@@ -15,15 +16,22 @@ import {
   orbitZoom,
   rayFromScreen,
   screenToNdc,
+  STANDARD_VIEWS,
+  viewOrbit,
   type Bounds,
   type Orbit,
+  type StandardView,
 } from "@/lib/preview-math"
 import {
   MESH_COLOR,
   PREVIEW_MESSAGE,
   SELECTED_COLOR,
   finiteMatrix,
+  guideColor,
   highlightRange,
+  meshFeatureEdges,
+  prepareOverlayLines,
+  sceneGuides,
   prepareActiveLine,
   prepareMeshUpload,
   prepareToolpathLines,
@@ -72,6 +80,7 @@ export function PreviewViewport({
 }) {
   const { palette, glass, isDark } = useTheme()
   const [orbit, setOrbit] = useState<Orbit>(() => fitOrbit(bounds))
+  const [view, setView] = useState<StandardView | undefined>("iso")
   const [meshError, setMeshError] = useState<string | undefined>()
   const [lineError, setLineError] = useState<string | undefined>()
   const [gpuError, setGpuError] = useState<string | undefined>()
@@ -85,6 +94,7 @@ export function PreviewViewport({
 
   useEffect(() => {
     setOrbit(fitOrbit(bounds))
+    setView("iso")
   }, [revision, bounds.min[0], bounds.min[1], bounds.min[2], bounds.max[0], bounds.max[1], bounds.max[2]])
 
   useEffect(() => {
@@ -155,6 +165,19 @@ export function PreviewViewport({
     }
   }, [scene, segments, stock])
 
+  // Crease outline is a pure function of the mesh: computed once per revision, not per frame.
+  const edges = useMemo(() => {
+    if (!mesh) return []
+    try { return meshFeatureEdges(mesh.positions, mesh.indices) } catch { return [] }
+  }, [mesh])
+  const boundsKey = `${bounds.min.join(",")}|${bounds.max.join(",")}`
+  const guides = useMemo(() => sceneGuides(bounds, guideColor(palette.background, palette.ink)), [boundsKey, palette.background, palette.ink])
+
+  useEffect(() => {
+    if (!scene) return
+    scene.setOverlay(prepareOverlayLines(guides, edges))
+  }, [scene, guides, edges])
+
   useEffect(() => {
     if (!scene || !linesOk.current) return
     const segment = segments?.[playhead]
@@ -170,7 +193,8 @@ export function PreviewViewport({
     const mvp = mvpOf(orbit, size.width / Math.max(size.height, 1))
     if (!finiteMatrix(mvp)) return
     const rgb = palette.background.startsWith("#") ? rgbFromHex(palette.background) : rgbFromHex("")
-    scene.setCamera(Float32Array.from(mvp), rgb[0], rgb[1], rgb[2])
+    const { eye } = cameraBasis(orbit)
+    scene.setCamera(Float32Array.from(mvp), rgb[0], rgb[1], rgb[2], eye[0], eye[1], eye[2])
   }, [scene, orbit, size.width, size.height, palette.background])
 
   const pick = (x: number, y: number) => {
@@ -181,13 +205,22 @@ export function PreviewViewport({
     current.onSelectPart(hitMeshPart(ray, current.mesh.positions, current.mesh.indices, current.mesh.parts))
   }
 
+  const showView = (next: StandardView) => {
+    setOrbit(viewOrbit(bounds, next))
+    setView(next)
+  }
+  const nextView = STANDARD_VIEWS[(STANDARD_VIEWS.findIndex((item) => item.id === view) + 1) % STANDARD_VIEWS.length]!
+  const viewLabel = STANDARD_VIEWS.find((item) => item.id === view)?.label
+
   const cameraAction = (action: string) => {
     if (failed) return
-    if (action === "reset") setOrbit(fitOrbit(bounds))
+    if (action === "reset") showView("iso")
+    else if (action === "view") showView(nextView.id)
+    else if (action.startsWith("view:")) showView(action.slice(5) as StandardView)
     else if (action === "increment") setOrbit((current) => orbitZoom(current, 0.8))
     else if (action === "decrement") setOrbit((current) => orbitZoom(current, 1.25))
-    else if (action === "rotateLeft") setOrbit((current) => orbitDrag(current, -40, 0))
-    else if (action === "rotateRight") setOrbit((current) => orbitDrag(current, 40, 0))
+    else if (action === "rotateLeft") { setOrbit((current) => orbitDrag(current, -40, 0)); setView(undefined) }
+    else if (action === "rotateRight") { setOrbit((current) => orbitDrag(current, 40, 0)); setView(undefined) }
     else return
     haptic("selection")
   }
@@ -201,6 +234,7 @@ export function PreviewViewport({
         { name: "increment", label: "Zoom in" }, { name: "decrement", label: "Zoom out" },
         { name: "rotateLeft", label: "Rotate left" }, { name: "rotateRight", label: "Rotate right" },
         { name: "reset", label: "Reset camera" },
+        ...STANDARD_VIEWS.map((item) => ({ name: `view:${item.id}`, label: `${item.label} view` })),
       ]}
       onAccessibilityAction={(event) => cameraAction(event.nativeEvent.actionName)}
       style={StyleSheet.absoluteFill}
@@ -245,6 +279,7 @@ export function PreviewViewport({
         const dy = event.nativeEvent.locationY - previous.y
         if (Math.hypot(event.nativeEvent.locationX - previous.startX, event.nativeEvent.locationY - previous.startY) > 6) gesture.current.moved = true
         setOrbit((current) => orbitDrag(current, dx, dy))
+        if (dx !== 0 || dy !== 0) setView(undefined)
         gesture.current.x = event.nativeEvent.locationX
         gesture.current.y = event.nativeEvent.locationY
       }}
@@ -264,7 +299,7 @@ export function PreviewViewport({
         />
       ) : null}
       <Text accessibilityElementsHidden numberOfLines={1} style={{ position: "absolute", left: 12, right: 12, bottom: 10, color: palette.muted, ...type(11) }} pointerEvents="none">
-        Drag to orbit · pinch to zoom
+        {viewLabel ? `${viewLabel} · ` : ""}Drag to orbit · pinch to zoom · two fingers to pan
       </Text>
       {failed ? (
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", padding: 24 }]}>
@@ -277,6 +312,7 @@ export function PreviewViewport({
     {!failed ? <AdaptiveBlur tint={isDark ? "dark" : "light"} fallbackColor={glass.shellStrong} opaqueFallbackColor={palette.surface}
       style={{ position: "absolute", top: 10, right: 10, flexDirection: "row", borderRadius: layout.controlRadius, borderCurve: "continuous", overflow: "hidden" }}>
       {[
+        { action: "view", label: `Show ${nextView.label.toLowerCase()} view`, Icon: Box },
         { action: "reset", label: "Reset camera", Icon: RotateCcw },
         { action: "decrement", label: "Zoom out", Icon: Minus },
         { action: "increment", label: "Zoom in", Icon: Plus },

@@ -53,6 +53,7 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
 
     case "tool_call": {
       const call = event as Extract<ChatEvent, { type: "tool_call" }>
+      if (log.some((row) => row.kind === "tool" && row.callId === call.callId)) return log
       return [...log, { kind: "tool" as const, tool: toolLabel(call.tool), rawTool: call.tool, ok: null, callId: call.callId, input: call.input, ...(call.agent ? { agent: call.agent } : {}) }]
     }
 
@@ -67,6 +68,7 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
 
     case "permission_request": {
       const request = event as Extract<ChatEvent, { type: "permission_request" }>
+      if (log.some((row) => row.kind === "request" && row.requestId === request.requestId)) return log
       return [
         ...log,
         {
@@ -99,13 +101,14 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
     }
     case "done": {
       const done = event as Extract<ChatEvent, { type: "done" }>
-      if (!done.text) return log
+      const settled = log.map((row) => (row.kind === "request" || row.kind === "question") && row.sessionId === done.sessionId ? { ...row, answered: true } : row)
+      if (!done.text) return settled
       let start = log.length
       while (start > 0 && log[start - 1]?.kind !== "user") start--
-      const current = log.slice(start)
+      const current = settled.slice(start).filter((row) => row.kind !== "error")
       const streamed = current.flatMap((row) => row.kind === "assistant" && row.sessionId === done.sessionId ? [row.text] : []).join("")
-      if (streamed === done.text) return log
-      return [...log.slice(0, start), ...current.filter((row) => row.kind !== "assistant" || row.sessionId !== done.sessionId), { kind: "assistant", sessionId: done.sessionId, text: done.text }]
+      if (streamed === done.text) return [...settled.slice(0, start), ...current]
+      return [...settled.slice(0, start), ...current.filter((row) => row.kind !== "assistant" || row.sessionId !== done.sessionId), { kind: "assistant", sessionId: done.sessionId, text: done.text }]
     }
 
     case "error": {

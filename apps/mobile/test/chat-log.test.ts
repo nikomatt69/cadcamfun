@@ -65,3 +65,17 @@ test("tool diagnostics preserve actionable failure evidence", () => {
   log = appendChatEvent(log, { type: "tool_diagnostic", sessionId: "s", callId: "c", tool: "cam_verify_toolpath", kind: "verification", severity: "error", message: "Holder collision", recovery: "Inspect holder reach" })
   expect(log[0]).toMatchObject({ kind: "tool", ok: false, agent: "machinist", output: "collision", diagnostic: { message: "Holder collision", recovery: "Inspect holder reach" } })
 })
+
+test("polling recovery does not duplicate tools or reopen answered approvals", () => {
+  const call = { type: "tool_call", sessionId: "s", callId: "c", tool: "cad_edit", input: {} } as const
+  const permission = { type: "permission_request", sessionId: "s", requestId: "p", permission: "cad_edit", patterns: [] } as const
+  let log = appendChatEvent(emptyLog, call)
+  log = appendChatEvent(log, { type: "tool_result", sessionId: "s", callId: "c", tool: "cad_edit", ok: true, output: "Saved" })
+  log = appendChatEvent(log, call)
+  log = appendChatEvent(log, permission)
+  log = answerRequest(log, "p", true)
+  log = appendChatEvent(log, permission)
+  expect(log).toHaveLength(2)
+  expect(log[0]).toMatchObject({ kind: "tool", ok: true, output: "Saved" })
+  expect(log[1]).toMatchObject({ kind: "request", answered: true })
+})

@@ -11,7 +11,7 @@
  * allocation alone.
  */
 
-import { boxEdges, type Bounds } from "./preview-math"
+import { boundsRadius, boxEdges, niceStep, type Bounds } from "./preview-math"
 
 /** Triangles. Matches the desktop preview cap. */
 export const PREVIEW_MAX_TRIANGLES = 80_000
@@ -21,6 +21,12 @@ export const PREVIEW_MAX_SEGMENTS = 20_000
 
 /** A stock box is twelve edges and nothing else. */
 export const PREVIEW_MAX_STOCK_EDGES = 12
+
+/** Feature edges, grid and axes drawn over the scene. Extra edges are dropped, never refused. */
+export const PREVIEW_MAX_OVERLAY_SEGMENTS = 40_000
+
+/** Dihedral angle above which a shared edge is drawn, like the desktop's crease outline. */
+export const FEATURE_EDGE_ANGLE = (30 * Math.PI) / 180
 
 /** xyz, tightly packed. */
 const VERTEX_FLOATS = 3
@@ -39,6 +45,10 @@ export const LINE_COLOR = {
   circular: [0.66, 0.46, 0.94],
   stock: [0.48, 0.5, 0.55],
   active: [1, 0.86, 0.32],
+  edge: [0.1, 0.12, 0.16],
+  axisX: [0.9, 0.3, 0.3],
+  axisY: [0.35, 0.78, 0.4],
+  axisZ: [0.35, 0.55, 0.95],
 } as const
 
 export const PREVIEW_MESSAGE = {
@@ -180,4 +190,115 @@ export const rgbFromHex = (value: string): readonly [number, number, number] => 
   if (!/^#[0-9a-fA-F]{6}$/.test(value)) return [0.08, 0.09, 0.1]
   const parsed = Number.parseInt(value.slice(1), 16)
   return [((parsed >> 16) & 255) / 255, ((parsed >> 8) & 255) / 255, (parsed & 255) / 255]
+}
+
+type Rgb = readonly [number, number, number]
+type OverlaySegment = { readonly from: PreviewPoint; readonly to: PreviewPoint; readonly color: Rgb }
+
+/**
+ * Boundary, non-manifold and crease edges of a triangle mesh.
+ * Vertices are welded by position first: crease normals split vertices, and an unwelded
+ * mesh would outline every triangle.
+ */
+export const meshFeatureEdges = (
+  positions: ArrayLike<number>,
+  indices: ArrayLike<number>,
+  angle = FEATURE_EDGE_ANGLE,
+  limit = PREVIEW_MAX_OVERLAY_SEGMENTS,
+): Array<{ from: [number, number, number]; to: [number, number, number] }> => {
+  const vertices = Math.floor(positions.length / 3)
+  if (vertices === 0 || indices.length < 3) return []
+  let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+  for (let v = 0; v < vertices; v++) {
+    const x = positions[v * 3]!, y = positions[v * 3 + 1]!, z = positions[v * 3 + 2]!
+    if (x < minX) minX = x; if (y < minY) minY = y; if (z < minZ) minZ = z
+    if (x > maxX) maxX = x; if (y > maxY) maxY = y; if (z > maxZ) maxZ = z
+  }
+  const tolerance = Math.max(Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) * 1e-6, 1e-9)
+  const welded = new Uint32Array(vertices)
+  const byPosition = new Map<string, number>()
+  for (let v = 0; v < vertices; v++) {
+    const key = `${Math.round(positions[v * 3]! / tolerance)},${Math.round(positions[v * 3 + 1]! / tolerance)},${Math.round(positions[v * 3 + 2]! / tolerance)}`
+    const known = byPosition.get(key)
+    if (known === undefined) { byPosition.set(key, v); welded[v] = v } else welded[v] = known
+  }
+  const triangles = Math.floor(indices.length / 3)
+  const normals = new Float64Array(triangles * 3)
+  // Edge key -> first face, or -1 once the edge is already known to be drawn (non-manifold).
+  const faces = new Map<number, number>()
+  const drawn = new Set<number>()
+  const cosLimit = Math.cos(angle)
+  for (let t = 0; t < triangles; t++) {
+    const a = welded[indices[t * 3]!]!, b = welded[indices[t * 3 + 1]!]!, c = welded[indices[t * 3 + 2]!]!
+    const ux = positions[b * 3]! - positions[a * 3]!, uy = positions[b * 3 + 1]! - positions[a * 3 + 1]!, uz = positions[b * 3 + 2]! - positions[a * 3 + 2]!
+    const vx = positions[c * 3]! - positions[a * 3]!, vy = positions[c * 3 + 1]! - positions[a * 3 + 1]!, vz = positions[c * 3 + 2]! - positions[a * 3 + 2]!
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx
+    const len = Math.hypot(nx, ny, nz)
+    if (a === b || b === c || a === c || len < 1e-20) { normals[t * 3 + 2] = Number.NaN; continue }
+    normals[t * 3] = nx / len; normals[t * 3 + 1] = ny / len; normals[t * 3 + 2] = nz / len
+    for (const [p, q] of [[a, b], [b, c], [c, a]] as const) {
+      const key = Math.min(p, q) * vertices + Math.max(p, q)
+      const other = faces.get(key)
+      if (other === undefined) { faces.set(key, t); continue }
+      faces.set(key, -1)
+      if (other < 0) { drawn.add(key); continue }
+      const cos = normals[other * 3]! * normals[t * 3]! + normals[other * 3 + 1]! * normals[t * 3 + 1]! + normals[other * 3 + 2]! * normals[t * 3 + 2]!
+      if (cos < cosLimit) drawn.add(key); else drawn.delete(key)
+    }
+  }
+  for (const [key, face] of faces) if (face >= 0) drawn.add(key)
+  const out: Array<{ from: [number, number, number]; to: [number, number, number] }> = []
+  for (const key of drawn) {
+    if (out.length >= limit) break
+    const p = Math.floor(key / vertices), q = key % vertices
+    out.push({ from: [positions[p * 3]!, positions[p * 3 + 1]!, positions[p * 3 + 2]!], to: [positions[q * 3]!, positions[q * 3 + 1]!, positions[q * 3 + 2]!] })
+  }
+  return out
+}
+
+/** Floor grid under the bounds plus X/Y/Z axes at the origin, or at the grid corner when the origin is off the grid. */
+export const sceneGuides = (bounds: Bounds, grid: Rgb): OverlaySegment[] => {
+  if (!finitePoint(bounds.min) || !finitePoint(bounds.max)) return []
+  const span = Math.max(bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1], boundsRadius(bounds))
+  const step = niceStep(span * 1.6, 12)
+  const cx = (bounds.min[0] + bounds.max[0]) / 2, cy = (bounds.min[1] + bounds.max[1]) / 2
+  const half = Math.ceil((span * 0.8) / step) * step
+  const x0 = Math.floor((cx - half) / step) * step, x1 = Math.ceil((cx + half) / step) * step
+  const y0 = Math.floor((cy - half) / step) * step, y1 = Math.ceil((cy + half) / step) * step
+  // Slightly below the part so its bottom face never fights the grid for depth.
+  const z = bounds.min[2] - span * 1e-3
+  const out: OverlaySegment[] = []
+  for (let x = x0; x <= x1 + step / 2; x += step) out.push({ from: [x, y0, z], to: [x, y1, z], color: grid })
+  for (let y = y0; y <= y1 + step / 2; y += step) out.push({ from: [x0, y, z], to: [x1, y, z], color: grid })
+  const onGrid = 0 >= x0 && 0 <= x1 && 0 >= y0 && 0 <= y1
+  const origin: PreviewPoint = onGrid ? [0, 0, z] : [x0, y0, z]
+  const axis = step * 2
+  out.push({ from: origin, to: [origin[0] + axis, origin[1], z], color: LINE_COLOR.axisX })
+  out.push({ from: origin, to: [origin[0], origin[1] + axis, z], color: LINE_COLOR.axisY })
+  out.push({ from: origin, to: [origin[0], origin[1], z + axis], color: LINE_COLOR.axisZ })
+  return out
+}
+
+/** Guides first, then feature edges, capped so a dense mesh drops outline rather than the frame. */
+export const prepareOverlayLines = (
+  guides: readonly OverlaySegment[],
+  edges: ReadonlyArray<{ readonly from: PreviewPoint; readonly to: PreviewPoint }>,
+  edgeColor: Rgb = LINE_COLOR.edge,
+): Float32Array => {
+  const segments = [...guides, ...edges.map((edge) => ({ ...edge, color: edgeColor }))]
+    .filter((segment) => finitePoint(segment.from) && finitePoint(segment.to))
+    .slice(0, PREVIEW_MAX_OVERLAY_SEGMENTS)
+  const data = new Float32Array(segments.length * SEGMENT_FLOATS)
+  let cursor = 0
+  for (const segment of segments) {
+    cursor = writeVertex(data, cursor, segment.from, segment.color)
+    cursor = writeVertex(data, cursor, segment.to, segment.color)
+  }
+  return data
+}
+
+/** Grid ink: the background moved a little toward the theme's ink so it reads in light and dark. */
+export const guideColor = (background: string, ink: string, amount = 0.14): Rgb => {
+  const a = rgbFromHex(background), b = rgbFromHex(ink)
+  return [a[0] + (b[0] - a[0]) * amount, a[1] + (b[1] - a[1]) * amount, a[2] + (b[2] - a[2]) * amount]
 }

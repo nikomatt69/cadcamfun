@@ -82,11 +82,41 @@ export const fitOrbit = (bounds: Bounds, fovY = DEFAULT_FOV): Orbit => {
   }
 }
 
+/** Just short of straight down, so a top view keeps a stable screen-right axis. */
+export const MAX_PITCH = Math.PI / 2 - 0.02
+
 export const orbitDrag = (orbit: Orbit, dx: number, dy: number): Orbit => ({
   ...orbit,
   yaw: orbit.yaw - dx * 0.008,
-  pitch: clamp(orbit.pitch + dy * 0.008, -1.2, 1.2),
+  pitch: clamp(orbit.pitch + dy * 0.008, -MAX_PITCH, MAX_PITCH),
 })
+
+export type StandardView = "iso" | "top" | "front" | "right"
+export const STANDARD_VIEWS: readonly { readonly id: StandardView; readonly label: string }[] = [
+  { id: "iso", label: "Isometric" },
+  { id: "top", label: "Top" },
+  { id: "front", label: "Front" },
+  { id: "right", label: "Right" },
+]
+
+/** Desktop view-cube faces, Z up: front looks along +Y, right along -X, top shows X to the right and Y up. */
+export const viewOrbit = (bounds: Bounds, view: StandardView, fovY = DEFAULT_FOV): Orbit => {
+  const fit = fitOrbit(bounds, fovY)
+  switch (view) {
+    case "iso": return fit
+    case "top": return { ...fit, yaw: -Math.PI / 2, pitch: MAX_PITCH }
+    case "front": return { ...fit, yaw: -Math.PI / 2, pitch: 0 }
+    case "right": return { ...fit, yaw: 0, pitch: 0 }
+  }
+}
+
+/** 1, 2 or 5 times a power of ten: grid spacing that reads as a round number of millimetres. */
+export const niceStep = (span: number, cells = 10): number => {
+  const raw = Math.max(span, 1e-6) / Math.max(cells, 1)
+  const power = 10 ** Math.floor(Math.log10(raw))
+  const unit = raw / power
+  return (unit <= 1 ? 1 : unit <= 2 ? 2 : unit <= 5 ? 5 : 10) * power
+}
 
 export const orbitZoom = (orbit: Orbit, factor: number): Orbit => ({
   ...orbit,

@@ -1,5 +1,6 @@
 import type { ComponentPreview, EntityChange, LibraryCatalogue, LiveEvent, MeshPreview, NotificationRow, PullRequestRow, ReviewRow, SessionControlReply, SessionStateReply, ToolpathPreview, ToolpathReview, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow, WorkspaceEntry } from "@cadcamfun/api"
 import type { Pairing } from "./pairing"
+import type { AssistantPreferences, AssistantProvider } from "./assistant-preferences"
 import type { ChatEvent } from "./sse"
 import { sseParser } from "./sse"
 
@@ -134,9 +135,18 @@ export class CompanionClient {
   /** Whether the paired desktop has a model key; checked before the user types. */
   aiStatus = (signal?: AbortSignal) => this.request<AiStatusInfo>("GET", "/api/ai/status", undefined, signal)
   agents = (signal?: AbortSignal) => this.request<AssistantAgentInfo[]>("GET", "/api/ai/agents", undefined, signal)
-  sessionState = (sessionId: string, signal?: AbortSignal) => this.request<typeof SessionStateReply.Type>("POST", "/api/ai/sessions/state", { sessionId }, signal)
+  sessionState = async (sessionId: string, signal?: AbortSignal) => {
+    const state = await this.request<typeof SessionStateReply.Type>("POST", "/api/ai/sessions/state", { sessionId }, signal)
+    if (typeof state.busy !== "boolean" || typeof state.text !== "string") throw new CompanionError(502, "The desktop returned an invalid assistant state")
+    return state
+  }
+  sessionControls = (sessionId: string, signal?: AbortSignal) => this.request<typeof SessionControlReply.Type>("POST", "/api/ai/sessions/control", { sessionId, action: "status" }, signal)
+  compactSession = (sessionId: string) => this.request<typeof SessionControlReply.Type>("POST", "/api/ai/sessions/control", { sessionId, action: "compact" })
+  cancelTask = (sessionId: string, taskId: string) => this.request<typeof SessionControlReply.Type>("POST", "/api/ai/sessions/control", { sessionId, action: "cancel_task", taskId })
   questionReply = (sessionId: string, requestId: string, answers: string[][]) => this.request<typeof SessionControlReply.Type>("POST", "/api/ai/sessions/control", { sessionId, action: "answer_question", requestId, answers })
   questionReject = (sessionId: string, requestId: string) => this.request<typeof SessionControlReply.Type>("POST", "/api/ai/sessions/control", { sessionId, action: "reject_question", requestId })
+
+  aiProviders = (signal?: AbortSignal) => this.request<AssistantProvider[]>("GET", "/api/ai/providers", undefined, signal)
 
   aiModels = (signal?: AbortSignal) => this.request<Array<{ id: string; provider: string; configured: boolean }>>("GET", "/api/ai/models", undefined, signal)
 
@@ -152,20 +162,56 @@ export class CompanionClient {
    * never touching `main`. Passing a `sessionId` continues the same conversation as the desktop.
    */
   async *chat(
-    body: { projectId: string; message?: string; sessionId?: string; agent?: string; mode?: "general" | "cad" | "cam" | "gcode" | "toolpath" },
+    body: { projectId: string; message?: string; sessionId?: string; agent?: string; mode?: "general" | "cad" | "cam" | "gcode" | "toolpath"; model?: AssistantPreferences["model"]; permissionMode?: AssistantPreferences["permissionMode"]; includeContext?: boolean },
     signal?: AbortSignal,
   ): AsyncGenerator<ChatEvent> {
     const parse = sseParser<ChatEvent>()
-    let terminal = false
-    for await (const chunk of this.transport.stream("/api/ai/chat/stream", "POST", body, signal)) {
-      if (signal?.aborted) break
-      for (const event of parse(chunk)) {
-        if (!event || typeof event !== "object" || typeof event.type !== "string") continue
-        if (event.type === "done" || event.type === "error") terminal = true
-        yield event
+    let sessionId = body.sessionId
+    try {
+      for await (const chunk of this.transport.stream("/api/ai/chat/stream", "POST", body, signal)) {
+        if (signal?.aborted) return
+        for (const event of parse(chunk)) {
+          if (!event || typeof event !== "object" || typeof event.type !== "string") continue
+          if (typeof event.sessionId === "string" && event.sessionId) sessionId = event.sessionId
+          yield event
+          // Do not wait for URLSession's EOF after the server has finished the turn.
+          if (event.type === "done" || event.type === "error") return
+        }
       }
+      if (!signal?.aborted) throw new CompanionError(0, "The assistant connection ended before the turn finished")
+    } catch (error) {
+      if (signal?.aborted) return
+      if (error instanceof CompanionError && error.status !== 0) throw error
+      if (!sessionId) throw error
+      // Read the desktop's existing turn. Replaying the POST could repeat CAD/CAM changes.
+      yield* this.resumeChat(sessionId, signal)
     }
-    if (!terminal && !signal?.aborted) throw new CompanionError(0, "The assistant connection ended before the turn finished")
+  }
+
+  /** Reattach after a network drop, project switch or app suspension, without starting another turn. */
+  async *resumeChat(sessionId: string, signal?: AbortSignal): AsyncGenerator<ChatEvent> {
+    for (let attempt = 0; attempt < 60 && !signal?.aborted; attempt += 1) {
+      const state = await this.sessionState(sessionId, signal)
+      if (signal?.aborted) return
+      for (const event of state.events ?? []) yield event
+      if (!state.busy) {
+        yield state.error
+          ? { type: "error", sessionId, code: "provider", message: state.error }
+          : { type: "done", sessionId, text: state.text, recovered: true, ...(state.usage ? { usage: state.usage } : {}) }
+        return
+      }
+      const controls = await this.sessionControls(sessionId, signal)
+      if (signal?.aborted) return
+      for (const permission of controls.permissions ?? []) yield { type: "permission_request", ...permission }
+      for (const question of controls.questions) yield { type: "question_request", sessionId, ...question }
+      await new Promise<void>((resolve) => {
+        const finish = () => { clearTimeout(timer); signal?.removeEventListener("abort", finish); resolve() }
+        const timer = setTimeout(finish, 2_000)
+        signal?.addEventListener("abort", finish, { once: true })
+        if (signal?.aborted) finish()
+      })
+    }
+    if (!signal?.aborted) throw new CompanionError(0, "The desktop is still working. Reconnect to recover its answer; your message has not been sent again.")
   }
 
   /** Adds a steer/queued message to a running session without opening a new stream. */

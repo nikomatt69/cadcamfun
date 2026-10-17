@@ -59,7 +59,8 @@ export function ServerProvider({ children }: PropsWithChildren) {
   }, [])
 
   const activate = useCallback((pairing: Pairing) => {
-    useUIStore.getState().setAssistantDesktop(`${pairing.baseUrl}|${pairing.fingerprint}`)
+    // Wi-Fi, hotspot and VPN addresses can change while the desktop identity stays the same.
+    useUIStore.getState().setAssistantDesktop(pairing.fingerprint)
     setConfig(pairing)
   }, [])
 

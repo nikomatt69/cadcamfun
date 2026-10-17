@@ -411,6 +411,33 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           { type: "text", text: input.message },
           ...(input.files ?? []).map((f) => ({ type: "file" as const, mime: f.mime, filename: f.filename, url: f.url }))
         ]
+        let beforePrompt: string | undefined
+        let beforePromptKnown = false
+        const recoverInterruption = async (): Promise<"retry" | "finished"> => {
+          const messages = await host.client.session.messages({ sessionID: sessionId, limit: 40 }).catch(() => undefined)
+          const progressed = beforePromptKnown && messages !== undefined && messages.at(-1)?.info.id !== beforePrompt
+          const current = progressed ? await Effect.runPromise(readHostSessionState(host, sessionId)).catch(() => undefined) : undefined
+          // Prompt waiters can be rejected after the host already saved a complete answer.
+          if (current && !current.busy && !current.error && current.text.trim() !== "") {
+            offer({ type: "done", sessionId, text: [...answers, current.text].filter((text) => text.trim() !== "").join("\n\n"), recovered: true, ...(current.usage ? { usage: current.usage } : {}) })
+            controller.abort()
+            return "finished"
+          }
+          const ranTools = state.toolCalls > 0 || current?.events?.some((event) => event.type === "tool_call")
+          if ((state.reportedUser.size > 0 || ranTools) && await finishFromSession(answers)) return "finished"
+          // A missing record cannot establish that resending a mutation is safe.
+          if (beforePromptKnown && messages !== undefined && !ranTools && attempt < resumes && !controller.signal.aborted) {
+            attempt += 1
+            offer({ type: "retry", sessionId, attempt, message: `The previous answer was still finishing. Sending your message again (${attempt}/${resumes}).` })
+            await new Promise((resolve) => setTimeout(resolve, INTERRUPT_BACKOFF_MS * attempt))
+            state.sessionError = undefined
+            state.idle = false
+            return "retry"
+          }
+          controller.abort()
+          offer({ type: "error", sessionId, code: "aborted", message: INTERRUPTED_MESSAGE })
+          return "finished"
+        }
         // `/goal`: the host's own command sets, pauses, resumes, clears or reads the goal; the application only parses the line
         // and carries the answer. An objective then runs as the turn: the command writes its brief and starts the agent.
         const hostModel = `${input.model.providerID}/${input.model.modelID}`
@@ -446,6 +473,9 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         for (;;) {
           let result: HostPromptResult
           try {
+            const snapshot = await host.client.session.messages({ sessionID: sessionId, limit: 1 }).catch(() => undefined)
+            beforePromptKnown = snapshot !== undefined
+            beforePrompt = snapshot?.at(-1)?.info.id
             usedGoalCommand = false
             if (goalPending !== undefined) {
               goalPending = undefined
@@ -463,17 +493,8 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             const message = describeHostFailure(cause)
             // The host started the goal and ran its loop, then failed to encode the command's reply: the work is in the session.
             if (usedGoalCommand && !isInterruption(message) && !controller.signal.aborted && (await host.client.session.goal({ sessionID: sessionId }).catch(() => null)) !== null && (await finishFromSession(answers))) return
-            if (isInterruption(message) && state.reportedUser.size > 0 && (await finishFromSession(answers))) return
             if (isInterruption(message)) {
-              if (attempt < resumes && !controller.signal.aborted) {
-                // The turn that was running when this message arrived has just ended: ask again, same message.
-                attempt += 1
-                offer({ type: "retry", sessionId, attempt, message: `The previous answer was still finishing. Sending your message again (${attempt}/${resumes}).` })
-                await new Promise((r) => setTimeout(r, INTERRUPT_BACKOFF_MS * attempt))
-                continue
-              }
-              controller.abort()
-              offer({ type: "error", sessionId, code: "aborted", message: INTERRUPTED_MESSAGE })
+              if (await recoverInterruption() === "retry") continue
               return
             }
             if (attempt < resumes && !controller.signal.aborted && isTransientFailure(message)) {
@@ -510,7 +531,10 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           }
           // The call went through: the outage (if any) is over, so the next one gets its full set of resumes again.
           if (!failure) attempt = 0
-          if (failure && isInterruption(failure.message) && state.reportedUser.size > 0 && (await finishFromSession(answers))) return
+          if (failure && isInterruption(failure.message)) {
+            if (await recoverInterruption() === "retry") continue
+            return
+          }
           const answerOf = (): string => (result.parts ?? []).filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
           if (!failure && !controller.signal.aborted && continuationState !== undefined && continuations < maxContinues) {
             const text = answerOf()

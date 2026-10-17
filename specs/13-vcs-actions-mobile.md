@@ -105,6 +105,12 @@ A commit/merge triggers the `push` workflows of the pushed branch; opening a PR 
 
 ## 5. AI companion flow
 
+Owner refinement: use `/Volumes/SSD/Projects/nikcli/packages/mobile` as the assistant interaction reference. WP13 adds a searchable provider/model/thinking picker, persisted per-project agent/model/permission/context preferences, new-conversation control and session inspector using existing CADCAMFUN contracts. WP4 additionally owns the read-only `GET /api/ai/providers` companion allowance so model names, capabilities and supported thinking variants come from the same catalogue as desktop. Provider credentials remain on the paired desktop. Model, variant, permission mode and context selection travel on the next chat request and in persisted offline messages; selection never silently falls back to a different paid model. Install the signed Release on the connected physical iPhone Nikoemme after verification.
+
+### Mobile assistant reliability (2026-10-17)
+
+Owner-requested integration scope: WP13 owns the mobile transport, assistant lifecycle and reconnect presentation; WP8 owns interruption handling in the existing nikcli chat adapter; WP4 owns companion end-to-end regression fixtures. No new wire format or gateway privileges are required. A host interruption returned as a prompt result follows the same recovery rules as a rejected prompt. Stored completed answers are recovered before considering a retry; confirmed tool execution must never be replayed by resending the user's mutation. Switching mobile projects or reconnecting detaches the stream without stopping desktop work. Only the Stop action aborts the server turn. Reconnect restores stored tool results and pending permissions/questions through the existing scoped state/control endpoints. An uncertain delivery is never automatically queued for execution again.
+
 1. Phone: *"make the plate 20 mm wider and regenerate the pocket"* → `POST /api/ai/chat/stream` on the paired desktop.
 2. Assistant (tools in `apps/sidecar/src/services/ai-vcs-tools.ts`): `vcs_status` → `vcs_start_change` (creates and checks out `ai/<topic>`; refuses on a dirty working copy) → `cad_*` / `cam_*` edits → `vcs_commit` → `vcs_open_pull_request` (+ `actions_run`).
 3. Pull request opens → `pullRequest` workflows run (validation, G-code present, later `cam/verify`).

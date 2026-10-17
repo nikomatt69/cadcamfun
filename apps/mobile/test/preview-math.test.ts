@@ -7,6 +7,9 @@ import {
   dot,
   fitOrbit,
   hitMeshPart,
+  MAX_PITCH,
+  niceStep,
+  viewOrbit,
   mvpOf,
   normalize,
   orbitDrag,
@@ -35,8 +38,8 @@ describe("preview camera", () => {
 
   test("drag clamps the pitch", () => {
     const orbit = fitOrbit(bounds)
-    expect(orbitDrag(orbit, 0, 10_000).pitch).toBeLessThanOrEqual(1.2)
-    expect(orbitDrag(orbit, 0, -10_000).pitch).toBeGreaterThanOrEqual(-1.2)
+    expect(orbitDrag(orbit, 0, 10_000).pitch).toBeLessThanOrEqual(MAX_PITCH)
+    expect(orbitDrag(orbit, 0, -10_000).pitch).toBeGreaterThanOrEqual(-MAX_PITCH)
   })
 })
 
@@ -65,5 +68,27 @@ describe("preview picking and toolpath sync", () => {
     expect(defineComponentPrompt({ id: "d1", name: "Plate" }, ["e1", "e2"])).toContain("e1, e2")
     expect(defineComponentPrompt({ id: "d1", name: "Plate" }, [])).toContain("whole design")
     expect(changeComponentPrompt({ id: "c1", name: "Bracket" })).toContain("ai/ branch")
+  })
+})
+
+describe("standard views and grid spacing", () => {
+  const bounds = { min: [0, 0, 0] as const, max: [100, 40, 20] as const }
+  test("view-cube faces look along the desktop axes with Z up", () => {
+    const front = cameraBasis(viewOrbit(bounds, "front")).forward
+    const right = cameraBasis(viewOrbit(bounds, "right")).forward
+    const top = cameraBasis(viewOrbit(bounds, "top"))
+    expect(front[1]).toBeCloseTo(1, 6)
+    expect(right[0]).toBeCloseTo(-1, 6)
+    expect(top.forward[2]).toBeLessThan(-0.99)
+    // Top view keeps X to the right and Y up on screen, like the desktop.
+    expect(top.right[0]).toBeCloseTo(1, 3)
+    expect(top.up[1]).toBeGreaterThan(0.99)
+    expect(viewOrbit(bounds, "iso")).toEqual(fitOrbit(bounds))
+  })
+  test("grid steps are 1, 2 or 5 times a power of ten", () => {
+    expect(niceStep(100, 10)).toBe(10)
+    expect(niceStep(130, 10)).toBe(20)
+    expect(niceStep(31, 10)).toBe(5)
+    expect(niceStep(0.07, 10)).toBeCloseTo(0.01, 12)
   })
 })
