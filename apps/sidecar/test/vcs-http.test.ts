@@ -76,4 +76,19 @@ describe("vcs HTTP", () => {
     const manual = await app.call(v("/actions/dispatch"), { method: "POST", json: {} })
     expect(manual.body).toEqual([]) // ci.yml has no `manual` trigger
   })
+
+  test("a phone's history-changing action names the paired device in the ActivityLog", async () => {
+    const project = (await app.call("/api/projects", { method: "POST", json: { name: "Audited" } })).body.id
+    await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Plate", data: { w: 1 } } })
+    const commit = await app.call(`/api/projects/${project}/vcs/commit`, { method: "POST", json: { message: "From the phone" }, headers: { "x-cadcamfun-companion-device": "a1b2c3d4e5f6" } })
+    expect(commit.status).toBe(201)
+    // A malformed value is ignored rather than written into the audit trail.
+    await app.call(`/api/projects/${project}/vcs/branches`, { method: "POST", json: { name: "feature" }, headers: { "x-cadcamfun-companion-device": "<script>" } })
+    await app.call(`/api/projects/${project}/vcs/checkout`, { method: "POST", json: { branch: "feature" }, headers: { "x-cadcamfun-companion-device": "<script>" } })
+    const history = await app.call("/api/analytics/user-history?itemType=project&limit=100")
+    const rows = (history.body.logs as Array<{ itemId: string; action: string; details: Record<string, unknown> }>).filter((row) => row.itemId === project)
+    const byAction = Object.fromEntries(rows.map((row) => [row.action, row.details]))
+    expect(byAction["vcs.commit"]).toMatchObject({ via: "companion:a1b2c3d4e5f6", message: "From the phone" })
+    expect(byAction["vcs.checkout"]?.via).toBeUndefined()
+  })
 })

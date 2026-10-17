@@ -5,7 +5,7 @@ import { AppConfigService } from "../config.ts"
 import { getLocalPort, announced } from "../startup.ts"
 import {
   defaultHost, fingerprintOf, generateCertificate, hashToken, newToken, pairingHosts, pairingLink, startGateway,
-  type CompanionCertificate, type Gateway, type TokenRecord,
+  type CompanionCertificate, type Gateway, type GatewayRequestLog, type TokenRecord,
 } from "./companion-gateway.ts"
 import { KvStore } from "./kv.ts"
 
@@ -40,6 +40,21 @@ export class Companion extends Context.Service<Companion, {
     let gateway: Gateway | undefined
     let certificate: CompanionCertificate | undefined
     let touches = new Map<string, string>()
+    // The gateway runs outside Effect; its request lines go through this layer's logger (stderr JSON in the app, never stdout).
+    const runLog = Effect.runForkWith(yield* Effect.context<never>())
+    const logRequest = (entry: GatewayRequestLog): void => {
+      const line = entry.status >= 500 ? Effect.logWarning("Companion request") : Effect.logInfo("Companion request")
+      runLog(line.pipe(Effect.annotateLogs({
+        "companion.device": entry.device ?? "unpaired",
+        "companion.ip": entry.ip,
+        "companion.kind": entry.kind,
+        "http.method": entry.method,
+        "http.path": entry.path,
+        "http.status": entry.status,
+        "http.duration_ms": entry.ms,
+        ...(entry.reason ? { "companion.refused": entry.reason } : {}),
+      })))
+    }
 
     const settings = Effect.gen(function*() {
       const v = (yield* kv.get(SETTINGS))?.value as { enabled?: boolean; port?: number } | undefined
@@ -93,6 +108,7 @@ export class Companion extends Context.Service<Companion, {
             upstream: () => ({ port: getLocalPort() ?? local, token: Redacted.value(config.token) }),
             tokens: () => Effect.runPromise(tokens),
             touch: (id) => void touches.set(id, new Date().toISOString()),
+            log: logRequest,
           }),
           catch: (e) => new CompanionError({ code: "unavailable", message: `Could not start the gateway on port ${port}: ${String(e)}` }),
         })

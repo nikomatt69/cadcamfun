@@ -1,7 +1,9 @@
 import { Api, BadRequest, Conflict, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
 import { DatabaseError } from "@cadcamfun/db"
 import { Effect } from "effect"
+import { HttpServerRequest } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { COMPANION_DEVICE_HEADER } from "../services/companion-gateway.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { ProjectVcs, VcsFailure, type Actor } from "../services/project-vcs.ts"
 import { WorkflowRunner, type RunRow } from "../services/workflow-runner.ts"
@@ -86,7 +88,12 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
     if (level === "maintainer" && found.project.ownerId !== user.id && found.orgRole !== "ADMIN" && found.orgRole !== "MANAGER") {
       return yield* new Forbidden({ message: "Only the owner or an organisation admin/manager can do this" })
     }
-    const actor: Actor = { userId: user.id, name: user.name ?? user.email ?? "User", email: user.email ?? "unknown@cadcamfun.local" }
+    // Set only by the companion gateway, which replaces whatever a phone sends: the audit row names the paired device.
+    const device = (yield* HttpServerRequest.HttpServerRequest).headers[COMPANION_DEVICE_HEADER]
+    const actor: Actor = {
+      userId: user.id, name: user.name ?? user.email ?? "User", email: user.email ?? "unknown@cadcamfun.local",
+      ...(device && /^[0-9a-f]{1,64}$/.test(device) ? { via: `companion:${device}` } : {}),
+    }
     return actor
   })
 

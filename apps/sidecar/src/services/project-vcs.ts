@@ -48,6 +48,8 @@ export interface Actor {
   readonly kind?: "user" | "ai"
   /** The message that opened the AI turn, cited on an AI commit so history says what the work was for. */
   readonly lastPrompt?: string
+  /** Where the request came from when not the desktop itself, e.g. `companion:<device id>` for a paired phone. */
+  readonly via?: string
 }
 
 export type PullRequestRow = typeof schema.pullRequestTable.$inferSelect
@@ -151,7 +153,7 @@ export class ProjectVcs extends Context.Service<ProjectVcs, {
       const audit = (actor: Actor, projectId: string, action: string, details: Record<string, unknown>) => {
         // An AI commit cites the message that opened the turn, so history reads as "the user asked for X".
         const citation = actor.kind === "ai" && actor.lastPrompt ? `[ai] ${actor.lastPrompt.replace(/\s+/g, " ").slice(0, 200)}` : undefined
-        return store.audit(actor.userId, projectId, action, { ...details, actor: actor.kind ?? "user", ...(citation !== undefined ? { citation } : {}) }).pipe(Effect.ignore)
+        return store.audit(actor.userId, projectId, action, { ...details, actor: actor.kind ?? "user", ...(citation !== undefined ? { citation } : {}), ...(actor.via !== undefined ? { via: actor.via } : {}) }).pipe(Effect.ignore)
       }
 
       const remoteOf = Effect.fn("ProjectVcs.remoteOf")(function*(projectId: string) {
