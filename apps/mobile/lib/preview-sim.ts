@@ -4,7 +4,8 @@
  * The desktop sends motion as straight segments tagged with their G-code line. Timing comes from the
  * program itself: the modal `F` word in effect on each line (units per minute, in the program's own
  * units, so inch and metric programs both work without conversion). Rapids have no feed word; they
- * run at an assumed rapid rate, so the total is an estimate and is labelled as one in the UI.
+ * run at the desktop simulator's rapid rate, so the phone and the desktop quote the same cycle time. It is
+ * still an estimate (no acceleration, no machine rapid override) and is labelled as one in the UI.
  * Everything here is pure so playback can be tested without a device.
  */
 
@@ -17,11 +18,16 @@ export interface SimSegment {
   readonly to: readonly [number, number, number]
 }
 
-/** Assumed rapid traverse, units per minute. Typical of a small VMC in mm/min. */
-export const DEFAULT_RAPID_FEED = 5_000
+/**
+ * Rapid traverse, units per minute: mirrors `RAPID_FEEDRATE_MM_MIN` in `packages/core/src/cam/viewer/toolpath.ts`
+ * (the phone bundle does not import `@cadcamfun/core`; `test/preview-sim.test.ts` keeps the two equal).
+ */
+export const RAPID_FEEDRATE_MM_MIN = 1_000
+export const DEFAULT_RAPID_FEED = RAPID_FEEDRATE_MM_MIN
 
-/** Used when a cutting move appears before any `F` word: slow, so the estimate errs long. */
-export const FALLBACK_CUT_FEED = 100
+/** A cutting move before any `F` word runs at the desktop's `DEFAULT_CUTTING_FEEDRATE_MM_MIN`. */
+export const DEFAULT_CUTTING_FEEDRATE_MM_MIN = 500
+export const FALLBACK_CUT_FEED = DEFAULT_CUTTING_FEEDRATE_MM_MIN
 
 /** Playback multipliers offered in the simulation bar. */
 export const PLAYBACK_SPEEDS = [1, 5, 25, 100] as const

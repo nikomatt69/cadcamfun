@@ -14,6 +14,7 @@ import {
   startTimeOf,
   type SimSegment,
 } from "../lib/preview-sim"
+import { DEFAULT_CUTTING_FEEDRATE_MM_MIN, RAPID_FEEDRATE_MM_MIN } from "../../../packages/core/src/cam/viewer/toolpath.ts"
 
 const segment = (kind: SimSegment["kind"], line: number, from: [number, number, number], to: [number, number, number]): SimSegment => ({ kind, line, from, to })
 
@@ -24,6 +25,16 @@ describe("feeds from the program", () => {
   })
   test("lowercase words and decimals parse", () => {
     expect(modalFeeds("g1 x1 f250.5")[1]).toBe(250.5)
+  })
+})
+
+describe("feeds match the desktop simulator", () => {
+  test("rapid and fallback cutting feeds mirror packages/core", () => {
+    expect(DEFAULT_RAPID_FEED).toBe(RAPID_FEEDRATE_MM_MIN)
+    expect(FALLBACK_CUT_FEED).toBe(DEFAULT_CUTTING_FEEDRATE_MM_MIN)
+  })
+  test("a 100 mm rapid takes the desktop's 6 seconds", () => {
+    expect(segmentDurations([segment("rapid", 1, [0, 0, 0], [100, 0, 0])], [])[0]).toBeCloseTo(6, 9)
   })
 })
 
@@ -45,7 +56,7 @@ describe("simulation clock", () => {
   })
   test("time maps to the running block and a scrub resumes from its start", () => {
     expect(indexAtTime(ends, 0)).toBe(0)
-    expect(indexAtTime(ends, 0.5)).toBe(1)
+    expect(indexAtTime(ends, ends[0]! + 0.01)).toBe(1)
     expect(indexAtTime(ends, ends[1]! + 0.01)).toBe(2)
     expect(indexAtTime(ends, 1e9)).toBe(2)
     expect(indexAtTime([], 5)).toBe(0)
