@@ -334,9 +334,40 @@ largest single piece and the precondition of P6/P7.
 ## 7. Parity checklist (what "Fusion / hyperMILL level" means here)
 
 Parity is claimed per row of §1 only when its phase gate passed **and** it was checked in the running app (spec 31 lesson:
-tests have no WebGL; screenshots through the `run` skill). Today: A1–A4 partial (trunnion pose only), B1 partial (no tap,
-bore, lathe cycles), B2 no, C1–C4 no, D1 partial, D2 no, D3 partial (per-toolpath tool, wrong per-operation default), E1
-lathe only, E2–E3 no, F1–F3 workholding boxes only, G1 partial, G2 unmeasured.
+tests have no WebGL; screenshots through the `run` skill).
+
+At analysis (2026-10-19): A1–A4 partial (trunnion pose only), B1 partial (no tap, bore, lathe cycles), B2 no, C1–C4 no,
+D1 partial, D2 no, D3 partial (per-toolpath tool, wrong per-operation default), E1 lathe only, E2–E3 no, F1–F3 workholding
+boxes only, G1 partial, G2 unmeasured.
+
+Status 2026-10-20 (each row tested and seen in the running app unless said):
+
+| Row | Status |
+| --- | --- |
+| A1 machine model | yes, as envelopes of typical classes (P5); no CAD import of a real machine |
+| A2 machine classes | VMC, 4th axis, trunnion AC/BC, head-table BC, fork head AC, gantry router, lathe 2-axis; mill-turn only for G112 paths |
+| A3 limits, DRO | travel and rotary limits, machine-axes DRO; no singularity / unwinding report |
+| A4 TCP, tilted planes | G43.4 / G234 / TRAORI frames, G68 / G68.2 / CYCLE800; tool axis of a tilted plane not in the motion track |
+| B1 every operation | milling cycles incl. tapping / boring, thread milling, probing, lathe G70–G76, grooving, parting; unsupported words listed |
+| B2 cutter compensation | yes (G41 / G42 with D from G10 L12, host or header) |
+| C1 move classes | yes |
+| C2 colour modes | tool, operation, move, feed, Z; tool-axis vectors not drawn |
+| C3 operation browser | yes (show / hide / only / go); setups not grouped |
+| C4 timeline, NC sync | yes (bands, tool changes, findings / limits / collisions, steps, speed, NC strip) |
+| D1 tool library shapes | mill 21 shapes incl. tap, lollipop, barrel; lathe ISO C/D/V/S/T/W/R |
+| D2 holders | outlines per kind (ER, shrink, hydraulic, Weldon, arbor, tapping); no vendor catalogue, no spindle taper |
+| D3 tool per operation | yes (table, per toolpath, header and lathe-block inference) |
+| E1 live removal | 3-axis S1 (another session, partial gate), rotary S2 voxels, lathe profile |
+| E2 rest stock across operations | within one program; not across setups |
+| E3 comparison with the part | no (deviation colours open) |
+| F1 tool / holder vs stock | against the raw stock box |
+| F2 machine collision | head vs table / trunnion / workholding / stock by posed bounds; no near-miss clearance |
+| F3 events | yes (markers, seekable list, stop at collision) |
+| G1 inspection | partial: no section plane or measure in the simulator |
+| G2 scale | 1 M moves: viewer side ~0.7 s, interpreter ~1.5 s under load |
+
+Parity with Fusion 360 / hyperMILL is **not** claimed overall: E3, the near-miss and live-stock collision checks, section /
+measure and real machine models stay open.
 
 ## 8. Decisions and limits
 
