@@ -32,7 +32,7 @@ The preview draws each program on its machine, and the checks use the same geome
 | Drawn | stock, vise / clamps / plate, table | chuck, jaws, the bar being turned live, the insert | bed, build volume, nozzle, deposited beads |
 | Picture | as programmed, Z up | spindle axis horizontal, chuck on the left, +Z to the right, X drawn as a radius (up for a rear turret, down for a front one) | as programmed |
 
-The machine shown comes from the generator's output, the kernel (mill), or the G-code's own words; a mismatch is flagged. Lines the replay cannot run (G70-G76 lathe cycles) make a "partial preview".
+The machine shown comes from the generator's output, the kernel (mill), or the G-code's own words; a mismatch is flagged. The replay runs tapping and boring cycles (G84/G74/G85-G89/G76), G41/G42 cutter compensation (radius from G10 L12, the host or a `T1 D=6.` header), G52/G10 L2/G54-G59 offsets, G68/G68.2/CYCLE800 tilted planes, the lathe's G70-G76 cycles, U/W and G112 polar; lines it cannot run (e.g. G51 scaling, G16 polar coordinates, other Siemens cycles) make a "partial preview" — name them.
 
 ## Running a program on its machine
 cam action machine with `gcode` (or `operationId`), optional `params` (the workholding below, a mill `stock`) and `at` (seconds) answers the kinematics for that program: what turns and in which sense, where the tool is at `at` (program and preview coordinates, spindle, rpm, line), the set-up findings, the turned part (Z ranges and diameters) or the printed layers. Use it to check a change before writing it, and to explain what the preview shows.

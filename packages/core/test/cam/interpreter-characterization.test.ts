@@ -22,7 +22,9 @@ const RECORDED: Readonly<Record<string, string>> = {
   inch: "a1b5f9ee43985c52",
   rotary: "c1acf5ca65d47daf",
   subprograms: "e9e111e5e7cac0f6",
-  dwellAndUnsupported: "ea28d72a170a9b3a",
+  // Re-recorded for spec 32 P2: G64 is accepted and G41 without a known radius says why it is drawn uncompensated; the
+  // geometry is unchanged (asserted below against its fingerprint recorded before the change).
+  dwellAndUnsupported: "d2451e6a7bc84d3",
   probe: "5a7348242f10f1e2"
 }
 
@@ -32,4 +34,14 @@ describe("interpreter characterization (milling replay is bit-identical)", () =>
       expect(fingerprint(text)).toBe(RECORDED[name]!)
     })
   }
+})
+
+describe("spec 32 P2 changed only the warnings of the milling fixtures", () => {
+  test("dwellAndUnsupported: same segments, G64 accepted, G41 explained", () => {
+    const r = interpretGcode(MILL_PROGRAMS.dwellAndUnsupported!)
+    // Fingerprint of everything but the errors, recorded on main @ 73ce7b3 before the interpreter learnt G41 / G64.
+    expect(Bun.hash(JSON.stringify([r.segments, r.end, r.cutLength, r.rapidLength, r.minZ, r.mCodes, r.tools, r.ended])).toString(16)).toBe("32aab60a1bdb424")
+    expect(r.errors).toEqual(["line 6: G41 needs the tool radius (D1 is not set by G10 L12, the host or a T/D header comment): drawn on the programmed path"])
+    expect(r.unsupported).toEqual([{ line: 6, word: "G41" }])
+  })
 })

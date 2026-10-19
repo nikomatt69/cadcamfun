@@ -173,7 +173,7 @@ describe("CAM page", () => {
     const { dispose } = app.visit("/cam")
     try {
       await app.wait(() => editor())
-      await type(editor()!, "G18 G90 G21\nG96 S180 M3\nG50 S2500\nG0 X52 Z2\nG1 X44 F0.2\nG1 Z-40\nG71 U1 R0.5\nG0 X60 Z5\nM30")
+      await type(editor()!, "G18 G90 G21\nG96 S180 M3\nG50 S2500\nG0 X52 Z2\nG1 X44 F0.2\nG1 Z-40\nG51.1 Z0\nG0 X60 Z5\nM30")
       await clickText("button", "Preview")
       const badge = await app.wait(() => document.querySelector<HTMLElement>('[data-testid="machine-badge"]'), 30000)
       await app.wait(() => (badge.textContent === "Lathe" ? badge : undefined), 30000)

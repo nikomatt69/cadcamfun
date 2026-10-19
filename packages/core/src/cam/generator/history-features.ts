@@ -182,6 +182,9 @@ export const historyFeatures = (e: CadElement): HistoryFeatures | undefined => {
 }
 
 const derive = (history: History): HistoryFeatures => {
+  // Whole bodies mirrored or patterned carry their holes and pockets along; the walk below follows feature tools only, so such a
+  // part is left to the exact recognition of the planner (`exactFeatures`), which reads the real geometry.
+  if (history.features.some((f) => (f.type === "mirror" || f.type === "pattern") && f.bodies !== undefined)) throw new Error("body copies")
   const built = rebuild(history)
   const parameters = built.parameters
   const notes: string[] = []

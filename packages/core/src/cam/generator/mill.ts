@@ -57,29 +57,28 @@ export const generateMillGCode = (s: ToolpathSettings, g: GeometryInput, options
     gcode += "G61 ; Exact stop mode\n\n"
   }
 
-  const toolpath = withFinishingPass(s, g, millToolpath)
+  // With the control compensating (G41 / G42) the program follows the part's contour itself: the control adds the tool
+  // radius. Offsetting the path here as well would cut a radius too far (spec 32 §2.2).
+  const compensated = s.useToolCompensation && (s.operationType === "contour" || s.operationType === "profile") && (s.offset === "outside" || s.offset === "inside")
+  const toolpath = withFinishingPass(compensated ? { ...s, offset: "center" } : s, g, millToolpath)
 
   if (s.useToolCompensation) {
     gcode += "; Tool compensation enabled\n"
-    let side = ""
-    if (s.operationType === "contour" || s.operationType === "profile") {
-      if (s.offset === "outside") side = s.direction === "climb" ? "G42" : "G41"
-      else if (s.offset === "inside") side = s.direction === "climb" ? "G41" : "G42"
-    }
-    if (side) {
+    // The side follows the path as written: outside a counter-clockwise contour (or inside a clockwise one) the tool is on
+    // the right of the travel (G42), otherwise on the left (G41).
+    const first = firstLoop(toolpath)
+    const side = !compensated || first === undefined ? "" : (s.offset === "outside") === (signedArea(first.points) > 0) ? "G42" : "G41"
+    if (side && first !== undefined) {
       gcode += `${side} D${s.toolNumber || 1} ; Tool compensation\n`
-      // The legacy lookup took the first `G1` line, which is the Z plunge (no X/Y), so the approach never appeared.
-      let match: RegExpMatchArray | null = null
-      for (const line of toolpath.split("\n")) {
-        if (line.trim().startsWith("G1")) {
-          match = line.match(/X([-\d.]+)\s+Y([-\d.]+)/)
-          if (match) break
-        }
-      }
-      if (match) gcode += `G0 X${(parseFloat(match[1]!) - 5).toFixed(3)} Y${parseFloat(match[2]!).toFixed(3)} ; Approach point for compensation\n`
+      // The start-up move runs into the first corner along the first element, from more than a tool radius away.
+      const [a, b] = first.points
+      const dx = b!.x - a!.x, dy = b!.y - a!.y, len = Math.hypot(dx, dy) || 1
+      const lead = s.toolDiameter + 2
+      gcode += `G0 X${(a!.x - (dx / len) * lead).toFixed(3)} Y${(a!.y - (dy / len) * lead).toFixed(3)} ; Approach point for compensation\n`
       gcode += toolpath
       gcode += "G40 ; Cancel tool compensation\n"
     } else {
+      if (s.operationType === "contour" || s.operationType === "profile") gcode += "; Warning: tool compensation needs an inside or outside contour; the path is offset by the program instead\n"
       gcode += toolpath
     }
   } else {
@@ -92,4 +91,27 @@ export const generateMillGCode = (s: ToolpathSettings, g: GeometryInput, options
   gcode += "M5 ; Stop spindle\n"
   gcode += "M30 ; Program end\n"
   return gcode
+}
+
+/** The XY points of the first closed run of G1 moves in a toolpath text (the first contour level), with the start repeated. */
+const firstLoop = (toolpath: string): { readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }> } | undefined => {
+  const points: Array<{ x: number; y: number }> = []
+  let x: number | undefined, y: number | undefined
+  for (const raw of toolpath.split("\n")) {
+    const line = raw.replace(/;.*$/, "").trim()
+    const mx = /X(-?[\d.]+)/.exec(line), my = /Y(-?[\d.]+)/.exec(line)
+    if (mx) x = Number(mx[1])
+    if (my) y = Number(my[1])
+    if (!/^G0?1\b/.test(line) || x === undefined || y === undefined) { if (points.length > 2 && /^G0?0\b/.test(line) && (mx || my || /Z/.test(line))) break; continue }
+    const last = points[points.length - 1]
+    if (last === undefined || Math.hypot(last.x - x, last.y - y) > 1e-9) points.push({ x, y })
+    if (points.length > 3 && Math.hypot(points[0]!.x - x, points[0]!.y - y) < 1e-6) return { points }
+  }
+  return points.length > 2 ? { points } : undefined
+}
+
+const signedArea = (points: ReadonlyArray<{ readonly x: number; readonly y: number }>): number => {
+  let a = 0
+  for (let i = 0; i < points.length; i++) { const p = points[i]!, q = points[(i + 1) % points.length]!; a += p.x * q.y - q.x * p.y }
+  return a / 2
 }

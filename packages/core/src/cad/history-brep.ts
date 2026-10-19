@@ -747,12 +747,27 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
           break
         }
         case "mirror": {
-          const source = tools.get(f.feature)
-          if (source === undefined) break
           const value = f.offset === undefined ? 0 : dim(f.offset)
           const axis = f.plane === "XY" ? 2 : f.plane === "YZ" ? 0 : 1
           const m = [axis === 0 ? -1 : 1, 0, 0, 0, axis === 1 ? -1 : 1, 0, 0, 0, axis === 2 ? -1 : 1] as const
           const tr: Transform = { m, t: { x: axis === 0 ? 2 * value : 0, y: axis === 1 ? 2 * value : 0, z: axis === 2 ? 2 * value : 0 } }
+          if (f.bodies !== undefined) {
+            const chosen = bodies.filter((b) => f.bodies!.includes(b.id))
+            for (const b of chosen) {
+              const image: Exact = b.exact.brep === undefined ? b.exact : ok(transformBrep(b.exact.brep, tr))
+              if (f.join !== true) { bodies.push({ id: chosen.length === 1 ? f.id : `${f.id}#${b.id}`, feature: f.id, exact: image }); continue }
+              // The two halves of a symmetric part share their face on the mirror plane: sewn when the Boolean declines them.
+              let joined = boolean(b.exact, image, "union")
+              if (joined.brep === undefined && b.exact.brep !== undefined && image.brep !== undefined) {
+                const sewn = sewSolids(b.exact.brep, image.brep)
+                if (sewn !== undefined) joined = ok(sewn)
+              }
+              bodies[bodies.indexOf(b)] = { ...b, exact: joined }
+            }
+            break
+          }
+          const source = tools.get(f.feature!)
+          if (source === undefined) break
           const exact = source.exact.map((x) => (x.brep === undefined ? x : ok(transformBrep(x.brep, tr))))
           tools.set(f.id, { exact, operation: source.operation, ...(source.targets !== undefined ? { targets: source.targets } : {}) })
           const missing = exact.find((x) => x.brep === undefined)
@@ -833,12 +848,11 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
           break
         }
         case "pattern": {
-          const source = tools.get(f.feature)
-          if (source === undefined) break
+          const source = f.feature === undefined ? undefined : tools.get(f.feature)
+          if (f.feature !== undefined && source === undefined) break
           const count = dim(f.count)
-          const base = source.exact.find((x) => x.brep === undefined) ?? ok(unionAll(source.exact.map((x) => x.brep!)))
-          const copies: Array<{ exact: Exact; label: string }> = []
-          const emit = (tr: Transform, label: string) => copies.push({ exact: base.brep === undefined ? base : ok(transformBrep(base.brep, tr)), label })
+          const placements: Array<{ tr: Transform; label: string }> = []
+          const emit = (tr: Transform, label: string) => placements.push({ tr, label })
           if (f.kind === "grid") {
             const rows = dim(f.countB!)
             const a = (f.step ?? [0, 0, 0]).map(dim), bb = (f.stepB ?? [0, 0, 0]).map(dim)
@@ -855,6 +869,14 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
             const each = span >= 360 - 1e-9 ? span / count : span / (count - 1)
             for (let i = 1; i < count; i++) emit(rotation({ x: 0, y: 0, z: 1 }, (each * i * Math.PI) / 180, { x: c[0]!, y: c[1]!, z: 0 }), `${f.id}#${i}`)
           }
+          const moved = (x: Exact, tr: Transform): Exact => (x.brep === undefined ? x : ok(transformBrep(x.brep, tr)))
+          if (source === undefined) {
+            const chosen = bodies.filter((b) => f.bodies!.includes(b.id))
+            for (const b of chosen) for (const p of placements) bodies.push({ id: chosen.length === 1 ? p.label : `${p.label}:${b.id}`, feature: f.id, exact: moved(b.exact, p.tr) })
+            break
+          }
+          const base = source.exact.find((x) => x.brep === undefined) ?? ok(unionAll(source.exact.map((x) => x.brep!)))
+          const copies = placements.map((p) => ({ exact: moved(base, p.tr), label: p.label }))
           // The mesh rebuild applies disjoint copies in one Boolean (one body label); the exact replay applies them one by one,
           // which gives the same solid.
           if (source.operation === "new") for (const c of copies) apply(f.id, c.exact, "new", source.targets, c.label)

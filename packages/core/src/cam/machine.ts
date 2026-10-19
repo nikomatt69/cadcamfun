@@ -282,8 +282,11 @@ export const inferMachineKind = (gcode: string): MachineInference | undefined =>
     const t = words.find((w) => w.letter === "T")
     if (t !== undefined && t.value >= 100 && /T\s*0?\d{4}\b/i.test(text)) vote("lathe", 1, "turret tool and offset words (T0101)")
     if (has("Y") && (has("G", 0) || has("G", 1) || has("G", 2) || has("G", 3) || moves)) yMotion = true
+    if ([70, 71, 72, 73, 76].some((g) => has("G", g)) && has("P") && has("Q") && !has("Y") && !has("R")) vote("lathe", 3, "lathe repetitive cycles with a P..Q profile (G70-G73, G76)")
+    if (has("G", 112) || has("G", 12.1)) vote("lathe", 2, "polar interpolation on the face (G112)")
     if (has("G", 43)) vote("mill", 2, "tool length offset (G43)")
-    if ([73, 81, 82, 83].some((g) => has("G", g))) vote("mill", 2, "drilling cycles (G81-G83)")
+    if ([73, 81, 82, 83].some((g) => has("G", g)) && (has("Y") || has("R") || !(has("P") && has("Q")))) vote("mill", 2, "drilling cycles (G81-G83)")
+    if ([84, 85, 86, 89].some((g) => has("G", g))) vote("mill", 2, "tapping / boring cycles (G84-G89)")
     if (has("G", 17)) vote("mill", 1, "XY plane (G17)")
   }
   if (!motion) return undefined

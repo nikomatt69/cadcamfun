@@ -14,11 +14,20 @@
  * `G96`/`G97` constant surface speed, `G50` (S: spindle limit; X/Z: coordinate setting), `G92`/`G92.1` coordinate setting
  * (E alone resets the extruder), `G28` (homing: no drawn motion), the extruder `E` with `M82`/`M83`. With `track` the
  * machine state of every segment (spindle, plane, extrusion, tool, coolant, line) comes back in `states`.
+ * Spec 32 §4.3: tapping and boring cycles `G84 G74 G85 G86 G76 G87 G88 G89` (the tap's spindle reverses in the track),
+ * cutter radius compensation `G41/G42 D` / `G40` (`cutter-comp.ts`; the radius from `toolRadius`, `G10 L12` or the header),
+ * frames: `G52` local shift, `G10 L2` + `G54-G59` work offsets, `G68` rotation, `G68.2` / `CYCLE800` tilted planes
+ * (`G69` cancels), `G90.1` absolute arc centres, `G53` (machine coordinates: like `G28`, no drawn motion); lathe
+ * repetitive cycles `G70-G76` (`lathe-cycles.ts`), `U`/`W` incremental addresses, `G112/G113` polar interpolation (C is the
+ * face's Y); Siemens keywords and cycle calls are statements (only `CYCLE800` moves anything), never misread as words.
  * Anything else with an effect on motion is reported in `errors` (and `unsupported`). Output units are always millimetres.
  *
  * Motion inside a subprogram carries the line of the call in the main program as `line` (the block the
  * operation, the tool and every finding refer to) and its own physical line as `subLine`.
  */
+
+import { alongLine, joinOf, offsetElement, type CompElement, type CompLine, type CompSide } from "./cutter-comp.ts"
+import { finishCycle, patternCycle, peckCycle, roughCycle, threadCycle, type LatheMove, type ProfilePoint } from "./lathe-cycles.ts"
 
 /** Deepest `M98` nesting the interpreter follows (Fanuc allows four). */
 export const MAX_CALL_DEPTH = 8
@@ -63,6 +72,13 @@ export interface InterpretOptions {
    * stylus touches is not known before the machine runs). Off by default: the verifier and the evidence never see them as cuts.
    */
   readonly probeMoves?: boolean
+  /**
+   * The radius of the cutter compensated by `G41` / `G42 D<d>` (the control's D register for the tool in the spindle).
+   * Without it the radius comes from `G10 L12` in the program or its header comments (`T1 D=6.`, `Tool: … Ø6mm`).
+   */
+  readonly toolRadius?: (d: number | undefined, tool: number | undefined) => number | undefined
+  /** Read G70-G76 as lathe cycles and U / W as incremental X / Z. Default: a program with no Y words that uses G18, G96 or T0101-style tools. */
+  readonly lathe?: boolean
 }
 
 /** Largest chord sagitta of a G18/G19 arc, mm (the IR's `Arc` lies in XY, so other planes are replayed as chords). */
@@ -216,15 +232,18 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     pos = to
     note(pos)
   }
-  /** An arc in the G18 (ZX) or G19 (YZ) plane, replayed as chords; the sense is seen from the plane's normal (+Y, +X). */
-  const planeArc = (target: P3, clockwise: boolean, words: { readonly i?: number; readonly j?: number; readonly k?: number; readonly r?: number }, line: number): void => {
+  /**
+   * An arc in the G18 (ZX) or G19 (YZ) plane — or any arc of a tilted frame — replayed as chords; the sense is seen from the
+   * plane's normal (+Y, +X). `from` and `target` are in the arc's own frame, `map` places a chord point in the output.
+   */
+  const planeArc = (from: P3, target: P3, clockwise: boolean, words: { readonly i?: number; readonly j?: number; readonly k?: number; readonly r?: number }, line: number, map: (p: P3) => P3): void => {
     // (u, v, w): the plane's axes in right-handed order and its normal. G18: (Z, X, Y), G19: (Y, Z, X).
-    const toUvw = (p: P3): [number, number, number] => (plane === 18 ? [p.z, p.x, p.y] : [p.y, p.z, p.x])
-    const fromUvw = (u: number, v: number, w: number): P3 => (plane === 18 ? { x: v, y: w, z: u } : { x: w, y: u, z: v })
-    const [u0, v0, w0] = toUvw(pos)
+    const toUvw = (p: P3): [number, number, number] => (plane === 18 ? [p.z, p.x, p.y] : plane === 19 ? [p.y, p.z, p.x] : [p.x, p.y, p.z])
+    const fromUvw = (u: number, v: number, w: number): P3 => (plane === 18 ? { x: v, y: w, z: u } : plane === 19 ? { x: w, y: u, z: v } : { x: u, y: v, z: w })
+    const [u0, v0, w0] = toUvw(from)
     const [u1, v1, w1] = toUvw(target)
-    const du = plane === 18 ? words.k : words.j
-    const dv = plane === 18 ? words.i : words.k
+    const du = plane === 18 ? words.k : plane === 19 ? words.j : words.i
+    const dv = plane === 18 ? words.i : plane === 19 ? words.k : words.j
     let cu: number, cv: number
     if (du !== undefined || dv !== undefined) {
       cu = u0 + (du ?? 0) * unit
@@ -239,7 +258,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
       const side = (clockwise ? -1 : 1) * (words.r > 0 ? 1 : -1)
       cu = (u0 + u1) / 2 + (-ev / d) * h * side
       cv = (v0 + v1) / 2 + (eu / d) * h * side
-    } else { errors.push(`line ${physical}: arc without ${plane === 18 ? "I/K" : "J/K"}/R`); return }
+    } else { errors.push(`line ${physical}: arc without ${plane === 18 ? "I/K" : plane === 19 ? "J/K" : "I/J"}/R`); return }
     const r0 = Math.hypot(u0 - cu, v0 - cv), r1 = Math.hypot(u1 - cu, v1 - cv)
     const a0 = Math.atan2(v0 - cv, u0 - cu), a1 = Math.atan2(v1 - cv, u1 - cu)
     let sweep = clockwise ? a0 - a1 : a1 - a0
@@ -251,10 +270,198 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     const rate = feedNow(false)
     for (let n = 1; n <= count; n++) {
       const t = n / count
-      if (n === count) { linear(target, line, rate); break }
+      if (n === count) { linear(map(target), line, rate); break }
       const a = a0 + (clockwise ? -1 : 1) * sweep * t
       const r = r0 + (r1 - r0) * t
-      linear(fromUvw(cu + r * Math.cos(a), cv + r * Math.sin(a), w0 + (w1 - w0) * t), line, rate)
+      linear(map(fromUvw(cu + r * Math.cos(a), cv + r * Math.sin(a), w0 + (w1 - w0) * t)), line, rate)
+    }
+  }
+
+  // -- frames (spec 32 §4.3) ------------------------------------------------------------------------------------------------
+  // Program coordinates p reach the output as M·p + t (a G68 rotation, a G68.2 / CYCLE800 tilted plane) plus the offsets:
+  // the G92 / G50 setting, the G52 local shift and the work offset selected (G54-G59) relative to G54 when G10 L2 set them.
+  // Without a frame and with no local or work offset this is the old `programmed + shift`, to the bit.
+  const local = { x: 0, y: 0, z: 0 }
+  const workOffsets = new Map<number, P3>()
+  let activeWork = 54
+  let frame: Frame | undefined
+  let arcCentreAbsolute = false
+  let polar = false
+  const offsets = (): P3 => {
+    const own = workOffsets.get(activeWork), base = workOffsets.get(54)
+    const w = own === undefined ? { x: 0, y: 0, z: 0 } : { x: own.x - (base?.x ?? 0), y: own.y - (base?.y ?? 0), z: own.z - (base?.z ?? 0) }
+    return { x: shift.x + local.x + w.x, y: shift.y + local.y + w.y, z: shift.z + local.z + w.z }
+  }
+  const place = (p: P3): P3 => {
+    const o = offsets()
+    if (frame === undefined) return { x: p.x + o.x, y: p.y + o.y, z: p.z + o.z }
+    const q = mul3(frame.m, p)
+    return { x: q.x + frame.t.x + o.x, y: q.y + frame.t.y + o.y, z: q.z + frame.t.z + o.z }
+  }
+  const programOf = (q: P3): P3 => {
+    const o = offsets()
+    const d = { x: q.x - o.x, y: q.y - o.y, z: q.z - o.z }
+    return frame === undefined ? d : mulT3(frame.m, { x: d.x - frame.t.x, y: d.y - frame.t.y, z: d.z - frame.t.z })
+  }
+
+  // -- cutter radius compensation (G41 / G42) ------------------------------------------------------------------------------
+  // The programmed contour is offset by the tool radius (`cutter-comp.ts`). An element is drawn once the next one is known
+  // (the corner between them decides where it ends); Z-only blocks in between wait with it. `progPos` is the programmed,
+  // uncompensated position the next block's coordinates are read from.
+  const dRegisters = new Map<number, number>()
+  const header = headerTools(text)
+  let comp: { readonly side: CompSide; readonly radius: number } | undefined
+  let compStartup = false
+  interface Pending { readonly el: CompElement; readonly off: CompElement | undefined; readonly rapid: boolean; readonly feed: number; readonly line: number; readonly startup: boolean; readonly queued: Array<{ readonly z: number; readonly rapid: boolean; readonly feed: number; readonly line: number }> }
+  let pending: Pending | undefined
+  let progPos: P3 | undefined
+  const here = (): P3 => progPos ?? pos
+  const radiusFor = (d: number | undefined): number | undefined => {
+    if (d !== undefined && dRegisters.has(d)) return dRegisters.get(d)
+    const given = options.toolRadius?.(d, tool)
+    if (given !== undefined) return given
+    if (d !== undefined && header.byTool.has(d)) return header.byTool.get(d)! / 2
+    if (tool !== undefined && header.byTool.has(tool)) return header.byTool.get(tool)! / 2
+    return header.single !== undefined ? header.single / 2 : undefined
+  }
+  const arcTo = (target: P3, center: { readonly x: number; readonly y: number }, clockwise: boolean, rate: number, line: number): void => {
+    const radiusStart = Math.hypot(pos.x - center.x, pos.y - center.y)
+    const radiusEnd = Math.hypot(target.x - center.x, target.y - center.y)
+    const a0 = Math.atan2(pos.y - center.y, pos.x - center.x)
+    const a1 = Math.atan2(target.y - center.y, target.x - center.x)
+    let sweep = clockwise ? a0 - a1 : a1 - a0
+    sweep = ((sweep % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+    if (Math.hypot(target.x - pos.x, target.y - pos.y) < 1e-9 || sweep < 1e-12) sweep = 2 * Math.PI
+    const length = Math.hypot(radiusStart * sweep, target.z - pos.z)
+    segments.push({ kind: "arc", from: pos, to: target, center, clockwise, radiusStart, radiusEnd, feed: rate, line, ...inSub() })
+    sample(line, target)
+    cutLength += length
+    pos = target
+    note(pos)
+  }
+  const go = (to: P3, rapidMove: boolean, rate: number, line: number): void => { if (rapidMove) rapid(to, line); else linear(to, line, rate) }
+  /** Draws the pending element up to `end` (on its offset), then the Z-only blocks that waited with it. */
+  const drawPending = (p: Pending, end: P3): void => {
+    if (p.startup || p.off === undefined || p.off.kind === "line") go(end, p.rapid, p.feed, p.line)
+    else arcTo(end, p.off.center, p.off.clockwise, p.feed, p.line)
+    for (const q of p.queued) go({ ...pos, z: q.z }, q.rapid, q.feed, q.line)
+  }
+  const flushComp = (): void => {
+    if (pending === undefined) return
+    const p = pending
+    pending = undefined
+    const own = p.off ?? offsetElement(p.el, comp?.side ?? 1, comp?.radius ?? 0)
+    drawPending(p, own?.to ?? p.el.to)
+  }
+  /** A programmed XY element while compensating. */
+  const compElement = (el: CompElement, rapidMove: boolean, rate: number, line: number): void => {
+    const c = comp!
+    const off = offsetElement(el, c.side, c.radius)
+    if (off === undefined && el.kind === "arc") {
+      errors.push(`line ${physical}: cutter compensation: a tool of radius ${c.radius} does not fit the arc of radius ${Math.hypot(el.from.x - el.center.x, el.from.y - el.center.y).toFixed(3)} (the control would alarm or gouge)`)
+      return
+    }
+    const next: Pending = { el, off, rapid: rapidMove, feed: rate, line, startup: false, queued: [] }
+    if (compStartup) {
+      compStartup = false
+      pending = { ...next, startup: true }
+      return
+    }
+    const prev = pending
+    if (prev === undefined || off === undefined) { flushComp(); if (off !== undefined) { go(off.from, rapidMove, rate, line); pending = next } return }
+    pending = next
+    if (prev.startup) { drawPending(prev, off.from); return }
+    const join = prev.off !== undefined ? joinOf(prev.el, el, prev.off, off, c.side) : undefined
+    if (join === undefined) { drawPending(prev, prev.off?.to ?? prev.el.to); if (Math.hypot(pos.x - off.from.x, pos.y - off.from.y) > 1e-9) go({ ...off.from, z: pos.z }, prev.rapid, prev.feed, line); return }
+    if (join.kind === "meet") {
+      if (prev.off!.kind === "line" && alongLine(prev.off as CompLine, join.point) < -1e-9) errors.push(`line ${prev.line}: cutter compensation: the tool is larger than this element; the corner is overcut`)
+      drawPending(prev, join.point)
+      return
+    }
+    drawPending(prev, join.from)
+    arcTo({ x: join.to.x, y: join.to.y, z: pos.z }, join.center, join.clockwise, prev.feed, line)
+  }
+
+  // -- lathe repetitive cycles (G70-G76 with G18, `lathe-cycles.ts`) ----------------------------------------------------------
+  const latheText = options.lathe ?? (!/\bY\s*[-+.\d]/i.test(text) && /\b(G18|G96|T\d{4})\b/i.test(text))
+  const first: { g71?: { depth: number; retract: number }; g72?: { depth: number; retract: number }; g73?: { relief: { r: number; z: number }; passes: number }; g74?: number; g75?: number; g76?: { finish: number; minDepth: number; allowance: number } } = {}
+  let jumpTo: number | undefined
+  const radiusOfX = (x: number): number => (xMode === "diameter" ? x / 2 : x)
+  const xOfRadius = (r: number): number => (xMode === "diameter" ? r * 2 : r)
+  /** P / Q of the cycles are in the least input increment (0.001 mm, 0.0001 in); a value written with a decimal point is in mm. */
+  const increment = (v: number): number => (Number.isInteger(v) ? v * (unit === 1 ? 0.001 : 0.00254) : v * unit)
+  /** The profile of blocks N`ns`..N`nf`, replayed from the cycle's start point; and the index of the N`nf` line. */
+  const profileOf = (ns: number, nf: number, start: P3): { readonly points: ProfilePoint[]; readonly end: number } | undefined => {
+    const find = (n: number, from: number) => { for (let i = from; i < lines.length; i++) if (new RegExp(`^\\s*N0*${n}(?!\\d)`, "i").test(lines[i]!)) return i; return -1 }
+    const i0 = find(ns, 0), i1 = i0 < 0 ? -1 : find(nf, i0)
+    if (i0 < 0 || i1 < 0) { errors.push(`line ${physical}: the cycle's profile N${ns}..N${nf} is not in the program`); return undefined }
+    const prefix = `G${plane} ${absolute ? "G90" : "G91"} ${unit === 1 ? "G21" : "G20"} ${xMode === "radius" ? "G8" : "G7"} ${feedRev ? "G95" : "G94"}`
+    const sub = interpretGcode([prefix, ...lines.slice(i0, i1 + 1)].join("\n"), { start, lathe: true })
+    for (const e of sub.errors) errors.push(`line ${physical}: profile: ${e}`)
+    const points: ProfilePoint[] = [{ r: radiusOfX(start.x), z: start.z, rapid: true }]
+    for (const s of sub.segments) if (s.kind !== "dwell") points.push({ r: radiusOfX(s.to.x), z: s.to.z, rapid: s.kind === "rapid" })
+    return { points, end: i1 }
+  }
+  const drawLathe = (moves: ReadonlyArray<LatheMove>, y: number, line: number, threading = false): void => {
+    for (const m of moves) go(place({ x: xOfRadius(m.to.r), y, z: m.to.z }), m.kind === "rapid", feedNow(threading), line)
+  }
+  const latheCycle = (g: number, get: (letter: string) => number | undefined, line: number): void => {
+    const start = programOf(here())
+    const A = { r: radiusOfX(start.x), z: start.z }
+    const P = get("P"), Q = get("Q"), U = get("U"), W = get("W"), R = get("R"), X = get("X"), Z = get("Z"), D = get("D")
+    const allowance = { r: U !== undefined ? radiusOfX(U * unit) : 0, z: (W ?? 0) * unit }
+    const profiled = (): ReturnType<typeof profileOf> => (P !== undefined && Q !== undefined ? profileOf(Math.round(P), Math.round(Q), start) : undefined)
+    switch (g) {
+      case 71:
+      case 72: {
+        const key = g === 71 ? "g71" : "g72"
+        if (P === undefined || Q === undefined) { first[key] = { depth: ((g === 71 ? U : W) ?? 0) * unit, retract: (R ?? 0) * unit }; return }
+        const profile = profiled()
+        if (profile === undefined) return
+        const depth = first[key]?.depth ?? (D !== undefined ? increment(D) : 0)
+        if (depth <= 0) { errors.push(`line ${physical}: G${g} without a depth of cut`); return }
+        drawLathe(roughCycle({ start: A, profile: profile.points, depth, retract: first[key]?.retract ?? 0, allowance, axis: g === 71 ? "r" : "z" }), start.y, line)
+        jumpTo = profile.end + 1
+        return
+      }
+      case 73: {
+        if (P === undefined || Q === undefined) { first.g73 = { relief: { r: U !== undefined ? U * unit : 0, z: (W ?? 0) * unit }, passes: R ?? 1 }; return }
+        const profile = profiled()
+        if (profile === undefined) return
+        drawLathe(patternCycle(A, profile.points, first.g73?.relief ?? { r: 0, z: 0 }, allowance, first.g73?.passes ?? D ?? 1), start.y, line)
+        jumpTo = profile.end + 1
+        return
+      }
+      case 70: {
+        const profile = profiled()
+        if (profile !== undefined) drawLathe(finishCycle(A, profile.points), start.y, line)
+        return
+      }
+      case 76: {
+        if (X === undefined && Z === undefined && U === undefined && W === undefined) {
+          const p = Math.round(P ?? 0)
+          first.g76 = { finish: Math.max(1, Math.floor(p / 10000)), minDepth: Q !== undefined ? increment(Q) : 0, allowance: (R ?? 0) * unit }
+          return
+        }
+        const rootX = X !== undefined ? X * unit : start.x + (U ?? 0) * unit
+        const rootZ = Z !== undefined ? Z * unit : start.z + (W ?? 0) * unit
+        const height = P !== undefined ? increment(P) : 0
+        if (height <= 0 || feed <= 0) { errors.push(`line ${physical}: G76 without a thread height (P) or lead (F)`); return }
+        drawLathe(threadCycle({
+          start: A, root: { r: radiusOfX(rootX), z: rootZ }, taper: (R ?? 0) * unit, height, firstDepth: Q !== undefined ? increment(Q) : height,
+          minDepth: first.g76?.minDepth ?? 0, finishAllowance: first.g76?.allowance ?? 0, finishPasses: first.g76?.finish ?? 1
+        }), start.y, line, true)
+        return
+      }
+      case 74:
+      case 75: {
+        const key = g === 74 ? "g74" : "g75"
+        if (X === undefined && Z === undefined && U === undefined && W === undefined) { first[key] = (R ?? 0) * unit; return }
+        const end = { r: X !== undefined ? radiusOfX(X * unit) : U !== undefined ? A.r + radiusOfX(U * unit) : A.r, z: Z !== undefined ? Z * unit : A.z + (W ?? 0) * unit }
+        const along = g === 74 ? Q : P, across = g === 74 ? P : Q
+        drawLathe(peckCycle(A, end, along !== undefined ? increment(along) : 0, across !== undefined ? increment(across) : 0, first[key] ?? 0, g === 74 ? "z" : "r"), start.y, line)
+        return
+      }
     }
   }
 
@@ -272,11 +479,46 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     programs.set(p.number, { start: p.index + 1, end: i + 2 < starts.length ? starts[i + 2]!.index : lines.length })
   })
 
+  /**
+   * A statement that is not a word block: a Siemens cycle call `NAME(…)` or a keyword (`TRAORI`, `MSG`, Fanuc macro `IF`…).
+   * `CYCLE800` sets a tilted plane; the others are skipped, and listed as unsupported when they carry axis words (the old
+   * tokenizer read `CYCLE800(…)` as `E800`, `TRANS X10` as a move).
+   */
+  const statement = (raw: string, code: string): boolean => {
+    const upper = raw.toUpperCase()
+    const called = /^\s*(?:N\d+\s+)?([A-Z_]{2,}[A-Z0-9_]*)\s*\(([^)]*)\)/.exec(upper)
+    const keyword = called?.[1] ?? /^([A-Z_]{2,}[A-Z0-9_]*)\b/.exec(code.toUpperCase())?.[1]
+    if (keyword === undefined) return false
+    if (keyword === "CYCLE800") { cycle800(called?.[2] ?? ""); return true }
+    if (SILENT_STATEMENTS.has(keyword)) return true
+    if (tokenize(code).some((w) => "XYZABCIJKRE".includes(w.letter)) || called !== null) {
+      errors.push(`line ${physical}: unsupported ${keyword}`)
+      unsupported.push({ line: physical, word: keyword })
+    }
+    return true
+  }
+  /** Siemens CYCLE800 swivel plane: axis-by-axis rotation (the mode's bit pairs name the axes, first in the low bits). */
+  const cycle800 = (args: string): void => {
+    const a = args.split(",").map((s) => Number(s.replace(/"[^"]*"/g, "").trim()))
+    const at = (i: number): number => (Number.isFinite(a[i]) ? a[i]! : 0)
+    if (args.trim() === "" || a.slice(4, 13).every((v) => !Number.isFinite(v) || v === 0)) { frame = undefined; return }
+    const mode = Math.round(at(3))
+    if ((mode >> 6) & 3) { errors.push(`line ${physical}: unsupported CYCLE800 mode ${mode} (only axis-by-axis)`); unsupported.push({ line: physical, word: "CYCLE800" }); return }
+    const axisOf = (bits: number): "x" | "y" | "z" | undefined => (bits === 1 ? "x" : bits === 2 ? "y" : bits === 3 ? "z" : undefined)
+    let m = IDENTITY3
+    ;[at(7), at(8), at(9)].forEach((angle, i) => { const axis = axisOf((mode >> (2 * i)) & 3); if (axis !== undefined) m = mulM3(m, rot3(axis, angle)) })
+    const before = { x: at(4) * unit, y: at(5) * unit, z: at(6) * unit }, after = mul3(m, { x: at(10) * unit, y: at(11) * unit, z: at(12) * unit })
+    const additive = Math.round(at(2)) % 10 === 1 && frame !== undefined
+    const own: Frame = { m, t: { x: before.x + after.x, y: before.y + after.y, z: before.z + after.z }, planar: false }
+    frame = additive ? compose(frame!, own) : own
+  }
+
   const execLine = (raw: string, index: number, depth: number): Flow => {
     physical = index + 1
     const lineNo = site ?? physical
     const code = stripLine(raw)
     if (code === "" || code.startsWith("%")) return "next"
+    if (statement(raw, code)) return "next"
     let words = tokenize(code)
     if (words[0]?.letter === "O") words = words.slice(1)
     if (words[0]?.letter === "N") words = words.slice(1)
@@ -286,20 +528,26 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     let cycleStarted = false
     let ending = false
     let returning = false
-    /** The block sets coordinates (G92 / G50 X Z) or homes (G28): its axis words are not a move. */
-    let setting: "g92" | "g50" | "home" | undefined
+    /** The block sets coordinates (G92 / G50 X Z, G52, G10) or homes (G28 / G53): its axis words are not a move. */
+    let setting: "g92" | "g50" | "home" | "g52" | "g10" | undefined
+    /** The block sets a frame (G68, G68.2) or cancels it (G69): its words are the frame's. */
+    let frameWord: "g68" | "g68.2" | "g69" | undefined
+    let lathe: number | undefined
+    let compWord: CompSide | 0 | undefined
     let sIsParameter = false
     let call: { readonly program: number; readonly times: number } | undefined
+    const latheContext = latheText
     for (const w of words) {
       if (w.letter === "G") {
         const g = Math.round(w.value * 10) / 10
-        if ([0, 1, 2, 3, 73, 80, 81, 82, 83].includes(g)) {
+        if (latheContext && [70, 71, 72, 73, 74, 75, 76].includes(g)) lathe = g
+        else if ([0, 1, 2, 3, 73, 74, 76, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89].includes(g)) {
           motion = g
-          if (g === 73 || (g >= 81 && g <= 83)) cycleStarted = true
+          if (g === 73 || g === 74 || g === 76 || (g >= 81 && g <= 89)) cycleStarted = true
         } else if (g === 32 || g === 33) motion = 32
         else if (options.probeMoves === true && ((g >= 38.2 && g <= 38.5) || g === 31)) motion = 38
-        else if (g === 20) unit = 25.4
-        else if (g === 21) unit = 1
+        else if (g === 20 || g === 70) unit = 25.4
+        else if (g === 21 || g === 71) unit = 1
         else if (g === 98 || g === 99) retractMode = g
         else if (g === 4) {
           const p = get("P") ?? get("X") ?? 0
@@ -317,9 +565,21 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if (g === 92) setting = "g92"
         else if (g === 92.1) { shift.x = 0; shift.y = 0; shift.z = 0 }
         else if (g === 50) setting = "g50"
-        else if (g === 28) setting = "home"
-        else if ([40, 49, 43, 43.4, 43.5, 234, 54, 55, 56, 57, 58, 59].includes(g)) {
-          // Accepted modal words without geometric effect here.
+        else if (g === 28 || g === 53) setting = "home"
+        else if (g === 52) setting = "g52"
+        else if (g === 10) setting = "g10"
+        else if (g >= 54 && g <= 59 && Number.isInteger(g)) activeWork = g
+        else if (g === 68) frameWord = "g68"
+        else if (g === 68.2) frameWord = "g68.2"
+        else if (g === 69) frameWord = "g69"
+        else if (g === 41 || g === 42) compWord = plane === 18 ? undefined : g === 41 ? 1 : -1
+        else if (g === 40) compWord = plane === 18 ? undefined : 0
+        else if (g === 90.1) arcCentreAbsolute = true
+        else if (g === 91.1) arcCentreAbsolute = false
+        else if (g === 112 || g === 12.1) polar = true
+        else if (g === 113 || g === 13.1) { polar = false; pos = { ...pos, y: 0 }; if (progPos) progPos = { ...progPos, y: 0 } }
+        else if (ACCEPTED_G.includes(g)) {
+          // Accepted modal words without geometric effect here (tool length, exact stop / blending, look-ahead, TCP, G53.1).
         } else { errors.push(`line ${physical}: unsupported G${g}`); unsupported.push({ line: physical, word: `G${g}` }) }
       } else if (w.letter === "M") {
         const m = Math.round(w.value)
@@ -345,8 +605,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         tool = Math.round(w.value)
       } else if (w.letter === "F") {
         feed = w.value * unit
-      } else if (w.letter === "A" || w.letter === "B" || w.letter === "C") {
-        // Rotary angles are degrees in both unit systems; they persist until changed.
+      } else if ((w.letter === "A" || w.letter === "B" || w.letter === "C") && !(polar && w.letter === "C")) {
+        // Rotary angles are degrees in both unit systems; they persist until changed. Under G112 C is a length (face Y).
         rotary = { ...rotary, [w.letter.toLowerCase()]: w.value }
       }
     }
@@ -359,18 +619,63 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     // A G4 line is a dwell only; it carries no motion words of its own.
     if (words.some((w) => w.letter === "G" && Math.round(w.value) === 4)) return ending ? "end" : "next"
 
+    if (frameWord !== undefined) {
+      flushComp()
+      const at = programOf(here())
+      if (frameWord === "g69") frame = undefined
+      else if (frameWord === "g68") {
+        if (plane !== 17) { errors.push(`line ${physical}: unsupported G68 outside G17`); unsupported.push({ line: physical, word: "G68" }) }
+        else {
+          const cx = get("X") !== undefined ? get("X")! * unit : at.x, cy = get("Y") !== undefined ? get("Y")! * unit : at.y
+          const m = rot3("z", get("R") ?? 0)
+          const c = mul3(m, { x: cx, y: cy, z: 0 })
+          frame = { m, t: { x: cx - c.x, y: cy - c.y, z: 0 }, planar: true }
+        }
+      } else {
+        // G68.2 X Y Z I J K: the feature frame's origin and its Euler angles (Z, then X', then Z'').
+        const m = mulM3(mulM3(rot3("z", get("I") ?? 0), rot3("x", get("J") ?? 0)), rot3("z", get("K") ?? 0))
+        frame = { m, t: { x: (get("X") ?? 0) * unit, y: (get("Y") ?? 0) * unit, z: (get("Z") ?? 0) * unit }, planar: false }
+      }
+      return ending ? "end" : "next"
+    }
+    if (lathe !== undefined) {
+      flushComp()
+      latheCycle(lathe, get, lineNo)
+      return ending ? "end" : "next"
+    }
+
     const x = get("X")
-    const y = get("Y")
+    const y = polar ? get("C") : get("Y")
     const z = get("Z")
     const e = get("E")
-    const hasAxis = x !== undefined || y !== undefined || z !== undefined
+    // Fanuc lathe incremental addresses (G-code system A): U is an X distance, W a Z distance.
+    const u = latheContext ? get("U") : undefined
+    const wInc = latheContext ? get("W") : undefined
+    const hasAxis = x !== undefined || y !== undefined || z !== undefined || u !== undefined || wInc !== undefined
     if (setting !== undefined) {
       if (setting === "home") homed = true
-      else {
+      else if (setting === "g52") {
+        if (x !== undefined) local.x = x * unit
+        if (y !== undefined) local.y = y * unit
+        if (z !== undefined) local.z = z * unit
+      } else if (setting === "g10") {
+        const l = get("L"), p = get("P"), r = get("R")
+        if (l === 2 && p !== undefined && p >= 1 && p <= 6) {
+          const was = workOffsets.get(53 + Math.round(p)) ?? { x: 0, y: 0, z: 0 }
+          workOffsets.set(53 + Math.round(p), { x: x !== undefined ? x * unit : was.x, y: y !== undefined ? y * unit : was.y, z: z !== undefined ? z * unit : was.z })
+        } else if ((l === 12 || l === 13) && p !== undefined && r !== undefined) {
+          // Fanuc cutter radius geometry (L12) or wear (L13) of D`p`.
+          const d = Math.round(p)
+          dRegisters.set(d, l === 12 ? r * unit : (dRegisters.get(d) ?? 0) + r * unit)
+        }
+        // Tool length offsets (L10, L11, L1) and the extended work offsets (L20) do not move the drawn path.
+      } else {
         // Coordinate setting: the tool stays where it is and that point gets the programmed value.
-        if (x !== undefined) shift.x = pos.x - x * unit
-        if (y !== undefined) shift.y = pos.y - y * unit
-        if (z !== undefined) shift.z = pos.z - z * unit
+        const o = offsets()
+        const h = here()
+        if (x !== undefined) shift.x = h.x - x * unit - (o.x - shift.x)
+        if (y !== undefined) shift.y = h.y - y * unit - (o.y - shift.y)
+        if (z !== undefined) shift.z = h.z - z * unit - (o.z - shift.z)
         if (e !== undefined && setting === "g92") ePos = e
       }
       return ending ? "end" : "next"
@@ -384,56 +689,72 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     const before = segments.length
     // `G91`: the axis words are distances from where the tool is (arc centres always are).
     const axis = (value: number | undefined, current: number, offset: number): number => (value === undefined ? current : absolute ? value * unit + offset : current + value * unit)
-    const target: P3 = { x: axis(x, pos.x, shift.x), y: axis(y, pos.y, shift.y), z: axis(z, pos.z, shift.z) }
+    const start = here()
+    let target: P3
+    if (frame === undefined && u === undefined && wInc === undefined) {
+      const o = offsets()
+      target = { x: axis(x, start.x, o.x), y: axis(y, start.y, o.y), z: axis(z, start.z, o.z) }
+    } else {
+      const p0 = programOf(start)
+      const p = { x: x === undefined ? p0.x : absolute ? x * unit : p0.x + x * unit, y: y === undefined ? p0.y : absolute ? y * unit : p0.y + y * unit, z: z === undefined ? p0.z : absolute ? z * unit : p0.z + z * unit }
+      if (u !== undefined) p.x = p0.x + u * unit
+      if (wInc !== undefined) p.z = p0.z + wInc * unit
+      target = place(p)
+    }
 
-    if (motion === 0 && hasAxis) rapid(target, lineNo)
+    // Cutter compensation: G40 ends it (the block's move leaves the offset), G41 / G42 start it on the next XY move.
+    if (compWord === 0) {
+      flushComp()
+      comp = undefined
+      compStartup = false
+      progPos = undefined
+    } else if (compWord !== undefined) {
+      flushComp()
+      const d = get("D")
+      const radius = radiusFor(d)
+      if (radius === undefined) {
+        errors.push(`line ${physical}: G${compWord === 1 ? 41 : 42} needs the tool radius (D${d ?? ""} is not set by G10 L12, the host or a T/D header comment): drawn on the programmed path`)
+        unsupported.push({ line: physical, word: `G${compWord === 1 ? 41 : 42}` })
+        comp = undefined
+      } else if (radius > 0) {
+        comp = { side: compWord, radius }
+        compStartup = true
+        progPos = { ...here() }
+      }
+    }
+    const compensating = comp !== undefined && plane === 17 && (frame === undefined || frame.planar) && (motion === 0 || motion === 1 || motion === 2 || motion === 3)
+    if (comp !== undefined && compWord === undefined && !compensating && hasAxis) flushComp()
+
+    if (compensating && hasAxis) {
+      const from = here()
+      const xy = Math.hypot(target.x - from.x, target.y - from.y) > 1e-12
+      let arc: { readonly center: { readonly x: number; readonly y: number }; readonly clockwise: boolean } | undefined
+      if (motion === 2 || motion === 3) {
+        const i = get("I"), j = get("J"), r = get("R")
+        const c = arcCentre(from, target, motion === 2, i, j, r)
+        if (c !== undefined) arc = { center: c, clockwise: motion === 2 }
+      }
+      const rate = motion === 0 ? feed : feedNow(false)
+      if (xy || arc !== undefined) compElement(arc !== undefined ? { kind: "arc", from, to: target, center: arc.center, clockwise: arc.clockwise } : { kind: "line", from, to: target }, motion === 0, rate, lineNo)
+      else if (Math.abs(target.z - from.z) > 1e-12) {
+        if (pending !== undefined) pending.queued.push({ z: target.z, rapid: motion === 0, feed: rate, line: lineNo })
+        else go({ ...pos, z: target.z }, motion === 0, rate, lineNo)
+      }
+      progPos = target
+    } else if (motion === 0 && hasAxis) rapid(target, lineNo)
     else if (motion === 1 && hasAxis) linear(target, lineNo, feedNow(false))
     else if (motion === 32 && hasAxis) linear(target, lineNo, feedNow(true))
     else if (motion === 38 && hasAxis) linear(target, lineNo, feedNow(false))
-    else if ((motion === 2 || motion === 3) && hasAxis && plane !== 17) {
+    else if ((motion === 2 || motion === 3) && hasAxis && (plane !== 17 || (frame !== undefined && !frame.planar))) {
       const i = get("I"), j = get("J"), k = get("K"), r = get("R")
-      planeArc(target, motion === 2, { ...(i !== undefined ? { i } : {}), ...(j !== undefined ? { j } : {}), ...(k !== undefined ? { k } : {}), ...(r !== undefined ? { r } : {}) }, lineNo)
+      const words = { ...(i !== undefined ? { i } : {}), ...(j !== undefined ? { j } : {}), ...(k !== undefined ? { k } : {}), ...(r !== undefined ? { r } : {}) }
+      if (frame === undefined) planeArc(start, target, motion === 2, words, lineNo, (p) => p)
+      else planeArc(programOf(start), programOf(target), motion === 2, words, lineNo, place)
     } else if ((motion === 2 || motion === 3) && hasAxis) {
-      const clockwise = motion === 2
-      const i = get("I")
-      const j = get("J")
-      const r = get("R")
-      let center: { x: number; y: number } | undefined
-      if (i !== undefined || j !== undefined) {
-        center = { x: pos.x + (i ?? 0) * unit, y: pos.y + (j ?? 0) * unit }
-      } else if (r !== undefined) {
-        const dx = target.x - pos.x
-        const dy = target.y - pos.y
-        const d = Math.hypot(dx, dy)
-        if (d < 1e-12) errors.push(`line ${physical}: R arc with identical endpoints`)
-        else {
-          const radius = Math.abs(r) * unit
-          const h2 = radius * radius - (d / 2) * (d / 2)
-          if (h2 < -1e-9) errors.push(`line ${physical}: R too small for the chord`)
-          const h = Math.sqrt(Math.max(0, h2))
-          // Minor arc (R > 0): centre on the right of the chord for CW, left for CCW.
-          const side = (clockwise ? -1 : 1) * (r > 0 ? 1 : -1)
-          const mx = (pos.x + target.x) / 2
-          const my = (pos.y + target.y) / 2
-          center = { x: mx + (-dy / d) * h * side, y: my + (dx / d) * h * side }
-        }
-      } else errors.push(`line ${physical}: arc without I/J/R`)
-      if (center !== undefined) {
-        const radiusStart = Math.hypot(pos.x - center.x, pos.y - center.y)
-        const radiusEnd = Math.hypot(target.x - center.x, target.y - center.y)
-        const a0 = Math.atan2(pos.y - center.y, pos.x - center.x)
-        const a1 = Math.atan2(target.y - center.y, target.x - center.x)
-        let sweep = clockwise ? a0 - a1 : a1 - a0
-        sweep = ((sweep % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-        if (Math.hypot(target.x - pos.x, target.y - pos.y) < 1e-9 || sweep < 1e-12) sweep = 2 * Math.PI
-        const length = Math.hypot(radiusStart * sweep, target.z - pos.z)
-        segments.push({ kind: "arc", from: pos, to: target, center, clockwise, radiusStart, radiusEnd, feed: feedNow(false), line: lineNo, ...inSub() })
-        sample(lineNo, target)
-        cutLength += length
-        pos = target
-        note(pos)
-      }
-    } else if (motion === 73 || (motion >= 81 && motion <= 83)) {
+      const center = arcCentre(start, target, motion === 2, get("I"), get("J"), get("R"))
+      if (center !== undefined) arcTo(target, center, motion === 2, feedNow(false), lineNo)
+    } else if (motion === 73 || motion === 74 || motion === 76 || (motion >= 81 && motion <= 89)) {
+      flushComp()
       if (!absolute) {
         if (hasAxis || cycleStarted) errors.push(`line ${physical}: canned cycle in incremental mode`)
         return ending ? "end" : "next"
@@ -442,8 +763,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
       const rw = get("R")
       const qw = get("Q")
       const pw = get("P")
-      if (zw !== undefined) cycle.z = zw * unit + shift.z
-      if (rw !== undefined) cycle.r = rw * unit + shift.z
+      if (zw !== undefined) cycle.z = zw * unit
+      if (rw !== undefined) cycle.r = rw * unit
       if (qw !== undefined) cycle.q = qw * unit
       if (pw !== undefined) cycle.p = pw * dwellFactor
       if (!(x !== undefined || y !== undefined || cycleStarted)) return ending ? "end" : "next"
@@ -451,21 +772,42 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         errors.push(`line ${physical}: canned cycle without Z/R`)
         return ending ? "end" : "next"
       }
-      const hx = x !== undefined ? x * unit + shift.x : pos.x
-      const hy = y !== undefined ? y * unit + shift.y : pos.y
-      const initialZ = pos.z
+      // The hole, its bottom and its R level in program coordinates; `at` places a level of the hole in the output.
+      const p0 = programOf(pos)
+      const hx = x !== undefined ? x * unit : p0.x
+      const hy = y !== undefined ? y * unit : p0.y
+      const initialZ = p0.z
       const bottom = cycle.z
       const rz = cycle.r
-      const at = (zz: number): P3 => ({ x: hx, y: hy, z: zz })
-      if (Math.abs(hx - pos.x) > 1e-12 || Math.abs(hy - pos.y) > 1e-12) rapid(at(pos.z), lineNo)
-      rapid(at(rz), lineNo)
+      const at = (zz: number, dx = 0): P3 => place({ x: hx + dx, y: hy, z: zz })
+      if (Math.abs(hx - p0.x) > 1e-12 || Math.abs(hy - p0.y) > 1e-12) rapid(at(initialZ), lineNo)
       const dwell = (): void => {
         if (motion !== 81 && (cycle.p ?? 0) > 0) { segments.push({ kind: "dwell", seconds: cycle.p ?? 0, line: lineNo, ...inSub() }); sample(lineNo, pos) }
       }
+      const up = retractMode === 98 ? Math.max(initialZ, rz) : rz
+      const turning = spindle
+      if (motion === 87) {
+        // Back boring: oriented and shifted, down past the hole to R (below), back on the axis, the spindle on, up to Z.
+        const q = cycle.q ?? 0
+        spindle = "off"
+        rapid(at(initialZ, q), lineNo)
+        rapid(at(rz, q), lineNo)
+        rapid(at(rz), lineNo)
+        spindle = turning === "off" ? "cw" : turning
+        linear(at(bottom), lineNo, feedNow(false))
+        dwell()
+        spindle = "off"
+        rapid(at(bottom, q), lineNo)
+        rapid(at(initialZ, q), lineNo)
+        rapid(at(initialZ), lineNo)
+        spindle = turning
+        return ending ? "end" : "next"
+      }
+      rapid(at(rz), lineNo)
       if (motion === 81 || motion === 82) {
         linear(at(bottom), lineNo)
         dwell()
-      } else {
+      } else if (motion === 73 || motion === 83) {
         const peck = cycle.q !== undefined && cycle.q > 0 ? cycle.q : rz - bottom
         let level = rz
         while (level > bottom + 1e-9) {
@@ -481,8 +823,42 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
           level = next
         }
         dwell()
+      } else {
+        // Tapping, boring: in at feed, then each cycle's own way out to R.
+        const rate = feedNow(false)
+        linear(at(bottom), lineNo, rate)
+        if (motion === 84 || motion === 74) {
+          // The tap reverses at the bottom and feeds out at the same rate (G84 right hand: M3 in, M4 out; G74 the reverse).
+          dwell()
+          spindle = motion === 84 ? "ccw" : "cw"
+          linear(at(rz), lineNo, rate)
+          spindle = turning
+        } else if (motion === 85 || motion === 89) {
+          if (motion === 89) dwell()
+          linear(at(rz), lineNo, rate)
+        } else if (motion === 86) {
+          spindle = "off"
+          rapid(at(rz), lineNo)
+          spindle = turning
+        } else if (motion === 88) {
+          dwell()
+          spindle = "off"
+          rapid(at(rz), lineNo)
+          spindle = turning
+        } else {
+          // G76 fine boring: dwell, orient (spindle stopped), shift Q off the wall, out, shift back.
+          const q = cycle.q ?? 0
+          dwell()
+          spindle = "off"
+          rapid(at(bottom, q), lineNo)
+          rapid(at(up, q), lineNo)
+          rapid(at(up), lineNo)
+          spindle = turning
+          return ending ? "end" : "next"
+        }
       }
-      rapid(at(retractMode === 98 ? Math.max(initialZ, rz) : rz), lineNo)
+      if (motion === 81 || motion === 82 || motion === 73 || motion === 83) rapid(at(up), lineNo)
+      else if (up > rz) rapid(at(up), lineNo)
     }
     if (extrusion !== 0) {
       const made = segments.length - before
@@ -517,15 +893,90 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     return ending ? "end" : returning ? "return" : "next"
   }
 
+  /** The centre of a G17 arc from I/J (relative, or absolute under G90.1) or R. */
+  const arcCentre = (from: P3, target: P3, clockwise: boolean, i: number | undefined, j: number | undefined, r: number | undefined): { x: number; y: number } | undefined => {
+    if (i !== undefined || j !== undefined) {
+      if (frame === undefined && !arcCentreAbsolute) return { x: from.x + (i ?? 0) * unit, y: from.y + (j ?? 0) * unit }
+      const p0 = programOf(from)
+      const c = place(arcCentreAbsolute ? { x: (i ?? 0) * unit, y: (j ?? 0) * unit, z: p0.z } : { x: p0.x + (i ?? 0) * unit, y: p0.y + (j ?? 0) * unit, z: p0.z })
+      return { x: c.x, y: c.y }
+    }
+    if (r !== undefined) {
+      const dx = target.x - from.x
+      const dy = target.y - from.y
+      const d = Math.hypot(dx, dy)
+      if (d < 1e-12) { errors.push(`line ${physical}: R arc with identical endpoints`); return undefined }
+      const radius = Math.abs(r) * unit
+      const h2 = radius * radius - (d / 2) * (d / 2)
+      if (h2 < -1e-9) errors.push(`line ${physical}: R too small for the chord`)
+      const h = Math.sqrt(Math.max(0, h2))
+      // Minor arc (R > 0): centre on the right of the chord for CW, left for CCW.
+      const side = (clockwise ? -1 : 1) * (r > 0 ? 1 : -1)
+      const mx = (from.x + target.x) / 2
+      const my = (from.y + target.y) / 2
+      return { x: mx + (-dy / d) * h * side, y: my + (dx / d) * h * side }
+    }
+    errors.push(`line ${physical}: arc without I/J/R`)
+    return undefined
+  }
+
   const run = (start: number, end: number, depth: number): Flow => {
     for (let index = start; index < end; index++) {
       const flow = execLine(lines[index]!, index, depth)
       if (flow !== "next") return flow
+      // A lathe cycle continues after its profile blocks.
+      if (jumpTo !== undefined) { const to = jumpTo; jumpTo = undefined; if (to > index && to <= end) index = to - 1 }
     }
     return "next"
   }
 
   run(0, mainEnd, 0)
+  flushComp()
 
   return { segments, errors, end: pos, cutLength, rapidLength, minZ, mCodes, tools, ended, unsupported, ...(states !== undefined ? { states } : {}) }
+}
+
+// -- frame maths ----------------------------------------------------------------------------------------------------------
+
+type Mat3 = readonly [number, number, number, number, number, number, number, number, number]
+interface Frame { readonly m: Mat3; readonly t: P3; readonly planar: boolean }
+const IDENTITY3: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1]
+const mul3 = (m: Mat3, p: P3): P3 => ({ x: m[0] * p.x + m[1] * p.y + m[2] * p.z, y: m[3] * p.x + m[4] * p.y + m[5] * p.z, z: m[6] * p.x + m[7] * p.y + m[8] * p.z })
+const mulT3 = (m: Mat3, p: P3): P3 => ({ x: m[0] * p.x + m[3] * p.y + m[6] * p.z, y: m[1] * p.x + m[4] * p.y + m[7] * p.z, z: m[2] * p.x + m[5] * p.y + m[8] * p.z })
+const mulM3 = (a: Mat3, b: Mat3): Mat3 => {
+  const out: number[] = []
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) out.push(a[r * 3]! * b[c]! + a[r * 3 + 1]! * b[3 + c]! + a[r * 3 + 2]! * b[6 + c]!)
+  return out as unknown as Mat3
+}
+/** A right-handed rotation about a frame axis, degrees. */
+const rot3 = (axis: "x" | "y" | "z", degrees: number): Mat3 => {
+  const a = (degrees * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a)
+  return axis === "x" ? [1, 0, 0, 0, c, -s, 0, s, c] : axis === "y" ? [c, 0, s, 0, 1, 0, -s, 0, c] : [c, -s, 0, s, c, 0, 0, 0, 1]
+}
+/** `inner` expressed in `outer`: p -> outer(inner(p)). */
+const compose = (outer: Frame, inner: Frame): Frame => {
+  const t = mul3(outer.m, inner.t)
+  return { m: mulM3(outer.m, inner.m), t: { x: t.x + outer.t.x, y: t.y + outer.t.y, z: t.z + outer.t.z }, planar: outer.planar && inner.planar }
+}
+
+/** G words accepted without a geometric effect on the drawn path. */
+const ACCEPTED_G: ReadonlyArray<number> = [5, 5.1, 8, 9, 43, 43.4, 43.5, 49, 53.1, 54.1, 61, 61.1, 62, 63, 64, 103, 187, 234]
+
+/** Keyword statements that do not move the machine (Siemens settings, messages, TCP on / off). */
+const SILENT_STATEMENTS = new Set(["MSG", "TRAORI", "TRAFOOF", "SOFT", "BRISK", "FFWON", "FFWOF", "CFC", "CFTCP", "CFIN", "STOPRE", "WORKPIECE", "DIAMON", "DIAMOF", "DIAM90", "CYCLE832", "COMPCAD", "COMPCURV", "COMPOF", "SUPA", "TOFFON", "TOFFOF", "SETMS", "SPOS", "WAIT", "DEF", "PRINT_START", "PRINT_END", "START_PRINT", "END_PRINT"])
+
+/**
+ * Tool diameters a program's header comments state: Fusion / HSM style `T1 D=6.` per tool, or this app's generator
+ * `Tool: endmill Ø6mm` for its one tool.
+ */
+const headerTools = (text: string): { readonly byTool: ReadonlyMap<number, number>; readonly single?: number } => {
+  const byTool = new Map<number, number>()
+  const head = text.slice(0, 20_000)
+  for (const m of head.matchAll(/[(;]\s*T\s*(\d+)\b[^)\n]*?\bD\s*=\s*([\d.]+)/gi)) {
+    const d = Number(m[2])
+    if (Number.isFinite(d) && d > 0 && !byTool.has(Number(m[1]))) byTool.set(Number(m[1]), d)
+  }
+  const single = /[(;]\s*Tool:[^)\n]*?Ø\s*([\d.]+)\s*mm/i.exec(head)
+  const d = single !== null ? Number(single[1]) : NaN
+  return Number.isFinite(d) && d > 0 ? { byTool, single: d } : { byTool }
 }

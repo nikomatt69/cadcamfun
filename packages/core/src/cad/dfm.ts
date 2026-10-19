@@ -297,7 +297,7 @@ export const holeSites = (history: History, parameters: Readonly<Record<string, 
       const site: HoleSite = { feature: f.id, source: f.id, plane: f.plane as PlaneName, offset: value(f.offset, parameters) ?? 0, u, v, diameter, depth }
       base.set(f.id, site)
       sites.push(site)
-    } else if (f.type === "pattern") {
+    } else if (f.type === "pattern" && f.feature !== undefined) {
       const source = base.get(f.feature)
       const count = value(f.count, parameters)
       if (source === undefined || count === undefined || !Number.isInteger(count) || count < 2) continue

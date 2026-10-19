@@ -163,7 +163,7 @@ export const planDimensions = (history: History, result: RebuildResult): Dimensi
         for (const [id, o] of owner) if (o === site) owner.set(id, upgraded)
         break
       }
-    } else if (f.type === "pattern") {
+    } else if (f.type === "pattern" && f.feature !== undefined) {
       const base = owner.get(f.feature)
       if (base === undefined) continue
       const count = num(f.count)
@@ -200,7 +200,7 @@ export const planDimensions = (history: History, result: RebuildResult): Dimensi
     }
   }
   // Until annotation frames track each target through transforms, dimensions of the original features would be misleading.
-  if (history.features.some((f) => ["move", "mirror", "scale", "mate", "split"].includes(f.type))) {
+  if (history.features.some((f) => ["move", "mirror", "scale", "mate", "split"].includes(f.type) || (f.type === "pattern" && f.bodies !== undefined))) {
     notes.push("Transformed feature annotations are unsupported: only overall sizes are dimensioned")
     sites.clear()
     circles.length = 0

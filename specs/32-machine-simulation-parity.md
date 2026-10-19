@@ -1,6 +1,6 @@
 # Machine simulation at Fusion 360 / hyperMILL level: every kinematics, every operation, the right tool
 
-Status: **P1 built** (2026-10-19), P0/P2–P9 open; see §9. Analysis written at `main` @ 9aa648c. It extends
+Status: **P1, P2 built** (2026-10-19), P3–P9 open; see §9. Analysis written at `main` @ 9aa648c. It extends
 [31-machine-aware-toolpath-view](31-machine-aware-toolpath-view.md) (machine scene, motion track, frames, set-up checks) and
 [29-native-cam-kernel](29-native-cam-kernel.md) (kinematics, collision, stock); it does not replace them. Owners: WP2
 `packages/core/src/cam`, WP7 `apps/desktop/src/viewport/view3d`, WP6 `apps/desktop/src/features/cam`, WP8 `packages/ai`,
@@ -372,7 +372,38 @@ lathe only, E2–E3 no, F1–F3 workholding boxes only, G1 partial, G2 unmeasure
 - Limits: the generator's `toolType` list has no tap / lollipop / barrel (they come from tool resources); the lathe turned
   profile still uses one set-up tool (internal or not) for the whole program.
 
+### P2 — interpreter completeness (2026-10-19)
+
+- `testing/gcode-interpreter.ts` replays: `G84`/`G74` tapping (feed in, dwell, spindle reversed in the track, feed out at the
+  same rate; `M29` rigid tap), `G85`/`G89` (feed out), `G86`/`G88` (spindle stopped, rapid out), `G76` fine boring (orient,
+  shift `Q`, out, back), `G87` back boring; `G41`/`G42`/`G40` cutter compensation (`testing/cutter-comp.ts`: offset lines and
+  arcs, inside corners cut back to the intersection, outside corners rolled on an arc of the radius, start-up along the
+  first element, Z-only blocks wait with the element, `COMP` errors for an arc the tool does not fit or an element the
+  tool overcuts); the radius from `InterpretOptions.toolRadius`, `G10 L12/L13`, or header comments (`T1 D=6.`, this app's
+  `Tool: … Ø6mm`); `G52`, `G10 L2` + `G54-G59`, `G68`/`G69`, `G68.2`/`G53.1`, Siemens `CYCLE800` (axis by axis, additive),
+  `G90.1`/`G91.1`, `G53` (machine coordinates: no drawn motion, like `G28`), `G61/G64/G9/G5.1/G8/G187/G103` accepted;
+  lathe `G70-G76` two-block cycles (`testing/lathe-cycles.ts`: G71/G72 rough + final contour pass, G73 pattern, G70 finish,
+  G76 Δd√n with Δdmin and finishing passes, G74/G75 pecks), continuing after the profile blocks; `U`/`W` incremental;
+  `G112`/`G113` polar (C is the face's Y; the lathe display keeps Y on the face, turned 180° with a front turret).
+- Statements: Siemens keywords and cycle calls are no longer tokenized as words (`CYCLE800(…)` was read as `E800`,
+  `TRANS X10` as a move); non-motion keywords are skipped silently, the others listed as unsupported.
+- Context decides `G70-G76`: a program with no Y words that uses G18 / G96 / T0101 (or `InterpretOptions.lathe`) reads them
+  as lathe cycles; a milling program reads `G70/G71` as Siemens inch/metric, `G73/G74/G76` as milling cycles.
+- Generator fix: with `useToolCompensation` the contour was offset by the program **and** compensated by the control (one
+  radius too far: ±56 instead of ±53 on the default rectangle) and the side came from the settings, not the path; now the
+  program follows the part (`offset: center`), the side follows the path's winding, the start-up runs in along the first
+  element.
+- `inferMachineKind` knows lathe P..Q cycles, G112 and the milling tap / bore cycles.
+- Characterization: the nine milling fixtures stay bit-identical; `dwellAndUnsupported` keeps its segments (fingerprint of
+  everything but the errors asserted) and only changes its warnings. Tests: `packages/core/test/cam/interpreter-words.test.ts`
+  (24); updated `path-and-interpreter`, `interpreter-characterization`, desktop `cam-page` (partial preview now uses `G51.1`).
+- Limits: lathe nose-radius compensation (G41/G42 with G18) is accepted, drawn at the programmed point; G76 is drawn with
+  radial infeed; Fanuc lathe system-A `G90/G92/G94` single cycles, `G16` polar coordinates, `G51` scaling, `G51.1` mirror,
+  Heidenhain conversational and other Siemens cycles stay unsupported (listed); a tilted plane's tool axis is not yet in the
+  motion track (P5).
+
 ## Change log
 
 - 2026-10-19: analysis written from the code at 9aa648c and the probes of §2.2.
 - 2026-10-19: P1 built (§9).
+- 2026-10-19: P2 built (§9).

@@ -133,8 +133,13 @@ export interface HoleFeature {
 export interface PatternFeature {
   readonly id: string
   readonly type: "pattern"
-  /** The extrude / revolve / hole whose tool is copied. */
-  readonly feature: string
+  /** The extrude / revolve / hole whose tool is copied (a feature pattern). Give this or `bodies`. */
+  readonly feature?: string
+  /**
+   * Bodies copied whole (Fusion's Pattern > Bodies): each copy is a new body, `<id>#<k>` (`<id>#<k>:<body>` when several bodies are
+   * patterned), placed like the copies of a feature pattern. Join them to their source with a `combine` when one part is meant.
+   */
+  readonly bodies?: ReadonlyArray<string>
   readonly kind: "linear" | "circular" | "grid"
   readonly count: Dimension
   /** `linear` and `grid`: the offset between two copies. */
@@ -149,8 +154,14 @@ export interface PatternFeature {
 export interface MirrorFeature {
   readonly id: string
   readonly type: "mirror"
-  /** The extrude / revolve / hole whose tool is reflected. */
-  readonly feature: string
+  /** The extrude / revolve / hole whose tool is reflected (a feature mirror). Give this or `bodies`. */
+  readonly feature?: string
+  /**
+   * Bodies reflected whole (Fusion's Mirror > Bodies): the image of each is a new body, `<id>` (`<id>#<body>` for several), or with
+   * `join` it is united with its original, so half of a symmetric part becomes the whole part.
+   */
+  readonly bodies?: ReadonlyArray<string>
+  readonly join?: boolean
   /** The mirror plane: XY reflects Z, YZ reflects X, ZX reflects Y, at `offset` along the plane's normal. */
   readonly plane: PlaneName
   readonly offset?: Dimension
@@ -995,11 +1006,22 @@ export const rebuild = (history: History): RebuildResult => {
           break
         }
         case "mirror": {
-          const source = tools.get(f.feature)
-          if (source === undefined) { issues.push({ feature: f.id, severity: "error", message: `Feature '${f.feature}' has no tool to mirror` }); break }
+          if ((f.feature === undefined) === (f.bodies === undefined)) { issues.push({ feature: f.id, severity: "error", message: "A mirror takes either the feature whose tool it reflects or the bodies it reflects, not both or neither" }); break }
           const value = f.offset === undefined ? 0 : dim(f.offset, f.id)
           if (value === undefined) break
           const axis = f.plane === "XY" ? "z" : f.plane === "YZ" ? "x" : "y"
+          if (f.bodies !== undefined) {
+            const chosen = bodies.filter((b) => f.bodies!.includes(b.id))
+            if (chosen.length === 0) { issues.push({ feature: f.id, severity: "error", message: `There is no body ${f.bodies.join(", ")} to mirror` }); break }
+            for (const b of chosen) {
+              const image = mirrorMesh(b.mesh, axis, value)
+              if (f.join === true) bodies[bodies.indexOf(b)] = { ...b, mesh: booleanMesh(b.mesh, image, "union") }
+              else bodies.push({ id: chosen.length === 1 ? f.id : `${f.id}#${b.id}`, mesh: image, feature: f.id })
+            }
+            break
+          }
+          const source = tools.get(f.feature!)
+          if (source === undefined) { issues.push({ feature: f.id, severity: "error", message: `Feature '${f.feature}' has no tool to mirror` }); break }
           const meshes = source.meshes.map((m) => mirrorMesh(m, axis, value))
           tools.set(f.id, { meshes, operation: source.operation, ...(source.targets !== undefined ? { targets: source.targets } : {}) })
           apply(f.id, meshes.length === 1 ? meshes[0]! : mergeMeshes(meshes), source.operation, source.targets, f.id)
@@ -1509,14 +1531,17 @@ export const rebuild = (history: History): RebuildResult => {
           break
         }
         case "pattern": {
-          const source = tools.get(f.feature)
-          if (source === undefined) { issues.push({ feature: f.id, severity: "error", message: `Feature '${f.feature}' has no tool to copy` }); break }
+          if ((f.feature === undefined) === (f.bodies === undefined)) { issues.push({ feature: f.id, severity: "error", message: "A pattern copies either the tool of a feature or bodies, not both or neither" }); break }
+          const source = f.feature === undefined ? undefined : tools.get(f.feature)
+          if (f.feature !== undefined && source === undefined) { issues.push({ feature: f.id, severity: "error", message: `Feature '${f.feature}' has no tool to copy` }); break }
+          const chosen = f.bodies === undefined ? [] : bodies.filter((b) => f.bodies!.includes(b.id))
+          if (f.bodies !== undefined && chosen.length === 0) { issues.push({ feature: f.id, severity: "error", message: `There is no body ${f.bodies.join(", ")} to pattern` }); break }
           const count = dim(f.count, f.id)
           if (count === undefined) break
           if (!Number.isInteger(count) || count < 2 || count > 500) { issues.push({ feature: f.id, severity: "error", message: `The pattern count must be an integer from 2 to 500 (it is ${count})` }); break }
-          const tool0 = source.meshes.length === 1 ? source.meshes[0]! : mergeMeshes(source.meshes)
-          const copies: Array<{ readonly mesh: Mesh; readonly label: string }> = []
-          const emit = (mesh: Mesh, label: string): void => { copies.push({ mesh, label }) }
+          // Each placement maps the original to one copy; a feature pattern places the tool, a body pattern every chosen body.
+          const placements: Array<{ readonly place: (mesh: Mesh) => Mesh; readonly label: string }> = []
+          const emit = (place: (mesh: Mesh) => Mesh, label: string): void => { placements.push({ place, label }) }
           if (f.kind === "grid") {
             const rows = f.countB === undefined ? undefined : dim(f.countB, f.id)
             const a = (f.step ?? [0, 0, 0]).map((d) => dim(d, f.id)), b = (f.stepB ?? [0, 0, 0]).map((d) => dim(d, f.id))
@@ -1525,21 +1550,26 @@ export const rebuild = (history: History): RebuildResult => {
             if (!Number.isInteger(rows) || rows < 2 || count * rows > 500) { issues.push({ feature: f.id, severity: "error", message: `A grid needs an integer number of rows of at least 2 and at most 500 copies in all (it is ${count} x ${rows})` }); break }
             for (let i = 0; i < count; i++) for (let j = 0; j < rows; j++) {
               if (i === 0 && j === 0) continue
-              emit(translateMesh(tool0, a[0]! * i + b[0]! * j, a[1]! * i + b[1]! * j, a[2]! * i + b[2]! * j), `${f.id}#${i}.${j}`)
+              emit((m) => translateMesh(m, a[0]! * i + b[0]! * j, a[1]! * i + b[1]! * j, a[2]! * i + b[2]! * j), `${f.id}#${i}.${j}`)
             }
           } else if (f.kind === "linear") {
             const step = (f.step ?? [0, 0, 0]).map((d) => dim(d, f.id))
             if (step.some((s) => s === undefined)) break
-            for (let i = 1; i < count; i++) emit(translateMesh(tool0, step[0]! * i, step[1]! * i, step[2]! * i), `${f.id}#${i}`)
+            for (let i = 1; i < count; i++) emit((m) => translateMesh(m, step[0]! * i, step[1]! * i, step[2]! * i), `${f.id}#${i}`)
           } else {
             const c = (f.centre ?? [0, 0]).map((d) => dim(d, f.id))
             const span = f.span === undefined ? 360 : dim(f.span, f.id)
             if (c.some((s) => s === undefined) || span === undefined) break
             // A full circle divides by the count (the last copy is the first again); a partial one spreads the copies end to end.
             const each = span >= 360 - 1e-9 ? span / count : span / (count - 1)
-            for (let i = 1; i < count; i++) emit(rotateMesh(tool0, { x: 0, y: 0, z: 1 }, (each * i * Math.PI) / 180, { x: c[0]!, y: c[1]!, z: 0 }), `${f.id}#${i}`)
+            for (let i = 1; i < count; i++) emit((m) => rotateMesh(m, { x: 0, y: 0, z: 1 }, (each * i * Math.PI) / 180, { x: c[0]!, y: c[1]!, z: 0 }), `${f.id}#${i}`)
           }
-          applyCopies(f.id, copies, source.operation, source.targets)
+          if (source === undefined) {
+            for (const b of chosen) for (const p of placements) bodies.push({ id: chosen.length === 1 ? p.label : `${p.label}:${b.id}`, mesh: p.place(b.mesh), feature: f.id })
+            break
+          }
+          const tool0 = source.meshes.length === 1 ? source.meshes[0]! : mergeMeshes(source.meshes)
+          applyCopies(f.id, placements.map((p) => ({ mesh: p.place(tool0), label: p.label })), source.operation, source.targets)
           break
         }
       }

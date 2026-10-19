@@ -4,7 +4,10 @@
  *   mill, printer  identity: what the program says is where it is drawn (today's coordinates do not move).
  *   lathe          the spindle axis lies horizontal: display x = Z (the chuck on the left, the free end on the right),
  *                  display z = ±radius (X / 2 in diameter mode, X in radius mode; + for a rear turret, - for a front one),
- *                  display y = 0. The part is round, so drawing the tool plane at that azimuth is exact.
+ *                  display y = ±Y: 0 on a 2-axis lathe; under G112 polar interpolation the program's Y is the face's
+ *                  second coordinate (C as a length), so a mill-turn face path lies on the face. A front turret turns the
+ *                  picture 180° about the spindle axis (z and y both flip), so it stays right-handed. The part is round,
+ *                  so drawing the tool plane at that azimuth is exact.
  *
  * Rotation senses follow ISO 6983: M3 is clockwise seen from the spindle towards the workpiece. On a mill the spindle looks
  * down -Z, so M3 is a negative rotation about +Z; on a lathe the headstock looks along +Z, so M3 is a positive rotation
@@ -20,14 +23,15 @@ export type XMode = "diameter" | "radius"
 export const displayPoint = (setup: MachineSetup, p: Vec3, xMode?: XMode): Vec3 => {
   if (setup.kind !== "lathe") return p
   const radius = (xMode ?? setup.xMode) === "diameter" ? p.x / 2 : p.x
-  return { x: p.z, y: 0, z: (setup.turret === "rear" ? 1 : -1) * radius }
+  const s = setup.turret === "rear" ? 1 : -1
+  return { x: p.z, y: s * p.y + 0, z: s * radius }
 }
 
-/** The program point under a display point (lathe: the tool plane y = 0; y is ignored). */
+/** The program point under a display point (lathe: y is the face's second coordinate, 0 in the tool plane). */
 export const programPoint = (setup: MachineSetup, d: Vec3, xMode?: XMode): Vec3 => {
   if (setup.kind !== "lathe") return d
-  const radius = (setup.turret === "rear" ? 1 : -1) * d.z
-  return { x: (xMode ?? setup.xMode) === "diameter" ? 2 * radius : radius, y: 0, z: d.x }
+  const s = setup.turret === "rear" ? 1 : -1
+  return { x: (xMode ?? setup.xMode) === "diameter" ? 2 * s * d.z : s * d.z, y: s * d.y + 0, z: d.x }
 }
 
 export const AXIS_COLORS = { X: 0xef4444, Y: 0x22c55e, Z: 0x3b82f6 } as const

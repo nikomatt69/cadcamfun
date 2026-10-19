@@ -92,9 +92,12 @@ describe("reference interpreter", () => {
   })
 
   test("unsupported motion words are reported instead of ignored", () => {
-    expect(interpretGcode("G71 U2 R0.5\nG1 X1 F10").errors.length).toBe(1)
-    expect(interpretGcode("G76").errors.length).toBe(1)
-    expect(interpretGcode("G76").unsupported).toEqual([{ line: 1, word: "G76" }])
+    expect(interpretGcode("G51 X0 Y0 P2\nG1 X1 F10").errors.length).toBe(1)
+    expect(interpretGcode("G16").unsupported).toEqual([{ line: 1, word: "G16" }])
+    // Spec 32 P2: G71 / G76 mean what the context says — lathe cycles in a lathe program, Siemens metric / fine boring on a mill.
+    expect(interpretGcode("G71 U2 R0.5\nG1 X1 F10").errors).toEqual([])
+    expect(interpretGcode("G76").errors).toEqual(["line 1: canned cycle without Z/R"])
+    expect(interpretGcode("G76").unsupported).toEqual([])
   })
 
   test("the lathe plane is replayed, not reported (spec 31 D1)", () => {
