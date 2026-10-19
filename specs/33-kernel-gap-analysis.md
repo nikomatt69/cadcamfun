@@ -1,0 +1,111 @@
+# 33 — CAD and CAM kernel gap analysis (Fusion 360 / hyperMILL reference)
+
+Status: analysis measured on 2026-10-19 against `main` (`ed73e6c` → `8a10f5b0`), followed in the same pass by the first fixes listed in
+§5. Owner request: "analizza i gap mancanti nel core del cad e del cam kernel e il loro utilizzo nel sidecar, httpapi e desktop …
+li aggiorniamo con il mancante". This spec is the inventory the follow-up work is ordered from. It does not claim parity: the gates
+of [spec 12](12-professional-cad-cam.md) and the release claims of [spec 29](29-native-cam-kernel.md) still decide that.
+
+Method: read the kernel sources (`packages/core/src/cad`, `cad/brep`, `cam/operations`, `cam/kernel`, `cam/generator`), the
+HTTP contracts (`packages/api/src`), the sidecar handlers (`apps/sidecar/src/http`, `services/ai.ts`), the desktop features
+(`apps/desktop/src/features/{cad,cam}`) and the assistant actions (`packages/ai/src/actions`), and counted which kernel entry
+points each layer actually calls. Older summaries (spec 14 §2–3) are partly stale; where they disagree this spec is the measured
+state.
+
+## 1. CAD kernel
+
+### 1.1 What exists
+
+| Area | Where | Notes |
+| --- | --- | --- |
+| Parametric history, 24 feature types | `cad/history.ts` | sketch, extrude (edge/corner/taper), revolve, hole (simple/counterbore/countersink, threads, fits), pattern (linear/circular/grid), mirror, sweep, loft, shell, fillet/chamfer, primitive, coil, move, scale, split, combine, rib, sheet, thread, text, pushpull, draft, mate, plane |
+| Constraint sketcher | `cad/sketch.ts` | point/line/arc/circle, 24 constraint kinds (incl. tangent, equal, symmetric, point-on), LM solver, DOF |
+| Mesh kernel | `csg.ts`, `mesh-clean.ts`, `mesh-topology.ts` | closed-manifold BSP Booleans, topology/genus checks |
+| Exact B-rep | `cad/brep/*`, `history-brep.ts` | analytic + NURBS faces, exact Booleans, fillet/chamfer of straight and coaxial edges, shells, sweeps, lofts, drafts and push-pull of planar faces, STEP read/write, mass properties, validation, hole recognition |
+| Engineering layer | `fasteners.ts`, `smart-fasteners.ts`, `dfm.ts`, `recipes.ts`, `assembly-analysis.ts` | ISO tables, DFM rules, 7 recipes, interference/BOM/joints from holes |
+| Drawings | `drawing/*` | projected views, section, detail, dimensions from history features, sheet + SVG/PDF |
+
+### 1.2 Gaps, ranked by value for a Fusion-class modeller
+
+| # | Gap | Today | Why it matters |
+| --- | --- | --- | --- |
+| C1 | **Mirror / pattern of whole bodies** | only the tool of a feature | half-part modelling, multi-body layouts — **closed in this pass** (§5) |
+| C2 | Exact model of `coil`, `rib`, `sheet`, `text`, modelled `thread` | mesh only, with a reason | STEP export and B-rep CAM features lose these bodies |
+| C3 | Fillets of non-coaxial curved edges, variable radius, setback vertex blends | refused or mitred | pipe T-junctions, cast parts, consumer products |
+| C4 | Chamfer by two distances / distance-angle | equal setback only | drawing-callout chamfers (e.g. 2 x 30°) |
+| C5 | Shell of a Boolean result, a loft, a partial revolution; per-face thickness | refused | housings built from several features |
+| C6 | Persistent naming (topological naming) | selections by point / box | edits upstream re-pick faces silently or fail |
+| C7 | Surface modelling: patch, trim, stitch, thicken, offset surface | absent | class-A and freeform parts |
+| C8 | Direct editing: offset / delete / replace face on any body | planar push-pull only (exact), curved by mesh | imported STEP editing |
+| C9 | Pattern along a path, pattern of faces | absent | chains, ribs on curves |
+| C10 | Sheet metal: flange on an edge, reliefs, corner closures, multi-bend unfold of a 3D part | base flange + hems + flat pattern | real sheet-metal parts |
+| C11 | Assembly joint solver (several joints, motion limits, cam/gear joints), motion study | one rigid `mate` per body | mechanisms (the rack-and-pinion target of the harness goal) |
+| C12 | Exact holes on work planes | mesh only on work planes | tilted / face holes lose exactness and CAM features |
+| C13 | Sketch: splines, ellipses, offset/trim/extend/project tools in the solver | lines, arcs, circles | freeform profiles must be approximated |
+| C14 | Drawings: GD&T beyond flatness, balloons/BOM, assembly drawings, exact silhouettes | partial | production sheets |
+
+## 2. CAM kernel
+
+### 2.1 What exists
+
+| Area | Where |
+| --- | --- |
+| 2.5D: face, adaptive, pocket, profile (leads, tabs), bore (helical), drill/spot (G81/G82/G83/G73), thread milling, engrave, chamfer/deburr | `cam/operations/*`, kernel `execute.ts` |
+| 3D: roughing (contour/adaptive), rest roughing, parallel, waterline, steep-shallow, rest finishing/pencil — **and now scallop (3D offset), spiral, radial, flat-area** | `operations/surface.ts` |
+| 5-axis: indexed 3+2 (AC/BC trunnion), simultaneous parallel/contour finishing on a trunnion (kernel `multiaxis`), voxel stock bracket for tilted removal, joint-move collision, head B / head AB kinematics (module only) | `cam/indexing.ts`, `five-axis.ts`, `kernel/{motion,stock,collision,head}.ts` |
+| Kernel orchestration | `cam/kernel`: materials (ISO P/M/K/N/S/H grades), cutting data with power/torque/deflection limits, feature planning from history or B-rep, NC replay evidence, claims and release levels |
+| Posts | generic/LinuxCNC, Fanuc, Haas, GRBL, Heidenhain (advanced), subprograms |
+| Verification | height-field replay, gouge vs part, rapid-in-stock, holder/shank, machine table clearance, travel |
+| Turning | legacy generator only (`generator/lathe.ts`): facing, turning, boring, threading, grooving, parting, knurling |
+
+### 2.2 Gaps, ranked
+
+| # | Gap | Today | Notes |
+| --- | --- | --- | --- |
+| M1 | **3D finishing families**: constant scallop, spiral, radial, horizontal | raster/waterline/steep-shallow only; legacy spiral/radial finishing silently fell back to a raster | **closed in this pass** (§5) |
+| M2 | Hole making in the kernel: rigid tapping (G84), reaming (G85), boring cycles, back-boring; tap/reamer/boring-bar cutters | drill and spot only; threads are milled | the interpreter already replays G84/G85 (spec 32 P2) — **next** |
+| M3 | Turning in the kernel (facing, OD/ID roughing and finishing, grooving, threading, parting) with stock evolution | legacy generator only, no kernel evidence | mill-turn later |
+| M4 | Stock-aware rest: operation B consumes the stock A left (spec 29 §6) | rest from a previous tool diameter | voxel stock exists for 5-axis only |
+| M5 | 5-axis strategies: swarf, 5x contour, multi-axis roughing, automatic tilting from a 3-axis path (collision avoidance) | parallel/contour lean on a trunnion | head-table and head-head machines in the kernel |
+| M6 | Pencil as a standalone strategy (bi-tangency), morph / flowline / projection finishing | pencil = rest finish after a larger ball | |
+| M7 | Toolpath linking optimisation (2-opt/TSP over rapids, stay-down links in 2.5D) | nearest neighbour | cycle time |
+| M8 | Holder-aware automatic tool length (minimum stick-out) | fixed stick-out per cutter | rigidity, chatter |
+| M9 | Machine simulation parity (right tool per operation, interpreter words, machine model, live removal) | **spec 32, in progress in a parallel session** | P1 and P2 landed 2026-10-19 |
+
+## 3. Integration: what each layer reaches
+
+| Capability | Core | Assistant (AI) | HTTP API / sidecar | Desktop |
+| --- | --- | --- | --- | --- |
+| Parametric rebuild, exact replay, STEP of a history | yes | `cad.parametric`, `parametric_exact` | via AI actions only; `/api/cad/exact/{analyze,assembly,step}` take a scene | Parametric panel (local core), Exact model panel |
+| STEP import | `stepToElements` | `cad_edit` read | — | Import dialog |
+| Drawings | `generateSheet` | `cad.drawing` | companion previews | Drawing panel |
+| DFM, fasteners, recipes | yes | `cad_parametric` actions | via AI | Manufacturability / Recipes sections |
+| Sheet-metal flat pattern DXF | `flatPatternDxf` | **not exposed** | **not exposed** | **not exposed** |
+| Sketch solver | `solveSketch` | inside rebuild | — | no interactive drag-to-edit sketcher |
+| Kernel CAM job | `runJob`, `planOnly` | `cam.manufacture`, `cam_edit.manufacture` | `POST /api/toolpaths/manufacture` | Kernel section (plan, cutters, evidence) |
+| Legacy generator | `generator/*` | `cam_edit` create | `POST /api/toolpaths/generate` | Operation generator |
+| Verification | `verifyToolpath` | `cam.verify` | `POST /api/toolpaths/verify` | Verify tab |
+
+Integration defects found and fixed in this pass: the HTTP artifact schema did not list the `multiaxis` strategy the kernel already
+produced (a five-axis artifact could not be encoded), the generated clients were stale after the five-axis operation, and the
+desktop kernel cutter table typechecked only after the parallel session's fix. Still open: `flatPatternDxf` unreachable from any
+layer; no HTTP route rebuilds a parametric history without the assistant; the desktop has no interactive sketcher on the solver.
+
+## 4. Order of work
+
+1. M2 hole making in the kernel (tap/ream cycles in the IR, posts, cutters, cutting data, planner choice tap vs thread mill).
+2. C12 exact holes on work planes, then C4 chamfer variants, then C2 exact rib/text/coil.
+3. M4 stock-aware rest between operations (voxel stock for 3-axis too).
+4. M3 turning in the kernel.
+5. C6 persistent naming before any wider direct-editing work (C8), C11 joint solver for the harness target.
+6. Integration: expose `flatPatternDxf` (AI + desktop export), an HTTP parametric rebuild route if a non-AI client needs it.
+
+## 5. Closed in this pass
+
+| Commit | What | Evidence |
+| --- | --- | --- |
+| `71a32fe4`, `29d3198c` | five-axis finishing operation and its voxel stock bracket brought onto main from the `kernel-rotary-stock` worktree (the merged worktrees were removed) | kernel suite 108/108 |
+| `c117e271` | M1: scallop (geodesic 3D offset over the drop-cutter surface), spiral, radial, flat-area in the surface engine, kernel (`SurfaceMode`, `center`, flat = finish-floor), planner flat-area finish on freeform parts with ledges, legacy generator spiral/radial finishing made real, desktop picker, API `multiaxis`, clients + OpenAPI snapshot (additions only) | `surface-finishing.test.ts`: ring spacing along the tool-centre surface = target (mean within 2 %), no gouge (verifier), coverage of spiral/radial ≤ half a spacing, flat faces at exact height and full coverage; kernel job claims pass |
+| `8a10f5b0` (+ part swept into `e6735d31`) | C1: mirror/pattern of bodies (`bodies`, `join`), mesh and exact; AI schema and validation | `history-bodies.test.ts`: half plate mirrored joined is one closed genus-2 body, exact volume to 1e-9, valid B-rep; patterns with matching mesh/exact ids |
+
+Known unrelated failures seen while testing: `packages/ai/test/harness-inventory.test.ts` (sidecar `workspace.ts` handler
+resolution; the two assertions disagree with each other) and the AI MCP test helper typecheck; both predate this pass.

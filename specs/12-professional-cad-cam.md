@@ -111,5 +111,6 @@ New regression tests are beside the WP-owned CAD/CAM source. Existing golden NC 
 
 ## Change log
 
+- 2026-10-19: measured kernel gap inventory and its order of work in [spec 33](33-kernel-gap-analysis.md); 3D finishing families (scallop, spiral, radial, flat) and body mirror/pattern closed there. Documentation pointer only.
 - 2026-10-14: corrected statements that treated exact B-rep and STEP as absent: the native `cad/brep/` kernel (spec 03 §7c) exists with STEP read/write; gate 1 remains open for lack of recorded corpus evidence (AI-11 Step 0). Documentation only.
 - 2026-10-13: linked the owner-requested [native CAM kernel contract](29-native-cam-kernel.md), distinguishing its current-source inventory and target architecture from historical implementation summaries. Design only; no acceptance gate or commercial parity claimed.
