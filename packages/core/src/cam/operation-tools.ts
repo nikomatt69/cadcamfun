@@ -9,6 +9,8 @@
 import type { MachineKind } from "./machine.ts"
 import type { ToolpathSettings } from "./generator/schema.ts"
 import type { Strategy } from "./kernel/contracts.ts"
+import type { Program } from "./ir.ts"
+import type { MotionTrack } from "./viewer/motion-track.ts"
 import { headerTools } from "./testing/header-tools.ts"
 import { toolMachineOf, toolModelOf, toolTypeIn, toolModelFromSettings, type LatheInsert, type MillShape, type ToolModel, type ToolResource } from "./tool-model.ts"
 
@@ -197,3 +199,36 @@ export const headerToolModels = (gcode: string, kind: MachineKind = "mill"): Rea
   return out
 }
 
+
+/**
+ * The insert each tool of a lathe program needs, read from the words of its own blocks (an imported program has no
+ * settings to say it): threading (G32 / G33 / G76), grooving (G74 / G75 pecks), parting (a feed down to the axis with no Z
+ * travel), else turning.
+ * Every model is flagged assumed: the type was read from the moves, not given.
+ */
+export const latheToolModels = (program: Program, track: MotionTrack | undefined, gcode: string): ReadonlyMap<string, ToolModel> => {
+  const out = new Map<string, ToolModel>()
+  const lines = gcode.split(/\r?\n/).map((l) => l.replace(/\([^)]*\)/g, " ").replace(/;.*$/, "").toUpperCase())
+  program.toolpaths.forEach((path, i) => {
+    if (out.has(path.toolId)) return
+    const own = new Set((track?.paths[i]?.lines ?? []).filter((n): n is number => n !== undefined))
+    const words = [...own].map((n) => lines[n - 1] ?? "").join(" ")
+    const g = (n: number) => new RegExp(`\\bG0*${n}(?![\\d.])`).test(words)
+    let insert: LatheInsert = "turning"
+    if (g(32) || g(33) || g(76)) insert = "threading"
+    else if (g(74) || g(75)) insert = "grooving"
+    else {
+      const feeds = path.moves.filter((m): m is Extract<typeof m, { _tag: "Linear" }> => m._tag === "Linear")
+      let at = { x: Infinity, z: 0 }
+      let parts = false
+      for (const m of path.moves) {
+        if ((m._tag === "Linear") && Math.abs(m.to.x) < 1e-6 && Math.abs(m.to.z - at.z) < 1e-6 && at.x > 1e-6) parts = true
+        if (m._tag === "Rapid" || m._tag === "Linear" || m._tag === "Arc") at = { x: m.to.x, z: m.to.z }
+      }
+      if (parts && feeds.length > 0) insert = "parting"
+    }
+    const model = toolModelOf({ type: insert, diameter: insert === "parting" || insert === "grooving" ? 3 : 12 }, "lathe")
+    out.set(path.toolId, { ...model, assumed: [...model.assumed, "type"] })
+  })
+  return out
+}

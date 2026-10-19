@@ -77,13 +77,19 @@ export default function CamPage(): JSX.Element {
     setting: gen.settings.machineType
   }))
   const toolModel = createMemo(() => previewToolModel(machineChoice().kind, gen.settings, gen.selectedLibraryTool as never))
-  const toolIssues = createMemo(() => cam.settingsToolIssues(gen.settings, toolModel()))
+  // The generator's tool against its operation: only for the generator's own program on its own machine.
+  const toolIssues = createMemo(() => gen.currentGCode !== "" && gen.currentGCode === camStore.gcode && machineChoice().kind === gen.settings.machineType ? cam.settingsToolIssues(gen.settings, toolModel()) : [])
   // The assistant's operations shown together: each one's own tool (spec 32 §4.2).
   const operationTools = createMemo(() => camStore.operationResults.length > 0 && combineOperationResults(camStore.operationResults).gcode === camStore.gcode
     ? operationToolsOf(camStore.operationResults)
     : [])
   // An imported program split at its tool changes (T1, T2…): each tool as its header comments describe it.
-  const headerModels = createMemo(() => camStore.program.toolpaths.some((tp) => /^T\d+$/.test(tp.toolId)) ? cam.headerToolModels(camStore.gcode, machineChoice().kind) : undefined)
+  const headerModels = createMemo(() => {
+    if (!camStore.program.toolpaths.some((tp) => /^T\d+$/.test(tp.toolId))) return undefined
+    const header = cam.headerToolModels(camStore.gcode, machineChoice().kind)
+    // A lathe program's tools from its own words (threading, grooving, parting), unless its header names them.
+    return machineChoice().kind === "lathe" ? new Map([...cam.latheToolModels(camStore.program, camStore.motion, camStore.gcode), ...[...header].filter(([, m]) => m.family === "lathe")]) : header
+  })
   const operationToolModels = createMemo(() => operationTools().length > 0 ? new Map(operationTools().map((o) => [o.toolId, o.model])) : (headerModels()?.size ?? 0) > 0 ? headerModels() : undefined)
   const previewMachine = createMemo(() => previewSetup(machineChoice().kind, gen.settings, previewStock(), {
     ...(kernelShown() ? { artifact: camStore.kernelArtifact, machineId: gen.kernelSettings.machine } : {}),

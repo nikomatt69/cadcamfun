@@ -95,3 +95,19 @@ describe("a program split at its tool changes", () => {
     expect(cam.toolTypeIn("spot drill")).toBe("spotdrill")
   })
 })
+
+describe("an imported lathe program's inserts", () => {
+  test("each tool's insert is read from its own blocks: turning, threading, grooving, parting", () => {
+    const gcode = [
+      "G21 G18 G90 G95", "T0101", "G96 S200 M3", "G50 S3000", "G0 X52 Z2", "G71 U2 R0.5", "G71 P10 Q20 U0.4 W0.1 F0.25", "N10 G0 X20", "G1 Z-20", "N20 X52",
+      "T0303", "G97 S600 M3", "G0 X24 Z5", "G76 P020060 Q50 R0.02", "G76 X17.4 Z-18 P1300 Q300 F2",
+      "T0505", "G97 S800 M3", "G0 X30 Z-25", "G75 R0.5", "G75 X16 Z-25 P1000 F0.05",
+      "T0707", "G97 S800 M3", "G0 X55 Z-45", "G1 X0 F0.05", "G0 X60",
+      "M30"
+    ].join("\n")
+    const a = cam.generator.analyseGcode(gcode)
+    const models = cam.latheToolModels(a.program, a.motion, gcode)
+    expect([...models].map(([id, m]) => [id, m.family === "lathe" ? m.insert : m.family])).toEqual([["T101", "turning"], ["T303", "threading"], ["T505", "grooving"], ["T707", "parting"]])
+    for (const m of models.values()) expect(m.assumed).toContain("type")
+  })
+})
