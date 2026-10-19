@@ -85,7 +85,14 @@ export default function CamPage(): JSX.Element {
     : [])
   // An imported program split at its tool changes (T1, T2…): each tool as its header comments describe it.
   const headerModels = createMemo(() => {
-    if (!camStore.program.toolpaths.some((tp) => /^T\d+$/.test(tp.toolId))) return undefined
+    const paths = camStore.program.toolpaths
+    // A one-tool program keeps its toolpath `tool`: its tool is the T word the program selects, if the header names it.
+    if (paths.length === 1 && paths[0]!.toolId === "tool") {
+      const number = camStore.motion?.paths[0]?.runs.find((r) => r.tool !== undefined)?.tool
+      const own = number !== undefined ? cam.headerToolModels(camStore.gcode, machineChoice().kind).get(`T${number}`) : undefined
+      return own !== undefined ? new Map([["tool", own]]) : undefined
+    }
+    if (!paths.some((tp) => /^T\d+$/.test(tp.toolId))) return undefined
     const header = cam.headerToolModels(camStore.gcode, machineChoice().kind)
     // A lathe program's tools from its own words (threading, grooving, parting), unless its header names them.
     return machineChoice().kind === "lathe" ? new Map([...cam.latheToolModels(camStore.program, camStore.motion, camStore.gcode), ...[...header].filter(([, m]) => m.family === "lathe")]) : header

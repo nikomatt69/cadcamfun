@@ -20,7 +20,9 @@ const RECORDED: Readonly<Record<string, string>> = {
   incremental: "feef60165b723e1e",
   cycles: "60ef3e6e0f8ae59d",
   inch: "a1b5f9ee43985c52",
-  rotary: "c1acf5ca65d47daf",
+  // Re-recorded for spec 32 P5: the rotary-only block `G0 A30 C90` was dropped; it is now a zero-length rapid that turns
+  // the axes (asserted below: the only segment added).
+  rotary: "feb0a80e2850de93",
   subprograms: "e9e111e5e7cac0f6",
   // Re-recorded for spec 32 P2: G64 is accepted and G41 without a known radius says why it is drawn uncompensated; the
   // geometry is unchanged (asserted below against its fingerprint recorded before the change).
@@ -45,3 +47,14 @@ describe("spec 32 P2 changed only the warnings of the milling fixtures", () => {
     expect(r.unsupported).toEqual([{ line: 6, word: "G41" }])
   })
 })
+
+describe("spec 32 P5: a block that only turns the rotary axes is a move", () => {
+  test("rotary: the one added segment is the G0 A30 C90 turn, at the same place", () => {
+    const r = interpretGcode(MILL_PROGRAMS.rotary!)
+    expect(r.segments).toHaveLength(4)
+    expect(r.segments[1]).toEqual({ kind: "rapid", from: { x: 0, y: 0, z: 50 }, to: { x: 0, y: 0, z: 50 }, feed: 0, line: 4, rotary: { a: 30, c: 90 } })
+    // A repeated block that changes nothing still draws nothing.
+    expect(interpretGcode("G90\nG0 X0 Y0 Z0\nG0 X0 Y0 Z0").segments).toHaveLength(0)
+  })
+})
+

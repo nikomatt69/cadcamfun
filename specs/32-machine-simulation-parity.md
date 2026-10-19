@@ -1,6 +1,6 @@
 # Machine simulation at Fusion 360 / hyperMILL level: every kinematics, every operation, the right tool
 
-Status: **P1, P2 built** (2026-10-19); P3 player and P4 S1 removal partially implemented, full gates open; P5–P9 open.
+Status: **P1, P2, P3 built**, **P5 built (presets, poses, limits)** (2026-10-20); P4 S1 removal partially implemented (another session); P6–P9 open.
 See §9. Analysis written at `main` @ 9aa648c. It extends
 [31-machine-aware-toolpath-view](31-machine-aware-toolpath-view.md) (machine scene, motion track, frames, set-up checks) and
 [29-native-cam-kernel](29-native-cam-kernel.md) (kinematics, collision, stock); it does not replace them. Owners: WP2
@@ -419,6 +419,51 @@ Verification: `bun --no-env-file test --timeout 60000 packages/core/test/cam/sto
 apps/desktop/test/stock-simulation.test.ts apps/desktop/test/cam-simulation.test.ts apps/desktop/test/cam-page.test.ts`
 passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh checks use Three.js buffers directly.
 
+### P3 — move semantics and player (2026-10-19 / 20)
+
+- Core: `viewer/move-class.ts` (`classifyMoves`: rapid, retract, plunge, ramp, lead-in, lead-out, cut, link, cycle, probe,
+  dwell; lathe and printer rules; `cycleLinesOf`, `operationSpans`, `timeOfLine`, `moveClassSummary`); `analyseGcode`
+  splits a program at its tool changes (`T1`, `T2`… one toolpath each; one tool stays `gcode` / `tool`);
+  `testing/header-tools.ts` reads Fusion / HSM `T1 D=6. CR=0. - … - flat end mill` headers; `headerToolModels`,
+  `toolTypeIn`, `latheToolModels` (the insert of each lathe tool from its own blocks: G32/G76 threading, G74/G75 grooving,
+  a feed to the axis parting); `timedIndexAt` and the desktop `segmentIndexAt` give the move starting at a boundary.
+- Desktop: `viewport/view3d/toolpath-colors.ts` (one vertex-coloured line object for the cuts and one for the rapids;
+  colour by tool, operation, move class, feed or Z, legend, "path up to the playhead" draw range), `SimulationTimeline`
+  (operation bands, tool-change ticks, finding / limit markers, step by move and operation, speed 0.1×–1000×),
+  operations panel (show / hide / only / go), NC strip (blocks round the playhead, click to seek), DRO (feed, S, T, move
+  class, operation, machine axes), `features/cam/lib/simulation.ts`.
+- Checked in the running app (Vite + sidecar + headless Chromium with SwiftShader): a four-tool Fusion-style mill program
+  (contour with G41, G83 drilling, G84 tapping, ball finishing) — bands, ticks, T3 tap drawn from its header, the NC strip on
+  the G84 block, the move legend; a lathe program (G71/G70 then G76) — the threading insert for T303, the turned profile.
+- Tests: `packages/core/test/cam/move-class.test.ts`, `apps/desktop/test/cam-simulation.test.ts`, the "simulation player"
+  case of `apps/desktop/test/cam-page.test.ts`.
+
+### P5 — machine models (2026-10-20)
+
+- `viewer/rotary.ts` knows the head machines: `head-table-BC` (B head, C table) and `head-head-AC` (fork head), from the
+  header (`HEAD-TABLE-BC`, `HEAD-HEAD-AC`) or a caller's layout; tool axis H·Z in the machine, Rᵀ·H·Z in the part; the
+  trunnion maths is unchanged (same calls into `indexing.ts`).
+- `viewer/machine-model.ts`: presets `vmc-3`, `vmc-4a`, `trunnion-ac`, `trunnion-bc`, `head-table-bc`, `head-head-ac`,
+  `router-gantry`, sized from the set-up's table and the travels given (assumed otherwise, drawn translucent); links base,
+  column, head, spindle, fork, table, cradle, platter; `machinePose` places every link in the part frame (part still) or the
+  machine frame (base still: the table travels the axes it carries and turns), with the spindle nose a gauge length up the
+  tool axis; `checkLimits` reports X/Y/Z travel (Z with the gauge) and A/B/C range overruns at their first move and line
+  (errors for entered limits, warnings for assumed ones).
+- Viewer: Machine section → "Show the machine", machine class (auto or a preset), part / machine view for every mill;
+  `View3D` takes the tool tip, axis and table matrix from the machine pose; the DRO shows the machine axes; limit findings are
+  timeline markers and stats lines. `ToolpathVisualizer.machineTravel` takes a library machine's work volume (not wired from
+  the machine library yet: that selector is another session's work in progress).
+- Interpreter fix found by the tests: a block that only turns the rotary axes (`G0 A90`, `G1 A130 C10`) was dropped; it is
+  now a zero-length move with the new angles (the `rotary` characterization fixture re-recorded; the only added segment is
+  asserted).
+- Checked in the running app: a TCP trunnion A/C program — part view (the machine turns round the still part, the tool
+  leans) and machine view (the platter tilts A30 with the vise and stock, the tool vertical), DRO `X22.214 Y-1.214 Z-3.01
+  A30 C200`.
+- Tests: `packages/core/test/cam/machine-model.test.ts`, "the machine model round a mill" in
+  `apps/desktop/test/cam-machine-view.test.ts`.
+- Limits: inverse kinematics for non-TCP head machines takes X Y Z as tool tip positions; no singularity or unwinding
+  report yet; machine bodies are envelopes, not CAD models; machine-body collision is P7.
+
 ## Change log
 
 - 2026-10-19: analysis written from the code at 9aa648c and the probes of §2.2.
@@ -426,3 +471,4 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
 - 2026-10-19: P2 built (§9).
 - 2026-10-19: continued partial P4 S1 removal: preserved kernel cutter profiles, deterministic partial/full replay,
   rewind/reset mesh invalidation, non-cutting probes, machine scope guards and desktop stock readout; 39 regressions pass.
+- 2026-10-20: P3 completed and checked in the running app; P5 machine models built (§9).

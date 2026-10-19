@@ -215,9 +215,13 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     homed = false
   }
 
+  // A block that only turns the rotary axes (`G0 A90`) is a move too: zero length, new angles.
+  let emittedRotary = "{}"
+  const turned = (angles: RotaryAngles | undefined): boolean => { const key = JSON.stringify(angles ?? {}); if (key === emittedRotary) return false; emittedRotary = key; return true }
   const rapid = (to: P3, line: number): void => {
-    if (dist(pos, to) < 1e-12) return
     const angles = rotaryOf()
+    if (dist(pos, to) < 1e-12 && !turned(angles)) return
+    turned(angles)
     segments.push(angles === undefined ? { kind: "rapid", from: pos, to, feed, line, ...inSub() } : { kind: "rapid", from: pos, to, feed, line, ...inSub(), rotary: angles })
     sample(line, to)
     rapidLength += dist(pos, to)
@@ -225,8 +229,9 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     note(pos)
   }
   const linear = (to: P3, line: number, rate = feed): void => {
-    if (dist(pos, to) < 1e-12) return
     const angles = rotaryOf()
+    if (dist(pos, to) < 1e-12 && !turned(angles)) return
+    turned(angles)
     segments.push(angles === undefined ? { kind: "linear", from: pos, to, feed: rate, line, ...inSub() } : { kind: "linear", from: pos, to, feed: rate, line, ...inSub(), rotary: angles })
     sample(line, to)
     cutLength += dist(pos, to)
@@ -652,7 +657,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     // Fanuc lathe incremental addresses (G-code system A): U is an X distance, W a Z distance.
     const u = latheContext ? get("U") : undefined
     const wInc = latheContext ? get("W") : undefined
-    const hasAxis = x !== undefined || y !== undefined || z !== undefined || u !== undefined || wInc !== undefined
+    const rotaryWord = get("A") !== undefined || get("B") !== undefined || (!polar && get("C") !== undefined)
+    const hasAxis = x !== undefined || y !== undefined || z !== undefined || u !== undefined || wInc !== undefined || (rotaryWord && (motion === 0 || motion === 1))
     if (setting !== undefined) {
       if (setting === "home") homed = true
       else if (setting === "g52") {

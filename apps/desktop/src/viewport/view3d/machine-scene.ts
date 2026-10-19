@@ -24,6 +24,8 @@ export interface MachineDisplay {
   readonly layer?: number
   /** Rotary mills: the part stays and the tool leans (`part`), or the tool stays vertical and the table turns (`machine`). */
   readonly frame?: "part" | "machine"
+  /** Mills: draw the machine around the part — base, column, head, table, trunnion, fork head (spec 32 P5). */
+  readonly showMachine?: boolean
 }
 
 export const DEFAULT_MACHINE_DISPLAY: MachineDisplay = { showWorkholding: true, showTriad: true, spin: true, depositMode: "progressive" }
@@ -39,6 +41,10 @@ export interface MachineSceneInput {
   readonly scale: number
   /** Where the machine is before the first move (`cam.viewer.programStart`). */
   readonly start?: Vec3
+  /** The machine model's preset and travels (a library machine's work volume). */
+  readonly machineOptions?: cam.viewer.MachineModelOptions
+  /** Tip-to-spindle-nose length of each toolpath's tool, mm (the head stands that far up the tool axis). */
+  readonly gaugeOf?: (path: number) => number
   /**
    * The tool of each toolpath when the program's operations use different ones (spec 32 §4.2): a lathe program that faces,
    * threads and parts off draws the facing insert, the threading insert and the parting blade in turn. `undefined` entries
@@ -56,6 +62,10 @@ export interface MachineScene {
   readonly spinAngle: (seconds: number) => number
   /** Moves the lathe tool / nozzle, spins the chuck, grows the turned part and the deposits. True when something moved. */
   readonly update: (seconds: number) => boolean
+  /** The machine model drawn round a mill (spec 32 P5), its travel / rotary limit findings and its links' placement. */
+  readonly model?: cam.viewer.MachineModel
+  readonly limits: ReadonlyArray<cam.viewer.LimitFinding>
+  readonly placeMachine: (pose: cam.viewer.MachinePose) => boolean
   readonly dispose: () => void
 }
 
@@ -191,6 +201,8 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     if (setup.kind === "lathe" && body.role === "stock") continue
     // The mill stock outline is drawn by the viewport's stock box (its opacity setting applies).
     if (setup.kind === "mill" && body.role === "stock") continue
+    // With the machine drawn, its own table stands under the workholding.
+    if (setup.kind === "mill" && display.showMachine && body.role === "table") continue
     ;(body.spins ? spinning : statics).add(bodyMesh(body))
   }
   if (display.showTriad) root.add(triad(setup, Math.max(30, Math.min(120, input.scale * 0.6))))
@@ -345,8 +357,32 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   }
   update(0)
 
+  // The machine model: one group per link, placed every frame from the joints (`cam.viewer.machinePose`).
+  const model = setup.kind === "mill" && display.showMachine ? cam.viewer.machineModelOf(setup, input.machineOptions) : undefined
+  const linkGroups = new Map<cam.viewer.LinkRole, THREE.Group>()
+  if (model !== undefined) {
+    const group = new THREE.Group(); group.name = "machine-model"
+    for (const body of model.bodies) {
+      let link = linkGroups.get(body.link)
+      if (link === undefined) { link = new THREE.Group(); link.name = `machine-link:${body.link}`; link.matrixAutoUpdate = false; linkGroups.set(body.link, link); group.add(link) }
+      link.add(modelBodyMesh(body, model.assumed.length > 0))
+    }
+    root.add(group)
+  }
+  const rotary = setup.kind === "mill" ? setup.rotary : undefined
+  const limits = model !== undefined ? cam.viewer.checkLimits(model, timeline, rotary, input.gaugeOf ?? (() => 0)) : []
+  const placeMachine = (pose: cam.viewer.MachinePose): boolean => {
+    let changed = false
+    for (const [role, group] of linkGroups) {
+      const m = pose.links[role]
+      const target = new THREE.Matrix4().set(m[0]!, m[1]!, m[2]!, m[3]!, m[4]!, m[5]!, m[6]!, m[7]!, m[8]!, m[9]!, m[10]!, m[11]!, 0, 0, 0, 1)
+      if (!group.matrix.equals(target)) { group.matrix.copy(target); group.matrixWorldNeedsUpdate = true; changed = true }
+    }
+    return changed
+  }
+
   return {
-    root, timeline, findings, layers: deposits?.layers ?? [], spinAngle, update,
+    root, timeline, findings, layers: deposits?.layers ?? [], spinAngle, update, ...(model !== undefined ? { model } : {}), limits, placeMachine,
     dispose: () => { disposeObject(root); root.clear() }
   }
 }
@@ -371,6 +407,37 @@ export interface MachineInfo {
   readonly findings: ReadonlyArray<cam.viewer.SetupFinding>
   readonly layers: ReadonlyArray<number>
   readonly timeline: cam.viewer.Timeline
+  /** The machine model drawn, and the moves that leave its travels or rotary limits. */
+  readonly model?: cam.viewer.MachineModel
+  readonly limits?: ReadonlyArray<cam.viewer.LimitFinding>
+}
+
+const LINK_COLORS: Readonly<Record<cam.viewer.LinkRole, number>> = {
+  base: 0x334155, column: 0x475569, head: 0x64748b, spindle: 0x94a3b8, table: 0x1e293b, cradle: 0x0f766e, platter: 0x14b8a6, fork: 0x7c3aed
+}
+
+/** A body of the machine model in its link's home position; translucent when the machine's sizes were assumed. */
+const modelBodyMesh = (body: cam.viewer.ModelBody, assumed: boolean): THREE.Object3D => {
+  const shape = body.shape
+  let geometry: THREE.BufferGeometry
+  const at = new THREE.Vector3()
+  if (shape.type === "box") {
+    geometry = new THREE.BoxGeometry(Math.max(1e-3, shape.max.x - shape.min.x), Math.max(1e-3, shape.max.y - shape.min.y), Math.max(1e-3, shape.max.z - shape.min.z))
+    at.set((shape.min.x + shape.max.x) / 2, (shape.min.y + shape.max.y) / 2, (shape.min.z + shape.max.z) / 2)
+  } else {
+    geometry = new THREE.CylinderGeometry(shape.radius, shape.radius, shape.length, 48)
+    // Three's cylinder stands along +Y.
+    if (shape.axis === "z") geometry.rotateX(Math.PI / 2)
+    else if (shape.axis === "x") geometry.rotateZ(-Math.PI / 2)
+    at.set(shape.center.x, shape.center.y, shape.center.z)
+  }
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: LINK_COLORS[body.link], metalness: 0.4, roughness: 0.55, transparent: true, opacity: assumed ? 0.35 : 0.9, depthWrite: !assumed, side: THREE.DoubleSide }))
+  mesh.position.copy(at)
+  mesh.name = `machine-model:${body.id}`
+  mesh.userData.noFit = true
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 25), new THREE.LineBasicMaterial({ color: 0xcbd5e1, transparent: true, opacity: assumed ? 0.4 : 0.7 }))
+  mesh.add(edges)
+  return mesh
 }
 
 export const machineSpatial = (setup: cam.viewer.MachineSetup, machine: MachineScene, seconds: number): Record<string, unknown> => {

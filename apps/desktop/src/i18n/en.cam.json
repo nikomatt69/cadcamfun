@@ -547,5 +547,9 @@
   "cam.move.link": "Link",
   "cam.move.cycle": "Cycle",
   "cam.move.probe": "Probe",
-  "cam.move.dwell": "Dwell"
+  "cam.move.dwell": "Dwell",
+  "cam.visualizer.showMachine": "Show the machine (axes, head, table)",
+  "cam.visualizer.machineClass": "Machine class",
+  "cam.visualizer.machineAxes": "Machine axes",
+  "cam.visualizer.limit": "Limit"
 }

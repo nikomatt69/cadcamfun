@@ -238,3 +238,43 @@ describe("one 3D object per tool (spec 31): Resources page, CAM preview and mach
     expect(names(scene(printer, "M104 S200\nG1 X10 Y10 Z0.2 E1 F600").root)).toContain("nozzle:hardened")
   })
 })
+
+describe("the machine model round a mill (spec 32 P5)", () => {
+  const program = "(TABLE-AC)\nG21 G90 G17\nG43.4 H1\nG0 X0 Y0 Z60 A0 C0\nG1 X20 Y0 Z0 A30 C90 F800\nG1 X0 Y20 Z0 A130 C180\nM30"
+  const a = cam.generator.analyseGcode(program)
+  const stock: cam.generator.Stock = { width: 100, height: 60, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 }
+  const setup = cam.viewer.withRotary(cam.viewer.setupOf("mill", settings({ axes: 5 }), stock), a.program, program)
+
+  test("its links are drawn only when asked, and replace the set-up's table", () => {
+    const off = createMachineScene({ setup, program: a.program, motion: a.motion, display: DEFAULT_MACHINE_DISPLAY, scale: 100 })
+    expect(off.model).toBeUndefined()
+    expect(off.root.getObjectByName("machine-model")).toBeUndefined()
+    off.dispose()
+    const on = createMachineScene({ setup, program: a.program, motion: a.motion, display: { ...DEFAULT_MACHINE_DISPLAY, showMachine: true }, scale: 100, gaugeOf: () => 80 })
+    expect(on.model?.preset).toBe("trunnion-ac")
+    for (const link of ["base", "column", "head", "spindle", "table", "cradle", "platter"]) expect(on.root.getObjectByName(`machine-link:${link}`), link).toBeDefined()
+    expect(on.root.getObjectsByProperty("name", "table:table").length + on.root.getObjectsByProperty("name", "table:table (assumed)").length).toBe(0)
+    // A130 is past the assumed ±120 tilt: one warning at its line.
+    expect(on.limits.map((f) => [f.code, f.severity, f.line])).toEqual([["ROTARY_A", "warning", 6]])
+    on.dispose()
+  })
+
+  test("the pose moves the links: the spindle nose `gauge` up the tool axis, the platter with the table", () => {
+    const scene = createMachineScene({ setup, program: a.program, motion: a.motion, display: { ...DEFAULT_MACHINE_DISPLAY, showMachine: true }, scale: 100, gaugeOf: () => 80 })
+    const rotary = setup.kind === "mill" ? setup.rotary : undefined
+    const pose = cam.viewer.machinePose(scene.model!, { x: 20, y: 0, z: 0 }, { a: 30, c: 90 }, rotary, 80, "part")
+    expect(scene.placeMachine(pose)).toBe(true)
+    expect(scene.placeMachine(pose)).toBe(false)
+    const spindle = scene.root.getObjectByName("machine-link:spindle")!
+    spindle.updateMatrixWorld(true)
+    const nose = new THREE.Vector3(0, 0, 0).applyMatrix4(spindle.matrix)
+    expect(nose.x).toBeCloseTo(20 + 80 * pose.axis.x, 6)
+    expect(nose.z).toBeCloseTo(80 * pose.axis.z, 6)
+    const machine = cam.viewer.machinePose(scene.model!, { x: 20, y: 0, z: 0 }, { a: 30, c: 90 }, rotary, 80, "machine")
+    scene.placeMachine(machine)
+    const platter = scene.root.getObjectByName("machine-link:platter")!
+    const m = machine.part
+    expect([...platter.matrix.elements]).toEqual([m[0]!, m[4]!, m[8]!, 0, m[1]!, m[5]!, m[9]!, 0, m[2]!, m[6]!, m[10]!, 0, m[3]!, m[7]!, m[11]!, 1])
+    scene.dispose()
+  })
+})

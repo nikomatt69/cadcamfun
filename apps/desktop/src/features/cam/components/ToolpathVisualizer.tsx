@@ -46,6 +46,8 @@ export interface ToolpathVisualizerProps {
   readonly operationTools?: ReadonlyArray<OperationTool>
   /** The program text the preview plays: the NC strip shows the block at the playhead and seeks to a clicked one. */
   readonly gcode?: string
+  /** The travels of the machine the program is for (a library machine's work volume), mm. */
+  readonly machineTravel?: { readonly x: number; readonly y: number; readonly z: number }
   /** The machine the program runs on (spec 31): vise / chuck / bed, its axes, what turns. */
   readonly machine?: cam.viewer.MachineSetup
   /** Machine state per move (the parse's motion track). */
@@ -93,6 +95,9 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const [depositMode, setDepositMode] = createSignal<"progressive" | "all">("progressive")
   const [layer, setLayer] = createSignal<number>()
   const [frame, setFrame] = createSignal<"part" | "machine">("part")
+  // The machine around a mill's part (spec 32 P5): drawn or not, and which class of machine when the program does not say.
+  const [showMachine, setShowMachine] = createSignal(false)
+  const [machinePreset, setMachinePreset] = createSignal<cam.viewer.MachinePresetId | "auto">("auto")
   const [machineInfo, setMachineInfo] = createSignal<MachineInfo>()
   const [stockInfo, setStockInfo] = createSignal<StockInfo>()
   // Simulation (spec 32 §4.4, §4.8): colour mode, the path as it runs, hidden operations, the legend, speed, panels.
@@ -130,7 +135,14 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     const id = r !== undefined ? props.program.toolpaths[r.operation]?.toolId : undefined
     return id !== undefined ? props.toolModels?.get(id) : undefined
   }
-  const machineDisplay = createMemo(() => ({ showWorkholding: showWorkholding(), showTriad: true, spin: spin(), depositMode: depositMode(), frame: frame(), ...(layer() !== undefined ? { layer: layer()! } : {}) }))
+  const machineDisplay = createMemo(() => ({ showWorkholding: showWorkholding(), showTriad: true, spin: spin(), depositMode: depositMode(), frame: frame(), showMachine: showMachine(), ...(layer() !== undefined ? { layer: layer()! } : {}) }))
+  const machineOptions = createMemo((): cam.viewer.MachineModelOptions => ({ ...(machinePreset() !== "auto" ? { preset: machinePreset() as cam.viewer.MachinePresetId } : {}), ...(props.machineTravel !== undefined ? { travel: props.machineTravel } : {}) }))
+  /** The machine's own axis values at the playhead (the machine DRO): the tool tip in machine coordinates and A B C. */
+  const joints = createMemo(() => {
+    const model = machineInfo()?.model, r = readout()
+    return model !== undefined && r !== undefined ? cam.viewer.machinePose(model, r.program, r.angles, rotary(), 0, "machine").joints : undefined
+  })
+  const limitMarkers = createMemo(() => findingTimes(timeline(), (machineInfo()?.limits ?? []).map((f) => ({ ...(f.line !== undefined ? { line: f.line } : {}), severity: f.severity, message: f.message }))))
   const rotary = (): cam.viewer.RotarySetup | undefined => (props.machine?.kind === "mill" ? props.machine.rotary : undefined)
   // Each machine opens on the view its operator reads: a lathe from the front (the XZ plane flat, the chuck on the left).
   const presetFor = (kind: cam.MachineKind | undefined): ViewPreset => (kind === "lathe" ? "front" : "perspective")
@@ -234,7 +246,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
             onPathLegend={setLegend}
             onStockInfo={setStockInfo}
-            {...(props.machine !== undefined ? { machine: props.machine, machineDisplay: machineDisplay(), onMachineInfo: setMachineInfo } : {})}
+            {...(props.machine !== undefined ? { machine: props.machine, machineDisplay: machineDisplay(), machineOptions: machineOptions(), onMachineInfo: setMachineInfo } : {})}
             {...(props.motion !== undefined ? { motion: props.motion } : {})}
             showControls
             onPresetChange={setPreset}
@@ -352,6 +364,12 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                     </Show>
                     <div>{r().rapid ? "G0" : `F${Math.round(r().feed)}`} · S{Math.round(r().rpm)}{r().tool !== undefined ? ` · T${r().tool}` : ""} · <span class="text-white" data-testid="visualizer-move-class">{r().klass !== undefined ? moveLabel(r().klass!) : ""}</span></div>
                     <div>{t("cam.operations.current")}: <span class="text-white">{names()[r().operation] ?? ""}</span></div>
+                    <Show when={joints()}>{(j) => (
+                      <div data-testid="visualizer-joints">{t("cam.visualizer.machineAxes")}: <span class="text-white">X{fmt(j().x)} Y{fmt(j().y)} Z{fmt(j().z)}{j().a !== undefined ? ` A${fmt(j().a!)}` : ""}{j().b !== undefined ? ` B${fmt(j().b!)}` : ""}{j().c !== undefined ? ` C${fmt(j().c!)}` : ""}</span></div>
+                    )}</Show>
+                    <For each={(machineInfo()?.limits ?? []).slice(0, 3)}>{(f) => (
+                      <div data-testid="visualizer-limit" class={f.severity === "error" ? "text-red-400" : "text-amber-300"}>{t("cam.visualizer.limit")}: {f.message}{f.count > 1 ? ` (×${f.count})` : ""}</div>
+                    )}</For>
                   </div>
                 )}</Show>
                 <Show when={stockInfo()}>{(info) => (
@@ -390,7 +408,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               colors={bandColors()}
               names={names()}
               toolChanges={toolChangeTimes(props.program, spans())}
-              markers={findingTimes(timeline(), machineInfo()?.findings ?? [])}
+              markers={[...findingTimes(timeline(), machineInfo()?.findings ?? []), ...limitMarkers()]}
               rate={rate()}
               onRate={setRate}
               onSeek={(seconds) => { props.onPlayingChange?.(false); seekTo(seconds) }}
@@ -490,6 +508,24 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                   <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.machine")}</h4>
                   {toggle(t("cam.visualizer.showWorkholding"), showWorkholding, setShowWorkholding)}
                   <Show when={machine().kind !== "3dprinter"}>{toggle(t("cam.visualizer.spin"), spin, setSpin)}</Show>
+                  <Show when={machine().kind === "mill"}>
+                    {toggle(t("cam.visualizer.showMachine"), showMachine, setShowMachine)}
+                    <Show when={showMachine()}>
+                      <label class="block text-xs text-slate-200">{t("cam.visualizer.machineClass")}
+                        <select aria-label={t("cam.visualizer.machineClass")} data-testid="machine-preset" class="mt-1 w-full rounded border border-slate-600 bg-slate-800 p-1.5" value={machinePreset()} onChange={(event) => setMachinePreset(event.currentTarget.value as cam.viewer.MachinePresetId | "auto")}>
+                          <option value="auto">{t("cam.visualizer.machineAuto")}</option>
+                          <For each={cam.viewer.MACHINE_PRESETS}>{(p) => <option value={p.id}>{p.name}</option>}</For>
+                        </select>
+                      </label>
+                      <Show when={!rotary()}>
+                        <label class="block text-xs text-slate-200">{t("cam.visualizer.rotaryFrame")}
+                          <select aria-label={t("cam.visualizer.rotaryFrame")} class="mt-1 w-full rounded border border-slate-600 bg-slate-800 p-1.5" value={frame()} onChange={(event) => setFrame(event.currentTarget.value as "part" | "machine")}>
+                            <option value="part">{t("cam.visualizer.framePart")}</option><option value="machine">{t("cam.visualizer.frameMachine")}</option>
+                          </select>
+                        </label>
+                      </Show>
+                    </Show>
+                  </Show>
                   <Show when={rotary()}>{(r) => (
                     <label class="block text-xs text-slate-200" title={r().reasons.join("; ")}>{t("cam.visualizer.rotaryFrame")} <span class="text-slate-400">({r().layout}{r().assumed ? `, ${t("cam.visualizer.assumed")}` : ""})</span>
                       <select aria-label={t("cam.visualizer.rotaryFrame")} class="mt-1 w-full rounded border border-slate-600 bg-slate-800 p-1.5" value={frame()} onChange={(event) => setFrame(event.currentTarget.value as "part" | "machine")}>

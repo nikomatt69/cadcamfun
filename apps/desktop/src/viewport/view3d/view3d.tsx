@@ -92,6 +92,8 @@ export interface View3DProps {
   /** Spindle, extrusion and plane of every move (the parse's motion track); derived from the program when absent or stale. */
   readonly motion?: cam.viewer.MotionTrack
   readonly machineDisplay?: MachineDisplay
+  /** The machine model's preset and travels (spec 32 P5), e.g. from the machine chosen in the library. */
+  readonly machineOptions?: cam.viewer.MachineModelOptions
   /** What the machine scene found (set-up findings, printer layers) after each rebuild. */
   readonly onMachineInfo?: (info: MachineInfo) => void
   readonly toolpathDisplay?: {
@@ -291,7 +293,23 @@ export function View3D(props: View3DProps) {
     const anglesOf = new Map<string, cam.viewer.Angles>()
     const zAxis = new THREE.Vector3(0, 0, 1)
     /** Where the tool is and how it leans at `seconds` on a rotary mill, and how the table is turned (machine frame). */
+    /** Tip-to-spindle-nose length of a toolpath's tool as it is drawn (its holder, or the assumed one). */
+    const gaugeOf = (path: number): number => {
+      const model = modelFor(props.program?.toolpaths[path]?.toolId ?? "")
+      if (model === undefined || (model.family !== "mill" && model.family !== "probe")) return 60
+      return cam.toolProfile(model.family === "mill" && props.toolpathDisplay?.showHolder !== false ? { ...model, holder: model.holder ?? cam.assumedHolderOf(model) } : model).length
+    }
     const rotaryPose = (seconds: number): { readonly at: Vec3; readonly axis: THREE.Vector3; readonly table?: THREE.Matrix4 } | undefined => {
+      if (machineScene?.model !== undefined) {
+        // The machine drawn round the part (spec 32 P5): the same pose moves its links, the tool and the table.
+        const at = cam.viewer.poseAt(machineScene.timeline, seconds)
+        const path = at.move?.path ?? 0
+        const pose = cam.viewer.machinePose(machineScene.model, at.point, at.angles, rotary, gaugeOf(path), props.machineDisplay?.frame ?? "part")
+        if (machineScene.placeMachine(pose)) invalidate()
+        const m = pose.part
+        const table = new THREE.Matrix4().set(m[0]!, m[1]!, m[2]!, m[3]!, m[4]!, m[5]!, m[6]!, m[7]!, m[8]!, m[9]!, m[10]!, m[11]!, 0, 0, 0, 1)
+        return { at: pose.tip, axis: new THREE.Vector3(pose.axis.x, pose.axis.y, pose.axis.z).normalize(), table }
+      }
       if (!rotary || !machineScene) return undefined
       const pose = cam.viewer.poseAt(machineScene.timeline, seconds)
       if ((props.machineDisplay?.frame ?? "part") === "machine") {
@@ -301,7 +319,8 @@ export function View3D(props: View3DProps) {
         const m = new THREE.Matrix4().set(r[0], r[1], r[2], 0, r[3], r[4], r[5], 0, r[6], r[7], r[8], 0, 0, 0, 0, 1)
         const t = new THREE.Vector3(pv.x, pv.y, pv.z).sub(new THREE.Vector3(pv.x, pv.y, pv.z).applyMatrix4(m))
         m.setPosition(t)
-        return { at: cam.viewer.machinePointOf(pose.point, pose.angles, rotary), axis: zAxis.clone(), table: m }
+        const head = cam.viewer.toolAxisInMachine(pose.angles, rotary)
+        return { at: cam.viewer.machinePointOf(pose.point, pose.angles, rotary), axis: new THREE.Vector3(head.x, head.y, head.z).normalize(), table: m }
       }
       const axis = cam.viewer.toolAxisInPart(pose.angles, rotary)
       return { at: cam.viewer.partPointOf(pose.point, pose.angles, rotary), axis: new THREE.Vector3(axis.x, axis.y, axis.z).normalize() }
@@ -469,12 +488,14 @@ export function View3D(props: View3DProps) {
         machineScene = createMachineScene({
           setup: machine, program: props.program, ...(props.motion !== undefined ? { motion: props.motion } : {}), display: props.machineDisplay ?? DEFAULT_MACHINE_DISPLAY,
           ...(start !== undefined ? { start } : {}),
+          ...(props.machineOptions !== undefined ? { machineOptions: props.machineOptions } : {}),
+          gaugeOf,
           ...(props.toolModels !== undefined ? { pathTools: props.program.toolpaths.map((tp) => props.toolModels!.get(tp.toolId)) } : {}),
           ...(cutter ? { tool: { radius: cutter.diameter / 2, length: cutter.stickout } } : {}),
           scale: machine.kind === "lathe" ? Math.max(machine.stock.diameter, machine.stock.length / 2) : machine.kind === "3dprinter" ? Math.max(machine.bed.width, machine.bed.depth) / 2 : extent
         })
         scene.add(machineScene.root)
-        props.onMachineInfo?.({ findings: machineScene.findings, layers: machineScene.layers, timeline: machineScene.timeline })
+        props.onMachineInfo?.({ findings: machineScene.findings, layers: machineScene.layers, timeline: machineScene.timeline, ...(machineScene.model !== undefined ? { model: machineScene.model } : {}), limits: machineScene.limits })
       }
       // The live stock: the material as the program removes it (spec 32 §4.5). A mill with a stock
       // and a cutter per tool: the height field is carved by the moves as the playhead advances.
