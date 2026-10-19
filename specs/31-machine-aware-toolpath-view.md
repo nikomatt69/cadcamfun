@@ -391,7 +391,7 @@ Deviations from the plan above:
 - Found while checking the running app: the 1 mm CAM grid at Z0 occluded every cut below Z0 in the depth buffer (already on `main`: only rapids above the stock were visible). In CAM mode the grid now does not write depth and is drawn first. The CAD viewport's grid is unchanged.
 - The live turned profile marks every bin the move covers (sampling at exactly the bin pitch skipped bins through float rounding; regression test added).
 
-Not done: §5.5 rotary mills (Orient / rotary words are still not drawn as table or tool tilt); a fixture-level unit test of the CAM grid depth setting (it needs WebGL; verified by screenshot).
+Not done: a fixture-level unit test of the CAM grid depth setting (it needs WebGL; verified by screenshot). §5.5 rotary mills is partly done since e3d0124 (`viewer/rotary.ts`: table-AC / table-BC pose, part or machine frame, tool lean, the table group turned about the pivot); the trunnion bodies, other machine classes and the rest of the simulation are planned in [32-machine-simulation-parity](32-machine-simulation-parity.md).
 
 ### Mobile companion (2026-10-18)
 
