@@ -255,8 +255,8 @@ describe("the machine model round a mill (spec 32 P5)", () => {
     expect(on.model?.preset).toBe("trunnion-ac")
     for (const link of ["base", "column", "head", "spindle", "table", "cradle", "platter"]) expect(on.root.getObjectByName(`machine-link:${link}`), link).toBeDefined()
     expect(on.root.getObjectsByProperty("name", "table:table").length + on.root.getObjectsByProperty("name", "table:table (assumed)").length).toBe(0)
-    // A130 is past the assumed ±120 tilt: one warning at its line.
-    expect(on.limits.map((f) => [f.code, f.severity, f.line])).toEqual([["ROTARY_A", "warning", 6]])
+    // A130 is past the assumed ±120 tilt: one warning at its line; the first tilt leaves the pole while C turns 90°.
+    expect(on.limits.map((f) => [f.code, f.severity, f.line])).toEqual([["SINGULARITY", "warning", 5], ["ROTARY_A", "warning", 6]])
     on.dispose()
   })
 
