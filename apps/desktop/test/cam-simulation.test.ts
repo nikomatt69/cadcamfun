@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { buildPlayback, TOOL_COLORS, toolColors } from "../src/viewport/view3d/playback.ts"
-import { pathBuffers, rampColor, startedBy } from "../src/viewport/view3d/toolpath-colors.ts"
+import { classLookup, pathBuffers, rampColor, startedBy } from "../src/viewport/view3d/toolpath-colors.ts"
 import { findingTimes, ncWindow, operationAt, readoutAt, stepMove, stepOperation, toolChangeTimes } from "../src/features/cam/lib/simulation.ts"
 import { createLiveStock, createStockSimulation } from "../src/viewport/view3d/stock-simulation.ts"
 
@@ -139,3 +139,12 @@ describe("the live stock (spec 32 P4)", () => {
     expect(createStockSimulation({ program: analysis.program, timeline, tools: new Map(), stock })).toBeUndefined()
   })
 })
+
+describe("class lookup without string keys", () => {
+  test("every timeline move's class by its toolpath and index", () => {
+    const lookup = classLookup(timeline, classes)
+    timeline.moves.forEach((m, i) => expect(lookup(m.path, m.index)).toBe(classes[i]!))
+    expect(lookup(99, 0)).toBeUndefined()
+  })
+})
+

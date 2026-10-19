@@ -53,19 +53,28 @@ export const rampColor = (f: number): number => {
 }
 
 export const pathBuffers = (playback: Playback, input: PathBufferInput, palette: ReadonlyArray<number>): PathBuffers => {
-  const cut: number[] = [], cutColors: number[] = [], cutStarts: number[] = []
-  const rapid: number[] = [], rapidStarts: number[] = []
-  const segments = playback.segments.filter((s) => input.hidden === undefined || !input.hidden.has(s.path))
-  // The ranges the feed and height ramps span.
+  const all = playback.segments
+  const shownSegment = (s: Playback["segments"][number]) => input.hidden === undefined || !input.hidden.has(s.path)
+  // The ranges the feed and height ramps span, and the size of each buffer (filled in place: a million moves stay cheap).
   let fMin = Infinity, fMax = -Infinity, zMin = Infinity, zMax = -Infinity
   const feedOf = (s: Playback["segments"][number]): number => {
     const length = Math.hypot(s.to.x - s.from.x, s.to.y - s.from.y, s.to.z - s.from.z)
     return s.duration > 0 ? (length / s.duration) * 60 : 0
   }
-  for (const s of segments) {
+  const asRapid = (s: Playback["segments"][number]): boolean => {
+    if (!s.rapid) return false
+    if (input.mode !== "move") return true
+    const klass = input.classOf?.(s.path, s.index)
+    return klass === "rapid" || klass === undefined
+  }
+  let cuts = 0, rapids = 0
+  for (const s of all) {
+    if (!shownSegment(s)) continue
+    if (asRapid(s)) { rapids++; continue }
+    cuts++
     if (s.rapid) continue
     const f = feedOf(s)
-    if (f > 0) { fMin = Math.min(fMin, f); fMax = Math.max(fMax, f) }
+    if (f > 0) { if (f < fMin) fMin = f; if (f > fMax) fMax = f }
     zMin = Math.min(zMin, s.from.z, s.to.z); zMax = Math.max(zMax, s.from.z, s.to.z)
   }
   const colorOf = (s: Playback["segments"][number]): number => {
@@ -77,32 +86,44 @@ export const pathBuffers = (playback: Playback, input: PathBufferInput, palette:
       case "z": return rampColor(zMax > zMin ? ((s.from.z + s.to.z) / 2 - zMin) / (zMax - zMin) : 0.5)
     }
   }
+  const cut = new Float32Array(cuts * 6), cutColors = new Float32Array(cuts * 6), cutStarts = new Float64Array(cuts)
+  const rapid = new Float32Array(rapids * 6), rapidStarts = new Float64Array(rapids)
+  const rgbCache = new Map<number, readonly [number, number, number]>()
   const used = new Map<string, number>()
-  for (const s of segments) {
+  let c = 0, r = 0
+  for (const s of all) {
+    if (!shownSegment(s)) continue
     const a = input.shown(s.from, s.path, s.index), b = input.shown(s.to, s.path, s.index)
-    const klass = input.mode === "move" ? input.classOf?.(s.path, s.index) : undefined
-    if (s.rapid && (input.mode !== "move" || klass === "rapid" || klass === undefined)) {
-      rapid.push(a.x, a.y, a.z, b.x, b.y, b.z); rapidStarts.push(s.start)
+    if (asRapid(s)) {
+      rapid[r * 6] = a.x; rapid[r * 6 + 1] = a.y; rapid[r * 6 + 2] = a.z; rapid[r * 6 + 3] = b.x; rapid[r * 6 + 4] = b.y; rapid[r * 6 + 5] = b.z
+      rapidStarts[r++] = s.start
       if (input.mode === "move") used.set("rapid", cam.viewer.MOVE_CLASS_COLORS.rapid)
       continue
     }
-    const c = colorOf(s)
-    const [r, g, bl] = rgb(c)
-    cut.push(a.x, a.y, a.z, b.x, b.y, b.z); cutColors.push(r, g, bl, r, g, bl); cutStarts.push(s.start)
-    if (input.mode === "move") used.set(klass ?? "cut", c)
-    else if (input.mode === "operation") used.set(input.operationNames?.[s.path] ?? `#${s.path + 1}`, c)
-    else if (input.mode === "tool") used.set(s.toolId, c)
+    const color = colorOf(s)
+    let rgbOf = rgbCache.get(color)
+    if (rgbOf === undefined) { rgbOf = rgb(color); rgbCache.set(color, rgbOf) }
+    const o = c * 6
+    cut[o] = a.x; cut[o + 1] = a.y; cut[o + 2] = a.z; cut[o + 3] = b.x; cut[o + 4] = b.y; cut[o + 5] = b.z
+    cutColors[o] = cutColors[o + 3] = rgbOf[0]; cutColors[o + 1] = cutColors[o + 4] = rgbOf[1]; cutColors[o + 2] = cutColors[o + 5] = rgbOf[2]
+    cutStarts[c++] = s.start
+    if (input.mode === "move") { const klass = input.classOf?.(s.path, s.index) ?? "cut"; if (!used.has(klass)) used.set(klass, color) }
+    else if (input.mode === "operation") { const name = input.operationNames?.[s.path] ?? `#${s.path + 1}`; if (!used.has(name)) used.set(name, color) }
+    else if (input.mode === "tool" && !used.has(s.toolId)) used.set(s.toolId, color)
   }
   let legend: LegendEntry[]
   if (input.mode === "feed") legend = fMax >= fMin ? [{ label: `${Math.round(fMin)} mm/min`, color: rampColor(0) }, { label: `${Math.round(fMax)} mm/min`, color: rampColor(1) }] : []
   else if (input.mode === "z") legend = zMax >= zMin ? [{ label: `Z ${Math.round(zMin * 100) / 100}`, color: rampColor(0) }, { label: `Z ${Math.round(zMax * 100) / 100}`, color: rampColor(1) }] : []
   else if (input.mode === "move") legend = cam.viewer.MOVE_CLASSES.filter((k) => used.has(k)).map((k) => ({ label: k, color: used.get(k)! }))
   else legend = [...used].map(([label, color]) => ({ label, color }))
-  return {
-    cut: { positions: new Float32Array(cut), colors: new Float32Array(cutColors), starts: new Float64Array(cutStarts) },
-    rapid: { positions: new Float32Array(rapid), starts: new Float64Array(rapidStarts) },
-    legend
-  }
+  return { cut: { positions: cut, colors: cutColors, starts: cutStarts }, rapid: { positions: rapid, starts: rapidStarts }, legend }
+}
+
+/** A class lookup by toolpath and move index (no string keys: a million moves). */
+export const classLookup = (timeline: cam.viewer.Timeline, classes: ReadonlyArray<cam.viewer.MoveClass>): ((path: number, index: number) => cam.viewer.MoveClass | undefined) => {
+  const byPath: Array<Array<cam.viewer.MoveClass>> = []
+  timeline.moves.forEach((m, i) => { (byPath[m.path] ??= [])[m.index] = classes[i]! })
+  return (path, index) => byPath[path]?.[index]
 }
 
 /** How many segments of a buffer have started by `seconds` (the draw range of the "only what has run" view). */

@@ -13,7 +13,7 @@ import { buildPlayback, positionAt, toolAt, toolColors, TOOL_COLORS, type Playba
 import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
 import { toolObject } from "./tool-object.ts"
 import { gaugeOfTool, previewToolFor } from "./tool-models.ts"
-import { pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
+import { classLookup, pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
 import { createLiveStock, createStockSimulation, type LiveStock, type StockInfo } from "./stock-simulation.ts"
 export { machineSpatial, type MachineInfo } from "./machine-scene.ts"
@@ -549,9 +549,7 @@ export function View3D(props: View3DProps) {
           ...(machine?.kind === "mill" ? { stockTop: machine.stock.max.z } : props.stock ? { stockTop: props.stock.origin.z + props.stock.size.z } : {}),
           ...(display?.cycleLines !== undefined ? { cycleLines: display.cycleLines } : {})
         })
-        const byMove = new Map<string, cam.viewer.MoveClass>()
-        timeline.moves.forEach((m, i) => byMove.set(`${m.path}:${m.index}`, classes[i]!))
-        classOf = (path, index) => byMove.get(`${path}:${index}`)
+        classOf = classLookup(timeline, classes)
       }
       const buffers = pathBuffers(machine?.kind === "3dprinter" ? { ...playback, segments: [] } : playback, {
         mode, toolColors: colors, shown,

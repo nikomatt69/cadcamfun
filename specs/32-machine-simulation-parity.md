@@ -503,8 +503,12 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
   (`CNMG 120408` -> C, r0.8), `ToolResource.insertCode`; turning / facing default to C 80°, boring to D 55° (flagged
   `insertShape` assumed); `latheToolOutlines` draws the shape (rhombus, triangle, trigon corner, round) with its nose radius;
   the tool label names the code. Tests: "ISO lathe inserts" in `packages/core/test/cam/operation-tools.test.ts`.
-- Open in P8: ISO turning holders (PCLNR / MVJNR approach angles) and the turret; spindle tapers above the gauge line;
-  the 1 M-move performance budget.
+- Scale (2026-10-20): `pathBuffers` fills preallocated typed arrays and converts each colour once; move classes are looked
+  up by toolpath and index (`classLookup`), not by string keys. Measured on this machine under load (load average ~15) for
+  1 000 000 G1 moves: interpreter + analysis 1.5 s (sidecar), timeline 0.2 s, classes 0.09 s, playback 0.2 s, path buffers
+  0.18 s (was 1.19 s) — the viewer side about 0.7 s. The interpreter is now the largest share; a worker for the viewer side
+  is not needed at this size.
+- Open in P8: ISO turning holders (PCLNR / MVJNR approach angles) and the turret; spindle tapers above the gauge line.
 
 ## Change log
 
@@ -518,3 +522,4 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
 - 2026-10-20: P9 assistant part built (§9); mobile part open.
 - 2026-10-20: P8 holder outlines built (§9).
 - 2026-10-20: P8 ISO lathe insert shapes built (§9).
+- 2026-10-20: P8 scale work: path buffers 6× faster on 1 M moves (§9).
