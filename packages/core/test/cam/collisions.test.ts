@@ -54,3 +54,33 @@ describe("collisions", () => {
     expect(v.toolReachOf(cam.toolModelOf({ type: "turning", diameter: 3 }, "lathe"))).toBeUndefined()
   })
 })
+
+describe("collisions against the stock left, and near misses", () => {
+  const flat10 = cam.toolModelOf({ type: "endmill", diameter: 10, cuttingLength: 20, stickout: 40 }, "mill")
+  const live = { toolOf: () => flat10, cell: 0.5 }
+  const liveCheck = (gcode: string, clearance = 2) => v.checkCollisions({ setup, timeline: timelineOf(gcode), reachOf: () => v.toolReachOf(flat10), live, clearance })
+  const slot = "G21 G90\nS9000 M3\nG0 X0 Y0 Z5\nG1 Z-5 F300\nG1 X20 F800\nG0 Z5\n"
+
+  test("a rapid back down into the opened slot is not a crash; against the raw box it was", () => {
+    const program = slot + "G0 X10 Y0\nG0 Z-3\nG0 Z5\nM30"
+    expect(liveCheck(program, 0)).toEqual([])
+    expect(v.checkCollisions({ setup, timeline: timelineOf(program), reachOf: () => v.toolReachOf(flat10) }).map((e) => e.code)).toEqual(["RAPID_INTO_STOCK"])
+  })
+
+  test("a rapid into a wall still standing is", () => {
+    const found = liveCheck(slot + "G0 X10 Y20\nG0 Z-3\nM30", 0)
+    expect(found.map((e) => [e.code, e.line])).toEqual([["RAPID_INTO_STOCK", 8]])
+  })
+
+  test("a rapid 1 mm over the stock, the holder within the clearance: near misses", () => {
+    const pass = "G21 G90\nS9000 M3\nG0 Z50\nG0 X-60 Y0\nG0 Z1\nG0 X60\nM30"
+    expect(liveCheck(pass).map((e) => [e.code, e.severity, e.line])).toEqual([["NEAR_MISS", "warning", 6]])
+    expect(liveCheck(pass, 0.5)).toEqual([])
+  })
+
+  test("the spindle housing passing within the clearance of the stock", () => {
+    const model = v.machineModelOf(setup)!
+    const found = v.checkCollisions({ setup, timeline: timelineOf("G21 G90\nG0 X0 Y0 Z5\nG1 Z-9 F200\nG0 Z50\nM30"), reachOf: () => undefined, model, gaugeOf: () => 10 })
+    expect(found.map((e) => [e.code, e.bodies?.[0], e.bodies?.[1]])).toEqual([["NEAR_MISS", "spindle", "stock"]])
+  })
+})

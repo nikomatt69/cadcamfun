@@ -4,11 +4,15 @@
  *   RAPID_INTO_STOCK   a rapid that goes down or across below the stock top inside the stock (a straight retract is not one)
  *   SHANK_IN_STOCK     the tool goes deeper into the stock than its cutting length: the shank rubs
  *   HOLDER_IN_STOCK    deeper than its stickout: the holder hits the part
+ *   NEAR_MISS          a rapid, the holder or a head-side body passes within `clearance` of the stock / the part side
+ *                      without touching it
  *   MACHINE_COLLISION  a head-side body of the machine model (ram, spindle housing, fork) meets a part-side one (table,
  *                      cradle, platter, workholding, stock) at a move's end or middle
  *
- * The stock is the raw box (its top, not the material left by earlier moves): the stock checks are conservative inside a
- * pocket that has already been opened, and say so. Bodies are compared by their axis-aligned bounds after the pose, also
+ * With `live` (3-axis programs) the stock checks run against the material left at that moment: the moves are replayed in
+ * order on a height field (`cam/sim`), each one checked before it cuts — a rapid back down into an opened pocket is not a
+ * crash, one into a wall still standing is. Otherwise the stock is the raw box (its top), conservative inside an opened
+ * pocket, and the messages say so. Bodies are compared by their axis-aligned bounds after the pose, also
  * conservative; every event says what was compared.
  */
 import type { Vec3 } from "../../cad/vec.ts"
@@ -18,8 +22,10 @@ import { machineBodies } from "./machine-bodies.ts"
 import { apply4, machinePose, type MachineModel, type Mat4, type ModelBody } from "./machine-model.ts"
 import type { RotarySetup } from "./rotary.ts"
 import { pointOn, type Timeline } from "./timeline.ts"
+import { StockSim, type SimCutter } from "../sim/stock-sim.ts"
+import { simCutterOfModel } from "../sim/cutters.ts"
 
-export type CollisionCode = "RAPID_INTO_STOCK" | "SHANK_IN_STOCK" | "HOLDER_IN_STOCK" | "MACHINE_COLLISION"
+export type CollisionCode = "RAPID_INTO_STOCK" | "SHANK_IN_STOCK" | "HOLDER_IN_STOCK" | "MACHINE_COLLISION" | "NEAR_MISS"
 
 export interface CollisionEvent {
   readonly code: CollisionCode
@@ -86,6 +92,10 @@ export interface CollisionInput {
   readonly model?: MachineModel
   readonly rotary?: RotarySetup
   readonly gaugeOf?: (path: number) => number
+  /** Check against the stock left at each moment (3-axis only), with the cutters of the preview's tools. */
+  readonly live?: { readonly toolOf: (path: number) => ToolModel | undefined; readonly cell?: number }
+  /** Distance under which a pass is a near miss, mm (default 2; 0 turns them off). */
+  readonly clearance?: number
 }
 
 const HEAD_SIDE = new Set(["head", "spindle", "fork"])
@@ -94,6 +104,7 @@ const PART_SIDE = new Set(["table", "cradle", "platter"])
 export const checkCollisions = (input: CollisionInput): ReadonlyArray<CollisionEvent> => {
   const { setup, timeline } = input
   if (setup.kind !== "mill") return []
+  const clearance = input.clearance ?? 2
   const stock = setup.stock
   const top = stock.max.z
   const events = new Map<string, CollisionEvent>()
@@ -104,8 +115,10 @@ export const checkCollisions = (input: CollisionInput): ReadonlyArray<CollisionE
   const inside = (p: Vec3, r: number) => p.x > stock.min.x - r && p.x < stock.max.x + r && p.y > stock.min.y - r && p.y < stock.max.y + r
   const workholding = machineBodies(setup).filter((b) => b.obstacle && b.role !== "table" && b.shape.type === "box").map((b) => ({ id: `${b.role}:${b.id}`, box: b.shape as Box }))
   const partBoxes: Array<{ id: string; box: Box }> = [{ id: "stock", box: stock }, ...workholding]
+  const live = input.live !== undefined && input.rotary === undefined
+  if (live) liveStockChecks(input, add, clearance)
   timeline.moves.forEach((m, i) => {
-    if (m.kind === "dwell" || m.state.probe) return
+    if (live || m.kind === "dwell" || m.state.probe) return
     const line = m.state.line
     const at = { seconds: m.start, move: i, ...(line !== undefined ? { line } : {}) }
     const reach = input.reachOf(m.path)
@@ -142,7 +155,10 @@ export const checkCollisions = (input: CollisionInput): ReadonlyArray<CollisionE
         const headBoxes = heads.map((b) => ({ id: b.id, box: boundsOf(b, pose.links[b.link]) }))
         const others = [...parts.map((b) => ({ id: b.id, box: boundsOf(b, pose.links[b.link]) })), ...partBoxes.map((p) => ({ id: p.id, box: moved(p.box, pose.part) }))]
         for (const h of headBoxes) for (const o of others) {
-          if (!overlap(h.box, o.box, 0.01)) continue
+          if (!overlap(h.box, o.box, 0.01)) {
+            if (clearance > 0 && overlap(h.box, o.box, -clearance)) add(`near:${h.id}:${o.id}`, { code: "NEAR_MISS", severity: "warning", seconds: m.start + m.duration * f, move: i, ...(m.state.line !== undefined ? { line: m.state.line } : {}), bodies: [h.id, o.id], message: `the ${h.id} passes within ${clearance} mm of the ${o.id}` })
+            continue
+          }
           add(`machine:${h.id}:${o.id}`, { code: "MACHINE_COLLISION", severity: model.assumed.length > 0 ? "warning" : "error", seconds: m.start + m.duration * f, move: i, ...(m.state.line !== undefined ? { line: m.state.line } : {}), bodies: [h.id, o.id], message: `the ${h.id} meets the ${o.id}${model.assumed.length > 0 ? " (machine sizes assumed)" : ""}` })
           return
         }
@@ -151,3 +167,39 @@ export const checkCollisions = (input: CollisionInput): ReadonlyArray<CollisionE
   }
   return [...events.values()].sort((a, b) => a.seconds - b.seconds)
 }
+
+/** The stock checks against the material left at each moment: replay the moves in order on a height field. */
+const liveStockChecks = (input: CollisionInput, add: (key: string, event: Omit<CollisionEvent, "count">) => void, clearance: number): void => {
+  const setup = input.setup
+  if (setup.kind !== "mill" || input.live === undefined) return
+  const s = setup.stock
+  const cell = input.live.cell ?? Math.max(0.25, Math.sqrt(((s.max.x - s.min.x) * (s.max.y - s.min.y)) / 250_000))
+  const sim = new StockSim({ minX: s.min.x, maxX: s.max.x, minY: s.min.y, maxY: s.max.y, minZ: s.min.z, maxZ: s.max.z }, cell)
+  const field = sim.field
+  const cutters = new Map<number, SimCutter | undefined>()
+  const cutterOf = (path: number) => { if (!cutters.has(path)) cutters.set(path, simCutterOfModel(input.live!.toolOf(path))); return cutters.get(path) }
+  input.timeline.moves.forEach((m, i) => {
+    if (m.kind === "dwell") return
+    const line = m.state.line
+    const at = { seconds: m.start, move: i, ...(line !== undefined ? { line } : {}) }
+    const cutter = cutterOf(m.path)
+    const reach = input.reachOf(m.path)
+    const samples = Math.max(2, Math.min(64, Math.ceil(Math.hypot(m.to.x - m.from.x, m.to.y - m.from.y, m.to.z - m.from.z) / cell)))
+    const retract = m.to.z > m.from.z && Math.hypot(m.to.x - m.from.x, m.to.y - m.from.y) < 1e-6
+    // A contact anywhere along the move wins over a near miss earlier on it.
+    const points = Array.from({ length: samples + 1 }, (_, k) => pointOn(m, k / samples))
+    if (m.kind === "rapid" && !retract && cutter !== undefined) {
+      if (points.some((p) => field.touches(cutter, p.x, p.y, p.z))) add(`rapid:${i}`, { code: "RAPID_INTO_STOCK", severity: "error", ...at, message: `rapid into the stock left at line ${line ?? "?"}` })
+      else if (clearance > 0 && points.some((p) => field.reaches(p.x, p.y, cutter.radius + clearance, p.z - clearance))) add(`near-rapid:${i}`, { code: "NEAR_MISS", severity: "warning", ...at, message: `rapid within ${clearance} mm of the stock left at line ${line ?? "?"}` })
+    }
+    if (m.kind === "feed" && reach !== undefined && !m.state.probe) {
+      if (points.some((p) => field.reaches(p.x, p.y, reach.holder, p.z + reach.stickout))) add("holder", { code: "HOLDER_IN_STOCK", severity: "error", ...at, message: `the holder meets the stock left (stickout ${reach.stickout} mm)` })
+      else if (points.some((p) => field.reaches(p.x, p.y, reach.shank, p.z + reach.flute))) add("shank", { code: "SHANK_IN_STOCK", severity: "warning", ...at, message: `the shank rubs the stock left above the ${reach.flute} mm cutting length` })
+      else if (clearance > 0 && points.some((p) => field.reaches(p.x, p.y, reach.holder + clearance, p.z + reach.stickout - clearance))) add("near-holder", { code: "NEAR_MISS", severity: "warning", ...at, message: `the holder passes within ${clearance} mm of the stock left` })
+    }
+    if (m.kind === "feed" && cutter !== undefined && m.state.spindle !== "off" && !m.state.probe) {
+      sim.cut({ rapid: false, from: m.from, to: m.to, ...(m.center !== undefined ? { center: m.center, clockwise: m.clockwise ?? false } : {}) }, cutter, cell / 2)
+    }
+  })
+}
+

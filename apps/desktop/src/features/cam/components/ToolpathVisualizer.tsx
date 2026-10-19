@@ -155,6 +155,9 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     const model = showMachine() ? cam.viewer.machineModelOf(setup, machineOptions()) : undefined
     return cam.viewer.checkCollisions({
       setup, timeline: timeline(), reachOf: (path) => cam.viewer.toolReachOf(toolOf(path)),
+      // Against the stock left at each moment (3-axis, up to a size the page replays quickly), near misses within 2 mm.
+      ...(setup.rotary === undefined && timeline().moves.length <= 200_000 ? { live: { toolOf } } : {}),
+      clearance: 2,
       ...(model !== undefined ? { model, gaugeOf: (path: number) => gaugeOfTool(toolOf(path), showHolder()) } : {}),
       ...(setup.rotary !== undefined ? { rotary: setup.rotary } : {})
     })

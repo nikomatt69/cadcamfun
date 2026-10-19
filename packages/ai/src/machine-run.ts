@@ -117,7 +117,7 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
         limits: cam.viewer.checkLimits(model, timeline, setup.rotary, () => gauge).map((f) => ({ code: f.code, severity: f.severity, ...(f.line !== undefined ? { line: f.line } : {}), count: f.count, message: f.message }))
       }
     }
-    out["collisions"] = cam.viewer.checkCollisions({ setup, timeline, reachOf: () => cam.viewer.toolReachOf(toolModel), ...(model !== undefined ? { model, gaugeOf: () => gauge } : {}), ...(setup.rotary !== undefined ? { rotary: setup.rotary } : {}) })
+    out["collisions"] = cam.viewer.checkCollisions({ setup, timeline, reachOf: () => cam.viewer.toolReachOf(toolModel), clearance: 2, ...(setup.rotary === undefined ? { live: { toolOf: () => toolModel } } : {}), ...(model !== undefined ? { model, gaugeOf: () => gauge } : {}), ...(setup.rotary !== undefined ? { rotary: setup.rotary } : {}) })
       .slice(0, 20).map((e) => ({ code: e.code, severity: e.severity, seconds: round(e.seconds), ...(e.line !== undefined ? { line: e.line } : {}), count: e.count, message: e.message }))
   }
   return out
