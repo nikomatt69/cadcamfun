@@ -21,6 +21,7 @@
  * mitred corner, not a rolling-ball vertex patch.
  */
 import { booleanMesh, mergeMeshes, rotateMesh } from "./csg.ts"
+import { chamferRefusal, chamferSetbacks } from "./blend-spec.ts"
 import type { Mesh } from "./solid.ts"
 import { meshOf } from "./solid.ts"
 import { sweepSolid, type P3 } from "./sweep-loft.ts"
@@ -189,7 +190,7 @@ export interface BlendResult {
 }
 
 /** The cross-section of the tool for one edge, as 3D offsets from the edge line and 2D coordinates in the section's plane. */
-const section = (edge: BlendEdge, radius: number, style: "fillet" | "chamfer"): { readonly points: P3[]; readonly flat: Vec2[]; readonly basis: [P3, P3] } | string => {
+const section = (edge: BlendEdge, radius: number, style: "fillet" | "chamfer", chamfer?: { readonly secondDistance?: number; readonly angle?: number }): { readonly points: P3[]; readonly flat: Vec2[]; readonly basis: [P3, P3] } | string => {
   const { nA, nB } = edge
   const cosA = dot(nA, nB)
   if (1 + cosA < 1e-3) return "the faces meet at a knife edge"
@@ -197,7 +198,6 @@ const section = (edge: BlendEdge, radius: number, style: "fillet" | "chamfer"): 
   const tangent = radius * Math.tan(alpha / 2)
   const limit = Math.min(edge.reachA, edge.reachB)
   if (style === "fillet" && tangent > limit + 1e-6) return `a radius of ${radius} mm needs ${tangent.toFixed(2)} mm of face on each side; the faces reach only ${limit.toFixed(2)} mm`
-  if (style === "chamfer" && radius > limit + 1e-6) return `a chamfer of ${radius} mm is wider than the faces (${limit.toFixed(2)} mm)`
   const sign = edge.convex ? 1 : -1
   const g = Math.max(0.05, radius * 0.1)
   // Mitre point of the two planes offset by g (away from the material on a convex edge, into it on a concave one).
@@ -206,8 +206,21 @@ const section = (edge: BlendEdge, radius: number, style: "fillet" | "chamfer"): 
   if (style === "chamfer") {
     // Along each face, away from the edge and perpendicular to it.
     const dA = unit(add(mul(nB, -sign), mul(nA, sign * cosA))), dB = unit(add(mul(nA, -sign), mul(nB, sign * cosA)))
-    const c = radius
-    out.push(add(add(mul(dA, c), mul(nA, sign * g)), { x: 0, y: 0, z: 0 }), mul(dA, c), mul(dB, c), add(mul(dB, c), mul(nB, sign * g)))
+    // The two setbacks: the first distance on the more horizontal face, the second on the other (the same numbers the exact
+    // kernel uses, so the mesh and the B-rep agree).
+    let onA = radius, onB = radius
+    if (chamfer !== undefined) {
+      const spec = { distance: radius, ...chamfer }
+      const refusal = chamferRefusal(spec, nA, nB)
+      if (refusal !== undefined) return refusal
+      const setbacks = chamferSetbacks(spec, nA, nB)
+      if (setbacks === undefined) return "the chamfer callout cannot be honoured on this edge"
+      onA = setbacks.onA
+      onB = setbacks.onB
+    }
+    if (onA > edge.reachA + 1e-6) return `a chamfer of ${onA.toFixed(2)} mm is wider than its first face (${edge.reachA.toFixed(2)} mm)`
+    if (onB > edge.reachB + 1e-6) return `a chamfer of ${onB.toFixed(2)} mm is wider than its second face (${edge.reachB.toFixed(2)} mm)`
+    out.push(add(add(mul(dA, onA), mul(nA, sign * g)), { x: 0, y: 0, z: 0 }), mul(dA, onA), mul(dB, onB), add(mul(dB, onB), mul(nB, sign * g)))
   } else {
     // Rolling ball: centre at r behind (convex) or in front of (concave) the edge along the bisector.
     const centre = mul(add(nA, nB), (-sign * radius) / (1 + cosA))
@@ -231,8 +244,9 @@ const section = (edge: BlendEdge, radius: number, style: "fillet" | "chamfer"): 
  * Blends the selected edges of the mesh. Each edge is cut (convex) or filled (concave) in turn; an edge that cannot be blended
  * (the radius is wider than the faces, or the faces are nearly parallel) is left alone and named in `rejected`.
  */
-export const blendEdges = (mesh: Mesh, edges: ReadonlyArray<BlendEdge>, radius: number, style: "fillet" | "chamfer" = "fillet"): BlendResult => {
-  if (!(radius > 0)) throw new RangeError(`A ${style} needs a positive size (it is ${radius})`)
+export const blendEdges = (mesh: Mesh, edges: ReadonlyArray<BlendEdge>, radius: number, style: "fillet" | "chamfer" = "fillet", chamfer?: { readonly secondDistance?: number; readonly angle?: number }): BlendResult => {
+  if (!Number.isFinite(radius) || !(radius > 0)) throw new RangeError(`A ${style} needs a finite positive size (it is ${radius})`)
+  if (style !== "chamfer" && (chamfer?.secondDistance !== undefined || chamfer?.angle !== undefined)) throw new RangeError("A fillet has one radius: a second distance or an angle belongs to a chamfer")
   let current = mesh
   let blended = 0
   const rejected: string[] = []
@@ -240,7 +254,7 @@ export const blendEdges = (mesh: Mesh, edges: ReadonlyArray<BlendEdge>, radius: 
   const done: BlendEdge[] = []
   for (const edge of edges) {
     const name = `edge ${edge.a.x.toFixed(2)},${edge.a.y.toFixed(2)},${edge.a.z.toFixed(2)} to ${edge.b.x.toFixed(2)},${edge.b.y.toFixed(2)},${edge.b.z.toFixed(2)}`
-    const cut = section(edge, radius, style)
+    const cut = section(edge, radius, style, chamfer)
     if (typeof cut === "string") { rejected.push(`${name}: ${cut}`); continue }
     const e = unit(sub(edge.b, edge.a))
     const overrun = 0.01

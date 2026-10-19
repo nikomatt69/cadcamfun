@@ -535,6 +535,8 @@
   "cam.visualizer.color.z": "Height (Z)",
   "cam.visualizer.pathDone": "Path only up to the playhead",
   "cam.visualizer.ncStrip": "NC blocks at the playhead",
+  "cam.visualizer.removed": "Material removed",
+  "cam.visualizer.stockNoTool": "Stock removal skipped for tools: {tools}",
   "cam.move.rapid": "Rapid",
   "cam.move.retract": "Retract",
   "cam.move.plunge": "Plunge",

@@ -7,10 +7,22 @@
  * compare against a model must allow one cell of lateral slack (see `neighbourhood`).
  */
 import type { Mesh } from "../../cad/solid.ts"
-import type { ToolModel } from "./tool-model.ts"
 
 /** Height tolerance below which a column is considered untouched, mm. */
 export const EPS = 1e-6
+
+/**
+ * What the height field needs of a cutter: its radius and the height of its cutting surface above
+ * the tip at a radial distance. The verifier's `ToolModel` and the live simulation's cutter both
+ * satisfy it, so the two remove the same material.
+ */
+export interface CuttingProfile {
+  readonly radius: number
+  /** `true` when the cutting profile is flat, so the stamp needs no square root. */
+  readonly flat: boolean
+  /** Height of the cutting surface above the tip at radial distance `r` (0 ≤ r ≤ radius). */
+  readonly profile: (r: number) => number
+}
 
 export class HeightField {
   readonly top: Float64Array
@@ -55,7 +67,7 @@ export class HeightField {
    * Lowers every column under the cutting profile at `(cx, cy)` with the tip at `tipZ`. Returns the
    * removed volume, mm³.
    */
-  cut(tool: ToolModel, cx: number, cy: number, tipZ: number): number {
+  cut(tool: CuttingProfile, cx: number, cy: number, tipZ: number): number {
     const [i0, i1] = this.span(cx, tool.radius, this.minX, this.cellX, this.nx)
     const [j0, j1] = this.span(cy, tool.radius, this.minY, this.cellY, this.ny)
     const r2 = tool.radius * tool.radius
@@ -79,7 +91,7 @@ export class HeightField {
   }
 
   /** Whether the cutting profile at `(cx, cy, tipZ)` would touch material (nothing is removed). */
-  touches(tool: ToolModel, cx: number, cy: number, tipZ: number): boolean {
+  touches(tool: CuttingProfile, cx: number, cy: number, tipZ: number): boolean {
     const [i0, i1] = this.span(cx, tool.radius, this.minX, this.cellX, this.nx)
     const [j0, j1] = this.span(cy, tool.radius, this.minY, this.cellY, this.ny)
     const r2 = tool.radius * tool.radius

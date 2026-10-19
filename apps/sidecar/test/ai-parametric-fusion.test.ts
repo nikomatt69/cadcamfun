@@ -19,6 +19,30 @@ afterAll(async () => { await app.dispose() })
 describe("shapes and catalogue solids, stored and edited by parameter", () => {
   let elementId = ""
 
+  test("chamfer callouts survive storage and invalid parameter edits do not replace the part", async () => {
+    for (const callout of [{ secondDistance: "cut" }, { angle: "cut" }]) {
+      const created = await run({ action: "create", name: "Chamfered plate", history: {
+        parameters: { cut: "angle" in callout ? 30 : 1 },
+        features: [
+          { id: "s", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: 40, height: 25 }] } },
+          { id: "plate", type: "extrude", sketch: "s", depth: 6, operation: "new" },
+          { id: "ch", type: "fillet", style: "chamfer", radius: 2, edges: { within: { min: [0, 0, 5.5], max: [40, 25, 6.5] } }, ...callout }
+        ]
+      } })
+      expect(created.ok).toBe(true)
+      const partId = created.ids[0]
+      const before = await run({ action: "inspect", elementId: partId })
+      expect(before.ok).toBe(true)
+      expect(before.history.features.at(-1)).toMatchObject(callout)
+      expect(before.volumeMm3).toBeLessThan(6000)
+      const refused = await run({ action: "update", elementId: partId, expectedRevision: before.revision, parameters: { cut: -1 } })
+      expect(refused.ok).toBe(false)
+      const after = await run({ action: "inspect", elementId: partId })
+      expect(after.revision).toBe(before.revision)
+      expect(after.volumeMm3).toBe(before.volumeMm3)
+    }
+  }, SLOW)
+
   test("the skill's example is stored, and the stored part reports the volume of what it describes", async () => {
     const created = await run({ action: "create", name: "Slotted plate", history: FUSION_EXAMPLE_HISTORY })
     expect(created.ok).toBe(true)

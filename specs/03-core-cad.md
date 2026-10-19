@@ -1,6 +1,6 @@
 # WP1 — CAD geometry core (`packages/core/src/cad`)
 
-Status: done; targeted solid geometry and document preservation hardening implemented. Owner dir: `packages/core/src/cad` (+ `packages/core/package.json`, `tsconfig.json`, `src/index.ts` barrel for the `cad` exports).
+Status: done; targeted solid geometry/document preservation hardening and spec 33 C4 chamfer callouts implemented. Owner dir: `packages/core/src/cad` (+ `packages/core/package.json`, `tsconfig.json`, `src/index.ts` barrel for the `cad` exports).
 
 Pure, I/O-free TypeScript. No DOM, no Three.js, no Bun APIs, no database. Must run in Bun, in the webview, and in a Worker.
 
@@ -238,6 +238,12 @@ Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 `bun --no-env-file test packages/core`, and `bun --no-env-file x tsc -p packages/core/tsconfig.json`.
 
 ## 8. Change log
+
+- 2026-10-19: completed spec 33 C4. `fillet` with `style: "chamfer"` accepts `secondDistance` or `angle` in the history,
+  including expressions; the mesh and B-rep share setbacks with radians in geometry modules. The first distance belongs to
+  the more horizontal face; ambiguous unequal callouts and impossible/invalid dimensions are refused without cutting.
+  Explicit equal setbacks work on all supported edges. Twelve geometry tests cover analytic volumes, mesh agreement,
+  STEP exchange, sloped-corner limits and exact conical hole rims; the API/AI/sidecar preserve the same callout fields.
 
 - 2026-10-14: push-pull and mate are replayed exactly (`brep/face-edit.ts`). A pushed face's prism is sewn on
   without a Boolean when it shares the face; a pulled one is subtracted; a bored face carries its bore through.

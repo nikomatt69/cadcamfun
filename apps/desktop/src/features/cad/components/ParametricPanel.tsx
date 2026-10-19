@@ -89,7 +89,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
       case "draft": return `draft ${String(feature.angle)}° on the face near (${feature.near.map(String).join(", ")})`
       case "mate": return `mate ${feature.body} to ${feature.to.body}${feature.offset !== undefined ? `, gap ${String(feature.offset)}` : ""}`
       case "pushpull": return `press/pull ${String(feature.distance)} mm`
-      case "fillet": return `${feature.style ?? "fillet"} of ${feature.edges?.parallel ? `${feature.edges.parallel}-parallel` : feature.edges?.within ? "boxed" : "all"} ${feature.edges?.kind ?? "convex"} edges`
+      case "fillet": return `${feature.style ?? "fillet"}${feature.style === "chamfer" && feature.secondDistance !== undefined ? ` ${String(feature.radius)} x ${String(feature.secondDistance)}` : feature.style === "chamfer" && feature.angle !== undefined ? ` ${String(feature.radius)} x ${String(feature.angle)}°` : ""} of ${feature.edges?.parallel ? `${feature.edges.parallel}-parallel` : feature.edges?.within ? "boxed" : "all"} ${feature.edges?.kind ?? "convex"} edges`
     }
   }
 
@@ -338,7 +338,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
                 <div class="mb-1 grid grid-cols-2 gap-x-2" data-testid={`fillet-${feature.id}`}>
                   <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">style</span>
                     <select class={SELECT} disabled={props.locked} aria-label={`${feature.id} style`} value={(feature as Feature & { type: "fillet" }).style ?? "fillet"}
-                      onChange={(event) => patchFeature(feature.id, { style: event.currentTarget.value })}>
+                      onChange={(event) => { const style = event.currentTarget.value; patchFeature(feature.id, { style, ...(style === "fillet" ? { secondDistance: undefined, angle: undefined } : {}) }) }}>
                       <option value="fillet">fillet</option><option value="chamfer">chamfer</option>
                     </select></label>
                   <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">edges</span>
@@ -351,6 +351,16 @@ export default function ParametricPanel(props: { readonly element: Element; read
                       onChange={(event) => patchFeature(feature.id, { edges: { ...(feature as Feature & { type: "fillet" }).edges, curved: event.currentTarget.checked ? true : undefined } })} />
                     <span>include curved-surface rims (slow)</span>
                   </label>
+                  <Show when={(feature as Feature & { type: "fillet" }).style === "chamfer"}>
+                    <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">second distance (mm, empty = equal)</span>
+                      <input class={INPUT} disabled={props.locked} aria-label={`${feature.id} second distance input`} value={String((feature as Feature & { type: "fillet" }).secondDistance ?? "")}
+                        onChange={(event) => { const text = event.currentTarget.value.trim(); patchFeature(feature.id, { secondDistance: text === "" ? undefined : asValue(text), ...(text !== "" ? { angle: undefined } : {}) }) }} />
+                    </label>
+                    <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">angle (°, empty = no angle)</span>
+                      <input class={INPUT} disabled={props.locked} aria-label={`${feature.id} chamfer angle input`} value={String((feature as Feature & { type: "fillet" }).angle ?? "")}
+                        onChange={(event) => { const text = event.currentTarget.value.trim(); patchFeature(feature.id, { angle: text === "" ? undefined : asValue(text), ...(text !== "" ? { secondDistance: undefined } : {}) }) }} />
+                    </label>
+                  </Show>
                 </div>
               </Show>
               <Show when={feature.type === "shell"}>

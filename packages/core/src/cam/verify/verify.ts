@@ -11,6 +11,7 @@
 import { meshOf } from "../../cad/solid.ts"
 import type { P3 } from "../testing/gcode-interpreter.ts"
 import { EPS, HeightField } from "./heightfield.ts"
+import { deviationOf } from "./deviation.ts"
 import { forEachSample, pathFromGcode, pathFromProgram, sampleCount, type PathSegment } from "./path.ts"
 import type { VerifyBounds, VerifyCode, VerifyIssue, VerifyRequest, VerifyResponse } from "./schema.ts"
 import { toolModel, type ToolModel } from "./tool-model.ts"
@@ -243,33 +244,23 @@ export const verifyToolpath = (request: VerifyRequest): VerifyResponse => {
         }
       }
     }
-    const around = field.neighbourhood(target)
     const tolerance = request.tolerance
-    const area = field.cellArea
-    gougeCells = new Uint8Array(field.top.length)
-    let gouge = 0, maxGouge = 0, gougeCount = 0, uncut = 0, maxUncut = 0, uncutCount = 0
-    let worst = -1
-    for (let k = 0; k < field.top.length; k++) {
-      const top = field.top[k]!
-      const low = around.min[k]! - top
-      if (low > tolerance) {
-        gougeCells[k] = 1
-        gouge += low * area
-        gougeCount++
-        if (low > maxGouge) { maxGouge = low; worst = k }
-      }
-      const high = top - around.max[k]!
-      if (high > tolerance) {
-        uncut += high * area
-        uncutCount++
-        if (high > maxUncut) maxUncut = high
-      }
-    }
+    // The same comparison the live simulation uses (spec 32 §4.5), so the preview and the report agree.
+    const deviation = deviationOf(field, target, tolerance)
+    gougeCells = deviation.gougeCells
+    const gouge = deviation.gougeVolume
+    const maxGouge = deviation.maxGouge
+    const uncut = deviation.uncutVolume
+    const maxUncut = deviation.maxUncut
+    let gougeCount = 0
+    let uncutCount = 0
+    for (let k = 0; k < gougeCells.length; k++) { if (gougeCells[k] === 1) gougeCount++; if (deviation.uncutCells[k] === 1) uncutCount++ }
     stats.gougeVolume = gouge
     stats.maxGouge = maxGouge
     stats.uncutVolume = uncut
     stats.maxUncut = maxUncut
     if (gougeCount > 0) {
+      const worst = deviation.worstIndex
       const i = worst % grid.nx
       const j = Math.floor(worst / grid.nx)
       issues.push({

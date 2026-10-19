@@ -187,6 +187,8 @@ const feature = Schema.Union([
   described(
     Schema.Struct({
       id, type: Schema.Literal("fillet"), radius: dimension, style: optional(Schema.Literals(["fillet", "chamfer"])), targets,
+      secondDistance: optional(described(dimension, "Chamfer only: the setback on the second face, mm (the callout '2 x 1'). The first setback is radius, on the more horizontal of the two faces.")),
+      angle: optional(described(dimension, "Chamfer only: the angle between the chamfer face and the first face, degrees (the callout '2 x 30°'). It fixes the setback on the second face.")),
       edges: optional(described(
         Schema.Struct({
           parallel: optional(axis3), kind: optional(Schema.Literals(["convex", "concave", "both"])), minLength: optional(dimension), curved: optional(Schema.Boolean),
@@ -195,7 +197,7 @@ const feature = Schema.Union([
         "Which edges: parallel to an axis, convex/concave (default convex), longer than minLength, wholly inside the box within {min,max}; curved:true also takes rims of curved surfaces (slow, off by default). No selection = every convex edge."
       ))
     }),
-    "Round (fillet radius) or bevel (chamfer setback) the edges between planar faces that meet at 25 degrees or more, on the bodies built so far. Read the issues: a size wider than the faces is refused."
+    "Round (fillet radius) or bevel (chamfer setback) the edges between planar faces that meet at 25 degrees or more, on the bodies built so far. A chamfer takes one setback (radius) on both faces, or two distances (radius and secondDistance), or a distance and an angle (radius and angle), never both secondDistance and angle. Distances are positive; angle is strictly between 0 and 90 degrees. Unequal setbacks need a uniquely more horizontal first face. Read the issues: a size wider than the faces is refused."
   ),
   described(
     Schema.Struct({ id, type: Schema.Literal("rib"), sketch: id, thickness: dimension, depth: dimension, direction: optional(direction), operation: optional(operation), targets }),
@@ -283,6 +285,10 @@ const historyIssues = (features: ReadonlyArray<Feature>): Array<Schema.FilterIss
     if (f.type === "loft") for (const ref of f.sections) if (seen.get(ref)?.type !== "sketch") issue(index, `Loft section '${ref}' must be an earlier sketch`)
     if (f.type === "shell" && !["extrude", "revolve", "sweep"].includes(seen.get(f.feature)?.type ?? "")) issue(index, `Shell source '${f.feature}' must be an earlier extrude, revolve or sweep`)
     if (f.type === "fillet" && !hasBody()) issue(index, "A fillet needs a body built before it (extrude, revolve, sweep or loft)")
+    if (f.type === "fillet" && (f.style ?? "fillet") === "fillet" && (f.secondDistance !== undefined || f.angle !== undefined)) issue(index, "A fillet has one radius: secondDistance and angle belong to a chamfer")
+    if (f.type === "fillet" && f.secondDistance !== undefined && f.angle !== undefined) issue(index, "A chamfer takes either two distances or a distance and an angle, not both")
+    if (f.type === "fillet" && typeof f.secondDistance === "number" && !(f.secondDistance > 0)) issue(index, "The second chamfer distance must be positive")
+    if (f.type === "fillet" && typeof f.angle === "number" && !(f.angle > 0 && f.angle < 90)) issue(index, "The chamfer angle must be between 0 and 90 degrees")
     if ((f.type === "draft" || f.type === "mate") && !hasBody()) issue(index, `A ${f.type} needs a body built before it`)
     if (f.type === "mate" && f.body === f.to.body) issue(index, "A mate needs two different bodies")
     if (f.type === "mate" && (!seen.has(f.body) || !seen.has(f.to.body))) issue(index, "Both bodies of a mate must be earlier features")

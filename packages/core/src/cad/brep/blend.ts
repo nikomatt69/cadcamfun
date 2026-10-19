@@ -29,6 +29,7 @@ import { BooleanError, booleanBrep } from "./boolean.ts"
 import { makeSphere, polyhedron } from "./primitives.ts"
 import { extrudeProfile, revolveProfile, type ProfileLoop, type ProfileSegment } from "./sweep.ts"
 import { edgeUses, mergeBreps, type Brep } from "./topology.ts"
+import { chamferRefusal, chamferSetbacks } from "../blend-spec.ts"
 import { BudgetExceeded } from "./budget.ts"
 
 interface Box { readonly lo: Vec3; readonly hi: Vec3 }
@@ -202,8 +203,9 @@ export const selectBlendEdges = (edges: ReadonlyArray<BlendCandidate>, s: BlendS
 /**
  * The tool's cross-section for faces with outward normals nA, nB (2D, in a basis of the plane square to the edge) meeting at
  * the origin: the corner region between the faces (reaching `g` beyond them) and the ball's arc (fillet) or the flat (chamfer).
+ * A chamfer has a setback on each face: `size` on the first, `second` on the other.
  */
-const crossSection = (nA: Vec2, nB: Vec2, convex: boolean, size: number, style: "fillet" | "chamfer", g: number): ProfileLoop | string => {
+const crossSection = (nA: Vec2, nB: Vec2, convex: boolean, size: number, style: "fillet" | "chamfer", g: number, second = size): ProfileLoop | string => {
   const cosA = nA.x * nB.x + nA.y * nB.y
   if (1 + cosA < 1e-3) return "the faces meet at a knife edge"
   if (1 - cosA < 1e-9) return "the faces are tangent"
@@ -219,7 +221,7 @@ const crossSection = (nA: Vec2, nB: Vec2, convex: boolean, size: number, style: 
   if (style === "chamfer") {
     // Along each face, away from the edge and square to it.
     const along = (n: Vec2, m: Vec2): Vec2 => { const d = { x: -sign * (m.x - n.x * cosA), y: -sign * (m.y - n.y * cosA) }; const l = Math.hypot(d.x, d.y); return { x: d.x / l, y: d.y / l } }
-    const pA = at({ x: 0, y: 0 }, along(nA, nB), size), pB = at({ x: 0, y: 0 }, along(nB, nA), size)
+    const pA = at({ x: 0, y: 0 }, along(nA, nB), size), pB = at({ x: 0, y: 0 }, along(nB, nA), second)
     const qA = at(pA, nA, sign * g), qB = at(pB, nB, sign * g)
     return [line(corner, qA), line(qA, pA), line(pA, pB), line(pB, qB), line(qB, corner)]
   }
@@ -241,6 +243,11 @@ export interface BlendOptions {
   readonly margin?: number
   /** Diagnostics: each Boolean's stages (see `BooleanOptions.debug`), tagged with the edge being blended. */
   readonly debug?: (edge: string, stage: string, data: unknown) => void
+  /**
+   * A chamfer's callout: the second setback (`secondDistance`), or the angle in radians of the chamfer face to the first face (`angle`),
+   * which fixes it. The first setback is the `size` argument. See `cad/blend-spec.ts`.
+   */
+  readonly chamfer?: { readonly secondDistance?: number; readonly angle?: number }
 }
 
 export interface BlendResult {
@@ -313,16 +320,32 @@ const ballCentre = (b: Brep, faces: ReadonlyArray<number>, V: Vec3, r: number): 
 }
 
 /** The tool of one edge, or the reason there is none. */
-const edgeTool = (b: Brep, uses: ReturnType<typeof edgeUses>, e: BlendCandidate, size: number, style: "fillet" | "chamfer", g: number, cuts: [HalfSpace[], HalfSpace[]] = [[], []]): Brep | string => {
+const edgeTool = (b: Brep, uses: ReturnType<typeof edgeUses>, e: BlendCandidate, size: number, style: "fillet" | "chamfer", g: number, cuts: [HalfSpace[], HalfSpace[]] = [[], []], chamfer?: { readonly secondDistance?: number; readonly angle?: number }): Brep | string => {
   const alpha = Math.acos(Math.max(-1, Math.min(1, dot3(e.nA, e.nB))))
-  const need = style === "fillet" ? size * Math.tan(alpha / 2) : size
-  const limit = Math.min(e.reachA, e.reachB)
-  if (need > limit + 1e-9) return `a ${style} of ${size} mm needs ${need.toFixed(3)} mm of face on each side; the faces reach only ${limit.toFixed(3)} mm`
+  // The chamfer's two setbacks: the first distance on the more horizontal face, the second on the other.
+  let onA = size, onB = size
+  if (style === "chamfer" && chamfer !== undefined) {
+    const spec = { distance: size, ...chamfer }
+    const refusal = chamferRefusal(spec, e.nA, e.nB)
+    if (refusal !== undefined) return refusal
+    const setbacks = chamferSetbacks(spec, e.nA, e.nB)
+    if (setbacks === undefined) return `the chamfer callout cannot be honoured on this edge`
+    onA = setbacks.onA
+    onB = setbacks.onB
+  }
+  if (style === "fillet") {
+    const need = size * Math.tan(alpha / 2)
+    const limit = Math.min(e.reachA, e.reachB)
+    if (need > limit + 1e-9) return `a ${style} of ${size} mm needs ${need.toFixed(3)} mm of face on each side; the faces reach only ${limit.toFixed(3)} mm`
+  } else {
+    if (onA > e.reachA + 1e-9) return `a chamfer of ${onA.toFixed(3)} mm is wider than its first face (${e.reachA.toFixed(3)} mm)`
+    if (onB > e.reachB + 1e-9) return `a chamfer of ${onB.toFixed(3)} mm is wider than its second face (${e.reachB.toFixed(3)} mm)`
+  }
   if (e.curve === "line") {
     const dir = normalize3(sub3(e.b, e.a))
     const u = normalize3(add3(e.nA, e.nB)), v = cross3(dir, u)
     const to2 = (n: Vec3): Vec2 => ({ x: dot3(n, u), y: dot3(n, v) })
-    const loop = crossSection(to2(e.nA), to2(e.nB), e.convex, size, style, g)
+    const loop = crossSection(to2(e.nA), to2(e.nB), e.convex, onA, style, g, onB)
     if (typeof loop === "string") return loop
     const edge = b.edges[e.edge]!
     // Past a free end by g; up to the plane of a wall square to the edge.
@@ -361,7 +384,7 @@ const edgeTool = (b: Brep, uses: ReturnType<typeof edgeUses>, e: BlendCandidate,
   const [rho, h] = radialAxial(e.a, ax.origin, ax.dir)
   const radial = normalize3(madd3(sub3(e.a, ax.origin), ax.dir, -h))
   const to2 = (n: Vec3): Vec2 => ({ x: dot3(n, radial), y: dot3(n, ax.dir) })
-  const loop = crossSection(to2(e.nA), to2(e.nB), e.convex, size, style, g)
+  const loop = crossSection(to2(e.nA), to2(e.nB), e.convex, onA, style, g, onB)
   if (typeof loop === "string") return loop
   const moved = loop.map((s): ProfileSegment => s.kind === "line"
     ? { kind: "line", a: { x: s.a.x + rho, y: s.a.y + h }, b: { x: s.b.x + rho, y: s.b.y + h } }
@@ -443,7 +466,8 @@ const cornerTools = (b: Brep, done: ReadonlyArray<BlendCandidate>, r: number, g:
  * a chamfer of setback `size`, one edge after the other. An edge that cannot be blended is named in `rejected` and left alone.
  */
 export const blendBrep = (b: Brep, edges: ReadonlyArray<BlendCandidate>, size: number, style: "fillet" | "chamfer" = "fillet", options: BlendOptions = {}): BlendResult => {
-  if (!(size > 0)) throw new RangeError(`A ${style} needs a positive size (it is ${size})`)
+  if (!Number.isFinite(size) || !(size > 0)) throw new RangeError(`A ${style} needs a finite positive size (it is ${size})`)
+  if (style !== "chamfer" && (options.chamfer?.secondDistance !== undefined || options.chamfer?.angle !== undefined)) throw new RangeError("A fillet has one radius: a second distance or an angle belongs to a chamfer")
   const g = options.margin ?? Math.max(0.05, size * 0.1)
   const uses = edgeUses(b)
   let current = b
@@ -456,7 +480,7 @@ export const blendBrep = (b: Brep, edges: ReadonlyArray<BlendCandidate>, size: n
   const built: Array<{ readonly edge: BlendCandidate; readonly tool: Brep; readonly box: Box }> = []
   for (const e of edges) {
     try {
-      const tool = edgeTool(b, uses, e, size, style, g, endCuts(b, e, edges, size, style))
+      const tool = edgeTool(b, uses, e, size, style, g, endCuts(b, e, edges, size, style), options.chamfer)
       if (typeof tool === "string") { rejected.push(`${describeBlendEdge(e)}: ${tool}`); continue }
       built.push({ edge: e, tool, box: toolBox(tool, g) })
     } catch (err) {

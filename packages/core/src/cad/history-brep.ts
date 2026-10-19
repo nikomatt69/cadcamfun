@@ -905,6 +905,22 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
           // `curved`) on the exact solid; an edge the exact blend fails on leaves the body without an exact model.
           const style = f.style ?? "fillet"
           const size = dim(f.radius)
+          // The chamfer's callout: the second setback, or the angle that fixes it.
+          const secondDistance = f.secondDistance === undefined ? undefined : dim(f.secondDistance)
+          const angle = f.angle === undefined ? undefined : dim(f.angle)
+          if (f.secondDistance !== undefined && secondDistance === undefined) break
+          if (f.angle !== undefined && angle === undefined) break
+          if (style === "fillet" && (secondDistance !== undefined || angle !== undefined)) {
+            unsupported(f, "a fillet has one radius: a second distance or an angle belongs to a chamfer")
+            break
+          }
+          if (secondDistance !== undefined && angle !== undefined) {
+            unsupported(f, "a chamfer takes either two distances or a distance and an angle, not both")
+            break
+          }
+          const chamfer = style === "chamfer" && (secondDistance !== undefined || angle !== undefined)
+            ? { ...(secondDistance !== undefined ? { secondDistance } : {}), ...(angle !== undefined ? { angle: angle * Math.PI / 180 } : {}) }
+            : undefined
           const sel = f.edges
           const selector = {
             ...(sel?.parallel !== undefined ? { parallel: sel.parallel } : {}), ...(sel?.kind !== undefined ? { kind: sel.kind } : {}),
@@ -915,7 +931,7 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
             if (b.exact.brep === undefined) continue
             const picked = selectBlendEdges(blendCandidates(b.exact.brep, 25), selector)
             if (picked.length === 0) continue
-            const res = blendBrep(b.exact.brep, picked, size, style)
+            const res = blendBrep(b.exact.brep, picked, size, style, chamfer === undefined ? {} : { chamfer })
             for (const why of res.rejected.slice(0, 4)) warnings.push(`${f.id}: not blended: ${why}`)
             bodies[bodies.indexOf(b)] = { ...b, exact: res.failures.length > 0 ? no(`exact ${style} failed: ${res.failures[0]}`) : ok(res.brep) }
           }

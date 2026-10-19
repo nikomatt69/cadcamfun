@@ -14,6 +14,7 @@ import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlay
 import { toolObject } from "./tool-object.ts"
 import { pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
+import { createLiveStock, createStockSimulation, type LiveStock, type StockInfo } from "./stock-simulation.ts"
 export { machineSpatial, type MachineInfo } from "./machine-scene.ts"
 
 export type ViewPreset = "perspective" | "top" | "front" | "right" | "isometric" | "bottom" | "back" | "left" | "four-view"
@@ -107,6 +108,8 @@ export interface View3DProps {
     readonly showTool?: boolean
     /** Draw the holder, a generic one when the cutter has none (default true). */
     readonly showHolder?: boolean
+    /** Draw the live stock: the material as the program removes it (default true). */
+    readonly liveStock?: boolean
     /** Colour the path by tool (default), operation, move class, feed or height (spec 32 §4.4). */
     readonly colorMode?: ColorMode
     /** Toolpaths (operations) not drawn. */
@@ -120,6 +123,8 @@ export interface View3DProps {
   }
   /** The colours the path is drawn in, after each rebuild (the legend). */
   readonly onPathLegend?: (legend: ReadonlyArray<LegendEntry>) => void
+  /** The live stock's volumes, after every change (the panel's readout). */
+  readonly onStockInfo?: (info: StockInfo | undefined) => void
 }
 
 export const disposeGroup = (group: THREE.Object3D): void => {
@@ -313,6 +318,16 @@ export function View3D(props: View3DProps) {
       return changed
     }
     const disposeMachine = (): void => { if (machineScene) { scene.remove(machineScene.root); machineScene.dispose(); machineScene = undefined } }
+    /** The live stock (spec 32 §4.5): the material as the program removes it. */
+    let liveStock: LiveStock | undefined
+    const disposeStock = (): void => {
+      if (liveStock === undefined) return
+      content.remove(liveStock.mesh)
+      liveStock.mesh.geometry.dispose()
+      const material = liveStock.mesh.material
+      if (Array.isArray(material)) material.forEach((m) => m.dispose()); else material.dispose()
+      liveStock = undefined
+    }
     let toolColorOf: ReadonlyMap<string, number> = new Map()
     // The path's two line objects and their segments' start times (for the "only what has run" draw range).
     let pathLines: { readonly cut?: THREE.LineSegments; readonly cutStarts: Float64Array; readonly rapid?: THREE.LineSegments; readonly rapidStarts: Float64Array } | undefined
@@ -421,6 +436,8 @@ export function View3D(props: View3DProps) {
       invalidate()
       meshJobs.reset(); setMeshError(undefined)
       gizmo.detach(); selectedMesh = undefined; setSelected(undefined)
+      disposeStock()
+      props.onStockInfo?.(undefined)
       disposeGroup(content)
       for (const [index, solid] of (props.solids ?? []).entries()) addSolid(solid, index)
       if (props.stock && (props.machine === undefined || props.machine.kind === "mill")) {
@@ -458,6 +475,35 @@ export function View3D(props: View3DProps) {
         })
         scene.add(machineScene.root)
         props.onMachineInfo?.({ findings: machineScene.findings, layers: machineScene.layers, timeline: machineScene.timeline })
+      }
+      // The live stock: the material as the program removes it (spec 32 §4.5). A mill with a stock
+      // and a cutter per tool: the height field is carved by the moves as the playhead advances.
+      if (props.program && props.toolpathDisplay?.liveStock !== false) {
+        const millStock = props.machine?.kind === "mill" ? props.machine.stock : undefined
+        const box = millStock !== undefined
+          ? { minX: millStock.min.x, maxX: millStock.max.x, minY: millStock.min.y, maxY: millStock.max.y, minZ: millStock.min.z, maxZ: millStock.max.z }
+          : props.stock !== undefined
+            ? { minX: props.stock.origin.x, maxX: props.stock.origin.x + props.stock.size.x, minY: props.stock.origin.y, maxY: props.stock.origin.y + props.stock.size.y, minZ: props.stock.origin.z, maxZ: props.stock.origin.z + props.stock.size.z }
+            : undefined
+        const timeline = machineScene?.timeline ?? cam.viewer.buildTimeline(props.program, props.motion, cam.viewer.DEFAULT_RAPID_RATE, start)
+        if (box !== undefined) {
+          const simulation = createStockSimulation({
+            program: props.program,
+            timeline,
+            ...(props.machine !== undefined ? { machine: props.machine } : {}),
+            ...(props.toolModels !== undefined ? { toolModels: props.toolModels } : {}),
+            ...(props.tools !== undefined ? { tools: props.tools } : {}),
+            ...(props.defaultToolModel !== undefined ? { defaultToolModel: props.defaultToolModel } : {}),
+            ...(props.defaultTool !== undefined ? { defaultTool: props.defaultTool } : {}),
+            stock: box
+          })
+          if (simulation !== undefined) {
+            liveStock = createLiveStock(simulation, { opacity: props.toolpathDisplay?.stockOpacity ?? 0.85 })
+            liveStock.mesh.visible = props.toolpathDisplay?.stockVisible ?? true
+            content.add(liveStock.mesh)
+            props.onStockInfo?.({ removed: simulation.removedVolume, remaining: simulation.remainingVolume, cell: simulation.sim.cell, missingTools: simulation.missingTools })
+          }
+        }
       }
       // A tool setter stands on the table where the program measures (its pad top is the length reference, Z0).
       const setterModel = props.defaultToolModel?.family === "setter" ? props.defaultToolModel : undefined
@@ -608,6 +654,19 @@ export function View3D(props: View3DProps) {
       previous = now
       let p = positionAt(playback, seconds)
       if (machineScene?.update(seconds)) invalidate()
+      // The live stock follows the playhead: the material the program has removed by now.
+      if (liveStock !== undefined) {
+        liveStock.simulation.advanceTo(seconds)
+        if (liveStock.update()) {
+          invalidate()
+          props.onStockInfo?.({
+            removed: liveStock.simulation.removedVolume,
+            remaining: liveStock.simulation.remainingVolume,
+            cell: liveStock.simulation.sim.cell,
+            missingTools: liveStock.simulation.missingTools
+          })
+        }
+      }
       // "Only what has run": the path's draw ranges follow the playhead.
       if (pathLines !== undefined) {
         const done = props.toolpathDisplay?.progress === "done"
@@ -656,7 +715,7 @@ export function View3D(props: View3DProps) {
       renderFrame()
       return { canvas: renderer.domElement, camera: { position: [activeCamera.position.x, activeCamera.position.y, activeCamera.position.z], target: [controls.target.x, controls.target.y, controls.target.z] }, ...(props.visionMode === "cam" && props.program ? { programText: cam.programGeometryText(props.program) } : {}), ...(machineScene && props.machine ? { spatial: machineSpatial(props.machine, machineScene, seconds) } : {}) }
     })
-    onCleanup(() => { unregisterCapture(); disposeMachine(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
+    onCleanup(() => { unregisterCapture(); disposeMachine(); disposeStock(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />

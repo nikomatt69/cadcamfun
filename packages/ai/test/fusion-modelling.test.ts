@@ -54,6 +54,36 @@ describe("the history schema offers the Fusion 360 commands to the assistant", (
     expect(parse({ parameters: {}, features: [{ id: "s", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "x", kind: "star", at: [0, 0] }] } }] }).success).toBe(false)
   })
 
+  test("the shared wire schema and assistant preserve chamfer callouts and rebuild their expressions", () => {
+    const base = {
+      parameters: { second: 1, degrees: 30 },
+      features: [
+        { id: "s", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: 40, height: 25 }] } },
+        { id: "e", type: "extrude", sketch: "s", depth: 6, operation: "new" }
+      ]
+    }
+    for (const callout of [{ secondDistance: 1 }, { secondDistance: "second" }, { angle: 30 }, { angle: "degrees" }]) {
+      const feature = { id: "ch", type: "fillet", style: "chamfer", radius: 2, edges: { within: { min: [0, 0, 5.5], max: [40, 25, 6.5] } }, ...callout }
+      const history = { ...base, features: [...base.features, feature] }
+      const wire = Schema.decodeUnknownSync(PARAMETRIC_ACTION_INPUTS["cad.parametric_validate"])({ history })
+      expect(wire.history.features.at(-1)).toMatchObject(callout)
+      const parsed = parseHistory(history) as History
+      expect(parsed.features.at(-1)).toMatchObject(callout)
+      const report = parametricReport(parsed)
+      expect(report.ok, JSON.stringify(callout)).toBe(true)
+      const lower = historyVolume(rebuild(parsed))
+      expect(lower).toBeLessThan(40 * 25 * 6)
+      expect(lower).toBeGreaterThan(40 * 25 * 5)
+    }
+    for (const callout of [{ secondDistance: 0 }, { secondDistance: -1 }, { angle: 0 }, { angle: 90 }, { secondDistance: 1, angle: 30 }, { style: "fillet", secondDistance: 1 }]) {
+      const history = { ...base, features: [...base.features, { id: "ch", type: "fillet", style: "chamfer", radius: 2, ...callout }] }
+      expect(parse(history).success, JSON.stringify(callout)).toBe(false)
+    }
+    // Expressions pass the structural schema, then the kernel checks the resolved value.
+    const invalid = parseHistory({ ...base, parameters: { second: -1 }, features: [...base.features, { id: "ch", type: "fillet", style: "chamfer", radius: 2, secondDistance: "second" }] }) as History
+    expect(parametricReport(invalid).ok).toBe(false)
+  })
+
   test("a hand-drawn constraint can name a point a shape made; a missing one is reported", () => {
     const sketch = (ref: string) => parse({
       parameters: {},

@@ -213,7 +213,12 @@ describe("CAM page", () => {
       target.click(); await settle()
       await app.wait(() => (document.querySelector('[data-testid="nc-strip"] [data-current="true"]')?.textContent?.includes("G1 X40 F800") ? true : undefined), 30000)
       expect(document.querySelector('[data-testid="visualizer-move-class"]')!.textContent).toBe("Cut")
-    } finally { dispose() }
+    } finally {
+      // The CAM store is a module-level singleton: leave the tab where the page opens it,
+      // or the next test waits for an editor that is not on screen.
+      useCamStore.getState().setActiveTab("editor")
+      dispose()
+    }
   })
 
   test("the preview shows the program's machine (spec 31): a lathe program, the pick, the mismatch, a partial replay", async () => {

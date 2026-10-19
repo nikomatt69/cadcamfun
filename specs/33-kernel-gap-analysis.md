@@ -1,6 +1,6 @@
 # 33 — CAD and CAM kernel gap analysis (Fusion 360 / hyperMILL reference)
 
-Status: analysis measured on 2026-10-19 against `main` (`ed73e6c` → `8b3a3712`), followed in the same pass by the first fixes listed in
+Status: analysis measured on 2026-10-19 against `main` (`ed73e6c` → `8b3a3712`), followed by the fixes listed in
 §5. Owner request: "analizza i gap mancanti nel core del cad e del cam kernel e il loro utilizzo nel sidecar, httpapi e desktop …
 li aggiorniamo con il mancante". This spec is the inventory the follow-up work is ordered from. It does not claim parity: the gates
 of [spec 12](12-professional-cad-cam.md) and the release claims of [spec 29](29-native-cam-kernel.md) still decide that.
@@ -31,7 +31,7 @@ state.
 | C1 | **Mirror / pattern of whole bodies** | only the tool of a feature | half-part modelling, multi-body layouts — **closed in this pass** (§5) |
 | C2 | Exact model of `coil`, `rib`, `sheet`, `text`, modelled `thread` | mesh only, with a reason | STEP export and B-rep CAM features lose these bodies |
 | C3 | Fillets of non-coaxial curved edges, variable radius, setback vertex blends | refused or mitred | pipe T-junctions, cast parts, consumer products |
-| C4 | Chamfer by two distances / distance-angle | equal setback only | drawing-callout chamfers (e.g. 2 x 30°) |
+| C4 | Chamfer by two distances / distance-angle | mesh and exact, shared callout geometry; API/AI and desktop controls | **closed in this continuation** (§5); unequal callouts require a uniquely more horizontal first face |
 | C5 | Shell of a Boolean result, a loft, a partial revolution; per-face thickness | refused | housings built from several features |
 | C6 | Persistent naming (topological naming) | selections by point / box | edits upstream re-pick faces silently or fail |
 | C7 | Surface modelling: patch, trim, stitch, thicken, offset surface | absent | class-A and freeform parts |
@@ -69,7 +69,7 @@ state.
 | M6 | Pencil as a standalone strategy (bi-tangency), morph / flowline / projection finishing | pencil = rest finish after a larger ball | |
 | M7 | Toolpath linking optimisation (2-opt/TSP over rapids, stay-down links in 2.5D) | nearest neighbour | cycle time |
 | M8 | Holder-aware automatic tool length (minimum stick-out) | fixed stick-out per cutter | rigidity, chatter |
-| M9 | Machine simulation parity (right tool per operation, interpreter words, machine model, live removal) | **spec 32, in progress in a parallel session** | P1 and P2 landed 2026-10-19 |
+| M9 | Machine simulation parity (right tool per operation, interpreter words, machine model, live removal) | **spec 32, in progress in the collaborating session** | P1/P2 landed; P3 player/P4 S1 removal partial, including cutter profiles and deterministic rewind; full gates open |
 
 ## 3. Integration: what each layer reaches
 
@@ -92,8 +92,18 @@ layer; no HTTP route rebuilds a parametric history without the assistant; the de
 
 ## 4. Order of work
 
+C4 continuation scope: deepen the existing mesh and B-rep blend modules, with their shared chamfer section calculation,
+and preserve the callout through the existing parametric API/assistant and desktop panel adapters. `radius` remains the
+first setback; `secondDistance` and `angle` (degrees at the history boundary) are mutually exclusive and chamfer-only.
+The first face is the more horizontal face; ambiguous unequal callouts are refused. Distances must be finite and positive,
+angles strictly between 0 and 90 degrees and geometrically possible at the selected edge. Invalid callouts leave geometry
+unchanged and report the reason. Equal setbacks retain existing behavior, including explicitly equal second distances.
+Owners: WP1 CAD blends/history/tests, WP3 parametric schema/tests, WP4 existing parametric handler tests,
+WP8 modelling guidance/tests and WP6 existing parametric panel only. CAM simulation changes in the collaborating session
+remain a separate scope. Geometry modules receive radians; history/UI callouts retain degrees.
+
 1. M2 hole making in the kernel (tap/ream cycles in the IR, posts, cutters, cutting data, planner choice tap vs thread mill) — **done**.
-2. C12 exact holes on work planes — **done**; then C4 chamfer variants, then C2 exact rib/text/coil.
+2. C12 exact holes on work planes and C4 chamfer variants — **done**; next C2 exact rib/text/coil.
 3. M4 stock-aware rest between operations (voxel stock for 3-axis too).
 4. M3 turning in the kernel.
 5. C6 persistent naming before any wider direct-editing work (C8), C11 joint solver for the harness target.
@@ -108,6 +118,18 @@ layer; no HTTP route rebuilds a parametric history without the assistant; the de
 | `8a10f5b0` (+ part swept into `e6735d31`) | C1: mirror/pattern of bodies (`bodies`, `join`), mesh and exact; AI schema and validation | `history-bodies.test.ts`: half plate mirrored joined is one closed genus-2 body, exact volume to 1e-9, valid B-rep; patterns with matching mesh/exact ids |
 | `0ad8c0b9` (the M2 core work was swept into the parallel session's commit) + `37f57511` | M2: rigid tapping and reaming in the kernel — `tap` / `ream` cycles in the IR (G84 with the feed = pitch x speed, G85 fed in and out), tap and reamer cutters with their 3D models, cutting data (speed factor, feed per revolution, tapping torque), the planner tapping a threaded hole when the control can and reaming a fitted bore, the posts refusing a tap they cannot run, the HTTP contract and the assistant's hole skill | `holes.test.ts`: M29 S… + G84 on Fanuc, G84 alone on Haas, the refusal on GRBL, the replay of the tap in and out, the tapping data (45 % of the drilling speed, one pitch per turn, the torque under the machine's), the reamer's data (60 %, 2.5 x the drilling feed, the radial allowance); kernel suite 117/117, CAM 294 + 689, API contracts 3/3 |
 | `8b3a3712` | C12: exact holes on work planes — the exact branch resolves the plane a `plane` feature made (offset, angle, three points, a face of the body) and cuts the hole along its normal; the rebuild publishes the resolved work planes, so the CAM sees a tilted hole's entry and direction and the planner reports it as needing an indexed setup instead of dropping it | `history-brep.test.ts`: the hole on an offset plane is the same exact cylinder, the hole on a 30° plane leaves a cylindrical face and a valid B-rep, a hole on a plane that does not exist is an error and the body keeps its model; `work-plane-holes.test.ts`: the entry and the direction follow the plane, a base plane is unchanged, the planner names the tilted hole |
+| Uncommitted continuation | C4: two-distance and distance-angle chamfers in the mesh and exact history; finite positive dimensions, mutually exclusive callouts, explicit equal setbacks and geometrically impossible angles handled consistently. Shared section geometry uses radians internally. API/assistant preserve numeric and expression fields; the desktop removes incompatible fields when switching callout/style. | `chamfer-callout.test.ts`: 12 tests including analytic setbacks/volumes, mesh agreement, STEP round-trip, a sloped wedge's removable angle singularity, impossible angles and a conical hole rim. Together with AI and persisted sidecar integration: 41 tests pass. The mounted desktop panel also exercises callout switching. |
 
 Known unrelated failures seen while testing: `packages/ai/test/harness-inventory.test.ts` (sidecar `workspace.ts` handler
 resolution; the two assertions disagree with each other) and the AI MCP test helper typecheck; both predate this pass.
+
+## 6. Continuation verification and change log
+
+- 2026-10-19: completed C4 from the existing working-tree implementation; preserved the concurrent CAM changes. Core, API,
+  AI, sidecar and desktop typechecks pass. API suite: 22/22, including generated-client consistency and OpenAPI.
+  C4/core/AI/sidecar integration: 41/41; mounted parametric panel: 33/33 (including a fresh pass of the initial fillet timing
+  failure). The broad core run had 2177 passes and three failures while concurrent checks were
+  active: the surface performance threshold, the default five-axis timeout and a probe simulation regression loaded before
+  the collaborating session's fix. Fresh reruns of all three files pass 16/16; the surface job takes 1.2 s (30 s gate).
+  CAM S1 simulation correctness is recorded separately in spec 32; it does not close M4 stock-aware rest planning.
+  The global RM statuses remain unchanged: this is continuation of the owner's concrete kernel work, not an RM acceptance claim.

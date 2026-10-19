@@ -1,6 +1,7 @@
 # Machine simulation at Fusion 360 / hyperMILL level: every kinematics, every operation, the right tool
 
-Status: **P1, P2 built** (2026-10-19), P3–P9 open; see §9. Analysis written at `main` @ 9aa648c. It extends
+Status: **P1, P2 built** (2026-10-19); P3 player and P4 S1 removal partially implemented, full gates open; P5–P9 open.
+See §9. Analysis written at `main` @ 9aa648c. It extends
 [31-machine-aware-toolpath-view](31-machine-aware-toolpath-view.md) (machine scene, motion track, frames, set-up checks) and
 [29-native-cam-kernel](29-native-cam-kernel.md) (kinematics, collision, stock); it does not replace them. Owners: WP2
 `packages/core/src/cam`, WP7 `apps/desktop/src/viewport/view3d`, WP6 `apps/desktop/src/features/cam`, WP8 `packages/ai`,
@@ -402,8 +403,26 @@ lathe only, E2–E3 no, F1–F3 workholding boxes only, G1 partial, G2 unmeasure
   Heidenhain conversational and other Siemens cycles stay unsupported (listed); a tilted plane's tool axis is not yet in the
   motion track (P5).
 
+### P4 continuation — stock replay correctness (2026-10-19)
+
+The existing S1 implementation now passes the correctness regressions without claiming the full P4 gate.
+The desktop adapter preserves each kernel cutter's ball/bull/conical profile using `toolModelFromCutter`, with the same
+tool precedence as the drawn tool, including `defaultTool`. Explicit non-milling models do not fall back to a mill.
+Stock restore/reset invalidates the displayed mesh only when its cells change. Completing a partial move restores
+its initial field before full sampling, so curved cutters and arcs leave the same cells regardless of playback history.
+Probing moves never remove material, even when the fallback cutter is a mill.
+The S1 adapter is restricted to vertical milling: lathe/printer setups and rotary programs keep their existing stock
+representation. The stock readout starts at zero and clears when a new program cannot use S1. Worker execution,
+3D deviation colours and the full performance/browser gates remain open.
+
+Verification: `bun --no-env-file test --timeout 60000 packages/core/test/cam/stock-sim.test.ts
+apps/desktop/test/stock-simulation.test.ts apps/desktop/test/cam-simulation.test.ts apps/desktop/test/cam-page.test.ts`
+passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh checks use Three.js buffers directly.
+
 ## Change log
 
 - 2026-10-19: analysis written from the code at 9aa648c and the probes of §2.2.
 - 2026-10-19: P1 built (§9).
 - 2026-10-19: P2 built (§9).
+- 2026-10-19: continued partial P4 S1 removal: preserved kernel cutter profiles, deterministic partial/full replay,
+  rewind/reset mesh invalidation, non-cutting probes, machine scope guards and desktop stock readout; 39 regressions pass.

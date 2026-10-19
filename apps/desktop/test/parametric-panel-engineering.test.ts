@@ -336,6 +336,38 @@ describe("the Add feature shortcuts", () => {
 })
 
 describe("the feature controls for the engineering treatments", () => {
+  test("chamfer callouts switch between distances and angle without leaving incompatible fields", async () => {
+    const base = plateTemplate()
+    const id = await open({ ...base, features: [...base.features, {
+      id: "ch", type: "fillet", style: "chamfer", radius: 2, secondDistance: 1,
+      edges: { within: { min: [0, 0, 7.5], max: [60, 40, 8.5] } }
+    }] })
+    expect(byId("issues-ch")).toBeNull()
+    expect(input("ch second distance input").value).toBe("1")
+    const twoDistances = volume(id)
+    await change("ch chamfer angle input", "30")
+    expect(stored(id).features.at(-1)).toMatchObject({ angle: 30 })
+    expect(stored(id).features.at(-1)).not.toHaveProperty("secondDistance")
+    expect(input("ch second distance input").value).toBe("")
+    expect(byId("issues-ch")).toBeNull()
+    expect(volume(id)).toBeLessThan(twoDistances)
+    await change("ch second distance input", "1")
+    expect(stored(id).features.at(-1)).toMatchObject({ secondDistance: 1 })
+    expect(stored(id).features.at(-1)).not.toHaveProperty("angle")
+    expect(volume(id)).toBeCloseTo(twoDistances, 5)
+    await change("ch second distance input", "")
+    expect(stored(id).features.at(-1)).not.toHaveProperty("secondDistance")
+    expect(byId("issues-ch")).toBeNull()
+    await change("ch chamfer angle input", "30")
+    await change("ch style", "fillet")
+    expect(stored(id).features.at(-1)).toMatchObject({ style: "fillet" })
+    expect(stored(id).features.at(-1)).not.toHaveProperty("angle")
+    expect(stored(id).features.at(-1)).not.toHaveProperty("secondDistance")
+    expect(document.querySelector('[aria-label="ch chamfer angle input"]')).toBeNull()
+    expect(byId("issues-ch")).toBeNull()
+    close()
+  }, SLOW)
+
   test("an extrusion's edge treatment, a hole's kind: choosing them edits the history and the dimension fields appear", async () => {
     const id = await open(plateTemplate())
     const plain = volume(id)

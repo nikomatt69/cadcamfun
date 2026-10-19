@@ -214,6 +214,16 @@ export interface FilletFeature {
   /** The radius of a fillet or the setback of a chamfer. */
   readonly radius: Dimension
   readonly style?: "fillet" | "chamfer"
+  /**
+   * A chamfer only: the setback on the second face, mm (the callout "2 x 1"). The first setback is `radius`; it goes on the
+   * more horizontal of the two faces, the second one on the other.
+   */
+  readonly secondDistance?: Dimension
+  /**
+   * A chamfer only: the angle between the chamfer face and the first face, degrees (the callout "2 x 30°"). It fixes the
+   * setback on the second face.
+   */
+  readonly angle?: Dimension
   /** Without a selection every convex edge between planar faces is taken. */
   readonly edges?: EdgeSelection
   readonly targets?: ReadonlyArray<string>
@@ -1033,6 +1043,31 @@ export const rebuild = (history: History): RebuildResult => {
           const radius = dim(f.radius, f.id)
           if (radius === undefined) break
           if (!(radius > 0)) { issues.push({ feature: f.id, severity: "error", message: `The ${f.style ?? "fillet"} size must be positive (it is ${radius})` }); break }
+          const style = f.style ?? "fillet"
+          // The chamfer's callout: the second setback, or the angle that fixes it.
+          const secondDistance = f.secondDistance === undefined ? undefined : dim(f.secondDistance, f.id)
+          const angle = f.angle === undefined ? undefined : dim(f.angle, f.id)
+          if (f.secondDistance !== undefined && secondDistance === undefined) break
+          if (f.angle !== undefined && angle === undefined) break
+          if (style === "fillet" && (secondDistance !== undefined || angle !== undefined)) {
+            issues.push({ feature: f.id, severity: "error", message: "A fillet has one radius: a second distance or an angle belongs to a chamfer" })
+            break
+          }
+          if (secondDistance !== undefined && angle !== undefined) {
+            issues.push({ feature: f.id, severity: "error", message: "A chamfer takes either two distances or a distance and an angle, not both" })
+            break
+          }
+          if (secondDistance !== undefined && !(secondDistance > 0)) {
+            issues.push({ feature: f.id, severity: "error", message: `The second chamfer distance must be positive (it is ${secondDistance})` })
+            break
+          }
+          if (angle !== undefined && !(angle > 0 && angle < 90)) {
+            issues.push({ feature: f.id, severity: "error", message: `The chamfer angle must be between 0 and 90 degrees (it is ${angle})` })
+            break
+          }
+          const chamfer = style === "chamfer" && (secondDistance !== undefined || angle !== undefined)
+            ? { ...(secondDistance !== undefined ? { secondDistance } : {}), ...(angle !== undefined ? { angle: angle * Math.PI / 180 } : {}) }
+            : undefined
           const within = f.edges?.within === undefined ? undefined : { min: f.edges.within.min.map((d) => dim(d, f.id)), max: f.edges.within.max.map((d) => dim(d, f.id)) }
           if (within !== undefined && [...within.min, ...within.max].some((v) => v === undefined)) break
           const minLength = f.edges?.minLength === undefined ? undefined : dim(f.edges.minLength, f.id)
@@ -1047,7 +1082,7 @@ export const rebuild = (history: History): RebuildResult => {
           for (const b of chosen) {
             const found = findEdges(b.mesh)
             const picked = selectEdges(found.edges, selector)
-            const result = blendEdges(b.mesh, picked, radius, f.style ?? "fillet")
+            const result = blendEdges(b.mesh, picked, radius, style, chamfer)
             blended += result.blended
             for (const why of result.rejected.slice(0, 4)) issues.push({ feature: f.id, severity: "warning", message: `Not blended: ${why}` })
             bodies[bodies.indexOf(b)] = { ...b, mesh: result.mesh }

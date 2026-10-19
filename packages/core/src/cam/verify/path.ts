@@ -64,7 +64,7 @@ export const pathFromProgram = (program: Program, start?: P3): ReplayedPath => {
   return { segments, warnings }
 }
 
-const xyLength = (s: PathSegment): number => {
+const xyLength = (s: Pick<PathSegment, "from" | "to" | "center" | "clockwise">): number => {
   if (s.center === undefined) return Math.hypot(s.to.x - s.from.x, s.to.y - s.from.y)
   const r = Math.hypot(s.from.x - s.center.x, s.from.y - s.center.y)
   const rEnd = Math.hypot(s.to.x - s.center.x, s.to.y - s.center.y)
@@ -76,7 +76,7 @@ const xyLength = (s: PathSegment): number => {
  * of horizontal travel and one per `4 * step` of vertical travel, so steep ramps and plunges are not
  * stepped over.
  */
-export const sampleCount = (segment: PathSegment, step: number): number =>
+export const sampleCount = (segment: Pick<PathSegment, "from" | "to" | "center" | "clockwise">, step: number): number =>
   Math.max(1, Math.ceil(xyLength(segment) / step), Math.ceil(Math.abs(segment.to.z - segment.from.z) / (4 * step)))
 
 /**
@@ -85,7 +85,7 @@ export const sampleCount = (segment: PathSegment, step: number): number =>
  * helix and an arc with a small endpoint mismatch both come out right).
  */
 export const forEachSample = (
-  segment: PathSegment,
+  segment: Pick<PathSegment, "from" | "to" | "center" | "clockwise">,
   step: number,
   visit: (x: number, y: number, z: number) => void
 ): void => {

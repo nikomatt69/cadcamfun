@@ -20,6 +20,7 @@ import { SimulationTimeline } from "./SimulationTimeline.tsx"
 import { findingTimes, ncWindow, operationAt, readoutAt, stepMove, stepOperation, toolChangeTimes } from "../lib/simulation.ts"
 import { COLOR_MODES, operationColor, type ColorMode, type LegendEntry } from "../../../viewport/view3d/toolpath-colors.ts"
 import { TOOL_COLORS, colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
+import type { StockInfo } from "../../../viewport/view3d/stock-simulation.ts"
 
 export interface ToolpathVisualizerProps {
   readonly program: cam.Program
@@ -93,6 +94,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const [layer, setLayer] = createSignal<number>()
   const [frame, setFrame] = createSignal<"part" | "machine">("part")
   const [machineInfo, setMachineInfo] = createSignal<MachineInfo>()
+  const [stockInfo, setStockInfo] = createSignal<StockInfo>()
   // Simulation (spec 32 §4.4, §4.8): colour mode, the path as it runs, hidden operations, the legend, speed, panels.
   const [colorMode, setColorMode] = createSignal<ColorMode>("tool")
   const [progress, setProgress] = createSignal<"all" | "done">("all")
@@ -231,6 +233,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             stock={stock()}
             toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
             onPathLegend={setLegend}
+            onStockInfo={setStockInfo}
             {...(props.machine !== undefined ? { machine: props.machine, machineDisplay: machineDisplay(), onMachineInfo: setMachineInfo } : {})}
             {...(props.motion !== undefined ? { motion: props.motion } : {})}
             showControls
@@ -349,6 +352,14 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                     </Show>
                     <div>{r().rapid ? "G0" : `F${Math.round(r().feed)}`} · S{Math.round(r().rpm)}{r().tool !== undefined ? ` · T${r().tool}` : ""} · <span class="text-white" data-testid="visualizer-move-class">{r().klass !== undefined ? moveLabel(r().klass!) : ""}</span></div>
                     <div>{t("cam.operations.current")}: <span class="text-white">{names()[r().operation] ?? ""}</span></div>
+                  </div>
+                )}</Show>
+                <Show when={stockInfo()}>{(info) => (
+                  <div data-testid="visualizer-stock" class="tabular-nums">
+                    <div>{t("cam.visualizer.removed")}: <span class="text-white">{Math.round(info().removed)} mm³</span></div>
+                    <Show when={info().missingTools.length > 0}>
+                      <div class="text-amber-300">{t("cam.visualizer.stockNoTool", { tools: info().missingTools.join(", ") })}</div>
+                    </Show>
                   </div>
                 )}</Show>
                 <Show when={machine().assumed.includes("workholding")}><div class="text-amber-300">{t("cam.visualizer.assumedWorkholding")}</div></Show>

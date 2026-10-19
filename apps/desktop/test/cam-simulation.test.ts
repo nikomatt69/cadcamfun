@@ -7,6 +7,7 @@ import { cam } from "@cadcamfun/core"
 import { buildPlayback, TOOL_COLORS, toolColors } from "../src/viewport/view3d/playback.ts"
 import { pathBuffers, rampColor, startedBy } from "../src/viewport/view3d/toolpath-colors.ts"
 import { findingTimes, ncWindow, operationAt, readoutAt, stepMove, stepOperation, toolChangeTimes } from "../src/features/cam/lib/simulation.ts"
+import { createLiveStock, createStockSimulation } from "../src/viewport/view3d/stock-simulation.ts"
 
 const v = cam.viewer
 const GCODE = [
@@ -102,5 +103,39 @@ describe("navigation and readout", () => {
     expect(rows.map((r) => r.line)).toEqual([6, 7, 8, 9, 10, 11])
     expect(rows.find((r) => r.current)!.text).toBe("G1 X40 F800")
     expect(ncWindow(GCODE, undefined)).toEqual([])
+  })
+})
+
+describe("the live stock (spec 32 P4)", () => {
+  const stock = { minX: -5, maxX: 45, minY: -5, maxY: 25, minZ: -5, maxZ: 5 }
+  // The program changes tools: each toolpath has its own cutter.
+  const tools = new Map<string, cam.kernel.Cutter>(
+    analysis.program.toolpaths.map((tp) => [tp.toolId, cam.kernel.DEFAULT_CUTTERS.find((c) => c.id === (tp.toolId === "T2" ? "drill-6" : "flat-10"))!])
+  )
+  const simulation = createStockSimulation({ program: analysis.program, timeline, tools, stock, cell: 1 })
+
+  test("the simulation is built from the program's own tools", () => {
+    expect(simulation).toBeDefined()
+    expect(simulation!.missingTools).toEqual([])
+    expect(simulation!.removedVolume).toBe(0)
+  })
+
+  test("the mesh follows the playhead: the material the program has cut is gone", () => {
+    const live = createLiveStock(simulation!)
+    const before = live.mesh.geometry.getAttribute("position").array as Float32Array
+    // Nothing has run yet: the whole stock is there.
+    for (let k = 0; k < before.length / 3; k++) expect(before[k * 3 + 2]).toBe(5)
+    simulation!.advanceTo(timeline.duration)
+    expect(live.update()).toBe(true)
+    const after = live.mesh.geometry.getAttribute("position").array as Float32Array
+    // The columns the cutter passed over are lower than the ceiling.
+    const heights = [...after].filter((_, i) => i % 3 === 2)
+    expect(Math.min(...heights)).toBeLessThan(5)
+    // Nothing changed since: the mesh is not rebuilt.
+    expect(live.update()).toBe(false)
+  })
+
+  test("a program without a cutter has no stock to simulate", () => {
+    expect(createStockSimulation({ program: analysis.program, timeline, tools: new Map(), stock })).toBeUndefined()
   })
 })

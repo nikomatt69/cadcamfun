@@ -2,6 +2,7 @@
 export * from "./schema.ts"
 export * from "./tool-model.ts"
 export * from "./heightfield.ts"
+export * from "./deviation.ts"
 export * from "./path.ts"
 export * from "./verify.ts"
 export * from "./request.ts"

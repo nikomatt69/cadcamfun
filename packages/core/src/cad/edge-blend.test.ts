@@ -206,7 +206,7 @@ describe("blendEdges: what cannot be blended", () => {
   test("a chamfer wider than the faces says so", () => {
     const r = blendEdges(body, selectEdges(edges, { parallel: "z" }), 45, "chamfer")
     expect(r.blended).toBe(0)
-    expect(r.rejected[0]).toMatch(/chamfer of 45 mm is wider than the faces/)
+    expect(r.rejected[0]).toMatch(/chamfer of 45\.00 mm is wider than its first face/)
   })
 
   test("two faces folded onto each other (a knife edge) cannot take a blend", () => {

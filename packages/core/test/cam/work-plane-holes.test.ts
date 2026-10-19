@@ -4,7 +4,8 @@
  * so instead of dropping it.
  */
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import type { DimConstraint, Feature, History, SketchEntity } from "../../src/cad/history.ts"
+import type { DimConstraint, Feature, History } from "../../src/cad/history.ts"
+import type { SketchEntity } from "../../src/cad/sketch.ts"
 import { historyFeatures } from "../../src/cam/generator/history-features.ts"
 import { planOnly } from "../../src/cam/kernel/index.ts"
 
