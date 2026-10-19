@@ -1,6 +1,6 @@
 # 33 — CAD and CAM kernel gap analysis (Fusion 360 / hyperMILL reference)
 
-Status: analysis measured on 2026-10-19 against `main` (`ed73e6c` → `8a10f5b0`), followed in the same pass by the first fixes listed in
+Status: analysis measured on 2026-10-19 against `main` (`ed73e6c` → `8b3a3712`), followed in the same pass by the first fixes listed in
 §5. Owner request: "analizza i gap mancanti nel core del cad e del cam kernel e il loro utilizzo nel sidecar, httpapi e desktop …
 li aggiorniamo con il mancante". This spec is the inventory the follow-up work is ordered from. It does not claim parity: the gates
 of [spec 12](12-professional-cad-cam.md) and the release claims of [spec 29](29-native-cam-kernel.md) still decide that.
@@ -39,7 +39,7 @@ state.
 | C9 | Pattern along a path, pattern of faces | absent | chains, ribs on curves |
 | C10 | Sheet metal: flange on an edge, reliefs, corner closures, multi-bend unfold of a 3D part | base flange + hems + flat pattern | real sheet-metal parts |
 | C11 | Assembly joint solver (several joints, motion limits, cam/gear joints), motion study | one rigid `mate` per body | mechanisms (the rack-and-pinion target of the harness goal) |
-| C12 | Exact holes on work planes | mesh only on work planes | tilted / face holes lose exactness and CAM features |
+| C12 | Exact holes on work planes | mesh only on work planes | tilted / face holes lose exactness and CAM features — **closed in this pass** (§5) |
 | C13 | Sketch: splines, ellipses, offset/trim/extend/project tools in the solver | lines, arcs, circles | freeform profiles must be approximated |
 | C14 | Drawings: GD&T beyond flatness, balloons/BOM, assembly drawings, exact silhouettes | partial | production sheets |
 
@@ -62,7 +62,7 @@ state.
 | # | Gap | Today | Notes |
 | --- | --- | --- | --- |
 | M1 | **3D finishing families**: constant scallop, spiral, radial, horizontal | raster/waterline/steep-shallow only; legacy spiral/radial finishing silently fell back to a raster | **closed in this pass** (§5) |
-| M2 | Hole making in the kernel: rigid tapping (G84), reaming (G85), boring cycles, back-boring; tap/reamer/boring-bar cutters | drill and spot only; threads are milled | the interpreter already replays G84/G85 (spec 32 P2) — **next** |
+| M2 | Hole making in the kernel: rigid tapping (G84), reaming (G85), boring cycles, back-boring; tap/reamer/boring-bar cutters | drill and spot only; threads are milled | the interpreter already replays G84/G85 (spec 32 P2) — **closed in this pass** (§5); back-boring (G87) still missing |
 | M3 | Turning in the kernel (facing, OD/ID roughing and finishing, grooving, threading, parting) with stock evolution | legacy generator only, no kernel evidence | mill-turn later |
 | M4 | Stock-aware rest: operation B consumes the stock A left (spec 29 §6) | rest from a previous tool diameter | voxel stock exists for 5-axis only |
 | M5 | 5-axis strategies: swarf, 5x contour, multi-axis roughing, automatic tilting from a 3-axis path (collision avoidance) | parallel/contour lean on a trunnion | head-table and head-head machines in the kernel |
@@ -92,8 +92,8 @@ layer; no HTTP route rebuilds a parametric history without the assistant; the de
 
 ## 4. Order of work
 
-1. M2 hole making in the kernel (tap/ream cycles in the IR, posts, cutters, cutting data, planner choice tap vs thread mill).
-2. C12 exact holes on work planes, then C4 chamfer variants, then C2 exact rib/text/coil.
+1. M2 hole making in the kernel (tap/ream cycles in the IR, posts, cutters, cutting data, planner choice tap vs thread mill) — **done**.
+2. C12 exact holes on work planes — **done**; then C4 chamfer variants, then C2 exact rib/text/coil.
 3. M4 stock-aware rest between operations (voxel stock for 3-axis too).
 4. M3 turning in the kernel.
 5. C6 persistent naming before any wider direct-editing work (C8), C11 joint solver for the harness target.
@@ -106,6 +106,8 @@ layer; no HTTP route rebuilds a parametric history without the assistant; the de
 | `71a32fe4`, `29d3198c` | five-axis finishing operation and its voxel stock bracket brought onto main from the `kernel-rotary-stock` worktree (the merged worktrees were removed) | kernel suite 108/108 |
 | `c117e271` | M1: scallop (geodesic 3D offset over the drop-cutter surface), spiral, radial, flat-area in the surface engine, kernel (`SurfaceMode`, `center`, flat = finish-floor), planner flat-area finish on freeform parts with ledges, legacy generator spiral/radial finishing made real, desktop picker, API `multiaxis`, clients + OpenAPI snapshot (additions only) | `surface-finishing.test.ts`: ring spacing along the tool-centre surface = target (mean within 2 %), no gouge (verifier), coverage of spiral/radial ≤ half a spacing, flat faces at exact height and full coverage; kernel job claims pass |
 | `8a10f5b0` (+ part swept into `e6735d31`) | C1: mirror/pattern of bodies (`bodies`, `join`), mesh and exact; AI schema and validation | `history-bodies.test.ts`: half plate mirrored joined is one closed genus-2 body, exact volume to 1e-9, valid B-rep; patterns with matching mesh/exact ids |
+| `0ad8c0b9` (the M2 core work was swept into the parallel session's commit) + `37f57511` | M2: rigid tapping and reaming in the kernel — `tap` / `ream` cycles in the IR (G84 with the feed = pitch x speed, G85 fed in and out), tap and reamer cutters with their 3D models, cutting data (speed factor, feed per revolution, tapping torque), the planner tapping a threaded hole when the control can and reaming a fitted bore, the posts refusing a tap they cannot run, the HTTP contract and the assistant's hole skill | `holes.test.ts`: M29 S… + G84 on Fanuc, G84 alone on Haas, the refusal on GRBL, the replay of the tap in and out, the tapping data (45 % of the drilling speed, one pitch per turn, the torque under the machine's), the reamer's data (60 %, 2.5 x the drilling feed, the radial allowance); kernel suite 117/117, CAM 294 + 689, API contracts 3/3 |
+| `8b3a3712` | C12: exact holes on work planes — the exact branch resolves the plane a `plane` feature made (offset, angle, three points, a face of the body) and cuts the hole along its normal; the rebuild publishes the resolved work planes, so the CAM sees a tilted hole's entry and direction and the planner reports it as needing an indexed setup instead of dropping it | `history-brep.test.ts`: the hole on an offset plane is the same exact cylinder, the hole on a 30° plane leaves a cylindrical face and a valid B-rep, a hole on a plane that does not exist is an error and the body keeps its model; `work-plane-holes.test.ts`: the entry and the direction follow the plane, a base plane is unchanged, the planner names the tilted hole |
 
 Known unrelated failures seen while testing: `packages/ai/test/harness-inventory.test.ts` (sidecar `workspace.ts` handler
 resolution; the two assertions disagree with each other) and the AI MCP test helper typecheck; both predate this pass.
