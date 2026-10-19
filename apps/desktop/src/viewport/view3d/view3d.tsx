@@ -13,6 +13,7 @@ import { buildPlayback, positionAt, toolAt, toolColors, TOOL_COLORS, type Playba
 import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
 import { toolObject } from "./tool-object.ts"
 import { gaugeOfTool, previewToolFor } from "./tool-models.ts"
+import { createVoxelStock, type VoxelStock } from "./voxel-stock.ts"
 import { classLookup, pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
 import { createLiveStock, createStockSimulation, type LiveStock, type StockInfo } from "./stock-simulation.ts"
@@ -344,6 +345,9 @@ export function View3D(props: View3DProps) {
       if (Array.isArray(material)) material.forEach((m) => m.dispose()); else material.dispose()
       liveStock = undefined
     }
+    /** The voxel stock of a rotary program (spec 32 P6): where the height field does not hold. */
+    let voxelStock: VoxelStock | undefined
+    const disposeVoxels = (): void => { if (voxelStock === undefined) return; content.remove(voxelStock.mesh); voxelStock.dispose(); voxelStock = undefined }
     let toolColorOf: ReadonlyMap<string, number> = new Map()
     // The path's two line objects and their segments' start times (for the "only what has run" draw range).
     let pathLines: { readonly cut?: THREE.LineSegments; readonly cutStarts: Float64Array; readonly rapid?: THREE.LineSegments; readonly rapidStarts: Float64Array } | undefined
@@ -445,7 +449,7 @@ export function View3D(props: View3DProps) {
       invalidate()
       meshJobs.reset(); setMeshError(undefined)
       gizmo.detach(); selectedMesh = undefined; setSelected(undefined)
-      disposeStock()
+      disposeStock(); disposeVoxels()
       props.onStockInfo?.(undefined)
       disposeGroup(content)
       for (const [index, solid] of (props.solids ?? []).entries()) addSolid(solid, index)
@@ -513,6 +517,11 @@ export function View3D(props: View3DProps) {
             liveStock.mesh.visible = props.toolpathDisplay?.stockVisible ?? true
             content.add(liveStock.mesh)
             props.onStockInfo?.({ removed: simulation.removedVolume, remaining: simulation.remainingVolume, cell: simulation.sim.cell, missingTools: simulation.missingTools })
+          } else if (props.machine?.kind === "mill" && props.machine.rotary !== undefined) {
+            voxelStock = createVoxelStock({ program: props.program, timeline, rotary: props.machine.rotary, stock: props.machine.stock, tools: props, opacity: props.toolpathDisplay?.stockOpacity ?? 0.85 })
+            voxelStock.mesh.visible = props.toolpathDisplay?.stockVisible ?? true
+            content.add(voxelStock.mesh)
+            props.onStockInfo?.({ removed: voxelStock.sim.removedVolume(), remaining: voxelStock.sim.remainingVolume(), cell: voxelStock.sim.voxel, missingTools: [] })
           }
         }
       }
@@ -676,6 +685,10 @@ export function View3D(props: View3DProps) {
           })
         }
       }
+      if (voxelStock !== undefined && voxelStock.update(seconds)) {
+        invalidate()
+        props.onStockInfo?.({ removed: voxelStock.sim.removedVolume(), remaining: voxelStock.sim.remainingVolume(), cell: voxelStock.sim.voxel, missingTools: [] })
+      }
       // "Only what has run": the path's draw ranges follow the playhead.
       if (pathLines !== undefined) {
         const done = props.toolpathDisplay?.progress === "done"
@@ -724,7 +737,7 @@ export function View3D(props: View3DProps) {
       renderFrame()
       return { canvas: renderer.domElement, camera: { position: [activeCamera.position.x, activeCamera.position.y, activeCamera.position.z], target: [controls.target.x, controls.target.y, controls.target.z] }, ...(props.visionMode === "cam" && props.program ? { programText: cam.programGeometryText(props.program) } : {}), ...(machineScene && props.machine ? { spatial: machineSpatial(props.machine, machineScene, seconds) } : {}) }
     })
-    onCleanup(() => { unregisterCapture(); disposeMachine(); disposeStock(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
+    onCleanup(() => { unregisterCapture(); disposeMachine(); disposeStock(); disposeVoxels(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />

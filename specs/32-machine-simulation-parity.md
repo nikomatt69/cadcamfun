@@ -1,6 +1,6 @@
 # Machine simulation at Fusion 360 / hyperMILL level: every kinematics, every operation, the right tool
 
-Status: **P1, P2, P3 built**, **P5 built (presets, poses, limits)**, **P7 built (stock, reach, machine collisions)** (2026-10-20); P4 S1 removal partially implemented (another session); P6–P9 open.
+Status: **P1, P2, P3 built**, **P5 built (presets, poses, limits)**, **P7 built (stock, reach, machine collisions)**, **P6 S2 voxel stock built** (2026-10-20); P4 S1 removal partially implemented (another session); P6–P9 open.
 See §9. Analysis written at `main` @ 9aa648c. It extends
 [31-machine-aware-toolpath-view](31-machine-aware-toolpath-view.md) (machine scene, motion track, frames, set-up checks) and
 [29-native-cam-kernel](29-native-cam-kernel.md) (kinematics, collision, stock); it does not replace them. Owners: WP2
@@ -510,6 +510,21 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
   is not needed at this size.
 - Open in P8: ISO turning holders (PCLNR / MVJNR approach angles) and the turret; spindle tapers above the gauge line.
 
+### P6 — the stock of rotary programs (2026-10-20)
+
+- `cam/sim/voxel-sim.ts` `createVoxelSim`: a voxel grid over the stock in the part frame (about 1 M voxels by default, or a
+  given size), cut at every sample of every feed move by the tool's cutting profile along its own axis (`toolAxisInPart` of
+  the move's interpolated angles, the tip in the part frame), so 3+2 faces, simultaneous tilts and undercut tools remove
+  what they reach; forward by applying moves, backward from checkpoints (every ~1/40 of the program); the faces that touch
+  air as the mesh. Chose voxels over a tri-dexel: the kernel's `kernel/stock.ts` already brackets the evidence with voxels,
+  and at these sizes the face mesh stays small.
+- Viewport: `viewport/view3d/voxel-stock.ts` draws it for the rotary mills, where the S1 height field does not hold (the
+  3-axis programs keep the other session's S1); throttled redraw; the stock readout reports it.
+- Checked in the running app: an A/C program — the material removed (16 033 mm³) with the header's Ø8 end mill.
+- Tests: `packages/core/test/cam/voxel-sim.test.ts` (slot volume within 5 %, an A90 side bore along +Y with the top intact,
+  back-and-forth determinism, no tool no cut, closed quads), `apps/desktop/test/voxel-stock.test.ts`.
+- Open: deviation colours against the part (shared with P4), a worker for very fine voxels.
+
 ## Change log
 
 - 2026-10-19: analysis written from the code at 9aa648c and the probes of §2.2.
@@ -523,3 +538,4 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
 - 2026-10-20: P8 holder outlines built (§9).
 - 2026-10-20: P8 ISO lathe insert shapes built (§9).
 - 2026-10-20: P8 scale work: path buffers 6× faster on 1 M moves (§9).
+- 2026-10-20: P6 S2 voxel stock for rotary programs built (§9).

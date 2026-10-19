@@ -2,3 +2,4 @@
 export * from "./stock-sim.ts"
 export * from "./simulation.ts"
 export * from "./cutters.ts"
+export * from "./voxel-sim.ts"
