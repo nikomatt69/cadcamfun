@@ -4,13 +4,14 @@
  */
 import { describe, expect, test } from "bun:test"
 import { cam } from "../../src/index.ts"
+import type { Vec3 } from "../../src/cad/vec.ts"
 
 const v = cam.viewer
 const g = cam.generator
 const settings = (patch: Record<string, unknown> = {}) => g.withMachineDefaults(g.decodeSettings(patch) as cam.generator.ToolpathSettings)
 const stock: cam.generator.Stock = { width: 100, height: 60, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 }
-const mill = v.setupOf("mill", settings(), stock)
-const close = (a: cam.Vec3, b: cam.Vec3, digits = 9) => { expect(a.x).toBeCloseTo(b.x, digits); expect(a.y).toBeCloseTo(b.y, digits); expect(a.z).toBeCloseTo(b.z, digits) }
+const mill = v.setupOf("mill", settings(), stock) as cam.viewer.MillSetup
+const close = (a: Vec3, b: Vec3, digits = 9) => { expect(a.x).toBeCloseTo(b.x, digits); expect(a.y).toBeCloseTo(b.y, digits); expect(a.z).toBeCloseTo(b.z, digits) }
 const origin = { x: 0, y: 0, z: 0 }
 const rotary = (layout: cam.viewer.MachineRotaryLayout, coordinates: "part" | "machine" = "part"): cam.viewer.RotarySetup => ({ layout, pivot: { x: 0, y: 0, z: -40 }, coordinates, assumed: false, reasons: [] })
 

@@ -12,6 +12,7 @@ import { t } from "../../i18n/index.ts"
 import { buildPlayback, positionAt, toolAt, toolColors, TOOL_COLORS, type Playback } from "./playback.ts"
 import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
 import { toolObject } from "./tool-object.ts"
+import { gaugeOfTool, previewToolFor } from "./tool-models.ts"
 import { pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
 import { createLiveStock, createStockSimulation, type LiveStock, type StockInfo } from "./stock-simulation.ts"
@@ -294,11 +295,7 @@ export function View3D(props: View3DProps) {
     const zAxis = new THREE.Vector3(0, 0, 1)
     /** Where the tool is and how it leans at `seconds` on a rotary mill, and how the table is turned (machine frame). */
     /** Tip-to-spindle-nose length of a toolpath's tool as it is drawn (its holder, or the assumed one). */
-    const gaugeOf = (path: number): number => {
-      const model = modelFor(props.program?.toolpaths[path]?.toolId ?? "")
-      if (model === undefined || (model.family !== "mill" && model.family !== "probe")) return 60
-      return cam.toolProfile(model.family === "mill" && props.toolpathDisplay?.showHolder !== false ? { ...model, holder: model.holder ?? cam.assumedHolderOf(model) } : model).length
-    }
+    const gaugeOf = (path: number): number => gaugeOfTool(modelFor(props.program?.toolpaths[path]?.toolId ?? ""), props.toolpathDisplay?.showHolder !== false)
     const rotaryPose = (seconds: number): { readonly at: Vec3; readonly axis: THREE.Vector3; readonly table?: THREE.Matrix4 } | undefined => {
       if (machineScene?.model !== undefined) {
         // The machine drawn round the part (spec 32 P5): the same pose moves its links, the tool and the table.
@@ -353,14 +350,7 @@ export function View3D(props: View3DProps) {
     const disposeTools = (): void => { for (const g of toolGroups.values()) if (g) { scene.remove(g); disposeGroup(g) } toolGroups.clear() }
     /** The model the preview draws for a toolpath's tool: its own, the kernel's cutter, the generator's tool. A tool setter is
      * on the table (see `rebuild`): what moves is the cutter it measures. */
-    const modelFor = (id: string): cam.ToolModel | undefined => {
-      const own = props.toolModels?.get(id)
-      if (own !== undefined) return own
-      const cutter = props.tools?.get(id)
-      if (cutter !== undefined) return cam.toolModelFromCutter(cutter)
-      const fallback = props.defaultToolModel ?? (props.defaultTool !== undefined ? cam.toolModelFromCutter(props.defaultTool) : undefined)
-      return fallback?.family === "setter" ? cam.toolModelOf({ type: "endmill", diameter: 6 }) : fallback
-    }
+    const modelFor = (id: string): cam.ToolModel | undefined => previewToolFor(id, props)
     const toolGroupFor = (id: string): THREE.Group | null => {
       const known = toolGroups.get(id)
       if (known !== undefined) return known

@@ -551,5 +551,7 @@
   "cam.visualizer.showMachine": "Show the machine (axes, head, table)",
   "cam.visualizer.machineClass": "Machine class",
   "cam.visualizer.machineAxes": "Machine axes",
-  "cam.visualizer.limit": "Limit"
+  "cam.visualizer.limit": "Limit",
+  "cam.visualizer.collision": "Collision",
+  "cam.visualizer.stopAtCollision": "Stop at a collision"
 }

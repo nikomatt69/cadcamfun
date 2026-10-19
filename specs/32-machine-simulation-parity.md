@@ -1,6 +1,6 @@
 # Machine simulation at Fusion 360 / hyperMILL level: every kinematics, every operation, the right tool
 
-Status: **P1, P2, P3 built**, **P5 built (presets, poses, limits)** (2026-10-20); P4 S1 removal partially implemented (another session); P6–P9 open.
+Status: **P1, P2, P3 built**, **P5 built (presets, poses, limits)**, **P7 built (stock, reach, machine collisions)** (2026-10-20); P4 S1 removal partially implemented (another session); P6–P9 open.
 See §9. Analysis written at `main` @ 9aa648c. It extends
 [31-machine-aware-toolpath-view](31-machine-aware-toolpath-view.md) (machine scene, motion track, frames, set-up checks) and
 [29-native-cam-kernel](29-native-cam-kernel.md) (kinematics, collision, stock); it does not replace them. Owners: WP2
@@ -464,6 +464,25 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
 - Limits: inverse kinematics for non-TCP head machines takes X Y Z as tool tip positions; no singularity or unwinding
   report yet; machine bodies are envelopes, not CAD models; machine-body collision is P7.
 
+### P7 — collisions (2026-10-20)
+
+- `viewer/collisions.ts` `checkCollisions` on the playback timeline: `RAPID_INTO_STOCK` (a rapid that goes down or across
+  below the stock top over the stock; a straight retract is not one), `SHANK_IN_STOCK` (deeper than the cutting length,
+  warning: against the raw top), `HOLDER_IN_STOCK` (deeper than the stickout, error), `MACHINE_COLLISION` (the head, spindle
+  housing or fork of the machine model against the table, cradle, platter, workholding or stock, at each move's middle and
+  end; warnings while the machine's sizes are assumed). Bodies are compared by their posed bounds (a tilted cylinder by its
+  end discs). Each event has its time, move, line, count and depth or bodies.
+- `viewport/view3d/tool-models.ts`: one rule for the tool of a toolpath (`previewToolFor`) and its tip-to-nose length
+  (`gaugeOfTool`), used by the 3D view, the machine head and the checks.
+- Visualizer: the events are computed from the same timeline and tools (so they hold without WebGL), drawn as timeline
+  markers and as stats lines that seek to the contact; "Stop at a collision" (default on) pauses playback at the first
+  contact it crosses.
+- Checked in the running app: a rapid 8 mm into the stock — the red event line, the NC strip on its block, the marker.
+- Tests: `packages/core/test/cam/collisions.test.ts`, "collisions with the preview's tools" in
+  `apps/desktop/test/cam-machine-view.test.ts`, "collisions on the timeline" in `apps/desktop/test/cam-page.test.ts`.
+- Limits: against the raw stock box, not the stock left by earlier moves (P4's height field is the place for that); no
+  near-miss clearance yet; the tool's own flutes against fixtures stay with the spec 31 set-up checks.
+
 ## Change log
 
 - 2026-10-19: analysis written from the code at 9aa648c and the probes of §2.2.
@@ -472,3 +491,4 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
 - 2026-10-19: continued partial P4 S1 removal: preserved kernel cutter profiles, deterministic partial/full replay,
   rewind/reset mesh invalidation, non-cutting probes, machine scope guards and desktop stock readout; 39 regressions pass.
 - 2026-10-20: P3 completed and checked in the running app; P5 machine models built (§9).
+- 2026-10-20: P7 collisions built (§9).

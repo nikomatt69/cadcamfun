@@ -9,6 +9,7 @@ import { cam } from "@cadcamfun/core"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, machineSpatial } from "../src/viewport/view3d/machine-scene.ts"
 import { buildPlayback } from "../src/viewport/view3d/playback.ts"
 import { toolObject } from "../src/viewport/view3d/tool-object.ts"
+import { gaugeOfTool, previewToolFor } from "../src/viewport/view3d/tool-models.ts"
 import { previewSetup, resolveMachineKind } from "../src/features/cam/lib/machine-view.ts"
 
 const g = cam.generator
@@ -276,5 +277,22 @@ describe("the machine model round a mill (spec 32 P5)", () => {
     const m = machine.part
     expect([...platter.matrix.elements]).toEqual([m[0]!, m[4]!, m[8]!, 0, m[1]!, m[5]!, m[9]!, 0, m[2]!, m[6]!, m[10]!, 0, m[3]!, m[7]!, m[11]!, 1])
     scene.dispose()
+  })
+})
+
+describe("collisions with the preview's tools (spec 32 P7)", () => {
+  test("the reach of the tool the preview draws for a toolpath decides the shank and holder checks", () => {
+    const stock: cam.generator.Stock = { width: 100, height: 60, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 }
+    const setup = cam.viewer.setupOf("mill", settings({ workholding: "plate" }), stock)
+    const a = cam.generator.analyseGcode("G21 G90\nG0 X0 Y0 Z5\nG0 Z-3\nG1 Z-19 F200\nG0 Z20\nM30")
+    const timeline = cam.viewer.buildTimeline(a.program, a.motion)
+    const short = cam.toolModelOf({ type: "endmill", diameter: 6, cuttingLength: 10, stickout: 15 }, "mill")
+    const tool = (path: number) => previewToolFor(a.program.toolpaths[path]!.toolId, { defaultToolModel: short })
+    const found = cam.viewer.checkCollisions({ setup, timeline, reachOf: (path) => cam.viewer.toolReachOf(tool(path)) })
+    expect(found.map((e) => [e.code, e.line])).toEqual([["RAPID_INTO_STOCK", 3], ["HOLDER_IN_STOCK", 4]])
+    expect(found[0]!.seconds).toBe(timeline.moves.find((m) => m.state.line === 3)!.start)
+    // The gauge runs through the (assumed) holder: longer than the stickout.
+    expect(gaugeOfTool(short)).toBeGreaterThan(15)
+    expect(gaugeOfTool(short, false)).toBeCloseTo(15, 9)
   })
 })

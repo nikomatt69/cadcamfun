@@ -20,6 +20,7 @@ import { SimulationTimeline } from "./SimulationTimeline.tsx"
 import { findingTimes, ncWindow, operationAt, readoutAt, stepMove, stepOperation, toolChangeTimes } from "../lib/simulation.ts"
 import { COLOR_MODES, operationColor, type ColorMode, type LegendEntry } from "../../../viewport/view3d/toolpath-colors.ts"
 import { TOOL_COLORS, colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
+import { gaugeOfTool, previewToolFor } from "../../../viewport/view3d/tool-models.ts"
 import type { StockInfo } from "../../../viewport/view3d/stock-simulation.ts"
 
 export interface ToolpathVisualizerProps {
@@ -142,6 +143,31 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     const model = machineInfo()?.model, r = readout()
     return model !== undefined && r !== undefined ? cam.viewer.machinePose(model, r.program, r.angles, rotary(), 0, "machine").joints : undefined
   })
+  const [stopAtCollision, setStopAtCollision] = createSignal(true)
+  /**
+   * Collisions on the timeline (spec 32 P7): pure checks of the core on the same clock and the same tools the 3D view draws,
+   * so they hold without a WebGL view too. The machine's head is checked when the machine is shown.
+   */
+  const collisions = createMemo((): ReadonlyArray<cam.viewer.CollisionEvent> => {
+    const setup = props.machine
+    if (setup === undefined || setup.kind !== "mill") return []
+    const toolOf = (path: number) => previewToolFor(props.program.toolpaths[path]?.toolId ?? "", props)
+    const model = showMachine() ? cam.viewer.machineModelOf(setup, machineOptions()) : undefined
+    return cam.viewer.checkCollisions({
+      setup, timeline: timeline(), reachOf: (path) => cam.viewer.toolReachOf(toolOf(path)),
+      ...(model !== undefined ? { model, gaugeOf: (path: number) => gaugeOfTool(toolOf(path), showHolder()) } : {}),
+      ...(setup.rotary !== undefined ? { rotary: setup.rotary } : {})
+    })
+  })
+  // "Stop at collision": playing across the first contact of an event pauses there, the event in view.
+  let lastTime = 0
+  createEffect(on(() => props.playbackTime, (now) => {
+    const before = lastTime
+    lastTime = now
+    if (!props.playing || !stopAtCollision() || now <= before) return
+    const hit = collisions().find((e) => e.seconds > before + 1e-9 && e.seconds <= now + 1e-9)
+    if (hit !== undefined) { props.onPlayingChange?.(false); props.onPlaybackTimeChange(hit.seconds) }
+  }))
   const limitMarkers = createMemo(() => findingTimes(timeline(), (machineInfo()?.limits ?? []).map((f) => ({ ...(f.line !== undefined ? { line: f.line } : {}), severity: f.severity, message: f.message }))))
   const rotary = (): cam.viewer.RotarySetup | undefined => (props.machine?.kind === "mill" ? props.machine.rotary : undefined)
   // Each machine opens on the view its operator reads: a lathe from the front (the XZ plane flat, the chuck on the left).
@@ -367,6 +393,11 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                     <Show when={joints()}>{(j) => (
                       <div data-testid="visualizer-joints">{t("cam.visualizer.machineAxes")}: <span class="text-white">X{fmt(j().x)} Y{fmt(j().y)} Z{fmt(j().z)}{j().a !== undefined ? ` A${fmt(j().a!)}` : ""}{j().b !== undefined ? ` B${fmt(j().b!)}` : ""}{j().c !== undefined ? ` C${fmt(j().c!)}` : ""}</span></div>
                     )}</Show>
+                    <For each={collisions().slice(0, 4)}>{(e) => (
+                      <button type="button" data-testid="visualizer-collision" class={`block text-left pointer-events-auto hover:underline ${e.severity === "error" ? "text-red-400" : "text-amber-300"}`} onClick={() => { props.onPlayingChange?.(false); props.onPlaybackTimeChange(e.seconds) }}>
+                        {t("cam.visualizer.collision")}: {e.message}{e.count > 1 ? ` (×${e.count})` : ""}
+                      </button>
+                    )}</For>
                     <For each={(machineInfo()?.limits ?? []).slice(0, 3)}>{(f) => (
                       <div data-testid="visualizer-limit" class={f.severity === "error" ? "text-red-400" : "text-amber-300"}>{t("cam.visualizer.limit")}: {f.message}{f.count > 1 ? ` (×${f.count})` : ""}</div>
                     )}</For>
@@ -408,7 +439,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               colors={bandColors()}
               names={names()}
               toolChanges={toolChangeTimes(props.program, spans())}
-              markers={[...findingTimes(timeline(), machineInfo()?.findings ?? []), ...limitMarkers()]}
+              markers={[...findingTimes(timeline(), machineInfo()?.findings ?? []), ...limitMarkers(), ...collisions().map((e) => ({ seconds: e.seconds, severity: e.severity, message: e.message }))]}
               rate={rate()}
               onRate={setRate}
               onSeek={(seconds) => { props.onPlayingChange?.(false); seekTo(seconds) }}
@@ -500,6 +531,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               <section class="space-y-2 border-t border-slate-700 pt-3">
                 <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.tool")}</h4>
                 {toggle(t("cam.visualizer.pathDone"), () => progress() === "done", (on) => setProgress(on ? "done" : "all"))}
+                {toggle(t("cam.visualizer.stopAtCollision"), stopAtCollision, setStopAtCollision)}
                 {toggle(t("cam.visualizer.showTool"), showTool, setShowTool)}
                 <Show when={showTool()}>{toggle(t("cam.visualizer.showHolder"), showHolder, setShowHolder)}</Show>
               </section>

@@ -221,6 +221,21 @@ describe("CAM page", () => {
     }
   })
 
+  test("collisions on the timeline (spec 32 P7): a rapid into the stock is a marker and a line that seeks to it", async () => {
+    const { dispose } = app.visit("/cam")
+    try {
+      await app.wait(() => editor())
+      await type(editor()!, "G21 G90 G17\nS8000 M3\nG0 X0 Y0 Z5\nG1 Z0 F300\nG1 X10 F800\nG0 X0 Y0 Z-6\nG0 Z20\nM30")
+      await clickText("button", "Preview")
+      const event = await app.wait(() => document.querySelector<HTMLButtonElement>('[data-testid="visualizer-collision"]') ?? undefined, 30000)
+      expect(event.textContent).toContain("rapid")
+      expect(document.querySelectorAll('[data-testid="timeline-marker"]').length).toBeGreaterThan(0)
+      event.click(); await settle()
+      expect(useCamStore.getState().playbackTime).toBeGreaterThan(0)
+      await app.wait(() => (document.querySelector('[data-testid="nc-strip"] [data-current="true"]')?.textContent?.includes("G0 X0 Y0 Z-6") ? true : undefined), 30000)
+    } finally { dispose() }
+  })
+
   test("the preview shows the program's machine (spec 31): a lathe program, the pick, the mismatch, a partial replay", async () => {
     const { dispose } = app.visit("/cam")
     try {
