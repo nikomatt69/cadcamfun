@@ -64,6 +64,7 @@ import {
   validateBrep,
   writeStepBreps,
   type StepWriteOptions,
+  sewSolids,
   transformBrep,
   translation,
   uniformScale,

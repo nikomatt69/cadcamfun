@@ -70,8 +70,8 @@ export default function ParametricPanel(props: { readonly element: Element; read
       case "extrude": return `extrude ${feature.operation} from ${feature.sketch}${feature.edge ? `, edge ${feature.edge.style}` : ""}${feature.corner ? `, corner ${feature.corner.style}` : ""}${feature.taper !== undefined ? `, draft ${String(feature.taper)}°` : ""}`
       case "revolve": return `revolve ${feature.operation} from ${feature.sketch}`
       case "hole": return `${feature.kind && feature.kind !== "simple" ? `${feature.kind} ` : ""}hole on ${feature.plane}`
-      case "pattern": return `${feature.kind} pattern of ${feature.feature}`
-      case "mirror": return `mirror of ${feature.feature} through ${feature.plane}`
+      case "pattern": return `${feature.kind} pattern of ${feature.feature ?? `bodies ${feature.bodies?.join(", ") ?? ""}`}`
+      case "mirror": return `mirror of ${feature.feature ?? `bodies ${feature.bodies?.join(", ") ?? ""}${feature.join === true ? " (joined)" : ""}`} through ${feature.plane}`
       case "sweep": return `sweep ${feature.operation} of ${feature.profile} along ${feature.path}${feature.bendRadius !== undefined ? `, bends R${String(feature.bendRadius)}` : ""}`
       case "loft": return `loft ${feature.operation} through ${feature.sections.join(", ")}${feature.smooth ? " (smooth)" : ""}`
       case "shell": return `shell of ${feature.feature}, open ${feature.open ?? "none"}`

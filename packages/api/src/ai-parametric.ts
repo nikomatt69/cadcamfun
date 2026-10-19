@@ -132,7 +132,9 @@ const feature = Schema.Union([
     headDiameter: optional(dimension), headDepth: optional(dimension), angle: optional(dimension)
   }),
   Schema.Struct({
-    id, type: Schema.Literal("pattern"), feature: id, kind: Schema.Literals(["linear", "circular", "grid"]), count: dimension, step: optional(triple), centre: optional(pair), span: optional(dimension),
+    id, type: Schema.Literal("pattern"), feature: optional(id),
+    bodies: optional(described(Schema.Array(id).check(Schema.isMinLength(1), Schema.isMaxLength(50)), "instead of feature: body ids copied whole, each copy a new body <id>#<k>.")),
+    kind: Schema.Literals(["linear", "circular", "grid"]), count: dimension, step: optional(triple), centre: optional(pair), span: optional(dimension),
     countB: optional(described(dimension, "grid only: the number of rows (count is the number along step).")),
     stepB: optional(described(triple, "grid only: the offset between two rows [dx,dy,dz]."))
   }),
@@ -249,8 +251,8 @@ const feature = Schema.Union([
     "Work plane (Fusion Construct), named by this feature's id in the plane field of a sketch, hole or text. offset: base moved distance along its normal. angle: base turned angle degrees about its u or v axis (hinge at position `at` along the other axis). points: through three points (u from the first to the second). face: ON the planar face of a body nearest near, at the face centre (u = world X projected on the face, v = normal x u: a top face reads like XY), lifted by offset; follows the face on every rebuild. Sketch on a face = a face plane + a sketch on it."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("mirror"), feature: id, plane, offset: optional(dimension) }),
-    "Mirror the tool of an earlier extrude, revolve, hole or mirror through a plane: XY reflects Z, YZ reflects X, ZX reflects Y, at offset along the plane normal."
+    Schema.Struct({ id, type: Schema.Literal("mirror"), feature: optional(id), bodies: optional(Schema.Array(id).check(Schema.isMinLength(1), Schema.isMaxLength(50))), join: optional(Schema.Boolean), plane, offset: optional(dimension) }),
+    "Mirror the tool of an earlier extrude, revolve, hole or mirror (feature), or whole bodies (bodies: a new body; join: united with the original, half a symmetric part becomes the part) through a plane: XY reflects Z, YZ reflects X, ZX reflects Y, at offset along the plane normal."
   )
 ])
 type Feature = typeof feature.Type
@@ -272,8 +274,10 @@ const historyIssues = (features: ReadonlyArray<Feature>): Array<Schema.FilterIss
     if ((f.type === "extrude" || f.type === "revolve" || f.type === "rib" || f.type === "sheet") && seen.get(f.sketch)?.type !== "sketch") issue(index, `Sketch '${f.sketch}' must precede this feature`)
     if (f.type === "pattern" && (f.kind === "linear" || f.kind === "grid") && f.step === undefined) issue(index, `${f.kind === "grid" ? "Grid" : "Linear"} patterns need step [dx,dy,dz]`)
     if (f.type === "pattern" && f.kind === "grid" && (f.countB === undefined || f.stepB === undefined)) issue(index, "Grid patterns need countB (rows) and stepB [dx,dy,dz]")
-    if (f.type === "pattern" && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Pattern source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft, primitive, coil, rib, sheet, thread, text or mirror`)
-    if (f.type === "mirror" && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Mirror source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft, primitive, coil, rib, sheet, thread, text or mirror`)
+    if ((f.type === "pattern" || f.type === "mirror") && (f.feature === undefined) === (f.bodies === undefined)) issue(index, `A ${f.type} takes either feature (copy its tool) or bodies (copy them whole), not both or neither`)
+    if (f.type === "pattern" && f.feature !== undefined && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Pattern source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft, primitive, coil, rib, sheet, thread, text or mirror`)
+    if (f.type === "mirror" && f.feature !== undefined && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Mirror source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft, primitive, coil, rib, sheet, thread, text or mirror`)
+    if ((f.type === "pattern" || f.type === "mirror") && f.bodies !== undefined && !hasBody()) issue(index, `A ${f.type} of bodies needs an earlier feature that makes a body`)
     if (f.type === "sweep") for (const [role, ref] of [["profile", f.profile], ["path", f.path]] as const) if (seen.get(ref)?.type !== "sketch") issue(index, `Sweep ${role} '${ref}' must be an earlier sketch`)
     if (f.type === "sweep" && f.profile === f.path) issue(index, "A sweep needs two different sketches: the profile and the path")
     if (f.type === "loft") for (const ref of f.sections) if (seen.get(ref)?.type !== "sketch") issue(index, `Loft section '${ref}' must be an earlier sketch`)

@@ -34,7 +34,7 @@ Every command a designer reaches for in Fusion 360 has a counterpart in the para
 - Press Pull a flat face: `pushpull` (`near` a point on the face, `normal` to choose the top or the bottom, `distance` positive grows the body, negative cuts it; holes in the face stay; a curved face such as a boss side or a hole wall is offset along its normals, so a cylinder changes radius).
 - Draft one face of any body: `draft` (`near` a point on the face, `angle`, `pull` direction, `neutral` plane position; positive leans the wall inward above the neutral plane; a curved face is drafted one way, neutral at its base or top, so a boss becomes a cone). Join two bodies rigidly face to face: `mate` (`body` moves its `face` flush against `to.face`, `offset` gap, `spin` degrees = revolute, `slide` [u,v] = slider, `limits` for the range of motion; an overlap of the two bodies is reported); both bodies must exist (operation new for the second).
 - Combine bodies by id: `combine` (join, cut, intersect; `keepTools`). Split Body with a plane: `split`. Move/Copy: `move` (rotate in degrees, then translate; `copy`). Scale: `scale` (one factor or three).
-- Rectangular and circular pattern: `pattern` (linear, grid, circular) of an earlier tool; mirror: `mirror` through XY, YZ or ZX at an offset.
+- Rectangular and circular pattern: `pattern` (linear, grid, circular) of an earlier tool, or `bodies` to copy whole bodies; mirror: `mirror` through XY, YZ or ZX at an offset, of a tool or of `bodies` (`join: true` turns half of a symmetric part into the part: model the half, mirror it joined).
 
 ## Parameters
 
