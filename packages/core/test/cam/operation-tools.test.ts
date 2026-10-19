@@ -220,3 +220,33 @@ describe("tool holders as their outline (spec 32 P8)", () => {
     expect(cam.toolProfile(held).length).toBeCloseTo(held.stickout + 60, 9)
   })
 })
+
+describe("ISO lathe inserts (spec 32 P8)", () => {
+  test("the code gives the shape and the nose radius", () => {
+    expect(cam.isoInsertOf("CNMG 120408")).toEqual({ shape: "C", noseRadius: 0.8, code: "CNMG 120408" })
+    expect(cam.isoInsertOf("VBMT160404 finishing")).toEqual({ shape: "V", noseRadius: 0.4, code: "VBMT160404" })
+    expect(cam.isoInsertOf("DNMG")).toEqual({ shape: "D", code: "DNMG" })
+    expect(cam.isoInsertOf("turning")).toBeUndefined()
+    const fine = cam.toolModelOf({ type: "turning", diameter: 3, insertCode: "VBMT 160404" }, "lathe") as cam.LatheModel
+    expect(fine).toMatchObject({ shape: "V", noseRadius: 0.4, code: "VBMT 160404" })
+    expect(fine.assumed).not.toContain("insertShape")
+    expect(cam.describeTool(fine)).toContain("VBMT 160404")
+    const plain = cam.toolModelOf({ type: "turning", diameter: 3 }, "lathe") as cam.LatheModel
+    expect(plain.shape).toBe("C")
+    expect(plain.assumed).toContain("insertShape")
+    expect((cam.toolModelOf({ type: "boring", diameter: 16 }, "lathe") as cam.LatheModel).shape).toBe("D")
+    expect((cam.toolModelOf({ type: "threading", diameter: 3 }, "lathe") as cam.LatheModel).shape).toBeUndefined()
+  })
+
+  test("the drawn insert has the shape's tip angle", () => {
+    const tipAngle = (shape: cam.IsoInsertShape) => {
+      const pts = cam.viewer.latheToolOutlines("turning", 0, 0, shape)[0]!.points
+      const a = pts[1]!, b = pts[pts.length - 1]!
+      return (Math.acos((a.x * b.x + a.z * b.z) / (Math.hypot(a.x, a.z) * Math.hypot(b.x, b.z))) * 180) / Math.PI
+    }
+    for (const shape of ["C", "D", "V", "S", "T", "W"] as const) expect(tipAngle(shape), shape).toBeCloseTo(cam.ISO_INSERT_ANGLE[shape], 6)
+    // A round insert touches the part at the programmed point.
+    const round = cam.viewer.latheToolOutlines("turning", 0, 0, "R")[0]!.points
+    expect(Math.min(...round.map((p) => Math.hypot(p.x, p.z)))).toBeCloseTo(0, 6)
+  })
+})

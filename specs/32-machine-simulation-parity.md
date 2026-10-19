@@ -499,8 +499,12 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
   so the preview, the Resources page and the machine's gauge length use it; the collision reach takes the flange radius.
 - Checked in the running app: the assumed ER chuck (nut, cone, body, flange) above a Ø10 end mill.
 - Tests: "tool holders as their outline" in `packages/core/test/cam/operation-tools.test.ts`.
-- Open in P8: ISO lathe inserts in their holders and the turret; spindle tapers above the gauge line; the 1 M-move
-  performance budget.
+- ISO lathe inserts (2026-10-20): `IsoInsertShape` C / D / V / S / T / W / R with their tip angles, `isoInsertOf`
+  (`CNMG 120408` -> C, r0.8), `ToolResource.insertCode`; turning / facing default to C 80°, boring to D 55° (flagged
+  `insertShape` assumed); `latheToolOutlines` draws the shape (rhombus, triangle, trigon corner, round) with its nose radius;
+  the tool label names the code. Tests: "ISO lathe inserts" in `packages/core/test/cam/operation-tools.test.ts`.
+- Open in P8: ISO turning holders (PCLNR / MVJNR approach angles) and the turret; spindle tapers above the gauge line;
+  the 1 M-move performance budget.
 
 ## Change log
 
@@ -513,3 +517,4 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
 - 2026-10-20: P7 collisions built (§9).
 - 2026-10-20: P9 assistant part built (§9); mobile part open.
 - 2026-10-20: P8 holder outlines built (§9).
+- 2026-10-20: P8 ISO lathe insert shapes built (§9).

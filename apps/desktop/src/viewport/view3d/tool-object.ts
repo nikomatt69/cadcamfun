@@ -58,7 +58,7 @@ const flutes = (m: cam.MillModel): THREE.Group => {
 const latheInsert = (m: cam.LatheModel, turret: "rear" | "front"): THREE.Group => {
   const group = new THREE.Group()
   group.name = "lathe-tool"
-  for (const outline of cam.viewer.latheToolOutlines(m.insert, m.width, m.noseRadius)) {
+  for (const outline of cam.viewer.latheToolOutlines(m.insert, m.width, m.noseRadius, m.shape)) {
     // The outline is in the (x, z) tool plane; a Shape is drawn in (x, y), so y stands for z and the extrusion runs along y.
     const shape = new THREE.Shape(outline.points.map((p) => new THREE.Vector2(p.x, p.z)))
     const geometry = new THREE.ExtrudeGeometry(shape, { depth: outline.thickness, bevelEnabled: false, curveSegments: 12 })

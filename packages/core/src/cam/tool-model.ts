@@ -59,7 +59,30 @@ export interface MillModel {
 }
 export interface ProbeModel { readonly family: "probe"; readonly ballDiameter: number; readonly stylusLength: number; readonly bodyDiameter: number; readonly assumed: ReadonlyArray<string> }
 export interface SetterModel { readonly family: "setter"; readonly padDiameter: number; readonly height: number; readonly assumed: ReadonlyArray<string> }
-export interface LatheModel { readonly family: "lathe"; readonly insert: LatheInsert; readonly noseRadius: number; readonly width: number; readonly assumed: ReadonlyArray<string> }
+/** ISO 1832 insert shapes: C 80°, D 55°, V 35°, S 90° rhombi / square, T 60° triangle, W 80° trigon, R round. */
+export type IsoInsertShape = "C" | "D" | "V" | "S" | "T" | "W" | "R"
+export const ISO_INSERT_ANGLE: Readonly<Record<IsoInsertShape, number>> = { C: 80, D: 55, V: 35, S: 90, T: 60, W: 80, R: 180 }
+
+export interface LatheModel {
+  readonly family: "lathe"
+  readonly insert: LatheInsert
+  readonly noseRadius: number
+  readonly width: number
+  /** The insert's ISO shape (turning, facing, boring), from its code or the operation's usual one. */
+  readonly shape?: IsoInsertShape
+  /** The ISO code the shape and nose radius came from (`DNMG 150608`). */
+  readonly code?: string
+  readonly assumed: ReadonlyArray<string>
+}
+
+/** Shape letter and nose radius of an ISO 1832 code: `CNMG 120408` -> C, r0.8; `VBMT160404` -> V, r0.4. */
+export const isoInsertOf = (code: string | null | undefined): { readonly shape: IsoInsertShape; readonly noseRadius?: number; readonly code: string } | undefined => {
+  const m = /\b([CDVSTWR])[A-Z]{2,3}\s*-?\s*(\d{2})(\d{2})(\d{2})\b/i.exec(code ?? "") ?? /\b([CDVSTWR])[A-Z]{3}\b/i.exec(code ?? "")
+  if (m === null) return undefined
+  const shape = m[1]!.toUpperCase() as IsoInsertShape
+  const r = m[4] !== undefined ? Number(m[4]) / 10 : undefined
+  return { shape, ...(r !== undefined ? { noseRadius: r } : {}), code: m[0]!.toUpperCase() }
+}
 export interface NozzleModel { readonly family: "nozzle"; readonly diameter: number; readonly nozzle: NozzleType; readonly assumed: ReadonlyArray<string> }
 
 export type ToolModel = MillModel | ProbeModel | SetterModel | LatheModel | NozzleModel
@@ -79,6 +102,8 @@ export interface ToolResource {
   readonly holderLength?: number | null
   /** The holder's kind (`er`, `shrink`, `hydraulic`, `weldon`, `arbor`, `tapping`, or words naming one). */
   readonly holderType?: string | null
+  /** A lathe insert's ISO code (`CNMG 120408`): its shape and nose radius. */
+  readonly insertCode?: string | null
   readonly stickout?: number | null
   /** Barrel / circle-segment cutters: the radius of the side form. */
   readonly formRadius?: number | null
@@ -172,8 +197,15 @@ export const toolModelOf = (tool: ToolResource, context?: MachineKind): ToolMode
   if (lathe !== undefined && (context === "lathe" || MILL_TYPES[key] === undefined)) {
     const noseDefault = lathe === "turning" || lathe === "facing" || lathe === "boring" ? 0.4 : 0
     // A nose radius of 0 is a real choice (a sharp tool), not a missing value.
-    const nose = typeof tool.cornerRadius === "number" && Number.isFinite(tool.cornerRadius) && tool.cornerRadius >= 0 ? tool.cornerRadius : (assumed.push("cornerRadius"), noseDefault)
-    return { family: "lathe", insert: lathe, noseRadius: lathe === "turning" || lathe === "facing" || lathe === "boring" ? nose : 0, width: lathe === "grooving" || lathe === "parting" ? Math.min(d, 10) : d, assumed }
+    const iso = isoInsertOf(tool.insertCode) ?? isoInsertOf(tool.type)
+    const nose = typeof tool.cornerRadius === "number" && Number.isFinite(tool.cornerRadius) && tool.cornerRadius >= 0 ? tool.cornerRadius : iso?.noseRadius !== undefined ? iso.noseRadius : (assumed.push("cornerRadius"), noseDefault)
+    const shaped = lathe === "turning" || lathe === "facing" || lathe === "boring"
+    // The usual shape of each operation when no code says: C 80° roughing and facing, D 55° boring.
+    const shape: IsoInsertShape | undefined = shaped ? iso?.shape ?? (assumed.push("insertShape"), lathe === "boring" ? "D" : "C") : undefined
+    return {
+      family: "lathe", insert: lathe, noseRadius: shaped ? nose : 0, width: lathe === "grooving" || lathe === "parting" ? Math.min(d, 10) : d,
+      ...(shape !== undefined ? { shape } : {}), ...(iso !== undefined && shaped ? { code: iso.code } : {}), assumed
+    }
   }
   const nozzle = NOZZLES[key]
   if (nozzle !== undefined) return { family: "nozzle", diameter: positive(tool.diameter) ? tool.diameter : 0.4, nozzle, assumed }
@@ -462,7 +494,7 @@ export const describeTool = (model: ToolModel): string => {
     case "mill": return `${model.shape} Ø${model.diameter}, ${model.flutes} flutes, ${model.fluteLength} mm cutting, Ø${model.shankDiameter} shank, ${round(model.stickout)} mm stickout${model.cornerRadius !== undefined ? `, r${model.cornerRadius}` : ""}${model.angle !== undefined ? `, ${model.angle}°` : ""}${model.pitch !== undefined ? `, pitch ${model.pitch}` : ""}${model.formRadius !== undefined ? `, form R${round(model.formRadius)}` : ""}${assumed}`
     case "probe": return `touch probe, ball Ø${model.ballDiameter}, stylus ${model.stylusLength} mm${assumed}`
     case "setter": return `tool setter, pad Ø${model.padDiameter}${assumed}`
-    case "lathe": return `${model.insert} insert${model.noseRadius > 0 ? `, nose r${model.noseRadius}` : ""}${model.insert === "grooving" || model.insert === "parting" ? `, ${model.width} mm wide` : ""}${assumed}`
+    case "lathe": return `${model.insert} insert${model.code !== undefined ? ` ${model.code}` : model.shape !== undefined ? ` (ISO ${model.shape} ${ISO_INSERT_ANGLE[model.shape]}°)` : ""}${model.noseRadius > 0 ? `, nose r${model.noseRadius}` : ""}${model.insert === "grooving" || model.insert === "parting" ? `, ${model.width} mm wide` : ""}${assumed}`
     case "nozzle": return `${model.nozzle} nozzle Ø${model.diameter}${assumed}`
   }
 }

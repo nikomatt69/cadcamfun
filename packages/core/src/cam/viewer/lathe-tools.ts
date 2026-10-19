@@ -11,6 +11,8 @@
  *   knurling          two hardened wheels pressed on the bar
  * A nose radius rounds the insert's tip (the programmed point is the theoretical sharp tip).
  */
+import { ISO_INSERT_ANGLE, type IsoInsertShape } from "../tool-model.ts"
+
 export interface ToolOutline {
   readonly part: "insert" | "shank"
   /** Closed polygon, (x, z) display coordinates relative to the programmed point, rear turret. */
@@ -53,7 +55,27 @@ const roundCorner = (points: ReadonlyArray<{ x: number; z: number }>, index: num
   return [...points.slice(0, index), ...fillet, ...points.slice(index + 1)]
 }
 
-export const latheToolOutlines = (toolType: string, width: number, noseRadius = 0): ReadonlyArray<ToolOutline> => {
+/**
+ * The insert of an ISO shape with its tip at the origin pointing along -(dirX, dirZ): rhombi C / D / V / S with their tip
+ * angle, a triangle T, a trigon W (drawn as its 80° corner), a round R insert touching at the origin.
+ */
+const isoInsert = (shape: IsoInsertShape, size: number, dirX: number, dirZ: number): Array<{ x: number; z: number }> => {
+  if (shape === "R") {
+    const len = Math.hypot(dirX, dirZ), r = size / 2
+    const c = { x: (dirX / len) * r, z: (dirZ / len) * r }
+    return Array.from({ length: 32 }, (_, k) => ({ x: c.x - (dirX / len) * r * Math.cos((k / 32) * 2 * Math.PI) - (dirZ / len) * r * Math.sin((k / 32) * 2 * Math.PI), z: c.z - (dirZ / len) * r * Math.cos((k / 32) * 2 * Math.PI) + (dirX / len) * r * Math.sin((k / 32) * 2 * Math.PI) }))
+  }
+  if (shape === "T" || shape === "W") {
+    // An equilateral triangle (T), or the 80° corner of a trigon: the tip and the two far corners.
+    const len = Math.hypot(dirX, dirZ), ux = dirX / len, uz = dirZ / len
+    const half = ((shape === "T" ? 60 : 80) * Math.PI) / 360
+    const h = size * Math.cos(half), w = size * Math.sin(half)
+    return [{ x: 0, z: 0 }, { x: ux * h - uz * w, z: uz * h + ux * w }, { x: ux * h + uz * w, z: uz * h - ux * w }]
+  }
+  return rhombus(size, ISO_INSERT_ANGLE[shape], dirX, dirZ)
+}
+
+export const latheToolOutlines = (toolType: string, width: number, noseRadius = 0, shape?: IsoInsertShape): ReadonlyArray<ToolOutline> => {
   switch (toolType) {
     case "threading":
       return [
@@ -70,12 +92,12 @@ export const latheToolOutlines = (toolType: string, width: number, noseRadius = 
     }
     case "boring":
       return [
-        { part: "insert", points: roundCorner(rhombus(9, 55, 1, -1.2), 0, noseRadius), thickness: 4 },
+        { part: "insert", points: roundCorner(isoInsert(shape ?? "D", 9, 1, -1.2), 0, noseRadius), thickness: 4 },
         { part: "shank", points: rect(4, -10, 140, -2), thickness: 10 }
       ]
     case "facing":
       return [
-        { part: "insert", points: roundCorner(rhombus(12, 80, 1, 0.45), 0, noseRadius), thickness: 5 },
+        { part: "insert", points: shape === "R" ? isoInsert("R", 12, 1, 0.45) : roundCorner(isoInsert(shape ?? "C", 12, 1, 0.45), 0, noseRadius), thickness: 5 },
         { part: "shank", points: rect(8, 2, 90, 22), thickness: 20 }
       ]
     case "knurling": {
@@ -89,7 +111,7 @@ export const latheToolOutlines = (toolType: string, width: number, noseRadius = 
     }
     default:
       return [
-        { part: "insert", points: roundCorner(rhombus(12, 80, 0.45, 1), 0, noseRadius), thickness: 5 },
+        { part: "insert", points: shape === "R" ? isoInsert("R", 12, 0.45, 1) : roundCorner(isoInsert(shape ?? "C", 12, 0.45, 1), 0, noseRadius), thickness: 5 },
         { part: "shank", points: rect(2, 10, 22, 90), thickness: 20 }
       ]
   }
