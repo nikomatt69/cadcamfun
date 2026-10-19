@@ -54213,6 +54213,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             "dwell",
                                             "peck",
                                             "chipBreak",
+                                            "tap",
+                                            "ream",
                                           ],
                                           "type": "string",
                                         },
@@ -54226,6 +54228,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         },
                                         "peckDepth": {
                                           "minimum": 0,
+                                          "type": "number",
+                                        },
+                                        "pitch": {
+                                          "exclusiveMinimum": 0,
                                           "type": "number",
                                         },
                                         "retractHeight": {
@@ -55269,6 +55275,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "enum": [
                                 "drill",
                                 "spot",
+                                "tap",
+                                "ream",
                               ],
                               "type": "string",
                             },
@@ -56057,6 +56065,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "facemill",
                             "threadmill",
                             "engraver",
+                            "tap",
+                            "reamer",
                           ],
                           "type": "string",
                         },
@@ -56393,6 +56403,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "chamfer",
                                       "engrave",
                                       "thread-mill",
+                                      "tap",
+                                      "ream",
                                     ],
                                     "type": "string",
                                   },
@@ -56436,6 +56448,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           "chamfer",
                                           "engrave",
                                           "thread-mill",
+                                          "tap",
+                                          "ream",
                                         ],
                                         "type": "string",
                                       },
@@ -56937,6 +56951,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                     "dwell",
                                                     "peck",
                                                     "chipBreak",
+                                                    "tap",
+                                                    "ream",
                                                   ],
                                                   "type": "string",
                                                 },
@@ -56950,6 +56966,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                 },
                                                 "peckDepth": {
                                                   "minimum": 0,
+                                                  "type": "number",
+                                                },
+                                                "pitch": {
+                                                  "exclusiveMinimum": 0,
                                                   "type": "number",
                                                 },
                                                 "retractHeight": {
@@ -57229,6 +57249,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "facemill",
                                       "threadmill",
                                       "engraver",
+                                      "tap",
+                                      "reamer",
                                     ],
                                     "type": "string",
                                   },
@@ -57897,6 +57919,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             "dwell",
                                             "peck",
                                             "chipBreak",
+                                            "tap",
+                                            "ream",
                                           ],
                                           "type": "string",
                                         },
@@ -57910,6 +57934,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         },
                                         "peckDepth": {
                                           "minimum": 0,
+                                          "type": "number",
+                                        },
+                                        "pitch": {
+                                          "exclusiveMinimum": 0,
                                           "type": "number",
                                         },
                                         "retractHeight": {
@@ -59277,6 +59305,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           "dwell",
                                           "peck",
                                           "chipBreak",
+                                          "tap",
+                                          "ream",
                                         ],
                                         "type": "string",
                                       },
@@ -59290,6 +59320,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       },
                                       "peckDepth": {
                                         "minimum": 0,
+                                        "type": "number",
+                                      },
+                                      "pitch": {
+                                        "exclusiveMinimum": 0,
                                         "type": "number",
                                       },
                                       "retractHeight": {

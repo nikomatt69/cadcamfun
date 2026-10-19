@@ -1313,7 +1313,7 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
         readonly top: number
         readonly bottom: number
-        readonly cut?: "drill" | "spot"
+        readonly cut?: "drill" | "spot" | "tap" | "ream"
       }
     | {
         readonly id: string
@@ -1425,7 +1425,18 @@ export type ToolpathGeneratorManufacturePayload = {
   readonly tools?: ReadonlyArray<{
     readonly id: string
     readonly name: string
-    readonly kind: "flat" | "ball" | "bull" | "chamfer" | "spot" | "drill" | "facemill" | "threadmill" | "engraver"
+    readonly kind:
+      | "flat"
+      | "ball"
+      | "bull"
+      | "chamfer"
+      | "spot"
+      | "drill"
+      | "facemill"
+      | "threadmill"
+      | "engraver"
+      | "tap"
+      | "reamer"
     readonly diameter: number
     readonly flutes: number
     readonly material: "hss" | "hss-co" | "carbide" | "pcd"
@@ -1482,12 +1493,13 @@ export type ToolpathGeneratorVerifyPayload = {
         | { readonly _tag: "Comment"; readonly text: string }
         | {
             readonly _tag: "Cycle"
-            readonly cycle: "drill" | "dwell" | "peck" | "chipBreak"
+            readonly cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream"
             readonly to: { readonly x: number; readonly y: number; readonly z: number }
             readonly feed: number
             readonly peckDepth: number
             readonly dwellSeconds: number
             readonly retractHeight: number
+            readonly pitch?: number
           }
         | { readonly _tag: "Orient"; readonly a?: number; readonly b?: number; readonly c?: number }
       >
@@ -5940,6 +5952,8 @@ export type ToolpathGeneratorManufactureOutput =
             | "chamfer"
             | "engrave"
             | "thread-mill"
+            | "tap"
+            | "ream"
           status: "ok" | "failed"
           cutting?: {
             cut:
@@ -5955,6 +5969,8 @@ export type ToolpathGeneratorManufactureOutput =
               | "chamfer"
               | "engrave"
               | "thread-mill"
+              | "tap"
+              | "ream"
             rpm: number
             vc: number
             vcRecommended: number
@@ -6032,12 +6048,13 @@ export type ToolpathGeneratorManufactureOutput =
               | { _tag: "Comment"; text: string }
               | {
                   _tag: "Cycle"
-                  cycle: "drill" | "dwell" | "peck" | "chipBreak"
+                  cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream"
                   to: { x: number; y: number; z: number }
                   feed: number
                   peckDepth: number
                   dwellSeconds: number
                   retractHeight: number
+                  pitch?: number
                 }
               | { _tag: "Orient"; a?: number; b?: number; c?: number }
             >
@@ -6047,7 +6064,18 @@ export type ToolpathGeneratorManufactureOutput =
         tools: Array<{
           id: string
           name: string
-          kind: "flat" | "ball" | "bull" | "chamfer" | "spot" | "drill" | "facemill" | "threadmill" | "engraver"
+          kind:
+            | "flat"
+            | "ball"
+            | "bull"
+            | "chamfer"
+            | "spot"
+            | "drill"
+            | "facemill"
+            | "threadmill"
+            | "engraver"
+            | "tap"
+            | "reamer"
           diameter: number
           flutes: number
           material: "hss" | "hss-co" | "carbide" | "pcd"
@@ -6186,12 +6214,13 @@ export type ToolpathGeneratorParseOutput = {
         | { _tag: "Comment"; text: string }
         | {
             _tag: "Cycle"
-            cycle: "drill" | "dwell" | "peck" | "chipBreak"
+            cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream"
             to: { x: number; y: number; z: number }
             feed: number
             peckDepth: number
             dwellSeconds: number
             retractHeight: number
+            pitch?: number
           }
         | { _tag: "Orient"; a?: number; b?: number; c?: number }
       >

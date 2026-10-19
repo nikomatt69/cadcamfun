@@ -23,9 +23,9 @@ export const CamMachiningPlan = Schema.Struct({
 })
 export const CamCuttingDataInput = Schema.Struct({
   material: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
-  cut: Schema.Literals(["face", "slot", "rough-side", "adaptive", "finish-wall", "finish-floor", "finish-3d", "drill", "spot", "chamfer", "engrave", "thread-mill"]),
+  cut: Schema.Literals(["face", "slot", "rough-side", "adaptive", "finish-wall", "finish-floor", "finish-3d", "drill", "spot", "chamfer", "engrave", "thread-mill", "tap", "ream"]),
   tool: Schema.Struct({
-    kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver"]),
+    kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer"]),
     diameter: positive.check(Schema.isLessThanOrEqualTo(250)),
     flutes: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 16 })),
     toolMaterial: Schema.optionalKey(Schema.Literals(["hss", "hss-co", "carbide", "pcd"])),

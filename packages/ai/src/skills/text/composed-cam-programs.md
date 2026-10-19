@@ -7,7 +7,7 @@ A real part has many operations. Plan them in this order and do not skip ahead.
 3. Rough (`roughing` or `adaptive`), leaving a small allowance (0.1 to 0.3 mm).
 4. Rest-machine what the big tool could not reach (`rest`) with a smaller tool.
 5. Finish floors and ledges first (`flat`, flat end mill), then the surface (`steep-shallow`, `scallop`, `parallel`, `waterline`, `spiral`, `radial`), cusp height from the scallop setting, climb milling.
-6. Drill before tapping or thread milling (`drill`, peck cycle for deep holes).
+6. Drill before tapping or reaming or thread milling (`drill`; peck cycle for deep holes, `cut: "ream"` for a fitted bore, `cut: "tap"` when the control taps rigidly).
 7. Chamfer (kernel `deburr` width: 2D chamfer on outlines, pockets and holes) or engrave last.
 8. Indexing (3+2) only after the bulk is removed.
 
@@ -15,7 +15,7 @@ A real part has many operations. Plan them in this order and do not skip ahead.
 
 - Closed outline, outside a part: `profile`.
 - Closed outline, inside a recess: `pocket`.
-- Hole pattern: `drill` (peck when depth is at least 3 times the diameter; pilot above 12 mm).
+- Hole pattern: `drill` (peck when depth is at least 3 times the diameter; pilot above 12 mm; ream a bore with an ISO fit, tap a threaded hole).
 - Curved face: `steep-shallow` (waterline on walls, raster on flats) or `scallop` (constant 3D stepover on slopes, walls over 80° need a waterline); `spiral` / `radial` (with `center`) for round domes and bosses; pencil = rest finishing after a larger ball.
 - Horizontal faces at size: `flat` (the kernel plans it on freeform parts with ledges).
 - Deep pockets: `adaptive` then `rest`.

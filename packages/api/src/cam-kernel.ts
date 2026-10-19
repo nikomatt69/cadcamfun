@@ -31,7 +31,7 @@ export const CamKernelIssue = Schema.Struct({
   message: Schema.String, operationId: Schema.optionalKey(Schema.String), line: Schema.optionalKey(Schema.Int), point: Schema.optionalKey(cad.Vec3Schema)
 })
 const cutting = Schema.Struct({
-  cut: Schema.Literals(["face", "slot", "rough-side", "adaptive", "finish-wall", "finish-floor", "finish-3d", "drill", "spot", "chamfer", "engrave", "thread-mill"]),
+  cut: Schema.Literals(["face", "slot", "rough-side", "adaptive", "finish-wall", "finish-floor", "finish-3d", "drill", "spot", "chamfer", "engrave", "thread-mill", "tap", "ream"]),
   rpm: Schema.Finite, vc: Schema.Finite, vcRecommended: Schema.Finite, effectiveDiameter: Schema.Finite,
   fz: Schema.Finite, chipThickness: Schema.Finite, feed: Schema.Finite, plungeFeed: Schema.Finite,
   ap: Schema.Finite, ae: Schema.Finite, stepoverPercent: Schema.Finite, rampAngle: Schema.Finite, helixPitch: Schema.Finite,
@@ -42,7 +42,7 @@ const cutting = Schema.Struct({
   reference: cam.generator.CuttingReferenceSchema
 })
 const cutter = Schema.Struct({
-  id, name: Schema.String, kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver"]),
+  id, name: Schema.String, kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer"]),
   diameter: positive, flutes: Schema.Int, material: Schema.Literals(["hss", "hss-co", "carbide", "pcd"]),
   coating: Schema.Literals(["none", "tin", "ticn", "altin", "alcrn", "zrn", "dlc", "diamond"]),
   cornerRadius: Schema.optionalKey(Schema.Finite), angle: Schema.optionalKey(Schema.Finite), tipDiameter: Schema.optionalKey(Schema.Finite), pitch: Schema.optionalKey(Schema.Finite),
