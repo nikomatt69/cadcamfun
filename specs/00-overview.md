@@ -107,3 +107,4 @@ Agents in the same wave never touch the same directory, so they can run concurre
 - v4: remaining work sequenced in `specs/roadmap/` (RM-00–RM-11); `AGENTS.md` requires following it when the roadmap is cited.
 - v5: `31-machine-aware-toolpath-view.md`: the CAM preview shows each machine as it runs (mill in a vise, lathe part turning in the chuck, printer depositing on a bed), with the AI aware of the same setup.
 - v6: `32-machine-simulation-parity.md`: analysis and phased plan for a Fusion 360 / hyperMILL-class simulator (machine models for every kinematics, every operation replayed, the right tool per operation, live material removal, collision).
+- v6: `33-kernel-gap-analysis.md`: measured gap inventory of the CAD and CAM kernels and of what the HTTP API, sidecar, desktop and assistant reach; order of work.
