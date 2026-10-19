@@ -193,3 +193,30 @@ describe("new tool shapes", () => {
     }
   })
 })
+
+describe("tool holders as their outline (spec 32 P8)", () => {
+  test("every kind runs from its nose to its length, clears the shank, and ends in the flange", () => {
+    for (const kind of cam.HOLDER_KINDS) {
+      const outline = cam.holderOutline({ diameter: 32, length: 60, kind }, 5)
+      expect(outline[0]!.z, kind).toBe(0)
+      expect(outline[outline.length - 1]!.z, kind).toBe(60)
+      for (let i = 1; i < outline.length; i++) expect(outline[i]!.z, kind).toBeGreaterThanOrEqual(outline[i - 1]!.z - 1e-9)
+      for (const p of outline) expect(p.r, kind).toBeGreaterThanOrEqual(5)
+      expect(Math.max(...outline.map((p) => p.r)), kind).toBe(20)
+    }
+    // A shrink-fit nose is slim: a 3 mm wall round the shank.
+    expect(cam.holderOutline({ diameter: 32, length: 60, kind: "shrink" }, 5)[0]!.r).toBe(8)
+  })
+
+  test("the kind from words; the assumed holder suits the tool; the drawn tool includes it", () => {
+    expect(["ER32 collet chuck", "Shrink fit", "hydraulic chuck", "Weldon", "shell mill arbor", "tapping chuck", "pinza ER"].map(cam.holderKindOf)).toEqual(["er", "shrink", "hydraulic", "weldon", "arbor", "tapping", "er"])
+    expect(cam.holderKindOf("")).toBeUndefined()
+    const m = (type: string) => cam.toolModelOf({ type, diameter: 10 }, "mill") as cam.MillModel
+    expect(cam.assumedHolderOf(m("tap")).kind).toBe("tapping")
+    expect(cam.assumedHolderOf(m("facemill")).kind).toBe("arbor")
+    expect(cam.assumedHolderOf(m("endmill")).kind).toBe("er")
+    const held = cam.toolModelOf({ type: "endmill", diameter: 10, holderDiameter: 32, holderLength: 60, holderType: "shrink fit" }, "mill") as cam.MillModel
+    expect(held.holder).toEqual({ diameter: 32, length: 60, kind: "shrink" })
+    expect(cam.toolProfile(held).length).toBeCloseTo(held.stickout + 60, 9)
+  })
+})

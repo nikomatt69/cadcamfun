@@ -49,7 +49,8 @@ describe("collisions", () => {
   })
 
   test("the reach of a mill model; none for a lathe insert", () => {
-    expect(v.toolReachOf(cam.toolModelOf({ type: "endmill", diameter: 10, cuttingLength: 22, stickout: 40, shankDiameter: 10, holderDiameter: 32 }, "mill"))).toEqual({ flute: 22, stickout: 40, shank: 5, holder: 16 })
+    // The holder's flange (1.25 x its radius) is its widest point.
+    expect(v.toolReachOf(cam.toolModelOf({ type: "endmill", diameter: 10, cuttingLength: 22, stickout: 40, shankDiameter: 10, holderDiameter: 32 }, "mill"))).toEqual({ flute: 22, stickout: 40, shank: 5, holder: 20 })
     expect(v.toolReachOf(cam.toolModelOf({ type: "turning", diameter: 3 }, "lathe"))).toBeUndefined()
   })
 })

@@ -491,6 +491,17 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
   `machines-and-axes.md` says so. Test: "the simulation player's view" in `packages/ai/test/machine-kinematics.test.ts`.
 - Mobile: the phone's preview payload is not extended yet (operation bands, move classes, machine links, collisions).
 
+### P8 (first part) — holders as their outline (2026-10-20)
+
+- `tool-model.ts`: `HolderKind` (`er`, `shrink`, `hydraulic`, `weldon`, `arbor`, `tapping`), `holderOutline` (nose, body,
+  flange per kind), `holderKindOf` (from words: "ER32 collet chuck", "shrink fit", "pinza ER"…), `ToolResource.holderType`;
+  the assumed holder is an ER chuck (a tapping chuck for a tap, an arbor for a face mill); `toolProfile` draws the outline,
+  so the preview, the Resources page and the machine's gauge length use it; the collision reach takes the flange radius.
+- Checked in the running app: the assumed ER chuck (nut, cone, body, flange) above a Ø10 end mill.
+- Tests: "tool holders as their outline" in `packages/core/test/cam/operation-tools.test.ts`.
+- Open in P8: ISO lathe inserts in their holders and the turret; spindle tapers above the gauge line; the 1 M-move
+  performance budget.
+
 ## Change log
 
 - 2026-10-19: analysis written from the code at 9aa648c and the probes of §2.2.
@@ -501,3 +512,4 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
 - 2026-10-20: P3 completed and checked in the running app; P5 machine models built (§9).
 - 2026-10-20: P7 collisions built (§9).
 - 2026-10-20: P9 assistant part built (§9); mobile part open.
+- 2026-10-20: P8 holder outlines built (§9).

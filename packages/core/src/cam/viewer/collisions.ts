@@ -12,7 +12,7 @@
  * conservative; every event says what was compared.
  */
 import type { Vec3 } from "../../cad/vec.ts"
-import type { ToolModel } from "../tool-model.ts"
+import { assumedHolderOf, holderOutline, type ToolModel } from "../tool-model.ts"
 import type { MachineSetup } from "./machine-setup.ts"
 import { machineBodies } from "./machine-bodies.ts"
 import { apply4, machinePose, type MachineModel, type Mat4, type ModelBody } from "./machine-model.ts"
@@ -41,7 +41,9 @@ export interface ToolReach { readonly flute: number; readonly stickout: number; 
 
 export const toolReachOf = (model: ToolModel | undefined): ToolReach | undefined => {
   if (model === undefined || model.family !== "mill") return undefined
-  return { flute: model.fluteLength, stickout: model.stickout, shank: model.shankDiameter / 2, holder: (model.holder?.diameter ?? Math.max(model.shankDiameter * 1.6 + 12, 22)) / 2 }
+  // The holder's widest point (its flange), the assumed ER chuck when the tool names none.
+  const holder = model.holder ?? assumedHolderOf(model)
+  return { flute: model.fluteLength, stickout: model.stickout, shank: model.shankDiameter / 2, holder: Math.max(...holderOutline(holder, model.shankDiameter / 2).map((p) => p.r)) }
 }
 
 interface Box { readonly min: Vec3; readonly max: Vec3 }

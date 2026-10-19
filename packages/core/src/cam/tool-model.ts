@@ -25,6 +25,13 @@ export type MillShape =
   | "flat" | "roughing" | "ball" | "bull" | "cornerRounding" | "chamfer" | "engraver" | "spot" | "drill" | "reamer" | "tapered"
   | "facemill" | "threadmill" | "disc" | "dovetail" | "boringBar" | "tap" | "lollipop" | "barrel" | "backChamfer" | "counterbore"
 
+/**
+ * Tool holders as their outline (spec 32 P8): an ER collet chuck (nut, cone, body), a shrink-fit chuck (a slim 4.5° nose),
+ * a hydraulic chuck, a Weldon side-lock, a shell-mill arbor, a tapping chuck; each ends in the flange the spindle grips.
+ */
+export type HolderKind = "er" | "shrink" | "hydraulic" | "weldon" | "arbor" | "tapping"
+export const HOLDER_KINDS: ReadonlyArray<HolderKind> = ["er", "shrink", "hydraulic", "weldon", "arbor", "tapping"]
+
 export type LatheInsert = "turning" | "facing" | "threading" | "grooving" | "parting" | "boring" | "knurling"
 export type NozzleType = "brass" | "hardened" | "ruby" | "standard"
 
@@ -38,7 +45,7 @@ export interface MillModel {
   readonly shankDiameter: number
   /** Tip to holder face, mm. */
   readonly stickout: number
-  readonly holder?: { readonly diameter: number; readonly length: number }
+  readonly holder?: { readonly diameter: number; readonly length: number; readonly kind?: HolderKind }
   readonly cornerRadius?: number
   /** Included angle: chamfer / V-bit / spot / drill point / dovetail, degrees. */
   readonly angle?: number
@@ -70,6 +77,8 @@ export interface ToolResource {
   readonly threadPitch?: number | null
   readonly holderDiameter?: number | null
   readonly holderLength?: number | null
+  /** The holder's kind (`er`, `shrink`, `hydraulic`, `weldon`, `arbor`, `tapping`, or words naming one). */
+  readonly holderType?: string | null
   readonly stickout?: number | null
   /** Barrel / circle-segment cutters: the radius of the side form. */
   readonly formRadius?: number | null
@@ -177,7 +186,8 @@ export const toolModelOf = (tool: ToolResource, context?: MachineKind): ToolMode
   const stickout = positive(tool.stickout) ? tool.stickout
     : positive(tool.totalLength) ? (assumed.push("stickout"), Math.max(fluteLength + 2, tool.totalLength * 0.66))
     : (assumed.push("stickout"), Math.max(fluteLength + 5, short ? 40 : 4 * d + 10))
-  const holder = positive(tool.holderDiameter) ? { diameter: tool.holderDiameter, length: positive(tool.holderLength) ? tool.holderLength : 45 } : undefined
+  const holderKind = holderKindOf(tool.holderType)
+  const holder = positive(tool.holderDiameter) ? { diameter: tool.holderDiameter, length: positive(tool.holderLength) ? tool.holderLength : 45, ...(holderKind !== undefined ? { kind: holderKind } : {}) } : undefined
   const angleDefault: Partial<Record<MillShape, number>> = { chamfer: 90, engraver: 60, spot: 90, drill: 118, dovetail: 60, backChamfer: 90 }
   return {
     family: "mill", shape, diameter: d, flutes: positive(tool.numberOfFlutes) ? Math.round(tool.numberOfFlutes) : (assumed.push("numberOfFlutes"), shape === "facemill" ? 5 : shape === "drill" ? 2 : 3),
@@ -361,18 +371,58 @@ export const toolProfile = (model: MillModel | ProbeModel): AssemblyProfile => {
   push({ r: Rs, z: stickout }, "shank")
   let length = stickout
   if (model.holder !== undefined) {
-    const Rh = Math.max(model.holder.diameter / 2, Rs)
-    push({ r: Rh, z: stickout }, "holder")
-    push({ r: Rh, z: stickout + model.holder.length }, "holder")
+    for (const p of holderOutline(model.holder, Rs)) push({ r: p.r, z: stickout + p.z }, "holder")
     push({ r: 0, z: stickout + model.holder.length }, "holder")
     length += model.holder.length
   } else push({ r: 0, z: stickout }, "shank")
   return { points, parts, length, assumedHolder: false }
 }
 
-/** Generic collet holder for a mill model that names none (drawn translucent, flagged assumed). */
-export const assumedHolderOf = (m: MillModel): { readonly diameter: number; readonly length: number } =>
-  ({ diameter: Math.round(Math.max(m.shankDiameter * 1.6 + 12, 22)), length: 45 })
+/** Generic collet holder for a mill model that names none (drawn translucent, flagged assumed): an ER chuck. */
+export const assumedHolderOf = (m: MillModel): { readonly diameter: number; readonly length: number; readonly kind: HolderKind } =>
+  ({ diameter: Math.round(Math.max(m.shankDiameter * 1.6 + 12, 22)), length: 45, kind: m.shape === "tap" ? "tapping" : m.shape === "facemill" ? "arbor" : "er" })
+
+/** The holder kind words name (`ER32 collet chuck`, `shrink fit`, `hydraulic`, `Weldon`, `shell mill arbor`, `tapping`). */
+export const holderKindOf = (words: string | null | undefined): HolderKind | undefined => {
+  const t = (words ?? "").toLowerCase()
+  if (t === "") return undefined
+  if (/shrink|thermal|calettament/.test(t)) return "shrink"
+  if (/hydraul|idraul/.test(t)) return "hydraulic"
+  if (/weldon|side.?lock/.test(t)) return "weldon"
+  if (/arbor|shell|manicotto/.test(t)) return "arbor"
+  if (/tap|maschi/.test(t)) return "tapping"
+  if (/\ber\b|er\d|collet|pinz/.test(t)) return "er"
+  return HOLDER_KINDS.find((k) => k === t)
+}
+
+/**
+ * The outline of a holder from its nose (z = 0, at the stickout) up to its length, outer radius `D / 2` at its widest; the
+ * last stretch is the flange the spindle grips. `Rs` is the shank radius it clamps.
+ */
+export const holderOutline = (h: { readonly diameter: number; readonly length: number; readonly kind?: HolderKind }, Rs: number): ReadonlyArray<ProfilePoint> => {
+  const R = Math.max(h.diameter / 2, Rs), L = Math.max(h.length, 10)
+  const flange = Math.max(R * 1.25, Rs + 8)
+  const top = (z: number): ProfilePoint[] => [{ r: flange, z }, { r: flange, z: L * 0.92 }, { r: Math.max(R * 0.8, Rs), z: L * 0.92 }, { r: Math.max(R * 0.8, Rs), z: L }]
+  switch (h.kind ?? "er") {
+    case "shrink": {
+      // A slim nose that opens at 4.5° from a 3 mm wall round the shank.
+      const r0 = Rs + 3, rise = Math.min(L * 0.6, Math.max(0, (R - r0) / Math.tan((4.5 * Math.PI) / 180)))
+      return [{ r: r0, z: 0 }, { r: r0 + rise * Math.tan((4.5 * Math.PI) / 180), z: rise }, { r: R, z: Math.max(rise, L * 0.62) }, ...top(L * 0.78)]
+    }
+    case "hydraulic":
+      return [{ r: Math.max(R * 0.85, Rs + 4), z: 0 }, { r: Math.max(R * 0.85, Rs + 4), z: L * 0.55 }, { r: R, z: L * 0.6 }, ...top(L * 0.78)]
+    case "weldon":
+      return [{ r: R, z: 0 }, { r: R, z: L * 0.72 }, ...top(L * 0.78)]
+    case "arbor":
+      // The face mill sits on a short spigot with drive keys.
+      return [{ r: Math.max(R * 0.55, Rs), z: 0 }, { r: Math.max(R * 0.55, Rs), z: L * 0.12 }, { r: R, z: L * 0.12 }, { r: R, z: L * 0.65 }, ...top(L * 0.75)]
+    case "tapping":
+      return [{ r: R * 0.7, z: 0 }, { r: R * 0.7, z: L * 0.25 }, { r: R, z: L * 0.3 }, { r: R, z: L * 0.72 }, ...top(L * 0.8)]
+    case "er":
+      // The clamping nut, its cone, the body.
+      return [{ r: R * 0.82, z: 0 }, { r: R, z: L * 0.05 }, { r: R, z: L * 0.26 }, { r: R * 0.74, z: L * 0.34 }, { r: R * 0.74, z: L * 0.62 }, { r: R * 0.92, z: L * 0.7 }, ...top(L * 0.78)]
+  }
+}
 
 /** Meshes of a revolved model; `assumeHolder` adds the generic holder when the model has none. */
 export const toolMeshes = (model: MillModel | ProbeModel, options: { readonly assumeHolder?: boolean; readonly segments?: number } = {}): ReadonlyArray<AssemblyMesh> => {
