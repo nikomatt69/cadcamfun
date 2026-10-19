@@ -435,6 +435,29 @@ describe("3d_surface runs the surface engine over the selected solids", () => {
     expect(feedPoints(finish!).length).toBeGreaterThan(30)
   })
 
+  test("a spiral or radial finishing pass is that pattern over the surface, not a raster fallback", () => {
+    for (const pattern of ["spiral", "radial"] as const) {
+      const { gcode, warnings } = surface({ surfaceStrategy: "roughing", finishingPass: true, finishingAllowance: 0.3, finishingStrategy: pattern })
+      expect(gcode).toContain(`; Finishing pass (${pattern}), 0.300 mm left by the roughing`)
+      expect(warnings.filter((w) => w.includes("not available"))).toEqual([])
+      const finish = feedPoints(gcode.split(`; Finishing pass (${pattern})`)[1]!).filter((p) => Math.hypot(p.x, p.y) < 9)
+      expect(finish.length).toBeGreaterThan(30)
+      for (const p of finish) expect(p.z).toBeGreaterThanOrEqual(Math.sqrt(144 - Math.hypot(p.x, p.y) ** 2) - 12 - 0.03)
+    }
+  })
+
+  test("constant scallop, spiral, radial and flat are surface strategies of their own", () => {
+    for (const strategy of ["scallop", "spiral", "radial"] as const) {
+      const { gcode } = surface({ surfaceStrategy: strategy, scallop: 0.02 })
+      expect(gcode).toContain(`; 3D surface: 1 element(s) as one part model, ${strategy}`)
+      const pts = feedPoints(gcode).filter((p) => Math.hypot(p.x, p.y) < 8)
+      expect(pts.length).toBeGreaterThan(30)
+      for (const p of pts) expect(p.z).toBeGreaterThanOrEqual(Math.sqrt(144 - Math.hypot(p.x, p.y) ** 2) - 12 - 0.03)
+    }
+    // A sphere has no flat face: the flat strategy says so instead of cutting.
+    expect(surface({ surfaceStrategy: "flat", toolType: "endmill" }).gcode).toContain("no flat face")
+  })
+
   test("the verifier finds no gouge, shank or below-stock collision in the program the generator wrote (roughing + waterline finish)", () => {
     const request = {
       settings: settings({ operationType: "3d_surface", toolType: "ballnose", toolDiameter: 4, depth: 9, stepdown: 3, stepover: 50, tolerance: 0.02, surfaceStrategy: "roughing", finishingPass: true, finishingAllowance: 0.3, finishingStrategy: "contour" }),

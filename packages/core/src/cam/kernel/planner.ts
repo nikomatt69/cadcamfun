@@ -38,6 +38,34 @@ export interface PlanInput {
   readonly scallop: number
   /** Chamfer width that breaks the top edges of outlines, pockets and holes, mm (no deburring when absent). */
   readonly deburr?: number
+  /** Upward horizontal faces of the part, by height (`horizontalFaces`): a freeform part with some gets a flat-area finish. */
+  readonly flats?: ReadonlyArray<{ readonly z: number; readonly area: number }>
+}
+
+/**
+ * Upward-facing horizontal faces of triangle meshes, grouped by height (within 1 micron) with their area, highest first: the
+ * floors, ledges and tops a flat-area finish can leave exactly at size. A triangle counts when its normal is within half a degree
+ * of +Z.
+ */
+export const horizontalFaces = (meshes: ReadonlyArray<{ readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }>): Array<{ readonly z: number; readonly area: number }> => {
+  const cos = Math.cos((0.5 * Math.PI) / 180)
+  const found: Array<{ z: number; area: number }> = []
+  for (const m of meshes) {
+    const p = m.positions, ix = m.indices
+    for (let t = 0; t + 2 < ix.length; t += 3) {
+      const a = ix[t]! * 3, b = ix[t + 1]! * 3, c = ix[t + 2]! * 3
+      const ux = p[b]! - p[a]!, uy = p[b + 1]! - p[a + 1]!, uz = p[b + 2]! - p[a + 2]!
+      const vx = p[c]! - p[a]!, vy = p[c + 1]! - p[a + 1]!, vz = p[c + 2]! - p[a + 2]!
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx
+      const len = Math.hypot(nx, ny, nz)
+      if (!(len > 0) || nz < cos * len) continue
+      const z = (p[a + 2]! + p[b + 2]! + p[c + 2]!) / 3
+      const group = found.find((f) => Math.abs(f.z - z) <= 1e-3)
+      if (group === undefined) found.push({ z, area: len / 2 })
+      else group.area += len / 2
+    }
+  }
+  return found.sort((x, y) => y.z - x.z)
 }
 
 export interface Plan {
@@ -345,6 +373,11 @@ export const planJob = (input: PlanInput): Plan => {
       ops.push({ id: "surface-rough", name: "3D adaptive roughing", strategy: "surface", mode: "roughing", clearing: "adaptive", tool: rough.id, allowance })
       if (rough.fluteLength < depth) notes.push(`3D roughing: ${rough.name} has ${rough.fluteLength} mm flutes for ${r3(depth)} mm of stock; deep walls rely on the shank clearance check`)
     }
+    // Flat faces (the top only when it is not faced): finished at their exact height by a flat end mill before the ball runs over
+    // them, so a floor or ledge is left flat instead of with the ball's cusps.
+    const ledges = (input.flats ?? []).filter((f) => f.z > partBottom + 1e-6 && (f.z < partTop - 1e-6 || faceDepth <= 0.005))
+    const flatMill = millers.find((t) => t.kind === "flat" && t.diameter <= (rough?.diameter ?? maxRough) + 1e-9 && ledges.some((f) => f.area >= Math.PI * (t.diameter / 2) ** 2))
+    if (flatMill !== undefined) ops.push({ id: "surface-flats", name: "3D flat-area finishing", strategy: "surface", mode: "flat", tool: flatMill.id, allowance: 0 })
     if (ball === undefined) unmachined.push("No ball mill for 3D finishing")
     else {
       // One finish: waterline on the walls, raster on the flats (each where it keeps the cusp; no pass repeated over the other).

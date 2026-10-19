@@ -210,6 +210,10 @@ function SurfaceSettings(): JSX.Element {
           <option value="parallel">Parallel finishing (raster on the surface)</option>
           <option value="waterline">Waterline finishing (constant Z contours)</option>
           <option value="steep-shallow">Steep and shallow (waterline on walls, raster on flats)</option>
+          <option value="scallop">Constant scallop (3D offset, equal stepover on slopes)</option>
+          <option value="spiral">Spiral finishing (from the middle of the part)</option>
+          <option value="radial">Radial finishing (lines from the middle of the part)</option>
+          <option value="flat">Flat areas (horizontal faces at their exact height)</option>
         </select>
       </div>
       <Show when={s().surfaceStrategy === "steep-shallow"}>
@@ -226,6 +230,9 @@ function SurfaceSettings(): JSX.Element {
         <Show when={s().surfaceClearing === "adaptive"}>
           <div><label class={LABEL}>Radial engagement (% of tool diameter)</label><NumberField min="1" max="50" step="1" value={s().adaptiveEngagement} onValue={(value) => gen.updateSettings("adaptiveEngagement", value)} /></div>
         </Show>
+      </Show>
+      <Show when={s().surfaceStrategy === "scallop" || s().surfaceStrategy === "spiral" || s().surfaceStrategy === "radial"}>
+        <div><label class={LABEL}>Cusp height (mm)</label><NumberField min="0" step="0.005" value={s().scallop} onValue={(value) => gen.updateSettings("scallop", value)} /></div>
       </Show>
       <Show when={raster()}>
         <div class="grid grid-cols-2 gap-3">

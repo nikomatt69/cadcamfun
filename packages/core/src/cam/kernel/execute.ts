@@ -61,7 +61,7 @@ import { digestOf, sha256 } from "./identity.ts"
 import { DEFAULT_MACHINE } from "./machines.ts"
 import { checkNcClearance, type TableGeometry } from "./machine-clearance.ts"
 import { findMaterial, type WorkpieceMaterial } from "./materials.ts"
-import { offsetRing, planJob, type Plan } from "./planner.ts"
+import { horizontalFaces, offsetRing, planJob, type Plan } from "./planner.ts"
 
 export const KERNEL_ALGORITHM = "cadcamfun-cam-kernel@1"
 
@@ -141,7 +141,7 @@ export const prepareJob = (job: ManufacturingJob): CamResult<PreparedJob> => {
   const finishAllowance = job.quality?.finishAllowance ?? material.finishAllowance
   const scallop = job.quality?.scallop ?? 0.01
   const plan = job.operations === undefined
-    ? planJob({ elements, bounds, stock, tools, material, rigidity: machine.limits.rigidity ?? "standard", finishAllowance, scallop, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {}) })
+    ? planJob({ elements, bounds, stock, tools, material, rigidity: machine.limits.rigidity ?? "standard", finishAllowance, scallop, flats: horizontalFaces(meshes), ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {}) })
     : undefined
   const operations = job.operations ?? plan!.operations
   if (operations.length === 0) return { status: "failed", issues: [issue("InvalidInput", "plan", "No operation to run: the part needs no machining or no feature could be planned"), ...(plan?.unmachined ?? []).map((m) => issue("UnsupportedCapability", "plan", m))] }
@@ -168,7 +168,7 @@ const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
     case "thread": return "thread-mill"
     case "engrave": return "engrave"
     case "chamfer": return "chamfer"
-    case "surface": return op.mode === "roughing" ? (op.clearing === "contour" ? "rough-side" : "adaptive") : "finish-3d"
+    case "surface": return op.mode === "roughing" ? (op.clearing === "contour" ? "rough-side" : "adaptive") : op.mode === "flat" ? "finish-floor" : "finish-3d"
     case "multiaxis": return "finish-3d"
   }
 }
@@ -484,7 +484,7 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
           if (op.restFrom !== undefined && restTool === undefined) { fail("UnknownTool", `${op.id}: rest-from cutter '${op.restFrom}' is not in the library`, data); return }
           const params = decode(SurfaceParams, {
             ...common, strategy: op.mode, stepover: Math.max(1, Math.min(100, stepover)), scallop: op.mode === "roughing" ? 0 : (op.scallop ?? prepared.scallop),
-            angle: op.angle ?? 0, ...(op.slopeAngle !== undefined ? { slopeAngle: op.slopeAngle } : {}), allowance: allowance ?? 0, tolerance: prepared.tolerance, entry: "helix", helixPitch: data.helixPitch,
+            angle: op.angle ?? 0, ...(op.slopeAngle !== undefined ? { slopeAngle: op.slopeAngle } : {}), ...(op.center !== undefined ? { center: shift2(op.center, o) } : {}), allowance: allowance ?? 0, tolerance: prepared.tolerance, entry: "helix", helixPitch: data.helixPitch,
             rampAngle: Math.max(0.1, Math.min(45, data.rampAngle)), clearing: op.clearing ?? "adaptive", engagement: Math.max(1, Math.min(50, stepover)),
             ...(restTool !== undefined ? { restFrom: { diameter: restTool.diameter, kind: legacyTool(restTool).kind, ...(restTool.kind === "bull" && restTool.cornerRadius !== undefined ? { tipRadius: restTool.cornerRadius } : {}) } } : {})
           })

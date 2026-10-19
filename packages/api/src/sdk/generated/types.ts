@@ -1386,13 +1386,40 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly coolant?: "off" | "flood" | "mist"
         readonly radialEngagement?: number
         readonly strategy: "surface"
-        readonly mode: "roughing" | "parallel" | "waterline" | "steep-shallow"
+        readonly mode:
+          | "roughing"
+          | "parallel"
+          | "waterline"
+          | "steep-shallow"
+          | "scallop"
+          | "spiral"
+          | "radial"
+          | "flat"
         readonly slopeAngle?: number
         readonly allowance?: number
         readonly scallop?: number
         readonly clearing?: "contour" | "adaptive"
         readonly angle?: number
         readonly restFrom?: string
+        readonly center?: { readonly x: number; readonly y: number }
+      }
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "multiaxis"
+        readonly top: number
+        readonly angle?: number
+        readonly toolAxis?: "normal" | "lead"
+        readonly lead?: number
+        readonly tilt?: number
       }
   >
   readonly tools?: ReadonlyArray<{
@@ -5898,6 +5925,7 @@ export type ToolpathGeneratorManufactureOutput =
             | "engrave"
             | "chamfer"
             | "surface"
+            | "multiaxis"
           toolId: string
           cut:
             | "face"

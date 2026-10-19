@@ -89,7 +89,11 @@ export type OperationSpec =
   | (OperationBase & { readonly strategy: "thread"; readonly center: Vec2; readonly diameter: number; readonly pitch: number; readonly internal: boolean; readonly top: number; readonly length: number; readonly rightHand?: boolean })
   | (OperationBase & { readonly strategy: "engrave"; readonly paths: ReadonlyArray<{ readonly points: ReadonlyArray<Vec2>; readonly closed: boolean }>; readonly top: number; readonly depth: number })
   | (OperationBase & { readonly strategy: "chamfer"; readonly loops: ReadonlyArray<{ readonly points: ReadonlyArray<Vec2>; readonly side: "outside" | "inside" }>; readonly top: number; readonly width: number; readonly tipOffset?: number })
-  | (OperationBase & { readonly strategy: "surface"; readonly mode: "roughing" | "parallel" | "waterline" | "steep-shallow"; readonly slopeAngle?: number; readonly allowance?: number; readonly scallop?: number; readonly clearing?: "contour" | "adaptive"; readonly angle?: number; readonly restFrom?: string })
+  /**
+   * 3D strategies over the part's surface. Finishing: `parallel` raster, `waterline` constant Z, `steep-shallow` (waterline on walls,
+   * raster on flats), `scallop` (constant 3D stepover), `spiral` / `radial` about `center`, `flat` (horizontal faces at their height).
+   */
+  | (OperationBase & { readonly strategy: "surface"; readonly mode: SurfaceMode; readonly slopeAngle?: number; readonly allowance?: number; readonly scallop?: number; readonly clearing?: "contour" | "adaptive"; readonly angle?: number; readonly restFrom?: string; readonly center?: Vec2 })
   /**
    * Simultaneous five-axis finishing on a trunnion table: the tool leans off the surface normal (`lead` towards the travel, `tilt`
    * sideways) and the table turns with the linear axes. The moves carry A/B/C words; `top` is the highest the tool may be.
@@ -97,6 +101,9 @@ export type OperationSpec =
   | (OperationBase & { readonly strategy: "multiaxis"; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead"; readonly lead?: number; readonly tilt?: number })
 
 export type Strategy = OperationSpec["strategy"]
+
+export const SURFACE_MODES = ["roughing", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"] as const
+export type SurfaceMode = typeof SURFACE_MODES[number]
 
 export interface QualityRequirement {
   /** Wall / floor stock the roughing leaves for finishing, mm (default: the material's). */

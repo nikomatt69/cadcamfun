@@ -58,7 +58,7 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
   origin: cad.Vec3Schema,
   stockBounds: Schema.Struct({ min: cad.Vec3Schema, max: cad.Vec3Schema }),
   operations: Schema.Array(Schema.Struct({
-    id, name: Schema.String, strategy: Schema.Literals(["face", "adaptive", "pocket", "profile", "bore", "drill", "thread", "engrave", "chamfer", "surface"]),
+    id, name: Schema.String, strategy: Schema.Literals(["face", "adaptive", "pocket", "profile", "bore", "drill", "thread", "engrave", "chamfer", "surface", "multiaxis"]),
     toolId: id, cut: cutting.fields.cut, status: Schema.Literals(["ok", "failed"]), cutting: Schema.optionalKey(cutting),
     parameters: Schema.Record(Schema.String, Schema.Unknown), overridden: strings, warnings: strings, startZ: Schema.optionalKey(Schema.Finite),
     cutLength: Schema.Finite, timeSeconds: Schema.Finite, removedVolume: Schema.Finite

@@ -311,15 +311,37 @@ describe("running a job: NC plus evidence about that NC", () => {
       schemaVersion: 1, id: "j", name: "Dome", material: "6061", part: { kind: "elements", elements: [base, dome] },
       stock: { min: { x: -22, y: -22, z: 0 }, max: { x: 22, y: 22, z: 17 } }, quality: { resolution: 0.4, scallop: 0.02 }
     }))
-    // Roughing, then one steep-and-shallow finish (waterline on the walls, raster on the dome) with a ball.
-    expect(a.operations.map((o) => o.strategy)).toEqual(["face", "surface", "surface"])
+    // Roughing, the flat ledge of the base round the dome at its exact height with a flat end mill, then one steep-and-shallow
+    // finish (waterline on the walls, raster on the dome) with a ball.
+    expect(a.operations.map((o) => o.strategy)).toEqual(["face", "surface", "surface", "surface"])
     expect(a.operations[1]!.cut).toBe("adaptive")
-    expect(a.operations[2]!.toolId.startsWith("ball-")).toBe(true)
-    expect(a.operations[2]!.cut).toBe("finish-3d")
+    expect(a.operations[2]!.id).toBe("surface-flats")
+    expect(a.operations[2]!.cut).toBe("finish-floor")
+    expect(a.tools.find((t) => t.id === a.operations[2]!.toolId)!.kind).toBe("flat")
+    expect(a.operations[3]!.toolId.startsWith("ball-")).toBe(true)
+    expect(a.operations[3]!.cut).toBe("finish-3d")
     expect(claim(a, "no-gouge")).toBe("passed")
     expect(claim(a, "no-rapid-in-stock")).toBe("passed")
     // Most of the stock above the part is gone; a ball cannot reach the base's sharp inner corner, which the evidence reports.
     expect(a.stock.finalVolume).toBeLessThan(a.stock.partVolume * 1.05)
+  })
+
+  test("constant-scallop, spiral and radial finishing run as kernel operations with their cutting data and evidence", () => {
+    const base = { id: "base", type: "cube", x: 0, y: 0, z: 4, width: 32, height: 32, depth: 8 }
+    const dome = { id: "dome", type: "sphere", x: 0, y: 0, z: 8, radius: 8 }
+    const stock = { min: { x: -17, y: -17, z: 0 }, max: { x: 17, y: 17, z: 16.5 } }
+    for (const mode of ["scallop", "spiral", "radial"] as const) {
+      const a = ok(runJob({
+        schemaVersion: 1, id: `j-${mode}`, name: "Dome", material: "6061", part: { kind: "elements", elements: [base, dome] }, stock,
+        quality: { resolution: 0.4 },
+        operations: [{ id: "finish", strategy: "surface", mode, tool: "ball-6", scallop: 0.02, ...(mode === "scallop" ? {} : { center: { x: 0, y: 0 } }) }]
+      }))
+      expect(a.operations[0]!.status).toBe("ok")
+      expect(a.operations[0]!.cut).toBe("finish-3d")
+      expect(a.operations[0]!.cutLength).toBeGreaterThan(100)
+      expect(claim(a, "no-gouge")).toBe("passed")
+      expect(claim(a, "nc-replay")).toBe("passed")
+    }
   })
 
   test("invalid jobs fail with typed issues instead of producing a program", () => {

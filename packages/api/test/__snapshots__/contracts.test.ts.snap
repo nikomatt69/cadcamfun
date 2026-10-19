@@ -53494,6 +53494,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "parallel",
                           "waterline",
                           "steep-shallow",
+                          "scallop",
+                          "spiral",
+                          "radial",
+                          "flat",
                         ],
                         "type": "string",
                       },
@@ -55698,6 +55702,22 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "angle": {
                               "type": "number",
                             },
+                            "center": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "x": {
+                                  "type": "number",
+                                },
+                                "y": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                              ],
+                              "type": "object",
+                            },
                             "clearing": {
                               "enum": [
                                 "contour",
@@ -55728,6 +55748,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "parallel",
                                 "waterline",
                                 "steep-shallow",
+                                "scallop",
+                                "spiral",
+                                "radial",
+                                "flat",
                               ],
                               "type": "string",
                             },
@@ -56602,6 +56626,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "engrave",
                                       "chamfer",
                                       "surface",
+                                      "multiaxis",
                                     ],
                                     "type": "string",
                                   },
@@ -58627,6 +58652,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "parallel",
                           "waterline",
                           "steep-shallow",
+                          "scallop",
+                          "spiral",
+                          "radial",
+                          "flat",
                         ],
                         "type": "string",
                       },

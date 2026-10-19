@@ -102,7 +102,7 @@ export const surfaceProgram = (placed: ReadonlyArray<CadElement>, s: ToolpathSet
   // Rest machining continues the tool before it. On a roughing that is the `rest` strategy; on a finishing strategy it restricts the
   // path to where the previous (larger) tool did not reach as low: pencil machining when that tool was a ball.
   const rest = s.useRestMachining && s.surfaceStrategy === "roughing"
-  const restFinish = s.useRestMachining && (s.surfaceStrategy === "parallel" || s.surfaceStrategy === "waterline" || s.surfaceStrategy === "steep-shallow")
+  const restFinish = s.useRestMachining && (s.surfaceStrategy === "parallel" || s.surfaceStrategy === "waterline" || s.surfaceStrategy === "steep-shallow" || s.surfaceStrategy === "scallop" || s.surfaceStrategy === "spiral" || s.surfaceStrategy === "radial")
   const strategy: SurfaceStrategy = rest ? "rest" : s.surfaceStrategy
   const previousKind = s.toolType === "ballnose" ? "ballnose" : "endmill"
   const first = modelFor(strategy)
@@ -147,12 +147,10 @@ export const surfaceProgram = (placed: ReadonlyArray<CadElement>, s: ToolpathSet
   })
   gcode += movesToGcode(primary.toolpath.moves)
   if (finishes) {
-    if (s.finishingStrategy === "spiral" || s.finishingStrategy === "radial") {
-      warnings.push(`The ${s.finishingStrategy} finishing strategy is not available for surfaces; a parallel raster is used.`)
-    }
-    const waterline = s.finishingStrategy === "contour"
-    const finish = run("Finishing", waterline ? "waterline" : "parallel", { allowance: 0, scallop: s.scallop, angle: s.rasterAngle, oneWay: s.rasterOneWay })
-    gcode += `\n; Finishing pass (${waterline ? "waterline" : "parallel"}), ${f3(s.finishingAllowance)} mm left by the roughing\n`
+    // `contour` finishes a surface at constant Z (waterline); spiral and radial run about the middle of the part.
+    const finishing: SurfaceStrategy = s.finishingStrategy === "contour" ? "waterline" : s.finishingStrategy
+    const finish = run("Finishing", finishing, { allowance: 0, scallop: s.scallop, angle: s.rasterAngle, oneWay: s.rasterOneWay })
+    gcode += `\n; Finishing pass (${finishing}), ${f3(s.finishingAllowance)} mm left by the roughing\n`
     gcode += movesToGcode(finish.toolpath.moves)
   }
   return { gcode, warnings: [...new Set(warnings)] }

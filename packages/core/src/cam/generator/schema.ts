@@ -71,9 +71,10 @@ export const ToolpathSettingsSchema = Schema.Struct({
   finishingStrategy: withDefault(Schema.Literals(["contour", "parallel", "spiral", "radial"]), "contour"),
   /**
    * `3d_surface` only. `roughing` clears the stock level by level around the part (and, with `finishingPass`, is followed by the
-   * finishing strategy below); `parallel` and `waterline` finish the surface directly.
+   * finishing strategy below); the others finish the surface directly: `parallel` raster, `waterline` constant Z, `steep-shallow`,
+   * `scallop` (constant 3D stepover), `spiral` / `radial` about the middle of the part, `flat` (horizontal faces at their height).
    */
-  surfaceStrategy: withDefault(Schema.Literals(["roughing", "parallel", "waterline", "steep-shallow"]), "roughing"),
+  surfaceStrategy: withDefault(Schema.Literals(["roughing", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"]), "roughing"),
   /** `steep-shallow`: slope, degrees from the horizontal, above which the surface is finished by waterline instead of raster. */
   steepAngle: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 5, maximum: 85 })), 45),
   /**
