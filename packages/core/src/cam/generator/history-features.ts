@@ -202,15 +202,15 @@ const derive = (history: History): HistoryFeatures => {
 
   // Holes: the sites DFM measures (patterns included), carried to world coordinates, then the copies mirrors make.
   const holes: MachiningHole[] = []
-  for (const site of holeSites(history, parameters)) {
+  for (const site of holeSites(history, parameters, built.planes)) {
     const f = features.get(site.source) as HoleFeature | undefined
-    const frame = FRAMES[site.plane]
-    if (f === undefined || frame === undefined) continue
+    const frame = site.frame
+    if (f === undefined) continue
     const head = f.kind === "counterbore" || f.kind === "countersink" ? valueOf(f.headDiameter, parameters) : undefined
     const headDepth = f.kind === "counterbore" ? valueOf(f.headDepth, parameters) : undefined
     holes.push({
       id: site.feature, source: site.source,
-      entry: add(add(scale(frame.n, site.offset), scale(frame.u, site.u)), scale(frame.v, site.v)),
+      entry: add(add(add(frame.origin, scale(frame.n, site.offset)), scale(frame.u, site.u)), scale(frame.v, site.v)),
       direction: scale(frame.n, -1), diameter: site.diameter, depth: site.depth, kind: f.kind ?? "simple",
       ...(head !== undefined ? { headDiameter: head } : {}), ...(headDepth !== undefined ? { headDepth } : {}),
       ...threadOf(f, parameters, site.depth), ...(f.fit !== undefined ? { fit: f.fit } : {})

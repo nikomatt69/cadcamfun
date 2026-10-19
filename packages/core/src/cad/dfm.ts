@@ -14,7 +14,7 @@
  */
 import { dimensionValue, type Dimension } from "./expr.ts"
 import { minEdgeDistance } from "./fasteners.ts"
-import { rebuild, type Feature, type History, type PlaneName, type RebuildResult } from "./history.ts"
+import { rebuild, type Feature, type History, type PlaneName, type PlaneRef, type PlaneFrame, type RebuildResult } from "./history.ts"
 import { sharpVertices, treatCorners } from "./profile-shape.ts"
 import { sketchProfiles } from "./sketch.ts"
 import { meshBounds, meshVolume, type Mesh } from "./solid.ts"
@@ -268,7 +268,8 @@ const meshArea = (mesh: Mesh): number => overhangArea(mesh, 90).total
 
 export interface HoleSite {
   readonly feature: string
-  readonly plane: PlaneName
+  /** The plane the hole lies on: one of the three base planes, or the id of a work plane a `plane` feature made. */
+  readonly plane: PlaneRef
   readonly offset: number
   readonly u: number
   readonly v: number
@@ -276,6 +277,8 @@ export interface HoleSite {
   readonly depth: number
   /** The id of the hole feature this site comes from (a pattern copy keeps its source's id). */
   readonly source: string
+  /** The plane's frame in the world, before the site's offset: the caller needs no other lookup. */
+  readonly frame: PlaneFrame
 }
 
 /** The numeric value of a dimension, or undefined when it cannot be evaluated (the rebuild reports why). */
@@ -284,28 +287,41 @@ const value = (d: Dimension | undefined, parameters: Readonly<Record<string, num
   try { return dimensionValue(d, parameters) } catch { return undefined }
 }
 
-/** Every hole of the history in plane coordinates, with the copies the patterns make. */
-export const holeSites = (history: History, parameters: Readonly<Record<string, number>>): HoleSite[] => {
+/** Every hole of the history in plane coordinates, with the copies the patterns make. The work planes a `plane` feature made are needed for the holes on them. */
+export const holeSites = (history: History, parameters: Readonly<Record<string, number>>, planes: Readonly<Record<string, PlaneFrame>> = {}): HoleSite[] => {
   const base = new Map<string, HoleSite>()
   const sites: HoleSite[] = []
+  /** The frame of a plane: a base plane, or a work plane the rebuild made. */
+  const frameOf = (ref: string): PlaneFrame | undefined => {
+    if (Object.hasOwn(FRAME_UV, ref)) {
+      const f = FRAME_UV[ref as PlaneName]
+      // The normal is u x v, as the base planes are right-handed.
+      return {
+        u: f.u, v: f.v,
+        n: { x: f.u.y * f.v.z - f.u.z * f.v.y, y: f.u.z * f.v.x - f.u.x * f.v.z, z: f.u.x * f.v.y - f.u.y * f.v.x },
+        origin: { x: 0, y: 0, z: 0 }
+      }
+    }
+    return planes[ref]
+  }
   for (const f of history.features) {
     if (f.type === "hole") {
-      // Holes on a work plane (not XY, YZ or ZX) are outside this check: it measures in the three base planes.
-      if (!Object.hasOwn(FRAME_UV, f.plane)) continue
+      const frame = frameOf(f.plane)
+      if (frame === undefined) continue
       const u = value(f.at[0], parameters), v = value(f.at[1], parameters), diameter = value(f.diameter, parameters), depth = value(f.depth, parameters)
       if (u === undefined || v === undefined || diameter === undefined || depth === undefined) continue
-      const site: HoleSite = { feature: f.id, source: f.id, plane: f.plane as PlaneName, offset: value(f.offset, parameters) ?? 0, u, v, diameter, depth }
+      const site: HoleSite = { feature: f.id, source: f.id, plane: f.plane, offset: value(f.offset, parameters) ?? 0, u, v, diameter, depth, frame }
       base.set(f.id, site)
       sites.push(site)
     } else if (f.type === "pattern" && f.feature !== undefined) {
       const source = base.get(f.feature)
       const count = value(f.count, parameters)
       if (source === undefined || count === undefined || !Number.isInteger(count) || count < 2) continue
+      const { u, v } = source.frame
       if (f.kind === "grid") {
         const rows = value(f.countB, parameters)
         const a = (f.step ?? [0, 0, 0]).map((d) => value(d, parameters)), b = (f.stepB ?? [0, 0, 0]).map((d) => value(d, parameters))
         if (rows === undefined || !Number.isInteger(rows) || a.some((d) => d === undefined) || b.some((d) => d === undefined)) continue
-        const { u, v } = FRAME_UV[source.plane]
         const proj = (w: ReadonlyArray<number | undefined>, axis: V3): number => w[0]! * axis.x + w[1]! * axis.y + w[2]! * axis.z
         for (let i = 0; i < count; i++) for (let j = 0; j < rows; j++) {
           if (i === 0 && j === 0) continue
@@ -314,7 +330,6 @@ export const holeSites = (history: History, parameters: Readonly<Record<string, 
       } else if (f.kind === "linear") {
         const step = (f.step ?? [0, 0, 0]).map((s) => value(s, parameters))
         if (step.some((s) => s === undefined)) continue
-        const { u, v } = FRAME_UV[source.plane]
         const du = step[0]! * u.x + step[1]! * u.y + step[2]! * u.z, dv = step[0]! * v.x + step[1]! * v.y + step[2]! * v.z
         for (let i = 1; i < count; i++) sites.push({ ...source, feature: `${f.id}#${i}`, u: source.u + du * i, v: source.v + dv * i })
       } else if (source.plane === "XY") {
@@ -467,8 +482,10 @@ export const analyzeManufacturability = (history: History, options: DfmOptions =
     if (process === "mill" && site.diameter < 14 && Math.abs(site.diameter * 10 - Math.round(site.diameter * 10)) > 1e-6) {
       add({ severity: "info", code: "NON_STANDARD_DRILL", feature: site.feature, message: `Hole Ø${round(site.diameter, 4)} mm is not a standard drill size (steps of 0.1 mm below 14 mm)`, measured: site.diameter, fix: "Use a standard size, or plan to ream / bore it" })
     }
-    const own = outlineSegments(history, result, site.plane)
-    const segments = own.length > 0 ? own : bodyOutline(result, site.plane)
+    // The edge distance is measured in the plane's own coordinates: the outlines it knows are the ones of the base planes.
+    if (!Object.hasOwn(FRAME_UV, site.plane)) continue
+    const own = outlineSegments(history, result, site.plane as PlaneName)
+    const segments = own.length > 0 ? own : bodyOutline(result, site.plane as PlaneName)
     let edge = Infinity
     for (const [a, b] of segments) edge = Math.min(edge, pointSegmentDistance({ x: site.u, y: site.v }, a, b))
     const needed = minEdgeDistance(site.diameter, material)

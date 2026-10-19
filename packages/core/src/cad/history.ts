@@ -473,6 +473,8 @@ export interface RebuildResult {
   readonly bodies: ReadonlyArray<Body>
   readonly parameters: Readonly<Record<string, number>>
   readonly sketches: Readonly<Record<string, { readonly plane: PlaneRef; readonly offset: number; readonly frame: PlaneFrame; readonly solve: SolveResult }>>
+  /** The work planes the `plane` features made, by feature id: a hole, a text or a sketch on one follows it. */
+  readonly planes: Readonly<Record<string, PlaneFrame>>
   /** The flat pattern of each sheet-metal feature: straight length, bends and the strip's length before bending. */
   readonly flatPatterns: Readonly<Record<string, Developed>>
   readonly issues: ReadonlyArray<Issue>
@@ -1577,7 +1579,7 @@ export const rebuild = (history: History): RebuildResult => {
       issues.push({ feature: f.id, severity: "error", message: error instanceof SketchError || error instanceof Error ? error.message : String(error) })
     }
   }
-  return { bodies, parameters: values, sketches, flatPatterns, issues }
+  return { bodies, parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues }
 }
 
 /** Volume of the bodies together, mm^3 (they may touch but are assumed not to overlap). */

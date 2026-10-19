@@ -463,7 +463,7 @@ describe("exact replay on work planes", () => {
     expect(Math.hypot(exact.x - mesh.x, exact.y - mesh.y, exact.z - mesh.z)).toBeLessThan(1e-3)
   })
 
-  test("a hole on a work plane says it has no exact model and adds no body", () => {
+  test("a hole on a work plane is an exact cylinder cut", () => {
     const h = history([
       rectangle("s1", "XY", 0, 0, 40, 25),
       { id: "plate", type: "extrude", sketch: "s1", depth: 6, operation: "new" },
@@ -472,6 +472,43 @@ describe("exact replay on work planes", () => {
     ])
     const r = rebuildExact(h)
     expect(r.bodies.length).toBe(1)
-    expect(r.bodies[0]!.reason).toContain("work plane 'w'")
+    expect(r.bodies[0]!.reason).toBeUndefined()
+    // The same cylinder the base plane cuts.
+    expect(rel(massProperties(r.bodies[0]!.brep!).volume, 6000 - PI * 16 * 6)).toBeLessThan(1e-9)
+  })
+
+  test("a hole on a tilted work plane is cut along the plane's normal", () => {
+    const h = history([
+      rectangle("s1", "XY", 0, 0, 40, 25),
+      { id: "plate", type: "extrude", sketch: "s1", depth: 6, operation: "new" },
+      // A plane tilted 30 degrees about the X axis, crossing the plate.
+      { id: "w", type: "plane", from: { kind: "angle", base: "XY", angle: 30, about: "u", at: 12.5 } },
+      { id: "h1", type: "hole", plane: "w", at: [20, 0], diameter: 8, depth: 6 }
+    ])
+    const r = rebuildExact(h)
+    expect(r.bodies.length).toBe(1)
+    expect(r.bodies[0]!.reason).toBeUndefined()
+    const rep = validateBrep(r.bodies[0]!.brep!)
+    expect(rep.issues.map((i) => i.message)).toEqual([])
+    // The hole is a cylinder: the body lost a cylindrical face and some volume.
+    const faces = r.bodies[0]!.brep!.faces.filter((f) => f.surface.kind === "cylinder")
+    expect(faces.length).toBeGreaterThan(0)
+    const v = massProperties(r.bodies[0]!.brep!).volume
+    expect(v).toBeLessThan(6000)
+    expect(v).toBeGreaterThan(6000 - PI * 16 * 6)
+  })
+
+  test("a hole on a work plane that does not exist is an error and the body keeps its model", () => {
+    const h = history([
+      rectangle("s1", "XY", 0, 0, 40, 25),
+      { id: "plate", type: "extrude", sketch: "s1", depth: 6, operation: "new" },
+      { id: "h1", type: "hole", plane: "missing", at: [20, 12.5], diameter: 8, depth: 6 }
+    ])
+    const r = rebuildExact(h)
+    expect(r.result.issues.filter((i) => i.feature === "h1").map((i) => i.severity)).toEqual(["error"])
+    expect(r.bodies.length).toBe(1)
+    // The hole never ran, so the plate is untouched and still exact.
+    expect(r.bodies[0]!.reason).toBeUndefined()
+    expect(rel(massProperties(r.bodies[0]!.brep!).volume, 6000)).toBeLessThan(1e-9)
   })
 })

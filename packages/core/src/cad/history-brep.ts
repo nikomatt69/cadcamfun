@@ -16,7 +16,7 @@
  */
 import { dimensionValue, type Dimension } from "./expr.ts"
 import { polygonArea, sketchProfiles, type Sketch } from "./sketch.ts"
-import { length3, sub3 } from "./vec.ts"
+import { add3, cross3, dot3, length3, normalize3, scale3, sub3 } from "./vec.ts"
 import { rebuild, type Feature, type History, type PlaneName, type RebuildResult } from "./history.ts"
 import {
   blendBrep,
@@ -576,6 +576,16 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
   const sweeps = new Map<string, { readonly loops: ReadonlyArray<ProfileLoop>; readonly start: PathFrame; readonly pieces: ReadonlyArray<PathPiece>; readonly closed: boolean }>()
   // And of a revolution: its (radial, axial) profile and axis.
   const revolutions = new Map<string, { readonly loop: ProfileLoop; readonly full: boolean; readonly origin: Vec3; readonly axis: Vec3; readonly radial: Vec3 }>()
+  // Work planes made by `plane` features, with their offset already applied: what the holes, texts and threads on them use.
+  const planes = new Map<string, { readonly u: Vec3; readonly v: Vec3; readonly n: Vec3; readonly origin: Vec3 }>()
+  /** The frame of a plane reference (a base plane or a work plane) with `offset` along its normal. */
+  const planeFrame = (ref: string, offset: number): { readonly u: Vec3; readonly v: Vec3; readonly n: Vec3; readonly origin: Vec3 } | undefined => {
+    const base = Object.hasOwn(PLANES, ref)
+      ? { ...PLANES[ref as PlaneName], origin: { x: 0, y: 0, z: 0 } }
+      : planes.get(ref)
+    if (base === undefined) return undefined
+    return offset === 0 ? base : { ...base, origin: add3(base.origin, scale3(base.n, offset)) }
+  }
 
   const boolean = (a: Exact, b: Exact, op: "union" | "subtract" | "intersect"): Exact => {
     if (a.brep === undefined) return a
@@ -721,13 +731,19 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
         case "hole": {
           const offset = f.offset === undefined ? 0 : dim(f.offset)
           const x = dim(f.at[0]), y = dim(f.at[1]), d = dim(f.diameter), depth = dim(f.depth)
-          if (!Object.hasOwn(PLANES, f.plane)) {
+          // The plane the hole lies on: one of the three base planes, or a work plane a `plane` feature made (a tilted or a
+          // face plane). The hole goes into the part, against the plane's normal.
+          const P = planeFrame(f.plane, offset)
+          if (P === undefined) {
             // A hole always subtracts: the bodies it cuts lose their exact model, no new body appears.
             unsupported({ ...f, operation: "subtract" }, `a hole on the work plane '${f.plane}' has no exact model yet`)
             break
           }
-          const P = PLANES[f.plane as PlaneName]
-          const origin = { x: P.n.x * offset + P.u.x * x + P.v.x * y, y: P.n.y * offset + P.u.y * x + P.v.y * y, z: P.n.z * offset + P.u.z * x + P.v.z * y }
+          const origin = {
+            x: P.origin.x + P.u.x * x + P.v.x * y,
+            y: P.origin.y + P.u.y * x + P.v.y * y,
+            z: P.origin.z + P.u.z * x + P.v.z * y
+          }
           const e = 0.01
           let profile: Vec2[]
           if (f.kind === undefined || f.kind === "simple") profile = [{ x: 0, y: e }, { x: d / 2, y: e }, { x: d / 2, y: -depth }, { x: 0, y: -depth }]
@@ -999,9 +1015,67 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
           bodies[bodies.indexOf(target)] = { ...target, exact: typeof drafted === "string" ? no(drafted) : ok(drafted) }
           break
         }
-        case "plane":
-          // Construction geometry only: no body changes.
+        case "plane": {
+          // Construction geometry: no body changes, but the frame it defines is what the holes, texts and threads on it use.
+          const d = f.from
+          let made: { readonly u: Vec3; readonly v: Vec3; readonly n: Vec3; readonly origin: Vec3 } | undefined
+          if (d.kind === "offset") {
+            const distance = dim(d.distance)
+            if (distance === undefined) break
+            made = planeFrame(d.base, distance)
+          } else if (d.kind === "angle") {
+            const angle = dim(d.angle), at = d.at === undefined ? 0 : dim(d.at)
+            const base = planeFrame(d.base, 0)
+            if (angle === undefined || at === undefined || base === undefined) break
+            const axis = d.about === "u" ? base.u : base.v
+            const across = d.about === "u" ? base.v : base.u
+            const turn = (vec: Vec3): Vec3 => {
+              const c = Math.cos((angle * Math.PI) / 180), sn = Math.sin((angle * Math.PI) / 180)
+              return add3(add3(scale3(vec, c), scale3(cross3(axis, vec), sn)), scale3(axis, dot3(axis, vec) * (1 - c)))
+            }
+            const origin = add3(base.origin, scale3(across, at))
+            made = d.about === "u" ? { u: base.u, v: turn(base.v), n: turn(base.n), origin } : { u: turn(base.u), v: base.v, n: turn(base.n), origin }
+          } else if (d.kind === "points") {
+            const raw = d.points.map((q) => q.map(dim))
+            if (raw.some((q) => q.some((v) => v === undefined))) break
+            const p = raw as ReadonlyArray<ReadonlyArray<number>>
+            const p1 = { x: p[0]![0]!, y: p[0]![1]!, z: p[0]![2]! }
+            const p2 = { x: p[1]![0]!, y: p[1]![1]!, z: p[1]![2]! }
+            const p3 = { x: p[2]![0]!, y: p[2]![1]!, z: p[2]![2]! }
+            const e1 = sub3(p2, p1), nn = cross3(e1, sub3(p3, p1))
+            if (length3(e1) < 1e-9 || length3(nn) < 1e-9) break
+            const u = normalize3(e1), n = normalize3(nn)
+            made = { u, v: cross3(n, u), n, origin: p1 }
+          } else {
+            // A face of a body: the nearest planar face to `near` (`normal` tells which side), square to it.
+            const nx = dim(d.near[0]), ny = dim(d.near[1]), nz = dim(d.near[2])
+            const hx = d.normal === undefined ? undefined : dim(d.normal[0])
+            const hy = d.normal === undefined ? undefined : dim(d.normal[1])
+            const hz = d.normal === undefined ? undefined : dim(d.normal[2])
+            const lift = d.offset === undefined ? 0 : dim(d.offset)
+            if (nx === undefined || ny === undefined || nz === undefined || lift === undefined) break
+            if (d.normal !== undefined && (hx === undefined || hy === undefined || hz === undefined)) break
+            const near = { x: nx, y: ny, z: nz }
+            const hint = hx === undefined || hy === undefined || hz === undefined ? undefined : { x: hx, y: hy, z: hz }
+            const candidates = bodies.filter((b) => d.body === undefined || b.id === d.body)
+            let best: { readonly frame: { readonly normal: Vec3; readonly centroid: Vec3; readonly u: Vec3; readonly v: Vec3 }; readonly distance: number } | undefined
+            for (const b of candidates) {
+              if (b.exact.brep === undefined) continue
+              const pick = pickPlanarFace(b.exact.brep, near, hint)
+              if (pick === undefined) continue
+              const found = planarFaceFrame(b.exact.brep, pick)
+              if (typeof found === "string") continue
+              if (best === undefined || pick.distance < best.distance) best = { frame: found, distance: pick.distance }
+            }
+            if (best === undefined) break
+            made = {
+              u: best.frame.u, v: best.frame.v, n: best.frame.normal,
+              origin: add3(best.frame.centroid, scale3(best.frame.normal, lift))
+            }
+          }
+          if (made !== undefined) planes.set(f.id, made)
           break
+        }
         case "sweep": {
           const prof = sketchOf(f.profile), route = sketchOf(f.path)
           if (prof === undefined || route === undefined) break
