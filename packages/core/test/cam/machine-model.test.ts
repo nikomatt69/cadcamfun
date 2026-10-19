@@ -110,3 +110,17 @@ describe("travel and rotary limits", () => {
     expect(v.checkLimits(model, t, r, () => 60).map((f) => [f.code, f.severity])).toEqual([["ROTARY_A", "error"]])
   })
 })
+
+describe("singularities and C unwinding", () => {
+  const timelineOf = (gcode: string) => { const a = g.analyseGcode(gcode); return { a, t: v.buildTimeline(a.program, a.motion) } }
+  test("C spinning at A≈0 is a singularity; a C turn over 180° in one move unwinds the long way", () => {
+    const program = "(TABLE-AC)\nG21 G90\nG43.4 H1\nG0 X0 Y0 Z50 A0 C0\nG1 X10 A0.5 C90 F500\nG1 A30 C100\nG1 C350\nG1 A-10 C340\nM30"
+    const { a, t } = timelineOf(program)
+    const r = v.rotaryOfProgram(a.program, program)!
+    const model = v.machineModelOf({ ...mill, axes: 5, rotary: r }, { tilt: [-120, 120], travel: { x: 800, y: 800, z: 800 } })!
+    const found = v.checkLimits(model, t, r, () => 60)
+    expect(found.map((f) => [f.code, f.line])).toEqual([["SINGULARITY", 5], ["C_UNWIND", 7]])
+    // A30 -> A-10 crosses the pole but C barely turns: not reported.
+    expect(found.find((f) => f.code === "SINGULARITY")!.count).toBe(1)
+  })
+})

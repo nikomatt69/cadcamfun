@@ -249,7 +249,7 @@ const jointsOf = (m: Vec3, angles: Angles): Joints => ({ x: m.x, y: m.y, z: m.z,
 // -- limits -----------------------------------------------------------------------------------------------------------------
 
 export interface LimitFinding {
-  readonly code: "TRAVEL_X" | "TRAVEL_Y" | "TRAVEL_Z" | "ROTARY_A" | "ROTARY_B" | "ROTARY_C"
+  readonly code: "TRAVEL_X" | "TRAVEL_Y" | "TRAVEL_Z" | "ROTARY_A" | "ROTARY_B" | "ROTARY_C" | "SINGULARITY" | "C_UNWIND"
   readonly severity: "error" | "warning"
   /** First move (index into the timeline) where the axis leaves its range, its source line, and how many moves do. */
   readonly move: number
@@ -266,8 +266,19 @@ export interface LimitFinding {
  * must stay under the top of the Z travel, so Z is checked with the tool's `gauge`. Assumed limits give warnings, entered
  * ones errors.
  */
+/** Within this tilt (degrees) of the pole, a turning C is a singularity. */
+export const SINGULAR_TILT = 1
+/** A C turn this large (degrees) in one move near the pole is reported. */
+export const SINGULAR_C = 10
+const round2 = (n: number) => Math.round(n * 100) / 100
+
 export const checkLimits = (model: MachineModel, timeline: Timeline, rotary: RotarySetup | undefined, gaugeOf: (path: number) => number): ReadonlyArray<LimitFinding> => {
   const found = new Map<LimitFinding["code"], LimitFinding>()
+  const single = (code: LimitFinding["code"], move: number, line: number | undefined, value: number, message: string) => {
+    const was = found.get(code)
+    if (was !== undefined) { found.set(code, { ...was, count: was.count + 1 }); return }
+    found.set(code, { code, severity: "warning", move, ...(line !== undefined ? { line } : {}), count: 1, value, range: [0, 0], assumed: false, message })
+  }
   const assumedTravel = model.assumed.includes("travel"), assumedRotary = model.assumed.includes("rotary limits")
   timeline.moves.forEach((move, i) => {
     const pose = poseAt(timeline, move.start + move.duration)
@@ -287,6 +298,16 @@ export const checkLimits = (model: MachineModel, timeline: Timeline, rotary: Rot
     check("ROTARY_A", pose.angles.a ?? 0, model.rotaryLimits.a, assumedRotary, "A")
     check("ROTARY_B", pose.angles.b ?? 0, model.rotaryLimits.b, assumedRotary, "B")
     check("ROTARY_C", pose.angles.c ?? 0, model.rotaryLimits.c, assumedRotary, "C")
+    // Kinematic singularities and C turning the long way (spec 32 §4.1): read from the move's own angles.
+    if (rotary !== undefined && move.kind !== "dwell") {
+      const tilt = rotary.layout === "table-BC" || rotary.layout === "head-table-BC" ? "b" : "a"
+      const t0 = move.anglesFrom[tilt] ?? 0, t1 = move.angles[tilt] ?? 0
+      const c0 = move.anglesFrom.c ?? 0, c1 = move.angles.c ?? 0
+      const dc = c1 - c0
+      const near = Math.min(Math.abs(t0), Math.abs(t1)) < SINGULAR_TILT || t0 * t1 < 0
+      if (near && Math.abs(dc) > SINGULAR_C) single("SINGULARITY", i, move.state.line, Math.abs(dc), `${tilt.toUpperCase()} ${round2(t0)}→${round2(t1)} passes the pole while C turns ${round2(dc)}°: the table spins round a still tool (a singularity)`)
+      if (Math.abs(dc) > 180 + 1e-9) single("C_UNWIND", i, move.state.line, Math.abs(dc), `C turns ${round2(dc)}° in one move: the long way round (unwind C or split the move)`)
+    }
   })
   return [...found.values()]
 }

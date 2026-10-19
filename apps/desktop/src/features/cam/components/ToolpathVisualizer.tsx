@@ -168,7 +168,19 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     const hit = collisions().find((e) => e.seconds > before + 1e-9 && e.seconds <= now + 1e-9)
     if (hit !== undefined) { props.onPlayingChange?.(false); props.onPlaybackTimeChange(hit.seconds) }
   }))
-  const limitMarkers = createMemo(() => findingTimes(timeline(), (machineInfo()?.limits ?? []).map((f) => ({ ...(f.line !== undefined ? { line: f.line } : {}), severity: f.severity, message: f.message }))))
+  /**
+   * Machine limits on the same clock (spec 32 §4.1): singularities and C unwinding for every rotary program; travel and rotary
+   * ranges only with the machine shown (they need its sizes).
+   */
+  const limits = createMemo((): ReadonlyArray<cam.viewer.LimitFinding> => {
+    const setup = props.machine
+    if (setup === undefined || setup.kind !== "mill" || (!showMachine() && setup.rotary === undefined)) return []
+    const model = cam.viewer.machineModelOf(setup, machineOptions())
+    if (model === undefined) return []
+    const found = cam.viewer.checkLimits(model, timeline(), setup.rotary, (path) => gaugeOfTool(previewToolFor(props.program.toolpaths[path]?.toolId ?? "", props), showHolder()))
+    return showMachine() ? found : found.filter((f) => f.code === "SINGULARITY" || f.code === "C_UNWIND")
+  })
+  const limitMarkers = createMemo(() => findingTimes(timeline(), limits().map((f) => ({ ...(f.line !== undefined ? { line: f.line } : {}), severity: f.severity, message: f.message }))))
   const rotary = (): cam.viewer.RotarySetup | undefined => (props.machine?.kind === "mill" ? props.machine.rotary : undefined)
   // Each machine opens on the view its operator reads: a lathe from the front (the XZ plane flat, the chuck on the left).
   const presetFor = (kind: cam.MachineKind | undefined): ViewPreset => (kind === "lathe" ? "front" : "perspective")
@@ -398,7 +410,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                         {t("cam.visualizer.collision")}: {e.message}{e.count > 1 ? ` (×${e.count})` : ""}
                       </button>
                     )}</For>
-                    <For each={(machineInfo()?.limits ?? []).slice(0, 3)}>{(f) => (
+                    <For each={limits().slice(0, 3)}>{(f) => (
                       <div data-testid="visualizer-limit" class={f.severity === "error" ? "text-red-400" : "text-amber-300"}>{t("cam.visualizer.limit")}: {f.message}{f.count > 1 ? ` (×${f.count})` : ""}</div>
                     )}</For>
                   </div>
