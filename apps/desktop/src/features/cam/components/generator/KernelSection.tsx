@@ -21,7 +21,7 @@ type Cutter = cam.kernel.Cutter
 const KINDS: Readonly<Record<Operation["strategy"], ReadonlyArray<Cutter["kind"]>>> = {
   face: ["facemill", "flat", "bull"], adaptive: ["flat", "bull", "ball"], pocket: ["flat", "bull", "ball"], profile: ["flat", "bull", "ball"],
   bore: ["flat", "bull"], drill: ["drill", "spot", "chamfer"], thread: ["threadmill"], engrave: ["engraver", "chamfer", "spot", "ball"],
-  chamfer: ["chamfer", "spot", "engraver"], surface: ["flat", "bull", "ball"]
+  chamfer: ["chamfer", "spot", "engraver"], surface: ["flat", "bull", "ball"], multiaxis: ["ball", "bull", "flat"]
 }
 const OVERRIDES = ["rpm", "feed", "stepdown", "stepover"] as const
 

@@ -5,7 +5,9 @@
  *
  *   mill     a solid of revolution about +Z, tip at the origin: flat, ball, bull, corner rounding, chamfer / V-bit /
  *            engraver / spot drill, drill, reamer, tapered, roughing, face mill, thread mill (its teeth at the pitch),
- *            T-slot / Woodruff / keyway (a disc on a neck), dovetail, boring bar; shank and holder above
+ *            T-slot / Woodruff / keyway (a disc on a neck), dovetail, boring bar, tap (thread form behind a chamfer lead),
+ *            lollipop (a ball on a neck: undercuts), barrel / circle segment (a large side radius, hyperMILL-style finishing),
+ *            back chamfer (a cone facing up), counterbore (a pilot below the cutter); shank and holder above
  *   probe    a touch probe: ruby ball, stylus, body (spindle off)
  *   setter   a tool setter on the table: what is measured is the cutter in the spindle
  *   lathe    a flat insert outline in the tool plane: turning, facing, threading, grooving, parting, boring, knurling
@@ -21,7 +23,7 @@ import { revolveProfile, type AssemblyMesh, type AssemblyPart, type AssemblyProf
 
 export type MillShape =
   | "flat" | "roughing" | "ball" | "bull" | "cornerRounding" | "chamfer" | "engraver" | "spot" | "drill" | "reamer" | "tapered"
-  | "facemill" | "threadmill" | "disc" | "dovetail" | "boringBar"
+  | "facemill" | "threadmill" | "disc" | "dovetail" | "boringBar" | "tap" | "lollipop" | "barrel" | "backChamfer" | "counterbore"
 
 export type LatheInsert = "turning" | "facing" | "threading" | "grooving" | "parting" | "boring" | "knurling"
 export type NozzleType = "brass" | "hardened" | "ruby" | "standard"
@@ -44,6 +46,8 @@ export interface MillModel {
   /** Disc and dovetail cutters: the neck between the head and the shank. */
   readonly neckDiameter?: number
   readonly tipDiameter?: number
+  /** Barrel / circle-segment cutters: the radius of the side form, mm. */
+  readonly formRadius?: number
   readonly assumed: ReadonlyArray<string>
 }
 export interface ProbeModel { readonly family: "probe"; readonly ballDiameter: number; readonly stylusLength: number; readonly bodyDiameter: number; readonly assumed: ReadonlyArray<string> }
@@ -67,6 +71,8 @@ export interface ToolResource {
   readonly holderDiameter?: number | null
   readonly holderLength?: number | null
   readonly stickout?: number | null
+  /** Barrel / circle-segment cutters: the radius of the side form. */
+  readonly formRadius?: number | null
 }
 
 const MILL_TYPES: Readonly<Record<string, MillShape>> = {
@@ -85,7 +91,12 @@ const MILL_TYPES: Readonly<Record<string, MillShape>> = {
   threadmill: "threadmill",
   tslotcutter: "disc", tslot: "disc", woodruffcutter: "disc", woodruff: "disc", keywaycutter: "disc", keyseat: "disc", slittingsaw: "disc",
   dovetailcutter: "dovetail", dovetail: "dovetail",
-  boringbar: "boringBar", boringhead: "boringBar"
+  boringbar: "boringBar", boringhead: "boringBar",
+  tap: "tap", machinetap: "tap", spiraltap: "tap", formtap: "tap",
+  lollipop: "lollipop", lollipopcutter: "lollipop", undercutmill: "lollipop", sphericalmill: "lollipop",
+  barrel: "barrel", barrelcutter: "barrel", circlesegment: "barrel", circlesegmentcutter: "barrel", ovalform: "barrel", lensform: "barrel",
+  backchamfer: "backChamfer", backchamfermill: "backChamfer", backchamfercutter: "backChamfer",
+  counterbore: "counterbore", counterborecutter: "counterbore", pilotcounterbore: "counterbore"
 }
 const LATHE_TYPES: Readonly<Record<string, LatheInsert>> = {
   turning: "turning", turningtool: "turning", facing: "facing", facingtool: "facing", threading: "threading", threadingtool: "threading",
@@ -96,7 +107,7 @@ const NOZZLES: Readonly<Record<string, NozzleType>> = { brass: "brass", hardened
 
 /** The tool types the Resources offer, by machine (the form's type list). */
 export const TOOL_TYPES: Readonly<Record<MachineKind, ReadonlyArray<string>>> = {
-  mill: ["endmill", "roughingendmill", "ballendmill", "bullnose", "cornerroundingmill", "chamfermill", "vbit", "engraver", "spotdrill", "drillbit", "reamer", "taperedendmill", "facemill", "threadmill", "tslotcutter", "woodruffcutter", "keywaycutter", "dovetailcutter", "boringbar", "probe", "toolsetter"],
+  mill: ["endmill", "roughingendmill", "ballendmill", "bullnose", "cornerroundingmill", "chamfermill", "vbit", "engraver", "spotdrill", "drillbit", "reamer", "taperedendmill", "facemill", "threadmill", "tap", "tslotcutter", "woodruffcutter", "keywaycutter", "dovetailcutter", "lollipop", "barrel", "backchamfer", "counterbore", "boringbar", "probe", "toolsetter"],
   lathe: ["turning", "facing", "threading", "grooving", "parting", "boring", "knurling"],
   "3dprinter": ["brass", "hardened", "ruby", "standard"]
 }
@@ -108,6 +119,14 @@ export const toolMachineOf = (type: string): MachineKind | undefined => {
   if (LATHE_TYPES[key] !== undefined) return "lathe"
   if (NOZZLES[key] !== undefined) return "3dprinter"
   return undefined
+}
+
+/** ISO 261 coarse pitch of a metric tap of nominal diameter `d` (the nearest listed size). */
+export const isoCoarsePitch = (d: number): number => {
+  const table: ReadonlyArray<readonly [number, number]> = [[1, 0.25], [1.6, 0.35], [2, 0.4], [2.5, 0.45], [3, 0.5], [4, 0.7], [5, 0.8], [6, 1], [8, 1.25], [10, 1.5], [12, 1.75], [14, 2], [16, 2], [20, 2.5], [24, 3], [30, 3.5], [36, 4], [42, 4.5], [48, 5]]
+  let best = table[0]!
+  for (const row of table) if (Math.abs(row[0] - d) < Math.abs(best[0] - d)) best = row
+  return best[1]
 }
 
 const normalise = (type: string): string => type.toLowerCase().replace(/[\s_\-/]+/g, "")
@@ -140,24 +159,27 @@ export const toolModelOf = (tool: ToolResource, context?: MachineKind): ToolMode
   const nozzle = NOZZLES[key]
   if (nozzle !== undefined) return { family: "nozzle", diameter: positive(tool.diameter) ? tool.diameter : 0.4, nozzle, assumed }
   const shape = MILL_TYPES[key] ?? (assumed.push("type"), "flat" as const)
-  const short = shape === "facemill" || shape === "disc"
-  const fluteLength = pick(tool.cuttingLength, short ? Math.max(2, d * 0.12) : shape === "drill" || shape === "reamer" ? 5 * d : 3 * d, "cuttingLength")
+  const short = shape === "facemill" || shape === "disc" || shape === "backChamfer"
+  const fluteLength = pick(tool.cuttingLength, short ? Math.max(2, d * 0.12) : shape === "drill" || shape === "reamer" ? 5 * d : shape === "tap" ? 2 * d : shape === "lollipop" ? Math.max(3 * d, d + 2) : 3 * d, "cuttingLength")
+  const necked = shape === "disc" || shape === "dovetail" || shape === "lollipop" || shape === "backChamfer"
   const shankDiameter = pick(tool.shankDiameter, shape === "facemill" ? Math.min(32, Math.max(16, d * 0.4)) : shape === "disc" || shape === "dovetail" ? Math.max(6, Math.min(d * 0.4, 16)) : Math.max(3, d), "shankDiameter")
   // Stickout: given, else the total length less what a holder grips (a third), else the kind's default.
   const stickout = positive(tool.stickout) ? tool.stickout
     : positive(tool.totalLength) ? (assumed.push("stickout"), Math.max(fluteLength + 2, tool.totalLength * 0.66))
     : (assumed.push("stickout"), Math.max(fluteLength + 5, short ? 40 : 4 * d + 10))
   const holder = positive(tool.holderDiameter) ? { diameter: tool.holderDiameter, length: positive(tool.holderLength) ? tool.holderLength : 45 } : undefined
-  const angleDefault: Partial<Record<MillShape, number>> = { chamfer: 90, engraver: 60, spot: 90, drill: 118, dovetail: 60 }
+  const angleDefault: Partial<Record<MillShape, number>> = { chamfer: 90, engraver: 60, spot: 90, drill: 118, dovetail: 60, backChamfer: 90 }
   return {
     family: "mill", shape, diameter: d, flutes: positive(tool.numberOfFlutes) ? Math.round(tool.numberOfFlutes) : (assumed.push("numberOfFlutes"), shape === "facemill" ? 5 : shape === "drill" ? 2 : 3),
     fluteLength, shankDiameter, stickout, ...(holder !== undefined ? { holder } : {}),
     ...(shape === "bull" || shape === "cornerRounding" ? { cornerRadius: positive(tool.cornerRadius) ? tool.cornerRadius : (assumed.push("cornerRadius"), shape === "bull" ? d * 0.1 : d * 0.25) } : {}),
     ...(angleDefault[shape] !== undefined ? { angle: positive(tool.tipAngle) ? tool.tipAngle : (assumed.push("tipAngle"), angleDefault[shape]!) } : {}),
     ...(shape === "tapered" ? { angle: positive(tool.tipAngle) ? tool.tipAngle : (assumed.push("tipAngle"), 3) } : {}),
-    ...(shape === "threadmill" ? { pitch: positive(tool.threadPitch) ? tool.threadPitch : (assumed.push("threadPitch"), 1.5) } : {}),
-    ...(shape === "disc" || shape === "dovetail" ? { neckDiameter: Math.min(shankDiameter, d * 0.6) } : {}),
+    ...(shape === "threadmill" || shape === "tap" ? { pitch: positive(tool.threadPitch) ? tool.threadPitch : (assumed.push("threadPitch"), shape === "tap" ? isoCoarsePitch(d) : 1.5) } : {}),
+    ...(necked ? { neckDiameter: Math.min(shankDiameter, d * (shape === "lollipop" ? 0.5 : 0.6)) } : {}),
     ...(shape === "engraver" ? { tipDiameter: 0.2 } : {}),
+    ...(shape === "counterbore" ? (assumed.push("pilotDiameter"), { tipDiameter: d * 0.55 }) : {}),
+    ...(shape === "barrel" ? { cornerRadius: positive(tool.cornerRadius) ? tool.cornerRadius : (assumed.push("cornerRadius"), d * 0.1), formRadius: positive(tool.formRadius) ? tool.formRadius : (assumed.push("formRadius"), 5 * d) } : {}),
     assumed
   }
 }
@@ -168,18 +190,6 @@ export const toolModelFromSettings = (s: ToolpathSettings, kind: MachineKind = s
   if (kind === "lathe") return toolModelOf({ type: s.operationType === "knurling" ? "knurling" : LATHE_TYPES[normalise(s.toolType)] !== undefined ? s.toolType : "turning", diameter: s.toolDiameter, cornerRadius: s.noseRadius }, "lathe")
   if (s.operationType === "probing" || s.toolType === "probe") return toolModelOf({ type: s.toolType === "toolsetter" ? "toolsetter" : "probe", diameter: s.probeStylus })
   return toolModelOf({ type: s.toolType === "vbit" ? "vbit" : s.toolType, diameter: s.toolDiameter, numberOfFlutes: s.flutes, ...(s.toolType === "threadmill" ? { threadPitch: s.threadPitch } : {}) }, "mill")
-}
-
-/**
- * The model of the tool a preview draws: the user's tool resource when it belongs to this machine (and, on a mill, its
- * diameter is still the generator's), else the generator's own tool settings. The desktop preview and the sidecar that
- * serves the phone both ask here, so the two draw the same tool.
- */
-export const previewToolModel = (kind: MachineKind, settings: ToolpathSettings, library?: ToolResource): ToolModel => {
-  if (library !== undefined && toolMachineOf(library.type) === kind && (kind !== "mill" || Math.abs((library.diameter ?? 0) - settings.toolDiameter) < 1e-9)) {
-    return toolModelOf(library, kind)
-  }
-  return toolModelFromSettings(settings, kind)
 }
 
 const KERNEL_SHAPE: Readonly<Record<CutterKind, MillShape>> = { flat: "flat", ball: "ball", bull: "bull", chamfer: "chamfer", spot: "spot", drill: "drill", facemill: "facemill", threadmill: "threadmill", engraver: "engraver" }
@@ -257,6 +267,53 @@ const millCutting = (m: MillModel): ProfilePoint[] => {
       // The bar's swept envelope at the cutting diameter, a short insert: the head is drawn by its radius.
       return [{ r: 0, z: 0 }, { r: R, z: 0 }, { r: R, z: Math.min(top, 4) }, { r: Math.max(R * 0.45, 2), z: Math.min(top, 4) }, { r: Math.max(R * 0.45, 2), z: top }]
     }
+    case "tap": {
+      // A chamfer lead over the first three pitches (the teeth grow from the minor diameter), then the full thread form.
+      const p = Math.max(m.pitch ?? 1, 0.2)
+      const depth = Math.min(0.6134 * p, R * 0.35)
+      const lead = Math.min(3 * p, top / 2)
+      const out: ProfilePoint[] = [{ r: 0, z: 0 }, { r: R - depth, z: 0 }]
+      for (let z = 0; z + p <= top + 1e-9; z += p) {
+        const crest = R - depth * Math.max(0, 1 - (z + p / 2) / lead)
+        out.push({ r: crest, z: z + p / 2 }, { r: R - depth, z: z + p })
+      }
+      return out
+    }
+    case "lollipop": {
+      // A full ball of the cutting diameter on a neck: the upper half reaches under an overhang.
+      const neck = Math.min((m.neckDiameter ?? m.shankDiameter * 0.5) / 2, R * 0.9)
+      const lift = Math.asin(Math.min(1, neck / R))
+      // The equator is a vertex: the drawn ball is exactly the cutting diameter.
+      return [{ r: 0, z: 0 }, ...arc(0, R, R, -Math.PI / 2, 0, 10).slice(1), ...arc(0, R, R, 0, Math.PI / 2 - lift, 8).slice(1), { r: neck, z: Math.max(top, R + R * Math.cos(lift)) }]
+    }
+    case "barrel": {
+      // Circle segment: a corner radius at the tip, then a side arc of the large form radius whose widest point is at the
+      // full diameter, halfway up the cutting length (the form hyperMILL finishes steep walls with at a wide stepover).
+      const rc = Math.min(m.cornerRadius ?? R * 0.2, R * 0.5)
+      const zc = Math.max(top / 2, rc + 1e-3)
+      let Rf = Math.max(m.formRadius ?? 5 * m.diameter, zc + 1e-3)
+      const rAt = (z: number) => R - Rf + Math.sqrt(Math.max(0, Rf * Rf - (z - zc) * (z - zc)))
+      // The side must stay clear of the axis at the tip; a form too tight for this length is widened.
+      while (rAt(rc) < rc * 1.05 + R * 0.1) Rf *= 1.5
+      const out: ProfilePoint[] = [{ r: 0, z: 0 }, ...arc(rAt(rc) - rc, rc, rc, -Math.PI / 2, 0, 6)]
+      // Sampled below and above the widest point, which is a vertex itself.
+      for (let i = 1; i <= 8; i++) { const z = rc + ((zc - rc) * i) / 8; out.push({ r: rAt(z), z }) }
+      for (let i = 1; i <= 8; i++) { const z = zc + ((top - zc) * i) / 8; out.push({ r: rAt(z), z }) }
+      return out
+    }
+    case "backChamfer": {
+      // A cone facing up from a short land at the full diameter to the neck: it cuts the hidden lower edge of a bore.
+      const neck = Math.min((m.neckDiameter ?? m.shankDiameter * 0.6) / 2, R * 0.9)
+      const land = Math.min(0.5, top / 4)
+      const half = ((m.angle ?? 90) / 2) * (Math.PI / 180)
+      return [{ r: 0, z: 0 }, { r: R, z: 0 }, { r: R, z: land }, { r: neck, z: land + (R - neck) / Math.max(Math.tan(half), 1e-6) }]
+    }
+    case "counterbore": {
+      // The pilot that centres in the drilled hole, then the cutter of the full diameter.
+      const pilot = Math.min((m.tipDiameter ?? m.diameter * 0.55) / 2, R * 0.95)
+      const length = Math.min(Math.max(m.diameter * 0.5, 2), top / 2)
+      return [{ r: 0, z: 0 }, { r: pilot, z: 0 }, { r: pilot, z: length }, { r: R, z: length }, { r: R, z: top }]
+    }
     case "flat":
     case "facemill":
       return [{ r: 0, z: 0 }, { r: R, z: 0 }, { r: R, z: top }]
@@ -329,7 +386,7 @@ export const toolEnvelope = (model: ToolModel): { readonly radius: number; reado
 /** The closest kernel cutter for cutting data and verification (`undefined`: not a cutting tool). */
 export const cutterOf = (model: ToolModel, id = "tool", name = "tool"): Cutter | undefined => {
   if (model.family !== "mill") return undefined
-  const kind: CutterKind = ({ flat: "flat", roughing: "flat", reamer: "flat", tapered: "flat", disc: "flat", boringBar: "flat", ball: "ball", bull: "bull", cornerRounding: "bull", chamfer: "chamfer", dovetail: "chamfer", engraver: "engraver", spot: "spot", drill: "drill", facemill: "facemill", threadmill: "threadmill" } as const)[model.shape]
+  const kind: CutterKind = ({ flat: "flat", roughing: "flat", reamer: "flat", tapered: "flat", disc: "flat", boringBar: "flat", counterbore: "flat", ball: "ball", lollipop: "ball", bull: "bull", cornerRounding: "bull", barrel: "bull", chamfer: "chamfer", dovetail: "chamfer", backChamfer: "chamfer", engraver: "engraver", spot: "spot", drill: "drill", tap: "drill", facemill: "facemill", threadmill: "threadmill" } as const)[model.shape]
   return {
     id, name, kind, diameter: model.diameter, flutes: model.flutes, material: "carbide", coating: "none", fluteLength: model.fluteLength,
     shankDiameter: model.shankDiameter, stickout: model.stickout, ...(model.holder !== undefined ? { holder: model.holder } : {}),
@@ -342,7 +399,7 @@ export const cutterOf = (model: ToolModel, id = "tool", name = "tool"): Cutter |
 export const describeTool = (model: ToolModel): string => {
   const assumed = model.assumed.length > 0 ? ` (assumed: ${model.assumed.join(", ")})` : ""
   switch (model.family) {
-    case "mill": return `${model.shape} Ø${model.diameter}, ${model.flutes} flutes, ${model.fluteLength} mm cutting, Ø${model.shankDiameter} shank, ${round(model.stickout)} mm stickout${model.cornerRadius !== undefined ? `, r${model.cornerRadius}` : ""}${model.angle !== undefined ? `, ${model.angle}°` : ""}${model.pitch !== undefined ? `, pitch ${model.pitch}` : ""}${assumed}`
+    case "mill": return `${model.shape} Ø${model.diameter}, ${model.flutes} flutes, ${model.fluteLength} mm cutting, Ø${model.shankDiameter} shank, ${round(model.stickout)} mm stickout${model.cornerRadius !== undefined ? `, r${model.cornerRadius}` : ""}${model.angle !== undefined ? `, ${model.angle}°` : ""}${model.pitch !== undefined ? `, pitch ${model.pitch}` : ""}${model.formRadius !== undefined ? `, form R${round(model.formRadius)}` : ""}${assumed}`
     case "probe": return `touch probe, ball Ø${model.ballDiameter}, stylus ${model.stylusLength} mm${assumed}`
     case "setter": return `tool setter, pad Ø${model.padDiameter}${assumed}`
     case "lathe": return `${model.insert} insert${model.noseRadius > 0 ? `, nose r${model.noseRadius}` : ""}${model.insert === "grooving" || model.insert === "parting" ? `, ${model.width} mm wide` : ""}${assumed}`

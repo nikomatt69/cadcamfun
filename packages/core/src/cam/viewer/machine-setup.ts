@@ -16,6 +16,7 @@ import type { Stock, ToolpathSettings } from "../generator/schema.ts"
 import { stockInWork } from "../generator/dispatch.ts"
 import type { CamArtifact } from "../kernel/contracts.ts"
 import { toolModelFromSettings, type LatheModel, type NozzleModel } from "../tool-model.ts"
+import { toolForOperation } from "../operation-tools.ts"
 import { rotaryOfProgram, type RotarySetup } from "./rotary.ts"
 import type { Program } from "../ir.ts"
 
@@ -132,7 +133,7 @@ export const millSetupFromArtifact = (artifact: CamArtifact, settings: ToolpathS
 
 const INTERNAL_TOOLS = new Set(["boring"])
 
-export const latheSetupOf = (settings: ToolpathSettings, tool: LatheModel = toolModelFromSettings(settings, "lathe") as LatheModel): LatheSetup => {
+export const latheSetupOf = (settings: ToolpathSettings, tool: LatheModel = toolForOperation(settings, "lathe") as LatheModel): LatheSetup => {
   const diameter = settings.stockDiameter
   const internal = INTERNAL_TOOLS.has(settings.toolType) || tool.insert === "boring" || settings.operationType === "boring" || settings.turningOperation === "internal"
   const blade = tool.insert === "grooving" || tool.insert === "parting" || settings.operationType === "grooving" || settings.operationType === "parting"

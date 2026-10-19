@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, type JSX } from "solid-js"
+import { For, Show, createMemo, type JSX } from "solid-js"
 import { Upload, Wrench } from "lucide-solid"
 import { predefinedTools } from "../../../cad/lib/predefinedLibraries.ts"
 import { useRead } from "../../../../app/queries.ts"
@@ -7,9 +7,17 @@ import { t } from "../../../../i18n/index.ts"
 import { CHECKBOX, INPUT, LABEL, NumberField, Section } from "./ui.tsx"
 import { cam } from "@cadcamfun/core"
 import { ToolSilhouette } from "../ToolSilhouette.tsx"
+import { previewToolModel } from "../../lib/machine-view.ts"
 
 const MILL_TYPES = ["endmill", "ballnose", "drill", "vbit", "chamfer", "threadmill", "reamer"]
 const LATHE_TYPES = ["turning", "facing", "boring", "threading", "grooving", "parting"]
+
+/** The tool type select's entries by machine. */
+const TYPE_OPTIONS: Readonly<Record<cam.MachineKind, ReadonlyArray<readonly [ToolpathSettings["toolType"], string]>>> = {
+  mill: [["endmill", "Endmill"], ["ballnose", "Ballnose"], ["drill", "Drill"], ["vbit", "V-bit"], ["chamfer", "Chamfer"], ["threadmill", "Threadmill"], ["reamer", "Reamer"], ["probe", "Touch probe"], ["toolsetter", "Tool setter"]],
+  lathe: [["turning", "Turning"], ["facing", "Facing"], ["boring", "Boring"], ["threading", "Threading"], ["grooving", "Grooving"], ["parting", "Parting"]],
+  "3dprinter": [["standard", "Standard"], ["brass", "Brass"], ["hardened", "Hardened"], ["ruby", "Ruby"]]
+}
 
 /** Tool sketch drawn in the tool card (legacy SVG, one per kind). */
 function ToolSketch(): JSX.Element {
@@ -50,6 +58,12 @@ export function ToolSection(): JSX.Element {
   const machine = () => gen.settings.machineType
   const userTools = () => (tools.data() ?? []) as ReadonlyArray<{ id: string; name: string; type: string; diameter: number; material?: string; numberOfFlutes?: number | null; maxRPM?: number | null }>
   const fits = (type: string): boolean => machine() === "mill" ? MILL_TYPES.includes(type) : machine() === "lathe" ? LATHE_TYPES.includes(type) : true
+  // Only the tool types that can do the operation are offered (the current one always, so a mismatch stays visible).
+  const offered = createMemo(() => {
+    const allowed = cam.operationTools(cam.operationKey(gen.settings))?.allowed
+    return TYPE_OPTIONS[machine()].filter(([value]) => value === gen.settings.toolType || allowed === undefined || allowed.includes(cam.toolKindOf(cam.toolModelFromSettings({ ...gen.settings, toolType: value }))))
+  })
+  const issues = createMemo(() => cam.settingsToolIssues(gen.settings, previewToolModel(machine(), gen.settings, gen.selectedLibraryTool as never)))
   const select = (event: Event & { currentTarget: HTMLSelectElement }): void => gen.updateSettings("toolType", event.currentTarget.value as ToolpathSettings["toolType"])
   const pick = (value: string): void => {
     if (!value) return
@@ -68,26 +82,14 @@ export function ToolSection(): JSX.Element {
     <Section id="tool" delay={0.35} tone="indigo" icon={Wrench} title="Tool" testId="tool-section">
       <div>
         <label class={LABEL}>Tool Type</label>
-        <Switch>
-          <Match when={machine() === "mill"}>
-            <select class={INPUT} value={gen.settings.toolType} onChange={select}>
-              <option value="endmill">Endmill</option><option value="ballnose">Ballnose</option><option value="drill">Drill</option><option value="vbit">V-bit</option>
-              <option value="chamfer">Chamfer</option><option value="threadmill">Threadmill</option><option value="reamer">Reamer</option>
-              <option value="probe">Touch probe</option><option value="toolsetter">Tool setter</option>
-            </select>
-          </Match>
-          <Match when={machine() === "lathe"}>
-            <select class={INPUT} value={gen.settings.toolType} onChange={select}>
-              <option value="turning">Turning</option><option value="facing">Facing</option><option value="boring">Boring</option>
-              <option value="threading">Threading</option><option value="grooving">Grooving</option><option value="parting">Parting</option>
-            </select>
-          </Match>
-          <Match when={machine() === "3dprinter"}>
-            <select class={INPUT} value={gen.settings.toolType} onChange={select}>
-              <option value="standard">Standard</option><option value="brass">Brass</option><option value="hardened">Hardened</option><option value="ruby">Ruby</option>
-            </select>
-          </Match>
-        </Switch>
+        <select class={INPUT} value={gen.settings.toolType} onChange={select} data-testid="tool-type">
+          <For each={offered()}>{([value, label]) => <option value={value}>{label}</option>}</For>
+        </select>
+        <Show when={issues().length > 0}>
+          <ul class="mt-1 space-y-1" data-testid="tool-operation-issues">
+            <For each={issues()}>{(issue) => <li class={`text-xs rounded px-2 py-1 ${issue.severity === "error" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>{issue.message}</li>}</For>
+          </ul>
+        </Show>
       </div>
 
       <div class="p-3 bg-gray-50 rounded-md">

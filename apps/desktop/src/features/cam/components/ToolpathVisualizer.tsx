@@ -12,7 +12,7 @@ import { Motion } from "solid-motionone"
 import { RotateCcw, Settings, X } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { View3D, toolpathOverlayModel, type MachineInfo, type RenderMode, type ToolpathPointKind, type ViewPreset } from "../../../viewport/view3d/index.ts"
-import { MACHINE_LABELS, SOURCE_LABELS, type MachineChoice } from "../lib/machine-view.ts"
+import { MACHINE_LABELS, SOURCE_LABELS, type MachineChoice, type OperationTool } from "../lib/machine-view.ts"
 import { t } from "../../../i18n/index.ts"
 import type { Workpiece } from "../store/camStore.ts"
 import { SimulationMiniPlayer } from "./SimulationMiniPlayer.tsx"
@@ -33,6 +33,12 @@ export interface ToolpathVisualizerProps {
   readonly defaultTool?: cam.kernel.Cutter
   /** The 3D model of the generator's tool (a user's tool resource or the settings), drawn instead of `defaultTool`. */
   readonly defaultToolModel?: cam.ToolModel
+  /** What the generator's tool cannot do for its operation (spec 32 §4.2). */
+  readonly toolIssues?: ReadonlyArray<cam.ToolOperationIssue>
+  /** The 3D model of each operation's tool by `toolId` (a multi-operation program): playback swaps them at each operation. */
+  readonly toolModels?: ReadonlyMap<string, cam.ToolModel>
+  /** The operations' tools of a multi-operation program, for the stats overlay. */
+  readonly operationTools?: ReadonlyArray<OperationTool>
   /** The machine the program runs on (spec 31): vise / chuck / bed, its axes, what turns. */
   readonly machine?: cam.viewer.MachineSetup
   /** Machine state per move (the parse's motion track). */
@@ -167,6 +173,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             {...(props.tools !== undefined ? { tools: props.tools } : {})}
             {...(props.defaultTool !== undefined ? { defaultTool: props.defaultTool } : {})}
             {...(props.defaultToolModel !== undefined ? { defaultToolModel: props.defaultToolModel } : {})}
+            {...(props.toolModels !== undefined ? { toolModels: props.toolModels } : {})}
             preset={preset()}
             renderMode={mode()}
             gridVisible={gridVisible()}
@@ -278,9 +285,16 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 )}</For>
               </div>
             )}</Show>
-            <Show when={props.defaultToolModel !== undefined && (props.tools === undefined || props.machine?.kind !== "mill")}>
+            <Show when={props.defaultToolModel !== undefined && (props.operationTools ?? []).length === 0 && (props.tools === undefined || props.machine?.kind !== "mill")}>
               <div data-testid="visualizer-tool-model">{t("cam.visualizer.activeTool")}: <span class="text-white">{cam.describeTool(props.defaultToolModel!)}</span></div>
+              <For each={props.toolIssues ?? []}>{(issue) => <div data-testid="visualizer-tool-issue" class={issue.severity === "error" ? "text-red-400" : "text-amber-300"}>{issue.message}</div>}</For>
             </Show>
+            <For each={props.operationTools ?? []}>{(o) => (
+              <div data-testid="visualizer-operation-tool">
+                <div>{o.name}: <span class="text-white">{cam.describeTool(o.model)}</span></div>
+                <For each={o.issues}>{(issue) => <div data-testid="visualizer-tool-issue" class={issue.severity === "error" ? "text-red-400" : "text-amber-300"}>{issue.message}</div>}</For>
+              </div>
+            )}</For>
             <For each={props.defaultToolModel !== undefined && props.tools === undefined ? [] : usedTools()}>{(c) => <div data-testid="visualizer-tool">{t("cam.visualizer.activeTool")}: <span class="text-white">{c.name} · Ø{c.diameter} · {c.fluteLength} mm flutes · {c.stickout} mm out{c.holder ? ` · holder Ø${c.holder.diameter}` : ""}</span></div>}</For>
           </div>
         </Show>

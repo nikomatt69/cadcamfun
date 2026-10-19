@@ -98,7 +98,9 @@ export const profileRuns = (profile: TurnedProfile, tolerance = 1e-6): ReadonlyA
     if (o <= i + 1e-9) continue
     const x = profile.x0 + b * profile.bin
     const last = runs[runs.length - 1]
-    if (last !== undefined && Math.abs(last.x1 - x) < 1e-9 && Math.abs(last.outer - o) <= tolerance && Math.abs(last.inner - i) <= tolerance) last.x1 = x + profile.bin
+    // A merged run reports the turned size (the smallest outer, the largest bore), not the first bin's: the bin on a shoulder's
+    // nose radius would otherwise name the whole diameter after it.
+    if (last !== undefined && Math.abs(last.x1 - x) < 1e-9 && Math.abs(last.outer - o) <= tolerance && Math.abs(last.inner - i) <= tolerance) { last.x1 = x + profile.bin; last.outer = Math.min(last.outer, o); last.inner = Math.max(last.inner, i) }
     else runs.push({ x0: x, x1: x + profile.bin, outer: o, inner: i })
   }
   return runs

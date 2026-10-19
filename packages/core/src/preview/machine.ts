@@ -18,7 +18,7 @@ import { latheStockEnds, machineBodies } from "../cam/viewer/machine-bodies.ts"
 import { latheSetupOf, millSetupFromArtifact, millSetupOf, printerSetupOf, withRotary, type AssumedPart, type MachineSetup } from "../cam/viewer/machine-setup.ts"
 
 // Re-exported so callers of this module keep a single import site (the model itself lives in the `cam` namespace).
-export { previewToolModel } from "../cam/tool-model.ts"
+export { previewToolModel } from "../cam/operation-tools.ts"
 
 export interface PreviewBounds {
   readonly min: readonly [number, number, number]

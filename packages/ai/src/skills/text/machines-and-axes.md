@@ -39,10 +39,11 @@ cam action machine with `gcode` (or `operationId`), optional `params` (the workh
 
 ## Tools in 3D
 Every tool has one 3D model from its type and properties: the user's tool in Resources (type, diameter, flutes, cutting / total length, shank, corner or nose radius, included or taper angle, thread pitch, holder, stickout), the generator's tool, or the kernel's cutter. The Resources page, the preview and the set-up checks draw and use that same model; a property not given is taken from the type and said to be assumed.
-- Mill types: endmill, roughingendmill, ballendmill, bullnose, cornerroundingmill, chamfermill, vbit, engraver, spotdrill, drillbit, reamer, taperedendmill, facemill, threadmill (teeth at the pitch), tslotcutter / woodruffcutter / keywaycutter (disc on a neck), dovetailcutter, boringbar, probe (ruby ball, spindle off), toolsetter (on the table).
+- Mill types: endmill, roughingendmill, ballendmill, bullnose, cornerroundingmill, chamfermill, vbit, engraver, spotdrill, drillbit, reamer, taperedendmill, facemill, threadmill (teeth at the pitch), tap (ISO coarse pitch when not given), tslotcutter / woodruffcutter / keywaycutter (disc on a neck), dovetailcutter, lollipop (ball on a neck, undercuts), barrel (circle segment, steep-wall finishing), backchamfer, counterbore (pilot), boringbar, probe (ruby ball, spindle off), toolsetter (on the table).
 - Lathe: turning, facing, threading, grooving, parting (blade width), boring (inside the bore), knurling; `noseRadius` rounds the insert (0 = sharp) and the turned shoulder corners.
 - Printer nozzles: brass, hardened, ruby, standard, with `nozzleDiameter`.
-- cam action machine params.tool takes a tool resource to check a program with that exact tool.
+- cam action machine params.tool takes a tool resource to check a program with that exact tool; with params.operationType it returns tool.issues: TOOL_CANNOT_DO_OPERATION (e.g. a turning insert parting off), TOOL_REACH, TOOL_FLUTE_LENGTH, THREAD_PITCH_MISMATCH.
+- Each operation draws its own tool: a lathe operation without an insert type draws its insert (threading insert, parting blade, boring bar); picking an operation switches a tool that cannot do it to one that can.
 
 ## Rotary (3+2, 5-axis)
 The preview reads the trunnion (table-AC / table-BC) from the program header or its A/B/C words, and the frame of the coordinates (control TCP G234 / G43.4: part; indexed Orient or no TCP: machine). Part view: the part stays, the tool leans along R^T Z; machine view: the tool stays vertical and the table turns. Say when the layout or frame is assumed.

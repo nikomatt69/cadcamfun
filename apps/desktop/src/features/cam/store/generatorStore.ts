@@ -111,6 +111,12 @@ export const withSettingsEffects = (before: ToolpathSettings, after: ToolpathSet
   let next = after
   if (next.material !== before.material) next = g.withMaterialDefaults(next)
   if (next.machineType !== before.machineType) next = g.withMachineDefaults(next)
+  // A new operation whose current tool cannot do it takes the operation's tool (spec 32 §4.2): a parting operation gets a
+  // parting blade, a drilling operation a drill. Choosing the tool type itself is never overridden.
+  if (next.toolType === before.toolType && (next.operationType !== before.operationType || next.machineType !== before.machineType || next.surfaceStrategy !== before.surfaceStrategy || next.turningOperation !== before.turningOperation)) {
+    const toolType = cam.toolTypeForOperation(next)
+    if (toolType !== undefined) next = { ...next, toolType }
+  }
   return next
 }
 

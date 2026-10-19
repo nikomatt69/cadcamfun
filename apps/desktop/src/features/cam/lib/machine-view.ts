@@ -64,6 +64,33 @@ export const previewSetup = (
 export const previewToolModel = (kind: cam.MachineKind, settings: cam.generator.ToolpathSettings, library: (cam.ToolResource & { readonly type?: string }) | null | undefined): cam.ToolModel =>
   cam.previewToolModel(kind, settings, library?.type !== undefined ? library as cam.ToolResource : undefined)
 
+/** The tool an operation of a multi-operation program uses, as the preview draws it, and what is wrong with it. */
+export interface OperationTool {
+  readonly toolId: string
+  readonly name: string
+  readonly model: cam.ToolModel
+  readonly issues: ReadonlyArray<cam.ToolOperationIssue>
+}
+
+/**
+ * The tools of the operations of a combined program (spec 32 §4.2), keyed like `combineCamOperations` keys its toolpaths: every
+ * operation that carries its settings draws its own operation's tool, so drill → tap → chamfer shows three tools. Operations
+ * without settings are left to the preview's default tool. The first operation to use a tool id names it.
+ */
+export const operationToolsOf = (results: ReadonlyArray<{ readonly id: string; readonly name: string; readonly tool?: string; readonly settings?: cam.generator.ToolpathSettings; readonly program: cam.Program }>): ReadonlyArray<OperationTool> => {
+  const out = new Map<string, OperationTool>()
+  for (const r of results) {
+    if (r.settings === undefined) continue
+    const model = cam.toolForOperation(r.settings)
+    const issues = cam.settingsToolIssues(r.settings, model)
+    for (const tp of r.program.toolpaths) {
+      const toolId = r.tool ?? `${r.id}:${tp.toolId}`
+      if (!out.has(toolId)) out.set(toolId, { toolId, name: r.name, model, issues })
+    }
+  }
+  return [...out.values()]
+}
+
 export const MACHINE_LABELS: Readonly<Record<cam.MachineKind, string>> = { mill: "Mill", lathe: "Lathe", "3dprinter": "3D printer" }
 export const SOURCE_LABELS: Readonly<Record<MachineSource, string>> = { override: "chosen", generator: "generator", kernel: "kernel", inferred: "from the G-code", settings: "generator setting" }
 

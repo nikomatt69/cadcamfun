@@ -1,6 +1,6 @@
 # Machine simulation at Fusion 360 / hyperMILL level: every kinematics, every operation, the right tool
 
-Status: **analysis + plan** (2026-10-19, `main` @ 9aa648c, clean tree). Nothing in this spec is built yet. It extends
+Status: **P1 built** (2026-10-19), P0/P2–P9 open; see §9. Analysis written at `main` @ 9aa648c. It extends
 [31-machine-aware-toolpath-view](31-machine-aware-toolpath-view.md) (machine scene, motion track, frames, set-up checks) and
 [29-native-cam-kernel](29-native-cam-kernel.md) (kinematics, collision, stock); it does not replace them. Owners: WP2
 `packages/core/src/cam`, WP7 `apps/desktop/src/viewport/view3d`, WP6 `apps/desktop/src/features/cam`, WP8 `packages/ai`,
@@ -348,6 +348,31 @@ lathe only, E2–E3 no, F1–F3 workholding boxes only, G1 partial, G2 unmeasure
 - **Out of scope**: robots, Swiss-type lathes, sub-spindle transfer, multi-channel synchronisation, additive-subtractive
   hybrids.
 
+## 9. Implementation status
+
+### P1 — the right tool per operation (2026-10-19)
+
+- `cam/operation-tools.ts`: `OPERATION_TOOLS` (generator operations with their variants — 3D finishing, internal turning — and
+  every kernel strategy via `strategyKey`), `toolKindOf`, `toolTypeForOperation`, `toolForOperation`, `previewToolModel`
+  (moved here from `tool-model.ts`), `toolOperationIssues` / `settingsToolIssues` (`TOOL_CANNOT_DO_OPERATION`, `TOOL_REACH`,
+  `TOOL_FLUTE_LENGTH`, `THREAD_PITCH_MISMATCH`, `TOOL_TOO_LARGE_FOR_FEATURE`).
+- Lathe: a tool type that is not an insert draws the operation's insert (threading insert, parting / grooving blade, boring
+  bar for boring and internal turning), flagged assumed; `latheSetupOf`, the phone preview and `cam.machine` use it.
+- New mill shapes in `tool-model.ts`: tap (ISO 261 coarse pitch by default, chamfer lead), lollipop, barrel / circle segment
+  (`formRadius`), back chamfer, counterbore (pilot); each with its cutter mapping and envelope.
+- Desktop: the generator store switches the tool type when a new operation's tool cannot do it (never when the tool type
+  itself is chosen); the tool section offers only the types that can do the operation and lists the issues; the visualizer
+  lists the active tool's issues; the assistant's combined operations draw each operation's own tool (`operationToolsOf` →
+  `View3D.toolModels`), and a lathe program of several operations swaps the insert per toolpath (`MachineSceneInput.pathTools`).
+- AI: `cam.machine` with `params.operationType` returns `tool.issues`; skill text lists the new types and the rule.
+- Found on the way: `KernelSection.tsx` lacked the `multiaxis` strategy (desktop `tsc` failed on `main`); `profileRuns`
+  reported a merged section with its first bin's radius, so `cam.machine` named a Ø44 turn Ø44.014 (the nose-radius bin of the
+  shoulder; `packages/ai/test/machine-kinematics.test.ts` failed on `main`). Both fixed.
+- Tests: `packages/core/test/cam/operation-tools.test.ts`, `apps/desktop/test/cam-operation-tools.test.ts`.
+- Limits: the generator's `toolType` list has no tap / lollipop / barrel (they come from tool resources); the lathe turned
+  profile still uses one set-up tool (internal or not) for the whole program.
+
 ## Change log
 
 - 2026-10-19: analysis written from the code at 9aa648c and the probes of §2.2.
+- 2026-10-19: P1 built (§9).

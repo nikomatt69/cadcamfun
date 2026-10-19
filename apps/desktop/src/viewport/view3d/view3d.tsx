@@ -437,6 +437,7 @@ export function View3D(props: View3DProps) {
         machineScene = createMachineScene({
           setup: machine, program: props.program, ...(props.motion !== undefined ? { motion: props.motion } : {}), display: props.machineDisplay ?? DEFAULT_MACHINE_DISPLAY,
           ...(start !== undefined ? { start } : {}),
+          ...(props.toolModels !== undefined ? { pathTools: props.program.toolpaths.map((tp) => props.toolModels!.get(tp.toolId)) } : {}),
           ...(cutter ? { tool: { radius: cutter.diameter / 2, length: cutter.stickout } } : {}),
           scale: machine.kind === "lathe" ? Math.max(machine.stock.diameter, machine.stock.length / 2) : machine.kind === "3dprinter" ? Math.max(machine.bed.width, machine.bed.depth) / 2 : extent
         })

@@ -18,7 +18,8 @@ import { collidingMoves } from "../cam/viewer/setup-checks.ts"
 import { buildTimeline, programStart, type Timeline } from "../cam/viewer/timeline.ts"
 import { parseToolpath, type ToolpathPoint } from "../cam/viewer/toolpath.ts"
 import { tokenize, valuesOf } from "../cam/viewer/words.ts"
-import { previewToolModel, toolEnvelope, type ToolModel, type ToolResource } from "../cam/tool-model.ts"
+import { toolEnvelope, type ToolModel, type ToolResource } from "../cam/tool-model.ts"
+import { previewToolModel } from "../cam/operation-tools.ts"
 import {
   choosePreviewMachine,
   finishBounds,

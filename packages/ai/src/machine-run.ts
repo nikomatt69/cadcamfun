@@ -29,7 +29,7 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
   const analysis = cam.generator.analyseGcode(input.gcode)
   // The same believable start the preview draws (the program does not say where the machine is before its first move).
   const timeline = cam.viewer.buildTimeline(analysis.program, analysis.motion, cam.viewer.DEFAULT_RAPID_RATE, cam.viewer.programStart(input.kind, analysis.program))
-  const toolModel = input.tool !== undefined ? cam.toolModelOf(input.tool, input.kind) : cam.toolModelFromSettings(settings, input.kind)
+  const toolModel = input.tool !== undefined ? cam.toolModelOf(input.tool, input.kind) : cam.toolForOperation(settings, input.kind)
   // The mill stock: given, else a box round the cutting moves (top at the highest cut, at least Z0).
   let stock: cam.generator.Stock
   if (stockParam !== undefined) {
@@ -57,7 +57,8 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
     axes: axes.map((a) => ({ name: a.name, display: a.direction, moves: a.moves, positive: a.positive })),
     ...(rotary !== undefined ? { rotary: rotary.name } : {}),
     setup: { ...setup, assumedParts: setup.assumed },
-    tool: { model: toolModel, description: cam.describeTool(toolModel) },
+    // What this tool cannot do for the operation named in params (spec 32 §4.2): the same findings the panel and preview show.
+    tool: { model: toolModel, description: cam.describeTool(toolModel), ...(rest["operationType"] !== undefined ? { operation: cam.operationKey(settings), issues: cam.settingsToolIssues(settings, toolModel) } : {}) },
     ...(setup.kind === "mill" && setup.rotary !== undefined ? { rotary: { ...setup.rotary, toolAxisAtPose: cam.viewer.toolAxisInPart(cam.viewer.poseAt(timeline, Math.min(timeline.duration, Math.max(0, input.at ?? timeline.duration))).angles, setup.rotary) } } : {}),
     setupProblems: cam.viewer.validateMachineSetup(setup),
     duration: round(timeline.duration),
@@ -76,7 +77,7 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
   if (setup.kind === "lathe") {
     const runs = cam.viewer.profileRuns(cam.viewer.turnedProfileAt(setup, timeline, at), 0.01)
     out["turnedPart"] = {
-      note: "point tool (nose radius 0); Z of the program, diameters",
+      note: `${setup.noseRadius > 0 ? `insert nose radius ${setup.noseRadius} mm (shoulders rounded by it)` : "point tool (nose radius 0)"}; Z of the program, diameters`,
       sections: runs.slice(0, 60).map((r) => ({ zFrom: round(r.x0), zTo: round(r.x1), diameter: round(2 * r.outer), bore: round(2 * r.inner) })),
       ...(runs.length > 60 ? { more: runs.length - 60 } : {})
     }

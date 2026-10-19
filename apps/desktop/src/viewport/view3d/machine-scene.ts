@@ -39,6 +39,12 @@ export interface MachineSceneInput {
   readonly scale: number
   /** Where the machine is before the first move (`cam.viewer.programStart`). */
   readonly start?: Vec3
+  /**
+   * The tool of each toolpath when the program's operations use different ones (spec 32 §4.2): a lathe program that faces,
+   * threads and parts off draws the facing insert, the threading insert and the parting blade in turn. `undefined` entries
+   * (and a model of another machine) fall back to the set-up's tool.
+   */
+  readonly pathTools?: ReadonlyArray<cam.ToolModel | undefined>
 }
 
 export interface MachineScene {
@@ -217,17 +223,35 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   const spin = display.spin ? v.spinTable(timeline, setup.kind) : undefined
   const spinAngle = (seconds: number): number => (spin ? v.spinAngleAt(timeline, setup.kind, spin, seconds) : 0)
 
+  // One drawn tool per distinct model; the one of the playing toolpath is shown.
+  const toolObjects = new Map<cam.ToolModel, THREE.Group>()
+  const ownFamily = setup.kind === "lathe" ? "lathe" : setup.kind === "3dprinter" ? "nozzle" : undefined
+  const modelOfPath = (path: number | undefined): cam.ToolModel | undefined => {
+    const own = path !== undefined ? input.pathTools?.[path] : undefined
+    return own !== undefined && own.family === ownFamily ? own : setup.kind === "mill" ? undefined : setup.tool
+  }
+  const toolObjectOf = (model: cam.ToolModel): THREE.Group => {
+    let object = toolObjects.get(model)
+    if (object === undefined) {
+      object = toolObject(model, setup.kind === "lathe" ? { turret: setup.turret } : {})
+      object.userData.tool = cam.describeTool(model)
+      object.visible = false
+      toolObjects.set(model, object)
+      root.add(object)
+    }
+    return object
+  }
   if (setup.kind === "lathe") {
-    tool = toolObject(setup.tool, { turret: setup.turret })
-    root.add(tool)
+    tool = toolObjectOf(modelOfPath(timeline.moves[0]?.path)!)
+    tool.visible = true
     const marker = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 3), new THREE.MeshBasicMaterial({ color: 0xfacc15 }))
     const { back } = v.latheStockEnds(setup)
     marker.position.set(back - 2, 0, setup.workholding.chuckDiameter / 2 - 4)
     marker.name = "spindle-marker"
     spinning.add(marker)
   } else if (setup.kind === "3dprinter") {
-    tool = toolObject(setup.tool)
-    root.add(tool)
+    tool = toolObjectOf(setup.tool)
+    tool.visible = true
     deposits = v.printerDeposits(timeline, setup.layerHeight)
     const positions = new Float32Array(deposits.beads.length * 6)
     const colors = new Float32Array(deposits.beads.length * 6)
@@ -283,6 +307,11 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   const update = (seconds: number): boolean => {
     let changed = updateTurned(seconds)
     const pose = v.poseAt(timeline, seconds)
+    const model = setup.kind === "lathe" ? modelOfPath(pose.move?.path) : undefined
+    if (tool && model !== undefined) {
+      const next = toolObjectOf(model)
+      if (next !== tool) { next.position.copy(tool.position); tool.visible = false; tool = next; changed = true }
+    }
     if (tool) {
       const d = v.displayPoint(setup, pose.point, pose.state?.xMode)
       if (tool.position.x !== d.x || tool.position.y !== d.y || tool.position.z !== d.z) { tool.position.set(d.x, d.y, d.z); changed = true }
