@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   DEFAULT_RAPID_FEED,
   FALLBACK_CUT_FEED,
+  MAX_DISPLAY_REV_PER_SECOND,
   boundsSize,
   cumulativeTimes,
   formatDuration,
@@ -11,6 +12,8 @@ import {
   partBounds,
   pathTotals,
   segmentDurations,
+  spinIsClockwise,
+  spinRateAt,
   startTimeOf,
   type SimSegment,
 } from "../lib/preview-sim"
@@ -89,5 +92,49 @@ describe("measurements", () => {
     expect(partBounds(positions, indices, { triangleStart: 1, triangleCount: 2 })).toEqual({ min: [5, 5, 5], max: [6, 6, 7] })
     expect(partBounds(positions, indices, { triangleStart: 0, triangleCount: 1 })).toEqual({ min: [0, 0, 0], max: [1, 1, 0] })
     expect(partBounds(positions, indices, { triangleStart: 10, triangleCount: 1 })).toBeUndefined()
+  })
+})
+
+describe("spindle display", () => {
+  const spin = [
+    { segment: 2, rate: 1 },
+    { segment: 5, rate: 0.5 },
+  ]
+
+  test("the last run at or before the playhead is the spin in effect", () => {
+    expect(spinRateAt([], 0, true)).toBe(0)
+    expect(spinRateAt(spin, 0, true)).toBe(0)
+    expect(spinRateAt(spin, 1.9, true)).toBe(0)
+    expect(spinRateAt(spin, 2, true)).toBe(1)
+    expect(spinRateAt(spin, 4.9, true)).toBe(1)
+    expect(spinRateAt(spin, 5, true)).toBe(0.5)
+    expect(spinRateAt(spin, 99, true)).toBe(0.5)
+  })
+
+  test("a paused or scrubbed preview holds the spindle still", () => {
+    expect(spinRateAt(spin, 2, false)).toBe(0)
+    expect(spinRateAt([{ segment: 0, rate: 1 }], 0, false)).toBe(0)
+  })
+
+  test("rates are clamped to what the display can show and bad numbers stop the spin", () => {
+    expect(MAX_DISPLAY_REV_PER_SECOND).toBe(2)
+    expect(spinRateAt([{ segment: 0, rate: 10 }], 0, true)).toBe(2)
+    expect(spinRateAt([{ segment: 0, rate: -10 }], 0, true)).toBe(-2)
+    expect(spinRateAt([{ segment: 0, rate: Number.NaN }], 0, true)).toBe(0)
+    expect(spinRateAt([{ segment: 0, rate: 1 }], Number.NaN, true)).toBe(1)
+  })
+
+  test("a later run on the same segment replaces the earlier one", () => {
+    expect(spinRateAt([{ segment: 0, rate: 1 }, { segment: 0, rate: -1 }], 0, true)).toBe(-1)
+  })
+
+  test("clockwise reads as ISO 6983 does for each machine kind", () => {
+    expect(spinIsClockwise("lathe", 1)).toBe(true)
+    expect(spinIsClockwise("lathe", -1)).toBe(false)
+    expect(spinIsClockwise("lathe", 0)).toBe(false)
+    expect(spinIsClockwise("mill", -1)).toBe(true)
+    expect(spinIsClockwise("mill", 1)).toBe(false)
+    expect(spinIsClockwise("3dprinter", 1)).toBe(false)
+    expect(spinIsClockwise("3dprinter", -1)).toBe(false)
   })
 })

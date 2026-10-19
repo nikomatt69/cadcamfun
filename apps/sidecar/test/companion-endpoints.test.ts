@@ -117,7 +117,8 @@ describe("phone endpoints on the real HTTP server", () => {
       expect(await phone.workspaceLibrary(project.id)).toBeDefined()
       expect((await phone.status(project.id))).toBeDefined()
       expect((await phone.branches(project.id)).current).toBe("main")
-      expect(await phone.log(project.id)).toEqual([])
+      // A project is born with its first commit on `main` (see `ProjectVcs.initialize`), so the phone sees one entry.
+      expect((await phone.log(project.id)).map((commit) => commit.message.trim())).toEqual(["Initial commit"])
       expect(await phone.pullRequests(project.id)).toEqual([])
       expect(await phone.runs(project.id)).toEqual([])
       expect((await phone.aiStatus()).configured).toBe(false)

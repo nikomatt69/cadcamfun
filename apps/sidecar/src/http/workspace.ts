@@ -1,4 +1,4 @@
-import { Api, BadRequest, CurrentUser, InternalError, NotFound } from "@cadcamfun/api"
+import { Api, BadRequest, CamProgramDocument, CurrentUser, InternalError, NotFound, type ToolRow } from "@cadcamfun/api"
 import { cam, preview } from "@cadcamfun/core"
 import { Effect, Schema } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
@@ -46,6 +46,40 @@ export const matchesTag = (header: string | undefined, tag: string): boolean => 
 
 const encoder = new TextEncoder()
 
+const recordOf = (value: unknown): Record<string, unknown> | undefined =>
+  value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+
+/** A tool row as `cam.toolModelOf` reads it (the desktop's `toolResourceOf`). */
+const toolResourceOf = (row: ToolRow): cam.ToolResource => ({
+  type: row.type, diameter: row.diameter,
+  numberOfFlutes: row.numberOfFlutes, cuttingLength: row.cuttingLength, totalLength: row.totalLength,
+  shankDiameter: row.shankDiameter, cornerRadius: row.cornerRadius ?? null, tipAngle: row.tipAngle ?? null,
+  threadPitch: row.threadPitch ?? null, holderDiameter: row.holderDiameter ?? null,
+  holderLength: row.holderLength ?? null, stickout: row.stickout ?? null,
+})
+
+/**
+ * The inputs of the stored document that change the machine scene, for the entity tag. The CAD drawing, the notes and
+ * the operation list are left out, so editing them does not make the phone fetch the same path again.
+ */
+const sceneTagInputs = (data: unknown): unknown => {
+  const record = recordOf(data)
+  if (record === undefined) return null
+  const artifact = recordOf(record.kernelArtifact)
+  const request = recordOf(record.kernelRequest)
+  return {
+    settings: record.settings ?? null,
+    stock: record.stock ?? null,
+    program: record.program ?? null,
+    generatorGcode: record.gcode ?? null,
+    artifact: artifact === undefined ? null : {
+      nc: artifact.nc ?? null, identity: artifact.identity ?? null,
+      stockBounds: artifact.stockBounds ?? null, machine: artifact.machine ?? null,
+    },
+    machine: request?.machine ?? null,
+  }
+}
+
 /**
  * Phone workspace. Every handler is a GET. The stored CAD document stays on the desktop; the response is a
  * summary, a mesh, or a toolpath polyline.
@@ -89,6 +123,22 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
     if (!candidate) return preview.emptyToolpathPreview()
     const program = yield* Schema.decodeUnknownEffect(cam.ProgramSchema)(candidate).pipe(Effect.orElseSucceed(() => undefined))
     return program ? preview.toolpathPreviewFromProgram(program) : preview.emptyToolpathPreview()
+  })
+
+  /** The machine scene of a stored CAM document; absent when the row holds something else (older or partial data). */
+  const documentScene = Effect.fn("workspace.documentScene")(function*(data: unknown, gcode: string, toolRow: ToolRow | undefined) {
+    const document = yield* Schema.decodeUnknownEffect(CamProgramDocument)(data).pipe(Effect.orElseSucceed(() => undefined))
+    if (document === undefined) return undefined
+    return preview.machineScenePreview({
+      settings: document.settings,
+      stock: document.stock,
+      gcode,
+      program: document.program,
+      ...(document.kernelArtifact !== undefined ? { artifact: document.kernelArtifact, kernelNc: document.kernelArtifact.nc } : {}),
+      ...(document.gcode !== "" ? { generatorGcode: document.gcode } : {}),
+      ...(document.kernelRequest?.machine !== undefined ? { machineId: document.kernelRequest.machine } : {}),
+      ...(toolRow !== undefined ? { toolResource: toolResourceOf(toolRow) } : {}),
+    })
   })
 
   return handlers
@@ -157,9 +207,13 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
         if (!found || found.project.id !== params.id) return yield* new NotFound({ message: "Toolpath not found" })
         const row = found.row
         const gcode = row.gcode ?? ""
-        // Stored G-code wins over the program, so the program only enters the tag when it is what gets drawn.
-        return yield* conditional(previewTag("toolpath-path", row.id, row.updatedAt, gcode, gcode.trim() ? null : row.data), Effect.gen(function*() {
-          const path = yield* toolpathPreview(row.data, gcode)
+        // A tool edit changes the scene even when the toolpath row did not change, so its shape values enter the tag.
+        const toolRow = row.toolId === null ? undefined : (yield* tools.visibleByIds(user.id, [row.toolId]))[0]
+        const tag = previewTag("toolpath-path", row.id, row.updatedAt, gcode,
+          toolRow !== undefined ? toolResourceOf(toolRow) : null, row.machineConfigId, sceneTagInputs(row.data))
+        return yield* conditional(tag, Effect.gen(function*() {
+          const scene = yield* documentScene(row.data, gcode, toolRow)
+          const path = scene ?? (yield* toolpathPreview(row.data, gcode))
           return { ...path, revision: row.updatedAt }
         }))
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to preview toolpath"))))

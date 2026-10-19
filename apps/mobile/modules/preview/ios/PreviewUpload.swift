@@ -13,10 +13,16 @@ enum PreviewLimits {
   static let maxSegments = 20_000
   static let maxStockEdges = 12
   static let maxOverlaySegments = 40_000
-  static let maxActiveVertices = 74
+  static let maxActiveVertices = 116
+  /// Machine bodies (`machine-bodies.ts` `PREVIEW_MAX_SOLID_TRIANGLES`): ten floats per vertex, three per triangle.
+  static let maxSolidTriangles = 20_000
+  static let solidVertexFloats = 10
+  /// Display revolutions per second the spinning bodies may turn (`preview-sim.ts` `MAX_DISPLAY_REV_PER_SECOND`).
+  static let maxSpinRevPerSecond: Float = 2
   static var maxIndices: Int { maxTriangles * 3 }
   static var maxVertices: Int { maxTriangles * 3 }
   static var maxLineVertices: Int { (maxSegments + maxStockEdges) * 2 }
+  static var maxSolidVertices: Int { maxSolidTriangles * 3 }
 }
 
 enum PreviewRejection {
@@ -24,6 +30,7 @@ enum PreviewRejection {
   case meshInvalid
   case pathTooLarge
   case pathInvalid
+  case machineTooLarge
 
   var message: String {
     switch self {
@@ -31,6 +38,7 @@ enum PreviewRejection {
     case .meshInvalid: return "This preview could not be drawn."
     case .pathTooLarge: return "This toolpath is too large for the phone."
     case .pathInvalid: return "This toolpath could not be drawn."
+    case .machineTooLarge: return "This machine scene is too large for the phone."
     }
   }
 }
@@ -72,6 +80,22 @@ enum PreviewUpload {
   }
 
   private static var maxOverlayVertices: Int { PreviewLimits.maxOverlaySegments * 2 }
+
+  /// Machine bodies: interleaved xyz, normal xyz, rgba vertices (`PreviewLimits.solidVertexFloats`) and a triangle
+  /// index buffer, `opaqueTriangles` of which are opaque and the rest translucent. The module repeats the JS caps.
+  static func solids(_ vertices: Float32Array, _ indices: Uint32Array, opaqueTriangles: Int) -> PreviewRejection? {
+    guard aligned(vertices), aligned(indices, stride: 4) else { return .meshInvalid }
+    guard vertices.length % PreviewLimits.solidVertexFloats == 0, indices.length % 3 == 0 else { return .meshInvalid }
+    let triangles = indices.length / 3
+    let count = vertices.length / PreviewLimits.solidVertexFloats
+    if triangles > PreviewLimits.maxSolidTriangles || count > PreviewLimits.maxSolidVertices { return .machineTooLarge }
+    guard count > 0, triangles > 0, opaqueTriangles >= 0, finite(vertices) else { return .meshInvalid }
+    let limit = UInt32(count)
+    for index in 0..<indices.length where indices[index] >= limit {
+      return .meshInvalid
+    }
+    return nil
+  }
 
   /// The highlighted move (two vertices), optionally followed by the wireframe tool.
   static func activeLine(_ values: Float32Array) -> PreviewRejection? {

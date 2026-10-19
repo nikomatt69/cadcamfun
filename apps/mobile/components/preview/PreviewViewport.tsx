@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import type { PreviewMachine } from "@cadcamfun/api"
 import { useTheme } from "@/lib/theme"
 import { Box, Focus, Grid3x3, Maximize2, Minus, PenLine, Plus, X } from "lucide-react-native"
 import { AdaptiveBlur } from "@/components/GlassView"
@@ -44,7 +45,8 @@ import {
   toolMarkerLength,
   type PreviewSegment,
 } from "@/lib/preview-scene"
-import { formatSize, partBounds } from "@/lib/preview-sim"
+import { formatSize, partBounds, spinRateAt } from "@/lib/preview-sim"
+import { TOOL_GLYPH_COLOR, prepareMachineSolids, toolGlyphLines, type MachineSolids } from "@/lib/machine-bodies"
 import { type } from "@/lib/typography"
 
 export interface PreviewMesh {
@@ -65,12 +67,14 @@ const prepare = <T,>(build: () => T, fallback: string): Prepared<T> => {
 
 /**
  * Everything derived from the payload, computed once per mesh/path and shared by the inline and the full-screen
- * viewer: validating and packing a large mesh, and finding its crease edges, are the expensive steps.
+ * viewer: validating and packing a large mesh, finding its crease edges, and tessellating the machine, are the
+ * expensive steps.
  */
 interface PreparedScene {
   readonly mesh?: Prepared<ReturnType<typeof prepareMeshUpload>>
   readonly lines: Prepared<Float32Array>
   readonly edges: ReturnType<typeof meshFeatureEdges>
+  readonly solids: Prepared<MachineSolids>
 }
 
 /** Below this card width the zoom buttons give way: pinch and the accessibility actions still zoom. */
@@ -82,6 +86,8 @@ export interface PreviewViewportProps {
   mesh?: PreviewMesh
   segments?: readonly PreviewSegment[]
   stock?: Bounds
+  /** The machine around the program (spec 31 §5): bodies, tool glyph, spin and collisions; without it the preview stays bare. */
+  machine?: PreviewMachine
   playhead?: number
   /** Fade the not-yet-cut path and show the tool at the playhead (toolpath simulation). */
   simulating?: boolean
@@ -109,14 +115,17 @@ export function PreviewViewport(props: PreviewViewportProps) {
   const [showEdges, setShowEdges] = useState(true)
   const [showGrid, setShowGrid] = useState(true)
   const display = { showEdges, showGrid, onToggleEdges: () => setShowEdges((value) => !value), onToggleGrid: () => setShowGrid((value) => !value) }
-  const { mesh, segments, stock } = props
+  const { mesh, segments, stock, machine } = props
   const meshUpload = useMemo(() => mesh ? prepare(() => prepareMeshUpload(mesh), PREVIEW_MESSAGE.meshInvalid) : undefined, [mesh])
-  const lines = useMemo(() => prepare(() => prepareToolpathLines(segments ?? [], stock), PREVIEW_MESSAGE.pathInvalid), [segments, stock])
+  const machineUpload = useMemo(() => prepare(() => prepareMachineSolids(machine), PREVIEW_MESSAGE.machineTooLarge), [machine])
+  // A machine scene carries its own bodies: the generic stock box would double the outline they already give.
+  const collisions = useMemo(() => new Set(machine?.collisions ?? []), [machine])
+  const lines = useMemo(() => prepare(() => prepareToolpathLines(segments ?? [], machine ? undefined : stock, collisions), PREVIEW_MESSAGE.pathInvalid), [segments, stock, machine, collisions])
   const edges = useMemo(() => {
     if (!mesh) return []
     try { return meshFeatureEdges(mesh.positions, mesh.indices) } catch { return [] }
   }, [mesh])
-  const prepared = useMemo<PreparedScene>(() => ({ ...(meshUpload ? { mesh: meshUpload } : {}), lines, edges }), [meshUpload, lines, edges])
+  const prepared = useMemo<PreparedScene>(() => ({ ...(meshUpload ? { mesh: meshUpload } : {}), lines, edges, solids: machineUpload }), [meshUpload, lines, edges, machineUpload])
 
   return <>
     {/* Covered by the full-screen viewer, the inline one stops following the playhead and the camera: no hidden redraws. */}
@@ -143,6 +152,7 @@ function Viewport({
   revision,
   mesh,
   segments,
+  machine,
   playhead = 0,
   simulating = false,
   selectedPartId,
@@ -171,6 +181,7 @@ function Viewport({
   const [view, setView] = useState<StandardView | undefined>("iso")
   const [meshError, setMeshError] = useState<string | undefined>()
   const [lineError, setLineError] = useState<string | undefined>()
+  const [machineError, setMachineError] = useState<string | undefined>()
   const [gpuError, setGpuError] = useState<string | undefined>()
   const [scene, setScene] = useState<PreviewScene | null>(null)
   const [size, setSize] = useState({ width: 1, height: 1 })
@@ -179,7 +190,7 @@ function Viewport({
   const gesture = useRef({ x: 0, y: 0, startX: 0, startY: 0, pinch: 0, two: false, moved: false })
   const lastTap = useRef<{ x: number; y: number; at: number } | undefined>(undefined)
   const linesOk = useRef(true)
-  const failed = meshError ?? lineError ?? gpuError
+  const failed = meshError ?? lineError ?? machineError ?? gpuError
   const compact = size.width < COMPACT_WIDTH
   const aspect = size.width / Math.max(size.height, 1)
   // True while the camera is at a fitted view: a resize or rotation re-fits it. Any orbit, zoom or pan clears it.
@@ -261,6 +272,21 @@ function Viewport({
     setLineError(lines.error)
   }, [scene, prepared.lines])
 
+  // The machine bodies are one upload each; scrubbing and the camera never touch them again.
+  useEffect(() => {
+    if (!scene) return
+    const solids = prepared.solids
+    if (solids.value) {
+      scene.setSolids(solids.value.solids.vertices, solids.value.solids.indices, solids.value.solids.opaqueTriangles)
+      scene.setSpindle(solids.value.spindle.vertices, solids.value.spindle.indices, solids.value.spindle.opaqueTriangles)
+      setMachineError(undefined)
+      return
+    }
+    scene.setSolids(new Float32Array(), new Uint32Array(), 0)
+    scene.setSpindle(new Float32Array(), new Uint32Array(), 0)
+    setMachineError(solids.error)
+  }, [scene, prepared.solids])
+
   // Crease outline is a pure function of the mesh: computed once per mesh by the owner, not per viewer or frame.
   const edges = prepared.edges
   const boundsKey = `${bounds.min.join(",")}|${bounds.max.join(",")}`
@@ -268,8 +294,11 @@ function Viewport({
 
   useEffect(() => {
     if (!scene) return
-    scene.setOverlay(prepareOverlayLines(showGrid ? guides : [], showEdges ? edges : []))
-  }, [scene, guides, edges, showGrid, showEdges])
+    // The machine's wire bodies (mill stock outline, printer build volume) are the machine itself: the edge toggle
+    // hides the CAD outline, never them.
+    const wire = prepared.solids.value?.wire ?? []
+    scene.setOverlay(prepareOverlayLines(showGrid ? guides : [], [...wire, ...(showEdges ? edges : [])]))
+  }, [scene, guides, edges, showGrid, showEdges, prepared.solids])
 
   const segmentCount = segments?.length ?? 0
   useEffect(() => {
@@ -278,16 +307,29 @@ function Viewport({
     scene.setProgress(simulating ? range.travelled : -1, range.path, REMAINING_PATH_FADE)
   }, [scene, active, playhead, segmentCount, simulating])
 
+  // What turns with the spindle: the native view accumulates the angle while the rate is not zero.
+  // A covered viewer stops its spindle so the display link does not redraw a scene nobody sees.
+  useEffect(() => {
+    if (!scene) return
+    scene.setSpin(active ? spinRateAt(machine?.spin ?? [], playhead, simulating) : 0)
+  }, [scene, active, machine, playhead, simulating])
+
   const toolLength = useMemo(() => toolMarkerLength(bounds), [boundsKey])
   useEffect(() => {
     if (!scene || !active || !linesOk.current) return
     const segment = segments?.[playhead]
+    const family = machine?.tool.family
     try {
-      scene.setActiveLine(prepareActiveLine(segment, simulating ? toolLength : 0, rgbFromHex(palette.ink)))
+      // A lathe or printer machine draws its own tool (the insert, the nozzle) instead of the mill marker.
+      const machineGlyph = simulating && segment && machine && family !== undefined && family !== "mill"
+        ? toolGlyphLines([segment.to[0], segment.to[1], segment.to[2]], machine.tool, toolLength, TOOL_GLYPH_COLOR[family])
+        : []
+      const marker = simulating && (family === undefined || family === "mill") ? toolLength : 0
+      scene.setActiveLine(prepareActiveLine(segment, marker, rgbFromHex(palette.ink), machineGlyph))
     } catch {
       scene.setActiveLine(new Float32Array())
     }
-  }, [scene, active, segments, playhead, simulating, toolLength, palette.ink])
+  }, [scene, active, segments, playhead, simulating, toolLength, palette.ink, machine])
 
   useEffect(() => {
     if (!scene || !active) return

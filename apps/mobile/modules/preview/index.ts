@@ -8,6 +8,15 @@ export type PreviewScene = {
   setLines(lines: Float32Array): void
   /** One move (2 vertices) plus an optional wireframe tool, or an empty buffer. Kept off the path upload so scrubbing does not reallocate it. */
   setActiveLine(line: Float32Array): void
+  /**
+   * Machine bodies: interleaved xyz, normal xyz, rgba vertices and triangle indices, opaque triangles first
+   * (`machine-bodies.ts`). An empty pair clears them. Drawing waits for `PreviewSurface.attach`.
+   */
+  setSolids(vertices: Float32Array, indices: Uint32Array, opaqueTriangles: number): void
+  /** The bodies that turn with the spindle, drawn rotated about the display x axis by the accumulated spin. */
+  setSpindle(vertices: Float32Array, indices: Uint32Array, opaqueTriangles: number): void
+  /** Signed display revolutions per second the spindle turns; the native view accumulates the angle. 0 stops it. */
+  setSpin(rate: number): void
   /** Fades path vertices `[travelled, path)` toward the background by `fade`; `travelled < 0` shows the whole path. */
   setProgress(travelled: number, path: number, fade: number): void
   /** Feature edges, floor grid and axes. Decoration only: a refused upload just hides them. */

@@ -461,6 +461,25 @@ describe("lathe tools", () => {
   })
 })
 
+describe("the preview's tool model (spec 31 §5)", () => {
+  test("a mill uses the chosen resource only while it is this machine's and cuts the generator's diameter", () => {
+    const resource = { type: "ballendmill", diameter: 6, numberOfFlutes: 2, cuttingLength: 18, shankDiameter: 6 }
+    expect(cam.previewToolModel("mill", settings(), resource)).toMatchObject({ family: "mill", shape: "ball", diameter: 6, flutes: 2 })
+    // The generator cuts Ø4: the resource would draw a tool the program does not use.
+    expect(cam.previewToolModel("mill", settings({ toolDiameter: 4 }), resource)).toMatchObject({ family: "mill", shape: "flat", diameter: 4 })
+    // A resource of another machine is never the mill's tool.
+    expect(cam.previewToolModel("mill", settings(), { type: "turning", diameter: 6 })).toMatchObject({ family: "mill", shape: "flat", diameter: 6 })
+  })
+
+  test("a lathe takes the insert resource whole; a printer takes its nozzle; none falls back to the settings", () => {
+    expect(cam.previewToolModel("lathe", lathe({ toolDiameter: 6 }), { type: "grooving", diameter: 4, cornerRadius: 0.2 })).toMatchObject({ family: "lathe", insert: "grooving", width: 4 })
+    expect(cam.previewToolModel("lathe", lathe(), { type: "ballendmill", diameter: 6 })).toMatchObject({ family: "lathe", insert: "turning" })
+    const nozzle = cam.previewToolModel("3dprinter", settings({ machineType: "3dprinter", nozzleDiameter: 0.6 }), { type: "ruby", diameter: 0.6 })
+    expect(nozzle).toMatchObject({ family: "nozzle", nozzle: "ruby", diameter: 0.6 })
+    expect(cam.previewToolModel("3dprinter", settings({ machineType: "3dprinter", nozzleDiameter: 0.6 }))).toMatchObject({ family: "nozzle", nozzle: "standard", diameter: 0.6 })
+  })
+})
+
 describe("configured workholding is verified (spec 31 §6.1)", () => {
   const stock = { width: 100, height: 60, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 }
   const request = (patch: Record<string, unknown>) => ({ settings: settings(patch), geometry: { ...g.DEFAULT_GEOMETRY, stock }, printer: g.DEFAULT_PRINTER_EXTRAS }) as never

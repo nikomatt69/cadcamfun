@@ -7,9 +7,33 @@
  */
 import type { Vec3 } from "../cad/vec.ts"
 import { arcSweepBetween, expandMoves, moveTarget, type Program } from "../cam/ir.ts"
+import type { CamArtifact } from "../cam/kernel/contracts.ts"
+import type { Stock, ToolpathSettings } from "../cam/generator/schema.ts"
+import { analyseGcode } from "../cam/generator/analysis.ts"
+import { inferMachineKind } from "../cam/machine.ts"
+import { findMachine } from "../cam/kernel/machines.ts"
 import { elementMesh, type Element } from "../cam/model/element-mesh.ts"
+import { displayPoint, displaySpinRate, spinSense } from "../cam/viewer/frames.ts"
+import { collidingMoves } from "../cam/viewer/setup-checks.ts"
+import { buildTimeline, programStart, type Timeline } from "../cam/viewer/timeline.ts"
 import { parseToolpath, type ToolpathPoint } from "../cam/viewer/toolpath.ts"
 import { tokenize, valuesOf } from "../cam/viewer/words.ts"
+import { previewToolModel, toolEnvelope, type ToolModel, type ToolResource } from "../cam/tool-model.ts"
+import {
+  choosePreviewMachine,
+  finishBounds,
+  freshBounds,
+  grow,
+  previewBodyBounds,
+  previewMachineBlock,
+  previewSetupOf,
+  previewStockBounds,
+  EMPTY_BOUNDS,
+  type BoundsSink,
+  type PreviewBounds,
+  type PreviewMachine,
+  type PreviewSpinRun,
+} from "./machine.ts"
 
 /** Hard cap so one part cannot fill the local network. */
 export const MAX_PREVIEW_TRIANGLES = 80_000
@@ -19,7 +43,7 @@ export const MAX_PREVIEW_SEGMENTS = 20_000
  * Bump when the payload a given revision produces changes (rounding, caps, arc expansion), so a phone holding an
  * entity tag of the old shape fetches the new one instead of being told nothing changed.
  */
-export const PREVIEW_FORMAT = 2
+export const PREVIEW_FORMAT = 3
 
 /**
  * Mesh coordinates and normals travel rounded to 1e-5. The phone uploads them as float32, whose spacing is already
@@ -27,13 +51,6 @@ export const PREVIEW_FORMAT = 2
  */
 const MESH_PRECISION = 1e5
 const round = (value: number, scale: number): number => Math.round(value * scale) / scale
-
-export interface PreviewBounds {
-  readonly min: readonly [number, number, number]
-  readonly max: readonly [number, number, number]
-}
-
-export const EMPTY_BOUNDS: PreviewBounds = { min: [0, 0, 0], max: [0, 0, 0] }
 
 export interface MeshPart {
   readonly id: string
@@ -117,23 +134,6 @@ export const documentParameters = (data: unknown): PreviewParameter[] => {
   }
   return out
 }
-
-const grow = (bounds: { min: [number, number, number]; max: [number, number, number] }, x: number, y: number, z: number): void => {
-  bounds.min[0] = Math.min(bounds.min[0], x)
-  bounds.min[1] = Math.min(bounds.min[1], y)
-  bounds.min[2] = Math.min(bounds.min[2], z)
-  bounds.max[0] = Math.max(bounds.max[0], x)
-  bounds.max[1] = Math.max(bounds.max[1], y)
-  bounds.max[2] = Math.max(bounds.max[2], z)
-}
-
-const finishBounds = (bounds: { min: [number, number, number]; max: [number, number, number] }): PreviewBounds =>
-  Number.isFinite(bounds.min[0]) ? bounds : EMPTY_BOUNDS
-
-const freshBounds = (): { min: [number, number, number]; max: [number, number, number] } => ({
-  min: [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
-  max: [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY],
-})
 
 const vertexNormal = (positions: Float64Array, indices: Uint32Array): number[] => {
   const acc = new Float64Array(positions.length)
@@ -291,14 +291,14 @@ export const toolpathPreviewFromGcode = (gcode: string, options: ToolpathPreview
     }
     segments.push({ kind: pointKind(to), line: to.line ?? 0, from: [from.x, from.y, from.z], to: [to.x, to.y, to.z] })
   }
-  return pack(segments, blockStats(gcode), truncated)
+  return pack(segments, gcodeStats(gcode), truncated)
 }
 
 const pointKind = (point: ToolpathPoint): SegmentKind =>
   point.isRapid ? "rapid" : point.isArc || point.isShape || point.type === "G2" || point.type === "G3" ? "circular" : "linear"
 
 /** One count per motion block, modal blocks included (`X10` after `G1` is a linear move). */
-const blockStats = (gcode: string): ToolpathStats => {
+export const gcodeStats = (gcode: string): ToolpathStats => {
   let rapidMoves = 0
   let linearMoves = 0
   let circularMoves = 0
@@ -408,4 +408,215 @@ export const toolpathPreviewFromProgram = (program: Program, options: ToolpathPr
 
 export const emptyToolpathPreview = (): ToolpathPreview => pack([], EMPTY_STATS, false)
 
+// ---------------------------------------------------------------- the machine around the program
+
+export interface MachineSceneOptions {
+  /** The generator settings of the stored document (the machine setting is the last word on the kind). */
+  readonly settings: ToolpathSettings
+  readonly stock: Stock
+  /** The G-code the route draws. When empty or absent, the program alone is drawn. */
+  readonly gcode?: string | undefined
+  readonly program?: Program | undefined
+  /** The kernel artifact of the document: its stock and table replace the generator's for its own program. */
+  readonly artifact?: CamArtifact | undefined
+  /** The NC text of the artifact, for the identity check against `gcode`. */
+  readonly kernelNc?: string | undefined
+  /** The generator's own G-code of the document, for the identity and machine check against `gcode`. */
+  readonly generatorGcode?: string | undefined
+  /** Kernel machine id (`kernelRequest.machine`), for the table of the mill set-up. */
+  readonly machineId?: string | undefined
+  readonly tool?: ToolModel | undefined
+  /** The stored tool resource of the document: the scene picks the model once it knows the machine (§5.6). */
+  readonly toolResource?: ToolResource | undefined
+  readonly maxSegments?: number
+}
+
+/** The toolpath, and the machine the phone draws it on. `segments` are in the display world (`cam.viewer.frames`). */
+export interface MachineScenePreview extends ToolpathPreview {
+  readonly machine: PreviewMachine
+}
+
+const timelineStats = (timeline: Timeline): ToolpathStats => {
+  let rapidMoves = 0
+  let linearMoves = 0
+  let circularMoves = 0
+  for (const move of timeline.moves) {
+    if (move.kind === "rapid") rapidMoves++
+    else if (move.kind === "feed") {
+      if (move.center !== undefined) circularMoves++
+      else linearMoves++
+    }
+  }
+  return { rapidMoves, linearMoves, circularMoves, machineFunctions: 0 }
+}
+
+/**
+ * The timeline's moves as payload segments in display coordinates. `move` records which timeline move produced each
+ * segment, so the spin runs and the collisions of the machine block stay attached to the right chord (an arc is many
+ * segments of one move). Zero-length chords after the mapping are dropped: a Y move on a lathe draws nothing.
+ */
+const timelineSegments = (
+  setup: ReturnType<typeof previewSetupOf>,
+  timeline: Timeline,
+  maxSegments: number,
+): { readonly segments: ToolpathSegment[]; readonly move: number[]; readonly truncated: boolean } => {
+  const segments: ToolpathSegment[] = []
+  const move: number[] = []
+  let truncated = false
+  for (let index = 0; index < timeline.moves.length && !truncated; index++) {
+    const timed = timeline.moves[index]!
+    if (timed.kind === "dwell") continue
+    const points = timed.center !== undefined ? arcChordPoints(timed.from, timed.to, timed.center, timed.clockwise ?? false) : [timed.to]
+    let previous = timed.from
+    for (const point of points) {
+      // A malformed word must not poison the payload: the phone refuses non-finite geometry outright.
+      if (finitePoint(previous) && finitePoint(point)) {
+        const from = displayPoint(setup, previous, timed.state.xMode)
+        const to = displayPoint(setup, point, timed.state.xMode)
+        if (to.x !== from.x || to.y !== from.y || to.z !== from.z) {
+          if (segments.length >= maxSegments) {
+            truncated = true
+            break
+          }
+          const kind: SegmentKind = timed.kind === "rapid" ? "rapid" : timed.center !== undefined ? "circular" : "linear"
+          segments.push({ kind, line: timed.state.line ?? 0, from: [from.x, from.y, from.z], to: [to.x, to.y, to.z] })
+          move.push(index)
+        }
+      }
+      previous = point
+    }
+  }
+  return { segments, move, truncated }
+}
+
+/** Signed display revolutions per second of every change of spindle state, keyed by payload segment. */
+const spinRunsOf = (timeline: Timeline, move: readonly number[], kind: PreviewMachine["kind"]): PreviewSpinRun[] => {
+  const runs: PreviewSpinRun[] = []
+  let current = 0
+  for (let segment = 0; segment < move.length; segment++) {
+    const state = timeline.moves[move[segment]!]!.state
+    const rate = spinSense(kind, state.spindle) * displaySpinRate(state.rpm)
+    if (rate !== current) {
+      runs.push({ segment, rate })
+      current = rate
+    }
+  }
+  return runs
+}
+
+const unionBounds = (a: PreviewBounds, b: PreviewBounds): PreviewBounds => {
+  const sink: BoundsSink = { min: [a.min[0], a.min[1], a.min[2]], max: [a.max[0], a.max[1], a.max[2]] }
+  if (!Number.isFinite(a.min[0])) {
+    sink.min = [b.min[0], b.min[1], b.min[2]]
+    sink.max = [b.max[0], b.max[1], b.max[2]]
+    return finishBounds(sink)
+  }
+  if (!Number.isFinite(b.min[0])) return a
+  grow(sink, b.min[0], b.min[1], b.min[2])
+  grow(sink, b.max[0], b.max[1], b.max[2])
+  return finishBounds(sink)
+}
+
+/** The longest move list the workholding check reads; a surfacing program is longer than the phone can draw anyway. */
+const MAX_COLLISION_MOVES = MAX_PREVIEW_SEGMENTS
+
+/**
+ * The toolpath in display coordinates plus the machine around it (spec 31 §5, the payload contract of spec 13 §6):
+ * which machine the program is for, how it is set up, its bodies, the tool glyph, what turns while it runs and which
+ * segments run into the workholding. The phone never maps a program coordinate itself.
+ *
+ * With stored G-code the desktop's own replay (`analyseGcode`) drives the payload, so the phone and the desktop machine
+ * view play the same motion; a program the interpreter cannot read (G12/G13 shapes) falls back to the toolpath parser,
+ * which draws the shapes but has no motion state, so its payload carries no spin runs and no collisions.
+ */
+export const machineScenePreview = (options: MachineSceneOptions): MachineScenePreview => {
+  const maxSegments = options.maxSegments ?? MAX_PREVIEW_SEGMENTS
+  const gcode = options.gcode ?? ""
+  const stored = gcode.trim().length > 0
+  const produced = !stored ? undefined
+    : options.kernelNc !== undefined && options.kernelNc === gcode ? { kind: "mill" as const, source: "kernel" as const }
+    : options.generatorGcode !== undefined && options.generatorGcode !== "" && options.generatorGcode === gcode ? { kind: options.settings.machineType, source: "generator" as const }
+    : undefined
+  const choice = choosePreviewMachine({
+    ...(produced !== undefined ? { produced } : {}),
+    ...(stored ? { inferred: inferMachineKind(gcode) } : {}),
+    setting: options.settings.machineType,
+  })
+  const kernelTable = options.machineId !== undefined ? findMachine(options.machineId)?.table : undefined
+  const tool = options.tool ?? (options.toolResource !== undefined ? previewToolModel(choice.kind, options.settings, options.toolResource) : undefined)
+  const setup = previewSetupOf(choice.kind, options.settings, options.stock, {
+    ...(options.artifact !== undefined ? { artifact: options.artifact } : {}),
+    ...(options.program !== undefined ? { program: options.program } : {}),
+    gcode,
+    ...(tool !== undefined ? { tool } : {}),
+    ...(kernelTable !== undefined ? { table: { length: kernelTable.length, width: kernelTable.width } } : {}),
+  })
+
+  let segments: ToolpathSegment[] = []
+  const move: number[] = []
+  let truncated = false
+  let stats: ToolpathStats = EMPTY_STATS
+  let timeline: Timeline | undefined
+
+  if (stored) {
+    stats = gcodeStats(gcode)
+    const analysis = (() => {
+      try { return analyseGcode(gcode) } catch { return undefined }
+    })()
+    // The desktop's own replay drives the payload when it draws something (spec 31 §5.7 parity).
+    if (analysis !== undefined && analysis.program.toolpaths.some((path) => path.moves.length > 0)) {
+      const candidate = buildTimeline(analysis.program, analysis.motion, undefined, programStart(choice.kind, analysis.program))
+      const built = timelineSegments(setup, candidate, maxSegments)
+      if (built.segments.length > 0) {
+        timeline = candidate
+        segments = built.segments
+        move.push(...built.move)
+        truncated = built.truncated
+      }
+    }
+    if (segments.length === 0) {
+      // The parser reads what the interpreter cannot (G12/G13 shapes): drawn, but with no motion state to check.
+      const parsed = toolpathPreviewFromGcode(gcode, { maxSegments })
+      segments = parsed.segments.map((segment) => {
+        const from = displayPoint(setup, { x: segment.from[0], y: segment.from[1], z: segment.from[2] })
+        const to = displayPoint(setup, { x: segment.to[0], y: segment.to[1], z: segment.to[2] })
+        return { kind: segment.kind, line: segment.line, from: [from.x, from.y, from.z], to: [to.x, to.y, to.z] }
+      })
+      truncated = parsed.truncated
+    }
+  } else if (options.program !== undefined) {
+    timeline = buildTimeline(options.program, undefined, undefined, programStart(choice.kind, options.program))
+    const built = timelineSegments(setup, timeline, maxSegments)
+    segments = built.segments
+    move.push(...built.move)
+    truncated = built.truncated
+    stats = timelineStats(timeline)
+  }
+
+  const envelope = tool !== undefined ? toolEnvelope(tool) : undefined
+  let collisions: number[] = []
+  if (timeline !== undefined && timeline.moves.length <= MAX_COLLISION_MOVES) {
+    const hits = collidingMoves(setup, timeline, envelope)
+    if (hits.size > 0) collisions = move.flatMap((index, segment) => (hits.has(index) ? [segment] : []))
+  }
+
+  const machine = previewMachineBlock({
+    setup,
+    choice,
+    ...(tool !== undefined ? { tool } : {}),
+    spin: timeline !== undefined ? spinRunsOf(timeline, move, choice.kind) : [],
+    collisions,
+  })
+
+  return {
+    segments,
+    bounds: unionBounds(boundsOfSegments(segments), previewBodyBounds(setup)),
+    stock: previewStockBounds(setup),
+    truncated,
+    stats,
+    machine,
+  }
+}
+
 export { PreviewCache, type PreviewCacheOptions } from "./cache.ts"
+export * from "./machine.ts"

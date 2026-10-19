@@ -1,9 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FlatList, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native"
 import { ChevronDown, ChevronUp, Pause, Play, SkipBack, SkipForward } from "lucide-react-native"
-import type { ToolpathPreview, ToolpathReview as ToolpathReviewPayload, ToolpathSegment } from "@cadcamfun/api"
+import type { PreviewMachine, ToolpathPreview, ToolpathReview as ToolpathReviewPayload, ToolpathSegment } from "@cadcamfun/api"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
+import { MACHINE_LABELS, MACHINE_SOURCE_LABELS } from "@/lib/machine-bodies"
 import { clampPlayhead, segmentIndexForLine } from "@/lib/preview-math"
 import {
   PLAYBACK_SPEEDS,
@@ -15,6 +16,8 @@ import {
   modalFeeds,
   pathTotals,
   segmentDurations,
+  spinIsClockwise,
+  spinRateAt,
   startTimeOf,
 } from "@/lib/preview-sim"
 import { mono } from "@/lib/typography"
@@ -79,6 +82,8 @@ export function ToolpathReview({
   const stats = preview?.stats ?? review?.stats
   const speed = PLAYBACK_SPEEDS[speedIndex] ?? 1
   const simulating = playing || playhead > 0
+  const machine = preview?.machine
+  const machineSpin = machine ? spinRateAt(machine.spin, playhead, simulating) : 0
 
   useEffect(() => {
     setPlayhead(0)
@@ -162,11 +167,12 @@ export function ToolpathReview({
       revision={preview.revision}
       segments={segments}
       stock={preview.stock}
+      machine={preview.machine}
       playhead={playhead}
       simulating={simulating}
       fullscreenTitle={review?.name ?? "Toolpath"}
       fullscreenFooter={bar}
-      accessibilityLabel="Toolpath preview"
+      accessibilityLabel={machine ? `${MACHINE_LABELS[machine.kind]} toolpath preview` : "Toolpath preview"}
       accessibilityHint="Drag to orbit. Pinch to zoom. The listing follows the current block."
     />
   ) : (
@@ -193,12 +199,43 @@ export function ToolpathReview({
             </View>)}
           </View>
         ) : null}
+        {machine ? (
+          <View accessibilityRole="summary" style={{ gap: 3 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: `${palette.accent}1f` }}>
+                <Text style={{ color: palette.accent, fontSize: 12, fontWeight: "700" }}>{MACHINE_LABELS[machine.kind]}</Text>
+              </View>
+              <Text selectable style={{ color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>
+                {MACHINE_SOURCE_LABELS[machine.source]} · {machine.axes} axes
+                {machine.turret ? ` · ${machine.turret} turret` : ""}{machine.xMode ? ` · X is a ${machine.xMode}` : ""}
+              </Text>
+            </View>
+            <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 18 }}>{machine.turns}.</Text>
+            <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 18 }}>{machine.workholding}.</Text>
+            {machine.assumed.length ? (
+              <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 18 }}>Assumed: {machine.assumed.join(", ")}.</Text>
+            ) : null}
+            {machine.mismatch ? (
+              <Text style={{ color: palette.warning, fontSize: 12, lineHeight: 17 }}>
+                The G-code reads like a {MACHINE_LABELS[machine.mismatch.inferred].toLowerCase()} program, not this one. {machine.mismatch.reasons.join("; ")}
+              </Text>
+            ) : null}
+            {machine.collisions.length ? (
+              <Text style={{ color: palette.warning, fontSize: 12, lineHeight: 17 }}>
+                {machine.collisions.length === 1 ? "One move runs" : `${machine.collisions.length.toLocaleString("en")} moves run`} into the workholding (red on the path).
+              </Text>
+            ) : null}
+            {machine.spin.length ? (
+              <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 17, fontVariant: ["tabular-nums"] }}>{spinText(machine, machineSpin)}</Text>
+            ) : null}
+          </View>
+        ) : null}
         {segments.length > 0 && preview ? <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: 16, rowGap: 4 }}>
           {[
             { label: "Cycle", value: `≈ ${formatDuration(totals.seconds)}` },
             { label: "Cutting", value: `${formatLength(totals.cutLength)} mm` },
             { label: "Rapid", value: `${formatLength(totals.rapidLength)} mm` },
-            { label: "Stock", value: formatSize(preview.stock) },
+            { label: machine?.kind === "3dprinter" ? "Build volume" : machine?.kind === "lathe" ? "Bar" : "Stock", value: formatSize(preview.stock) },
           ].map(({ label, value }) => <Text key={label} selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>
             {label} <Text style={{ color: palette.ink, fontWeight: "600" }}>{value}</Text>
           </Text>)}
@@ -409,3 +446,9 @@ const GcodeRow = memo(function GcodeRow({
     </Pressable>
   )
 })
+
+/** What the block's spin run means in words (ISO 6983: a mill runs clockwise at a negative display rate). */
+const spinText = (machine: PreviewMachine, rate: number): string =>
+  rate === 0
+    ? "Spindle stopped on this block"
+    : `${machine.kind === "lathe" ? "The part turns" : "The tool turns"} ${spinIsClockwise(machine.kind, rate) ? "clockwise" : "counter-clockwise"} on this block`

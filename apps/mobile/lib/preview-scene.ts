@@ -4,8 +4,9 @@
  * The desktop already caps a preview. The phone checks again, because the GPU copy must not
  * trust the network: a non-finite coordinate or an index past the vertex buffer is a Metal fault,
  * not a blank frame. Numbers here are the same caps as `packages/core` (`MAX_PREVIEW_TRIANGLES`,
- * `MAX_PREVIEW_SEGMENTS`) plus the twelve edges of a stock box. `PreviewUpload.swift` repeats
- * them; `preview-scene.test.ts` fails if the two copies drift.
+ * `MAX_PREVIEW_SEGMENTS`) plus the twelve edges of a stock box and the machine scene's own
+ * triangles (`machine-bodies.ts`). `PreviewUpload.swift` repeats them; `preview-scene.test.ts`
+ * fails if the two copies drift.
  *
  * The playhead is a second buffer. Scrubbing a toolpath recolours one move and leaves the path
  * allocation alone.
@@ -46,6 +47,8 @@ export const LINE_COLOR = {
   stock: [0.48, 0.5, 0.55],
   // Amber reads on both the dark and the light background; the old pale yellow vanished on light.
   active: [1, 0.62, 0.12],
+  /** A move that runs into the workholding (`machine.collisions`), the desktop's `0xff2d2d`. */
+  collision: [1, 0.18, 0.18],
   tool: [0.98, 0.98, 1],
   edge: [0.1, 0.12, 0.16],
   axisX: [0.9, 0.3, 0.3],
@@ -58,6 +61,7 @@ export const PREVIEW_MESSAGE = {
   meshInvalid: "This preview could not be drawn.",
   pathTooLarge: "This toolpath is too large for the phone.",
   pathInvalid: "This toolpath could not be drawn.",
+  machineTooLarge: "This machine scene is too large for the phone.",
 } as const
 
 export class PreviewPayloadError extends Error {
@@ -153,19 +157,28 @@ const assertPoint = (point: PreviewPoint): void => {
   if (!finitePoint(point)) throw new PreviewPayloadError("pathInvalid")
 }
 
-/** Coloured path and stock edges. The playhead is not baked in. */
-export const prepareToolpathLines = (segments: readonly PreviewSegment[], stock: Bounds | undefined): Float32Array => {
+/** No move runs into the workholding; the common case, shared so the default allocates nothing. */
+const NO_COLLISIONS: ReadonlySet<number> = new Set()
+
+/**
+ * Coloured path and stock edges. The playhead is not baked in. Segment indices in `collisions` are drawn red
+ * (`machine.collisions`); the stock box is left out of a machine scene (`stock === undefined`), whose outline the
+ * bodies carry instead.
+ */
+export const prepareToolpathLines = (segments: readonly PreviewSegment[], stock: Bounds | undefined, collisions: ReadonlySet<number> = NO_COLLISIONS): Float32Array => {
   if (segments.length > PREVIEW_MAX_SEGMENTS) throw new PreviewPayloadError("pathTooLarge")
   const edges = stock ? boxEdges(stock) : []
   if (stock && (!finitePoint(stock.min) || !finitePoint(stock.max))) throw new PreviewPayloadError("pathInvalid")
   if (edges.length > PREVIEW_MAX_STOCK_EDGES) throw new PreviewPayloadError("pathTooLarge")
   const data = new Float32Array((segments.length + edges.length) * SEGMENT_FLOATS)
   let cursor = 0
-  for (const segment of segments) {
+  for (let index = 0; index < segments.length; index++) {
+    const segment = segments[index]!
     assertPoint(segment.from)
     assertPoint(segment.to)
-    cursor = writeVertex(data, cursor, segment.from, LINE_COLOR[segment.kind])
-    cursor = writeVertex(data, cursor, segment.to, LINE_COLOR[segment.kind])
+    const color = collisions.has(index) ? LINE_COLOR.collision : LINE_COLOR[segment.kind]
+    cursor = writeVertex(data, cursor, segment.from, color)
+    cursor = writeVertex(data, cursor, segment.to, color)
   }
   for (const edge of edges) {
     cursor = writeVertex(data, cursor, edge.from, LINE_COLOR.stock)
@@ -178,7 +191,13 @@ export const prepareToolpathLines = (segments: readonly PreviewSegment[], stock:
 export const TOOL_GLYPH_SIDES = 16
 
 /** The current move, plus a wireframe tool: a ring at the tip, a ring at the top and four flutes between them. */
-export const PREVIEW_MAX_ACTIVE_VERTICES = 2 + TOOL_GLYPH_SIDES * 2 * 2 + 4 * 2
+export const MILL_TOOL_VERTICES = 2 + TOOL_GLYPH_SIDES * 2 * 2 + 4 * 2
+
+/** The largest machine glyph beside the playhead: the printer nozzle's ring, four spokes and the stub above it. */
+export const MACHINE_GLYPH_MAX_VERTICES = 42
+
+/** The current move, the mill wireframe tool and the largest machine glyph; the Metal module repeats this cap. */
+export const PREVIEW_MAX_ACTIVE_VERTICES = MILL_TOOL_VERTICES + MACHINE_GLYPH_MAX_VERTICES
 
 /** How strongly the not-yet-cut path fades toward the background while simulating (0 = no fade). */
 export const REMAINING_PATH_FADE = 0.72
@@ -187,34 +206,50 @@ export const REMAINING_PATH_FADE = 0.72
 const TOOL_GLYPH_RADIUS = 0.2
 
 /**
- * The current move, plus a wireframe tool of height `toolLength` standing on the tool tip when it is positive.
- * `toolColor` is the theme ink so the tool reads on light and dark. Empty when no move is current.
+ * The current move, plus a wireframe tool of height `toolLength` standing on the tool tip when it is positive,
+ * plus the machine's own glyph (`machine-bodies.ts` `toolGlyphLines`: the lathe insert or the printer nozzle)
+ * appended in the same buffer. `toolColor` is the theme ink so the tool reads on light and dark. Empty when no
+ * move is current.
  */
-export const prepareActiveLine = (segment: PreviewSegment | undefined, toolLength = 0, toolColor: Rgb = LINE_COLOR.tool): Float32Array => {
+export const prepareActiveLine = (
+  segment: PreviewSegment | undefined,
+  toolLength = 0,
+  toolColor: Rgb = LINE_COLOR.tool,
+  glyph: readonly { readonly from: PreviewPoint; readonly to: PreviewPoint; readonly color?: Rgb }[] = [],
+): Float32Array => {
   if (!segment) return new Float32Array()
   assertPoint(segment.from)
   assertPoint(segment.to)
   const tool = Number.isFinite(toolLength) && toolLength > 0
-  const data = new Float32Array(tool ? PREVIEW_MAX_ACTIVE_VERTICES * LINE_VERTEX_FLOATS : SEGMENT_FLOATS)
+  const vertices = (tool ? MILL_TOOL_VERTICES : 2) + glyph.length * 2
+  if (vertices > PREVIEW_MAX_ACTIVE_VERTICES) throw new PreviewPayloadError("pathInvalid")
+  const data = new Float32Array(vertices * LINE_VERTEX_FLOATS)
   let cursor = writeVertex(data, 0, segment.from, LINE_COLOR.active)
   cursor = writeVertex(data, cursor, segment.to, LINE_COLOR.active)
-  if (!tool) return data
-  const x = segment.to[0], y = segment.to[1], z = segment.to[2]
-  const radius = toolLength * TOOL_GLYPH_RADIUS
-  const at = (side: number, height: number): PreviewPoint => {
-    const angle = (side / TOOL_GLYPH_SIDES) * Math.PI * 2
-    return [x + Math.cos(angle) * radius, y + Math.sin(angle) * radius, z + height]
-  }
-  for (const height of [0, toolLength]) {
-    for (let side = 0; side < TOOL_GLYPH_SIDES; side++) {
-      cursor = writeVertex(data, cursor, at(side, height), toolColor)
-      cursor = writeVertex(data, cursor, at(side + 1, height), toolColor)
+  if (tool) {
+    const x = segment.to[0], y = segment.to[1], z = segment.to[2]
+    const radius = toolLength * TOOL_GLYPH_RADIUS
+    const at = (side: number, height: number): PreviewPoint => {
+      const angle = (side / TOOL_GLYPH_SIDES) * Math.PI * 2
+      return [x + Math.cos(angle) * radius, y + Math.sin(angle) * radius, z + height]
+    }
+    for (const height of [0, toolLength]) {
+      for (let side = 0; side < TOOL_GLYPH_SIDES; side++) {
+        cursor = writeVertex(data, cursor, at(side, height), toolColor)
+        cursor = writeVertex(data, cursor, at(side + 1, height), toolColor)
+      }
+    }
+    for (let flute = 0; flute < 4; flute++) {
+      const side = (flute * TOOL_GLYPH_SIDES) / 4
+      cursor = writeVertex(data, cursor, at(side, 0), toolColor)
+      cursor = writeVertex(data, cursor, at(side, toolLength), toolColor)
     }
   }
-  for (let flute = 0; flute < 4; flute++) {
-    const side = (flute * TOOL_GLYPH_SIDES) / 4
-    cursor = writeVertex(data, cursor, at(side, 0), toolColor)
-    cursor = writeVertex(data, cursor, at(side, toolLength), toolColor)
+  for (const line of glyph) {
+    assertPoint(line.from)
+    assertPoint(line.to)
+    cursor = writeVertex(data, cursor, line.from, line.color ?? toolColor)
+    cursor = writeVertex(data, cursor, line.to, line.color ?? toolColor)
   }
   return data
 }
@@ -247,7 +282,10 @@ export const rgbFromHex = (value: string): readonly [number, number, number] => 
 }
 
 type Rgb = readonly [number, number, number]
-type OverlaySegment = { readonly from: PreviewPoint; readonly to: PreviewPoint; readonly color: Rgb }
+export type OverlaySegment = { readonly from: PreviewPoint; readonly to: PreviewPoint; readonly color: Rgb }
+
+/** An overlay line: the mesh's feature edges take the caller's ink, the machine's own wire bodies carry their colour. */
+export type OverlayEdge = { readonly from: PreviewPoint; readonly to: PreviewPoint; readonly color?: Rgb }
 
 /**
  * Boundary, non-manifold and crease edges of a triangle mesh.
@@ -333,13 +371,16 @@ export const sceneGuides = (bounds: Bounds, grid: Rgb): OverlaySegment[] => {
   return out
 }
 
-/** Guides first, then feature edges, capped so a dense mesh drops outline rather than the frame. */
+/**
+ * Guides first, then the machine's wire bodies, then feature edges, capped so a dense mesh drops outline rather
+ * than the frame. An edge without a colour takes `edgeColor` (a wire body keeps its own).
+ */
 export const prepareOverlayLines = (
   guides: readonly OverlaySegment[],
-  edges: ReadonlyArray<{ readonly from: PreviewPoint; readonly to: PreviewPoint }>,
+  edges: readonly OverlayEdge[],
   edgeColor: Rgb = LINE_COLOR.edge,
 ): Float32Array => {
-  const segments = [...guides, ...edges.map((edge) => ({ ...edge, color: edgeColor }))]
+  const segments = [...guides, ...edges.map((edge) => ({ from: edge.from, to: edge.to, color: edge.color ?? edgeColor }))]
     .filter((segment) => finitePoint(segment.from) && finitePoint(segment.to))
     .slice(0, PREVIEW_MAX_OVERLAY_SEGMENTS)
   const data = new Float32Array(segments.length * SEGMENT_FLOATS)

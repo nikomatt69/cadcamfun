@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { CompanionClient, CompanionError, type Transport } from "../lib/client"
+import { CompanionClient, CompanionError, retryAfterMs, type Transport } from "../lib/client"
 
 /** An in-memory transport that records calls and replays canned responses. */
 class FakeTransport implements Transport {
   calls: Array<{ path: string; method: string; body?: unknown }> = []
-  handler: (path: string, method: string, body?: unknown) => { status: number; body: string } = () => ({ status: 200, body: "{}" })
+  handler: (path: string, method: string, body?: unknown) => { status: number; body: string; headers?: Record<string, string> } = () => ({ status: 200, body: "{}" })
   streams: Array<string[]> = []
 
   request(path: string, method: string, body?: unknown) {
@@ -70,6 +70,12 @@ describe("CompanionClient", () => {
     await expect(client(t).projects()).rejects.toBeInstanceOf(CompanionError)
   })
 
+  test("a refused request carries the gateway's back-off", async () => {
+    const t = new FakeTransport()
+    t.handler = () => ({ status: 429, body: JSON.stringify({ message: "Too many writes" }), headers: { "retry-after": "3" } })
+    await expect(client(t).projects()).rejects.toMatchObject({ status: 429, message: "Too many writes", retryAfterMs: 3000 })
+  })
+
   test("diff builds the to/from query", async () => {
     const t = new FakeTransport()
     await client(t).diff("p1", "abc", "def")
@@ -116,6 +122,17 @@ test("successful invalid JSON and redirects are errors rather than undefined dat
   await expect(client(t).projects()).rejects.toThrow("invalid JSON")
   t.handler = () => ({ status: 302, body: "" })
   await expect(client(t).projects()).rejects.toMatchObject({ status: 302 })
+})
+
+test("retryAfterMs reads seconds and HTTP-dates, and nothing else", () => {
+  expect(retryAfterMs("3")).toBe(3000)
+  expect(retryAfterMs(" 0 ")).toBe(0)
+  expect(retryAfterMs(undefined)).toBeUndefined()
+  expect(retryAfterMs("soon")).toBeUndefined()
+  // HTTP-date form; its one-second resolution lands between 1 and 2 seconds from now.
+  const ms = retryAfterMs(new Date(Date.now() + 2000).toUTCString())
+  expect(ms).toBeGreaterThan(0)
+  expect(ms).toBeLessThanOrEqual(2000)
 })
 
 test("questions and session recovery use the shared desktop API", async () => {

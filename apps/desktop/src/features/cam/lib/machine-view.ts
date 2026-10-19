@@ -61,12 +61,8 @@ export const previewSetup = (
  * machine (and its diameter is still the generator's), else the generator's tool settings (spec 31: the same model the
  * resource's page shows).
  */
-export const previewToolModel = (kind: cam.MachineKind, settings: cam.generator.ToolpathSettings, library: (cam.ToolResource & { readonly type?: string }) | null | undefined): cam.ToolModel => {
-  if (library?.type !== undefined && cam.toolMachineOf(library.type) === kind && (kind !== "mill" || Math.abs((library.diameter ?? 0) - settings.toolDiameter) < 1e-9)) {
-    return cam.toolModelOf(library as cam.ToolResource, kind)
-  }
-  return cam.toolModelFromSettings(settings, kind)
-}
+export const previewToolModel = (kind: cam.MachineKind, settings: cam.generator.ToolpathSettings, library: (cam.ToolResource & { readonly type?: string }) | null | undefined): cam.ToolModel =>
+  cam.previewToolModel(kind, settings, library?.type !== undefined ? library as cam.ToolResource : undefined)
 
 export const MACHINE_LABELS: Readonly<Record<cam.MachineKind, string>> = { mill: "Mill", lathe: "Lathe", "3dprinter": "3D printer" }
 export const SOURCE_LABELS: Readonly<Record<MachineSource, string>> = { override: "chosen", generator: "generator", kernel: "kernel", inferred: "from the G-code", settings: "generator setting" }

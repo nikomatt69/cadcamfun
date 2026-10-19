@@ -21,6 +21,10 @@ const metalCompiler = (): boolean => {
 test("the preview shader source is embedded in the Swift view", () => {
   expect(shader).toContain("vertex MeshOut meshVertex")
   expect(shader).toContain("fragment float4 lineFragment")
+  // The machine bodies (spec 31) have their own pipeline: interleaved xyz/normal/rgba and a spin about x.
+  expect(shader).toContain("vertex SolidOut solidVertex")
+  expect(shader).toContain("fragment float4 solidFragment")
+  expect(shader).toContain("spinAboutX")
 })
 
 test.skipIf(!metalCompiler())("the preview shaders compile for iOS", () => {

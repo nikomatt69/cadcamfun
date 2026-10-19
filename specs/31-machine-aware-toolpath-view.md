@@ -62,7 +62,7 @@ CamPage ─► ToolpathVisualizer ─► View3D(visionMode "cam") ─► buildPl
 | D10 | Unsupported words are toasted only on "Process G-code"; the 3D view shows a partial program without saying so. | `CamPage.processGCode` |
 | D11 | `Orient` (3+2) and rotary words are dropped from playback: indexed/5-axis programs are drawn without the table/tool tilt. | `playback.ts:21` |
 
-The mobile toolpath screens list programs and do not draw them in 3D; they are out of scope.
+The mobile toolpath screens used to list programs without drawing them in 3D; as of 2026-10-18 the workspace toolpath preview carries the machine scene to the phone (§12).
 
 ## 3. Principles (binding for every phase)
 
@@ -393,7 +393,12 @@ Deviations from the plan above:
 
 Not done: §5.5 rotary mills (Orient / rotary words are still not drawn as table or tool tilt); a fixture-level unit test of the CAM grid depth setting (it needs WebGL; verified by screenshot).
 
+### Mobile companion (2026-10-18)
+
+The workspace toolpath preview (spec 13 §6) carries the same machine scene to the phone as payload format 3, built by `machineScenePreview` from the stored document, kernel artifact or G-code, settings/stock and tool row. Bodies travel as display-space `box` / `cylinder-x` / `cone-x` shapes, so the phone tessellates them instead of importing the kernel; `spins` splits the static and spindle buffers, `assumed` selects the desktop's 0.45 alpha, `wire` keeps the mill stock outline and printer build volume as edges. The phone draws colliding segments red, spins the spindle set about display x at up to ±2 rev/s with a native display link, and draws the lathe insert or printer nozzle at the playhead. §5.5 rotary mills and the live turned profile remain desktop-only. The review header reports kind, source, axes, turns, workholding, assumptions, mismatch and collisions. Tests: `apps/mobile/test/machine-bodies.test.ts`, `preview-scene.test.ts`, `preview-sim.test.ts`, `preview-shader.test.ts`; the sidecar route is covered by `apps/sidecar/test/workspace-preview.test.ts`.
+
 ## Change log
 
 - 2026-10-17: spec written from the analysis of `main` @ 063eed5; baseline §1 verified green.
 - 2026-10-17: built (§12); full suites green except two failures that also fail on clean `main` (`packages/web` API documentation coverage, a type error in `packages/ai/test/helpers/mcp-server.ts`).
+- 2026-10-18: the mobile companion draws the machine scene (payload format 3): display-space bodies tessellated on the phone, a separate spindle buffer with native spin, assumed workholding alpha, wire stock/build volume, red collisions and the lathe/printer tool glyph. Desktop turned profile and rotary tilt remain desktop-only.

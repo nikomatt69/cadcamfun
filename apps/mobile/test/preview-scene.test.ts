@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import {
   LINE_COLOR,
+  MACHINE_GLYPH_MAX_VERTICES,
+  MILL_TOOL_VERTICES,
   PREVIEW_MAX_SEGMENTS,
   PREVIEW_MAX_TRIANGLES,
   PREVIEW_MESSAGE,
@@ -22,6 +24,8 @@ import {
   PREVIEW_MAX_OVERLAY_SEGMENTS,
   rgbFromHex,
 } from "../lib/preview-scene"
+import { PREVIEW_MAX_SOLID_TRIANGLES, TOOL_GLYPH_COLOR, prepareMachineSolids, toolGlyphLines } from "../lib/machine-bodies"
+import { MAX_DISPLAY_REV_PER_SECOND } from "../lib/preview-sim"
 
 const triangle = {
   positions: [0, 0, 0, 2, 0, 0, 0, 2, 0],
@@ -87,6 +91,19 @@ describe("preview upload", () => {
     expect(() => prepareActiveLine(segment("rapid", [Number.POSITIVE_INFINITY, 0, 0], [1, 0, 0]))).toThrow(PREVIEW_MESSAGE.pathInvalid)
   })
 
+  test("collision moves draw red and a machine scene drops the generic stock box", () => {
+    const segments = [segment("linear", [0, 0, 0], [1, 0, 0]), segment("rapid", [1, 0, 0], [1, 1, 0])]
+    const data = prepareToolpathLines(segments, undefined, new Set([1]))
+    expect(data).toHaveLength(24)
+    expect(Array.from(data.slice(3, 6))).toEqual(float32([...LINE_COLOR.linear]))
+    expect(Array.from(data.slice(15, 18))).toEqual(float32([...LINE_COLOR.collision]))
+    // The stock box stays in a path with no machine, and its edges are never recoloured.
+    const withStock = prepareToolpathLines(segments, { min: [0, 0, 0], max: [1, 1, 1] }, new Set([0, 1]))
+    expect(withStock).toHaveLength((2 + 12) * 12)
+    expect(Array.from(withStock.slice(3, 6))).toEqual(float32([...LINE_COLOR.collision]))
+    expect(Array.from(withStock.slice((2 + 1) * 12 + 3, (2 + 1) * 12 + 6))).toEqual(float32([...LINE_COLOR.stock]))
+  })
+
   test("the camera matrix and the clear colour are finite", () => {
     expect(finiteMatrix(Array.from({ length: 16 }, () => 0))).toBe(true)
     expect(finiteMatrix([Number.NaN])).toBe(false)
@@ -101,6 +118,9 @@ describe("preview upload", () => {
     expect(source).toContain("static let maxStockEdges = 12")
     expect(source).toContain(`static let maxActiveVertices = ${PREVIEW_MAX_ACTIVE_VERTICES}`)
     expect(source).toContain(`static let maxOverlaySegments = ${PREVIEW_MAX_OVERLAY_SEGMENTS.toLocaleString("en").replace(",", "_")}`)
+    expect(source).toContain(`static let maxSolidTriangles = ${PREVIEW_MAX_SOLID_TRIANGLES.toLocaleString("en").replace(",", "_")}`)
+    expect(source).toContain("static let solidVertexFloats = 10")
+    expect(source).toContain(`static let maxSpinRevPerSecond: Float = ${MAX_DISPLAY_REV_PER_SECOND}`)
     for (const message of Object.values(PREVIEW_MESSAGE)) expect(source).toContain(message)
   })
 })
@@ -157,6 +177,14 @@ describe("CAD outline and scene guides", () => {
     expect(prepareOverlayLines([], [{ from: [0, 0, Number.NaN], to: [1, 0, 0] }])).toHaveLength(0)
     expect(guideColor("#000000", "#FFFFFF", 0.5)).toEqual([0.5, 0.5, 0.5])
   })
+
+  test("a wire body keeps its own colour while the mesh outline takes the caller's ink", () => {
+    const wire = { from: [0, 0, 0] as const, to: [1, 0, 0] as const, color: [0.78, 0.66, 0.47] as const }
+    const feature = { from: [0, 0, 0] as const, to: [0, 1, 0] as const }
+    const data = prepareOverlayLines([], [wire, feature], [0.1, 0.12, 0.16])
+    expect(Array.from(data.slice(3, 6))).toEqual(float32([0.78, 0.66, 0.47]))
+    expect(Array.from(data.slice(15, 18))).toEqual(float32([0.1, 0.12, 0.16]))
+  })
 })
 
 describe("toolpath simulation upload", () => {
@@ -165,8 +193,8 @@ describe("toolpath simulation upload", () => {
   test("the active move can carry a wireframe tool standing on the tool tip", () => {
     expect(prepareActiveLine(move)).toHaveLength(12)
     const withTool = prepareActiveLine(move, 5, [0.1, 0.2, 0.3])
-    expect(withTool).toHaveLength(PREVIEW_MAX_ACTIVE_VERTICES * 6)
-    const points = Array.from({ length: PREVIEW_MAX_ACTIVE_VERTICES - 2 }, (_, index) => Array.from(withTool.slice((index + 2) * 6, (index + 2) * 6 + 6)))
+    expect(withTool).toHaveLength(MILL_TOOL_VERTICES * 6)
+    const points = Array.from({ length: MILL_TOOL_VERTICES - 2 }, (_, index) => Array.from(withTool.slice((index + 2) * 6, (index + 2) * 6 + 6)))
     // Every tool vertex is on a cylinder of radius 1 around the tip, between the tip and 5 mm above it, in the given colour.
     for (const [x, y, z, ...rgb] of points) {
       expect(Math.hypot(x! - 10, y!)).toBeCloseTo(1, 5)
@@ -175,6 +203,27 @@ describe("toolpath simulation upload", () => {
       expect(rgb).toEqual(float32([0.1, 0.2, 0.3]))
     }
     expect(prepareActiveLine(move, Number.NaN)).toHaveLength(12)
+  })
+
+  test("a machine glyph rides in the same buffer as the move", () => {
+    const glyph = [
+      { from: [10, 0, -1] as const, to: [12, 0, 3] as const, color: TOOL_GLYPH_COLOR.lathe },
+      { from: [12, 0, 3] as const, to: [10, 0, -1] as const },
+    ]
+    const data = prepareActiveLine(move, 0, [0.1, 0.2, 0.3], glyph)
+    expect(data).toHaveLength((2 + glyph.length * 2) * 6)
+    expect(Array.from(data.slice(12, 18))).toEqual(float32([10, 0, -1, ...TOOL_GLYPH_COLOR.lathe]))
+    // A glyph line without its own colour falls back to the tool tint.
+    expect(Array.from(data.slice(27, 30))).toEqual(float32([0.1, 0.2, 0.3]))
+  })
+
+  test("the active line refuses a glyph past its cap and the largest real glyph fits", () => {
+    const line = { from: [0, 0, 0] as const, to: [1, 0, 0] as const }
+    const over = Array.from({ length: Math.ceil(PREVIEW_MAX_ACTIVE_VERTICES / 2) + 1 }, () => line)
+    expect(() => prepareActiveLine(move, 0, undefined, over)).toThrow(PREVIEW_MESSAGE.pathInvalid)
+    const nozzle = toolGlyphLines([0, 0, 0], { family: "nozzle", diameter: 0.4, width: 0, noseRadius: 0, insert: "", internal: false }, 4, TOOL_GLYPH_COLOR.nozzle)
+    expect(nozzle.length * 2).toBeLessThanOrEqual(MACHINE_GLYPH_MAX_VERTICES)
+    expect(prepareActiveLine(move, 0, undefined, nozzle)).toHaveLength((2 + nozzle.length * 2) * 6)
   })
 
   test("progress fades only path vertices after the playhead and never the stock box", () => {

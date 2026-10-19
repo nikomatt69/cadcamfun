@@ -1,5 +1,10 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { Schema } from "effect"
+import { cam } from "@cadcamfun/core"
+import { CamProgramDocument } from "@cadcamfun/api"
 import { makeApp } from "./helpers.ts"
+
+setDefaultTimeout(120_000)
 
 let app: Awaited<ReturnType<typeof makeApp>>
 let projectId: string
@@ -14,6 +19,17 @@ afterAll(async () => { await app.dispose() })
 
 const cube = { id: "box", name: "Box", type: "cube", width: 10, height: 20, depth: 30, color: "#888" }
 const gcode = "G21\nG0 X10 Y0 Z5\nG1 X20 Y0 Z-1 F200\n"
+
+/** A saved CAM document with the generator defaults, patched for the machine and the evidence it must carry. */
+const documentOf = (patch: Record<string, unknown>): CamProgramDocument => Schema.decodeUnknownSync(CamProgramDocument)({
+  format: "cadcamfun-cam", version: 1, gcode: "",
+  program: cam.makeProgram("preview", [], {}),
+  settings: cam.generator.DEFAULT_SETTINGS,
+  printer: cam.generator.DEFAULT_PRINTER_EXTRAS,
+  stock: { width: 100, height: 60, depth: 20 },
+  drawing: {},
+  ...patch,
+})
 
 describe("companion workspace preview", () => {
   test("drawing and component previews are meshes, and lists omit the document", async () => {
@@ -129,5 +145,70 @@ describe("companion workspace preview", () => {
     const path = await app.call(`/api/projects/${projectId}/workspace/toolpaths/${created.body.id}/preview`)
     // The review and the path are different payloads of one toolpath, so their tags differ.
     expect(review.headers.get("etag")).not.toBe(path.headers.get("etag"))
+  })
+})
+
+describe("companion machine scene preview", () => {
+  test("a lathe document is drawn on its machine, in display coordinates", async () => {
+    const lathe = ["G18 G90", "M3 S600", "G0 X52 Z2", "G0 X44", "G1 Z-90 F60", "M5", "G0 X52", "M30"].join("\n")
+    const document = documentOf({
+      gcode: lathe,
+      program: cam.generator.analyseGcode(lathe).program,
+      settings: { ...cam.generator.DEFAULT_SETTINGS, machineType: "lathe", stockDiameter: 50, stockLength: 100 },
+    })
+    const created = await app.call("/api/toolpaths", {
+      method: "POST",
+      json: { name: "Turn", projectId, type: "lathe", operationType: "turning", data: document, gcode: lathe },
+    })
+    expect(created.status).toBe(201)
+
+    const path = await app.call(`/api/projects/${projectId}/workspace/toolpaths/${created.body.id}/preview`)
+    expect(path.status).toBe(200)
+    expect(path.body.machine).toMatchObject({ kind: "lathe", source: "generator", axes: 2, xMode: "diameter", turret: "rear" })
+    // Display x is Z and display z is +X/2: the program is already mapped, the phone never sees X as a diameter.
+    expect(path.body.segments[0]).toMatchObject({ kind: "rapid", from: [2, 0, 26], to: [2, 0, 22] })
+    expect(path.body.segments.some((segment: { to: number[] }) => segment.to[1] !== 0)).toBe(false)
+    expect(path.body.machine.bodies.map((body: { role: string }) => body.role)).toContain("chuck")
+    expect(path.body.machine.spin[0]).toEqual({ segment: 0, rate: 2 })
+    expect(path.body.machine.collisions.length).toBeGreaterThan(0)
+    expect(path.body.stats).toMatchObject({ rapidMoves: 3, linearMoves: 1 })
+  })
+
+  test("a kernel document carries its stock, its machine preset's table and the chosen tool", async () => {
+    const request = {
+      schemaVersion: 1, id: "preview-kernel", name: "Plate", material: "6061", machine: "vmc-standard",
+      elements: [{ id: "plate", type: "cube", width: 30, height: 20, depth: 5, layerId: "default" }],
+    }
+    const generated = await app.call("/api/toolpaths/manufacture", { method: "POST", json: request })
+    expect(generated.status).toBe(200)
+    const artifact = generated.body.value
+    const document = documentOf({
+      gcode: artifact.nc,
+      program: artifact.program,
+      settings: { ...cam.generator.DEFAULT_SETTINGS, toolDiameter: 6 },
+      stock: { width: 34, height: 24, depth: 6 },
+      drawing: { elements: request.elements },
+      kernelRequest: request,
+      kernelArtifact: artifact,
+    })
+    const tool = (await app.call("/api/tools", { method: "POST", json: { name: "EM6", type: "endmill", diameter: 6, material: "Carbide" } })).body
+    const created = await app.call("/api/toolpaths", {
+      method: "POST",
+      json: { name: "Kernel", projectId, toolId: tool.id, type: "mill", operationType: "kernel", data: document, gcode: artifact.nc },
+    })
+    expect(created.status).toBe(201)
+
+    const path = await app.call(`/api/projects/${projectId}/workspace/toolpaths/${created.body.id}/preview`)
+    expect(path.status).toBe(200)
+    expect(path.body.machine).toMatchObject({ kind: "mill", source: "kernel", axes: 3, tool: { family: "mill", diameter: 6 } })
+    // The kernel's stock box, not the generator's 34 x 24 x 6 one.
+    const { min, max } = artifact.stockBounds
+    expect(path.body.stock).toEqual({
+      min: [min.x - artifact.origin.x, min.y - artifact.origin.y, min.z - artifact.origin.z],
+      max: [max.x - artifact.origin.x, max.y - artifact.origin.y, max.z - artifact.origin.z],
+    })
+    const table = path.body.machine.bodies.find((body: { role: string }) => body.role === "table")
+    expect(table.shape.max.x - table.shape.min.x).toBeCloseTo(1000, 6)
+    expect(path.body.machine.bodies.some((body: { role: string }) => body.role === "vise-base")).toBe(true)
   })
 })

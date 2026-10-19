@@ -55,7 +55,7 @@ describe("companion end to end", () => {
 
       expect((await phone.projects()).map((p) => p.name)).toEqual(["Bracket"])
       await phone.commit(project.id, "Initial import")
-      expect((await phone.log(project.id)).map((c) => c.message.trim())).toEqual(["Initial import"])
+      expect((await phone.log(project.id)).map((c) => c.message.trim())).toEqual(["Initial import", "Initial commit"])
       expect(await phone.runs(project.id)).toEqual([])
       expect((await phone.branches(project.id)).current).toBe("main")
 

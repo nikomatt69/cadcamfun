@@ -32,6 +32,43 @@ export const FALLBACK_CUT_FEED = DEFAULT_CUTTING_FEEDRATE_MM_MIN
 /** Playback multipliers offered in the simulation bar. */
 export const PLAYBACK_SPEEDS = [1, 5, 25, 100] as const
 
+/**
+ * Largest spin the preview shows, display revolutions per second: mirrors `MAX_DISPLAY_REV_PER_SECOND`
+ * in `packages/core/src/cam/viewer/frames.ts` (faster would alias at 60 frames per second).
+ */
+export const MAX_DISPLAY_REV_PER_SECOND = 2
+
+/** A run of equal display spin of the machine block: from `segment` on, `rate` signed revolutions per second. */
+export interface SpinRun {
+  readonly segment: number
+  readonly rate: number
+}
+
+/**
+ * The display spin in effect on `playhead`: the last run that starts at or before it, zero before the first run
+ * and whenever the simulation is not running (a paused preview holds the spindle still). Non-finite or
+ * out-of-range rates from the wire are clamped, never handed to the native view.
+ */
+export const spinRateAt = (spin: readonly SpinRun[], playhead: number, simulating: boolean): number => {
+  if (!simulating) return 0
+  const at = Number.isFinite(playhead) ? playhead : 0
+  let best: SpinRun | undefined
+  for (const run of spin) {
+    if (run.segment > at) continue
+    if (best === undefined || run.segment >= best.segment) best = run
+  }
+  if (best === undefined) return 0
+  const rate = Math.max(-MAX_DISPLAY_REV_PER_SECOND, Math.min(MAX_DISPLAY_REV_PER_SECOND, best.rate))
+  return Number.isFinite(rate) ? rate : 0
+}
+
+/**
+ * ISO 6983 sense of `rate`, as `cam.viewer.spinSense` reads it: a mill runs clockwise at a negative display rate
+ * (about +Z), a lathe clockwise at a positive one (about +x). A printer has no spindle.
+ */
+export const spinIsClockwise = (kind: "mill" | "lathe" | "3dprinter", rate: number): boolean =>
+  kind === "lathe" ? rate > 0 : kind === "mill" ? rate < 0 : false
+
 const FEED_WORD = /(?:^|[^A-Z])F\s*([+-]?(?:\d+\.?\d*|\.\d+))/i
 
 /** Strip `( … )` and `; …` comments so a feed in a comment is not read as a command. */

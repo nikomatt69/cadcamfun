@@ -170,6 +170,18 @@ export const toolModelFromSettings = (s: ToolpathSettings, kind: MachineKind = s
   return toolModelOf({ type: s.toolType === "vbit" ? "vbit" : s.toolType, diameter: s.toolDiameter, numberOfFlutes: s.flutes, ...(s.toolType === "threadmill" ? { threadPitch: s.threadPitch } : {}) }, "mill")
 }
 
+/**
+ * The model of the tool a preview draws: the user's tool resource when it belongs to this machine (and, on a mill, its
+ * diameter is still the generator's), else the generator's own tool settings. The desktop preview and the sidecar that
+ * serves the phone both ask here, so the two draw the same tool.
+ */
+export const previewToolModel = (kind: MachineKind, settings: ToolpathSettings, library?: ToolResource): ToolModel => {
+  if (library !== undefined && toolMachineOf(library.type) === kind && (kind !== "mill" || Math.abs((library.diameter ?? 0) - settings.toolDiameter) < 1e-9)) {
+    return toolModelOf(library, kind)
+  }
+  return toolModelFromSettings(settings, kind)
+}
+
 const KERNEL_SHAPE: Readonly<Record<CutterKind, MillShape>> = { flat: "flat", ball: "ball", bull: "bull", chamfer: "chamfer", spot: "spot", drill: "drill", facemill: "facemill", threadmill: "threadmill", engraver: "engraver" }
 
 /** The model of a kernel cutter (the kernel's own tool library): the same shape the preview draws for a resource. */

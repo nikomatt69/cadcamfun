@@ -79,12 +79,72 @@ export const ToolpathSegment = Schema.Struct({
 })
 export type ToolpathSegment = typeof ToolpathSegment.Type
 
+const Point3 = Schema.Struct({ x: Schema.Number, y: Schema.Number, z: Schema.Number })
+
+/** The machine around the program (spec 31 §5): the phone tessellates these shapes and draws them as-is. */
+export const PreviewBodyShape = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("box"), min: Point3, max: Point3 }),
+  Schema.Struct({ type: Schema.Literal("cylinder-x"), x0: Schema.Number, x1: Schema.Number, radius: Schema.Number, inner: Schema.Number }),
+  Schema.Struct({ type: Schema.Literal("cone-x"), x0: Schema.Number, x1: Schema.Number, r0: Schema.Number, r1: Schema.Number }),
+])
+export type PreviewBodyShape = typeof PreviewBodyShape.Type
+
+export const PreviewBody = Schema.Struct({
+  id: Schema.String,
+  role: Schema.Literals(["stock", "jaw", "parallel", "vise-base", "clamp", "table", "chuck", "collet", "tailstock", "bed", "build-volume"]),
+  shape: PreviewBodyShape,
+  rotateX: Schema.optionalKey(Schema.Number),
+  spins: Schema.Boolean,
+  assumed: Schema.Boolean,
+  obstacle: Schema.Boolean,
+  wire: Schema.optionalKey(Schema.Boolean),
+})
+export type PreviewBody = typeof PreviewBody.Type
+
+export const PreviewToolGlyph = Schema.Struct({
+  family: Schema.Literals(["mill", "lathe", "nozzle"]),
+  diameter: Schema.Number,
+  width: Schema.Number,
+  noseRadius: Schema.Number,
+  insert: Schema.String,
+  internal: Schema.Boolean,
+  turret: Schema.optionalKey(Schema.Literals(["rear", "front"])),
+})
+export type PreviewToolGlyph = typeof PreviewToolGlyph.Type
+
+/** From `segment` on, the spindle turns `rate` signed display revolutions per second. */
+export const PreviewSpinRun = Schema.Struct({ segment: Schema.Number, rate: Schema.Number })
+export type PreviewSpinRun = typeof PreviewSpinRun.Type
+
+export const PreviewMachine = Schema.Struct({
+  kind: Schema.Literals(["mill", "lathe", "3dprinter"]),
+  source: Schema.Literals(["override", "kernel", "generator", "inferred", "settings"]),
+  mismatch: Schema.optionalKey(Schema.Struct({
+    inferred: Schema.Literals(["mill", "lathe", "3dprinter"]),
+    reasons: Schema.Array(Schema.String),
+  })),
+  axes: Schema.Number,
+  turns: Schema.String,
+  workholding: Schema.String,
+  assumed: Schema.Array(Schema.Literals(["workholding", "table", "stock"])),
+  xMode: Schema.optionalKey(Schema.Literals(["diameter", "radius"])),
+  turret: Schema.optionalKey(Schema.Literals(["rear", "front"])),
+  bodies: Schema.Array(PreviewBody),
+  spin: Schema.Array(PreviewSpinRun),
+  /** Indices of the segments whose move runs into the workholding (drawn red). */
+  collisions: Schema.Array(Schema.Number),
+  tool: PreviewToolGlyph,
+})
+export type PreviewMachine = typeof PreviewMachine.Type
+
 export const ToolpathPreview = Schema.Struct({
   segments: Schema.Array(ToolpathSegment),
   bounds: PreviewBounds,
   stock: PreviewBounds,
   truncated: Schema.Boolean,
   stats: ToolpathStats,
+  /** Present when the payload carries the machine scene (format 3); absent in older servers. */
+  machine: Schema.optionalKey(PreviewMachine),
   revision: Schema.String,
 })
 export type ToolpathPreview = typeof ToolpathPreview.Type

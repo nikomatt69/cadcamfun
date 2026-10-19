@@ -49,10 +49,25 @@ export interface AssistantAgentInfo {
   readonly edits: boolean
 }
 
-/** A raw HTTP response: status and text body (JSON is parsed by the caller). */
+/** A raw HTTP response: status, text body (JSON is parsed by the caller) and the exposed headers. */
 export interface TransportResponse {
   readonly status: number
   readonly body: string
+  /** `etag` for conditional previews, `retry-after` for the gateway's back-off; absent when a transport exposes none. */
+  readonly headers?: Readonly<Record<string, string>>
+}
+
+/**
+ * `retry-after` as milliseconds for the caller's own back-off: the gateway sends seconds, the HTTP-date form is
+ * accepted too, and anything absent or unparsable means "no advice".
+ */
+export const retryAfterMs = (retryAfter: string | null | undefined): number | undefined => {
+  const raw = retryAfter?.trim()
+  if (!raw) return undefined
+  const seconds = Number(raw)
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000)
+  const at = Date.parse(raw)
+  return Number.isNaN(at) ? undefined : Math.max(0, at - Date.now())
 }
 
 /**
@@ -61,13 +76,22 @@ export interface TransportResponse {
  * certificate fingerprint) so the client never sees credentials.
  */
 export interface Transport {
-  request(path: string, method: string, body?: unknown, signal?: AbortSignal): Promise<TransportResponse>
+  /**
+   * `extra` carries conditional-request headers only (`if-none-match`); credentials and framing always come from the
+   * pairing. The reply's `headers` expose `etag` and `retry-after` and nothing else.
+   */
+  request(path: string, method: string, body?: unknown, signal?: AbortSignal, extra?: Readonly<Record<string, string>>): Promise<TransportResponse>
   /** Raw text chunks (SSE frames split arbitrarily); the caller feeds them to `sseParser`. */
   stream(path: string, method: string, body?: unknown, signal?: AbortSignal): AsyncGenerator<string>
 }
 
 export class CompanionError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+    /** The gateway's back-off (`retry-after`) in milliseconds, when it sent one. */
+    readonly retryAfterMs?: number,
+  ) {
     super(message)
   }
 }
@@ -115,7 +139,7 @@ export class CompanionClient {
     }
     if (res.status < 200 || res.status >= 300) {
       const message = (json as { message?: string } | undefined)?.message ?? `HTTP ${res.status}`
-      throw new CompanionError(res.status, message)
+      throw new CompanionError(res.status, message, retryAfterMs(res.headers?.["retry-after"]))
     }
     if (res.status !== 204 && (json === undefined || json === null || typeof json !== "object")) throw new CompanionError(res.status, "The desktop returned an invalid JSON response")
     return json as T

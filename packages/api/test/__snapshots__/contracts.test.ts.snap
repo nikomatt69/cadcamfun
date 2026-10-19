@@ -50493,6 +50493,607 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       ],
                       "type": "object",
                     },
+                    "machine": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "assumed": {
+                          "items": {
+                            "enum": [
+                              "workholding",
+                              "table",
+                              "stock",
+                            ],
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "axes": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
+                        "bodies": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "assumed": {
+                                "type": "boolean",
+                              },
+                              "id": {
+                                "type": "string",
+                              },
+                              "obstacle": {
+                                "type": "boolean",
+                              },
+                              "role": {
+                                "enum": [
+                                  "stock",
+                                  "jaw",
+                                  "parallel",
+                                  "vise-base",
+                                  "clamp",
+                                  "table",
+                                  "chuck",
+                                  "collet",
+                                  "tailstock",
+                                  "bed",
+                                  "build-volume",
+                                ],
+                                "type": "string",
+                              },
+                              "rotateX": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              "shape": {
+                                "anyOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "max": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number",
+                                              },
+                                              {
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN",
+                                                ],
+                                                "type": "string",
+                                              },
+                                            ],
+                                          },
+                                          "y": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number",
+                                              },
+                                              {
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN",
+                                                ],
+                                                "type": "string",
+                                              },
+                                            ],
+                                          },
+                                          "z": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number",
+                                              },
+                                              {
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN",
+                                                ],
+                                                "type": "string",
+                                              },
+                                            ],
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "min": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number",
+                                              },
+                                              {
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN",
+                                                ],
+                                                "type": "string",
+                                              },
+                                            ],
+                                          },
+                                          "y": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number",
+                                              },
+                                              {
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN",
+                                                ],
+                                                "type": "string",
+                                              },
+                                            ],
+                                          },
+                                          "z": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number",
+                                              },
+                                              {
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN",
+                                                ],
+                                                "type": "string",
+                                              },
+                                            ],
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "type": {
+                                        "enum": [
+                                          "box",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "type",
+                                      "min",
+                                      "max",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "inner": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                      "radius": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                      "type": {
+                                        "enum": [
+                                          "cylinder-x",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "x0": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                      "x1": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                    },
+                                    "required": [
+                                      "type",
+                                      "x0",
+                                      "x1",
+                                      "radius",
+                                      "inner",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "r0": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                      "r1": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                      "type": {
+                                        "enum": [
+                                          "cone-x",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "x0": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                      "x1": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                    },
+                                    "required": [
+                                      "type",
+                                      "x0",
+                                      "x1",
+                                      "r0",
+                                      "r1",
+                                    ],
+                                    "type": "object",
+                                  },
+                                ],
+                              },
+                              "spins": {
+                                "type": "boolean",
+                              },
+                              "wire": {
+                                "type": "boolean",
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "role",
+                              "shape",
+                              "spins",
+                              "assumed",
+                              "obstacle",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "collisions": {
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "type": "array",
+                        },
+                        "kind": {
+                          "enum": [
+                            "mill",
+                            "lathe",
+                            "3dprinter",
+                          ],
+                          "type": "string",
+                        },
+                        "mismatch": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "inferred": {
+                              "enum": [
+                                "mill",
+                                "lathe",
+                                "3dprinter",
+                              ],
+                              "type": "string",
+                            },
+                            "reasons": {
+                              "items": {
+                                "type": "string",
+                              },
+                              "type": "array",
+                            },
+                          },
+                          "required": [
+                            "inferred",
+                            "reasons",
+                          ],
+                          "type": "object",
+                        },
+                        "source": {
+                          "enum": [
+                            "override",
+                            "kernel",
+                            "generator",
+                            "inferred",
+                            "settings",
+                          ],
+                          "type": "string",
+                        },
+                        "spin": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "rate": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              "segment": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                            },
+                            "required": [
+                              "segment",
+                              "rate",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "tool": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "diameter": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            "family": {
+                              "enum": [
+                                "mill",
+                                "lathe",
+                                "nozzle",
+                              ],
+                              "type": "string",
+                            },
+                            "insert": {
+                              "type": "string",
+                            },
+                            "internal": {
+                              "type": "boolean",
+                            },
+                            "noseRadius": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            "turret": {
+                              "enum": [
+                                "rear",
+                                "front",
+                              ],
+                              "type": "string",
+                            },
+                            "width": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                          },
+                          "required": [
+                            "family",
+                            "diameter",
+                            "width",
+                            "noseRadius",
+                            "insert",
+                            "internal",
+                          ],
+                          "type": "object",
+                        },
+                        "turns": {
+                          "type": "string",
+                        },
+                        "turret": {
+                          "enum": [
+                            "rear",
+                            "front",
+                          ],
+                          "type": "string",
+                        },
+                        "workholding": {
+                          "type": "string",
+                        },
+                        "xMode": {
+                          "enum": [
+                            "diameter",
+                            "radius",
+                          ],
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "kind",
+                        "source",
+                        "axes",
+                        "turns",
+                        "workholding",
+                        "assumed",
+                        "bodies",
+                        "spin",
+                        "collisions",
+                        "tool",
+                      ],
+                      "type": "object",
+                    },
                     "revision": {
                       "type": "string",
                     },

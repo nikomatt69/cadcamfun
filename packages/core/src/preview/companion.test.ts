@@ -1,14 +1,22 @@
 import { describe, expect, test } from "bun:test"
 import { makeProgram } from "../cam/ir.ts"
+import { decodeSettings, type Stock } from "../cam/generator/schema.ts"
+import { withMachineDefaults } from "../cam/generator/settings.ts"
+import { toolModelFromSettings } from "../cam/tool-model.ts"
 import { previewPath } from "../cam/viewer/lines.ts"
 import {
   arcChordPoints,
   documentParameters,
   elementsOfDocument,
+  machineScenePreview,
   meshPreview,
   toolpathPreviewFromGcode,
   toolpathPreviewFromProgram,
 } from "./companion.ts"
+
+const settings = (patch: Record<string, unknown> = {}) => withMachineDefaults(decodeSettings(patch))
+const stock: Stock = { width: 100, height: 60, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 }
+const latheSettings = settings({ machineType: "lathe", stockDiameter: 50, stockLength: 100 })
 
 describe("companion mesh preview", () => {
   test("a cube becomes a closed mesh with one named part", () => {
@@ -162,5 +170,101 @@ describe("companion toolpath preview", () => {
   test("non-finite G-code coordinates are dropped instead of reaching the phone", () => {
     const preview = toolpathPreviewFromGcode(["G0 X0 Y0 Z5", "G1 X1e999 F100", "G1 X5 Y5 Z0"].join("\n"))
     for (const segment of preview.segments) expect([...segment.from, ...segment.to].every(Number.isFinite)).toBe(true)
+  })
+})
+
+describe("companion machine preview (spec 31 §5, the spec 13 §6 payload)", () => {
+  const latheProgram = ["G18 G90", "M3 S600", "G0 X52 Z2", "G0 X44", "G1 Z-40 F60", "M5", "G0 X52", "M30"].join("\n")
+
+  test("a lathe program is mapped to the display world: x is Z, z is +X/2 for a rear turret", () => {
+    const preview = machineScenePreview({ settings: latheSettings, stock, gcode: latheProgram, generatorGcode: latheProgram })
+    expect(preview.machine).toMatchObject({ kind: "lathe", source: "generator", xMode: "diameter", turret: "rear" })
+    // The machine's position before the first move is assumed; the first rapid only sets it.
+    expect(preview.segments[0]).toMatchObject({ kind: "rapid", from: [2, 0, 26], to: [2, 0, 22] })
+    expect(preview.segments[1]).toMatchObject({ kind: "linear", line: 5, from: [2, 0, 22], to: [-40, 0, 22] })
+    // Program coordinates stay out of the payload: display x is Z, and X is never a diameter on the phone.
+    for (const segment of preview.segments) expect(segment.to[1]).toBe(0)
+    expect(preview.machine.tool).toMatchObject({ family: "lathe", turret: "rear" })
+    expect(preview.machine.bodies.map((body) => body.role)).toContain("chuck")
+    expect(preview.machine.axes).toBe(2)
+  })
+
+  test("M3 turns the part positively and M5 stops it; the collision into the chuck is red", () => {
+    const gcode = ["G18 G90", "M3 S600", "G0 X40 Z0", "G1 Z-90 F60", "M5", "G0 X52"].join("\n")
+    const preview = machineScenePreview({ settings: latheSettings, stock, gcode })
+    // S600 is capped at two display revolutions per second, the lathe's M3 sense is positive.
+    expect(preview.machine.spin[0]).toEqual({ segment: 0, rate: 2 })
+    const last = preview.machine.spin[preview.machine.spin.length - 1]!
+    expect(last.rate).toBe(0)
+    expect(last.segment).toBe(preview.segments.length - 1)
+    // Z-90 is inside the jaws, which grip the bar up to Z-80.
+    expect(preview.machine.collisions.length).toBeGreaterThan(0)
+    expect(preview.segments[preview.machine.collisions[0]!]!.line).toBe(4)
+    expect(preview.machine.assumed).toEqual(["workholding"])
+  })
+
+  test("a mill program keeps the program's own coordinates and turns the tool negatively with M3", () => {
+    const gcode = ["M3 S60", "G0 Z5", "G1 X60 F60", "M5", "G1 X120"].join("\n")
+    const preview = machineScenePreview({ settings: settings(), stock, gcode, generatorGcode: gcode })
+    expect(preview.machine).toMatchObject({ kind: "mill", source: "generator", axes: 3, tool: { family: "mill" } })
+    expect(preview.segments.map((segment) => segment.to)).toEqual([[60, 0, 5], [120, 0, 5]])
+    expect(preview.machine.spin).toEqual([{ segment: 0, rate: -1 }, { segment: 1, rate: 0 }])
+    expect(preview.machine.bodies.map((body) => body.role)).toContain("vise-base")
+    expect(preview.machine.workholding).toContain("vise")
+  })
+
+  test("the kernel's NC is the kernel's mill, and its artifact carries the stock", () => {
+    const gcode = ["M3 S60", "G0 Z5", "G1 X60 F60"].join("\n")
+    const artifact = {
+      schemaVersion: 1, jobId: "j", material: { id: "m", name: "Aluminium", iso: "N30" }, machine: { id: "vmc-standard", name: "VMC", post: "fanuc" },
+      origin: { x: 0, y: 0, z: 0 }, stockBounds: { min: { x: -20, y: -20, z: -10 }, max: { x: 20, y: 20, z: 0 } },
+      operations: [], program: makeProgram("k", []), tools: [], nc: gcode, claims: [], issues: [], release: "preview",
+      stock: { initialVolume: 1, finalVolume: 1, partVolume: 1, remainingVolume: 0, maxRemaining: 0, cellSize: 1 },
+      cycleTimeSeconds: 1, identity: { job: "j", part: "p", nc: "n", algorithm: "a" }, notes: [],
+    } as Parameters<typeof machineScenePreview>[0]["artifact"]
+    const preview = machineScenePreview({ settings: settings(), stock, gcode, kernelNc: gcode, artifact, machineId: "vmc-standard" })
+    expect(preview.machine).toMatchObject({ kind: "mill", source: "kernel" })
+    // The kernel's stock box and the machine preset's table, not the generator's 100 x 60 stock.
+    expect(preview.stock.min).toEqual([-20, -20, -10])
+    const table = preview.machine.bodies.find((body) => body.role === "table")!
+    if (table.shape.type !== "box") throw new Error("expected a box table")
+    expect(table.shape.max.x - table.shape.min.x).toBeCloseTo(1000, 6)
+  })
+
+  test("a program the interpreter cannot read falls back to the parser's shapes, with no motion state", () => {
+    const gcode = ["M3 S1000", "G0 X0 Y0 Z5", "G13 D20 F200"].join("\n")
+    const preview = machineScenePreview({ settings: settings(), stock, gcode })
+    const circular = preview.segments.filter((segment) => segment.kind === "circular")
+    expect(circular.length).toBeGreaterThan(16)
+    expect(preview.machine.spin).toEqual([])
+    expect(preview.machine.collisions).toEqual([])
+    // The G-code stats still count the shape's line.
+    expect(preview.stats).toMatchObject({ rapidMoves: 1, circularMoves: 0 })
+  })
+
+  test("a program without G-code draws the timeline in display coordinates and counts its moves", () => {
+    const program = makeProgram("face", [{
+      id: "tp", name: "face", toolId: "t1", spindleRpm: 1000, coolant: "off",
+      moves: [
+        { _tag: "Rapid", to: { x: 10, y: 0, z: 5 } },
+        { _tag: "Linear", to: { x: 20, y: 0, z: -1 }, feed: 200 },
+      ],
+    }])
+    const preview = machineScenePreview({ settings: latheSettings, stock, program })
+    expect(preview.machine.source).toBe("settings")
+    expect(preview.segments.map((segment) => [segment.kind, segment.from, segment.to])).toEqual([
+      ["rapid", [5, 0, 10], [5, 0, 5]],
+      ["linear", [5, 0, 5], [-1, 0, 10]],
+    ])
+    expect(preview.stats).toEqual({ rapidMoves: 1, linearMoves: 1, circularMoves: 0, machineFunctions: 0 })
+    // The lathe's display x is Z and display z is X/2, and the path starts where the machine was: max X and max Z.
+    expect(preview.machine.kind).toBe("lathe")
+  })
+
+  test("the payload frames the machine and keeps the stock's own size", () => {
+    const preview = machineScenePreview({ settings: settings({ workholdingConfigured: true }), stock, gcode: "M3 S60\nG0 Z5\nG1 X60 F60" })
+    expect(preview.bounds.min[2]).toBeLessThan(-20)
+    expect(preview.stock).toEqual({ min: [-50, -30, -20], max: [50, 30, 0] })
+    expect(preview.truncated).toBe(false)
   })
 })

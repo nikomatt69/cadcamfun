@@ -1,5 +1,6 @@
 import ExpoModulesCore
 import Metal
+import QuartzCore
 
 /**
  * Scene owned by JavaScript.
@@ -7,6 +8,8 @@ import Metal
  * Uploads are copied into private Metal buffers during the call. The view draws the latest
  * snapshot and does not orbit, pick, or keep a pointer into a JavaScript array. A rejected
  * upload drops that buffer and sets a stable fault; it never reaches `drawIndexedPrimitives`.
+ * The machine adds two more pairs of buffers (static bodies, spindle bodies); `replaceSpin` runs
+ * a display link that advances their display angle while the spindle turns.
  */
 public final class PreviewScene: SharedObject {
   let device: MTLDevice? = MTLCreateSystemDefaultDevice()
@@ -25,6 +28,24 @@ public final class PreviewScene: SharedObject {
   var activeVertices = 0
   var overlay: MTLBuffer?
   var overlayVertices = 0
+  /// Machine bodies (interleaved xyz / normal xyz / rgba). Opaque triangles come first, translucent after them.
+  var solids: MTLBuffer?
+  var solidIndices: MTLBuffer?
+  var solidVertices = 0
+  var solidTriangles = 0
+  var solidOpaqueTriangles = 0
+  /// The bodies that turn with the spindle: the view rotates them about the display x axis by `spinAngle`.
+  var spindle: MTLBuffer?
+  var spindleIndices: MTLBuffer?
+  var spindleVertices = 0
+  var spindleTriangles = 0
+  var spindleOpaqueTriangles = 0
+  var spinRate: Float = 0
+  var spinAngle: Float = 0
+  /// Main-thread only; the display link drives the angle while `spinRate` is not zero.
+  private var spinLink: CADisplayLink?
+  private var spinTarget: SpinLinkTarget?
+  private var spinLastAt: CFTimeInterval = 0
   /// Simulation progress over the line buffer; `travelledVertices < 0` draws the whole path at full colour.
   var travelledVertices = -1
   var pathVertices = 0
@@ -38,8 +59,12 @@ public final class PreviewScene: SharedObject {
   var selectedCount = 0
   var meshFault: String?
   var lineFault: String?
+  var solidFault: String?
 
   deinit {
+    spinLink?.invalidate()
+    spinLink = nil
+    spinTarget = nil
     lock.lock()
     positions = nil
     normals = nil
@@ -47,6 +72,10 @@ public final class PreviewScene: SharedObject {
     lines = nil
     active = nil
     overlay = nil
+    solids = nil
+    solidIndices = nil
+    spindle = nil
+    spindleIndices = nil
     surface = nil
     lock.unlock()
   }
@@ -125,6 +154,29 @@ public final class PreviewScene: SharedObject {
     redraw()
   }
 
+  /// Machine bodies (spec 31 §5): opaque triangles first, translucent (assumed) triangles after `opaqueTriangles`.
+  /// An empty pair clears the set; a refused payload drops both sets, because half a machine misleads.
+  func replaceSolids(vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) {
+    publishSolidSet(spindle: false, vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
+  }
+
+  /// The bodies that turn with the spindle (lathe bar and chuck, mill tool): drawn rotated about the display x axis.
+  func replaceSpindle(vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) {
+    publishSolidSet(spindle: true, vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
+  }
+
+  /// Signed display revolutions per second the spindle turns; a display link advances the angle while it is not zero.
+  func replaceSpin(rate: Double) {
+    let limit = PreviewLimits.maxSpinRevPerSecond
+    let value = rate.isFinite ? min(max(Float(rate), -limit), limit) : 0
+    lock.lock()
+    let changed = value != spinRate
+    spinRate = value
+    lock.unlock()
+    guard changed else { return }
+    updateSpinLink()
+  }
+
   /// Fades path vertices `[travelled, path)` toward the background; stock edges after `path` stay untouched.
   func replaceProgress(travelled: Int, path: Int, fade: Float) {
     lock.lock()
@@ -188,6 +240,17 @@ public final class PreviewScene: SharedObject {
       activeVertices: activeVertices,
       overlay: overlay,
       overlayVertices: overlayVertices,
+      solids: solids,
+      solidIndices: solidIndices,
+      solidVertices: solidVertices,
+      solidTriangles: solidTriangles,
+      solidOpaqueTriangles: solidOpaqueTriangles,
+      spindle: spindle,
+      spindleIndices: spindleIndices,
+      spindleVertices: spindleVertices,
+      spindleTriangles: spindleTriangles,
+      spindleOpaqueTriangles: spindleOpaqueTriangles,
+      spinAngle: spinAngle,
       travelledVertices: travelledVertices,
       pathVertices: pathVertices,
       remainingFade: remainingFade,
@@ -199,7 +262,8 @@ public final class PreviewScene: SharedObject {
       selectedStart: selectedStart,
       selectedCount: selectedCount,
       meshFault: meshFault,
-      lineFault: lineFault
+      lineFault: lineFault,
+      solidFault: solidFault
     )
   }
 
@@ -240,6 +304,103 @@ public final class PreviewScene: SharedObject {
     redraw()
   }
 
+  private func publishSolidSet(spindle: Bool, vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) {
+    guard let device else {
+      rejectSolids("This iPhone has no Metal device for the preview")
+      return
+    }
+    if vertices.length == 0 && indices.length == 0 {
+      publishSolids(spindle: spindle, vertices: nil, indices: nil, vertexCount: 0, triangles: 0, opaqueTriangles: 0, fault: nil)
+      return
+    }
+    if let rejection = PreviewUpload.solids(vertices, indices, opaqueTriangles: opaqueTriangles) {
+      previewLog.error("Rejected machine upload: \(rejection.message, privacy: .public)")
+      rejectSolids(rejection.message)
+      return
+    }
+    guard
+      let nextVertices = metalBuffer(vertices.rawPointer, vertices.byteLength, device, spindle ? "com.cadcamfun.preview.spindle" : "com.cadcamfun.preview.solids"),
+      let nextIndices = metalBuffer(indices.rawPointer, indices.byteLength, device, spindle ? "com.cadcamfun.preview.spindle-indices" : "com.cadcamfun.preview.solid-indices")
+    else {
+      rejectSolids(PreviewRejection.meshInvalid.message)
+      return
+    }
+    publishSolids(
+      spindle: spindle,
+      vertices: nextVertices,
+      indices: nextIndices,
+      vertexCount: vertices.length / PreviewLimits.solidVertexFloats,
+      triangles: indices.length / 3,
+      opaqueTriangles: opaqueTriangles,
+      fault: nil
+    )
+  }
+
+  /// One refused machine payload drops both sets: a body set and its spindle belong to the same scene.
+  private func rejectSolids(_ message: String) {
+    publishSolids(spindle: false, vertices: nil, indices: nil, vertexCount: 0, triangles: 0, opaqueTriangles: 0, fault: message)
+    publishSolids(spindle: true, vertices: nil, indices: nil, vertexCount: 0, triangles: 0, opaqueTriangles: 0, fault: message)
+  }
+
+  private func publishSolids(spindle: Bool, vertices vertexBuffer: MTLBuffer?, indices indexBuffer: MTLBuffer?, vertexCount: Int, triangles: Int, opaqueTriangles: Int, fault: String?) {
+    let alive = vertexCount > 0 && triangles > 0
+    let count = alive ? triangles : 0
+    let opaque = alive ? min(max(opaqueTriangles, 0), triangles) : 0
+    lock.lock()
+    if spindle {
+      self.spindle = alive ? vertexBuffer : nil
+      self.spindleIndices = alive ? indexBuffer : nil
+      self.spindleVertices = alive ? vertexCount : 0
+      self.spindleTriangles = count
+      self.spindleOpaqueTriangles = opaque
+    } else {
+      self.solids = alive ? vertexBuffer : nil
+      self.solidIndices = alive ? indexBuffer : nil
+      self.solidVertices = alive ? vertexCount : 0
+      self.solidTriangles = count
+      self.solidOpaqueTriangles = opaque
+    }
+    solidFault = fault
+    lock.unlock()
+    redraw()
+  }
+
+  /// Starts or stops the display link for the current rate; a stopped spindle still draws once more.
+  private func updateSpinLink() {
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.lock.lock()
+      let running = self.spinRate != 0
+      self.lock.unlock()
+      if running, self.spinLink == nil {
+        self.spinLastAt = CACurrentMediaTime()
+        let target = SpinLinkTarget(scene: self)
+        let link = CADisplayLink(target: target, selector: #selector(SpinLinkTarget.step(_:)))
+        link.add(to: .main, forMode: .common)
+        self.spinTarget = target
+        self.spinLink = link
+      } else if !running, let link = self.spinLink {
+        self.spinLink = nil
+        self.spinTarget = nil
+        self.spinLastAt = 0
+        link.invalidate()
+      }
+      self.redraw()
+    }
+  }
+
+  /// One display frame of spin: a long gap (background, a hitch) advances the angle by at most 0.1 s.
+  @objc fileprivate func stepSpin(_ link: CADisplayLink) {
+    let now = link.timestamp
+    let elapsed = spinLastAt > 0 ? min(max(now - spinLastAt, 0), 0.1) : 0
+    spinLastAt = now
+    lock.lock()
+    let angle = spinAngle + spinRate * Float(2 * Double.pi) * Float(elapsed)
+    spinAngle = angle.isFinite ? angle.truncatingRemainder(dividingBy: 2 * .pi) : 0
+    lock.unlock()
+    redraw()
+  }
+
   private func redraw() {
     lock.lock()
     if redrawScheduled {
@@ -271,6 +432,17 @@ struct PreviewFrame {
   let activeVertices: Int
   let overlay: MTLBuffer?
   let overlayVertices: Int
+  let solids: MTLBuffer?
+  let solidIndices: MTLBuffer?
+  let solidVertices: Int
+  let solidTriangles: Int
+  let solidOpaqueTriangles: Int
+  let spindle: MTLBuffer?
+  let spindleIndices: MTLBuffer?
+  let spindleVertices: Int
+  let spindleTriangles: Int
+  let spindleOpaqueTriangles: Int
+  let spinAngle: Float
   let travelledVertices: Int
   let pathVertices: Int
   let remainingFade: Float
@@ -283,6 +455,22 @@ struct PreviewFrame {
   let selectedCount: Int
   let meshFault: String?
   let lineFault: String?
+  let solidFault: String?
+}
+
+/// CADisplayLink retains its target. This proxy holds the scene weakly, so a scene released while the spindle
+/// still turns can deallocate and invalidate the link in its `deinit` instead of being kept alive by the run loop.
+private final class SpinLinkTarget: NSObject {
+  weak var scene: PreviewScene?
+
+  init(scene: PreviewScene) {
+    self.scene = scene
+    super.init()
+  }
+
+  @objc func step(_ link: CADisplayLink) {
+    scene?.stepSpin(link)
+  }
 }
 
 private func metalBuffer(_ bytes: UnsafeMutableRawPointer, _ length: Int, _ device: MTLDevice, _ label: String) -> MTLBuffer? {
@@ -320,6 +508,15 @@ public class CadPreviewModule: Module {
       }
       Function("setActiveLine") { (scene: PreviewScene, line: Float32Array) in
         scene.replaceActiveLine(line)
+      }
+      Function("setSolids") { (scene: PreviewScene, vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) in
+        scene.replaceSolids(vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
+      }
+      Function("setSpindle") { (scene: PreviewScene, vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) in
+        scene.replaceSpindle(vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
+      }
+      Function("setSpin") { (scene: PreviewScene, rate: Double) in
+        scene.replaceSpin(rate: rate)
       }
       Function("setHighlight") { (scene: PreviewScene, start: Int, count: Int, red: Double, green: Double, blue: Double, selectedRed: Double, selectedGreen: Double, selectedBlue: Double) in
         scene.replaceHighlight(

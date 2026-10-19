@@ -7072,6 +7072,52 @@ export type WorkspaceToolpathPreviewOutput = {
   stock: { min: [number, number, number]; max: [number, number, number] }
   truncated: boolean
   stats: { rapidMoves: number; linearMoves: number; circularMoves: number; machineFunctions: number }
+  machine?: {
+    kind: "mill" | "lathe" | "3dprinter"
+    source: "override" | "kernel" | "generator" | "inferred" | "settings"
+    mismatch?: { inferred: "mill" | "lathe" | "3dprinter"; reasons: Array<string> }
+    axes: number
+    turns: string
+    workholding: string
+    assumed: Array<"workholding" | "table" | "stock">
+    xMode?: "diameter" | "radius"
+    turret?: "rear" | "front"
+    bodies: Array<{
+      id: string
+      role:
+        | "stock"
+        | "jaw"
+        | "parallel"
+        | "vise-base"
+        | "clamp"
+        | "table"
+        | "chuck"
+        | "collet"
+        | "tailstock"
+        | "bed"
+        | "build-volume"
+      shape:
+        | { type: "box"; min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+        | { type: "cylinder-x"; x0: number; x1: number; radius: number; inner: number }
+        | { type: "cone-x"; x0: number; x1: number; r0: number; r1: number }
+      rotateX?: number
+      spins: boolean
+      assumed: boolean
+      obstacle: boolean
+      wire?: boolean
+    }>
+    spin: Array<{ segment: number; rate: number }>
+    collisions: Array<number>
+    tool: {
+      family: "mill" | "lathe" | "nozzle"
+      diameter: number
+      width: number
+      noseRadius: number
+      insert: string
+      internal: boolean
+      turret?: "rear" | "front"
+    }
+  }
   revision: string
 }
 

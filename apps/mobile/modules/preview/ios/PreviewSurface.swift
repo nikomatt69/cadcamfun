@@ -2,11 +2,13 @@ import ExpoModulesCore
 import MetalKit
 import UIKit
 
-/// Column-major MVP, a colour and the world-space eye. Layout matches the Metal `Uniforms` struct (96 bytes).
+/// Column-major MVP, a colour, the world-space eye and the pose. Layout matches the Metal `Uniforms` struct (112 bytes).
+/// `pose.x` is the spin angle in radians about the display x axis; the line draws use it as their tint.
 struct PreviewUniforms {
   var mvp: simd_float4x4
   var color: SIMD4<Float>
   var eye: SIMD4<Float>
+  var pose: SIMD4<Float>
 }
 
 /// Matches the Metal `LineParams` struct: drawable size in pixels, line width in pixels, clip-space depth pull.
@@ -39,9 +41,12 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
   private var queue: MTLCommandQueue?
   private var library: MTLLibrary?
   private var meshPipeline: MTLRenderPipelineState?
+  private var solidPipeline: MTLRenderPipelineState?
   private var linePipeline: MTLRenderPipelineState?
   private var depthLess: MTLDepthStencilState?
   private var depthEqual: MTLDepthStencilState?
+  /// Translucent (assumed) bodies: tested against the opaque depth, never written.
+  private var depthReadOnly: MTLDepthStencilState?
   private var scene: PreviewScene?
   private var reported = Set<String>()
   private var boundDevice: ObjectIdentifier?
@@ -101,6 +106,7 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
     let frame = scene.snapshot()
     if let fault = frame.meshFault { report(fault) }
     if let fault = frame.lineFault { report(fault) }
+    if let fault = frame.solidFault { report(fault) }
     let clear = frame.clear
     view.clearColor = MTLClearColor(red: Double(clear.x), green: Double(clear.y), blue: Double(clear.z), alpha: 1)
     guard let pass = view.currentRenderPassDescriptor, let drawable = view.currentDrawable else { return }
@@ -111,7 +117,7 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
       return
     }
     command.label = "com.cadcamfun.preview.frame"
-    var uniforms = PreviewUniforms(mvp: frame.mvp, color: frame.baseColor, eye: SIMD4(frame.eye, 1))
+    var uniforms = PreviewUniforms(mvp: frame.mvp, color: frame.baseColor, eye: SIMD4(frame.eye, 1), pose: SIMD4(0, 0, 0, 0))
     encoder.setDepthBias(0, slopeScale: 0, clamp: 0)
     if meshIsDrawable(frame), let positions = frame.positions, let normals = frame.normals, let indices = frame.indices, let meshPipeline, let depthLess {
       encoder.setRenderPipelineState(meshPipeline)
@@ -138,8 +144,21 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
         )
       }
     }
+    // Machine bodies: opaque triangles write depth, the translucent (assumed) ones follow with the depth read-only.
+    if let solidPipeline {
+      if let vertices = frame.solids, let indices = frame.solidIndices,
+         solidSetIsDrawable(vertices: vertices, indices: indices, vertexCount: frame.solidVertices, triangles: frame.solidTriangles) {
+        drawSolidSet(encoder, mvp: frame.mvp, eye: frame.eye, vertices: vertices, indices: indices,
+                     triangles: frame.solidTriangles, opaqueTriangles: frame.solidOpaqueTriangles, angle: 0, pipeline: solidPipeline)
+      }
+      if let vertices = frame.spindle, let indices = frame.spindleIndices,
+         solidSetIsDrawable(vertices: vertices, indices: indices, vertexCount: frame.spindleVertices, triangles: frame.spindleTriangles) {
+        drawSolidSet(encoder, mvp: frame.mvp, eye: frame.eye, vertices: vertices, indices: indices,
+                     triangles: frame.spindleTriangles, opaqueTriangles: frame.spindleOpaqueTriangles, angle: frame.spinAngle, pipeline: solidPipeline)
+      }
+    }
     // Line draws read `color` as a tint: rgb is the target, alpha how far to move toward it (0 = vertex colour).
-    var lineUniforms = PreviewUniforms(mvp: frame.mvp, color: SIMD4<Float>(0, 0, 0, 0), eye: SIMD4<Float>(frame.eye, 1))
+    var lineUniforms = PreviewUniforms(mvp: frame.mvp, color: SIMD4<Float>(0, 0, 0, 0), eye: SIMD4<Float>(frame.eye, 1), pose: SIMD4(0, 0, 0, 0))
     if linesAreDrawable(frame), let lines = frame.lines, let linePipeline, let depthLess {
       encoder.setRenderPipelineState(linePipeline)
       encoder.setDepthStencilState(depthLess)
@@ -204,6 +223,38 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
     encoder.drawPrimitives(type: .triangle, vertexStart: (start / 2) * 6, vertexCount: segments * 6)
   }
 
+  /// One machine body set: the opaque range first, then the translucent (assumed) one, from the same index buffer.
+  /// `angle` is the spin about the display x axis, zero for the bodies that stand still.
+  private func drawSolidSet(_ encoder: MTLRenderCommandEncoder, mvp: simd_float4x4, eye: SIMD3<Float>, vertices: MTLBuffer, indices: MTLBuffer, triangles: Int, opaqueTriangles: Int, angle: Float, pipeline: MTLRenderPipelineState) {
+    let opaque = min(max(opaqueTriangles, 0), triangles)
+    var uniforms = PreviewUniforms(mvp: mvp, color: SIMD4<Float>(0, 0, 0, 0), eye: SIMD4(eye, 1), pose: SIMD4(angle, 0, 0, 0))
+    encoder.setRenderPipelineState(pipeline)
+    encoder.setVertexBuffer(vertices, offset: 0, index: 0)
+    encoder.setVertexBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
+    encoder.setFragmentBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 0)
+    if opaque > 0, let depthLess {
+      encoder.setDepthStencilState(depthLess)
+      encoder.drawIndexedPrimitives(type: .triangle, indexCount: opaque * 3, indexType: .uint32, indexBuffer: indices, indexBufferOffset: 0)
+    }
+    let translucent = triangles - opaque
+    if translucent > 0, let depthReadOnly {
+      encoder.setDepthStencilState(depthReadOnly)
+      encoder.drawIndexedPrimitives(
+        type: .triangle,
+        indexCount: translucent * 3,
+        indexType: .uint32,
+        indexBuffer: indices,
+        indexBufferOffset: opaque * 3 * MemoryLayout<UInt32>.size
+      )
+    }
+  }
+
+  private func solidSetIsDrawable(vertices: MTLBuffer, indices: MTLBuffer, vertexCount: Int, triangles: Int) -> Bool {
+    guard vertexCount > 0, triangles > 0 else { return false }
+    let stride = PreviewLimits.solidVertexFloats * MemoryLayout<Float>.size
+    return vertices.length >= vertexCount * stride && indices.length >= triangles * 3 * MemoryLayout<UInt32>.size
+  }
+
   private func meshIsDrawable(_ frame: PreviewFrame) -> Bool {
     guard frame.indexCount >= 3, frame.indexCount % 3 == 0, frame.vertexCount > 0 else { return false }
     guard let positions = frame.positions, let normals = frame.normals, let indices = frame.indices else { return false }
@@ -221,15 +272,18 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
       boundDevice = incoming
       library = nil
       meshPipeline = nil
+      solidPipeline = nil
       linePipeline = nil
       depthLess = nil
       depthEqual = nil
+      depthReadOnly = nil
       queue = nil
       metalView.device = device
     }
     let samples = device.supportsTextureSampleCount(4) ? 4 : 1
     if metalView.sampleCount != samples {
       meshPipeline = nil
+      solidPipeline = nil
       linePipeline = nil
       metalView.sampleCount = samples
     }
@@ -246,6 +300,7 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
       library = try device.makeLibrary(source: shaderSource, options: nil)
       depthLess = depthState(device, compare: .less)
       depthEqual = depthState(device, compare: .lessEqual)
+      depthReadOnly = depthState(device, compare: .lessEqual, write: false)
     } catch {
       previewLog.error("Preview shaders failed: \(error.localizedDescription, privacy: .public)")
       report("The preview could not be displayed")
@@ -253,7 +308,7 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
   }
 
   private func ensurePipelines(_ view: MTKView) throws {
-    if meshPipeline != nil, linePipeline != nil { return }
+    if meshPipeline != nil, solidPipeline != nil, linePipeline != nil { return }
     guard let device = view.device, let library else { throw PreviewDrawError() }
     do {
       try buildPipelines(device, library, view)
@@ -262,6 +317,7 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
       previewLog.error("Multisample pipeline failed, drawing without it: \(error.localizedDescription, privacy: .public)")
       view.sampleCount = 1
       meshPipeline = nil
+      solidPipeline = nil
       linePipeline = nil
       try buildPipelines(device, library, view)
     }
@@ -269,10 +325,11 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
 
   private func buildPipelines(_ device: MTLDevice, _ library: MTLLibrary, _ view: MTKView) throws {
     meshPipeline = try pipeline(device, library, view, vertex: "meshVertex", fragment: "meshFragment")
+    solidPipeline = try pipeline(device, library, view, vertex: "solidVertex", fragment: "solidFragment", blending: true)
     linePipeline = try pipeline(device, library, view, vertex: "lineVertex", fragment: "lineFragment")
   }
 
-  private func pipeline(_ device: MTLDevice, _ library: MTLLibrary, _ view: MTKView, vertex: String, fragment: String) throws -> MTLRenderPipelineState {
+  private func pipeline(_ device: MTLDevice, _ library: MTLLibrary, _ view: MTKView, vertex: String, fragment: String, blending: Bool = false) throws -> MTLRenderPipelineState {
     guard let vertexFunction = library.makeFunction(name: vertex), let fragmentFunction = library.makeFunction(name: fragment) else {
       throw PreviewDrawError()
     }
@@ -283,13 +340,23 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
     descriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat
     descriptor.sampleCount = view.sampleCount
     descriptor.label = "com.cadcamfun.preview.\(vertex)"
+    if blending, let color = descriptor.colorAttachments[0] {
+      // The machine's assumed (translucent) bodies; an opaque vertex has alpha 1 and lands unchanged.
+      color.isBlendingEnabled = true
+      color.rgbBlendOperation = .add
+      color.alphaBlendOperation = .add
+      color.sourceRGBBlendFactor = .sourceAlpha
+      color.sourceAlphaBlendFactor = .sourceAlpha
+      color.destinationRGBBlendFactor = .oneMinusSourceAlpha
+      color.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+    }
     return try device.makeRenderPipelineState(descriptor: descriptor)
   }
 
-  private func depthState(_ device: MTLDevice, compare: MTLCompareFunction) -> MTLDepthStencilState? {
+  private func depthState(_ device: MTLDevice, compare: MTLCompareFunction, write: Bool = true) -> MTLDepthStencilState? {
     let descriptor = MTLDepthStencilDescriptor()
     descriptor.depthCompareFunction = compare
-    descriptor.isDepthWriteEnabled = true
+    descriptor.isDepthWriteEnabled = write
     return device.makeDepthStencilState(descriptor: descriptor)
   }
 
@@ -309,6 +376,8 @@ struct Uniforms {
   float4x4 mvp;
   float4 color;
   float4 eye;
+  // pose.x is the spin angle (radians) of the bodies that turn; the line draws keep it zero.
+  float4 pose;
 };
 
 struct MeshOut {
@@ -333,12 +402,13 @@ vertex MeshOut meshVertex(uint vid [[vertex_id]],
 }
 
 // CAD studio shading: a headlight that follows the camera, a fixed sky key, a sky/ground
-// ambient and a faint rim, so faces stay readable from every orbit angle.
-fragment float4 meshFragment(MeshOut in [[stage_in]]) {
-  float3 normal = in.normal;
+// ambient and a faint rim, so faces stay readable from every orbit angle. Shared by the CAD
+// mesh and the machine bodies, which differ only in what they do with the alpha.
+static inline float3 studio(float3 normalIn, float3 world, float3 eye, float3 base) {
+  float3 normal = normalIn;
   float len = length(normal);
   normal = len < 1e-4 ? float3(0.0, 0.0, 1.0) : normal / len;
-  float3 view = in.eye - in.world;
+  float3 view = eye - world;
   float viewLen = length(view);
   view = viewLen < 1e-6 ? float3(0.0, 0.0, 1.0) : view / viewLen;
   // Open or inverted shells: light the side the camera sees.
@@ -350,8 +420,53 @@ fragment float4 meshFragment(MeshOut in [[stage_in]]) {
   float3 halfway = normalize(key + view);
   float specular = pow(max(dot(normal, halfway), 0.0), 56.0) * 0.22 + pow(head, 24.0) * 0.08;
   float rim = pow(1.0 - head, 3.0) * 0.1;
-  float3 rgb = in.color.rgb * (ambient + head * 0.58 + sky * 0.24) + specular + rim;
-  return float4(min(rgb, float3(1.0)), 1.0);
+  return min(base * (ambient + head * 0.58 + sky * 0.24) + specular + rim, float3(1.0));
+}
+
+fragment float4 meshFragment(MeshOut in [[stage_in]]) {
+  return float4(studio(in.normal, in.world, in.eye, in.color.rgb), 1.0);
+}
+
+// The machine around the program: xyz, normal xyz, rgba. Keep the stride (40 bytes) in step with
+// `SOLID_VERTEX_FLOATS` in `machine-bodies.ts` and `PreviewUpload.swift`.
+struct SolidVertex {
+  packed_float3 position;
+  packed_float3 normal;
+  packed_float3 color;
+  float alpha;
+};
+
+struct SolidOut {
+  float4 position [[position]];
+  float3 normal;
+  float3 world;
+  float4 color;
+  float3 eye;
+};
+
+// What turns with the spindle rotates about the display x axis by `uniforms.pose.x` radians.
+static inline float3 spinAboutX(float3 value, float angle) {
+  float c = cos(angle), s = sin(angle);
+  return float3(value.x, value.y * c - value.z * s, value.y * s + value.z * c);
+}
+
+vertex SolidOut solidVertex(uint vid [[vertex_id]],
+                            constant SolidVertex* vertices [[buffer(0)]],
+                            constant Uniforms& uniforms [[buffer(1)]]) {
+  SolidVertex v = vertices[vid];
+  float3 world = spinAboutX(float3(v.position), uniforms.pose.x);
+  SolidOut out;
+  out.position = uniforms.mvp * float4(world, 1.0);
+  out.normal = spinAboutX(float3(v.normal), uniforms.pose.x);
+  out.world = world;
+  out.color = float4(float3(v.color), v.alpha);
+  out.eye = uniforms.eye.xyz;
+  return out;
+}
+
+// A body keeps its vertex alpha: 1 for a solid body, the desktop's 0.45 for an assumed workholding.
+fragment float4 solidFragment(SolidOut in [[stage_in]]) {
+  return float4(studio(in.normal, in.world, in.eye, in.color.rgb), in.color.a);
 }
 
 struct LineOut {

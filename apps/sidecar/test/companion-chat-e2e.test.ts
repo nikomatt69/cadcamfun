@@ -140,12 +140,12 @@ describe("the assistant from the phone", () => {
     const detail = await phone.pullRequest(project.id, pulls[0]!.number)
     expect(detail.changes.map((c) => c.kind)).toContain("drawings")
 
-    // main did not move: its only commit is the human's.
+    // main did not move: the project's initial commit and the human's, none of the AI's.
     const branches = await phone.branches(project.id)
     const main = await phone.log(project.id, 10)
     expect(Object.keys(branches.branches).sort()).toEqual(["main", pulls[0]!.head].sort())
     const mainLog = await (await local(`/api/projects/${project.id}/vcs/log?rev=main`)).json()
-    expect(mainLog.map((c: { message: string }) => c.message.trim())).toEqual(["Initial import"])
+    expect(mainLog.map((c: { message: string }) => c.message.trim())).toEqual(["Initial import", "Initial commit"])
     expect(main.length).toBeGreaterThanOrEqual(2) // the checked-out ai branch carries the AI's commit on top
   })
 

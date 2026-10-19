@@ -144,7 +144,7 @@ export const latheSetupOf = (settings: ToolpathSettings, tool: LatheModel = tool
       jawHeight: Math.max(12, diameter * 0.3), tailstock: settings.tailstock
     },
     internal,
-    toolWidth: blade ? Math.max(0.5, Math.min(settings.toolDiameter, 10)) : 0,
+    toolWidth: blade ? Math.max(0.5, Math.min(tool.width > 0 ? tool.width : settings.toolDiameter, 10)) : 0,
     toolType: tool.insert,
     noseRadius: tool.noseRadius,
     tool,
