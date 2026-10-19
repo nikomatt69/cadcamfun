@@ -7,6 +7,7 @@
  * warnings, never as a failure: a preview of a partial program is still useful.
  */
 import { interpretGcode, type GSegment } from "../testing/gcode-interpreter.ts"
+import { headerTools } from "../testing/header-tools.ts"
 import { makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import type { GcodeStats } from "./schema.ts"
 import { motionTrackOf, type MotionTrack } from "../viewer/motion-track.ts"
@@ -60,14 +61,32 @@ export const analyseGcode = (gcode: string, name = "Program", rapidRate = DEFAUL
   }
   const empty = !Number.isFinite(min.x)
   const zero = { x: 0, y: 0, z: 0 }
-  const toolpath: Toolpath = {
-    id: "gcode",
-    name,
-    toolId: "tool",
-    spindleRpm: spindleOf(gcode),
-    coolant: /\bM0?8\b/.test(gcode) ? "flood" : "off",
-    moves
-  }
+  // A program that changes tools mid-way is one toolpath per tool (spec 32 §4.8): the preview colours, lists and draws each
+  // tool's moves apart. One tool keeps the single toolpath `gcode` / `tool` it always was.
+  const states = result.states ?? []
+  const groups: Array<{ readonly start: number; readonly end: number; readonly tool: number | undefined }> = []
+  states.forEach((st, i) => {
+    const last = groups[groups.length - 1]
+    if (last === undefined) groups.push({ start: 0, end: 1, tool: st.tool })
+    else if (st.tool !== undefined && last.tool !== undefined && st.tool !== last.tool) groups.push({ start: i, end: i + 1, tool: st.tool })
+    else groups[groups.length - 1] = { ...last, end: i + 1, tool: last.tool ?? st.tool }
+  })
+  const header = headerTools(gcode)
+  const split = groups.length > 1 && moves.length === states.length
+  const toolpaths: Toolpath[] = !split
+    ? [{ id: "gcode", name, toolId: "tool", spindleRpm: spindleOf(gcode), coolant: /\bM0?8\b/.test(gcode) ? "flood" : "off", moves }]
+    : groups.map((g, k): Toolpath => {
+      const own = states.slice(g.start, g.end)
+      const described = g.tool !== undefined ? header.byTool.get(g.tool)?.description : undefined
+      return {
+        id: `gcode-${k + 1}`,
+        name: g.tool !== undefined ? `T${g.tool}${described !== undefined ? ` ${described}` : ""}` : name,
+        toolId: g.tool !== undefined ? `T${g.tool}` : "tool",
+        spindleRpm: own.find((st) => st.rpm > 0)?.rpm ?? 0,
+        coolant: own.some((st) => st.coolant === "flood") ? "flood" : own.some((st) => st.coolant === "mist") ? "mist" : "off",
+        moves: moves.slice(g.start, g.end)
+      }
+    })
   return {
     stats: {
       lines: gcode.split(/\r?\n/).filter(line => line.trim().length > 0).length,
@@ -79,7 +98,7 @@ export const analyseGcode = (gcode: string, name = "Program", rapidRate = DEFAUL
       bounds: empty ? { min: zero, max: zero } : { min, max }
     },
     warnings: result.errors,
-    program: makeProgram(name || "Program", moves.length > 0 ? [toolpath] : []),
-    motion: moves.length > 0 ? motionTrackOf(result.states ?? [], result.unsupported) : { paths: [], unsupported: result.unsupported }
+    program: makeProgram(name || "Program", moves.length > 0 ? toolpaths : []),
+    motion: moves.length > 0 ? motionTrackOf(states, result.unsupported, split ? groups.map((g) => g.end - g.start) : [states.length]) : { paths: [], unsupported: result.unsupported }
   }
 }

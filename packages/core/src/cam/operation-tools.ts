@@ -9,7 +9,8 @@
 import type { MachineKind } from "./machine.ts"
 import type { ToolpathSettings } from "./generator/schema.ts"
 import type { Strategy } from "./kernel/contracts.ts"
-import { toolMachineOf, toolModelOf, toolModelFromSettings, type LatheInsert, type MillShape, type ToolModel, type ToolResource } from "./tool-model.ts"
+import { headerTools } from "./testing/header-tools.ts"
+import { toolMachineOf, toolModelOf, toolTypeIn, toolModelFromSettings, type LatheInsert, type MillShape, type ToolModel, type ToolResource } from "./tool-model.ts"
 
 export type OperationToolKind = MillShape | LatheInsert | "probe" | "setter" | "nozzle"
 
@@ -180,3 +181,19 @@ export const settingsToolIssues = (s: ToolpathSettings, model: ToolModel = toolF
   })
 
 const round = (n: number) => Math.round(n * 100) / 100
+
+/**
+ * The tool models of a program's tools by toolpath tool id (`T<n>`, as `analyseGcode` splits a program at its tool changes),
+ * from the header comments the post wrote (`T1 D=6. CR=1. - … - bull nose end mill`): the preview then draws every tool of an
+ * imported program. A description that names no known type is drawn as an end mill and said to be assumed.
+ */
+export const headerToolModels = (gcode: string, kind: MachineKind = "mill"): ReadonlyMap<string, ToolModel> => {
+  const out = new Map<string, ToolModel>()
+  for (const tool of headerTools(gcode).byTool.values()) {
+    const type = tool.description !== undefined ? toolTypeIn(tool.description) : undefined
+    const model = toolModelOf({ type: type ?? "endmill", diameter: tool.diameter, ...(tool.cornerRadius !== undefined ? { cornerRadius: tool.cornerRadius } : {}) }, kind)
+    out.set(`T${tool.number}`, type === undefined ? { ...model, assumed: [...model.assumed, "type"] } : model)
+  }
+  return out
+}
+

@@ -5,6 +5,7 @@ import type { Dialect, Post } from "./types.ts"
 export const genericDialect: Dialect = {
   id: "generic",
   canned: true,
+  rigidTap: {},
   arcModes: ["ijk", "radius"],
   dwell: "seconds",
   uppercaseComments: false,

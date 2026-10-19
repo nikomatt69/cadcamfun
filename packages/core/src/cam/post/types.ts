@@ -79,6 +79,11 @@ export interface Dialect {
    * Absent on controls that must be given machine coordinates instead.
    */
   readonly tcp?: string
+  /**
+   * Rigid tapping (`G84` with the feed = pitch x speed). Absent on controls without it: a tapping cycle is then refused, since no
+   * expansion into plain moves reverses the spindle. `prefix` is the block the control needs before the cycle (Fanuc `M29 S<rpm>`).
+   */
+  readonly rigidTap?: { readonly prefix?: (rpm: number) => string }
   /** Upper-case comments (some controls reject lower case). */
   readonly uppercaseComments: boolean
   /** Lines before everything else, unnumbered (e.g. `%`, `O1000`). */

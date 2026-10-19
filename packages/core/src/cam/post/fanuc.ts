@@ -26,6 +26,8 @@ export const fanucSubprograms: NonNullable<Dialect["subprograms"]> = {
 export const fanucDialect: Dialect = {
   id: "fanuc",
   canned: true,
+  // Fanuc rigid tapping: M29 S<rpm> puts the spindle in position control before G84.
+  rigidTap: { prefix: (rpm) => `M29 S${Math.round(rpm)}` },
   arcModes: ["ijk", "radius"],
   dwell: "milliseconds",
   uppercaseComments: true,

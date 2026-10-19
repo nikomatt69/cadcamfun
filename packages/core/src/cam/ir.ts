@@ -72,14 +72,17 @@ export const OrientSchema = Schema.TaggedStruct("Orient", {
   c: Schema.optionalKey(Schema.Finite)
 })
 
-export const CycleKindSchema = Schema.Literals(["drill", "dwell", "peck", "chipBreak"])
+export const CycleKindSchema = Schema.Literals(["drill", "dwell", "peck", "chipBreak", "tap", "ream"])
 export type CycleKind = typeof CycleKindSchema.Type
 
 /**
  * Canned drilling cycle (extension of the spec's move set). The IR keeps the
  * *intent* (peck depth, dwell, retract plane); the post decides whether it can
- * be written as `G81`/`G82`/`G83`/`G73` or must be expanded with
+ * be written as `G81`/`G82`/`G83`/`G73`/`G84`/`G85` or must be expanded with
  * `expandCycle`. `to` is the hole bottom; the tool returns to `retractHeight`.
+ * `tap` is rigid tapping: the feed is `pitch` x spindle speed, the spindle reverses at the bottom and the tap feeds out; it has
+ * no expansion a control without the cycle could run (the reversal is the control's), so such a post refuses it. `ream` feeds in
+ * and back out at the cutting feed (reaming, boring to size), so the edge does not mark the finished bore on a rapid exit.
  */
 export const CycleSchema = Schema.TaggedStruct("Cycle", {
   cycle: CycleKindSchema,
@@ -91,7 +94,9 @@ export const CycleSchema = Schema.TaggedStruct("Cycle", {
   /** Dwell at the hole bottom, seconds; used by `dwell` and optionally by pecks. */
   dwellSeconds: NonNegative,
   /** Retract (R) plane, absolute Z. */
-  retractHeight: Schema.Finite
+  retractHeight: Schema.Finite,
+  /** `tap` only: the thread lead per spindle revolution, mm. */
+  pitch: Schema.optionalKey(Positive)
 })
 
 export const MoveSchema = Schema.Union([
@@ -251,6 +256,13 @@ export const expandCycle = (cycle: CycleMove, from: Vec3): ReadonlyArray<Move> =
       dwell()
       break
     }
+    // The motion of a rigid tap and of a reamer: in and back out at the feed (the tap's spindle reversal is not a move).
+    case "tap":
+    case "ream":
+      feed(bottom)
+      if (cycle.cycle === "ream") dwell()
+      feed(r)
+      break
   }
   rapid(r)
   return out

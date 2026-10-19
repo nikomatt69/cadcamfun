@@ -27,6 +27,7 @@
  */
 
 import { alongLine, joinOf, offsetElement, type CompElement, type CompLine, type CompSide } from "./cutter-comp.ts"
+import { headerTools } from "./header-tools.ts"
 import { finishCycle, patternCycle, peckCycle, roughCycle, threadCycle, type LatheMove, type ProfilePoint } from "./lathe-cycles.ts"
 
 /** Deepest `M98` nesting the interpreter follows (Fanuc allows four). */
@@ -320,8 +321,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     if (d !== undefined && dRegisters.has(d)) return dRegisters.get(d)
     const given = options.toolRadius?.(d, tool)
     if (given !== undefined) return given
-    if (d !== undefined && header.byTool.has(d)) return header.byTool.get(d)! / 2
-    if (tool !== undefined && header.byTool.has(tool)) return header.byTool.get(tool)! / 2
+    if (d !== undefined && header.byTool.has(d)) return header.byTool.get(d)!.diameter / 2
+    if (tool !== undefined && header.byTool.has(tool)) return header.byTool.get(tool)!.diameter / 2
     return header.single !== undefined ? header.single / 2 : undefined
   }
   const arcTo = (target: P3, center: { readonly x: number; readonly y: number }, clockwise: boolean, rate: number, line: number): void => {
@@ -964,19 +965,3 @@ const ACCEPTED_G: ReadonlyArray<number> = [5, 5.1, 8, 9, 43, 43.4, 43.5, 49, 53.
 
 /** Keyword statements that do not move the machine (Siemens settings, messages, TCP on / off). */
 const SILENT_STATEMENTS = new Set(["MSG", "TRAORI", "TRAFOOF", "SOFT", "BRISK", "FFWON", "FFWOF", "CFC", "CFTCP", "CFIN", "STOPRE", "WORKPIECE", "DIAMON", "DIAMOF", "DIAM90", "CYCLE832", "COMPCAD", "COMPCURV", "COMPOF", "SUPA", "TOFFON", "TOFFOF", "SETMS", "SPOS", "WAIT", "DEF", "PRINT_START", "PRINT_END", "START_PRINT", "END_PRINT"])
-
-/**
- * Tool diameters a program's header comments state: Fusion / HSM style `T1 D=6.` per tool, or this app's generator
- * `Tool: endmill Ø6mm` for its one tool.
- */
-const headerTools = (text: string): { readonly byTool: ReadonlyMap<number, number>; readonly single?: number } => {
-  const byTool = new Map<number, number>()
-  const head = text.slice(0, 20_000)
-  for (const m of head.matchAll(/[(;]\s*T\s*(\d+)\b[^)\n]*?\bD\s*=\s*([\d.]+)/gi)) {
-    const d = Number(m[2])
-    if (Number.isFinite(d) && d > 0 && !byTool.has(Number(m[1]))) byTool.set(Number(m[1]), d)
-  }
-  const single = /[(;]\s*Tool:[^)\n]*?Ø\s*([\d.]+)\s*mm/i.exec(head)
-  const d = single !== null ? Number(single[1]) : NaN
-  return Number.isFinite(d) && d > 0 ? { byTool, single: d } : { byTool }
-}

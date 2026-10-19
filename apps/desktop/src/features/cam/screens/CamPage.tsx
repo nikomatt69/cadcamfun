@@ -82,7 +82,9 @@ export default function CamPage(): JSX.Element {
   const operationTools = createMemo(() => camStore.operationResults.length > 0 && combineOperationResults(camStore.operationResults).gcode === camStore.gcode
     ? operationToolsOf(camStore.operationResults)
     : [])
-  const operationToolModels = createMemo(() => operationTools().length > 0 ? new Map(operationTools().map((o) => [o.toolId, o.model])) : undefined)
+  // An imported program split at its tool changes (T1, T2…): each tool as its header comments describe it.
+  const headerModels = createMemo(() => camStore.program.toolpaths.some((tp) => /^T\d+$/.test(tp.toolId)) ? cam.headerToolModels(camStore.gcode, machineChoice().kind) : undefined)
+  const operationToolModels = createMemo(() => operationTools().length > 0 ? new Map(operationTools().map((o) => [o.toolId, o.model])) : (headerModels()?.size ?? 0) > 0 ? headerModels() : undefined)
   const previewMachine = createMemo(() => previewSetup(machineChoice().kind, gen.settings, previewStock(), {
     ...(kernelShown() ? { artifact: camStore.kernelArtifact, machineId: gen.kernelSettings.machine } : {}),
     program: camStore.program, gcode: camStore.gcode, tool: toolModel()
@@ -378,7 +380,7 @@ export default function CamPage(): JSX.Element {
           >
             <Show when={camStore.activeTab === "preview"}>
               <div class="h-full">
-                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} playbackDuration={duration()} onPlayingChange={camStore.setPlaying} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} defaultToolModel={toolModel()} toolIssues={toolIssues()} operationTools={operationTools()} {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} />
+                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} playbackDuration={duration()} onPlayingChange={camStore.setPlaying} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} defaultToolModel={toolModel()} toolIssues={toolIssues()} operationTools={operationTools()} {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} gcode={camStore.gcode} />
               </div>
             </Show>
             <Show when={camStore.activeTab === "editor"}>
@@ -388,7 +390,7 @@ export default function CamPage(): JSX.Element {
             </Show>
             <Show when={camStore.activeTab === "toolpath"}>
               <div class="h-full rounded-xl">
-                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} playbackDuration={duration()} onPlayingChange={camStore.setPlaying} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} defaultToolModel={toolModel()} toolIssues={toolIssues()} operationTools={operationTools()} {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} />
+                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} playbackDuration={duration()} onPlayingChange={camStore.setPlaying} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} defaultToolModel={toolModel()} toolIssues={toolIssues()} operationTools={operationTools()} {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} gcode={camStore.gcode} />
               </div>
             </Show>
             <Show when={camStore.activeTab === "post"}>

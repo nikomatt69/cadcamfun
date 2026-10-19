@@ -20,6 +20,8 @@ import type { Dialect, Post } from "./types.ts"
 export const haasDialect: Dialect = {
   id: "haas",
   canned: true,
+  // Haas NGC taps rigidly in G84 (setting 130 on); no extra block.
+  rigidTap: {},
   arcModes: ["ijk", "radius"],
   dwell: "milliseconds",
   uppercaseComments: true,

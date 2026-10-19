@@ -85,7 +85,11 @@ export type OperationSpec =
   | (OperationBase & { readonly strategy: "pocket"; readonly region: RegionSpec; readonly top: number; readonly bottom: number; readonly allowance?: number; readonly finish?: boolean })
   | (OperationBase & { readonly strategy: "profile"; readonly loop: ReadonlyArray<Vec2>; readonly side: "outside" | "inside"; readonly top: number; readonly bottom: number; readonly allowance?: number; readonly finish?: boolean })
   | (OperationBase & { readonly strategy: "bore"; readonly center: Vec2; readonly diameter: number; readonly top: number; readonly bottom: number; readonly allowance?: number })
-  | (OperationBase & { readonly strategy: "drill"; readonly points: ReadonlyArray<Vec2>; readonly top: number; readonly bottom: number; readonly cut?: "drill" | "spot" })
+  /**
+   * Holes at points: drilled (peck / chip break from the cutting data), spotted, rigid-tapped with a `tap` cutter (the feed is its
+   * pitch x speed; the post needs G84) or reamed with a `reamer` (fed in and out). `bottom` is the tip's lowest point.
+   */
+  | (OperationBase & { readonly strategy: "drill"; readonly points: ReadonlyArray<Vec2>; readonly top: number; readonly bottom: number; readonly cut?: "drill" | "spot" | "tap" | "ream" })
   | (OperationBase & { readonly strategy: "thread"; readonly center: Vec2; readonly diameter: number; readonly pitch: number; readonly internal: boolean; readonly top: number; readonly length: number; readonly rightHand?: boolean })
   | (OperationBase & { readonly strategy: "engrave"; readonly paths: ReadonlyArray<{ readonly points: ReadonlyArray<Vec2>; readonly closed: boolean }>; readonly top: number; readonly depth: number })
   | (OperationBase & { readonly strategy: "chamfer"; readonly loops: ReadonlyArray<{ readonly points: ReadonlyArray<Vec2>; readonly side: "outside" | "inside" }>; readonly top: number; readonly width: number; readonly tipOffset?: number })

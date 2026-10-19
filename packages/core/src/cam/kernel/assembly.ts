@@ -74,6 +74,17 @@ const cuttingZone = (c: Cutter): ProfilePoint[] => {
     case "facemill":
     case "threadmill":
       return [{ r: 0, z: 0 }, { r: R, z: 0 }, { r: R, z: top }]
+    case "tap": {
+      // Form C lead: from the core (about the tap drill) at the tip to the full thread 2.5 pitches up.
+      const lead = Math.min(2.5 * (c.pitch ?? 1), top)
+      const core = Math.max(0, R - 0.6134 * (c.pitch ?? 1))
+      return [{ r: 0, z: 0 }, { r: core, z: 0 }, { r: R, z: lead }, ...(top > lead + 1e-9 ? [{ r: R, z: top }] : [])]
+    }
+    case "reamer": {
+      // A short 45 degree lead chamfer.
+      const lead = Math.min(0.1 * R, top)
+      return [{ r: 0, z: 0 }, { r: R - lead, z: 0 }, { r: R, z: lead }, { r: R, z: Math.max(top, lead) }]
+    }
   }
 }
 

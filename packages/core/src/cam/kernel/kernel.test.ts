@@ -224,15 +224,17 @@ describe("planning from the CAD feature history", () => {
     expect(r.value.unmachined).toEqual([])
   })
 
-  test("a thread note on a hole adds thread milling with the matching pitch", () => {
+  test("a thread note on a hole is tapped on a control that taps (thread milling otherwise: holes.test.ts)", () => {
     const history: History = {
       parameters: { ...plateRecipe.history.parameters, tap: 5 },
       features: [...plateRecipe.history.features, { id: "tapped", type: "hole", plane: "XY", offset: "thick", at: ["width / 2", "depth / 2"], diameter: "tap", depth: "thick", thread: { designation: "M6", depth: 10 } }]
     }
     const r = planOnly(job("C45", { part: { kind: "elements", elements: [{ ...plate, history }] } }))
     if (r.status !== "ok") throw new Error("plan failed")
-    const thread = r.value.operations.find((o) => o.strategy === "thread")
-    expect(thread).toMatchObject({ strategy: "thread", diameter: 6, pitch: 1, internal: true, length: 10, tool: "threadmill-p1" })
+    const tap = r.value.operations.find((o) => o.strategy === "drill" && o.cut === "tap")
+    // Through the 12 mm plate: 10 mm of thread from the top plus the 2.5-pitch lead of the M6 x 1 tap.
+    expect(tap).toMatchObject({ strategy: "drill", cut: "tap", tool: "tap-m6", top: 12, bottom: 12 - 10 - 2.5 })
+    expect(r.value.operations.some((o) => o.strategy === "thread")).toBe(false)
     expect(r.value.operations.some((o) => o.strategy === "drill" && o.tool === "drill-5")).toBe(true)
   })
 })

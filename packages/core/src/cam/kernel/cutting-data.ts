@@ -30,6 +30,8 @@ export type CutClass =
   | "chamfer"
   | "engrave"
   | "thread-mill"
+  | "tap"
+  | "ream"
 
 export type Rigidity = "hobby" | "light" | "standard" | "heavy"
 
@@ -190,13 +192,13 @@ export const suitability = (c: Cutter, mat: WorkpieceMaterial): number => {
 /** Speed factor of each kind of cut relative to the material's rough / finish speed. */
 const CUT_SPEED: Readonly<Record<CutClass, number>> = {
   face: 1, slot: 0.85, "rough-side": 1, adaptive: 1.2, "finish-wall": 1, "finish-floor": 1, "finish-3d": 1,
-  drill: 1, spot: 0.8, chamfer: 0.8, engrave: 0.8, "thread-mill": 0.7
+  drill: 1, spot: 0.8, chamfer: 0.8, engrave: 0.8, "thread-mill": 0.7, tap: 0.45, ream: 0.6
 }
 
 /** Feed-per-tooth factor of each kind of cut relative to side milling. */
 const CUT_FEED: Readonly<Record<CutClass, number>> = {
   face: 1.5, slot: 0.85, "rough-side": 1, adaptive: 1, "finish-wall": 0.8, "finish-floor": 0.8, "finish-3d": 0.7,
-  drill: 1, spot: 0.5, chamfer: 0.6, engrave: 0.4, "thread-mill": 0.5
+  drill: 1, spot: 0.5, chamfer: 0.6, engrave: 0.4, "thread-mill": 0.5, tap: 1, ream: 2.5
 }
 
 const RIGIDITY: Readonly<Record<Rigidity, { readonly depth: number; readonly feed: number }>> = {
@@ -348,6 +350,59 @@ const drilling = (req: CuttingRequest, warnings: string[], limitedBy: string[]):
   }
 }
 
+/**
+ * Cutting data for a rigid tap or a reamer: speed from the material's drilling speed (`CUT_SPEED`: taps 45 %, reamers 60 %), feed
+ * per revolution the pitch (a tap must advance exactly one pitch per turn) or 2.5 x the drilling feed (a reamer's many flutes).
+ * Torque: tapping M = kc P² d / 8000 N·m with kc at the chip of one lead tooth (thread depth 0.6134 P over a 2.5-pitch lead);
+ * reaming M = kc ae f d / 2000 with the radial allowance ae the drill left.
+ */
+const holeFinishing = (req: CuttingRequest, warnings: string[], limitedBy: string[]): CuttingData => {
+  const { material: mat, cutter: c, machine: m } = req
+  const d = c.diameter
+  const tapping = req.cut === "tap"
+  const pitch = c.pitch ?? 1
+  const speed = toolSpeed(c.material, mat, false, warnings) * coatingFactor(c.coating, mat, warnings)
+  const vcRecommended = speed * mat.drillSpeedFactor * CUT_SPEED[req.cut]
+  const rigidity = RIGIDITY[m.rigidity ?? "standard"]
+  const hss = c.material === "hss" || c.material === "hss-co"
+  let rpm = clampRpm((1000 * vcRecommended) / (Math.PI * d), c, m, limitedBy, warnings)
+  let feedPerRev = tapping ? pitch : Math.max(0.02, mat.drillFeed10 * Math.pow(Math.min(d, 25) / 10, 0.8) * (hss ? 0.8 : 1) * rigidity.feed * CUT_FEED[req.cut])
+  let feed = feedPerRev * rpm
+  if (feed > m.maxFeed) {
+    limitedBy.push("machine feed")
+    // A tap keeps one pitch per revolution: the spindle slows down instead.
+    if (tapping) { rpm = Math.max(1, Math.floor(m.maxFeed / pitch)); feed = pitch * rpm }
+    else { feed = m.maxFeed; feedPerRev = feed / rpm }
+  }
+  const vc = (Math.PI * d * rpm) / 1000
+  const depth = req.depth ?? d
+  const ae = tapping ? 0.6134 * pitch : Math.max(0.05, (d - Math.round((d - (d <= 6 ? 0.2 : 0.3)) * 10) / 10) / 2)
+  const h = tapping ? (0.6134 * pitch) / (2.5 * Math.max(1, c.flutes)) : feedPerRev / Math.max(1, c.flutes)
+  const kc = mat.kc11 * Math.pow(Math.max(h, 0.001), -mat.mc)
+  const torqueNm = tapping ? (kc * pitch * pitch * d) / 8000 : (kc * ae * feedPerRev * d) / 2000
+  const powerKw = (torqueNm * 2 * Math.PI * rpm) / 60_000
+  const exceeded: string[] = []
+  if (m.powerKw !== undefined && powerKw / (m.efficiency ?? 0.8) > m.powerKw) exceeded.push(`${tapping ? "Tapping" : "Reaming"} needs ${(powerKw / (m.efficiency ?? 0.8)).toFixed(2)} kW, the spindle has ${m.powerKw} kW`)
+  if (m.torqueNm !== undefined && torqueNm > m.torqueNm) exceeded.push(`${tapping ? "Tapping" : "Reaming"} needs ${torqueNm.toFixed(1)} N·m, the spindle gives ${m.torqueNm} N·m at low speed`)
+  if (depth > c.fluteLength + 1e-9) warnings.push(`${tapping ? "Thread" : "Bore"} depth ${r3(depth)} mm exceeds the ${c.fluteLength} mm flutes of ${c.name}`)
+  if (tapping && mat.iso === "H") warnings.push(`Tapping ${mat.name} breaks taps: mill the thread instead`)
+  if (tapping && mat.stringyChips) warnings.push(`${mat.name} makes long chips: use a spiral-flute tap in blind holes`)
+  return {
+    cut: req.cut, rpm, vc: r3(vc), vcRecommended: r3(vcRecommended), effectiveDiameter: d, fz: r3(feedPerRev / Math.max(1, c.flutes)), chipThickness: r3(h),
+    feed: Math.round(feed * 1000) / 1000, plungeFeed: Math.round(feed * 1000) / 1000, ap: r3(depth), ae: r3(ae), stepoverPercent: 100, rampAngle: mat.rampAngle, helixPitch: r3(pitch),
+    coolant: mat.coolant === "off" ? "flood" : mat.coolant, feedPerRev: r3(feedPerRev),
+    mrr: r3((Math.PI * d * ae * feed) / 1000), powerKw: r3(powerKw), torqueNm: r3(torqueNm), forceN: Math.round((2000 * torqueNm) / d), deflectionMm: 0,
+    limitedBy, warnings, exceeded,
+    source: `${mat.name}: ${tapping ? `tap at one pitch (${pitch} mm) per revolution` : `ream at ${r3(feedPerRev)} mm/rev`}, Vc ${Math.round(vcRecommended)} m/min (handbook starting values)`,
+    reference: {
+      table: "MATERIALS", row: mat.id, rowName: mat.name,
+      columns: { [speedRead(c.material, mat, false).column]: speedRead(c.material, mat, false).value, drillSpeedFactor: mat.drillSpeedFactor, drillFeed10: mat.drillFeed10, kc11: mat.kc11, mc: mat.mc },
+      factors: { toolMaterialSpeed: speedRead(c.material, mat, false).factor, coating: r3(coatingFactor(c.coating, mat, [])), cutSpeed: CUT_SPEED[req.cut], cutFeed: CUT_FEED[req.cut], rigidityFeed: rigidity.feed, toolMaterialFeed: hss ? 0.8 : 1 },
+      basis: REFERENCE_BASIS
+    }
+  }
+}
+
 /** Recommended cutting data; deterministic and pure. */
 export const cuttingData = (req: CuttingRequest): CuttingData => {
   const warnings: string[] = []
@@ -356,6 +411,11 @@ export const cuttingData = (req: CuttingRequest): CuttingData => {
   if (cut === "drill" || cut === "spot") {
     if (c.kind !== "drill" && c.kind !== "spot" && c.kind !== "chamfer") warnings.push(`${c.name} is not a drill: it plunges like one at drilling data`)
     return drilling(req, warnings, limitedBy)
+  }
+  if (cut === "tap" || cut === "ream") {
+    if (cut === "tap" && c.kind !== "tap") warnings.push(`${c.name} is not a tap`)
+    if (cut === "ream" && c.kind !== "reamer") warnings.push(`${c.name} is not a reamer: it is fed in and out like one`)
+    return holeFinishing(req, warnings, limitedBy)
   }
   if (c.kind === "drill") warnings.push(`${c.name} is a drill: it may only plunge, not ${cut}`)
   const d = c.diameter

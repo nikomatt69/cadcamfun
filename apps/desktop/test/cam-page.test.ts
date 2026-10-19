@@ -169,6 +169,53 @@ describe("CAM page", () => {
     } finally { second.dispose() }
   }, 60000)
 
+  test("the simulation player (spec 32 P3): operation bands, tool change, operations panel, colour modes, NC strip, readout", async () => {
+    const { dispose } = app.visit("/cam")
+    try {
+      await app.wait(() => editor())
+      const program = [
+        "(T1 D=10. CR=0. - ZMIN=-2. - flat end mill)", "(T2 D=6. CR=0. - ZMIN=-10. - drill)", "G21 G90 G17",
+        "T1 M6", "S8000 M3", "G0 X0 Y0 Z5", "G1 Z-2 F300", "G1 X40 F800", "G1 Y20", "G0 Z5",
+        "T2 M6", "S2000 M3", "G0 X10 Y10", "G81 X10 Y10 Z-10 R2 F100", "X30", "G80", "M30"
+      ].join("\n")
+      await type(editor()!, program)
+      await clickText("button", "Preview")
+      await app.wait(() => (document.querySelectorAll('[data-testid="timeline-band"]').length === 2 ? true : undefined), 30000)
+      expect(document.querySelectorAll('[data-testid="timeline-tool-change"]').length).toBe(1)
+      // Step to the second operation: the playhead moves to its start and the readout says the drill's tool.
+      ;(await find('[data-testid="timeline-next-op"]')).click()
+      await settle()
+      const second = useCamStore.getState().playbackTime
+      expect(second).toBeGreaterThan(0)
+      ;(await find('[data-testid="timeline-next-move"]')).click()
+      await settle()
+      expect(useCamStore.getState().playbackTime).toBeGreaterThan(second)
+      ;(await find('[data-testid="timeline-prev-op"]')).click()
+      await settle()
+      expect(useCamStore.getState().playbackTime).toBeCloseTo(second, 9)
+      const dro = await find('[data-testid="visualizer-dro"]')
+      expect(dro.textContent).toContain("T2")
+      // The operations panel lists both tools; hiding one keeps the other.
+      await click('[data-testid="operations-toggle"]')
+      const rows = await app.wait(() => (document.querySelectorAll('[data-testid="operation-row"]').length === 2 ? document.querySelectorAll('[data-testid="operation-row"]') : undefined), 30000)
+      expect([...rows].map((r) => r.textContent)).toEqual([expect.stringContaining("T1 flat end mill"), expect.stringContaining("T2 drill")])
+      const eye = rows[1]!.querySelector<HTMLButtonElement>('[data-testid="operation-visible"]')!
+      eye.click(); await settle()
+      expect(eye.getAttribute("aria-pressed")).toBe("false")
+      rows[0]!.querySelector<HTMLButtonElement>('[data-testid="operation-go"]')!.click(); await settle()
+      expect(useCamStore.getState().playbackTime).toBe(0)
+      // Colour modes are offered; the NC strip shows the playing block and a click on another one seeks to it.
+      const colour = document.querySelector<HTMLSelectElement>('[data-testid="color-mode"]')!
+      expect([...colour.options].map((o) => o.value)).toEqual(["tool", "operation", "move", "feed", "z"])
+      colour.value = "move"; colour.dispatchEvent(new window.Event("change", { bubbles: true })); await settle()
+      const strip = await find('[data-testid="nc-strip"]')
+      const target = [...strip.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.includes("G1 X40 F800"))!
+      target.click(); await settle()
+      await app.wait(() => (document.querySelector('[data-testid="nc-strip"] [data-current="true"]')?.textContent?.includes("G1 X40 F800") ? true : undefined), 30000)
+      expect(document.querySelector('[data-testid="visualizer-move-class"]')!.textContent).toBe("Cut")
+    } finally { dispose() }
+  })
+
   test("the preview shows the program's machine (spec 31): a lathe program, the pick, the mismatch, a partial replay", async () => {
     const { dispose } = app.visit("/cam")
     try {

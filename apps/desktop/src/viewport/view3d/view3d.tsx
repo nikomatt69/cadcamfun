@@ -9,9 +9,10 @@ import { ViewportControls, viewportLabels } from "./viewport-controls.tsx"
 import { creasedNormals, isClosedShape, meshOf, tessellate, cam, type Drawing, type Solid, type Vec3 } from "@cadcamfun/core"
 import { entityPaths, renderEntity } from "../editor2d/render.ts"
 import { t } from "../../i18n/index.ts"
-import { buildPlayback, positionAt, toolAt, toolColors, type Playback } from "./playback.ts"
+import { buildPlayback, positionAt, toolAt, toolColors, TOOL_COLORS, type Playback } from "./playback.ts"
 import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
 import { toolObject } from "./tool-object.ts"
+import { pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
 export { machineSpatial, type MachineInfo } from "./machine-scene.ts"
 
@@ -106,7 +107,19 @@ export interface View3DProps {
     readonly showTool?: boolean
     /** Draw the holder, a generic one when the cutter has none (default true). */
     readonly showHolder?: boolean
+    /** Colour the path by tool (default), operation, move class, feed or height (spec 32 §4.4). */
+    readonly colorMode?: ColorMode
+    /** Toolpaths (operations) not drawn. */
+    readonly hiddenPaths?: ReadonlyArray<number>
+    /** `done`: draw only the moves that have started by the playhead (the path grows as it plays). */
+    readonly progress?: "all" | "done"
+    /** Operation names by toolpath index, for the legend. */
+    readonly operationNames?: ReadonlyArray<string>
+    /** Source lines of canned cycles (`cam.viewer.cycleLinesOf`), for the move classes. */
+    readonly cycleLines?: ReadonlySet<number>
   }
+  /** The colours the path is drawn in, after each rebuild (the legend). */
+  readonly onPathLegend?: (legend: ReadonlyArray<LegendEntry>) => void
 }
 
 export const disposeGroup = (group: THREE.Object3D): void => {
@@ -301,6 +314,8 @@ export function View3D(props: View3DProps) {
     }
     const disposeMachine = (): void => { if (machineScene) { scene.remove(machineScene.root); machineScene.dispose(); machineScene = undefined } }
     let toolColorOf: ReadonlyMap<string, number> = new Map()
+    // The path's two line objects and their segments' start times (for the "only what has run" draw range).
+    let pathLines: { readonly cut?: THREE.LineSegments; readonly cutStarts: Float64Array; readonly rapid?: THREE.LineSegments; readonly rapidStarts: Float64Array } | undefined
     const disposeTools = (): void => { for (const g of toolGroups.values()) if (g) { scene.remove(g); disposeGroup(g) } toolGroups.clear() }
     /** The model the preview draws for a toolpath's tool: its own, the kernel's cutter, the generator's tool. A tool setter is
      * on the table (see `rebuild`): what moves is the cutter it measures. */
@@ -466,15 +481,44 @@ export function View3D(props: View3DProps) {
       const colors = props.program ? toolColors(props.program) : new Map<string, number>()
       disposeTools()
       toolColorOf = colors
-      const rapid: number[] = [], cuts = new Map<string, number[]>()
       // A printer's path is drawn by the machine scene: deposited beads and travel, not cuts.
-      for (const s of machine?.kind === "3dprinter" ? [] : playback.segments) {
-        const into = s.rapid ? rapid : cuts.get(s.toolId) ?? (cuts.set(s.toolId, []), cuts.get(s.toolId)!)
-        const a = shown(s.from, s.path, s.index), b = shown(s.to, s.path, s.index)
-        into.push(a.x, a.y, a.z, b.x, b.y, b.z)
+      const display = props.toolpathDisplay
+      const mode = display?.colorMode ?? "tool"
+      let classOf: ((path: number, index: number) => cam.viewer.MoveClass | undefined) | undefined
+      if (mode === "move" && props.program) {
+        const timeline = machineScene?.timeline ?? cam.viewer.buildTimeline(props.program, props.motion, cam.viewer.DEFAULT_RAPID_RATE, start)
+        const classes = cam.viewer.classifyMoves(timeline, {
+          ...(machine !== undefined ? { kind: machine.kind } : {}),
+          ...(machine?.kind === "mill" ? { stockTop: machine.stock.max.z } : props.stock ? { stockTop: props.stock.origin.z + props.stock.size.z } : {}),
+          ...(display?.cycleLines !== undefined ? { cycleLines: display.cycleLines } : {})
+        })
+        const byMove = new Map<string, cam.viewer.MoveClass>()
+        timeline.moves.forEach((m, i) => byMove.set(`${m.path}:${m.index}`, classes[i]!))
+        classOf = (path, index) => byMove.get(`${path}:${index}`)
       }
-      addLines(rapid, true)
-      for (const [toolId, positions] of cuts) addLines(positions, false, colors.get(toolId))
+      const buffers = pathBuffers(machine?.kind === "3dprinter" ? { ...playback, segments: [] } : playback, {
+        mode, toolColors: colors, shown,
+        ...(classOf !== undefined ? { classOf } : {}),
+        ...(display?.operationNames !== undefined ? { operationNames: display.operationNames } : {}),
+        ...(display?.hiddenPaths !== undefined ? { hidden: new Set(display.hiddenPaths) } : {})
+      }, TOOL_COLORS)
+      const lineObject = (positions: Float32Array, rapidLine: boolean, colorsOf?: Float32Array): THREE.LineSegments | undefined => {
+        if (positions.length === 0) return undefined
+        const geometry = new THREE.BufferGeometry()
+        geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
+        if (colorsOf !== undefined) geometry.setAttribute("color", new THREE.BufferAttribute(colorsOf, 3))
+        const line = new THREE.LineSegments(geometry, rapidLine
+          ? new THREE.LineDashedMaterial({ color: mode === "move" ? cam.viewer.MOVE_CLASS_COLORS.rapid : 0xf59e0b, dashSize: 2, gapSize: 1 })
+          : new THREE.LineBasicMaterial({ vertexColors: true }))
+        line.name = rapidLine ? "toolpath:rapids" : "toolpath:cuts"
+        if (rapidLine) line.computeLineDistances()
+        content.add(line)
+        return line
+      }
+      const rapidLine = lineObject(buffers.rapid.positions, true)
+      const cutLine = lineObject(buffers.cut.positions, false, buffers.cut.colors)
+      pathLines = { ...(cutLine ? { cut: cutLine } : {}), cutStarts: buffers.cut.starts, ...(rapidLine ? { rapid: rapidLine } : {}), rapidStarts: buffers.rapid.starts }
+      props.onPathLegend?.(buffers.legend)
       if (props.program && props.toolpathDisplay) {
         const overlay = toolpathOverlayModel(props.program)
         if (props.toolpathDisplay.showPoints) {
@@ -564,6 +608,17 @@ export function View3D(props: View3DProps) {
       previous = now
       let p = positionAt(playback, seconds)
       if (machineScene?.update(seconds)) invalidate()
+      // "Only what has run": the path's draw ranges follow the playhead.
+      if (pathLines !== undefined) {
+        const done = props.toolpathDisplay?.progress === "done"
+        const range = (line: THREE.LineSegments | undefined, starts: Float64Array) => {
+          if (line === undefined) return
+          const count = done ? startedBy(starts, seconds) * 2 : Infinity
+          if (line.geometry.drawRange.count !== count) { line.geometry.setDrawRange(0, count); invalidate() }
+        }
+        range(pathLines.cut, pathLines.cutStarts)
+        range(pathLines.rapid, pathLines.rapidStarts)
+      }
       // A lathe tool or a printer nozzle is the machine scene's; the milling cutter and the marker are for mills only.
       const ownTool = machineScene !== undefined && props.machine?.kind !== "mill"
       const visible = playback.segments.length > 0 && !ownTool

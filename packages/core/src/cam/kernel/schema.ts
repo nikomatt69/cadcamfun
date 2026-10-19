@@ -16,7 +16,7 @@ const ring = Schema.Array(point).check(Schema.isMinLength(3), Schema.isMaxLength
 
 export const CutterSchema = Schema.Struct({
   id, name: Schema.String.check(Schema.isMaxLength(120)),
-  kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver"]),
+  kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer"]),
   diameter: positive, flutes: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 24 })),
   material: Schema.Literals(["hss", "hss-co", "carbide", "pcd"]),
   coating: Schema.Literals(["none", "tin", "ticn", "altin", "alcrn", "zrn", "dlc", "diamond"]),
@@ -42,7 +42,7 @@ export const OperationSpecSchema = Schema.Union([
   Schema.Struct({ ...overrides, strategy: Schema.Literal("pocket"), region, top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative), finish: Schema.optionalKey(Schema.Boolean) }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("profile"), loop: ring, side: Schema.Literals(["outside", "inside"]), top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative), finish: Schema.optionalKey(Schema.Boolean) }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("bore"), center: point, diameter: positive, top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative) }),
-  Schema.Struct({ ...overrides, strategy: Schema.Literal("drill"), points: Schema.Array(point).check(Schema.isMinLength(1), Schema.isMaxLength(5000)), top: Schema.Finite, bottom: Schema.Finite, cut: Schema.optionalKey(Schema.Literals(["drill", "spot"])) }),
+  Schema.Struct({ ...overrides, strategy: Schema.Literal("drill"), points: Schema.Array(point).check(Schema.isMinLength(1), Schema.isMaxLength(5000)), top: Schema.Finite, bottom: Schema.Finite, cut: Schema.optionalKey(Schema.Literals(["drill", "spot", "tap", "ream"])) }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("thread"), center: point, diameter: positive, pitch: positive, internal: Schema.Boolean, top: Schema.Finite, length: positive, rightHand: Schema.optionalKey(Schema.Boolean) }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("engrave"), paths: Schema.Array(Schema.Struct({ points: Schema.Array(point).check(Schema.isMinLength(2)), closed: Schema.Boolean })).check(Schema.isMinLength(1), Schema.isMaxLength(2000)), top: Schema.Finite, depth: positive }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("chamfer"), loops: Schema.Array(Schema.Struct({ points: ring, side: Schema.Literals(["outside", "inside"]) })).check(Schema.isMinLength(1), Schema.isMaxLength(2000)), top: Schema.Finite, width: positive, tipOffset: Schema.optionalKey(nonNegative) }),

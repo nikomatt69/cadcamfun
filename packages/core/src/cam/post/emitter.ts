@@ -54,7 +54,9 @@ const CYCLE_CODE: Record<CycleMove["cycle"], string> = {
   drill: "G81",
   dwell: "G82",
   peck: "G83",
-  chipBreak: "G73"
+  chipBreak: "G73",
+  tap: "G84",
+  ream: "G85"
 }
 
 /** Pocket of every tool id: the override where it has a usable number, then the first free number in order of first use. */
@@ -377,6 +379,12 @@ class Writer {
   cycleMove(move: CycleMove): void {
     assertCycleSafe(move)
     const from = this.ir ?? { x: move.to.x, y: move.to.y, z: move.retractHeight }
+    if (move.cycle === "tap" && (!this.options.useCannedCycles || !this.dialect.canned || this.dialect.rigidTap === undefined)) {
+      throw new RangeError(`${this.dialect.id}: rigid tapping needs the control's G84 cycle (canned cycles on); mill the thread instead`)
+    }
+    if (move.cycle === "tap" && this.spindleRpm > 0 && Math.abs(move.feed - move.pitch! * this.spindleRpm) > 1e-6 * move.feed + 1e-9) {
+      throw new RangeError(`Tapping feed ${move.feed} mm/min is not the pitch ${move.pitch} x ${this.spindleRpm} rpm: the tap would strip the thread`)
+    }
     if (!this.options.useCannedCycles || !this.dialect.canned) {
       for (const m of expandCycle(move, from)) this.move(m)
       return
@@ -384,6 +392,12 @@ class Writer {
     if (from.z < move.retractHeight) this.rapid({ ...from, z: move.retractHeight })
     const code = CYCLE_CODE[move.cycle]
     if (this.cycle?.code !== code) {
+      // Rigid tapping is entered from the cancelled state, with its prefix block (the spindle switches to position control).
+      if (move.cycle === "tap") {
+        this.endCycle()
+        const prefix = this.dialect.rigidTap?.prefix?.(this.spindleRpm)
+        if (prefix !== undefined) this.block(prefix)
+      }
       this.cycle = { code }
     }
     const state = this.cycle!

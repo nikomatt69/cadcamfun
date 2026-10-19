@@ -3,7 +3,7 @@
  * each, the way a CAM programmer sequences a prismatic part:
  *
  *   face the stock top  ->  rough around the outlines and inside the pockets (adaptive / contour, wall allowance)
- *   ->  counterbores, spot drilling, drilling (or helical boring), countersinks, thread milling
+ *   ->  counterbores, spot drilling, drilling (or helical boring), reaming of fitted bores, countersinks, tapping or thread milling
  *   ->  finish the walls  ->  break the top edges (2D chamfer, when `deburr` is asked)  ->  3D roughing and finishing of the freeform bodies
  *
  * The features come from the parametric history (`generator/history-features.ts`, the same derivation the generator and
@@ -22,7 +22,7 @@ import { exactFeatures } from "../brep-part.ts"
 import { historyFeatures, type HistoryFeatures, type MachiningHole } from "../generator/history-features.ts"
 import type { CadElement } from "../generator/schema.ts"
 import type { OperationSpec, StockBox } from "./contracts.ts"
-import { pointLength, type Cutter } from "./cutters.ts"
+import { pointLength, reamDrill, type Cutter } from "./cutters.ts"
 import { suitability, type Rigidity } from "./cutting-data.ts"
 import type { WorkpieceMaterial } from "./materials.ts"
 
@@ -38,6 +38,8 @@ export interface PlanInput {
   readonly scallop: number
   /** Chamfer width that breaks the top edges of outlines, pockets and holes, mm (no deburring when absent). */
   readonly deburr?: number
+  /** The machine's control taps rigidly (G84): tapped holes are tapped, otherwise their threads are milled. */
+  readonly rigidTap?: boolean
   /** Upward horizontal faces of the part, by height (`horizontalFaces`): a freeform part with some gets a flat-area finish. */
   readonly flats?: ReadonlyArray<{ readonly z: number; readonly area: number }>
 }
@@ -260,12 +262,13 @@ export const planJob = (input: PlanInput): Plan => {
   const holes = features.flatMap((f) => f.holes)
   const spot = tools.filter((t) => t.kind === "spot").sort((a, b) => a.diameter - b.diameter)
   const chamfers = tools.filter((t) => t.kind === "chamfer" || t.kind === "spot").sort((a, b) => a.diameter - b.diameter)
-  type DrillGroup = { tool: Cutter; top: number; bottom: number; points: Vec2[]; cut: "drill" | "spot" }
+  type HoleCut = "drill" | "spot" | "ream" | "tap"
+  type DrillGroup = { tool: Cutter; top: number; bottom: number; points: Vec2[]; cut: HoleCut; label?: string }
   const groups = new Map<string, DrillGroup>()
-  const group = (tool: Cutter, top: number, bottom: number, at: Vec2, cut: "drill" | "spot"): void => {
+  const group = (tool: Cutter, top: number, bottom: number, at: Vec2, cut: HoleCut, label?: string): void => {
     const key = `${cut}|${tool.id}|${r3(top)}|${r3(bottom)}`
     const g = groups.get(key)
-    if (g === undefined) groups.set(key, { tool, top, bottom, points: [at], cut })
+    if (g === undefined) groups.set(key, { tool, top, bottom, points: [at], cut, ...(label !== undefined ? { label } : {}) })
     else g.points.push(at)
   }
   const threads: OperationSpec[] = []
@@ -282,7 +285,16 @@ export const planJob = (input: PlanInput): Plan => {
     }
     const bottomOfHole = h.entry.z - h.depth
     const through = bottomOfHole <= partBottom + 1e-6
-    const drill = drills.find((d) => Math.abs(d.diameter - h.diameter) <= 0.02)
+    // A fitted bore (H7 ...) is drilled under size and reamed, when the library has the reamer and its pre-drill.
+    const reamer = h.fit !== undefined && h.thread === undefined
+      ? tools.filter((t) => t.kind === "reamer" && Math.abs(t.diameter - h.diameter) <= 0.005 && t.fluteLength >= top - bottomOfHole).sort((a, b) => fit(b) - fit(a))[0]
+      : undefined
+    const preDrill = reamer === undefined ? undefined : drills.find((d) => Math.abs(d.diameter - reamDrill(h.diameter)) <= 0.02)
+    if (h.fit !== undefined && h.thread === undefined && (reamer === undefined || preDrill === undefined)) {
+      notes.push(`Hole ${h.id} Ø${r3(h.diameter)} ${h.fit}: ${reamer === undefined ? `no Ø${r3(h.diameter)} reamer` : `no Ø${reamDrill(h.diameter)} pre-drill`} in the library; it is drilled or bored, which does not hold ${h.fit}`)
+    }
+    const reaming = reamer !== undefined && preDrill !== undefined
+    const drill = reaming ? preDrill : drills.find((d) => Math.abs(d.diameter - h.diameter) <= 0.02)
     if (drill !== undefined) {
       const tip = pointLength(drill)
       const bottom = through ? bottomOfHole - tip - 0.5 : bottomOfHole - tip
@@ -294,6 +306,7 @@ export const planJob = (input: PlanInput): Plan => {
         if (depth > 0.05) group(s, top, top - depth, at, "spot")
       }
       group(drill, top, bottom, at, "drill")
+      if (reaming) group(reamer!, top, through ? bottomOfHole - 0.5 : bottomOfHole, at, "ream", `Ream Ø${r3(h.diameter)} ${h.fit}`)
     } else {
       const tool = endMill(Math.min(0.75 * h.diameter, maxRough), top - bottomOfHole)
       if (tool === undefined || tool.diameter < 0.3 * h.diameter) {
@@ -310,6 +323,19 @@ export const planJob = (input: PlanInput): Plan => {
     if (h.thread !== undefined) {
       const { diameter, pitch } = h.thread
       if (diameter === undefined || pitch === undefined) { unmachined.push(`Hole ${h.id}: thread ${h.thread.designation} is not a metric size the kernel mills`); continue }
+      // Rigid tapping when the control taps, the library has the tap, the material does not break it, and a blind hole leaves room
+      // under the thread for the tap's lead (2.5 pitches of form C); otherwise the thread is milled.
+      const threadLength = Math.min(h.thread.depth, h.depth)
+      const tapTip = top - threadLength - 2.5 * pitch
+      const tapTool = input.rigidTap === true && material.iso !== "H"
+        ? tools.filter((t) => t.kind === "tap" && Math.abs(t.diameter - diameter) < 1e-6 && t.pitch !== undefined && Math.abs(t.pitch - pitch) < 1e-9 && t.fluteLength >= threadLength).sort((a, b) => fit(b) - fit(a))[0]
+        : undefined
+      if (tapTool !== undefined && (through || tapTip >= bottomOfHole - 1e-6)) {
+        group(tapTool, top, tapTip, at, "tap", `Tap ${h.thread.designation}`)
+        if (through) notes.push(`Tap ${h.thread.designation} in ${h.id}: the lead runs ${r3(2.5 * pitch)} mm below the part; the parallels must leave that room`)
+        continue
+      }
+      if (tapTool !== undefined) notes.push(`Hole ${h.id}: ${tapTool.name} needs ${r3(threadLength + 2.5 * pitch)} mm for the thread and its lead, the hole is ${r3(h.depth)} mm deep: the thread is milled`)
       const mill = tools.filter((t) => t.kind === "threadmill" && t.pitch !== undefined && Math.abs(t.pitch - pitch) < 1e-9 && t.diameter < Math.min(h.diameter, threadMinorDiameter(diameter, pitch, true)) - 0.1)
         .sort((a, b) => b.diameter - a.diameter)[0]
       if (mill === undefined) unmachined.push(`Hole ${h.id}: no thread mill for ${h.thread.designation} (P${pitch}) that fits the Ø${r3(threadMinorDiameter(diameter, pitch, true))} minor diameter`)
@@ -319,12 +345,14 @@ export const planJob = (input: PlanInput): Plan => {
     }
   }
   ops.push(...bores)
-  const sortedGroups = [...groups.values()].sort((a, b) => (a.cut === b.cut ? a.tool.diameter - b.tool.diameter : a.cut === "spot" ? -1 : 1))
+  const ORDER: Readonly<Record<HoleCut, number>> = { spot: 0, drill: 1, ream: 2, tap: 3 }
+  const sortedGroups = [...groups.values()].sort((a, b) => (a.cut === b.cut ? a.tool.diameter - b.tool.diameter : ORDER[a.cut] - ORDER[b.cut]))
   let counter = 0
   for (const g of sortedGroups) {
     counter++
     ops.push({
-      id: `${g.cut}-${g.tool.id}-${counter}`, name: g.cut === "spot" ? `Spot / chamfer with ${g.tool.name}` : `Drill Ø${g.tool.diameter} (${g.points.length} holes)`,
+      id: `${g.cut}-${g.tool.id}-${counter}`,
+      name: g.cut === "spot" ? `Spot / chamfer with ${g.tool.name}` : g.cut === "drill" ? `Drill Ø${g.tool.diameter} (${g.points.length} holes)` : `${g.label ?? g.tool.name} (${g.points.length} holes)`,
       strategy: "drill", tool: g.tool.id, points: g.points, top: g.top, bottom: g.bottom, cut: g.cut
     })
   }

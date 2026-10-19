@@ -7,6 +7,9 @@ export const assertCycleSafe = (cycle: CycleMove): void => {
     feed <= 0 || peckDepth < 0 || dwellSeconds < 0 || to.z >= retractHeight) {
     throw new RangeError("Invalid drilling cycle geometry, feed, peck depth or dwell")
   }
+  if (cycle.cycle === "tap" && !(cycle.pitch !== undefined && Number.isFinite(cycle.pitch) && cycle.pitch > 0)) {
+    throw new RangeError("A tapping cycle needs the thread pitch")
+  }
   if (cycle.cycle === "peck" || cycle.cycle === "chipBreak") {
     const depth = retractHeight - to.z
     const peck = peckDepth > 0 ? peckDepth : depth

@@ -34,7 +34,7 @@ import { ProfileParams, generateProfile } from "../operations/profile.ts"
 import { SurfaceParams, generateSurface } from "../operations/surface.ts"
 import { ThreadParams, generateThread } from "../operations/thread.ts"
 import { ChamferParams, chamferGeometry, generateChamfer } from "../operations/chamfer.ts"
-import { getPost } from "../post/index.ts"
+import { dialectOf, getPost } from "../post/index.ts"
 import { genericPost } from "../post/generic.ts"
 import { interpretGcode, type GSegment } from "../testing/gcode-interpreter.ts"
 import type { Stock } from "../tool.ts"
@@ -141,7 +141,10 @@ export const prepareJob = (job: ManufacturingJob): CamResult<PreparedJob> => {
   const finishAllowance = job.quality?.finishAllowance ?? material.finishAllowance
   const scallop = job.quality?.scallop ?? 0.01
   const plan = job.operations === undefined
-    ? planJob({ elements, bounds, stock, tools, material, rigidity: machine.limits.rigidity ?? "standard", finishAllowance, scallop, flats: horizontalFaces(meshes), ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {}) })
+    ? planJob({
+        elements, bounds, stock, tools, material, rigidity: machine.limits.rigidity ?? "standard", finishAllowance, scallop, flats: horizontalFaces(meshes),
+        rigidTap: dialectOf(machine.post)?.rigidTap !== undefined, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {})
+      })
     : undefined
   const operations = job.operations ?? plan!.operations
   if (operations.length === 0) return { status: "failed", issues: [issue("InvalidInput", "plan", "No operation to run: the part needs no machining or no feature could be planned"), ...(plan?.unmachined ?? []).map((m) => issue("UnsupportedCapability", "plan", m))] }
@@ -164,7 +167,8 @@ const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
     case "pocket": return op.finish === true ? "finish-wall" : "rough-side"
     case "profile": return op.finish === true ? "finish-wall" : "rough-side"
     case "bore": return "rough-side"
-    case "drill": return op.cut === "spot" || tool.kind === "spot" || tool.kind === "chamfer" ? "spot" : "drill"
+    case "drill": return op.cut === "tap" || tool.kind === "tap" ? "tap" : op.cut === "ream" || tool.kind === "reamer" ? "ream"
+      : op.cut === "spot" || tool.kind === "spot" || tool.kind === "chamfer" ? "spot" : "drill"
     case "thread": return "thread-mill"
     case "engrave": return "engrave"
     case "chamfer": return "chamfer"
@@ -343,9 +347,9 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
       : op.strategy === "engrave" ? op.top - o.z - op.depth
       : op.strategy === "chamfer" ? op.top - o.z - chamferGeometry(coneOf(tool), op.width, op.tipOffset ?? 0.2).tipDepth
       : op.bottom - o.z
-    const finishing = cut === "finish-wall" || cut === "finish-3d" || cut === "thread-mill" || cut === "engrave" || cut === "spot" || cut === "chamfer"
+    const finishing = cut === "finish-wall" || cut === "finish-3d" || cut === "thread-mill" || cut === "engrave" || cut === "spot" || cut === "chamfer" || cut === "tap" || cut === "ream"
     // Enter from the material really left over the region: above the feature top when stock is still there, lower when it is gone.
-    let start = op.strategy === "thread" || op.strategy === "chamfer" ? opTop : materialTop > opTop + 1e-6 ? materialTop : finishing || materialTop === -Infinity ? opTop : Math.max(materialTop, opBottom)
+    let start = op.strategy === "thread" || op.strategy === "chamfer" || cut === "tap" || cut === "ream" ? opTop : materialTop > opTop + 1e-6 ? materialTop : finishing || materialTop === -Infinity ? opTop : Math.max(materialTop, opBottom)
     if (op.strategy === "face") start = Math.max(materialTop, opBottom)
     const warnings: string[] = []
     const overridden: string[] = []
@@ -430,10 +434,17 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
         }
         case "drill": {
           const { stepdown: _s, feed: _f, ...drillCommon } = common
+          const tapping = cut === "tap"
+          if (tapping && tool.pitch === undefined) { fail("InvalidInput", `${op.id}: the tap ${tool.id} has no pitch`, data); return }
+          const notes: string[] = []
+          // A tap advances one pitch per revolution whatever was asked: the feed follows the (possibly overridden) speed.
+          if (tapping && op.feed !== undefined) notes.push(`${op.id}: a tap feeds one pitch per revolution (${tool.pitch} mm x ${rpm} rpm); the feed override is not used`)
           const params = decode(DrillParams, {
-            ...drillCommon, plungeFeed: pick("feed", data.feed), peck: data.peck ?? 0, chipBreak: data.chipBreak ?? false, dwell: cut === "spot" ? 0.2 : 0
+            ...drillCommon, plungeFeed: tapping ? tool.pitch! * rpm : pick("feed", data.feed), peck: cut === "drill" ? data.peck ?? 0 : 0,
+            chipBreak: cut === "drill" ? data.chipBreak ?? false : false, dwell: cut === "spot" ? 0.2 : 0,
+            mode: tapping ? "tap" : cut === "ream" ? "ream" : "drill", ...(tapping ? { pitch: tool.pitch } : {})
           })
-          generated = { toolpath: generateDrill(params, op.points.map((p) => shift2(p, o)), legacy, opStock), warnings: [] }
+          generated = { toolpath: generateDrill(params, op.points.map((p) => shift2(p, o)), legacy, opStock), warnings: notes }
           break
         }
         case "thread": {
@@ -574,6 +585,23 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
         if (distanceToChain(p, ring, true) > reach) continue
         const k = j * nx + i
         limit[k] = Math.min(limit[k]!, floor)
+      }
+    }
+  }
+  // Declared removal the model does not carry: a thread, milled or tapped, cuts out to its major diameter beyond the drilled hole.
+  for (const op of operations) {
+    const t = toolOf(op.tool)
+    const rings = op.strategy === "thread" ? [{ c: op.center, r: op.diameter / 2, floor: op.top - o.z - op.length }]
+      : op.strategy === "drill" && (op.cut === "tap" || t.kind === "tap") ? op.points.map((c) => ({ c, r: t.diameter / 2, floor: op.bottom - o.z }))
+      : []
+    for (const { c: centre, r, floor } of rings) {
+      const c = shift2(centre, o), reach = r + Math.max(hf.cellX, hf.cellY)
+      const i0 = Math.max(0, Math.floor((c.x - reach - hf.minX) / hf.cellX)), i1 = Math.min(nx - 1, Math.ceil((c.x + reach - hf.minX) / hf.cellX))
+      const j0 = Math.max(0, Math.floor((c.y - reach - hf.minY) / hf.cellY)), j1 = Math.min(ny - 1, Math.ceil((c.y + reach - hf.minY) / hf.cellY))
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        if (Math.hypot(hf.centreX(i) - c.x, hf.centreY(j) - c.y) > reach) continue
+        const k = j * nx + i
+        limit[k] = Math.min(limit[k]!, floor - 1e-3)
       }
     }
   }

@@ -72,11 +72,14 @@ export const buildTimeline = (program: Program, track?: MotionTrack, rapidRate =
   return { moves, duration: time, track: used }
 }
 
-/** Index of the move playing at `seconds` (the move count past the end). */
+/**
+ * Index of the move playing at `seconds` (the move count past the end). At the instant one move ends and the next starts,
+ * the next one plays: stepping to an operation's start shows that operation, its tool and its line.
+ */
 export const timedIndexAt = (timeline: Timeline, seconds: number): number => {
   const t = Math.max(0, Math.min(timeline.duration, seconds))
   let lo = 0, hi = timeline.moves.length
-  while (lo < hi) { const mid = (lo + hi) >>> 1; const m = timeline.moves[mid]!; if (m.start + m.duration < t) lo = mid + 1; else hi = mid }
+  while (lo < hi) { const mid = (lo + hi) >>> 1; const m = timeline.moves[mid]!; if (m.start + m.duration <= t) lo = mid + 1; else hi = mid }
   return lo
 }
 

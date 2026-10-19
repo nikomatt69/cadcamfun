@@ -20,6 +20,10 @@ export type CutterKind =
   | "facemill"
   | "threadmill"
   | "engraver"
+  /** A machine tap (rigid tapping): `diameter` is the nominal (major) diameter, `pitch` the thread it cuts. */
+  | "tap"
+  /** A machine reamer: `diameter` is the finished bore. */
+  | "reamer"
 
 export type ToolMaterial = "hss" | "hss-co" | "carbide" | "pcd"
 
@@ -45,7 +49,7 @@ export interface Cutter {
   readonly angle?: number
   /** Flat tip diameter of an engraver, mm. */
   readonly tipDiameter?: number
-  /** Thread mill: the pitch its profile cuts, mm. */
+  /** Thread mill or tap: the pitch its profile cuts, mm. */
   readonly pitch?: number
   /** Length of the cutting edges from the tip, mm. */
   readonly fluteLength: number
@@ -67,7 +71,10 @@ const LEGACY_KIND: Readonly<Record<CutterKind, Tool["kind"]>> = {
   drill: "drill",
   facemill: "facemill",
   threadmill: "endmill",
-  engraver: "vbit"
+  engraver: "vbit",
+  // The replay sweeps a tap and a reamer as cylinders of their cutting diameter (the tap's lead chamfer is ignored: conservative).
+  tap: "endmill",
+  reamer: "endmill"
 }
 
 /** The legacy record the operations take (`cam/tool.ts`). */
@@ -111,7 +118,7 @@ export const cutterIssues = (c: Cutter): ReadonlyArray<string> => {
   if (c.fluteLength > c.stickout + 1e-9) out.push(`${c.id}: the flutes (${c.fluteLength} mm) are longer than the stickout (${c.stickout} mm)`)
   if (c.kind === "bull" && (c.cornerRadius === undefined || c.cornerRadius <= 0 || c.cornerRadius >= c.diameter / 2)) out.push(`${c.id}: a bull nose needs 0 < corner radius < D/2`)
   if ((c.kind === "chamfer" || c.kind === "spot" || c.kind === "engraver") && (c.angle === undefined || c.angle <= 0 || c.angle >= 180)) out.push(`${c.id}: a ${c.kind} needs its included angle`)
-  if (c.kind === "threadmill" && (c.pitch === undefined || c.pitch <= 0)) out.push(`${c.id}: a thread mill needs the pitch its profile cuts`)
+  if ((c.kind === "threadmill" || c.kind === "tap") && (c.pitch === undefined || c.pitch <= 0)) out.push(`${c.id}: a ${c.kind === "tap" ? "tap" : "thread mill"} needs the pitch its profile cuts`)
   return out
 }
 
@@ -134,16 +141,32 @@ const drill = (d: number): Cutter => ({
   fluteLength: Math.round(d * 5 + 4), shankDiameter: Math.max(3, Math.ceil(d)), stickout: Math.round(d * 5 + 15), holder: HOLDER
 })
 
-/** Drill sizes of the default library: every ISO tap drill and medium clearance hole of `cad/fasteners.ts`, plus round sizes. */
+/** Reamer sizes of the default library (H7), and the drill a reamer follows: 0.2 mm under up to Ø6, 0.3 mm above. */
+const REAMER_SIZES: ReadonlyArray<number> = [3, 4, 5, 6, 8, 10, 12]
+export const reamDrill = (d: number): number => Math.round((d - (d <= 6 ? 0.2 : 0.3)) * 10) / 10
+
+/** Drill sizes of the default library: every ISO tap drill and medium clearance hole of `cad/fasteners.ts`, the pre-ream sizes, plus round sizes. */
 const DRILL_SIZES: ReadonlyArray<number> = [...new Set([
   ...METRIC_THREADS.filter((t) => t.d <= 20).flatMap((t) => [t.tapDrill, t.clearance.medium]),
+  ...REAMER_SIZES.map(reamDrill),
   2, 3, 4, 5, 6, 7, 8, 10, 12
 ])].sort((a, b) => a - b)
+
+/** HSS-E-PM machine tap, TiCN, form C lead (2-3 pitches): coarse metric M3-M12. Taps run in a rigid holder. */
+const tap = (d: number, pitch: number): Cutter => ({
+  id: `tap-m${d}`, name: `Machine tap M${d}x${pitch} HSS-E TiCN form C`, kind: "tap", diameter: d, flutes: d <= 5 ? 3 : 4, material: "hss-co", coating: "ticn", pitch,
+  fluteLength: Math.round(d * 2.5 + 4), shankDiameter: Math.max(3.5, Math.round(d * 0.8 * 10) / 10), stickout: Math.round(d * 6 + 25), holder: HOLDER
+})
+
+const reamer = (d: number): Cutter => ({
+  id: `reamer-${d}`, name: `Reamer Ø${d} H7 carbide 6F`, kind: "reamer", diameter: d, flutes: 6, material: "carbide", coating: "tin",
+  fluteLength: Math.round(d * 3 + 6), shankDiameter: Math.max(3, Math.ceil(d)), stickout: Math.round(d * 5 + 20), holder: HOLDER
+})
 
 /**
  * A modest, realistic crib of carbide tools a job uses when it does not bring its own library: end mills Ø1-Ø16, ball
  * mills, two bull noses, a face mill, spot drills, chamfer mills, an engraver, thread mills for the coarse metric
- * pitches and the drills of the metric fastener table.
+ * pitches, taps M3-M12, H7 reamers Ø3-Ø12 and the drills of the metric fastener table and of the reamers.
  */
 export const DEFAULT_CUTTERS: ReadonlyArray<Cutter> = [
   ...[1, 2, 3, 4, 6, 8, 10, 12, 16].map((d) => flat(d, d < 3 ? 2 : d <= 12 ? 3 : 4)),
@@ -163,6 +186,8 @@ export const DEFAULT_CUTTERS: ReadonlyArray<Cutter> = [
     const d = pitch <= 0.8 ? 2.4 : pitch <= 1 ? 4.6 : pitch <= 1.5 ? 6.4 : 8.8
     return { id: `threadmill-p${pitch}`, name: `Thread mill Ø${d} P${pitch}`, kind: "threadmill", diameter: d, flutes: 3, material: "carbide", coating: "tin", pitch, fluteLength: Math.round(d * 2.5), shankDiameter: Math.max(4, Math.ceil(d)), stickout: Math.round(d * 4 + 15), holder: HOLDER }
   }),
+  ...METRIC_THREADS.filter((t) => t.d >= 3 && t.d <= 12).map((t) => tap(t.d, t.pitch)),
+  ...REAMER_SIZES.map(reamer),
   ...DRILL_SIZES.map(drill)
 ]
 

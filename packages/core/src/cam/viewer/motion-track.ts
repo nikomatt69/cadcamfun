@@ -75,7 +75,15 @@ const sameRun = (a: MotionRun, s: MotionSample, css: boolean): boolean =>
   a.coolant === s.coolant && a.feedMode === s.feedMode && (a.probe === true) === s.probe && (css || a.rpm === s.rpm)
 
 /** The track of a parsed program (one toolpath) from the interpreter's samples. */
-export const motionTrackOf = (samples: ReadonlyArray<MotionSample>, unsupported: MotionTrack["unsupported"] = []): MotionTrack => {
+export const motionTrackOf = (samples: ReadonlyArray<MotionSample>, unsupported: MotionTrack["unsupported"] = [], sizes: ReadonlyArray<number> = [samples.length]): MotionTrack => {
+  // One path track per toolpath: a parsed program is split at its tool changes (`analyseGcode`), `sizes` say where.
+  const paths: MotionPathTrack[] = []
+  let from = 0
+  for (const size of sizes) { paths.push(pathTrackOf(samples.slice(from, from + size))); from += size }
+  return { paths, unsupported }
+}
+
+const pathTrackOf = (samples: ReadonlyArray<MotionSample>): MotionPathTrack => {
   const css = samples.some((s) => s.css)
   const runs: MotionRun[] = []
   const extrude: number[] = []
@@ -97,12 +105,9 @@ export const motionTrackOf = (samples: ReadonlyArray<MotionSample>, unsupported:
     if (s.home) homes.push(index)
   })
   return {
-    paths: [{
-      count: samples.length, runs, lines,
-      ...(extruding ? { extrude } : {}), ...(css ? { rpm } : {}),
-      ...(retracts.length > 0 ? { retracts } : {}), ...(homes.length > 0 ? { homes } : {})
-    }],
-    unsupported
+    count: samples.length, runs, lines,
+    ...(extruding ? { extrude } : {}), ...(css ? { rpm } : {}),
+    ...(retracts.length > 0 ? { retracts } : {}), ...(homes.length > 0 ? { homes } : {})
   }
 }
 

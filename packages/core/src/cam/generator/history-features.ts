@@ -53,6 +53,8 @@ export interface MachiningHole {
   readonly headDepth?: number
   /** The cosmetic thread the hole carries (`HoleFeature.thread`): designation, its depth, and its metric size when known. */
   readonly thread?: { readonly designation: string; readonly depth: number; readonly diameter?: number; readonly pitch?: number }
+  /** ISO 286 fit of the bore (`HoleFeature.fit`, such as `H7`): a drilled hole is too rough for it, the planner reams it. */
+  readonly fit?: string
 }
 
 /** A region opened from above: the tool may clear `loop` from `top` down to `floor` (world Z). */
@@ -211,7 +213,7 @@ const derive = (history: History): HistoryFeatures => {
       entry: add(add(scale(frame.n, site.offset), scale(frame.u, site.u)), scale(frame.v, site.v)),
       direction: scale(frame.n, -1), diameter: site.diameter, depth: site.depth, kind: f.kind ?? "simple",
       ...(head !== undefined ? { headDiameter: head } : {}), ...(headDepth !== undefined ? { headDepth } : {}),
-      ...threadOf(f, parameters, site.depth)
+      ...threadOf(f, parameters, site.depth), ...(f.fit !== undefined ? { fit: f.fit } : {})
     })
   }
   for (const f of history.features) {

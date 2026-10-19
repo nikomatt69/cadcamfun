@@ -1,5 +1,6 @@
 /**
- * Drill operation (spec 04-core-cam.md §3): drills at points, optionally pecking.
+ * Drill operation (spec 04-core-cam.md §3): drills at points, optionally pecking; or taps (`mode: "tap"`, rigid tapping at
+ * `pitch` x spindle speed) or reams / bores to size (`mode: "ream"`, fed in and out).
  *
  * Holes are ordered by nearest neighbour from the work origin (deterministic).
  * Every hole is a canned-cycle intent in the IR (`Cycle`); the post emits
@@ -13,7 +14,7 @@ import type { Vec2 } from "../../cad/vec.ts"
 import type { Stock, Tool } from "../tool.ts"
 import type { CycleKind, Toolpath } from "../ir.ts"
 import { nearestNeighbourOrder } from "../geometry.ts"
-import { OperationFields, NonNegative, heightsOrdered, levelsOf, withDefault } from "../params.ts"
+import { OperationFields, NonNegative, Positive, heightsOrdered, levelsOf, withDefault } from "../params.ts"
 import { MoveBuilder, finish } from "./common.ts"
 
 const { stepdown: _stepdown, feed: _feed, ...commonFields } = OperationFields
@@ -26,8 +27,12 @@ export class DrillParams extends Schema.Class<DrillParams>("cam/DrillParams")(
     /** Break chips with a short retract instead of a full retract between pecks. */
     chipBreak: withDefault(Schema.Boolean, false),
     /** Dwell at the hole bottom, seconds. */
-    dwell: withDefault(NonNegative, 0)
-  }).check(heightsOrdered)
+    dwell: withDefault(NonNegative, 0),
+    /** What the cycle does: drill (peck / dwell as above), rigid tap, or ream (feed in and out). */
+    mode: withDefault(Schema.Literals(["drill", "tap", "ream"]), "drill"),
+    /** `tap`: thread pitch, mm; the feed is pitch x `spindleRpm` (`plungeFeed` is ignored). */
+    pitch: Schema.optionalKey(Positive)
+  }).check(heightsOrdered).check(Schema.makeFilter((p: { readonly mode: string; readonly pitch?: number }) => (p.mode !== "tap" || p.pitch !== undefined ? undefined : "a tapping cycle needs the thread pitch")))
 ) {}
 
 export type DrillGeometry = ReadonlyArray<Vec2 | Entity>
@@ -62,18 +67,20 @@ export const generateDrill = (params: DrillParams, geometry: DrillGeometry, tool
   const b = new MoveBuilder()
   b.comment(`Drill: ${params.name}`)
   const holes = nearestNeighbourOrder(holePoints(geometry))
-  const cycle: CycleKind =
-    params.peck > 0 ? (params.chipBreak ? "chipBreak" : "peck") : params.dwell > 0 ? "dwell" : "drill"
+  const cycle: CycleKind = params.mode !== "drill" ? params.mode
+    : params.peck > 0 ? (params.chipBreak ? "chipBreak" : "peck") : params.dwell > 0 ? "dwell" : "drill"
+  const feed = params.mode === "tap" ? params.pitch! * params.spindleRpm : params.plungeFeed
   holes.forEach((p, i) => {
     if (i === 0) b.rapid({ x: p.x, y: p.y, z: levels.clearanceZ })
     b.push({
       _tag: "Cycle",
       cycle,
       to: { x: p.x, y: p.y, z: levels.bottomZ },
-      feed: params.plungeFeed,
-      peckDepth: params.peck,
-      dwellSeconds: params.dwell,
-      retractHeight: levels.retractZ
+      feed,
+      peckDepth: params.mode === "drill" ? params.peck : 0,
+      dwellSeconds: params.mode === "tap" ? 0 : params.dwell,
+      retractHeight: levels.retractZ,
+      ...(params.mode === "tap" ? { pitch: params.pitch! } : {})
     })
   })
   if (holes.length === 0) b.comment("nothing to drill: no hole positions")

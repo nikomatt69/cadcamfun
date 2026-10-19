@@ -112,6 +112,16 @@ export const TOOL_TYPES: Readonly<Record<MachineKind, ReadonlyArray<string>>> = 
   "3dprinter": ["brass", "hardened", "ruby", "standard"]
 }
 
+/**
+ * The tool type a free description names (`flat end mill`, `bull nose end mill`, `right hand tap`…): the longest known type
+ * contained in it, `undefined` when none is.
+ */
+export const toolTypeIn = (description: string): string | undefined => {
+  const text = normalise(description)
+  const keys = [...Object.keys(MILL_TYPES), ...Object.keys(LATHE_TYPES), "probe", "toolsetter"].sort((a, b) => b.length - a.length)
+  return keys.find((k) => text.includes(k))
+}
+
 /** Which machine a tool type belongs to (`undefined`: not known; it is drawn as an end mill). */
 export const toolMachineOf = (type: string): MachineKind | undefined => {
   const key = normalise(type)
@@ -192,7 +202,7 @@ export const toolModelFromSettings = (s: ToolpathSettings, kind: MachineKind = s
   return toolModelOf({ type: s.toolType === "vbit" ? "vbit" : s.toolType, diameter: s.toolDiameter, numberOfFlutes: s.flutes, ...(s.toolType === "threadmill" ? { threadPitch: s.threadPitch } : {}) }, "mill")
 }
 
-const KERNEL_SHAPE: Readonly<Record<CutterKind, MillShape>> = { flat: "flat", ball: "ball", bull: "bull", chamfer: "chamfer", spot: "spot", drill: "drill", facemill: "facemill", threadmill: "threadmill", engraver: "engraver" }
+const KERNEL_SHAPE: Readonly<Record<CutterKind, MillShape>> = { flat: "flat", ball: "ball", bull: "bull", chamfer: "chamfer", spot: "spot", drill: "drill", facemill: "facemill", threadmill: "threadmill", engraver: "engraver", tap: "tap", reamer: "reamer" }
 
 /** The model of a kernel cutter (the kernel's own tool library): the same shape the preview draws for a resource. */
 export const toolModelFromCutter = (c: Cutter): MillModel => ({
