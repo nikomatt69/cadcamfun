@@ -59,3 +59,6 @@ Set it with the operation's params (cam_edit create / update), then the preview 
 - cam action analyze with `machineType` catches what is illogical for the axes: Y on a lathe, X through the axis, a cut away from the chuck, a spindle that never started, cold extrusion, a build that goes down.
 - cam_edit action verify simulates mills only; it includes the configured vise / clamps as fixtures.
 - Set-up findings: MILL_INTO_VISE / CLAMP / PARALLEL / TABLE, LATHE_INTO_CHUCK / TAILSTOCK, PRINTER_OFF_BED / ABOVE_VOLUME / FIRST_LAYER_HIGH.
+
+## Simulation (what the player shows)
+cam action machine with `gcode` also answers `operations` (each tool's band on the clock: a program is split at its tool changes, each tool read from a `T1 D=6. - … - flat end mill` header), `moveClasses` (rapid, retract, plunge, ramp, lead-in/out, cut, link, cycle, probe, dwell), `collisions` (RAPID_INTO_STOCK, SHANK_IN_STOCK, HOLDER_IN_STOCK, MACHINE_COLLISION, with time and line) and, on a mill, `machineModel`: the machine class (params.machinePreset: vmc-3, vmc-4a, trunnion-ac, trunnion-bc, head-table-bc, head-head-ac, router-gantry; params.machineTravel {x,y,z}), its axis values at `at` and its travel / rotary limit findings. Say which sizes are assumed.

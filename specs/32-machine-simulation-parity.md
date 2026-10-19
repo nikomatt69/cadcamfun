@@ -483,6 +483,14 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
 - Limits: against the raw stock box, not the stock left by earlier moves (P4's height field is the place for that); no
   near-miss clearance yet; the tool's own flutes against fixtures stay with the spec 31 set-up checks.
 
+### P9 — the assistant (2026-10-20)
+
+- `cam.machine` with `gcode` (`packages/ai/src/machine-run.ts`) also returns `operations` (each tool's band on the clock),
+  `moveClasses`, `collisions` and, on a mill, `machineModel` (class from `params.machinePreset`, travels from
+  `params.machineTravel`, assumed parts, axis values at `at`, travel / rotary limit findings); the skill
+  `machines-and-axes.md` says so. Test: "the simulation player's view" in `packages/ai/test/machine-kinematics.test.ts`.
+- Mobile: the phone's preview payload is not extended yet (operation bands, move classes, machine links, collisions).
+
 ## Change log
 
 - 2026-10-19: analysis written from the code at 9aa648c and the probes of §2.2.
@@ -492,3 +500,4 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
   rewind/reset mesh invalidation, non-cutting probes, machine scope guards and desktop stock readout; 39 regressions pass.
 - 2026-10-20: P3 completed and checked in the running app; P5 machine models built (§9).
 - 2026-10-20: P7 collisions built (§9).
+- 2026-10-20: P9 assistant part built (§9); mobile part open.

@@ -101,3 +101,15 @@ describe("the assistant's context and skills", () => {
     for (const part of ["## What the CAM preview shows", "## Running a program on its machine", "## Workholding", "workholdingConfigured", "LATHE_INTO_CHUCK", "clockwise seen from the headstock"]) expect(skill.body).toContain(part)
   })
 })
+
+describe("machineRun: the simulation player's view (spec 32 P3, P5, P7)", () => {
+  test("operations, move classes, the machine's axes and the collisions of a mill program", () => {
+    const gcode = "(T1 D=10. CR=0. - ZMIN=-5. - flat end mill)\n(T2 D=6. CR=0. - ZMIN=-10. - drill)\nG21 G90\nT1 M6\nS8000 M3\nG0 X-60 Y0 Z5\nG1 Z-5 F300\nG1 X60 F800\nG0 Z5\nT2 M6\nS2000 M3\nG0 X0 Y0 Z-6\nG81 X0 Y0 Z-10 R2 F100\nG80\nM30"
+    const r = machineRun({ kind: "mill", gcode, params: { workholding: "plate", stock: { width: 100, height: 60, depth: 20 }, machinePreset: "vmc-3", machineTravel: { x: 600, y: 400, z: 500 } } }) as Record<string, any>
+    expect(r["operations"].map((o: { toolId: string }) => o.toolId)).toEqual(["T1", "T2"])
+    expect(r["moveClasses"].map((c: { kind: string }) => c.kind)).toEqual(expect.arrayContaining(["rapid", "plunge", "cut", "cycle"]))
+    expect(r["machineModel"]).toMatchObject({ preset: "vmc-3", tableCarries: ["x", "y"], assumed: [] })
+    expect(Object.keys(r["machineModel"].axesAt)).toEqual(["X", "Y", "Z"])
+    expect(r["collisions"].map((c: { code: string; line: number }) => [c.code, c.line])).toEqual([["RAPID_INTO_STOCK", 12]])
+  })
+})

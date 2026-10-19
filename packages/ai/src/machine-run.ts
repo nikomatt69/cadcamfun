@@ -22,7 +22,7 @@ const round = (n: number) => Math.round(n * 1000) / 1000
 const point = (p: { readonly x: number; readonly y: number; readonly z: number }) => ({ x: round(p.x), y: round(p.y), z: round(p.z) })
 
 export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
-  const { stock: stockParam, ...rest } = (input.params ?? {}) as Record<string, unknown>
+  const { stock: stockParam, machinePreset, machineTravel, ...rest } = (input.params ?? {}) as Record<string, unknown>
   let settings: cam.generator.ToolpathSettings
   try { settings = cam.generator.withMachineDefaults(cam.generator.decodeSettings({ ...rest, machineType: input.kind })) }
   catch (cause) { return { ok: false, error: `params are not valid generator settings: ${cause instanceof Error ? cause.message.slice(0, 300) : String(cause)}` } }
@@ -94,6 +94,31 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
       filament: round(timeline.moves.reduce((sum, m) => sum + Math.max(0, m.state.extrude), 0)),
       travelMoves: deposits.travels.length
     }
+  }
+  // What the simulation player shows (spec 32 P3, P5, P7): the operations on the clock, what the moves are for, the machine
+  // drawn round a mill with its axis values at `at` and its limits, and the collisions on the same timeline.
+  const classes = cam.viewer.classifyMoves(timeline, { kind: input.kind, ...(setup.kind === "mill" ? { stockTop: setup.stock.max.z } : {}), cycleLines: cam.viewer.cycleLinesOf(input.gcode) })
+  out["operations"] = cam.viewer.operationSpans(timeline).map((s) => {
+    const path = analysis.program.toolpaths[s.path]
+    return { name: path?.name ?? `#${s.path + 1}`, toolId: path?.toolId ?? "", from: round(s.start), to: round(s.end) }
+  })
+  out["moveClasses"] = cam.viewer.moveClassSummary(timeline, classes).map((c) => ({ kind: c.kind, count: c.count, length: round(c.length), seconds: round(c.seconds) }))
+  if (setup.kind === "mill") {
+    const preset = typeof machinePreset === "string" && cam.viewer.MACHINE_PRESETS.some((p) => p.id === machinePreset) ? machinePreset as cam.viewer.MachinePresetId : undefined
+    const travel = typeof machineTravel === "object" && machineTravel !== null ? machineTravel as { x: number; y: number; z: number } : undefined
+    const model = cam.viewer.machineModelOf(setup, { ...(preset !== undefined ? { preset } : {}), ...(travel !== undefined ? { travel } : {}) })
+    const gauge = (toolModel.family === "mill" || toolModel.family === "probe") ? cam.toolProfile(toolModel.family === "mill" ? { ...toolModel, holder: toolModel.holder ?? cam.assumedHolderOf(toolModel) } : toolModel).length : 60
+    if (model !== undefined) {
+      const pose = cam.viewer.machinePose(model, cam.viewer.poseAt(timeline, at).point, cam.viewer.poseAt(timeline, at).angles, setup.rotary, gauge, "machine")
+      out["machineModel"] = {
+        preset: model.preset, name: model.name, ...(model.layout !== undefined ? { layout: model.layout } : {}), tableCarries: model.tableCarries,
+        travel: model.travel, rotaryLimits: model.rotaryLimits, assumed: model.assumed,
+        axesAt: Object.fromEntries(Object.entries(pose.joints).map(([k, v]) => [k.toUpperCase(), round(v as number)])),
+        limits: cam.viewer.checkLimits(model, timeline, setup.rotary, () => gauge).map((f) => ({ code: f.code, severity: f.severity, ...(f.line !== undefined ? { line: f.line } : {}), count: f.count, message: f.message }))
+      }
+    }
+    out["collisions"] = cam.viewer.checkCollisions({ setup, timeline, reachOf: () => cam.viewer.toolReachOf(toolModel), ...(model !== undefined ? { model, gaugeOf: () => gauge } : {}), ...(setup.rotary !== undefined ? { rotary: setup.rotary } : {}) })
+      .slice(0, 20).map((e) => ({ code: e.code, severity: e.severity, seconds: round(e.seconds), ...(e.line !== undefined ? { line: e.line } : {}), count: e.count, message: e.message }))
   }
   return out
 }
