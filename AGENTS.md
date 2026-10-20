@@ -28,6 +28,7 @@ Do not treat `20-integral-roadmap.md` or `21-integration-master-plan.md` as the 
 - Edit only the directories owned by your WP (see the task board) or by the current RM step. Cross-WP changes go through the specs first.
 - `.reference/` is the legacy Next.js/Prisma codebase: git-ignored, read-only, domain knowledge only. Never import from it.
 - Never read or print values from `.env*` files; they are legacy and unused.
+- Always regenerate the web API reference from the repository root before running the workspace typecheck or finishing API contract/schema changes: `bun --no-env-file packages/web/script/generate-api-reference.mjs`. Include the updated `packages/web/src/data/api-reference.json` in the change and keep `check:api-reference` / `--check` enabled.
 - Do not commit unless asked.
 
 ## Commands

@@ -7077,6 +7077,11 @@ export type WorkspaceDrawingPreviewOutput = {
   parts: Array<{ id: string; name: string; triangleStart: number; triangleCount: number }>
   truncated: boolean
   revision: string
+  features?: Array<{
+    elementId: string
+    name: string
+    features: Array<{ id: string; type: string; parameters: Array<{ key: string; value: string }> }>
+  }>
 }
 
 export type WorkspaceComponentsInput = { readonly id: { readonly id: string }["id"] }
@@ -7096,6 +7101,11 @@ export type WorkspaceComponentPreviewOutput = {
   parts: Array<{ id: string; name: string; triangleStart: number; triangleCount: number }>
   truncated: boolean
   revision: string
+  features?: Array<{
+    elementId: string
+    name: string
+    features: Array<{ id: string; type: string; parameters: Array<{ key: string; value: string }> }>
+  }>
   parameters: Array<{ key: string; value: string }>
 }
 
@@ -7202,6 +7212,14 @@ export type WorkspaceToolpathPreviewOutput = {
       internal: boolean
       turret?: "rear" | "front"
     }
+  }
+  part?: {
+    positions: Array<number>
+    indices: Array<number>
+    normals: Array<number>
+    bounds: { min: [number, number, number]; max: [number, number, number] }
+    parts: Array<{ id: string; name: string; triangleStart: number; triangleCount: number }>
+    truncated: boolean
   }
   revision: string
 }

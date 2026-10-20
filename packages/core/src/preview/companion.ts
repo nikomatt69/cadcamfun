@@ -79,6 +79,68 @@ export interface PreviewParameter {
   readonly value: string
 }
 
+/** One feature of a parametric part, as the feature tree shows it. */
+export interface PreviewFeature {
+  readonly id: string
+  readonly type: string
+  /** The feature's own values: the numbers and names the tree shows next to it. */
+  readonly parameters: ReadonlyArray<PreviewParameter>
+}
+
+/** The features one element is made of, in the order they were built. */
+export interface PreviewFeatureTree {
+  readonly elementId: string
+  readonly name: string
+  readonly features: ReadonlyArray<PreviewFeature>
+}
+
+/** The structural fields of a feature: the tree shows the values, not the model's wiring. */
+const FEATURE_STRUCTURE = new Set(["id", "type", "sketch", "plane", "from", "entities", "constraints", "shapes", "history", "profiles"])
+
+/** A feature's own values: the numbers and the parameter names it uses. */
+const featureParameters = (feature: Record<string, unknown>): PreviewParameter[] => {
+  const out: PreviewParameter[] = []
+  for (const [key, value] of Object.entries(feature)) {
+    if (FEATURE_STRUCTURE.has(key)) continue
+    if (typeof value === "number" && Number.isFinite(value)) out.push({ key, value: String(value) })
+    else if (typeof value === "string" && value.length > 0) out.push({ key, value })
+    if (out.length >= 24) break
+  }
+  return out
+}
+
+/**
+ * The feature trees of a drawing's parametric elements: what the part is made of, in the order it was built.
+ *
+ * The desktop shows this tree in the property panel; the phone shows the same list, so a part can be read on the
+ * phone without the desktop. An element that is not parametric has no tree.
+ */
+export const featureTrees = (elements: readonly Element[]): PreviewFeatureTree[] => {
+  const out: PreviewFeatureTree[] = []
+  for (const element of elements) {
+    const history = isRecord(element["history"]) ? element["history"] : undefined
+    if (history === undefined) continue
+    const features = Array.isArray(history["features"]) ? history["features"] : []
+    const list: PreviewFeature[] = []
+    for (const feature of features) {
+      if (!isRecord(feature)) continue
+      const type = typeof feature["type"] === "string" ? feature["type"] : "feature"
+      list.push({
+        id: typeof feature["id"] === "string" ? feature["id"] : type,
+        type,
+        parameters: featureParameters(feature),
+      })
+    }
+    if (list.length === 0) continue
+    out.push({
+      elementId: label(element.id, "element"),
+      name: label(element.name, label(element.type, "element")),
+      features: list,
+    })
+  }
+  return out
+}
+
 export type SegmentKind = "rapid" | "linear" | "circular"
 
 export interface ToolpathSegment {

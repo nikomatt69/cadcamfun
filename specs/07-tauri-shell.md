@@ -111,7 +111,7 @@ degenerate, duplicate, non-manifold, reversed and non-indexed faces.
 
 ## 7. Status
 
-Focused lifecycle checks: `cargo fmt --check`, `cargo test` (60 passed, 2 ignored: OS keychain and real-binary parent contract), and `cargo clippy --all-targets -- -D warnings` passed on macOS. Native UI, packaged builds and the real-binary graceful drain were not run in this pass.
+Latest focused checks: Rust fmt/clippy passed; `cargo test --locked --offline --all-features` passed 72 tests with two existing opt-in tests ignored (OS keychain and real-binary parent contract). Frontend production build and native `cargo build --locked --offline --all-features` passed. Native-window GPU profiling, packaged installers and the real-binary graceful drain were not run in this pass.
 
 ### Done and verified (macOS, `bunx tauri dev` with the stub sidecar)
 

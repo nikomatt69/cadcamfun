@@ -51,6 +51,29 @@ Scripts must fail fast, print each step, and never read `.env*`.
 
 Offline-first with optional cloud sync is in the README but out of scope for v6.0. Constraints to honour now so it stays possible later: every synced row has a stable string id (already `uuid`), `updatedAt` on all mutable tables (already present), soft-delete is **not** used yet (add a `deletedAt` migration when sync starts), and writes go through repositories so a change-log hook can be added in one place.
 
+### Synthetic demo storage on Cloudflare (2026-10-20)
+
+The owner authorized uploading a synthetic demo database to Cloudflare while keeping
+the account/login service separate. This is an artifact upload, not user database
+sync. Generate a fresh file with WP0's `packages/db/src/demo-cli.ts` into a new
+temporary directory; never upload `data/`, the real database, backups, credentials,
+or a previously used application database. The fixed synthetic fixtures contain
+no real user content. Authentication tables in the artifact remain empty.
+
+Use a dedicated private R2 bucket `cadcamfun-demo-data`, object
+`demo/cadcamfun-demo.db`. No public domain, `r2.dev` access, Worker binding, or user
+upload endpoint is needed. Keep one object at this fixed key on future refreshes
+rather than accumulating timestamped copies. R2 encrypts objects at rest with
+Cloudflare-managed keys and supports TLS transfers; this is not client-side
+encryption or anonymisation of real user data. The existing identity D1/KV service
+is unchanged and its personal-data processing needs separate privacy assessment.
+
+Verify the uploaded object by downloading it to the same temporary directory and
+comparing SHA-256 with the generated file. Record the object path, size, checksum
+and public-access status after verification. No Cloudflare token belongs in the
+repository. Run Wrangler from the temporary directory to avoid project environment
+files and use the existing authenticated Cloudflare account.
+
 ## 6. Acceptance criteria
 
 - `bun scripts/build.ts` on a clean macOS checkout produces a runnable `.app` and `.dmg`.
@@ -68,6 +91,7 @@ Offline-first with optional cloud sync is in the README but out of scope for v6.
 ## 7. Change log
 
 - v1: initial spec.
+- 2026-10-20: created private R2 bucket `cadcamfun-demo-data` (Western Europe location hint) and uploaded a freshly generated synthetic database to `demo/cadcamfun-demo.db`: 581,632 bytes, SHA-256 `d0cd407945ac1c52847a13b1c7d476e0659236ff9e3eb9b820d49b17181fab16`. Downloaded the remote object and verified the same digest. Confirmed `r2.dev` access disabled and no custom domains attached. Only fixed invented profile/project rows were generated; real application databases and identity D1/KV data were not uploaded or modified. The seven WP0 storage/demo regression tests pass (24 assertions). R2 encryption uses provider-managed keys; no client-side encryption or user database synchronization was introduced.
 - 2026-10-05: completed interrupted packaging follow-up: explicit architecture mapping and target paths, flat copied artifacts/checksums, tag/manual release gate, certificate thumbprint wiring, strict manifest merge and verified draft staging, helper/integration tests. Resource mapping now matches staged migrations. Root and other-WP sources unchanged; release acceptance is pending credentials and platform builds.
 
 ## Local updater signing configuration (2026-10-10)

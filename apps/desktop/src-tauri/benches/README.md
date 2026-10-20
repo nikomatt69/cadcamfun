@@ -117,3 +117,8 @@ by denied local socket binding in the sandbox. The entire boot file passed separ
 outside that sandbox (13 tests). Latest affected buffer/viewport/CAM/guest tests passed
 80 cases; six async edge integration cases were rechecked after disposal/version/ownership
 hardening. These are not native-window GPU profiling or packaged-app smoke results.
+
+Final builds: `bun run build` in `apps/desktop` and
+`cargo build --locked --offline --all-features` in `apps/desktop/src-tauri` passed.
+API generation is aligned with the latest workspace preview contract. No packaged installer
+or native-window GPU/FPS profiling was run.

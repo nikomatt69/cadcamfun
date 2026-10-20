@@ -101,6 +101,8 @@ apps/sidecar/src/
 
 ## 5. Change log
 
+- 2026-10-20: Web API reference freshness fix complete: regenerated `packages/web/src/data/api-reference.json` from the current contract (300 operations, 210 paths, 35 groups, 56 named schemas). Added the owner-requested mandatory regeneration rule to `AGENTS.md` while retaining the freshness gate. All 31 web tests pass (1,824 assertions); the full workspace typecheck passes all 15 package tasks plus the root check.
+
 - 2026-10-17: Web API documentation synchronization complete for the current contract: regenerated `packages/web/src/data/api-reference.json` and added the workspace resource page to API navigation. Web typecheck, documentation freshness checks, and all 31 web tests pass.
 
 - 2026-10-16: Added application-only OAuth authorize/complete endpoints, regenerated clients and OpenAPI snapshot. Wired subscription credential changes and OpenCode Zen/Go declarations into the native host. Provider tests exercise real handlers and native plugins against simulated external services.

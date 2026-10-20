@@ -8,6 +8,7 @@ import {
   arcChordPoints,
   documentParameters,
   elementsOfDocument,
+  featureTrees,
   machineScenePreview,
   meshPreview,
   toolpathPreviewFromGcode,
@@ -65,6 +66,33 @@ describe("companion mesh preview", () => {
       { key: "type", value: "custom" },
       { key: "width", value: "12" },
     ])
+  })
+
+  test("a parametric element's feature tree says what the part is made of", () => {
+    const trees = featureTrees([{
+      id: "bracket",
+      name: "Bracket",
+      type: "parametric",
+      history: {
+        parameters: {},
+        features: [
+          { id: "sk", type: "sketch", plane: "xy" },
+          { id: "ex", type: "extrude", sketch: "sk", depth: 20, direction: "up" },
+          { id: "ho", type: "hole", sketch: "sk", diameter: 6, depth: 10 },
+        ],
+      },
+    }])
+    expect(trees).toHaveLength(1)
+    expect(trees[0]?.name).toBe("Bracket")
+    expect(trees[0]?.features.map((feature) => feature.type)).toEqual(["sketch", "extrude", "hole"])
+    // The tree shows the values, not the model's wiring: the sketch it refers to is not a value.
+    expect(trees[0]?.features[1]?.parameters).toEqual([{ key: "depth", value: "20" }, { key: "direction", value: "up" }])
+    expect(trees[0]?.features[0]?.parameters).toEqual([])
+  })
+
+  test("an element that is not parametric has no tree", () => {
+    expect(featureTrees([{ id: "box", type: "cube", width: 10 }])).toEqual([])
+    expect(featureTrees([{ id: "box", type: "parametric", history: { features: [] } }])).toEqual([])
   })
 })
 

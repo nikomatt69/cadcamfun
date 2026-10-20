@@ -68,6 +68,30 @@ describe("companion workspace preview", () => {
     expect((await app.call("/api/projects/missing/workspace/drawings")).status).toBe(404)
   })
 
+  test("a parametric drawing carries its feature tree, so the phone can read the model", async () => {
+    const drawing = await app.call(`/api/projects/${projectId}/drawings`, {
+      method: "POST",
+      json: {
+        name: "Parametric",
+        data: {
+          elements: [{
+            id: "bracket",
+            name: "Bracket",
+            type: "parametric",
+            history: { parameters: {}, features: [{ id: "sk", type: "sketch", plane: "xy" }, { id: "ex", type: "extrude", sketch: "sk", depth: 20 }] },
+          }],
+        },
+      },
+    })
+    expect(drawing.status).toBe(201)
+    const mesh = await app.call(`/api/projects/${projectId}/workspace/drawings/${drawing.body.id}/preview`)
+    expect(mesh.status).toBe(200)
+    expect(mesh.body.features).toHaveLength(1)
+    expect(mesh.body.features[0].name).toBe("Bracket")
+    expect(mesh.body.features[0].features.map((feature: { type: string }) => feature.type)).toEqual(["sketch", "extrude"])
+    expect(mesh.body.features[0].features[1].parameters).toEqual([{ key: "depth", value: "20" }])
+  })
+
   test("toolpath review returns G-code and a line-mapped path, and the library lists the component", async () => {
     const created = await app.call("/api/toolpaths", {
       method: "POST",
@@ -181,6 +205,7 @@ describe("companion machine scene preview", () => {
       program: cam.generator.analyseGcode(nc).program,
       settings: { ...cam.generator.DEFAULT_SETTINGS, machineType: "mill", toolDiameter: 6 },
       stock: { width: 100, height: 60, depth: 20 },
+      drawing: { elements: [{ id: "plate", name: "Plate", type: "cube", width: 40, height: 30, depth: 10 }] },
     })
     const created = await app.call("/api/toolpaths", {
       method: "POST",
@@ -190,6 +215,9 @@ describe("companion machine scene preview", () => {
 
     const path = await app.call(`/api/projects/${projectId}/workspace/toolpaths/${created.body.id}/preview`)
     expect(path.status).toBe(200)
+    // The part the program cuts travels with the path, so the phone draws the workpiece beside it.
+    expect(path.body.part.parts[0]).toMatchObject({ id: "plate", name: "Plate" })
+    expect(path.body.part.positions.length).toBeGreaterThan(0)
     // The operations own a run of the path's segments, each with the tool it runs.
     expect(path.body.machine.operations.length).toBe(1)
     expect(path.body.machine.operations[0].startSegment).toBe(0)

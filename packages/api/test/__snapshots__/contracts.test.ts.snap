@@ -49209,6 +49209,65 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       ],
                       "type": "object",
                     },
+                    "features": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "elementId": {
+                            "type": "string",
+                          },
+                          "features": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                },
+                                "parameters": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "key": {
+                                        "type": "string",
+                                      },
+                                      "value": {
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "key",
+                                      "value",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
+                                },
+                                "type": {
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "parameters",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "elementId",
+                          "name",
+                          "features",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
                     "indices": {
                       "items": {
                         "anyOf": [
@@ -49654,6 +49713,65 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "max",
                       ],
                       "type": "object",
+                    },
+                    "features": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "elementId": {
+                            "type": "string",
+                          },
+                          "features": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                },
+                                "parameters": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "key": {
+                                        "type": "string",
+                                      },
+                                      "value": {
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "key",
+                                      "value",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
+                                },
+                                "type": {
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "parameters",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "elementId",
+                          "name",
+                          "features",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
                     },
                     "indices": {
                       "items": {
@@ -50894,6 +51012,80 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           },
                           "type": "array",
                         },
+                        "events": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                              },
+                              "line": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              "message": {
+                                "type": "string",
+                              },
+                              "seconds": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              "segment": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              "severity": {
+                                "enum": [
+                                  "error",
+                                  "warning",
+                                ],
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "code",
+                              "severity",
+                              "seconds",
+                              "segment",
+                              "message",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
                         "kind": {
                           "enum": [
                             "mill",
@@ -50925,6 +51117,210 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "reasons",
                           ],
                           "type": "object",
+                        },
+                        "operations": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "cutter": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "diameter": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "enum": [
+                                          "Infinity",
+                                          "-Infinity",
+                                          "NaN",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    ],
+                                  },
+                                  "fluteLength": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "enum": [
+                                          "Infinity",
+                                          "-Infinity",
+                                          "NaN",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    ],
+                                  },
+                                  "holder": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "assumed": {
+                                        "type": "boolean",
+                                      },
+                                      "diameter": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                      },
+                                      "length": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                    },
+                                    "required": [
+                                      "diameter",
+                                      "length",
+                                      "kind",
+                                      "assumed",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "noseRadius": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "enum": [
+                                          "Infinity",
+                                          "-Infinity",
+                                          "NaN",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    ],
+                                  },
+                                  "shankDiameter": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "enum": [
+                                          "Infinity",
+                                          "-Infinity",
+                                          "NaN",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    ],
+                                  },
+                                  "stickout": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                      },
+                                      {
+                                        "enum": [
+                                          "Infinity",
+                                          "-Infinity",
+                                          "NaN",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    ],
+                                  },
+                                },
+                                "required": [
+                                  "diameter",
+                                  "fluteLength",
+                                  "shankDiameter",
+                                  "stickout",
+                                  "noseRadius",
+                                  "holder",
+                                ],
+                                "type": "object",
+                              },
+                              "endSegment": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              "index": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              "name": {
+                                "type": "string",
+                              },
+                              "startSegment": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              "toolId": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "index",
+                              "name",
+                              "toolId",
+                              "startSegment",
+                              "endSegment",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
                         },
                         "source": {
                           "enum": [
@@ -51091,6 +51487,242 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "spin",
                         "collisions",
                         "tool",
+                      ],
+                      "type": "object",
+                    },
+                    "part": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "bounds": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "max": {
+                              "maxItems": 3,
+                              "minItems": 3,
+                              "prefixItems": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                              ],
+                              "type": "array",
+                            },
+                            "min": {
+                              "maxItems": 3,
+                              "minItems": 3,
+                              "prefixItems": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                              ],
+                              "type": "array",
+                            },
+                          },
+                          "required": [
+                            "min",
+                            "max",
+                          ],
+                          "type": "object",
+                        },
+                        "indices": {
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "type": "array",
+                        },
+                        "normals": {
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "type": "array",
+                        },
+                        "parts": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                              },
+                              "name": {
+                                "type": "string",
+                              },
+                              "triangleCount": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              "triangleStart": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "triangleStart",
+                              "triangleCount",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "positions": {
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "type": "array",
+                        },
+                        "truncated": {
+                          "type": "boolean",
+                        },
+                      },
+                      "required": [
+                        "positions",
+                        "indices",
+                        "normals",
+                        "bounds",
+                        "parts",
+                        "truncated",
                       ],
                       "type": "object",
                     },

@@ -51,6 +51,7 @@ export default function ComponentPreviewScreen() {
         error={preview.error}
         onRetry={() => void preview.reload()}
         parameters={mesh?.parameters}
+        features={mesh?.features}
         selectedPartId={selected}
         onSelectPart={setSelected}
         actionLabel="Propose a change"

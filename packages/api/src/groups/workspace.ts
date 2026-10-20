@@ -32,6 +32,25 @@ export const MeshPart = Schema.Struct({
 })
 export type MeshPart = typeof MeshPart.Type
 
+export const PreviewParameter = Schema.Struct({ key: Schema.String, value: Schema.String })
+export type PreviewParameter = typeof PreviewParameter.Type
+
+/** One feature of a parametric part, as the feature tree shows it. */
+export const PreviewFeature = Schema.Struct({
+  id: Schema.String,
+  type: Schema.String,
+  parameters: Schema.Array(PreviewParameter),
+})
+export type PreviewFeature = typeof PreviewFeature.Type
+
+/** The features one element is made of, in the order they were built. */
+export const PreviewFeatureTree = Schema.Struct({
+  elementId: Schema.String,
+  name: Schema.String,
+  features: Schema.Array(PreviewFeature),
+})
+export type PreviewFeatureTree = typeof PreviewFeatureTree.Type
+
 export const MeshPreview = Schema.Struct({
   positions: Schema.Array(Schema.Number),
   indices: Schema.Array(Schema.Number),
@@ -40,15 +59,16 @@ export const MeshPreview = Schema.Struct({
   parts: Schema.Array(MeshPart),
   truncated: Schema.Boolean,
   revision: Schema.String,
+  /** The feature trees of the parametric elements (format 4); absent in an older server's payload. */
+  features: Schema.optionalKey(Schema.Array(PreviewFeatureTree)),
 })
 export type MeshPreview = typeof MeshPreview.Type
-
-export const PreviewParameter = Schema.Struct({ key: Schema.String, value: Schema.String })
-export type PreviewParameter = typeof PreviewParameter.Type
 
 export const ComponentPreview = Schema.Struct({
   ...MeshPreview.fields,
   parameters: Schema.Array(PreviewParameter),
+  /** The feature trees of the parametric elements (format 4); absent in an older server's payload. */
+  features: Schema.optionalKey(Schema.Array(PreviewFeatureTree)),
 })
 export type ComponentPreview = typeof ComponentPreview.Type
 

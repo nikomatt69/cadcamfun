@@ -187,9 +187,15 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
         const user = yield* projectAccess(params.id)
         const drawing = yield* drawings.find(user.id, params.drawingId)
         if (!drawing || drawing.projectId !== params.id) return yield* new NotFound({ message: "Drawing not found" })
-        return yield* conditional(previewTag("drawing", drawing.id, drawing.updatedAt, drawing.data), Effect.sync(() => ({
-          ...preview.meshPreview(preview.elementsOfDocument(drawing.data)), revision: drawing.updatedAt,
-        })))
+        return yield* conditional(previewTag("drawing", drawing.id, drawing.updatedAt, drawing.data), Effect.sync(() => {
+          const elements = preview.elementsOfDocument(drawing.data)
+          const features = preview.featureTrees(elements)
+          return {
+            ...preview.meshPreview(elements),
+            ...(features.length > 0 ? { features } : {}),
+            revision: drawing.updatedAt,
+          }
+        }))
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to preview drawing"))))
     .handle("components", ({ params }) =>
       Effect.gen(function*() {
@@ -202,11 +208,16 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
         const user = yield* projectAccess(params.id)
         const component = yield* components.find(user.id, params.componentId)
         if (!component || component.projectId !== params.id) return yield* new NotFound({ message: "Component not found" })
-        return yield* conditional(previewTag("component", component.id, component.updatedAt, component.data), Effect.sync(() => ({
-          ...preview.meshPreview(preview.elementsOfDocument(component.data)),
-          parameters: preview.documentParameters(component.data),
-          revision: component.updatedAt,
-        })))
+        return yield* conditional(previewTag("component", component.id, component.updatedAt, component.data), Effect.sync(() => {
+          const elements = preview.elementsOfDocument(component.data)
+          const features = preview.featureTrees(elements)
+          return {
+            ...preview.meshPreview(elements),
+            parameters: preview.documentParameters(component.data),
+            ...(features.length > 0 ? { features } : {}),
+            revision: component.updatedAt,
+          }
+        }))
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to preview component"))))
     .handle("toolpaths", ({ params }) =>
       Effect.gen(function*() {

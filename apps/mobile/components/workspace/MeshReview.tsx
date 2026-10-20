@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react"
 import { AccessibilityInfo, FlatList, Text, View, useWindowDimensions } from "react-native"
 import { Box, Check, Sparkles } from "lucide-react-native"
-import type { MeshPart, MeshPreview, PreviewParameter } from "@cadcamfun/api"
+import type { MeshPart, MeshPreview, PreviewFeatureTree, PreviewParameter } from "@cadcamfun/api"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
@@ -18,7 +18,7 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { Skeleton } from "@/components/ui/Skeleton"
 
 /** One reading surface keeps preview, parameters and elements reachable on every phone size. */
-export function MeshReview({ title, mesh, loading, error, onRetry, parameters, selectedPartId, onSelectPart, actionLabel, onAction }: {
+export function MeshReview({ title, mesh, loading, error, onRetry, parameters, features, selectedPartId, onSelectPart, actionLabel, onAction }: {
   /** Shown in the full-screen viewer. */
   title?: string
   mesh: MeshPreview | undefined
@@ -26,6 +26,8 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, s
   error: string | undefined
   onRetry: () => void
   parameters?: readonly PreviewParameter[]
+  /** What the parametric elements are made of (preview format 4). */
+  features?: readonly PreviewFeatureTree[]
   selectedPartId: string | undefined
   onSelectPart: (id: string | undefined) => void
   actionLabel: string
@@ -91,6 +93,10 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, s
             <ListRow title={parameter.key} subtitle={parameter.value} showChevron={false} />
           </View>)}</SurfaceCard>
         </> : null}
+        {features?.length ? <>
+          <SectionHeader padded={false}>Feature tree</SectionHeader>
+          {features.map((tree) => <FeatureTree key={tree.elementId} tree={tree} />)}
+        </> : null}
         <SectionHeader padded={false}>Elements</SectionHeader>
       </View>}
       ListEmptyComponent={loading && !mesh ? <View style={{ gap: 12 }}>{[0, 1].map((key) => <Skeleton key={key} style={{ height: 74 }} />)}</View> : !error ?
@@ -113,4 +119,24 @@ function PartRow({ part, selected, onPress }: { part: MeshPart; selected: boolea
     subtitle={part.triangleCount > 0 ? `${part.triangleCount.toLocaleString("en")} triangles` : "Not in this preview"}
     trailing={selected ? <Check size={20} color={palette.accent} /> : undefined}
     showChevron={false} selected={selected} onPress={onPress} />
+}
+
+/**
+ * What a parametric element is made of, in the order it was built.
+ *
+ * The desktop shows the same tree in its property panel: the phone reads a part without the desktop, which is what a
+ * companion is for.
+ */
+function FeatureTree({ tree }: { tree: PreviewFeatureTree }) {
+  const { palette } = useTheme()
+  return <SurfaceCard inset={false}>
+    <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
+      <Text style={{ color: palette.ink, fontSize: 14, fontWeight: "600" }}>{tree.name}</Text>
+    </View>
+    {tree.features.map((feature, index) => <View key={feature.id}>
+      {index ? <Divider inset={16} /> : null}
+      <ListRow title={feature.type} subtitle={feature.parameters.map((parameter) => `${parameter.key} ${parameter.value}`).join(" · ")}
+        showChevron={false} />
+    </View>)}
+  </SurfaceCard>
 }

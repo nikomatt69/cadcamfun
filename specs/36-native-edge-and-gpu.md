@@ -148,6 +148,12 @@ it is rejected instead of silently interpreting its different layout. GPU line b
 
 ## 4. The renderer seam
 
+The owner-requested [rendering and compute architecture](37-webgpu-rendering-compute.md) refines this
+section's original sketch: the runtime also owns async initialization/capture, clipping, recovery and
+resource disposal, while rendering and stock compute are separately probed capabilities. Its hybrid
+chunk rejection/playhead policy supersedes the blanket uniform-only requirement below. It does not
+change the default backend or claim implementation of F2.
+
 ### 4.1 Interface
 
 The viewport asks for a renderer and never names a backend:
@@ -281,3 +287,7 @@ built speculatively.
   strict UTF-8 and padding validation, safe offset arithmetic, owned-copy decoding and bounded producer
   diagnostics. Desktop playback, CAM colour buffers and resource previews use the package; existing
   domain HTTP routes remain unchanged. Package lifecycle/ownership and transport scope are documented.
+- 2026-10-20: Owner requested the rendering/compute WebGPU architecture. Spec 37 refines the renderer
+  sketch with separate capability gates, CPU Worker and GPU stock adapters, async AI capture, bounded
+  GPU memory/submissions and loss recovery. It corrects the uniform-only performance assumption;
+  rendering, compute, HTTP transport and real-WebView gates remain unimplemented or unverified.

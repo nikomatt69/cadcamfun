@@ -50,6 +50,7 @@ export default function DrawingPreviewScreen() {
         loading={preview.loading}
         error={preview.error}
         onRetry={() => void preview.reload()}
+        features={mesh?.features}
         selectedPartId={selected}
         onSelectPart={setSelected}
         actionLabel="Define with the assistant"

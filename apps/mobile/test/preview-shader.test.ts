@@ -27,6 +27,15 @@ test("the preview shader source is embedded in the Swift view", () => {
   expect(shader).toContain("spinAboutX")
 })
 
+test("the native module draws the cutter at the playhead in its own buffer", () => {
+  const module = readFileSync(fileURLToPath(new URL("../modules/preview/ios/CadPreviewModule.swift", import.meta.url)), "utf8")
+  const surface = readFileSync(fileURLToPath(new URL("../modules/preview/ios/PreviewSurface.swift", import.meta.url)), "utf8")
+  // The cutter moves with the playhead, so it cannot live in the static or the spinning buffer.
+  expect(module).toContain("Function(\"setTool\")")
+  expect(module).toContain("replaceTool")
+  expect(surface).toContain("frame.tool")
+})
+
 test.skipIf(!metalCompiler())("the preview shaders compile for iOS", () => {
   const dir = mkdtempSync(join(tmpdir(), "cadcam-preview-shader-"))
   try {
