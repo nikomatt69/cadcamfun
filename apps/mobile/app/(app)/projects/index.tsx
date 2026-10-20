@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { RefreshControl, StyleSheet, Text, TextInput, View } from "react-native"
 import { FlashList } from "@shopify/flash-list"
 import { Stack, useRouter } from "expo-router"
-import { ArrowUpRight, FolderOpen, Layers3, Plus, Search } from "lucide-react-native"
+import { ArrowUpRight, FolderOpen, Plus, Search } from "lucide-react-native"
 import { useSyncExternalStore } from "react"
 import { useUIStore } from "@/lib/store"
 import { accountStore } from "@/lib/account"
@@ -23,6 +23,7 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { IconTile } from "@/components/ui/icon-tile"
+import { BrandMark } from "@/components/layout/BrandMark"
 import { Pill } from "@/components/ui/Pill"
 import { relativeTime } from "@/lib/format"
 import { caps, type } from "@/lib/typography"
@@ -120,7 +121,7 @@ export default function ProjectsScreen() {
       ListHeaderComponent={<View style={{ gap: 20, paddingBottom: 16 }}>
         <SurfaceCard tone="surface">
           <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-            <IconTile size={48}><Layers3 size={24} color={palette.accent} /></IconTile>
+            <BrandMark size={48} wordmark={false} />
             <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
               <Text style={{ color: palette.muted, ...caps(12) }}>Your workspace</Text>
               <Text style={{ color: palette.ink, ...type(20, { weight: "700" }) }} numberOfLines={fontScale > 1.2 ? undefined : 2}>{config?.name || "Desktop projects"}</Text>

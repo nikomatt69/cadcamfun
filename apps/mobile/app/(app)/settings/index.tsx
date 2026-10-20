@@ -3,7 +3,7 @@ import { Alert, Platform, Switch, Text, View } from "react-native"
 import Constants from "expo-constants"
 import * as Clipboard from "expo-clipboard"
 import { useRouter } from "expo-router"
-import { Check, ClipboardCopy, EyeOff, Fingerprint, MonitorSmartphone, Palette, Sparkles, Unplug, Vibrate, Lock, Info, Layers3 } from "lucide-react-native"
+import { Check, ClipboardCopy, EyeOff, Fingerprint, MonitorSmartphone, Palette, Sparkles, Unplug, Vibrate, Lock, Layers3 } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useUIStore } from "@/lib/store"
@@ -18,6 +18,7 @@ import { ConnectionStatus } from "@/components/layout/ConnectionStatus"
 import { usePrefersReducedMotion } from "@/lib/animation"
 import { PageScroll } from "@/components/layout/page-scroll"
 import { IconTile } from "@/components/ui/icon-tile"
+import { BrandMark } from "@/components/layout/BrandMark"
 import { Divider } from "@/components/ui/SectionHeader"
 import { LOCK_AFTER_OPTIONS, lockAfterLabel } from "@/lib/app-lock"
 import { buildDiagnostics, formatFingerprint, originOnly } from "@/lib/diagnostics"
@@ -201,7 +202,7 @@ export default function SettingsScreen() {
     </SettingsGroup>
 
     <SettingsGroup title="About">
-      <ListRow title="CADCAMFUN" subtitle={`Version ${APP_VERSION}${BUILD_NUMBER ? ` (${BUILD_NUMBER})` : ""} · iOS companion`} leading={<IconTile size={36}><Info size={18} color={palette.accent} /></IconTile>} />
+      <ListRow title="CADCAMFUN" subtitle={`Version ${APP_VERSION}${BUILD_NUMBER ? ` (${BUILD_NUMBER})` : ""} · iOS companion`} leading={<BrandMark size={36} wordmark={false} />} />
       <Divider inset={16} />
       <ListRow title="Encrypted connection" subtitle="Certificate-pinned HTTPS to your paired desktop" />
       {reduced ? <><Divider inset={16} /><ListRow title="Reduce Motion" subtitle="Following your iOS accessibility preference" /></> : null}

@@ -9,6 +9,7 @@ import { type } from "@/lib/typography"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { PageScroll } from "@/components/layout/page-scroll"
+import { BrandMark } from "@/components/layout/BrandMark"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 /** Pairing URLs share the scanner's validation and never render their credentials. */
@@ -42,6 +43,7 @@ export default function PairLinkScreen() {
   }, [connect, attempt, booting, router])
   return <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}><PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", gap: 16 }}>
     <Stack.Screen options={{ headerShown: false }} />
+    <BrandMark size={64} />
     <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(24, { weight: "700" }) }}>Pair with your desktop</Text>
     {busy || booting ? <ActivityIndicator color={palette.accent} accessibilityLabel="Pairing with your desktop" /> : null}
     {error ? <>
