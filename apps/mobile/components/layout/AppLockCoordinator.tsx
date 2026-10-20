@@ -5,7 +5,8 @@ import * as LocalAuthentication from "expo-local-authentication"
 import { Lock } from "lucide-react-native"
 import { useUIStore } from "@/lib/store"
 import { useServer } from "@/lib/server"
-import { useTheme } from "@/lib/theme"
+import { hexToRgba, useTheme } from "@/lib/theme"
+import { type } from "@/lib/typography"
 import { biometricLabel, getBiometricCapability, type BiometricLabel } from "@/lib/biometrics"
 import { coverWhenInactive, lockOnResume, lockWhenBackgrounded, unlockFailureMessage } from "@/lib/app-lock"
 import { haptic } from "@/lib/haptics"
@@ -115,7 +116,7 @@ export function AppLockCoordinator() {
   if (covered && !(locked && !skipLock)) {
     return <Modal visible transparent={false} animationType="none" presentationStyle="fullScreen" onRequestClose={() => undefined}>
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", backgroundColor: palette.background }]}>
-        <View style={{ width: 64, height: 64, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: `${palette.accent}14` }}><Lock size={28} color={palette.accent} /></View>
+        <View style={{ width: 64, height: 64, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.accent, 0.08) }}><Lock size={28} color={palette.accent} /></View>
       </View>
     </Modal>
   }
@@ -127,18 +128,18 @@ export function AppLockCoordinator() {
     <Modal visible transparent={false} animationType="none" presentationStyle="fullScreen" onRequestClose={() => undefined}>
     <SafeAreaView accessibilityViewIsModal style={{ flex: 1, backgroundColor: palette.background }}>
       <PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", gap: 20 }}>
-        <View style={{ width: 64, height: 64, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: `${palette.accent}14` }}>
+        <View style={{ width: 64, height: 64, borderRadius: 20, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.accent, 0.08) }}>
           <Lock size={28} color={palette.accent} />
         </View>
         <View style={{ alignItems: "center", gap: 8 }}>
-          <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 22, lineHeight: 28, fontWeight: "600", textAlign: "center" }}>CADCAMFUN is locked</Text>
-          <Text style={{ maxWidth: 300, color: palette.soft, fontSize: 15, lineHeight: 21, textAlign: "center" }}>Unlock with {label} or your device passcode to continue.</Text>
+          <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(22, { weight: "600" }) }}>CADCAMFUN is locked</Text>
+          <Text style={{ maxWidth: 300, color: palette.soft, textAlign: "center", ...type(15) }}>Unlock with {label} or your device passcode to continue.</Text>
         </View>
         <View style={{ alignSelf: "stretch", maxWidth: 360, width: "100%", gap: 10 }}>
           <ActionButton label={checking ? "Unlocking…" : `Unlock with ${label}`} loading={checking} onPress={() => void unlock()} />
           {needsReset ? <ActionButton label="Unpair this phone" variant="secondary" onPress={resetPairing} /> : null}
         </View>
-        {error ? <Text selectable accessibilityLiveRegion="polite" style={{ maxWidth: 320, color: palette.danger, fontSize: 15, lineHeight: 22, textAlign: "center" }}>{error}</Text> : null}
+        {error ? <Text selectable accessibilityLiveRegion="polite" style={{ maxWidth: 320, color: palette.danger, textAlign: "center", ...type(15) }}>{error}</Text> : null}
       </PageScroll>
     </SafeAreaView>
     </Modal>

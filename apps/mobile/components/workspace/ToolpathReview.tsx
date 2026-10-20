@@ -441,9 +441,9 @@ function OperationLegend({ operations, isolated, colorMode, onIsolate, onColorMo
             opacity: shown ? 1 : 0.45,
           })}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: swatch(operation.index) }} />
-          <Text numberOfLines={1} ellipsizeMode="tail" style={{ maxWidth: 180, color: palette.ink, fontSize: 13, fontWeight: "600" }}>{operation.name}</Text>
+          <Text numberOfLines={1} ellipsizeMode="tail" style={{ maxWidth: 180, color: palette.ink, ...type(13, { weight: "600" }) }}>{operation.name}</Text>
           {operation.cutter ? (
-            <Text style={{ color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>
+            <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>
               Ø{operation.cutter.diameter}
             </Text>
           ) : null}
@@ -452,7 +452,7 @@ function OperationLegend({ operations, isolated, colorMode, onIsolate, onColorMo
       })}
     </ScrollView>
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-      <Text style={{ color: palette.muted, fontSize: 12 }}>Path colour</Text>
+      <Text style={{ color: palette.muted, ...type(12) }}>Path colour</Text>
       {(["move", "operation"] as const).map((mode) => <Pressable key={mode} accessibilityRole="radio" accessibilityState={{ checked: colorMode === mode }}
         accessibilityLabel={`Colour the path by ${mode}`}
         hitSlop={{ top: 6, bottom: 6 }}
@@ -462,7 +462,7 @@ function OperationLegend({ operations, isolated, colorMode, onIsolate, onColorMo
           borderColor: colorMode === mode ? palette.accent : palette.border,
           backgroundColor: colorMode === mode ? hexToRgba(palette.accent, 0.12) : pressed ? hexToRgba(palette.ink, 0.07) : "transparent",
         })}>
-        <Text style={{ color: colorMode === mode ? palette.accentStrong : palette.soft, fontSize: 12, fontWeight: "600" }}>
+        <Text style={{ color: colorMode === mode ? palette.accentStrong : palette.soft, ...type(12, { weight: "600" }) }}>
           {mode === "move" ? "Move" : "Operation"}
         </Text>
       </Pressable>)}
@@ -490,7 +490,7 @@ function ContactList({ contacts, playhead, stopAtContact, onToggleStop, onSeek }
       style={({ pressed }) => ({
         minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, opacity: pressed ? 0.6 : 1,
       })}>
-      <Text style={{ flex: 1, minWidth: 0, color: palette.soft, fontSize: 13, lineHeight: 18 }}>Stop the simulation at a contact</Text>
+      <Text style={{ flex: 1, minWidth: 0, color: palette.soft, ...type(13) }}>Stop the simulation at a contact</Text>
       <Switch pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" value={stopAtContact} onValueChange={onToggleStop}
         trackColor={{ true: palette.accent, false: palette.border }} />
     </Pressable>
@@ -507,8 +507,8 @@ function ContactList({ contacts, playhead, stopAtContact, onToggleStop, onSeek }
         })}>
         <View style={{ width: 8, height: 8, borderRadius: 4, marginTop: 5, backgroundColor: tone }} />
         <View style={{ flex: 1, gap: 2 }}>
-          <Text selectable style={{ color: palette.ink, fontSize: 13, lineHeight: 18 }}>{event.message}</Text>
-          <Text style={{ color: palette.muted, fontSize: 11, lineHeight: 16, fontVariant: ["tabular-nums"] }}>
+          <Text selectable style={{ color: palette.ink, ...type(13) }}>{event.message}</Text>
+          <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(11) }}>
             {event.code}{event.line !== undefined ? ` · line ${event.line}` : ""} · {formatDuration(event.seconds)}
           </Text>
         </View>

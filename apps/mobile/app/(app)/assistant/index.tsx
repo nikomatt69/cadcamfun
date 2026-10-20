@@ -23,6 +23,7 @@ import { TranscriptItemView, type ErrorRecovery, type TranscriptActions } from "
 import { JumpToLatestPill } from "@/components/chat/JumpToLatestPill"
 import { TypingRow } from "@/components/chat/TypingRow"
 import { hexToRgba } from "@/lib/theme"
+import { caps, type } from "@/lib/typography"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { PressableScale } from "@/components/ui/PressableScale"
 import { EmptyState } from "@/components/ui/EmptyState"
@@ -616,7 +617,7 @@ export default function AssistantScreen() {
           accessibilityLabel={`Choose assistant project${currentProject ? `, current project: ${currentProject.name}` : ""}`}
           style={{ flex: stackedContext ? undefined : 1, minHeight: 44, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 10 }}
         >
-          <Text style={{ flexShrink: 1, color: palette.ink, fontSize: 15, lineHeight: 20, fontWeight: "600" }} numberOfLines={stackedContext ? undefined : 1}>
+          <Text style={{ flexShrink: 1, color: palette.ink, ...type(15, { weight: "600" }) }} numberOfLines={stackedContext ? undefined : 1}>
             {currentProject ? currentProject.name : "Choose a project"}
           </Text>
           <ChevronDown size={15} color={palette.muted} />
@@ -631,7 +632,7 @@ export default function AssistantScreen() {
           style={{ flex: stackedContext ? undefined : 1, minHeight: 44, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 10 }}
         >
           <Bot size={15} color={palette.accent} />
-          <Text style={{ flexShrink: 1, color: palette.soft, fontSize: 13, lineHeight: 18, fontWeight: "600" }} numberOfLines={stackedContext ? undefined : 1}>
+          <Text style={{ flexShrink: 1, color: palette.soft, ...type(13, { weight: "600" }) }} numberOfLines={stackedContext ? undefined : 1}>
             {currentAgent?.title ?? "CAD/CAM assistant"}
           </Text>
           <ChevronDown size={14} color={palette.muted} />
@@ -665,12 +666,12 @@ export default function AssistantScreen() {
                 <Sparkles size={27} color={palette.accent} strokeWidth={1.9} />
               </View>
               <View style={{ alignItems: "center", gap: 7 }}>
-                <Text selectable style={{ color: palette.ink, fontSize: 28, lineHeight: 34, fontWeight: "700", letterSpacing: -0.65, textAlign: "center" }}>Build with CADCAMFUN</Text>
-                <Text selectable style={{ maxWidth: 340, color: palette.soft, fontSize: 15, lineHeight: 21, textAlign: "center" }}>
+                <Text selectable style={{ color: palette.ink, textAlign: "center", ...type(28, { weight: "700" }) }}>Build with CADCAMFUN</Text>
+                <Text selectable style={{ maxWidth: 340, color: palette.soft, textAlign: "center", ...type(15) }}>
                   Turn an idea into a reviewed change. Your assistant works with the tools and context on your desktop.
                 </Text>
                 {ai?.tools?.length ? (
-                  <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 17 }}>{ai.tools.length} desktop tools available</Text>
+                  <Text selectable style={{ color: palette.muted, ...type(12) }}>{ai.tools.length} desktop tools available</Text>
                 ) : null}
               </View>
               <View style={{ alignSelf: "stretch", gap: 8 }}>
@@ -688,7 +689,7 @@ export default function AssistantScreen() {
                       style={{ minHeight: 52, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 16, borderCurve: "continuous", borderWidth: 0.5, borderColor: palette.border, backgroundColor: palette.surface, paddingHorizontal: 14, paddingVertical: 10 }}
                     >
                       <Icon size={18} color={palette.accent} />
-                      <Text style={{ flex: 1, color: palette.ink, fontSize: 15, lineHeight: 20, fontWeight: "600" }}>{item.label}</Text>
+                      <Text style={{ flex: 1, color: palette.ink, ...type(15, { weight: "600" }) }}>{item.label}</Text>
                     </PressableScale>
                   )
                 })}
@@ -726,7 +727,7 @@ export default function AssistantScreen() {
                 accessibilityLabel="Load older messages"
                 style={{ minHeight: 44, alignItems: "center", justifyContent: "center", marginBottom: 12 }}
               >
-                <Text style={{ color: palette.accent, fontSize: 13, lineHeight: 18, fontWeight: "600" }}>{loadingOlder ? "Loading…" : "Load older messages"}</Text>
+                <Text style={{ color: palette.accent, ...type(13, { weight: "600" }) }}>{loadingOlder ? "Loading…" : "Load older messages"}</Text>
               </PressableScale>
             ) : null}
           />
@@ -820,16 +821,16 @@ export default function AssistantScreen() {
                 </View>
                 <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7 }}>
-                    <Text style={{ flexShrink: 1, color: palette.ink, fontSize: 16, lineHeight: 23, fontWeight: "600" }}>{agent.title}</Text>
-                    <Text style={{ color: agent.edits ? palette.warning : palette.muted, fontSize: 11, lineHeight: 15, fontWeight: "700", letterSpacing: 0.5 }}>{agent.edits ? "CAN EDIT" : "READ ONLY"}</Text>
+                    <Text style={{ flexShrink: 1, color: palette.ink, ...type(16, { weight: "600" }) }}>{agent.title}</Text>
+                    <Text style={{ color: agent.edits ? palette.warning : palette.muted, ...caps(11, { weight: "700" }) }}>{agent.edits ? "Can edit" : "Read only"}</Text>
                   </View>
-                  <Text selectable style={{ color: palette.soft, fontSize: 13, lineHeight: 19 }}>{agent.description}</Text>
-                  {agent.tools.length > 0 ? <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 17 }}>{agent.tools.length} scoped tools</Text> : null}
+                  <Text selectable style={{ color: palette.soft, ...type(13) }}>{agent.description}</Text>
+                  {agent.tools.length > 0 ? <Text selectable style={{ color: palette.muted, ...type(12) }}>{agent.tools.length} scoped tools</Text> : null}
                 </View>
               </PressableScale>
             )
           })}
-          {agents.loading && !agents.data ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted, fontSize: 15, lineHeight: 21, padding: 16, textAlign: "center" }}>Loading desktop agents…</Text> : null}
+          {agents.loading && !agents.data ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted, padding: 16, textAlign: "center", ...type(15) }}>Loading desktop agents…</Text> : null}
           {agents.error ? <ErrorBanner message={agents.error} /> : null}
           {!agents.loading && !agents.error && agents.data?.length === 0 ? <EmptyState title="No agents available" description="Configure an assistant on your desktop to make it available here." /> : null}
         </View>
@@ -847,7 +848,7 @@ function LinkStrip({ text, gutter, offline = false }: { text: string; gutter: nu
     <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={text}
       style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginHorizontal: gutter, marginBottom: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderCurve: "continuous", backgroundColor: hexToRgba(color, 0.1) }}>
       {offline ? <CloudOff size={14} color={color} /> : <ActivityIndicator size="small" color={color} />}
-      <Text style={{ flexShrink: 1, color: offline ? palette.ink : palette.soft, fontSize: 12, lineHeight: 17, fontWeight: "500" }}>{text}</Text>
+      <Text style={{ flexShrink: 1, color: offline ? palette.ink : palette.soft, ...type(12, { weight: "500" }) }}>{text}</Text>
     </View>
   )
 }

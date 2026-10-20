@@ -10,6 +10,7 @@ import { useResource } from "@/lib/use-resource"
 import { usePoll } from "@/lib/use-poll"
 import { useUIStore } from "@/lib/store"
 import { hexToRgba, useTheme } from "@/lib/theme"
+import { type } from "@/lib/typography"
 import { haptic } from "@/lib/haptics"
 import { layout } from "@/lib/layout"
 import { relativeTime } from "@/lib/format"
@@ -163,8 +164,8 @@ export default function ActivityScreen() {
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         <IconTile size={48}><Bell size={23} color={palette.accent} /></IconTile>
         <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-          <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 20, lineHeight: 26, fontWeight: "700" }}>{unreadCount ? `${unreadCount} unread ${unreadCount === 1 ? "update" : "updates"}` : "You're all caught up"}</Text>
-          <Text style={{ color: palette.muted, fontSize: 14, lineHeight: 20 }}>Reviews, workflows and project updates.</Text>
+          <Text accessibilityRole="header" style={{ color: palette.ink, ...type(20, { weight: "700" }) }}>{unreadCount ? `${unreadCount} unread ${unreadCount === 1 ? "update" : "updates"}` : "You're all caught up"}</Text>
+          <Text style={{ color: palette.muted, ...type(14) }}>Reviews, workflows and project updates.</Text>
         </View>
       </View>
       <SegmentedControl segments={[{ value: "all", label: "All updates" }, { value: "unread", label: unreadCount ? `Unread (${unreadCount})` : "Unread" }]} value={filter} onChange={setFilter} />
@@ -182,8 +183,8 @@ export default function ActivityScreen() {
     renderItem={({ item }) => {
       if (item.kind === "section") {
         return <View accessibilityRole="header" accessible style={{ flexDirection: "row", alignItems: "baseline", gap: 8, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 4 }}>
-          <Text style={{ color: palette.ink, fontSize: 15, fontWeight: "700" }}>{item.title}</Text>
-          {item.unread ? <Text style={{ color: palette.accentStrong, fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] }}>{item.unread} new</Text> : null}
+          <Text style={{ color: palette.ink, ...type(15, { weight: "700" }) }}>{item.title}</Text>
+          {item.unread ? <Text style={{ color: palette.accentStrong, fontVariant: ["tabular-nums"], ...type(12, { weight: "600" }) }}>{item.unread} new</Text> : null}
         </View>
       }
       const row = item.row
@@ -198,11 +199,11 @@ export default function ActivityScreen() {
           style={{ padding: 16, borderRadius: layout.cardRadius, borderCurve: "continuous", backgroundColor: palette.surface, borderColor: row.isRead ? palette.border : hexToRgba(palette.accent, 0.35), borderWidth: 0.5, gap: 10 }}>
           <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: row.isRead ? palette.border : palette.accent }} />
-            <Text numberOfLines={1} style={{ flexGrow: 1, flexShrink: 1, color, fontSize: 12, fontWeight: "600" }}>{category.label}</Text>
-            <Text style={{ color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>{relativeTime(row.createdAt)}</Text>
+            <Text numberOfLines={1} style={{ flexGrow: 1, flexShrink: 1, color, ...type(12, { weight: "600" }) }}>{category.label}</Text>
+            <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>{relativeTime(row.createdAt)}</Text>
           </View>
-          <Text style={{ color: palette.ink, fontSize: 16, lineHeight: 23, fontWeight: row.isRead ? "500" : "600" }} numberOfLines={fontScale > 1.2 ? undefined : 3}>{row.title}</Text>
-          {row.content ? <Text style={{ color: palette.soft, fontSize: 14, lineHeight: 21 }} numberOfLines={fontScale > 1.2 ? undefined : 3}>{row.content}</Text> : null}
+          <Text style={{ color: palette.ink, ...type(16, { weight: row.isRead ? "500" : "600" }) }} numberOfLines={fontScale > 1.2 ? undefined : 3}>{row.title}</Text>
+          {row.content ? <Text style={{ color: palette.soft, ...type(14) }} numberOfLines={fontScale > 1.2 ? undefined : 3}>{row.content}</Text> : null}
         </PressableScale>
       </View>
     }}

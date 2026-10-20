@@ -13,6 +13,7 @@ import { ResourceList } from "@/components/ui/resource-list"
 import { RecordCard } from "@/components/ui/record-card"
 import { SegmentedControl } from "@/components/ui/SegmentedControl"
 import { toast } from "@/components/ui/ToastHost"
+import { type } from "@/lib/typography"
 
 const KINDS: readonly { value: ResourceKind; label: string; noun: string }[] = [
   { value: "materials", label: "Materials", noun: "material" },
@@ -72,7 +73,7 @@ export default function ResourcesScreen() {
   const Icon = kind === "materials" ? Layers3 : kind === "tools" ? Wrench : Cpu
   return <>
     <Stack.Screen options={{ title: "Resources", headerRight: () => kind === "machine-configs" ? null : (
-      <Pressable accessibilityRole="button" accessibilityLabel={`New ${current.noun}`} hitSlop={10} disabled={busy} onPress={() => void create()}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`New ${current.noun}`} hitSlop={11} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }} disabled={busy} onPress={() => void create()}>
         <Plus size={22} color={palette.accent} />
       </Pressable>
     ) }} />
@@ -81,7 +82,7 @@ export default function ResourcesScreen() {
       emptyIcon={<Icon size={26} color={palette.accent} />}
       header={<View style={{ gap: 12, paddingBottom: 12 }}>
         <SegmentedControl segments={KINDS.map(({ value, label }) => ({ value, label }))} value={kind} onChange={setKind} />
-        <Text style={{ color: palette.muted, fontSize: 13 }}>Only your own {current.label.toLowerCase()} · long-press a row for actions</Text>
+        <Text style={{ color: palette.muted, ...type(13) }}>Only your own {current.label.toLowerCase()} · long-press a row for actions</Text>
       </View>}
       renderItem={({ item }) => <RecordCard title={item.name} subtitle={item.type ?? item.description ?? undefined}
         meta={item.updatedAt ? `Updated ${relativeTime(item.updatedAt)}` : undefined} leading={<Icon size={21} color={palette.accent} />}

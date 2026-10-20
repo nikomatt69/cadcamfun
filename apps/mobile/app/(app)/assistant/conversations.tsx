@@ -12,6 +12,7 @@ import { Pill } from "@/components/ui/Pill"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { relativeTime } from "@/lib/format"
 import { sessionTitle } from "@/lib/session-history"
+import { type } from "@/lib/typography"
 import { haptic } from "@/lib/haptics"
 
 /**
@@ -92,8 +93,8 @@ export default function ConversationsScreen() {
         )}
         header={
           <View style={{ gap: 6 }}>
-            <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 19, lineHeight: 25, fontWeight: "700" }}>Recent conversations</Text>
-            <Text style={{ color: palette.soft, fontSize: 13, lineHeight: 19 }}>
+            <Text accessibilityRole="header" style={{ color: palette.ink, ...type(19, { weight: "700" }) }}>Recent conversations</Text>
+            <Text style={{ color: palette.soft, ...type(13) }}>
               The same conversations your desktop keeps. Open one to continue it from the phone.
             </Text>
           </View>
