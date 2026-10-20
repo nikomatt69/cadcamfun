@@ -213,7 +213,8 @@ describe("cad tools provision what is missing", () => {
       const gcode = await h.generateGcode(project, lathe.operationId)
       if (!("gcode" in gcode)) throw new Error("Expected a generated lathe program")
       expect(gcode.gcode).toContain("G18")
-      expect(gcode.gcode).toContain("G1 Z-80.000")
+      // The chuck grips 20 mm of the 80 mm bar and the tool stays 2 mm in front of the jaws, so the turning pass reaches Z-58.
+      expect(gcode.gcode).toContain("G1 Z-58.000")
       const probing = await h.createOperation(project, { type: "probing", params: { toolType: "probe", probeCycle: "corner", workOffset: "G55" } }) as { ok: boolean; operationId: string }
       expect(probing.ok).toBe(true)
       const program = await h.generateGcode(project, probing.operationId)

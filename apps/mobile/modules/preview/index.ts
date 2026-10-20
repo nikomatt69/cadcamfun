@@ -15,6 +15,11 @@ export type PreviewScene = {
   setSolids(vertices: Float32Array, indices: Uint32Array, opaqueTriangles: number): void
   /** The bodies that turn with the spindle, drawn rotated about the display x axis by the accumulated spin. */
   setSpindle(vertices: Float32Array, indices: Uint32Array, opaqueTriangles: number): void
+  /**
+   * The cutter at the playhead: the real tool of the running operation (preview format 4), in display coordinates.
+   * An empty pair clears it. It is its own set, because it moves with the playhead.
+   */
+  setTool(vertices: Float32Array, indices: Uint32Array, opaqueTriangles: number): void
   /** Signed display revolutions per second the spindle turns; the native view accumulates the angle. 0 stops it. */
   setSpin(rate: number): void
   /** Fades path vertices `[travelled, path)` toward the background by `fade`; `travelled < 0` shows the whole path. */

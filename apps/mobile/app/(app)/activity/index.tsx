@@ -6,6 +6,8 @@ import { Bell, BellOff } from "lucide-react-native"
 import type { NotificationRow } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
+import { usePoll } from "@/lib/use-poll"
+import { useUIStore } from "@/lib/store"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { relativeTime } from "@/lib/format"
@@ -30,7 +32,7 @@ const PAGE = 50
  * offset, so loading more never refetches what is already on screen.
  */
 export default function ActivityScreen() {
-  const { client } = useServer()
+  const { client, config, connectivity } = useServer()
   const { palette } = useTheme()
   const router = useRouter()
   const { gutter, fontScale, onLayout } = useContentLayout()
@@ -43,7 +45,10 @@ export default function ActivityScreen() {
   const feed = useResource(
     useCallback((signal) => (client ? client.notifications({ limit: PAGE }, signal) : Promise.reject(new Error("Not connected"))), [client]),
     "notifications",
+    { cacheKey: `notifications:${config?.fingerprint ?? ""}` },
   )
+  // The feed belongs to no project, so no single stream covers it: it refreshes itself while it is open.
+  usePoll(() => void feed.reload(), 25_000, connectivity === "online")
   // The newest page from the server replaces everything loaded before it, optimistic edits included.
   useEffect(() => {
     olderRequest.current?.abort()
@@ -141,6 +146,9 @@ export default function ActivityScreen() {
 
   const items = useMemo(() => groupActivity((data?.notifications ?? []).filter((row) => filter === "all" || !row.isRead), Date.now()), [data, filter])
   const unreadCount = data?.unreadCount ?? 0
+  // The tab badge follows the feed: reading on the phone clears it.
+  const setUnreadCount = useUIStore((state) => state.setUnreadCount)
+  useEffect(() => { setUnreadCount(unreadCount) }, [unreadCount, setUnreadCount])
   const mayHaveMore = data !== undefined && !data.exhausted
   const toneColor = (tone: ActivityTone) => tone === "success" ? palette.success : tone === "danger" ? palette.danger : tone === "accent" ? palette.accent : palette.muted
 
@@ -158,8 +166,7 @@ export default function ActivityScreen() {
       </View>
       <SegmentedControl segments={[{ value: "all", label: "All updates" }, { value: "unread", label: unreadCount ? `Unread (${unreadCount})` : "Unread" }]} value={filter} onChange={setFilter} />
       {unreadCount > 0 ? <ActionButton label="Mark all as read" small variant="secondary" loading={marking} onPress={() => void markAll()} /> : null}
-      {feed.error ? <ErrorBanner message={feed.data ? `Showing saved updates. ${feed.error}` : feed.error} actionLabel="Retry" onAction={() => void feed.reload()} /> : null}
-    </View>}
+      {feed.error ? <ErrorBanner message={feed.data ? `Showing saved updates. ${feed.error}` : feed.error} actionLabel="Retry" onAction={() => void feed.reload()} /> : null}    </View>}
     ListEmptyComponent={feed.loading && !data ? <View accessible accessibilityLabel="Loading updates" style={{ gap: 12 }}>{[0, 1, 2].map((key) => <Skeleton key={key} style={{ height: 104 }} />)}</View> : !feed.error ?
       <EmptyState icon={<BellOff size={26} color={palette.accent} />} title={filter === "unread" ? "All caught up" : "No updates yet"} description={filter === "unread" ? "You've read every update. New activity will appear here." : "Project reviews, workflow results and assistant changes will appear here."} /> : null}
     ListFooterComponent={mayHaveMore && filter === "all" ? <View style={{ paddingTop: 16, gap: 10 }}>

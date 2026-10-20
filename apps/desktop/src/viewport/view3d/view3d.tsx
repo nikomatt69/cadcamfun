@@ -1,3 +1,4 @@
+import { createDisplayEdges } from "../native-edges.ts"
 import { FrameScheduler } from "../../features/cad/lib/frame-scheduler.ts"
 import { MeshWorkerQueue } from "./mesh-jobs.ts"
 import { registerViewportCapture } from "../../features/ai/lib/viewport-capture.ts"
@@ -9,7 +10,7 @@ import { ViewportControls, viewportLabels } from "./viewport-controls.tsx"
 import { creasedNormals, isClosedShape, meshOf, tessellate, cam, type Drawing, type Solid, type Vec3 } from "@cadcamfun/core"
 import { entityPaths, renderEntity } from "../editor2d/render.ts"
 import { t } from "../../i18n/index.ts"
-import { buildPlayback, positionAt, toolAt, toolColors, TOOL_COLORS, type Playback } from "./playback.ts"
+import { buildPlayback, emptyPlayback, positionAt, toolAt, toolColors, TOOL_COLORS, type Playback } from "./playback.ts"
 import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
 import { toolObject } from "./tool-object.ts"
 import { gaugeOfTool, previewToolFor } from "./tool-models.ts"
@@ -159,7 +160,7 @@ export function View3D(props: View3DProps) {
   const [selected, setSelected] = createSignal<number>()
   let fit = () => {}, appearance = () => {}, transform = () => {}, applyLighting = () => {}, applyMaterial = () => {}, applySection = () => {}
   let rebuild = () => {}, setPreset = () => {}
-  let playback: Playback = { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
+  let playback: Playback = emptyPlayback()
   let seconds = 0
   createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
   createEffect(() => { if (props.preset) updatePreset(props.preset) })
@@ -414,7 +415,7 @@ export function View3D(props: View3DProps) {
       geometry.setAttribute("position", new THREE.BufferAttribute(shaded.positions, 3)); geometry.setIndex(new THREE.BufferAttribute(shaded.indices, 1)); geometry.setAttribute("normal", new THREE.BufferAttribute(shaded.normals, 3))
       const object = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: .2, roughness: .65, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }))
       object.userData.solidIndex = index
-      object.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 25), new THREE.LineBasicMaterial({ color: 0x202830 })))
+      object.add(new THREE.LineSegments(createDisplayEdges(geometry, 25, invalidate), new THREE.LineBasicMaterial({ color: 0x202830 })))
       content.add(object)
       appearance()
     }
@@ -473,7 +474,7 @@ export function View3D(props: View3DProps) {
       }
       // With a machine the first move starts where that machine believably is, not at the work zero inside the part.
       const start = props.machine && props.program ? cam.viewer.programStart(props.machine.kind, props.program) : undefined
-      playback = props.program ? buildPlayback(props.program, 5000, props.toolpathDisplay?.arcTolerance ?? .1, start) : { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
+      playback = props.program ? buildPlayback(props.program, 5000, props.toolpathDisplay?.arcTolerance ?? .1, start) : emptyPlayback()
       disposeMachine()
       const machine = props.machine
       if (machine && props.program) {
@@ -560,7 +561,7 @@ export function View3D(props: View3DProps) {
         })
         classOf = classLookup(timeline, classes)
       }
-      const buffers = pathBuffers(machine?.kind === "3dprinter" ? { ...playback, segments: [] } : playback, {
+      const buffers = pathBuffers(machine?.kind === "3dprinter" ? emptyPlayback() : playback, {
         mode, toolColors: colors, shown,
         ...(classOf !== undefined ? { classOf } : {}),
         ...(display?.operationNames !== undefined ? { operationNames: display.operationNames } : {}),
@@ -702,7 +703,7 @@ export function View3D(props: View3DProps) {
       }
       // A lathe tool or a printer nozzle is the machine scene's; the milling cutter and the marker are for mills only.
       const ownTool = machineScene !== undefined && props.machine?.kind !== "mill"
-      const visible = playback.segments.length > 0 && !ownTool
+      const visible = playback.segmentCount > 0 && !ownTool
       const activeId = visible ? toolAt(playback, seconds) : undefined
       const active = activeId !== undefined ? toolGroupFor(activeId) : null
       const lean = rotaryPose(seconds)

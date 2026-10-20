@@ -53,37 +53,39 @@ export const rampColor = (f: number): number => {
 }
 
 export const pathBuffers = (playback: Playback, input: PathBufferInput, palette: ReadonlyArray<number>): PathBuffers => {
-  const all = playback.segments
-  const shownSegment = (s: Playback["segments"][number]) => input.hidden === undefined || !input.hidden.has(s.path)
+  const { views: v, segmentCount } = playback
+  const toolId = (i: number) => playback.toolIds[v.toolIndex[i]!] ?? ""
+  const shownSegment = (i: number) => input.hidden === undefined || !input.hidden.has(v.pathIndex[i]!)
   // The ranges the feed and height ramps span, and the size of each buffer (filled in place: a million moves stay cheap).
   let fMin = Infinity, fMax = -Infinity, zMin = Infinity, zMax = -Infinity
-  const feedOf = (s: Playback["segments"][number]): number => {
-    const length = Math.hypot(s.to.x - s.from.x, s.to.y - s.from.y, s.to.z - s.from.z)
-    return s.duration > 0 ? (length / s.duration) * 60 : 0
+  const feedOf = (i: number): number => {
+    const a = i * 3
+    const length = Math.hypot(v.to[a]! - v.from[a]!, v.to[a + 1]! - v.from[a + 1]!, v.to[a + 2]! - v.from[a + 2]!)
+    return v.durations[i]! > 0 ? (length / v.durations[i]!) * 60 : 0
   }
-  const asRapid = (s: Playback["segments"][number]): boolean => {
-    if (!s.rapid) return false
+  const asRapid = (i: number): boolean => {
+    if (v.rapid[i] !== 1) return false
     if (input.mode !== "move") return true
-    const klass = input.classOf?.(s.path, s.index)
+    const klass = input.classOf?.(v.pathIndex[i]!, v.moveIndex[i]!)
     return klass === "rapid" || klass === undefined
   }
   let cuts = 0, rapids = 0
-  for (const s of all) {
-    if (!shownSegment(s)) continue
-    if (asRapid(s)) { rapids++; continue }
+  for (let i = 0; i < segmentCount; i++) {
+    if (!shownSegment(i)) continue
+    if (asRapid(i)) { rapids++; continue }
     cuts++
-    if (s.rapid) continue
-    const f = feedOf(s)
+    if (v.rapid[i] === 1) continue
+    const f = feedOf(i)
     if (f > 0) { if (f < fMin) fMin = f; if (f > fMax) fMax = f }
-    zMin = Math.min(zMin, s.from.z, s.to.z); zMax = Math.max(zMax, s.from.z, s.to.z)
+    zMin = Math.min(zMin, v.from[i * 3 + 2]!, v.to[i * 3 + 2]!); zMax = Math.max(zMax, v.from[i * 3 + 2]!, v.to[i * 3 + 2]!)
   }
-  const colorOf = (s: Playback["segments"][number]): number => {
+  const colorOf = (i: number): number => {
     switch (input.mode) {
-      case "tool": return input.toolColors.get(s.toolId) ?? 0x38bdf8
-      case "operation": return operationColor(s.path, palette)
-      case "move": return cam.viewer.MOVE_CLASS_COLORS[input.classOf?.(s.path, s.index) ?? "cut"]
-      case "feed": return rampColor(fMax > fMin ? (feedOf(s) - fMin) / (fMax - fMin) : 0.5)
-      case "z": return rampColor(zMax > zMin ? ((s.from.z + s.to.z) / 2 - zMin) / (zMax - zMin) : 0.5)
+      case "tool": return input.toolColors.get(toolId(i)) ?? 0x38bdf8
+      case "operation": return operationColor(v.pathIndex[i]!, palette)
+      case "move": return cam.viewer.MOVE_CLASS_COLORS[input.classOf?.(v.pathIndex[i]!, v.moveIndex[i]!) ?? "cut"]
+      case "feed": return rampColor(fMax > fMin ? (feedOf(i) - fMin) / (fMax - fMin) : 0.5)
+      case "z": return rampColor(zMax > zMin ? ((v.from[i * 3 + 2]! + v.to[i * 3 + 2]!) / 2 - zMin) / (zMax - zMin) : 0.5)
     }
   }
   const cut = new Float32Array(cuts * 6), cutColors = new Float32Array(cuts * 6), cutStarts = new Float64Array(cuts)
@@ -91,25 +93,27 @@ export const pathBuffers = (playback: Playback, input: PathBufferInput, palette:
   const rgbCache = new Map<number, readonly [number, number, number]>()
   const used = new Map<string, number>()
   let c = 0, r = 0
-  for (const s of all) {
-    if (!shownSegment(s)) continue
-    const a = input.shown(s.from, s.path, s.index), b = input.shown(s.to, s.path, s.index)
-    if (asRapid(s)) {
+  for (let i = 0; i < segmentCount; i++) {
+    if (!shownSegment(i)) continue
+    const offset = i * 3, path = v.pathIndex[i]!, move = v.moveIndex[i]!
+    const a = input.shown({ x: v.from[offset]!, y: v.from[offset + 1]!, z: v.from[offset + 2]! }, path, move)
+    const b = input.shown({ x: v.to[offset]!, y: v.to[offset + 1]!, z: v.to[offset + 2]! }, path, move)
+    if (asRapid(i)) {
       rapid[r * 6] = a.x; rapid[r * 6 + 1] = a.y; rapid[r * 6 + 2] = a.z; rapid[r * 6 + 3] = b.x; rapid[r * 6 + 4] = b.y; rapid[r * 6 + 5] = b.z
-      rapidStarts[r++] = s.start
+      rapidStarts[r++] = v.starts[i]!
       if (input.mode === "move") used.set("rapid", cam.viewer.MOVE_CLASS_COLORS.rapid)
       continue
     }
-    const color = colorOf(s)
+    const color = colorOf(i)
     let rgbOf = rgbCache.get(color)
     if (rgbOf === undefined) { rgbOf = rgb(color); rgbCache.set(color, rgbOf) }
     const o = c * 6
     cut[o] = a.x; cut[o + 1] = a.y; cut[o + 2] = a.z; cut[o + 3] = b.x; cut[o + 4] = b.y; cut[o + 5] = b.z
     cutColors[o] = cutColors[o + 3] = rgbOf[0]; cutColors[o + 1] = cutColors[o + 4] = rgbOf[1]; cutColors[o + 2] = cutColors[o + 5] = rgbOf[2]
-    cutStarts[c++] = s.start
-    if (input.mode === "move") { const klass = input.classOf?.(s.path, s.index) ?? "cut"; if (!used.has(klass)) used.set(klass, color) }
-    else if (input.mode === "operation") { const name = input.operationNames?.[s.path] ?? `#${s.path + 1}`; if (!used.has(name)) used.set(name, color) }
-    else if (input.mode === "tool" && !used.has(s.toolId)) used.set(s.toolId, color)
+    cutStarts[c++] = v.starts[i]!
+    if (input.mode === "move") { const klass = input.classOf?.(v.pathIndex[i]!, v.moveIndex[i]!) ?? "cut"; if (!used.has(klass)) used.set(klass, color) }
+    else if (input.mode === "operation") { const name = input.operationNames?.[v.pathIndex[i]!] ?? `#${v.pathIndex[i]! + 1}`; if (!used.has(name)) used.set(name, color) }
+    else if (input.mode === "tool" && !used.has(toolId(i))) used.set(toolId(i), color)
   }
   let legend: LegendEntry[]
   if (input.mode === "feed") legend = fMax >= fMin ? [{ label: `${Math.round(fMin)} mm/min`, color: rampColor(0) }, { label: `${Math.round(fMax)} mm/min`, color: rampColor(1) }] : []

@@ -56,6 +56,26 @@ export const LINE_COLOR = {
   axisZ: [0.35, 0.55, 0.95],
 } as const
 
+/**
+ * The desktop's tool palette (`viewport/view3d/playback.ts` `TOOL_COLORS`), so an operation has the same colour on the
+ * phone as on the desktop.
+ */
+export const OPERATION_PALETTE: ReadonlyArray<Rgb> = [
+  [0.22, 0.74, 0.97],
+  [0.13, 0.77, 0.37],
+  [0.98, 0.45, 0.09],
+  [0.91, 0.47, 0.98],
+  [0.98, 0.8, 0.08],
+  [0.96, 0.25, 0.37],
+  [0.18, 0.83, 0.75],
+  [0.66, 0.55, 0.98],
+  [0.52, 0.8, 0.09],
+  [0.98, 0.57, 0.24],
+] as const
+
+/** The colour of operation `index`, the desktop's `operationColor`. */
+export const operationColor = (index: number): Rgb => OPERATION_PALETTE[index % OPERATION_PALETTE.length]!
+
 export const PREVIEW_MESSAGE = {
   meshTooLarge: "This preview is too large for the phone.",
   meshInvalid: "This preview could not be drawn.",
@@ -160,23 +180,44 @@ const assertPoint = (point: PreviewPoint): void => {
 /** No move runs into the workholding; the common case, shared so the default allocates nothing. */
 const NO_COLLISIONS: ReadonlySet<number> = new Set()
 
+/** How the path is coloured and what it shows. */
+export interface PathStyle {
+  /** The colour of a segment; undefined keeps the move-class colour. */
+  readonly colorOf?: (index: number) => Rgb | undefined
+  /** Segments to leave out: the operations the user put away. */
+  readonly hidden?: (index: number) => boolean
+}
+
 /**
  * Coloured path and stock edges. The playhead is not baked in. Segment indices in `collisions` are drawn red
  * (`machine.collisions`); the stock box is left out of a machine scene (`stock === undefined`), whose outline the
  * bodies carry instead.
+ *
+ * A hidden segment is left out of the buffer, not greyed: the phone shows one operation at a time, like the desktop's
+ * operation browser. The buffer is built in two passes, because its size depends on how many segments are shown.
  */
-export const prepareToolpathLines = (segments: readonly PreviewSegment[], stock: Bounds | undefined, collisions: ReadonlySet<number> = NO_COLLISIONS): Float32Array => {
+export const prepareToolpathLines = (
+  segments: readonly PreviewSegment[],
+  stock: Bounds | undefined,
+  collisions: ReadonlySet<number> = NO_COLLISIONS,
+  style: PathStyle = {},
+): Float32Array => {
   if (segments.length > PREVIEW_MAX_SEGMENTS) throw new PreviewPayloadError("pathTooLarge")
   const edges = stock ? boxEdges(stock) : []
   if (stock && (!finitePoint(stock.min) || !finitePoint(stock.max))) throw new PreviewPayloadError("pathInvalid")
   if (edges.length > PREVIEW_MAX_STOCK_EDGES) throw new PreviewPayloadError("pathTooLarge")
-  const data = new Float32Array((segments.length + edges.length) * SEGMENT_FLOATS)
-  let cursor = 0
+  const shown: number[] = []
   for (let index = 0; index < segments.length; index++) {
+    if (style.hidden?.(index) === true) continue
+    shown.push(index)
+  }
+  const data = new Float32Array((shown.length + edges.length) * SEGMENT_FLOATS)
+  let cursor = 0
+  for (const index of shown) {
     const segment = segments[index]!
     assertPoint(segment.from)
     assertPoint(segment.to)
-    const color = collisions.has(index) ? LINE_COLOR.collision : LINE_COLOR[segment.kind]
+    const color = collisions.has(index) ? LINE_COLOR.collision : style.colorOf?.(index) ?? LINE_COLOR[segment.kind]
     cursor = writeVertex(data, cursor, segment.from, color)
     cursor = writeVertex(data, cursor, segment.to, color)
   }
@@ -258,12 +299,20 @@ export const prepareActiveLine = (
  * Line vertices drawn at full colour vs faded. The path buffer is `segments` first, stock edges after,
  * so `pathVertices` bounds the faded range and the stock box always stays at full colour.
  * Not simulating: everything is "travelled", i.e. the whole path at full colour.
+ *
+ * `travelledSegments` overrides the playhead's own segment count: when operations are hidden, only the segments the
+ * phone shows are in the buffer, so the playhead has passed a different number of them.
  */
-export const progressRange = (playhead: number, segmentCount: number, simulating: boolean): { travelled: number; path: number } => {
+export const progressRange = (
+  playhead: number,
+  segmentCount: number,
+  simulating: boolean,
+  travelledSegments?: number,
+): { travelled: number; path: number } => {
   const count = Math.max(0, Math.trunc(segmentCount))
   if (!simulating || count === 0) return { travelled: count * 2, path: count * 2 }
-  const done = Math.min(count, Math.max(0, Math.trunc(playhead)) + 1)
-  return { travelled: done * 2, path: count * 2 }
+  const done = travelledSegments ?? Math.min(count, Math.max(0, Math.trunc(playhead)) + 1)
+  return { travelled: Math.min(count, Math.max(0, Math.trunc(done))) * 2, path: count * 2 }
 }
 
 /** Tool marker height: a sixth of the part's size, so it reads at every zoom of a fitted view. */

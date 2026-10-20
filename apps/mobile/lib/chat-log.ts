@@ -14,8 +14,9 @@ export type ChatRow =
   /**
    * `queued`: sent while the desktop was busy and not yet taken into the conversation.
    * `offline`: written while the desktop was unreachable; it waits in the outbox and sends when the desktop is back.
+   * `attachments`: the names of the pictures that went with the message.
    */
-  | { kind: "user"; text: string; queued?: boolean; offline?: boolean }
+  | { kind: "user"; text: string; queued?: boolean; offline?: boolean; attachments?: readonly string[] }
   | { kind: "assistant"; text: string; sessionId: string }
   /** The model's reasoning before it answers or calls a tool; consecutive frames fold into one row. */
   | { kind: "reasoning"; text: string; sessionId: string }
@@ -36,6 +37,8 @@ export interface UserEvent {
   text: string
   queued?: boolean
   offline?: boolean
+  /** The names of the pictures sent with the message. */
+  attachments?: readonly string[]
 }
 
 export type LogEvent = ChatEvent | UserEvent
@@ -53,7 +56,7 @@ export const toolImages = (value: unknown): readonly string[] | undefined => {
   return images.length ? images : undefined
 }
 
-const toolLabel = (tool: string): string =>
+export const toolLabel = (tool: string): string =>
   tool
     .replace(/^vcs_/, "")
     .replace(/^cad_/, "")
@@ -66,7 +69,7 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
       // The ChatEvent union has an index-signature fallback, so an unmatched literal narrows to it
       // ("user" → unknown). The explicit cast recovers the UserEvent shape.
       const user = event as UserEvent
-      return [...log, { kind: "user" as const, text: user.text, ...(user.queued ? { queued: true } : {}), ...(user.offline ? { offline: true } : {}) }]
+      return [...log, { kind: "user" as const, text: user.text, ...(user.queued ? { queued: true } : {}), ...(user.offline ? { offline: true } : {}), ...(user.attachments && user.attachments.length > 0 ? { attachments: user.attachments } : {}) }]
     }
 
     case "user_message": {
@@ -175,12 +178,16 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
       // Retry notices describe a wait that is over once the turn finishes.
       const settled = log.filter((row) => row.kind !== "notice" || !row.retry).map((row) => (row.kind === "request" || row.kind === "question") && row.sessionId === done.sessionId ? { ...row, answered: true } : row)
       if (!done.text) return settled
+      // A recovered turn was read back from the desktop after the connection dropped: the transcript says so.
+      const notice: ChatRow[] = done.recovered === true
+        ? [{ kind: "notice", tone: "info", text: "Recovered from the desktop after the connection dropped" }]
+        : []
       let start = settled.length
       while (start > 0 && settled[start - 1]?.kind !== "user") start--
       const current = settled.slice(start).filter((row) => row.kind !== "error")
       const streamed = current.flatMap((row) => row.kind === "assistant" && row.sessionId === done.sessionId ? [row.text] : []).join("")
-      if (streamed === done.text) return [...settled.slice(0, start), ...current]
-      return [...settled.slice(0, start), ...current.filter((row) => row.kind !== "assistant" || row.sessionId !== done.sessionId), { kind: "assistant", sessionId: done.sessionId, text: done.text }]
+      if (streamed === done.text) return [...settled.slice(0, start), ...notice, ...current]
+      return [...settled.slice(0, start), ...notice, ...current.filter((row) => row.kind !== "assistant" || row.sessionId !== done.sessionId), { kind: "assistant", sessionId: done.sessionId, text: done.text }]
     }
 
     case "error": {

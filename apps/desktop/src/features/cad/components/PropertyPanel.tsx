@@ -15,6 +15,8 @@ import { canMakeParametric, makeParametric } from "../lib/makeParametric.ts"
 import { ColorListInput, ElementListInput, NumberField, Point3dInput, PointListInput, Vector3Input } from "./property-inputs/index.ts"
 
 const SOLID_TYPES_FOR_SURFACING = new Set(["box", "cube", "cylinder", "sphere", "cone", "torus", "extrude", "revolve"])
+/** The fields that draw their own label: the panel must not repeat it above them. */
+const SELF_LABELLED = new Set(["vector3", "point3d", "pointList", "list", "colorList"])
 
 type Props = Record<string, any>
 
@@ -207,7 +209,7 @@ export default function PropertyPanel(): JSX.Element {
               <For each={fields()}>{(field) =>
                 <Show when={!field.showIf || field.showIf(properties())}>
                   <Motion.div {...rise}>
-                    <Show when={field.type !== "vector3" && field.type !== "point3d"}><label for={field.name} class={LABEL}>{field.label}</label></Show>
+                    <Show when={!SELF_LABELLED.has(field.type)}><label for={field.name} class={LABEL}>{field.label}</label></Show>
                     {control(field)}
                   </Motion.div>
                 </Show>}

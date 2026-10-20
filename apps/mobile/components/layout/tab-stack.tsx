@@ -1,8 +1,12 @@
+import type { ReactNode } from "react"
 import { Stack } from "expo-router"
 import { useTheme } from "@/lib/theme"
 
-/** Every tab owns a native stack, so titles, status-bar insets and back gestures have one owner. */
-export function TabStack({ title, largeTitle = true }: { title: string; largeTitle?: boolean }) {
+/**
+ * Every tab owns a native stack, so titles, status-bar insets and back gestures have one owner.
+ * `children` registers the tab's own pushed screens (a list inside the tab, a detail sheet).
+ */
+export function TabStack({ title, largeTitle = true, children }: { title: string; largeTitle?: boolean; children?: ReactNode }) {
   const { palette } = useTheme()
   return (
     <Stack screenOptions={{
@@ -16,6 +20,7 @@ export function TabStack({ title, largeTitle = true }: { title: string; largeTit
       contentStyle: { backgroundColor: palette.background },
     }}>
       <Stack.Screen name="index" options={{ title }} />
+      {children}
     </Stack>
   )
 }

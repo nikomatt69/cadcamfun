@@ -29,6 +29,12 @@ describe("feeds from the program", () => {
   test("lowercase words and decimals parse", () => {
     expect(modalFeeds("g1 x1 f250.5")[1]).toBe(250.5)
   })
+  test("a program with Windows line endings reads the same", () => {
+    expect(modalFeeds("G1 X1 F250\r\nG1 X2\r\n")).toEqual([undefined, 250, 250, 250])
+  })
+  test("an empty program has no lines", () => {
+    expect(modalFeeds("")).toEqual([undefined])
+  })
 })
 
 describe("feeds match the desktop simulator", () => {

@@ -7170,6 +7170,29 @@ export type WorkspaceToolpathPreviewOutput = {
     }>
     spin: Array<{ segment: number; rate: number }>
     collisions: Array<number>
+    operations?: Array<{
+      index: number
+      name: string
+      toolId: string
+      startSegment: number
+      endSegment: number
+      cutter?: {
+        diameter: number
+        fluteLength: number
+        shankDiameter: number
+        stickout: number
+        noseRadius: number
+        holder: { diameter: number; length: number; kind: string; assumed: boolean }
+      }
+    }>
+    events?: Array<{
+      code: string
+      severity: "error" | "warning"
+      seconds: number
+      segment: number
+      line?: number
+      message: string
+    }>
     tool: {
       family: "mill" | "lathe" | "nozzle"
       diameter: number

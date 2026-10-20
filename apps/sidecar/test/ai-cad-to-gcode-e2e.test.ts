@@ -119,7 +119,8 @@ describe("specialist CAD → DFM → checked plan → CAM → review", () => {
     await step(id, "machinist", "cam_edit", { action: "generate", operationId: op })
     const gcode = await program(id, op)
     expect(gcode).toMatch(/; Tool: turning/)
-    expect(gcode).toMatch(/; Stock: Ø50mm x 130mm/)
+    // The bar is the 130 mm profile plus the 20 mm the chuck grips and the 2 mm of jaw clearance in front of it.
+    expect(gcode).toMatch(/; Stock: Ø50mm x 152mm/)
     const finish = gcode.slice(gcode.indexOf("; Finishing pass"))
     for (const diameter of [20, 25, 30]) expect(finish).toContain(`G1 X${diameter.toFixed(3)}`)
     expect(finish).toContain("Z-130.000")

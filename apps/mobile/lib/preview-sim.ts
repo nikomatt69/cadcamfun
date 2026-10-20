@@ -77,18 +77,26 @@ const stripComments = (line: string): string => line.replace(/\([^)]*\)/g, " ").
 /**
  * Modal feed in effect on each line, 1-based like the listing (index 0 unused).
  * `undefined` until the program sets a positive feed.
+ *
+ * The program is scanned line by line instead of being split into an array: a big program holds hundreds of
+ * thousands of lines, and the phone must not pay for a copy of every one of them.
  */
 export const modalFeeds = (gcode: string): Array<number | undefined> => {
-  const lines = gcode.split(/\r?\n/)
-  const feeds: Array<number | undefined> = new Array(lines.length + 1)
+  const feeds: Array<number | undefined> = [undefined]
   let feed: number | undefined
-  for (let index = 0; index < lines.length; index++) {
-    const match = FEED_WORD.exec(stripComments(lines[index]!))
+  let start = 0
+  for (;;) {
+    const end = gcode.indexOf("\n", start)
+    const raw = end < 0 ? gcode.slice(start) : gcode.slice(start, end)
+    const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw
+    const match = FEED_WORD.exec(stripComments(line))
     if (match) {
       const value = Number(match[1])
       if (Number.isFinite(value) && value > 0) feed = value
     }
-    feeds[index + 1] = feed
+    feeds.push(feed)
+    if (end < 0) break
+    start = end + 1
   }
   return feeds
 }

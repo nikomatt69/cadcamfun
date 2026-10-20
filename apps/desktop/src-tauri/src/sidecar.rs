@@ -125,7 +125,13 @@ struct LineBuffer {
 }
 
 impl LineBuffer {
+    #[inline(always)]
     fn push(&mut self, chunk: &[u8]) -> Vec<String> {
+        // Keep very small fragments cheap: iterator setup and bulk-copy bookkeeping
+        // cost more than the original byte path when a pipe splits every byte.
+        if chunk.len() > 16 {
+            return self.push_large(chunk);
+        }
         let mut lines = Vec::new();
         for &byte in chunk {
             if byte == b'\n' {
@@ -141,6 +147,39 @@ impl LineBuffer {
                 } else {
                     self.pending.push(byte);
                 }
+            }
+        }
+        lines
+    }
+
+    fn push_large(&mut self, chunk: &[u8]) -> Vec<String> {
+        let mut lines = Vec::new();
+        for part in chunk.split_inclusive(|&byte| byte == b'\n') {
+            let complete = part.last() == Some(&b'\n');
+            let bytes = if complete {
+                &part[..part.len() - 1]
+            } else {
+                part
+            };
+            if !self.discarding {
+                if bytes.len() > MAX_LINE_BYTES - self.pending.len() {
+                    self.pending.clear();
+                    self.discarding = true;
+                } else if complete && self.pending.is_empty() {
+                    // Most log records arrive whole. Decode them directly rather than
+                    // copying into the fragment buffer and then copying out again.
+                    lines.push(String::from_utf8_lossy(bytes).into_owned());
+                    continue;
+                } else {
+                    self.pending.extend_from_slice(bytes);
+                }
+            }
+            if complete {
+                if !self.discarding {
+                    lines.push(String::from_utf8_lossy(&self.pending).into_owned());
+                }
+                self.pending.clear();
+                self.discarding = false;
             }
         }
         lines
@@ -201,21 +240,112 @@ fn convert_event(event: CommandEvent) -> Option<ProcEvent> {
     }
 }
 
-fn proc_log_level(is_stderr: bool, line: &str) -> log::Level {
-    let structured = serde_json::from_str::<serde_json::Value>(line).ok();
-    match structured
-        .as_ref()
-        .and_then(|record| record.get("level"))
-        .and_then(|level| level.as_str())
-    {
-        Some("TRACE") => log::Level::Trace,
-        Some("DEBUG") => log::Level::Debug,
-        Some("INFO") => log::Level::Info,
-        Some("WARN") | Some("WARNING") => log::Level::Warn,
-        Some("ERROR") | Some("FATAL") => log::Level::Error,
-        _ if is_stderr => log::Level::Warn,
-        _ => log::Level::Info,
+fn named_log_level(level: &str) -> Option<log::Level> {
+    match level {
+        "TRACE" => Some(log::Level::Trace),
+        "DEBUG" => Some(log::Level::Debug),
+        "INFO" => Some(log::Level::Info),
+        "WARN" | "WARNING" => Some(log::Level::Warn),
+        "ERROR" | "FATAL" => Some(log::Level::Error),
+        _ => None,
     }
+}
+
+struct RecordLevel(Option<log::Level>);
+
+/// Validate metadata with the same JSON number/string/depth rules as Value,
+/// without retaining its object/array/string tree. IgnoredAny skips some of those
+/// checks, which would change the severity fallback for malformed diagnostics.
+struct LogMetadata;
+
+impl<'de> Deserialize<'de> for LogMetadata {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct MetadataVisitor;
+        impl<'de> serde::de::Visitor<'de> for MetadataVisitor {
+            type Value = LogMetadata;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("JSON metadata")
+            }
+            fn visit_bool<E: serde::de::Error>(self, _: bool) -> Result<Self::Value, E> {
+                Ok(LogMetadata)
+            }
+            fn visit_i64<E: serde::de::Error>(self, _: i64) -> Result<Self::Value, E> {
+                Ok(LogMetadata)
+            }
+            fn visit_u64<E: serde::de::Error>(self, _: u64) -> Result<Self::Value, E> {
+                Ok(LogMetadata)
+            }
+            fn visit_f64<E: serde::de::Error>(self, _: f64) -> Result<Self::Value, E> {
+                Ok(LogMetadata)
+            }
+            fn visit_str<E: serde::de::Error>(self, _: &str) -> Result<Self::Value, E> {
+                Ok(LogMetadata)
+            }
+            fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+                Ok(LogMetadata)
+            }
+            fn visit_seq<S: serde::de::SeqAccess<'de>>(
+                self,
+                mut seq: S,
+            ) -> Result<Self::Value, S::Error> {
+                while seq.next_element::<LogMetadata>()?.is_some() {}
+                Ok(LogMetadata)
+            }
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                mut map: M,
+            ) -> Result<Self::Value, M::Error> {
+                while map.next_key::<LogMetadata>()?.is_some() {
+                    map.next_value::<LogMetadata>()?;
+                }
+                Ok(LogMetadata)
+            }
+        }
+        deserializer.deserialize_any(MetadataVisitor)
+    }
+}
+
+impl<'de> Deserialize<'de> for RecordLevel {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct LevelVisitor;
+        impl<'de> serde::de::Visitor<'de> for LevelVisitor {
+            type Value = RecordLevel;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a structured log object")
+            }
+
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                mut map: M,
+            ) -> Result<Self::Value, M::Error> {
+                let mut level = None;
+                while let Some(key) = map.next_key::<Cow<'de, str>>()? {
+                    if key == "level" {
+                        let value = map.next_value::<serde_json::Value>()?;
+                        level = value.as_str().and_then(named_log_level);
+                    } else {
+                        // Large messages, annotations and spans do not need a second
+                        // allocation tree just to determine the native log severity.
+                        map.next_value::<LogMetadata>()?;
+                    }
+                }
+                Ok(RecordLevel(level))
+            }
+        }
+        deserializer.deserialize_map(LevelVisitor)
+    }
+}
+
+fn proc_log_level(is_stderr: bool, line: &str) -> log::Level {
+    serde_json::from_str::<RecordLevel>(line)
+        .ok()
+        .and_then(|record| record.0)
+        .unwrap_or(if is_stderr {
+            log::Level::Warn
+        } else {
+            log::Level::Info
+        })
 }
 
 fn log_proc_line(is_stderr: bool, line: &str, token: &str) {
@@ -977,6 +1107,47 @@ mod tests {
     }
 
     #[test]
+    fn severity_probe_matches_the_full_json_reference() {
+        let deeply_nested = format!(
+            r#"{{"level":"INFO","metadata":{}0{}}}"#,
+            "[".repeat(128),
+            "]".repeat(128)
+        );
+        let records = [
+            r#"{"level":"DEBUG","message":{"spans":["nested",{"key":"value"}]}}"#,
+            r#"{"level":"WARN","level":"INFO"}"#,
+            r#"{"level":"INFO","level":null}"#,
+            r#"{"level":{},"annotations":[1,2,3]}"#,
+            r#"{"level":"\u0045RROR","annotations":{"level":"INFO"}}"#,
+            r#"{"le\u0076el":"WARNING"}"#,
+            r#"{"level":"FATAL"} trailing garbage"#,
+            r#"{"level":"TRACE","invalid":}"#,
+            r#"["INFO"]"#,
+            r#"null"#,
+            r#"{"level":"unknown"}"#,
+            r#"{"level":"INFO","metadata":1e400}"#,
+            r#"{"level":"INFO","metadata":"\uD800"}"#,
+            deeply_nested.as_str(),
+        ];
+        for line in records {
+            for is_stderr in [false, true] {
+                let old = serde_json::from_str::<serde_json::Value>(line).ok();
+                let expected = old
+                    .as_ref()
+                    .and_then(|record| record.get("level"))
+                    .and_then(|level| level.as_str())
+                    .and_then(named_log_level)
+                    .unwrap_or(if is_stderr {
+                        log::Level::Warn
+                    } else {
+                        log::Level::Info
+                    });
+                assert_eq!(proc_log_level(is_stderr, line), expected, "{line}");
+            }
+        }
+    }
+
+    #[test]
     fn restart_budget_is_spent_once() {
         let mut restarts = 0;
         assert_eq!(take_restart(&mut restarts), Some(0));
@@ -1157,6 +1328,50 @@ mod tests {
         assert!(buffer.push(&vec![b'x'; MAX_LINE_BYTES + 100]).is_empty());
         assert!(buffer.pending.is_empty());
         assert_eq!(buffer.push(b"discarded\nnext\n"), vec!["next"]);
+    }
+
+    #[test]
+    fn framing_matches_whole_stream_decoding_for_arbitrary_chunks() {
+        let mut input = b"\n\r\n{\"event\":\"ready\",\"port\":42}\n".to_vec();
+        input.extend_from_slice("split UTF-8: é🙂\n".as_bytes());
+        input.extend_from_slice(b"invalid UTF-8: \xff\xfe\n");
+        input.extend_from_slice(&vec![b'a'; MAX_LINE_BYTES]);
+        input.push(b'\n');
+        input.extend_from_slice(&vec![b'b'; MAX_LINE_BYTES + 1]);
+        input.extend_from_slice(b"\nrecovered\n");
+        let expected: Vec<String> = input[..input.len() - 1]
+            .split(|&byte| byte == b'\n')
+            .filter(|line| line.len() <= MAX_LINE_BYTES)
+            .map(|line| String::from_utf8_lossy(line).into_owned())
+            .collect();
+        for width in [1, 2, 3, 7, 97, MAX_LINE_BYTES, MAX_LINE_BYTES * 4] {
+            let mut buffer = LineBuffer::default();
+            let actual: Vec<String> = input
+                .chunks(width)
+                .flat_map(|chunk| buffer.push(chunk))
+                .collect();
+            assert_eq!(actual, expected, "chunk width {width}");
+            assert!(buffer.pending.is_empty());
+            assert!(!buffer.discarding);
+        }
+    }
+
+    #[test]
+    fn framing_retains_the_exact_limit_and_discards_one_byte_more() {
+        for len in [MAX_LINE_BYTES - 1, MAX_LINE_BYTES, MAX_LINE_BYTES + 1] {
+            let mut input = vec![b'x'; len];
+            input.extend_from_slice(b"\nnext\n");
+            for split in [0, 1, len - 1, len, len + 1, input.len()] {
+                let mut buffer = LineBuffer::default();
+                let mut actual = buffer.push(&input[..split]);
+                actual.extend(buffer.push(&input[split..]));
+                if len <= MAX_LINE_BYTES {
+                    assert_eq!(actual, vec!["x".repeat(len), "next".into()]);
+                } else {
+                    assert_eq!(actual, vec!["next"]);
+                }
+            }
+        }
     }
 
     #[tokio::test]

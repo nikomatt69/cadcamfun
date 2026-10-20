@@ -16,6 +16,7 @@ use crate::secrets::{self, SecretError};
 use crate::sidecar::{SidecarEndpoint, SidecarError, SidecarHandle, READY_TIMEOUT};
 use crate::tray;
 use crate::updater;
+use crate::viewport_geometry::{self, ViewportPreparation};
 
 /// Extensions that would execute code if "opened" by the OS shell.
 const EXECUTABLE_EXTENSIONS: &[&str] = &[
@@ -36,6 +37,10 @@ pub enum CommandError {
     Dialog(String),
     #[error("path resolution failed: {0}")]
     Path(String),
+    #[error("invalid viewport preparation request: {0}")]
+    Viewport(String),
+    #[error("native viewport preparation is busy")]
+    ViewportBusy,
     #[error(transparent)]
     Update(#[from] updater::UpdateError),
 }
@@ -48,6 +53,34 @@ impl From<SidecarError> for CommandError {
 
 /// Waits long enough to cover one restart (two ready timeouts) plus slack.
 const ENDPOINT_WAIT: Duration = Duration::from_secs(READY_TIMEOUT.as_secs() * 2 + 5);
+
+/// Raw CGE1 in, raw CEL1 out: no large JSON arrays across the webview seam.
+#[tauri::command]
+pub async fn prepare_viewport_edges(
+    request: tauri::ipc::Request<'_>,
+    jobs: State<'_, ViewportPreparation>,
+) -> Result<tauri::ipc::Response, CommandError> {
+    let bytes = match request.body() {
+        tauri::ipc::InvokeBody::Raw(bytes) if bytes.len() <= viewport_geometry::MAX_INPUT_BYTES => {
+            bytes
+        }
+        _ => {
+            return Err(CommandError::Viewport(
+                "expected a bounded raw CGE1 body".into(),
+            ))
+        }
+    };
+    let permit = jobs.try_admit().ok_or(CommandError::ViewportBusy)?;
+    let owned = bytes.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        viewport_geometry::prepare_edges(&owned)
+            .map(tauri::ipc::Response::new)
+            .map_err(|error| CommandError::Viewport(error.to_string()))
+    })
+    .await
+    .map_err(|error| CommandError::Viewport(error.to_string()))?
+}
 
 #[tauri::command]
 pub async fn get_sidecar_endpoint(
@@ -365,6 +398,15 @@ mod tests {
     fn command_errors_serialise_with_kind() {
         let json = serde_json::to_string(&CommandError::InvalidPath("p".into())).expect("json");
         assert_eq!(json, r#"{"kind":"invalid_path","message":"p"}"#);
+        assert_eq!(
+            serde_json::to_string(&CommandError::ViewportBusy).expect("busy error"),
+            r#"{"kind":"viewport_busy"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&CommandError::Viewport("invalid".into()))
+                .expect("viewport error"),
+            r#"{"kind":"viewport","message":"invalid"}"#
+        );
     }
 
     #[test]

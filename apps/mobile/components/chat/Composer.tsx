@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native"
-import { ArrowUp, ChevronDown, Plus, Shield, Square } from "lucide-react-native"
+import { ArrowUp, Camera, ChevronDown, Plus, Shield, Square, X } from "lucide-react-native"
 import Animated from "react-native-reanimated"
 import { AdaptiveBlur } from "@/components/GlassView"
 import { hexToRgba, useTheme } from "@/lib/theme"
@@ -8,6 +8,7 @@ import { haptic } from "@/lib/haptics"
 import { usePressScale } from "@/lib/animation"
 import { layout } from "@/lib/layout"
 import { useContentLayout } from "@/components/layout/use-content-layout"
+import type { PendingAttachment } from "@/lib/attachments"
 
 export type AssistantMode = "general" | "cad" | "cam" | "gcode" | "toolpath"
 
@@ -39,6 +40,9 @@ export function Composer({
   seed,
   seedToken,
   modelLabel, permissionLabel, onOpenModels, onOpenControls, status,
+  attachments = [],
+  onAddAttachment,
+  onRemoveAttachment,
 }: {
   busy: boolean
   /** The desktop is unreachable: a message is saved to the outbox instead of starting a turn. */
@@ -61,6 +65,12 @@ export function Composer({
   onOpenControls(): void
   /** Live phase of the desktop turn (step, tool, retries, tokens); shown while busy. */
   status?: string
+  /** Pictures waiting to go with the next message. */
+  attachments?: readonly PendingAttachment[]
+  /** Opens the camera for a picture of the part. */
+  onAddAttachment?: () => void
+  /** Removes a picture the user no longer wants to send. */
+  onRemoveAttachment?: (index: number) => void
 }) {
   const { palette, glass, isDark } = useTheme()
   const content = useContentLayout()
@@ -113,6 +123,31 @@ export function Composer({
           opaqueFallbackColor={palette.surface}
           style={{ paddingTop: 5 }}
         >
+          {/* The pictures that go with the next message: visible, and removable. */}
+          {attachments.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingTop: 6 }}
+            >
+              {attachments.map((attachment, index) => (
+                <View key={`${attachment.name}-${index}`} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 10, paddingRight: 4, paddingVertical: 5, borderRadius: 999, backgroundColor: hexToRgba(palette.accent, 0.12) }}>
+                  <Camera size={14} color={palette.accent} />
+                  <Text numberOfLines={1} style={{ maxWidth: 150, color: palette.soft, fontSize: 12, fontWeight: "600" }}>{attachment.name}</Text>
+                  <Pressable
+                    onPress={() => { haptic("selection"); onRemoveAttachment?.(index) }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${attachment.name}`}
+                    style={({ pressed }) => ({ width: 28, height: 28, alignItems: "center", justifyContent: "center", borderRadius: 14, opacity: pressed ? 0.6 : 1 })}
+                  >
+                    <X size={13} color={palette.muted} />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          ) : null}
+
           <View style={{ minHeight: 52, flexDirection: stacked ? "column" : "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 10, paddingTop: 7, paddingBottom: 7 }}>
             <View style={{ flex: stacked ? undefined : 1, alignSelf: stacked ? "stretch" : undefined, minWidth: 0, justifyContent: "center", paddingLeft: 6, paddingVertical: 5 }}>
               {disabled ? (
@@ -188,6 +223,9 @@ export function Composer({
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingBottom: 5 }}>
             <Pressable onPress={onOpenControls} accessibilityRole="button" accessibilityLabel="Tools, permissions and session controls" style={({ pressed }) => ({ minWidth: 44, minHeight: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.ink, pressed ? 0.13 : 0.06) })}><Plus size={20} color={palette.soft} /></Pressable>
+            {onAddAttachment ? (
+              <Pressable onPress={onAddAttachment} accessibilityRole="button" accessibilityLabel="Take a photo of the part" style={({ pressed }) => ({ minWidth: 44, minHeight: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.ink, pressed ? 0.13 : 0.06) })}><Camera size={19} color={palette.soft} /></Pressable>
+            ) : null}
             <Pressable onPress={onOpenModels} accessibilityRole="button" accessibilityLabel={`Model: ${modelLabel}. Change provider, model or thinking effort`} style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 44, paddingHorizontal: 10, gap: 6, flexDirection: "row", alignItems: "center", borderRadius: 16, backgroundColor: pressed ? hexToRgba(palette.ink, 0.06) : "transparent" })}>
               <Text numberOfLines={stacked ? undefined : 1} style={{ flexShrink: 1, color: palette.soft, fontSize: 12, fontWeight: "600" }}>{modelLabel}</Text><ChevronDown size={13} color={palette.muted} />
             </Pressable>

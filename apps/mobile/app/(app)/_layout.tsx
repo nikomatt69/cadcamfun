@@ -4,6 +4,8 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { NetworkBanner } from "@/components/layout/NetworkBanner"
 import { useTheme } from "@/lib/theme"
 import { useServer } from "@/lib/server"
+import { useUIStore } from "@/lib/store"
+import { usePoll } from "@/lib/use-poll"
 
 /**
  * The signed-in shell: four native tabs (the platform's real tab bar — its materials, transitions
@@ -17,9 +19,18 @@ import { useServer } from "@/lib/server"
  */
 export default function AppLayout() {
   const { palette } = useTheme()
-  const { connectivity } = useServer()
+  const { client, connectivity } = useServer()
   const showConnection = !["online", "disconnected", "background"].includes(connectivity)
+  const unread = useUIStore((state) => state.unreadCount)
+  const setUnreadCount = useUIStore((state) => state.setUnreadCount)
   const nativeAccessory = Platform.OS === "ios" && Number.parseInt(String(Platform.Version), 10) >= 26
+
+  // The badge tells the user there is something to read without opening the app: one cheap read of the
+  // count, not the whole feed.
+  usePoll(() => {
+    if (!client) return
+    void client.notifications({ limit: 1 }).then((feed) => setUnreadCount(feed.unreadCount)).catch(() => undefined)
+  }, 30_000, connectivity === "online")
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
@@ -39,6 +50,7 @@ export default function AppLayout() {
         <NativeTabs.Trigger name="activity">
           <NativeTabs.Trigger.Icon sf={{ default: "bell", selected: "bell.fill" }} md="notifications" />
           <NativeTabs.Trigger.Label>Activity</NativeTabs.Trigger.Label>
+          {unread > 0 ? <NativeTabs.Trigger.Badge>{String(unread)}</NativeTabs.Trigger.Badge> : null}
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="settings">
           <NativeTabs.Trigger.Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} md="settings" />

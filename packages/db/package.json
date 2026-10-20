@@ -6,7 +6,9 @@
   "scripts": {
     "typecheck": "bun check -p tsconfig.json",
     "generate": "drizzle-kit generate",
-    "migrate": "bun src/migrate.ts"
+    "migrate": "bun src/migrate.ts",
+    "storage": "bun --no-env-file src/storage-cli.ts",
+    "demo": "bun --no-env-file src/demo-cli.ts"
   },
   "dependencies": {
     "drizzle-orm": "1.0.0-beta.22",

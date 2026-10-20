@@ -52,6 +52,20 @@ export const ComponentPreview = Schema.Struct({
 })
 export type ComponentPreview = typeof ComponentPreview.Type
 
+/**
+ * The part a program cuts, as a mesh: the drawing the document was made from. The phone draws it beside the path,
+ * like the desktop's CAM preview draws the workpiece.
+ */
+export const PartPreview = Schema.Struct({
+  positions: Schema.Array(Schema.Number),
+  indices: Schema.Array(Schema.Number),
+  normals: Schema.Array(Schema.Number),
+  bounds: PreviewBounds,
+  parts: Schema.Array(MeshPart),
+  truncated: Schema.Boolean,
+})
+export type PartPreview = typeof PartPreview.Type
+
 export const ToolpathStats = Schema.Struct({
   rapidMoves: Schema.Number,
   linearMoves: Schema.Number,
@@ -116,6 +130,47 @@ export type PreviewToolGlyph = typeof PreviewToolGlyph.Type
 export const PreviewSpinRun = Schema.Struct({ segment: Schema.Number, rate: Schema.Number })
 export type PreviewSpinRun = typeof PreviewSpinRun.Type
 
+/**
+ * The real cutter of an operation: the tool the program runs, drawn at the playhead. The phone draws it with these
+ * numbers instead of a generic marker (preview format 4).
+ */
+export const PreviewCutter = Schema.Struct({
+  diameter: Schema.Number,
+  fluteLength: Schema.Number,
+  shankDiameter: Schema.Number,
+  stickout: Schema.Number,
+  noseRadius: Schema.Number,
+  holder: Schema.Struct({
+    diameter: Schema.Number,
+    length: Schema.Number,
+    kind: Schema.String,
+    assumed: Schema.Boolean,
+  }),
+})
+export type PreviewCutter = typeof PreviewCutter.Type
+
+/** One operation of a program: a toolpath and the run of path segments it drew. */
+export const PreviewOperation = Schema.Struct({
+  index: Schema.Number,
+  name: Schema.String,
+  toolId: Schema.String,
+  startSegment: Schema.Number,
+  endSegment: Schema.Number,
+  cutter: Schema.optionalKey(PreviewCutter),
+})
+export type PreviewOperation = typeof PreviewOperation.Type
+
+/** A contact on the playback clock: the tool into the workholding, into the stock left, a near miss. */
+export const PreviewCollisionEvent = Schema.Struct({
+  code: Schema.String,
+  severity: Schema.Literals(["error", "warning"]),
+  seconds: Schema.Number,
+  segment: Schema.Number,
+  line: Schema.optionalKey(Schema.Number),
+  message: Schema.String,
+})
+export type PreviewCollisionEvent = typeof PreviewCollisionEvent.Type
+
 export const PreviewMachine = Schema.Struct({
   kind: Schema.Literals(["mill", "lathe", "3dprinter"]),
   source: Schema.Literals(["override", "kernel", "generator", "inferred", "settings"]),
@@ -133,6 +188,10 @@ export const PreviewMachine = Schema.Struct({
   spin: Schema.Array(PreviewSpinRun),
   /** Indices of the segments whose move runs into the workholding (drawn red). */
   collisions: Schema.Array(Schema.Number),
+  /** The program's operations (preview format 4); absent in an older server's payload. */
+  operations: Schema.optionalKey(Schema.Array(PreviewOperation)),
+  /** The contacts on the playback clock (preview format 4); absent in an older server's payload. */
+  events: Schema.optionalKey(Schema.Array(PreviewCollisionEvent)),
   tool: PreviewToolGlyph,
 })
 export type PreviewMachine = typeof PreviewMachine.Type
@@ -145,6 +204,8 @@ export const ToolpathPreview = Schema.Struct({
   stats: ToolpathStats,
   /** Present when the payload carries the machine scene (format 3); absent in older servers. */
   machine: Schema.optionalKey(PreviewMachine),
+  /** The part the program cuts (format 4); absent when the document names no drawing. */
+  part: Schema.optionalKey(PartPreview),
   revision: Schema.String,
 })
 export type ToolpathPreview = typeof ToolpathPreview.Type

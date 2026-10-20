@@ -1,4 +1,134 @@
 import { cam, type Vec3 } from "@cadcamfun/core"
+import { allocatePlaybackBuffer, BUFFER_VERSION, type PlaybackBuffer } from "@cadcamfun/buffer"
+
+/**
+ * The playback of a program: its segments as typed arrays, not as objects.
+ *
+ * A program is thousands to millions of segments, and one object per segment costs hundreds of megabytes of
+ * heap. The segments live in the packed layout of `@cadcamfun/buffer`, so the same bytes can travel over the
+ * wire and be drawn without a copy (spec 36 §3).
+ */
+export type Playback = PlaybackBuffer
+
+/** An empty playback, for a program that is not there yet. */
+export const emptyPlayback = (): Playback => {
+  const writer = allocatePlaybackBuffer(0)
+  const end = { x: 0, y: 0, z: 0 }
+  return { version: BUFFER_VERSION, segmentCount: 0, views: writer.views, toolIds: writer.toolIds, duration: 0, end, bytes: writer.finalize(0, end) }
+}
+
+/** The number of chords an arc is drawn with: the sweep, at the chord height the tolerance allows. */
+const arcChordCount = (from: Vec3, move: cam.ArcMove, tolerance: number): number => {
+  const radius = Math.hypot(from.x - move.center.x, from.y - move.center.y)
+  const sweep = cam.arcSweepBetween(from, move.to, move.center, move.clockwise)
+  const step = 2 * Math.acos(Math.max(-1, Math.min(1, 1 - Math.max(1e-6, tolerance) / Math.max(radius, 1e-6))))
+  return Math.min(65536, Math.max(2, Math.ceil(sweep / Math.max(step, 1e-6))))
+}
+
+/** How long a move takes, in seconds. */
+const moveDuration = (move: Extract<cam.Move, { readonly _tag: "Rapid" | "Linear" | "Arc" }>, from: Vec3, rapidRate: number): number =>
+  cam.moveLength(move, from) / Math.max(1e-6, move._tag === "Rapid" ? rapidRate : move.feed) * 60
+
+/** The tool ids of a program, in the order the program first uses them. */
+const toolTable = (program: cam.Program): { readonly ids: readonly string[]; readonly index: ReadonlyMap<string, number> } => {
+  const ids: string[] = []
+  const index = new Map<string, number>()
+  for (const path of program.toolpaths) {
+    if (index.has(path.toolId)) continue
+    index.set(path.toolId, ids.length)
+    ids.push(path.toolId)
+  }
+  return { ids, index }
+}
+
+/**
+ * The program's segments, counted.
+ *
+ * The count has to be known before the buffer exists, so the program is walked twice: once to count, once to
+ * fill. Both walks use the same helpers, and the filling walk refuses to write past the count, so a
+ * divergence between the two is a loud failure rather than a corrupted buffer.
+ */
+const countSegments = (program: cam.Program, tolerance: number, start: Vec3): number => {
+  let count = 0
+  let from: Vec3 = start
+  for (const path of program.toolpaths) {
+    for (const move of cam.expandMoves(path.moves, from)) {
+      if (move._tag === "Comment" || move._tag === "Orient" || move._tag === "Cycle") continue
+      if (move._tag === "Dwell") { count++; continue }
+      if (move._tag === "Arc") { count += arcChordCount(from, move, tolerance); from = move.to; continue }
+      count++
+      from = move.to
+    }
+  }
+  return count
+}
+
+/**
+ * The playback of a program: every move as a segment, every arc as its chords.
+ *
+ * `start` is where the machine is before the first move (the origin when not given, as before; see
+ * `cam.viewer.programStart`).
+ */
+export const buildPlayback = (
+  program: cam.Program,
+  rapidRate = 5000,
+  tolerance = 0.1,
+  start: Vec3 = { x: 0, y: 0, z: 0 },
+): Playback => {
+  const tools = toolTable(program)
+  const segmentCount = countSegments(program, tolerance, start)
+  const writer = allocatePlaybackBuffer(segmentCount, tools.ids)
+  const { views } = writer
+  let index = 0
+  let from: Vec3 = start
+  let time = 0
+  const write = (
+    segmentFrom: Vec3,
+    segmentTo: Vec3,
+    rapid: boolean,
+    duration: number,
+    path: number,
+    move: number,
+    tool: number,
+  ): void => {
+    if (index >= segmentCount) throw new RangeError("the playback has more segments than it counted")
+    const at = index * 3
+    views.starts[index] = time
+    views.durations[index] = duration
+    views.from[at] = segmentFrom.x; views.from[at + 1] = segmentFrom.y; views.from[at + 2] = segmentFrom.z
+    views.to[at] = segmentTo.x; views.to[at + 1] = segmentTo.y; views.to[at + 2] = segmentTo.z
+    views.pathIndex[index] = path
+    views.moveIndex[index] = move
+    views.toolIndex[index] = tool
+    views.rapid[index] = rapid ? 1 : 0
+    index++
+    time += duration
+  }
+  for (const [path, toolpath] of program.toolpaths.entries()) {
+    const tool = tools.index.get(toolpath.toolId) ?? 0
+    for (const [move, entry] of cam.expandMoves(toolpath.moves, from).entries()) {
+      if (entry._tag === "Comment" || entry._tag === "Orient" || entry._tag === "Cycle") continue
+      if (entry._tag === "Dwell") { write(from, from, false, entry.seconds, path, move, tool); continue }
+      const duration = moveDuration(entry, from, rapidRate)
+      if (entry._tag !== "Arc") { write(from, entry.to, entry._tag === "Rapid", duration, path, move, tool); from = entry.to; continue }
+      const origin = from
+      const radius = Math.hypot(from.x - entry.center.x, from.y - entry.center.y)
+      const sweep = cam.arcSweepBetween(from, entry.to, entry.center, entry.clockwise)
+      const angle = Math.atan2(from.y - entry.center.y, from.x - entry.center.x)
+      const count = arcChordCount(from, entry, tolerance)
+      for (let i = 1; i <= count; i++) {
+        const t = i / count, a = angle + (entry.clockwise ? -1 : 1) * sweep * t
+        const to = i === count
+          ? entry.to
+          : { x: entry.center.x + radius * Math.cos(a), y: entry.center.y + radius * Math.sin(a), z: origin.z + (entry.to.z - origin.z) * t }
+        write(from, to, false, duration / count, path, move, tool)
+        from = to
+      }
+    }
+  }
+  const bytes = writer.finalize(time, from)
+  return { version: BUFFER_VERSION, segmentCount, views, toolIds: writer.toolIds, duration: time, end: from, bytes }
+}
 
 export interface PlaybackSegment {
   readonly from: Vec3
@@ -6,65 +136,57 @@ export interface PlaybackSegment {
   readonly rapid: boolean
   readonly start: number
   readonly duration: number
-  /** The tool cutting it (the toolpath's `toolId`), so the preview can colour each tool. */
   readonly toolId: string
-  /** Toolpath and index in `expandMoves(path.moves)` of the move it belongs to (the motion track's index). */
   readonly path: number
   readonly index: number
 }
-export interface Playback { readonly segments: readonly PlaybackSegment[]; readonly duration: number; readonly end: Vec3 }
 
-/** `start`: where the machine is before the first move (the origin when not given, as before; see `cam.viewer.programStart`). */
-export const buildPlayback = (program: cam.Program, rapidRate = 5000, tolerance = 0.1, start: Vec3 = { x: 0, y: 0, z: 0 }): Playback => {
-  const segments: PlaybackSegment[] = []
-  let from: Vec3 = start, time = 0
-  let toolId = ""
-  let pathIndex = 0, moveIndex = 0
-  const append = (to: Vec3, rapid: boolean, duration: number) => {
-    segments.push({ from, to, rapid, start: time, duration, toolId, path: pathIndex, index: moveIndex }); time += duration; from = to
+/** Materialize only the segment a consumer needs; no retained object-per-move array. */
+export const playbackSegmentAt = (playback: Playback, index: number): PlaybackSegment | undefined => {
+  if (!Number.isInteger(index) || index < 0 || index >= playback.segmentCount) return undefined
+  const v = playback.views, at = index * 3
+  return {
+    from: { x: v.from[at]!, y: v.from[at + 1]!, z: v.from[at + 2]! },
+    to: { x: v.to[at]!, y: v.to[at + 1]!, z: v.to[at + 2]! },
+    rapid: v.rapid[index] === 1, start: v.starts[index]!, duration: v.durations[index]!,
+    toolId: playback.toolIds[v.toolIndex[index]!] ?? "", path: v.pathIndex[index]!, index: v.moveIndex[index]!,
   }
-  for (const [p, path] of program.toolpaths.entries()) {
-    toolId = path.toolId
-    pathIndex = p
-    for (const [i, move] of cam.expandMoves(path.moves, from).entries()) {
-      moveIndex = i
-      if (move._tag === "Comment" || move._tag === "Orient") continue
-      if (move._tag === "Dwell") { append(from, false, move.seconds); continue }
-      if (move._tag === "Cycle") continue
-      const duration = cam.moveLength(move, from) / Math.max(1e-6, move._tag === "Rapid" ? rapidRate : move.feed) * 60
-      if (move._tag !== "Arc") { append(move.to, move._tag === "Rapid", duration); continue }
-      const origin = from, radius = Math.hypot(from.x - move.center.x, from.y - move.center.y)
-      const sweep = cam.arcSweepBetween(from, move.to, move.center, move.clockwise)
-      const angle = Math.atan2(from.y - move.center.y, from.x - move.center.x)
-      const step = 2 * Math.acos(Math.max(-1, Math.min(1, 1 - Math.max(1e-6, tolerance) / Math.max(radius, 1e-6))))
-      const count = Math.min(65536, Math.max(2, Math.ceil(sweep / Math.max(step, 1e-6))))
-      for (let i = 1; i <= count; i++) {
-        const t = i / count, a = angle + (move.clockwise ? -1 : 1) * sweep * t
-        append(i === count ? move.to : { x: move.center.x + radius * Math.cos(a), y: move.center.y + radius * Math.sin(a), z: origin.z + (move.to.z - origin.z) * t }, false, duration / count)
-      }
-    }
-  }
-  return { segments, duration: time, end: from }
+}
+
+export function* playbackSegments(playback: Playback): Generator<PlaybackSegment> {
+  for (let i = 0; i < playback.segmentCount; i++) yield playbackSegmentAt(playback, i)!
 }
 
 /** Index of the segment playing at `seconds` (the segment count past the end); at a boundary, the one starting there. */
 export const segmentIndexAt = (playback: Playback, seconds: number): number => {
   const time = Math.max(0, Math.min(playback.duration, seconds))
-  let lo = 0, hi = playback.segments.length
-  while (lo < hi) { const mid = (lo + hi) >>> 1; const s = playback.segments[mid]; if (s && s.start + s.duration <= time) lo = mid + 1; else hi = mid }
+  const { starts, durations } = playback.views
+  let lo = 0, hi = playback.segmentCount
+  while (lo < hi) { const mid = (lo + hi) >>> 1; if (starts[mid]! + durations[mid]! <= time) lo = mid + 1; else hi = mid }
   return lo
 }
 
-/** The tool in the spindle at `seconds`: the toolpath's `toolId` of the playing segment (the last one past the end). */
-export const toolAt = (playback: Playback, seconds: number): string | undefined =>
-  (playback.segments[segmentIndexAt(playback, seconds)] ?? playback.segments[playback.segments.length - 1])?.toolId
+/** The tool in the spindle at `seconds`: the tool of the playing segment (the last one past the end). */
+export const toolAt = (playback: Playback, seconds: number): string | undefined => {
+  const index = segmentIndexAt(playback, seconds)
+  const at = index < playback.segmentCount ? index : playback.segmentCount - 1
+  if (at < 0) return undefined
+  return playback.toolIds[playback.views.toolIndex[at]!]
+}
 
 export const positionAt = (playback: Playback, seconds: number): Vec3 => {
   const time = Math.max(0, Math.min(playback.duration, seconds))
-  const s = playback.segments[segmentIndexAt(playback, seconds)]
-  if (!s) return playback.end
-  const t = s.duration > 0 ? Math.max(0, Math.min(1, (time - s.start) / s.duration)) : 1
-  return { x: s.from.x + (s.to.x - s.from.x) * t, y: s.from.y + (s.to.y - s.from.y) * t, z: s.from.z + (s.to.z - s.from.z) * t }
+  const index = segmentIndexAt(playback, seconds)
+  if (index >= playback.segmentCount) return playback.end
+  const { from, to, durations, starts } = playback.views
+  const at = index * 3
+  const duration = durations[index]!
+  const t = duration > 0 ? Math.max(0, Math.min(1, (time - starts[index]!) / duration)) : 1
+  return {
+    x: from[at]! + (to[at]! - from[at]!) * t,
+    y: from[at + 1]! + (to[at + 1]! - from[at + 1]!) * t,
+    z: from[at + 2]! + (to[at + 2]! - from[at + 2]!) * t,
+  }
 }
 
 /** Colours of the tools in a preview, in the order the program first uses them; the first is the single-tool colour. */

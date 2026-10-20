@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import type { PreviewBody, PreviewMachine } from "@cadcamfun/api"
+import type { PreviewBody, PreviewCutter, PreviewMachine } from "@cadcamfun/api"
 import {
   ASSUMED_BODY_ALPHA,
   BODY_COLOR,
   PREVIEW_MAX_SOLID_TRIANGLES,
   SOLID_VERTEX_FLOATS,
   bodyEdges,
+  prepareCutterSolid,
   prepareMachineSolids,
   toolGlyphLines,
 } from "../lib/machine-bodies"
@@ -129,6 +130,60 @@ describe("machine bodies as GPU buffers", () => {
     const count = Math.ceil(PREVIEW_MAX_SOLID_TRIANGLES / 400) + 1
     const scene = machine({ bodies: Array.from({ length: count }, (_, index) => cylinderBody(`chuck-${index}`, "chuck", 30, 10)) })
     expect(() => prepareMachineSolids(scene)).toThrow(PREVIEW_MESSAGE.machineTooLarge)
+  })
+})
+
+describe("the cutter at the playhead (preview format 4)", () => {
+  const cutter = (overrides: Partial<PreviewCutter> = {}): PreviewCutter => ({
+    diameter: 6,
+    fluteLength: 18,
+    shankDiameter: 6,
+    stickout: 34,
+    noseRadius: 0,
+    holder: { diameter: 32, length: 40, kind: "shrink", assumed: false },
+    ...overrides,
+  })
+
+  test("the real tool stands on the tip: its flute, its shank and its holder", () => {
+    const solid = prepareCutterSolid(cutter(), [10, 20, -5])
+    const count = solid.vertices.length / SOLID_VERTEX_FLOATS
+    expect(count).toBeGreaterThan(0)
+    expect(solid.indices.length / 3).toBeGreaterThan(0)
+    for (const index of solid.indices) expect(index).toBeLessThan(count)
+    let minZ = Infinity
+    let maxZ = -Infinity
+    let maxRadius = 0
+    for (let vertex = 0; vertex < count; vertex++) {
+      const [x, y, z] = vertexAt(solid.vertices, vertex) as number[]
+      minZ = Math.min(minZ, z!)
+      maxZ = Math.max(maxZ, z!)
+      maxRadius = Math.max(maxRadius, Math.hypot(x! - 10, y! - 20))
+    }
+    // The tip is the tip of the move, the top is the holder's face plus the holder.
+    expect(minZ).toBeCloseTo(-5, 4)
+    expect(maxZ).toBeCloseTo(-5 + 34 + 40, 4)
+    // The widest part is the holder, not the cutter.
+    expect(maxRadius).toBeCloseTo(16, 4)
+  })
+
+  test("a ball nose starts at a point and a flat cutter has a face", () => {
+    const ball = prepareCutterSolid(cutter({ noseRadius: 2 }), [0, 0, 0])
+    const flat = prepareCutterSolid(cutter(), [0, 0, 0])
+    const count = (solid: typeof ball) => solid.vertices.length / SOLID_VERTEX_FLOATS
+    // The nose replaces the first millimetres of the flute with a cone: fewer vertices, not more.
+    expect(count(ball)).toBeGreaterThan(0)
+    expect(count(flat)).toBeGreaterThan(0)
+    const radiusAt = (solid: typeof ball, z: number): number => {
+      let out = 0
+      for (let vertex = 0; vertex < count(solid); vertex++) {
+        const [x, y, zz] = vertexAt(solid.vertices, vertex) as number[]
+        if (Math.abs(zz! - z) < 1e-4) out = Math.max(out, Math.hypot(x!, y!))
+      }
+      return out
+    }
+    expect(radiusAt(ball, 0)).toBeCloseTo(0, 5)
+    expect(radiusAt(ball, 2)).toBeCloseTo(3, 5)
+    expect(radiusAt(flat, 0)).toBeCloseTo(3, 5)
   })
 })
 

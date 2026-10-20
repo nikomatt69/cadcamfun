@@ -7,6 +7,7 @@ mod secrets;
 mod sidecar;
 mod tray;
 mod updater;
+mod viewport_geometry;
 
 use std::sync::Arc;
 
@@ -55,6 +56,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     app.manage(updater::UpdaterService::new());
     app.manage(updater::PendingUpdate::default());
+    app.manage(viewport_geometry::ViewportPreparation::default());
 
     let data_dir = app.path().app_data_dir()?;
     std::fs::create_dir_all(&data_dir)?;
@@ -107,6 +109,7 @@ pub fn run() {
         .setup(setup)
         .invoke_handler(tauri::generate_handler![
             commands::get_sidecar_endpoint,
+            commands::prepare_viewport_edges,
             commands::get_logs_dir,
             commands::open_path,
             commands::secret_get,

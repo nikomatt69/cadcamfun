@@ -174,6 +174,36 @@ describe("companion machine scene preview", () => {
     expect(path.body.stats).toMatchObject({ rapidMoves: 3, linearMoves: 1 })
   })
 
+  test("a mill program reports its operations, their cutters and its contacts", async () => {
+    const nc = ["M3 S600", "G0 X0 Y0 Z5", "G1 X10 F100", "G0 Z-10"].join("\n")
+    const document = documentOf({
+      gcode: nc,
+      program: cam.generator.analyseGcode(nc).program,
+      settings: { ...cam.generator.DEFAULT_SETTINGS, machineType: "mill", toolDiameter: 6 },
+      stock: { width: 100, height: 60, depth: 20 },
+    })
+    const created = await app.call("/api/toolpaths", {
+      method: "POST",
+      json: { name: "Mill", projectId, type: "mill", operationType: "face", data: document, gcode: nc },
+    })
+    expect(created.status).toBe(201)
+
+    const path = await app.call(`/api/projects/${projectId}/workspace/toolpaths/${created.body.id}/preview`)
+    expect(path.status).toBe(200)
+    // The operations own a run of the path's segments, each with the tool it runs.
+    expect(path.body.machine.operations.length).toBe(1)
+    expect(path.body.machine.operations[0].startSegment).toBe(0)
+    expect(path.body.machine.operations[0].endSegment).toBe(path.body.segments.length - 1)
+    expect(path.body.machine.operations[0].cutter.diameter).toBe(6)
+    // The rapid into the stock is a contact on the clock, on the segment that made it.
+    const contact = path.body.machine.events.find((event: { code: string }) => event.code === "RAPID_INTO_STOCK")
+    expect(contact).toBeDefined()
+    expect(contact.severity).toBe("error")
+    expect(path.body.segments[contact.segment].kind).toBe("rapid")
+    // A contact is a red segment too.
+    expect(path.body.machine.collisions).toContain(contact.segment)
+  })
+
   test("a kernel document carries its stock, its machine preset's table and the chosen tool", async () => {
     const request = {
       schemaVersion: 1, id: "preview-kernel", name: "Plate", material: "6061", machine: "vmc-standard",

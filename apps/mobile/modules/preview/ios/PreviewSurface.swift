@@ -156,6 +156,12 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
         drawSolidSet(encoder, mvp: frame.mvp, eye: frame.eye, vertices: vertices, indices: indices,
                      triangles: frame.spindleTriangles, opaqueTriangles: frame.spindleOpaqueTriangles, angle: frame.spinAngle, pipeline: solidPipeline)
       }
+      // The cutter at the playhead: the real tool of the running operation, standing where the tool is.
+      if let vertices = frame.tool, let indices = frame.toolIndices,
+         solidSetIsDrawable(vertices: vertices, indices: indices, vertexCount: frame.toolVertices, triangles: frame.toolTriangles) {
+        drawSolidSet(encoder, mvp: frame.mvp, eye: frame.eye, vertices: vertices, indices: indices,
+                     triangles: frame.toolTriangles, opaqueTriangles: frame.toolOpaqueTriangles, angle: 0, pipeline: solidPipeline)
+      }
     }
     // Line draws read `color` as a tint: rgb is the target, alpha how far to move toward it (0 = vertex colour).
     var lineUniforms = PreviewUniforms(mvp: frame.mvp, color: SIMD4<Float>(0, 0, 0, 0), eye: SIMD4<Float>(frame.eye, 1), pose: SIMD4(0, 0, 0, 0))

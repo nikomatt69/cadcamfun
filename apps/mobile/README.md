@@ -8,11 +8,20 @@ Built with **Expo SDK 57** (React Native 0.86, New Architecture): Expo Router wi
 
 | Path | What it is |
 | --- | --- |
-| `app/` | Expo Router: boot, `connect` (pair), `pair` (deep link), `(app)` native tabs — Projects (list, detail with Overview/History/Pulls/Actions, commit diff, PR review form sheet), Assistant, Activity, Settings |
+| `app/` | Expo Router: boot, `connect` (pair), `pair` (deep link), `(app)` native tabs — Projects (list, detail with Overview/History/Pulls/Actions, commit diff, PR review form sheet), Assistant (with the conversation list and the camera), Activity, Settings |
 | `components/` | The design system (`ui/`), chat rows, project panels, live-connection chrome |
 | `lib/` | Pairing, SSE parser, `CompanionClient` (pure, bun-tested), pinned transport, server context, theme + typography, motion tokens, haptics |
 | `modules/companion-net` | Local Expo module (Swift): pinned-TLS `request` + streaming handle + `--pair-link` launch argument |
-| `test/` | Pure-logic tests (pairing, SSE, client, chat log, transport) run by `bun test` — no simulator needed |
+| `test/` | Pure-logic tests (pairing, SSE, client, chat log, transport, throttle, conflicts, attachments, history) run by `bun test` — no simulator needed |
+
+## What the phone can do
+
+The phone is a thin client of the desktop that owns the data; every action it takes is a real action on the desktop.
+
+- **The same conversations.** The conversation list is the desktop's own (`GET /api/ai/sessions`), so a chat that started on the Mac can be reopened on the phone, read back to its first page and continued there. The transcript keeps the stored past and the live turn apart, so a message is never shown twice.
+- **The same tools.** The assistant runs on the desktop with the desktop's tools and context; the phone steers it, answers its permission requests and questions, and stops the turn. A picture of the part on the bench can be attached to the message (the desktop's assistant already reads images).
+- **The same review.** Pull requests are read, commented on, approved, sent back for changes and merged from the phone; a merge that cannot be applied cleanly names the files and the JSON pointers that disagree. The phone can create a branch, commit, restore an older version as a new commit and run the workflows of a chosen branch.
+- **Honest about the desktop.** A busy desktop says "it will answer in about N seconds" and the read waits the gateway's own back-off; an unreachable desktop shows the copy the phone last saw, marked as saved; a failed pairing says what actually failed, inside the sheet that caused it.
 
 ## What CI proves
 
@@ -53,7 +62,7 @@ Projects include native search and recent-first cards. Project overview groups w
 
 `PressableScale` applies geometry and animated feedback to the same native press target: flex sizing, background fills and accessibility bounds match the visible control. Segmented controls use the SDK-matched @expo/ui SwiftUI Picker on iOS, with a wrapping React Native layout at accessibility sizes. The optional-module guard keeps an older native build usable until it is rebuilt. Controls use 44pt targets. Native modal sheets own dismissal, focus isolation, scrolling and keyboard avoidance; `SheetShell` composes the sheet without adding a second modal. Toasts remain visible above sheets and respect Reduce Motion. Skeletons stop pulsing under Reduce Motion.
 
-Validation: mobile typecheck, 94 unit tests (including reading geometry and light/dark text contrast), and the iOS JavaScript export. These checks validate source and bundle integration; they do not establish a new native device build or visual device verification.
+Validation: mobile typecheck, 220 unit tests (including reading geometry and light/dark text contrast), and the iOS JavaScript export. These checks validate source and bundle integration; they do not establish a new native device build or visual device verification.
 
 The precision pass measures the presented container instead of assuming the window width: native sheets, list cards, assistant context and page gutters share the same reading column. resource-list.tsx keeps existing rows visible through failed refreshes and provides the same refresh/error/empty structure for history, pull requests, workflows and workspace entries. record-card.tsx moves status below long titles when space is constrained.
 

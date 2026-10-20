@@ -28,6 +28,8 @@ bun test apps/sidecar
 
 ## Change log
 
+- 2026-10-20: the phone-owned deliverables of this step are implemented and tested: tool-call rows with the agent, the input and the output (1), review on the phone with the conflicting files shown when a merge cannot be applied (2), the honest recovered turn (`done.recovered`) (4). Added on top: the conversation list and the stored history of a conversation, pictures attached to a turn, branch creation, restore, a workflow run on a chosen branch, the gateway's own back-off honoured instead of a bare failure, the unread badge on the Activity tab and the saved copy of the lists when the desktop is unreachable. **APNs (3) is not built**: it needs the owner's Apple team and a push key, and the server-side registration and send are outside this step's owner directories, so the phone's "something happened" signal is the badge and the self-refreshing feed until then. RM-07 stays the prerequisite; the step stays **pending**.
+
 - 2026-10-12: [AI-07](../ai/07-companion-continuity.md) maps shared owner/revision/replay and outstanding native decisions to existing companion owners/allow-lists; RM-07 remains prerequisite. Implementation pending.
 
 - v1: companion UI + notifications on the existing gateway seam.

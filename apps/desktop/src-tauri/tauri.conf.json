@@ -60,7 +60,8 @@
       "binaries/sidecar"
     ],
     "resources": {
-      "resources/migrations/": "migrations/"
+      "resources/migrations/": "migrations/",
+      "THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
     },
     "fileAssociations": [
       {

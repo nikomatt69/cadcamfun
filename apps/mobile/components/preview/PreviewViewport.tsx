@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
-import type { PreviewMachine } from "@cadcamfun/api"
+import type { PreviewMachine, PreviewOperation } from "@cadcamfun/api"
 import { useTheme } from "@/lib/theme"
 import { Box, Focus, Grid3x3, Maximize2, Minus, PenLine, Plus, X } from "lucide-react-native"
 import { AdaptiveBlur } from "@/components/GlassView"
@@ -35,6 +35,7 @@ import {
   guideColor,
   highlightRange,
   meshFeatureEdges,
+  operationColor,
   prepareOverlayLines,
   progressRange,
   sceneGuides,
@@ -43,14 +44,15 @@ import {
   prepareToolpathLines,
   rgbFromHex,
   toolMarkerLength,
+  type PathStyle,
   type PreviewSegment,
 } from "@/lib/preview-scene"
 import { formatSize, partBounds, spinRateAt } from "@/lib/preview-sim"
-import { TOOL_GLYPH_COLOR, prepareMachineSolids, toolGlyphLines, type MachineSolids } from "@/lib/machine-bodies"
+import { TOOL_GLYPH_COLOR, prepareCutterSolid, prepareMachineSolids, toolGlyphLines, type MachineSolids, type SolidUpload } from "@/lib/machine-bodies"
 import { type } from "@/lib/typography"
 
 export interface PreviewMesh {
-  readonly revision: string
+  readonly revision?: string
   readonly positions: readonly number[]
   readonly indices: readonly number[]
   readonly normals: readonly number[]
@@ -88,6 +90,12 @@ export interface PreviewViewportProps {
   stock?: Bounds
   /** The machine around the program (spec 31 §5): bodies, tool glyph, spin and collisions; without it the preview stays bare. */
   machine?: PreviewMachine
+  /** The program's operations (preview format 4): each owns a run of the path's segments. */
+  operations?: readonly PreviewOperation[]
+  /** The operations the user put away; their segments are left out of the path. */
+  hiddenOperations?: ReadonlySet<number>
+  /** Colour the path by move class (the default) or by operation, like the desktop. */
+  colorMode?: "move" | "operation"
   playhead?: number
   /** Fade the not-yet-cut path and show the tool at the playhead (toolpath simulation). */
   simulating?: boolean
@@ -115,12 +123,36 @@ export function PreviewViewport(props: PreviewViewportProps) {
   const [showEdges, setShowEdges] = useState(true)
   const [showGrid, setShowGrid] = useState(true)
   const display = { showEdges, showGrid, onToggleEdges: () => setShowEdges((value) => !value), onToggleGrid: () => setShowGrid((value) => !value) }
-  const { mesh, segments, stock, machine } = props
+  const { mesh, segments, stock, machine, operations, hiddenOperations, colorMode } = props
   const meshUpload = useMemo(() => mesh ? prepare(() => prepareMeshUpload(mesh), PREVIEW_MESSAGE.meshInvalid) : undefined, [mesh])
   const machineUpload = useMemo(() => prepare(() => prepareMachineSolids(machine), PREVIEW_MESSAGE.machineTooLarge), [machine])
   // A machine scene carries its own bodies: the generic stock box would double the outline they already give.
   const collisions = useMemo(() => new Set(machine?.collisions ?? []), [machine])
-  const lines = useMemo(() => prepare(() => prepareToolpathLines(segments ?? [], machine ? undefined : stock, collisions), PREVIEW_MESSAGE.pathInvalid), [segments, stock, machine, collisions])
+  /** Which operation owns each segment; -1 when the payload names none. */
+  const operationOfSegment = useMemo(() => {
+    const map = new Int32Array(segments?.length ?? 0).fill(-1)
+    for (const operation of operations ?? []) {
+      for (let index = operation.startSegment; index <= operation.endSegment && index < map.length; index++) map[index] = operation.index
+    }
+    return map
+  }, [operations, segments?.length])
+  const style = useMemo<PathStyle>(() => {
+    const hidden = hiddenOperations
+    const byOperation = colorMode === "operation"
+    return {
+      colorOf: (index) => {
+        const operation = operationOfSegment[index] ?? -1
+        return operation >= 0 && byOperation ? operationColor(operation) : undefined
+      },
+      hidden: hidden !== undefined && hidden.size > 0
+        ? (index) => {
+          const operation = operationOfSegment[index] ?? -1
+          return operation >= 0 && hidden.has(operation)
+        }
+        : undefined,
+    }
+  }, [operationOfSegment, colorMode, hiddenOperations])
+  const lines = useMemo(() => prepare(() => prepareToolpathLines(segments ?? [], machine ? undefined : stock, collisions, style), PREVIEW_MESSAGE.pathInvalid), [segments, stock, machine, collisions, style])
   const edges = useMemo(() => {
     if (!mesh) return []
     try { return meshFeatureEdges(mesh.positions, mesh.indices) } catch { return [] }
@@ -153,6 +185,9 @@ function Viewport({
   mesh,
   segments,
   machine,
+  operations,
+  hiddenOperations,
+  colorMode,
   playhead = 0,
   simulating = false,
   selectedPartId,
@@ -300,12 +335,32 @@ function Viewport({
     scene.setOverlay(prepareOverlayLines(showGrid ? guides : [], [...wire, ...(showEdges ? edges : [])]))
   }, [scene, guides, edges, showGrid, showEdges, prepared.solids])
 
-  const segmentCount = segments?.length ?? 0
+  /** The segments the phone shows, and how many of them the playhead has passed. */
+  const shown = useMemo(() => {
+    const total = segments?.length ?? 0
+    const hidden = hiddenOperations
+    const operationOf = (index: number): number => {
+      if (hidden === undefined || hidden.size === 0) return -1
+      for (const operation of operations ?? []) {
+        if (index >= operation.startSegment && index <= operation.endSegment) return hidden.has(operation.index) ? operation.index : -1
+      }
+      return -1
+    }
+    let visible = 0
+    let travelled = 0
+    for (let index = 0; index < total; index++) {
+      if (operationOf(index) >= 0) continue
+      visible++
+      if (index <= playhead) travelled++
+    }
+    return { visible, travelled }
+  }, [segments?.length, operations, hiddenOperations, playhead])
+
   useEffect(() => {
     if (!scene || !active) return
-    const range = progressRange(playhead, segmentCount, simulating)
+    const range = progressRange(playhead, shown.visible, simulating, shown.travelled)
     scene.setProgress(simulating ? range.travelled : -1, range.path, REMAINING_PATH_FADE)
-  }, [scene, active, playhead, segmentCount, simulating])
+  }, [scene, active, playhead, shown, simulating])
 
   // What turns with the spindle: the native view accumulates the angle while the rate is not zero.
   // A covered viewer stops its spindle so the display link does not redraw a scene nobody sees.
@@ -315,6 +370,22 @@ function Viewport({
   }, [scene, active, machine, playhead, simulating])
 
   const toolLength = useMemo(() => toolMarkerLength(bounds), [boundsKey])
+  /** The real cutter of the operation at the playhead: the tool the program runs. */
+  const cutter = useMemo(() => {
+    const operation = (operations ?? []).find((item) => playhead >= item.startSegment && playhead <= item.endSegment)
+    return operation?.cutter
+  }, [operations, playhead])
+  /** The cutter as a solid, standing on the tip of the current move. */
+  const toolSolid = useMemo<SolidUpload>(() => {
+    const segment = segments?.[playhead]
+    if (!simulating || !cutter || !segment) return { vertices: new Float32Array(), indices: new Uint32Array(), opaqueTriangles: 0 }
+    try {
+      return prepareCutterSolid(cutter, [segment.to[0], segment.to[1], segment.to[2]])
+    } catch {
+      return { vertices: new Float32Array(), indices: new Uint32Array(), opaqueTriangles: 0 }
+    }
+  }, [cutter, segments, playhead, simulating])
+
   useEffect(() => {
     if (!scene || !active || !linesOk.current) return
     const segment = segments?.[playhead]
@@ -324,12 +395,14 @@ function Viewport({
       const machineGlyph = simulating && segment && machine && family !== undefined && family !== "mill"
         ? toolGlyphLines([segment.to[0], segment.to[1], segment.to[2]], machine.tool, toolLength, TOOL_GLYPH_COLOR[family])
         : []
-      const marker = simulating && (family === undefined || family === "mill") ? toolLength : 0
+      // The real cutter is a solid; the wireframe marker is the fallback for a server that names no tool.
+      const marker = simulating && (family === undefined || family === "mill") && cutter === undefined ? toolLength : 0
       scene.setActiveLine(prepareActiveLine(segment, marker, rgbFromHex(palette.ink), machineGlyph))
     } catch {
       scene.setActiveLine(new Float32Array())
     }
-  }, [scene, active, segments, playhead, simulating, toolLength, palette.ink, machine])
+    scene.setTool(toolSolid.vertices, toolSolid.indices, toolSolid.opaqueTriangles)
+  }, [scene, active, segments, playhead, simulating, toolLength, palette.ink, machine, cutter, toolSolid])
 
   useEffect(() => {
     if (!scene || !active) return

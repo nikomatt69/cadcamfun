@@ -5,12 +5,14 @@ import {
   LINE_COLOR,
   MACHINE_GLYPH_MAX_VERTICES,
   MILL_TOOL_VERTICES,
+  OPERATION_PALETTE,
   PREVIEW_MAX_SEGMENTS,
   PREVIEW_MAX_TRIANGLES,
   PREVIEW_MESSAGE,
   PreviewPayloadError,
   finiteMatrix,
   highlightRange,
+  operationColor,
   prepareActiveLine,
   prepareMeshUpload,
   prepareToolpathLines,
@@ -233,6 +235,33 @@ describe("toolpath simulation upload", () => {
     expect(progressRange(99, 10, true)).toEqual({ travelled: 20, path: 20 })
     expect(progressRange(-3, 10, true)).toEqual({ travelled: 2, path: 20 })
     expect(progressRange(3, 0, true)).toEqual({ travelled: 0, path: 0 })
+    // With operations hidden, only the segments the phone shows are in the buffer.
+    expect(progressRange(4, 6, true, 3)).toEqual({ travelled: 6, path: 12 })
+  })
+
+  test("an operation colours its own segments and a hidden operation is left out", () => {
+    const segments = Array.from({ length: 5 }, (_, index) => ({
+      kind: "linear" as const,
+      from: [index, 0, 0] as const,
+      to: [index + 1, 0, 0] as const,
+    }))
+    // The first two segments are operation 0, the rest operation 1.
+    const colour = operationColor(0)
+    const lines = prepareToolpathLines(segments, undefined, new Set(), {
+      colorOf: (index) => (index < 2 ? colour : undefined),
+      hidden: (index) => index === 0,
+    })
+    // One segment of the hidden operation is gone: four remain, two vertices each.
+    expect(lines).toHaveLength(4 * 12)
+    expect(Array.from(lines.slice(3, 6))).toEqual(float32(colour))
+    // The third segment kept the move-class colour, because the style named none for it.
+    expect(Array.from(lines.slice(2 * 12 + 3, 2 * 12 + 6))).toEqual(float32(LINE_COLOR.linear))
+  })
+
+  test("the operation palette is the desktop's tool palette", () => {
+    expect(OPERATION_PALETTE).toHaveLength(10)
+    expect(operationColor(0)).toEqual([0.22, 0.74, 0.97])
+    expect(operationColor(10)).toEqual(operationColor(0))
   })
 
   test("the tool marker scales with the part", () => {

@@ -83,6 +83,7 @@
       ]
     },
     "allow-get-sidecar-endpoint",
+    "allow-prepare-viewport-edges",
     "allow-get-logs-dir",
     "allow-open-path",
     "allow-secret-get",

@@ -9,7 +9,7 @@
  * display x axis, so the phone needs no live turned profile. Bodies marked `assumed` are translucent (the desktop's
  * 0.45) and drawn after the opaque ones; `wire` bodies (mill stock outline, printer build volume) are edges only.
  */
-import type { PreviewBody, PreviewBodyShape, PreviewMachine, PreviewToolGlyph } from "@cadcamfun/api"
+import type { PreviewBody, PreviewBodyShape, PreviewCutter, PreviewMachine, PreviewToolGlyph } from "@cadcamfun/api"
 import { PREVIEW_MESSAGE } from "./preview-scene"
 
 type Rgb = readonly [number, number, number]
@@ -293,12 +293,116 @@ export const prepareMachineSolids = (machine: PreviewMachine | undefined): Machi
   return { solids: flush(solids), spindle: flush(spindle), wire }
 }
 
+/** A cylinder along the display z (the tool's axis on a mill), from `from` to `to`. */
+const verticalCylinder = (
+  sink: Sink,
+  x: number,
+  y: number,
+  from: number,
+  to: number,
+  radius: number,
+  color: Rgb,
+): void => {
+  const segments = radialSegments(radius)
+  const step = (2 * Math.PI) / segments
+  for (let i = 0; i < segments; i++) {
+    const a0 = (i / segments) * 2 * Math.PI
+    const a1 = ((i + 1) / segments) * 2 * Math.PI
+    const n0: MachinePoint = [Math.cos(a0), Math.sin(a0), 0]
+    const n1: MachinePoint = [Math.cos(a1), Math.sin(a1), 0]
+    const b0 = vertex(sink, [x + n0[0] * radius, y + n0[1] * radius, from], n0, color, 1, true)
+    const t0 = vertex(sink, [x + n0[0] * radius, y + n0[1] * radius, to], n0, color, 1, true)
+    const b1 = vertex(sink, [x + n1[0] * radius, y + n1[1] * radius, from], n1, color, 1, true)
+    const t1 = vertex(sink, [x + n1[0] * radius, y + n1[1] * radius, to], n1, color, 1, true)
+    triangle(sink, b0, t0, t1, true)
+    triangle(sink, b0, t1, b1, true)
+  }
+}
+
+/** A cone along the display z, from radius `r0` at `from` to radius `r1` at `to`. */
+const verticalCone = (
+  sink: Sink,
+  x: number,
+  y: number,
+  from: number,
+  to: number,
+  r0: number,
+  r1: number,
+  color: Rgb,
+): void => {
+  const segments = radialSegments(Math.max(r0, r1))
+  const step = (2 * Math.PI) / segments
+  const length = Math.hypot(to - from, r1 - r0) || 1
+  const slope = (r1 - r0) / length
+  for (let i = 0; i < segments; i++) {
+    const a0 = (i / segments) * 2 * Math.PI
+    const a1 = ((i + 1) / segments) * 2 * Math.PI
+    const normalAt = (angle: number): MachinePoint => {
+      const radial = Math.cos(angle) * -slope
+      return [radial, Math.sin(angle) * -slope, (r1 - r0) / length]
+    }
+    const n0 = normalAt(a0)
+    const n1 = normalAt(a1)
+    const b0 = vertex(sink, [x + Math.cos(a0) * r0, y + Math.sin(a0) * r0, from], n0, color, 1, true)
+    const t0 = vertex(sink, [x + Math.cos(a0) * r1, y + Math.sin(a0) * r1, to], n0, color, 1, true)
+    const b1 = vertex(sink, [x + Math.cos(a1) * r0, y + Math.sin(a1) * r0, from], n1, color, 1, true)
+    const t1 = vertex(sink, [x + Math.cos(a1) * r1, y + Math.sin(a1) * r1, to], n1, color, 1, true)
+    triangle(sink, b0, t0, t1, true)
+    triangle(sink, b0, t1, b1, true)
+  }
+}
+
+/** A flat disc at `z`, facing `normal`. */
+const disc = (sink: Sink, x: number, y: number, z: number, radius: number, normal: MachinePoint, color: Rgb): void => {
+  const segments = radialSegments(radius)
+  const centre = vertex(sink, [x, y, z], normal, color, 1, true)
+  for (let i = 0; i < segments; i++) {
+    const a0 = (i / segments) * 2 * Math.PI
+    const a1 = ((i + 1) / segments) * 2 * Math.PI
+    const p0 = vertex(sink, [x + Math.cos(a0) * radius, y + Math.sin(a0) * radius, z], normal, color, 1, true)
+    const p1 = vertex(sink, [x + Math.cos(a1) * radius, y + Math.sin(a1) * radius, z], normal, color, 1, true)
+    if (normal[2] >= 0) triangle(sink, centre, p0, p1, true)
+    else triangle(sink, centre, p1, p0, true)
+  }
+}
+
+/**
+ * The cutter at the playhead, as a solid: the real tool of the running operation, not a marker.
+ *
+ * The tool's axis is the display z (up) on a mill: the cutting part stands on the tip, the shank follows, and the
+ * holder caps it. The desktop put the tip there, so the phone never places the tool itself. A ball nose is drawn as
+ * a cone (the nose radius), a flat cutter as a flat face.
+ */
+export const prepareCutterSolid = (cutter: PreviewCutter, tip: MachinePoint, color: Rgb = TOOL_GLYPH_COLOR.mill): SolidUpload => {
+  const sink: Sink = { vertices: [], opaque: [], translucent: [] }
+  const radius = Math.max(cutter.diameter, 0.01) / 2
+  const flute = Math.max(cutter.fluteLength, 0.05)
+  const nose = Math.min(Math.max(cutter.noseRadius, 0), flute)
+  const z = tip[2]
+  if (nose > 0) {
+    verticalCone(sink, tip[0], tip[1], z, z + nose, 0, radius, color)
+    verticalCylinder(sink, tip[0], tip[1], z + nose, z + flute, radius, color)
+  } else {
+    verticalCylinder(sink, tip[0], tip[1], z, z + flute, radius, color)
+    disc(sink, tip[0], tip[1], z, radius, [0, 0, -1], color)
+  }
+  // The shank, up to the holder's face.
+  const shankRadius = Math.max(cutter.shankDiameter, cutter.diameter, 0.01) / 2
+  const face = z + Math.max(cutter.stickout, flute)
+  if (face > z + flute) verticalCylinder(sink, tip[0], tip[1], z + flute, face, shankRadius, color)
+  // The holder, capped at the top.
+  const holderRadius = Math.max(cutter.holder.diameter, 0.01) / 2
+  const holderLength = Math.max(cutter.holder.length, 0.05)
+  verticalCylinder(sink, tip[0], tip[1], face, face + holderLength, holderRadius, color)
+  disc(sink, tip[0], tip[1], face + holderLength, holderRadius, [0, 0, 1], color)
+  return flush(sink)
+}
+
 /**
  * The lathe insert or printer nozzle drawn beside the playhead, in display coordinates. Fits
  * `MACHINE_GLYPH_MAX_VERTICES` in `preview-scene.ts` (the nozzle is the largest: 21 lines), which the
  * active-line upload cap counts in.
- */
-export const toolGlyphLines = (
+ */export const toolGlyphLines = (
   tip: MachinePoint,
   glyph: PreviewToolGlyph,
   length: number,

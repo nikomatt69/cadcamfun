@@ -194,11 +194,20 @@ const STREAM_ROUTES: readonly Rule[] = [
 ]
 const PROMPT_ROUTES = /^\/api\/ai\/(chat\/stream|sessions\/prompt|chat\/queue)$/
 
+/**
+ * POST routes that only read. The write budget refills one token per second, so a phone that polls the
+ * assistant's state with a POST would spend the same budget as its commits and starve itself. These
+ * routes change nothing on the desktop, so they take a request token and no write token.
+ */
+const READ_ONLY_POST_ROUTES: readonly RegExp[] = [/^\/api\/ai\/sessions\/state$/]
+
 export const routePolicy = (method: string, pathname: string): RoutePolicy => {
   const upper = method.toUpperCase()
   const body = PROMPT_ROUTES.test(pathname) ? PROMPT_BODY_LIMIT : WRITE_BODY_LIMIT
   if (STREAM_ROUTES.some((r) => r.methods.includes(upper) && r.path.test(pathname))) return { kind: "stream", maxBody: upper === "GET" ? 0 : body, timeoutMs: undefined }
   if (upper === "GET" || upper === "HEAD") return { kind: "read", maxBody: 0, timeoutMs: READ_TIMEOUT_MS }
+  // A read-only POST still carries a body, so it keeps a body limit; only the write token is spared.
+  if (READ_ONLY_POST_ROUTES.some((r) => r.test(pathname))) return { kind: "read", maxBody: body, timeoutMs: READ_TIMEOUT_MS }
   return { kind: "write", maxBody: body, timeoutMs: WRITE_TIMEOUT_MS }
 }
 

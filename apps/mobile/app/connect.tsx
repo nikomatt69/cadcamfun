@@ -154,7 +154,7 @@ export default function ConnectScreen() {
         </ScrollView>
       )}
 
-      <ManualSheet open={manualOpen} busy={busy} onClose={() => setManualOpen(false)} onPair={pair} />
+      <ManualSheet open={manualOpen} busy={busy} error={error} onClose={() => setManualOpen(false)} onPair={pair} />
     </View>
   )
 }
@@ -209,23 +209,32 @@ function ScannerOverlay({ busy, error, onScanned, onClose }: { busy: boolean; er
 }
 
 /** Advanced pairing: type the gateway address, scoped token and certificate fingerprint. */
-function ManualSheet({ open, busy, onClose, onPair }: { open: boolean; busy: boolean; onClose: () => void; onPair: (link: string) => void }) {
-  const [host, setHost] = useState("")
+function ManualSheet({ open, busy, error, onClose, onPair }: { open: boolean; busy: boolean; error: string | null; onClose: () => void; onPair: (link: string) => void }) {
+  const [address, setAddress] = useState("")
   const [token, setToken] = useState("")
   const [fingerprint, setFingerprint] = useState("")
 
+  /**
+   * Several addresses may be typed, one per line or separated by commas: the phone races them exactly like
+   * the QR does, so a Mac that is on Wi-Fi *and* Tailscale still connects when only one path works.
+   */
   const submit = () => {
-    const url = new URLSearchParams({ host, token, fp: fingerprint, name: "Desktop" })
-    onPair(`cadcamfun://pair?${url}`)
+    const origins = address.split(/[\s,]+/).map((part) => part.trim()).filter(Boolean)
+    const [first, ...rest] = origins
+    const params = new URLSearchParams({ host: first ?? "", token, fp: fingerprint, name: "Desktop" })
+    if (rest.length > 0) params.set("hosts", rest.join(","))
+    onPair(`cadcamfun://pair?${params}`)
   }
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Manual pairing">
       <View style={{ paddingHorizontal: 20, gap: 12 }}>
-        <TextField label="Desktop address" value={host} onChangeText={setHost} placeholder="https://192.168.1.10:8443" autoCapitalize="none" autoCorrect={false} keyboardType="url" editable={!busy} />
+        <TextField label="Desktop address" value={address} onChangeText={setAddress} placeholder="https://192.168.1.10:8443" autoCapitalize="none" autoCorrect={false} keyboardType="url" editable={!busy} />
         <TextField label="Pairing token" value={token} onChangeText={setToken} placeholder="Token from your desktop" autoCapitalize="none" autoCorrect={false} secureTextEntry editable={!busy} />
         <TextField label="Certificate fingerprint" value={fingerprint} onChangeText={setFingerprint} placeholder="64 hexadecimal characters" autoCapitalize="none" autoCorrect={false} editable={!busy} />
-        <ActionButton label="Pair" fullWidth loading={busy} disabled={busy || !host.trim() || !token.trim() || !fingerprint.trim()} onPress={submit} />
+        {/* The failure belongs inside the sheet: the screen behind it cannot be seen while it is open. */}
+        {error ? <ErrorBanner message={error} /> : null}
+        <ActionButton label="Pair" fullWidth loading={busy} disabled={busy || !address.trim() || !token.trim() || !fingerprint.trim()} onPress={submit} />
       </View>
     </BottomSheet>
   )

@@ -31,7 +31,7 @@ describe("path colour modes", () => {
 
   test("every segment is drawn once, as a cut or as a rapid, in playback order", () => {
     const b = buffers("tool")
-    expect(b.cut.starts.length + b.rapid.starts.length).toBe(playback.segments.length)
+    expect(b.cut.starts.length + b.rapid.starts.length).toBe(playback.segmentCount)
     for (const s of [b.cut.starts, b.rapid.starts]) for (let i = 1; i < s.length; i++) expect(s[i]!).toBeGreaterThanOrEqual(s[i - 1]!)
     expect(b.cut.colors!.length).toBe(b.cut.positions.length)
   })

@@ -138,6 +138,13 @@ describe("phone endpoints on the real HTTP server", () => {
       const history = await transport.request("/api/ai/sessions/ses_unknown/messages", "GET")
       expect(history.status).toBe(400)
 
+      // The same two routes through the phone's own client: the conversation list of a project, and the
+      // stored history of a conversation (an unknown one is refused, not unrouted).
+      expect(await phone.sessions(project.id)).toEqual([])
+      const refusedHistory = await phone.sessionMessages("ses_unknown").then(() => 200, (error: { status?: number }) => error.status ?? 0)
+      expect(refusedHistory).toBeGreaterThanOrEqual(400)
+      expect([403, 404, 405]).not.toContain(refusedHistory)
+
       // Workspace previews answer conditionally through the gateway: the tag survives the hop and a match is a 304.
       const previewPath = `/api/projects/${project.id}/workspace/drawings/${drawing.id}/preview`
       const tagged = await pinned(`${pairing.baseUrl}${previewPath}`, { headers: { authorization: `Bearer ${pairing.token}` } })

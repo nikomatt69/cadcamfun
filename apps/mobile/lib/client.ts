@@ -1,4 +1,4 @@
-import type { AiStatus, SessionStreamFrame } from "@cadcamfun/api"
+import type { AiSessionMessages, AiSessionSummary, AiStatus, SessionStreamFrame } from "@cadcamfun/api"
 import type { ComponentPreview, EntityChange, LibraryCatalogue, LiveEvent, MeshPreview, NotificationRow, PullRequestRow, ReviewRow, SessionControlReply, SessionStateReply, ToolpathPreview, ToolpathReview, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow, WorkspaceEntry } from "@cadcamfun/api"
 import type { Pairing } from "./pairing"
 import type { AssistantPreferences, AssistantProvider } from "./assistant-preferences"
@@ -124,6 +124,21 @@ export interface ChatRequest {
   model?: AssistantPreferences["model"]
   permissionMode?: AssistantPreferences["permissionMode"]
   includeContext?: boolean
+  /** The drawing the turn works on; the desktop checks it against the project before admitting the turn. */
+  drawingId?: string
+  /** Pictures and text files the turn can look at (a photo of the part on the bench). */
+  attachments?: readonly ChatAttachment[]
+}
+
+/**
+ * One attachment the desktop's assistant reads. `data` is base64 for a picture and plain text otherwise;
+ * the gateway's 36 MiB prompt budget is sized for five base64 images.
+ */
+export interface ChatAttachment {
+  readonly name: string
+  readonly mime?: string
+  readonly data: string
+  readonly encoding?: "base64" | "text"
 }
 
 export class CompanionClient {
@@ -177,7 +192,8 @@ export class CompanionClient {
     this.request<EntityChange[]>("GET", `${this.projectPath(id)}/vcs/diff?to=${encodeURIComponent(to)}${from ? `&from=${encodeURIComponent(from)}` : ""}`, undefined, signal)
   commit = (id: string, message: string) => this.request<VcsCommit>("POST", `${this.projectPath(id)}/vcs/commit`, { message })
   createBranch = (id: string, name: string) => this.request<VcsBranches>("POST", `${this.projectPath(id)}/vcs/branches`, { name })
-  checkout = (id: string, branch: string) => this.request<VcsBranches>("POST", `${this.projectPath(id)}/vcs/checkout`, { branch })
+  /** The desktop answers with the new working-copy status (`branch`, `head`, `dirty`), not with the branch list. */
+  checkout = (id: string, branch: string) => this.request<VcsStatus>("POST", `${this.projectPath(id)}/vcs/checkout`, { branch })
   restore = (id: string, rev: string) => this.request<VcsCommit>("POST", `${this.projectPath(id)}/vcs/restore`, { rev })
 
   // ── Pull requests ───────────────────────────────────────────────────────
@@ -214,6 +230,24 @@ export class CompanionClient {
   aiProviders = (signal?: AbortSignal) => this.request<AssistantProvider[]>("GET", "/api/ai/providers", undefined, signal)
 
   aiModels = (signal?: AbortSignal) => this.request<Array<{ id: string; provider: string; configured: boolean }>>("GET", "/api/ai/models", undefined, signal)
+
+  /**
+   * The conversations the caller owns in a project, newest first. `projectId` is required by the API:
+   * a bare call answers 400. `busy` marks a turn this desktop started.
+   */
+  sessions = (projectId: string, limit = 50, signal?: AbortSignal) =>
+    this.request<AiSessionSummary[]>("GET", `/api/ai/sessions?projectId=${encodeURIComponent(projectId)}&limit=${limit}`, undefined, signal)
+
+  /**
+   * One page of a conversation, oldest first. `before` continues with older messages; the reply's `before`
+   * is the cursor for the next older page (null when the page starts at the beginning).
+   */
+  sessionMessages = (sessionId: string, before?: string | null, limit = 30, signal?: AbortSignal) => {
+    const query = new URLSearchParams()
+    query.set("limit", String(limit))
+    if (before) query.set("before", before)
+    return this.request<AiSessionMessages>("GET", `/api/ai/sessions/${encodeURIComponent(sessionId)}/messages?${query.toString()}`, undefined, signal)
+  }
 
   /** Stops the turn the given session is running; `sessionId` may be omitted to stop whatever is running. */
   abortChat = (sessionId?: string) => this.request<{ message: string }>("POST", "/api/ai/chat/abort", sessionId ? { sessionId } : {})

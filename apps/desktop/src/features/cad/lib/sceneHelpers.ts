@@ -108,8 +108,8 @@ export function applyHighlight(root: THREE.Object3D, state: HighlightState): voi
 export { applyElementTransform, type ElementTransformFields } from "./element-transform.ts"
 
 /** Builds the Three object of an element; `userData.pivot` is its centre in world space. */
-export function buildElementObject(element: Element): THREE.Object3D | null {
-  const object = createThreeObject(element)
+export function buildElementObject(element: Element, onEdgesReady?: () => void): THREE.Object3D | null {
+  const object = createThreeObject(element, undefined, onEdgesReady)
   if (!object) return null
   initializeElementTransform(object, element as ElementTransformFields)
   object.userData.isCADElement = true

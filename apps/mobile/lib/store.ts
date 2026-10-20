@@ -31,11 +31,18 @@ export interface UIState {
   /** Queued assistant prompts waiting for the desktop to come back (SecureStore-backed). */
   offlineQueueCount: number
   offlineQueueRevision: number
+  /** Unread updates on the desktop; the Activity tab shows it as a badge. */
+  unreadCount: number
   /**
    * One-shot prompt handed off from a workspace preview. Not persisted: the composer
    * fills it so the user can confirm before anything is sent.
    */
   assistantDraft: AssistantDraft | null
+  /**
+   * The conversation the user opened from the conversation list. Not persisted: the assistant reads
+   * its stored history once, so a reopened conversation shows the desktop's own past.
+   */
+  assistantOpened: AssistantOpened | null
   setThemeMode: (mode: UIState["themeMode"]) => void
   setHaptics: (patch: Partial<UIState["haptics"]>) => void
   setSecurity: (patch: Partial<UIState["security"]>) => void
@@ -48,7 +55,9 @@ export interface UIState {
   startAssistantConversation: (projectId: string) => void
   setAssistantDraft: (draft: AssistantDraft) => void
   clearAssistantDraft: () => void
+  openAssistantConversation: (projectId: string, sessionId: string) => void
   setOfflineQueue: (count: number) => void
+  setUnreadCount: (count: number) => void
   showToast: (message: string, kind?: "info" | "success" | "error") => void
 }
 
@@ -58,6 +67,13 @@ export interface AssistantDraft {
   readonly projectId: string
   readonly text: string
   readonly mode: AssistantDraftMode
+}
+
+export interface AssistantOpened {
+  readonly projectId: string
+  readonly sessionId: string
+  /** Changes on every open, so opening the same conversation twice still reloads it. */
+  readonly token: number
 }
 
 let finishHydration: () => void = () => undefined
@@ -77,7 +93,9 @@ export const useUIStore = create<UIState>()(
       assistantModelVariants: {},
       offlineQueueCount: 0,
       offlineQueueRevision: 0,
+      unreadCount: 0,
       assistantDraft: null,
+      assistantOpened: null,
       setThemeMode: (themeMode) => set({ themeMode }),
       setHaptics: (patch) => set((s) => ({ haptics: { ...s.haptics, ...patch } })),
       setSecurity: (patch) => set((s) => ({ security: { ...s.security, ...patch } })),
@@ -94,8 +112,11 @@ export const useUIStore = create<UIState>()(
       startAssistantConversation: (projectId) => set((state) => ({ assistantSessions: Object.fromEntries(Object.entries(state.assistantSessions).filter(([id]) => id !== projectId)) })),
       setAssistantDraft: (assistantDraft) => set({ assistantDraft, assistantProjectId: assistantDraft.projectId }),
       clearAssistantDraft: () => set({ assistantDraft: null }),
+      openAssistantConversation: (projectId, sessionId) =>
+        set((state) => ({ assistantOpened: { projectId, sessionId, token: (state.assistantOpened?.token ?? 0) + 1 } })),
       setOfflineQueue: (offlineQueueCount) =>
         set((s) => ({ offlineQueueCount, offlineQueueRevision: s.offlineQueueRevision + 1 })),
+      setUnreadCount: (unreadCount) => set((s) => (s.unreadCount === unreadCount ? s : { unreadCount })),
       showToast: (message, kind = "info") => {
         // ToastHost owns rendering; lazy-require avoids a store→component import cycle.
         void import("@/components/ui/ToastHost").then(({ toast }) => toast(message, kind)).catch(() => undefined)

@@ -1,11 +1,13 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FlatList, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native"
-import { ChevronDown, ChevronUp, Pause, Play, SkipBack, SkipForward } from "lucide-react-native"
-import type { PreviewMachine, ToolpathPreview, ToolpathReview as ToolpathReviewPayload, ToolpathSegment } from "@cadcamfun/api"
+import { ChevronDown, ChevronUp, Eye, EyeOff, Pause, Play, SkipBack, SkipForward } from "lucide-react-native"
+import type { PreviewCollisionEvent, PreviewMachine, PreviewOperation, ToolpathPreview, ToolpathReview as ToolpathReviewPayload, ToolpathSegment } from "@cadcamfun/api"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { MACHINE_LABELS, MACHINE_SOURCE_LABELS } from "@/lib/machine-bodies"
 import { clampPlayhead, segmentIndexForLine } from "@/lib/preview-math"
+import { operationColor } from "@/lib/preview-scene"
+import { cutterAt, describeCutter, orderedContacts } from "@/lib/toolpath-review"
 import {
   PLAYBACK_SPEEDS,
   cumulativeTimes,
@@ -23,6 +25,7 @@ import {
 import { mono } from "@/lib/typography"
 import { PreviewViewport } from "@/components/preview/PreviewViewport"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
+import { SectionHeader } from "@/components/ui/SectionHeader"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { previewHeight, layout } from "@/lib/layout"
 import { useContentLayout } from "@/components/layout/use-content-layout"
@@ -36,6 +39,8 @@ const KIND_COLOR = {
 
 /** Playback publishes the block at most this often; the Metal view and the listing do not need 60 Hz. */
 const PLAYBACK_TICK_MS = 50
+/** How many lines of a program the phone keeps in memory; the listing renders a screenful at a time. */
+const MAX_GCODE_LINES = 20_000
 
 /**
  * G-code review: the 3D path, a simulation bar, and the NC listing stay on the same block.
@@ -67,9 +72,28 @@ export function ToolpathReview({
   const [playhead, setPlayhead] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [speedIndex, setSpeedIndex] = useState(1)
+  /** The operation the user put away: the phone shows that one alone, like the desktop's operation browser. */
+  const [isolated, setIsolated] = useState<number | undefined>(undefined)
+  /** The path is coloured by move class or by operation; the desktop offers both. */
+  const [colorMode, setColorMode] = useState<"move" | "operation">("move")
+  /** Playing across a contact stops there, like the desktop's "stop at collision". */
+  const [stopAtContact, setStopAtContact] = useState(true)
   const listRef = useRef<FlatList<string>>(null)
   const clock = useRef(0)
-  const lines = useMemo(() => review?.gcode ? review.gcode.split(/\r?\n/) : [], [review?.gcode])
+  // A phone lists a screenful of lines at a time: the program is read up to a bound instead of split whole.
+  const lines = useMemo(() => {
+    const text = review?.gcode
+    if (!text) return []
+    const out: string[] = []
+    let start = 0
+    while (out.length < MAX_GCODE_LINES) {
+      const end = text.indexOf("\n", start)
+      if (end < 0) { out.push(text.slice(start)); break }
+      out.push(text.slice(start, end))
+      start = end + 1
+    }
+    return out
+  }, [review?.gcode])
   const kindByLine = useMemo(() => {
     const kinds = new Map<number, ToolpathSegment["kind"]>()
     for (const segment of segments) kinds.set(segment.line, segment.kind)
@@ -84,6 +108,10 @@ export function ToolpathReview({
   const simulating = playing || playhead > 0
   const machine = preview?.machine
   const machineSpin = machine ? spinRateAt(machine.spin, playhead, simulating) : 0
+  const operations = machine?.operations ?? []
+  const contacts = useMemo(() => orderedContacts(machine?.events ?? []), [machine?.events])
+  const cutter = useMemo(() => cutterAt(operations, playhead), [operations, playhead])
+  const hiddenOperations = useMemo(() => (isolated === undefined ? undefined : new Set([isolated])), [isolated])
 
   useEffect(() => {
     setPlayhead(0)
@@ -95,6 +123,15 @@ export function ToolpathReview({
     if (activeLine < 1) return
     listRef.current?.scrollToIndex({ index: Math.min(activeLine - 1, Math.max(lines.length - 1, 0)), viewPosition: 0.35, animated: false })
   }, [activeLine, lines.length])
+
+  // "Stop at contact": playing across a contact pauses there, the contact in view (the desktop's "stop at collision").
+  useEffect(() => {
+    if (!playing || !stopAtContact) return
+    const hit = contacts.find((event) => event.segment === playhead)
+    if (hit === undefined) return
+    setPlaying(false)
+    haptic(hit.severity === "error" ? "error" : "warning")
+  }, [playing, playhead, contacts, stopAtContact])
 
   // The simulated clock advances in real time × speed; the block shown is the one running at that time.
   useEffect(() => {
@@ -165,9 +202,13 @@ export function ToolpathReview({
     <PreviewViewport
       bounds={preview.bounds}
       revision={preview.revision}
+      mesh={preview.part}
       segments={segments}
       stock={preview.stock}
       machine={preview.machine}
+      operations={operations}
+      hiddenOperations={hiddenOperations}
+      colorMode={colorMode}
       playhead={playhead}
       simulating={simulating}
       fullscreenTitle={review?.name ?? "Toolpath"}
@@ -242,6 +283,35 @@ export function ToolpathReview({
         </View> : null}
         {preview?.truncated ? (
           <Text style={{ color: palette.warning, fontSize: 12, lineHeight: 16 }}>Path truncated so it fits on the phone. The G-code listing is complete.</Text>
+        ) : null}
+        {cutter ? (
+          <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 18 }}>
+            Tool at the playhead: <Text style={{ color: palette.ink, fontWeight: "600" }}>{describeCutter(cutter)}</Text>
+          </Text>
+        ) : null}
+        {operations.length > 0 ? (
+          <View style={{ gap: 8 }}>
+            <SectionHeader padded={false}>Operations</SectionHeader>
+            <OperationLegend
+              operations={operations}
+              isolated={isolated}
+              colorMode={colorMode}
+              onIsolate={(index) => { haptic("selection"); setIsolated((current) => (current === index ? undefined : index)) }}
+              onColorMode={setColorMode}
+            />
+          </View>
+        ) : null}
+        {contacts.length > 0 ? (
+          <View style={{ gap: 6 }}>
+            <SectionHeader padded={false}>Contacts</SectionHeader>
+            <ContactList
+              contacts={contacts}
+              playhead={playhead}
+              stopAtContact={stopAtContact}
+              onToggleStop={() => { haptic("selection"); setStopAtContact((value) => !value) }}
+              onSeek={(event) => { haptic("selection"); seek(event.segment) }}
+            />
+          </View>
         ) : null}
         {split ? null : bar}
       </View>
@@ -319,6 +389,115 @@ export function ToolpathReview({
       {listing}
     </SafeAreaView>
   )
+}
+
+/**
+ * The program's operations: one chip each, with the colour the path uses for it.
+ *
+ * A chip isolates its operation (the phone shows that one alone) and a second tap puts it back. The colour mode
+ * switch is the desktop's: the path coloured by move class or by operation.
+ */
+function OperationLegend({ operations, isolated, colorMode, onIsolate, onColorMode }: {
+  operations: readonly PreviewOperation[]
+  isolated: number | undefined
+  colorMode: "move" | "operation"
+  onIsolate: (index: number) => void
+  onColorMode: (mode: "move" | "operation") => void
+}) {
+  const { palette } = useTheme()
+  const swatch = (index: number) => {
+    const [r, g, b] = operationColor(index)
+    return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
+  }
+  return <View style={{ gap: 8 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel="Operations"
+      contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+      {operations.map((operation) => {
+        const shown = isolated === undefined || isolated === operation.index
+        return <Pressable key={operation.index} accessibilityRole="button"
+          accessibilityState={{ selected: isolated === operation.index }}
+          accessibilityLabel={`${operation.name}${shown ? "" : ", hidden"}`}
+          onPress={() => onIsolate(operation.index)}
+          style={({ pressed }) => ({
+            minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, borderRadius: 22,
+            borderCurve: "continuous" as const, borderWidth: 0.5,
+            borderColor: isolated === operation.index ? palette.accent : palette.border,
+            backgroundColor: pressed ? `${palette.ink}18` : isolated === operation.index ? `${palette.accent}1f` : "transparent",
+            opacity: shown ? 1 : 0.45,
+          })}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: swatch(operation.index) }} />
+          <Text numberOfLines={1} style={{ color: palette.ink, fontSize: 13, fontWeight: "600" }}>{operation.name}</Text>
+          {operation.cutter ? (
+            <Text style={{ color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>
+              Ø{operation.cutter.diameter}
+            </Text>
+          ) : null}
+          {isolated === operation.index ? <EyeOff size={15} color={palette.accent} /> : null}
+        </Pressable>
+      })}
+    </ScrollView>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <Text style={{ color: palette.muted, fontSize: 12 }}>Path colour</Text>
+      {(["move", "operation"] as const).map((mode) => <Pressable key={mode} accessibilityRole="radio" accessibilityState={{ checked: colorMode === mode }}
+        accessibilityLabel={`Colour the path by ${mode}`}
+        onPress={() => { haptic("selection"); onColorMode(mode) }}
+        style={({ pressed }) => ({
+          minHeight: 32, justifyContent: "center", paddingHorizontal: 12, borderRadius: 16, borderWidth: 0.5,
+          borderColor: colorMode === mode ? palette.accent : palette.border,
+          backgroundColor: colorMode === mode ? `${palette.accent}1f` : pressed ? `${palette.ink}12` : "transparent",
+        })}>
+        <Text style={{ color: colorMode === mode ? palette.accentStrong : palette.soft, fontSize: 12, fontWeight: "600" }}>
+          {mode === "move" ? "Move" : "Operation"}
+        </Text>
+      </Pressable>)}
+    </View>
+  </View>
+}
+
+/**
+ * The contacts on the playback clock: the tool into the workholding, into the stock left, a near miss.
+ *
+ * Each row seeks to the move that made the contact, so the phone shows what the desktop's timeline marks.
+ */
+function ContactList({ contacts, playhead, stopAtContact, onToggleStop, onSeek }: {
+  contacts: readonly PreviewCollisionEvent[]
+  playhead: number
+  stopAtContact: boolean
+  onToggleStop: () => void
+  onSeek: (event: PreviewCollisionEvent) => void
+}) {
+  const { palette } = useTheme()
+  return <View style={{ gap: 6 }}>
+    <Pressable accessibilityRole="switch" accessibilityState={{ checked: stopAtContact }}
+      accessibilityLabel="Stop the simulation at a contact"
+      onPress={onToggleStop}
+      style={({ pressed }) => ({
+        minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, opacity: pressed ? 0.6 : 1,
+      })}>
+      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: stopAtContact ? palette.accent : palette.border }} />
+      <Text style={{ color: palette.soft, fontSize: 13 }}>Stop the simulation at a contact</Text>
+    </Pressable>
+    {contacts.map((event) => {
+      const current = event.segment === playhead
+      const tone = event.severity === "error" ? palette.danger : palette.warning
+      return <Pressable key={`${event.code}:${event.segment}`} accessibilityRole="button"
+        accessibilityLabel={`${event.severity === "error" ? "Error" : "Warning"}: ${event.message}`}
+        onPress={() => onSeek(event)}
+        style={({ pressed }) => ({
+          minHeight: 44, flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 8,
+          paddingHorizontal: 10, borderRadius: 10, borderCurve: "continuous" as const,
+          backgroundColor: current ? `${tone}18` : pressed ? `${palette.ink}12` : "transparent",
+        })}>
+        <View style={{ width: 8, height: 8, borderRadius: 4, marginTop: 5, backgroundColor: tone }} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text selectable style={{ color: palette.ink, fontSize: 13, lineHeight: 18 }}>{event.message}</Text>
+          <Text style={{ color: palette.muted, fontSize: 11, fontVariant: ["tabular-nums"] }}>
+            {event.code}{event.line !== undefined ? ` · line ${event.line}` : ""} · {formatDuration(event.seconds)}
+          </Text>
+        </View>
+      </Pressable>
+    })}
+  </View>
 }
 
 /** Transport controls and scrubber. Rendered under the inline preview and in the full-screen viewer. */

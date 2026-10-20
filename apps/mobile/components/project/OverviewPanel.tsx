@@ -27,8 +27,11 @@ const WORKSPACE = [
   { screen: "library", title: "Library", detail: "Tools, materials & machines", Icon: Library },
 ] as const
 
-export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheckout }: {
-  client: CompanionClient; projectId: string; refreshKey: number; onCommit: () => void; onCheckout: (branch: string) => void
+export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheckout, onCreateBranch }: {
+  client: CompanionClient; projectId: string; refreshKey: number
+  onCommit: (summary: { branch: string; files: number }) => void
+  onCheckout: (branch: string) => void
+  onCreateBranch: () => void
 }) {
   const { palette } = useTheme()
   const { width, fontScale, gutter, onLayout } = useContentLayout()
@@ -62,7 +65,7 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
         {vcs?.dirty.slice(0, 4).map((path) => <Text key={path} selectable style={{ color: palette.soft, fontFamily: "Menlo", fontSize: 12, lineHeight: 18 }}>{path}</Text>)}
         {dirtyCount > 4 ? <Text style={{ color: palette.muted, fontSize: 12 }}>+{dirtyCount - 4} more files</Text> : null}
       </View>
-      <ActionButton label="Commit changes" variant={dirtyCount ? "primary" : "secondary"} disabled={!vcs || !dirtyCount} onPress={onCommit} />
+      <ActionButton label="Commit changes" variant={dirtyCount ? "primary" : "secondary"} disabled={!vcs || !dirtyCount} onPress={() => onCommit({ branch: vcs?.branch ?? "", files: dirtyCount })} />
     </SurfaceCard>}
 
     <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 19, fontWeight: "700", marginTop: 6 }}>Explore workspace</Text>
@@ -74,15 +77,16 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
       </PressableScale>)}
     </View>
 
-    {branchList.length ? <View style={{ gap: 10 }}>
+    <View style={{ gap: 10 }}>
       <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 19, fontWeight: "700", marginTop: 6 }}>Branches</Text>
-      <SurfaceCard inset={false}>{branchList.map(([name, oid], index) => <View key={name}>
+      {branchList.length ? <SurfaceCard inset={false}>{branchList.map(([name, oid], index) => <View key={name}>
         {index ? <Divider inset={16} /> : null}
         <ListRow title={name} subtitle={shortOid(oid)} leading={<GitBranch size={18} color={palette.muted} />}
           trailing={name === vcs?.branch ? <Pill tone="accent">Current</Pill> : undefined}
           onPress={name === vcs?.branch ? undefined : () => onCheckout(name)} />
-      </View>)}</SurfaceCard>
-    </View> : null}
+      </View>)}</SurfaceCard> : null}
+      <ActionButton label="New branch" variant="secondary" onPress={onCreateBranch} />
+    </View>
 
     <SurfaceCard inset={false}>
       <ListRow leading={<IconTile size={40}><Sparkles size={20} color={palette.accent} /></IconTile>} title="Desktop assistant"

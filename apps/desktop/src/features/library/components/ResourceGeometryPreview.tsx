@@ -6,7 +6,7 @@ import { disposeObject, fitCameraToObjects } from "../../cad/lib/sceneHelpers.ts
 import { FrameScheduler } from "../../cad/lib/frame-scheduler.ts"
 import type { Element } from "../../cad/store/elementsStore.ts"
 import { createComponentPreviewObject } from "../lib/component-preview.ts"
-import { buildPlayback, toolColors } from "../../../viewport/view3d/playback.ts"
+import { buildPlayback, playbackSegments, toolColors } from "../../../viewport/view3d/playback.ts"
 import { t } from "../../../i18n/index.ts"
 import { resourcePreviewElements } from "../lib/resource-geometry.ts"
 export { resourceElements } from "../lib/resource-geometry.ts"
@@ -65,7 +65,7 @@ export function ResourceGeometryPreview(props: {
       if (new THREE.Box3().setFromObject(part).isEmpty()) setGeometryError(true)
       if (props.program && pathsVisible()) {
         const colors = toolColors(props.program), groups = new Map<string, { readonly color: number; readonly points: number[] }>()
-        for (const segment of buildPlayback(props.program).segments) {
+        for (const segment of playbackSegments(buildPlayback(props.program))) {
           const key = `${segment.toolId}:${segment.rapid}`
           let group = groups.get(key)
           if (!group) { group = { color: segment.rapid ? 0x94a3b8 : colors.get(segment.toolId) ?? 0x38bdf8, points: [] }; groups.set(key, group) }

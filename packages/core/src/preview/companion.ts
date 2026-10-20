@@ -14,11 +14,12 @@ import { inferMachineKind } from "../cam/machine.ts"
 import { findMachine } from "../cam/kernel/machines.ts"
 import { elementMesh, type Element } from "../cam/model/element-mesh.ts"
 import { displayPoint, displaySpinRate, spinSense } from "../cam/viewer/frames.ts"
-import { collidingMoves } from "../cam/viewer/setup-checks.ts"
+import { checkCollisions, toolReachOf } from "../cam/viewer/collisions.ts"
+import { checkSetup, collidingMoves } from "../cam/viewer/setup-checks.ts"
 import { buildTimeline, programStart, type Timeline } from "../cam/viewer/timeline.ts"
 import { parseToolpath, type ToolpathPoint } from "../cam/viewer/toolpath.ts"
 import { tokenize, valuesOf } from "../cam/viewer/words.ts"
-import { toolEnvelope, type ToolModel, type ToolResource } from "../cam/tool-model.ts"
+import { toolEnvelope, toolMachineOf, toolModelOf, type ToolModel, type ToolResource } from "../cam/tool-model.ts"
 import { previewToolModel } from "../cam/operation-tools.ts"
 import {
   choosePreviewMachine,
@@ -26,13 +27,16 @@ import {
   freshBounds,
   grow,
   previewBodyBounds,
+  previewCutterOf,
   previewMachineBlock,
   previewSetupOf,
   previewStockBounds,
   EMPTY_BOUNDS,
   type BoundsSink,
   type PreviewBounds,
+  type PreviewCollisionEvent,
   type PreviewMachine,
+  type PreviewOperation,
   type PreviewSpinRun,
 } from "./machine.ts"
 
@@ -44,7 +48,7 @@ export const MAX_PREVIEW_SEGMENTS = 20_000
  * Bump when the payload a given revision produces changes (rounding, caps, arc expansion), so a phone holding an
  * entity tag of the old shape fetches the new one instead of being told nothing changed.
  */
-export const PREVIEW_FORMAT = 3
+export const PREVIEW_FORMAT = 4
 
 /**
  * Mesh coordinates and normals travel rounded to 1e-5. The phone uploads them as float32, whose spacing is already
@@ -429,6 +433,8 @@ export interface MachineSceneOptions {
   readonly tool?: ToolModel | undefined
   /** The stored tool resource of the document: the scene picks the model once it knows the machine (§5.6). */
   readonly toolResource?: ToolResource | undefined
+  /** The tools the program's toolpaths name, by tool id (a program that changes tools). */
+  readonly tools?: ReadonlyArray<{ readonly toolId: string; readonly resource: ToolResource }>
   readonly maxSegments?: number
 }
 
@@ -522,6 +528,101 @@ const unionBounds = (a: PreviewBounds, b: PreviewBounds): PreviewBounds => {
 const MAX_COLLISION_MOVES = MAX_PREVIEW_SEGMENTS
 
 /**
+ * The program's operations as the phone needs them: the toolpath, the run of path segments it drew and its cutter.
+ *
+ * A toolpath that drew nothing (a tool change, a dwell-only path) is left out: the phone lists operations it can
+ * show. The order is the program's order, like the desktop's operation list.
+ */
+const operationsOf = (
+  program: Program | undefined,
+  timeline: Timeline | undefined,
+  move: readonly number[],
+  toolOf: (path: number) => ToolModel | undefined,
+): PreviewOperation[] => {
+  if (program === undefined || timeline === undefined) return []
+  const out: PreviewOperation[] = []
+  for (let index = 0; index < program.toolpaths.length; index++) {
+    const toolpath = program.toolpaths[index]!
+    let start = -1
+    let end = -1
+    for (let segment = 0; segment < move.length; segment++) {
+      const timed = timeline.moves[move[segment]!]
+      if (timed === undefined || timed.path !== index) continue
+      if (start < 0) start = segment
+      end = segment
+    }
+    if (start < 0) continue
+    const cutter = previewCutterOf(toolOf(index))
+    out.push({
+      index,
+      name: toolpath.name,
+      toolId: toolpath.toolId,
+      startSegment: start,
+      endSegment: end,
+      ...(cutter !== undefined ? { cutter } : {}),
+    })
+  }
+  return out
+}
+
+/**
+ * The contacts on the playback clock: the tool into the workholding (the desktop's setup checks) and the collisions
+ * the core replays against the stock left at each moment (spec 32 P7).
+ *
+ * The live stock replay costs one height field per program, so it runs only for a program the phone can draw; a
+ * bigger one still reports the fixture contacts.
+ */
+const eventsOf = (
+  setup: ReturnType<typeof previewSetupOf>,
+  timeline: Timeline | undefined,
+  move: readonly number[],
+  envelope: ReturnType<typeof toolEnvelope> | undefined,
+  toolOf: (path: number) => ToolModel | undefined,
+): PreviewCollisionEvent[] => {
+  if (timeline === undefined) return []
+  const segmentsOfMove = new Map<number, number[]>()
+  move.forEach((timed, segment) => {
+    const known = segmentsOfMove.get(timed)
+    if (known === undefined) segmentsOfMove.set(timed, [segment])
+    else known.push(segment)
+  })
+  const out: PreviewCollisionEvent[] = []
+  for (const finding of checkSetup(setup, timeline, envelope)) {
+    const segment = segmentsOfMove.get(finding.move)?.[0]
+    if (segment === undefined) continue
+    out.push({
+      code: finding.code,
+      severity: finding.severity,
+      seconds: timeline.moves[finding.move]?.start ?? 0,
+      segment,
+      ...(finding.line !== undefined ? { line: finding.line } : {}),
+      message: finding.message,
+    })
+  }
+  // The live stock replay is a 3-axis program's: a rotary one has no height field to cut.
+  const live = setup.kind === "mill" && setup.rotary === undefined && timeline.moves.length <= MAX_PREVIEW_SEGMENTS
+  for (const event of checkCollisions({
+    setup,
+    timeline,
+    reachOf: (path) => toolReachOf(toolOf(path)),
+    ...(live ? { live: { toolOf } } : {}),
+    clearance: 2,
+  })) {
+    const segment = segmentsOfMove.get(event.move)?.[0]
+    if (segment === undefined) continue
+    out.push({
+      code: event.code,
+      severity: event.severity,
+      seconds: event.seconds,
+      segment,
+      ...(event.line !== undefined ? { line: event.line } : {}),
+      message: event.message,
+    })
+  }
+  return out.sort((a, b) => a.seconds - b.seconds)
+}
+
+/**
  * The toolpath in display coordinates plus the machine around it (spec 31 §5, the payload contract of spec 13 §6):
  * which machine the program is for, how it is set up, its bodies, the tool glyph, what turns while it runs and which
  * segments run into the workholding. The phone never maps a program coordinate itself.
@@ -558,6 +659,8 @@ export const machineScenePreview = (options: MachineSceneOptions): MachineSceneP
   let truncated = false
   let stats: ToolpathStats = EMPTY_STATS
   let timeline: Timeline | undefined
+  // The program the timeline plays: the analysed G-code's own, or the stored one.
+  let program: Program | undefined = options.program
 
   if (stored) {
     stats = gcodeStats(gcode)
@@ -570,6 +673,7 @@ export const machineScenePreview = (options: MachineSceneOptions): MachineSceneP
       const built = timelineSegments(setup, candidate, maxSegments)
       if (built.segments.length > 0) {
         timeline = candidate
+        program = analysis.program
         segments = built.segments
         move.push(...built.move)
         truncated = built.truncated
@@ -601,12 +705,38 @@ export const machineScenePreview = (options: MachineSceneOptions): MachineSceneP
     if (hits.size > 0) collisions = move.flatMap((index, segment) => (hits.has(index) ? [segment] : []))
   }
 
+  /**
+   * The tool of every toolpath: the document's tool rows by tool id first, the document's own tool next, the set-up's
+   * tool last. A program that changes tools therefore draws each operation with its own cutter, like the desktop's
+   * multi-operation preview.
+   */
+  const toolOf = (path: number): ToolModel | undefined => {
+    const id = program?.toolpaths[path]?.toolId
+    if (id !== undefined) {
+      const resource = options.tools?.find((entry) => entry.toolId === id)?.resource
+      // A tool of another machine is not this operation's tool: the set-up's own tool is used instead.
+      if (resource !== undefined && toolMachineOf(resource.type) === choice.kind) return toolModelOf(resource, choice.kind)
+    }
+    return tool ?? previewToolModel(choice.kind, options.settings)
+  }
+
+  const operations = operationsOf(program, timeline, move, toolOf)
+  const events = eventsOf(setup, timeline, move, envelope, toolOf)
+  if (events.length > 0) {
+    // A contact is a red segment too: the phone marks the whole move, not only its first segment.
+    const red = new Set(collisions)
+    for (const event of events) red.add(event.segment)
+    collisions = [...red].sort((a, b) => a - b)
+  }
+
   const machine = previewMachineBlock({
     setup,
     choice,
     ...(tool !== undefined ? { tool } : {}),
     spin: timeline !== undefined ? spinRunsOf(timeline, move, choice.kind) : [],
     collisions,
+    operations,
+    events,
   })
 
   return {

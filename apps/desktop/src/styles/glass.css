@@ -67,6 +67,15 @@
   backdrop-filter: blur(6px);
 }
 
+/* The action bar of a modal: the same glass, with a hairline that separates it from the body. */
+:root[data-glass] .ui-modal-footer {
+  background: var(--glass-fill-strong) !important;
+  border-top: 1px solid var(--glass-rim) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--glass-text);
+}
+
 /* Controls: a light translucent field with a hairline; the primary action keeps its solid colour. */
 :root[data-glass] .ui-btn-secondary,
 :root[data-glass] .ui-btn-ghost,

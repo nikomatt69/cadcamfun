@@ -50,6 +50,13 @@ test("recovered done displays the final answer without duplicate deltas", () => 
   expect(log.at(-1)).toMatchObject({ kind: "assistant", text: "Done and checked" })
 })
 
+test("a recovered turn says it was recovered, and a live one does not", () => {
+  const recovered = appendChatEvent(appendChatEvent(emptyLog, { type: "user", text: "Build" }), { type: "done", sessionId: "s1", text: "Done", recovered: true })
+  expect(recovered.some((row) => row.kind === "notice" && row.text.includes("Recovered"))).toBe(true)
+  const live = appendChatEvent(appendChatEvent(emptyLog, { type: "user", text: "Build" }), { type: "done", sessionId: "s1", text: "Done" })
+  expect(live.some((row) => row.kind === "notice")).toBe(false)
+})
+
 test("questions and permissions resolve from server events", () => {
   let log = appendChatEvent(emptyLog, { type: "question_request", sessionId: "s", requestId: "q", questions: [{ header: "Stock", question: "Material?", options: [] }] })
   log = appendChatEvent(log, { type: "question_resolved", sessionId: "s", requestId: "q" })

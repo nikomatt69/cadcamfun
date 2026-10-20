@@ -1,8 +1,8 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
-import { Motion, Presence } from "solid-motionone"
-import { Edit2, Minus, Move, Plus, X } from "lucide-solid"
+import { Edit2, Plus, Trash2 } from "lucide-solid"
 import type { Vector3 } from "./Vector3Input.tsx"
 import { NumberField } from "./NumberField.tsx"
+import { PropertyEditorModal } from "./PropertyEditorModal.tsx"
 
 interface PointListInputProps {
   readonly label: string
@@ -14,9 +14,19 @@ interface PointListInputProps {
   readonly exactPoints?: number | undefined
 }
 
-const COORD = "w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-blue-400"
+const TRIGGER = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-[#F8FBFF] dark:bg-gray-700 dark:hover:bg-gray-600 hover:bg-gray-50 flex justify-between items-center gap-2 text-gray-700 dark:text-blue-400"
+const LABEL = "block text-sm font-medium text-gray-700 dark:text-blue-400 mb-1"
+const COORD = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-blue-400"
+const AXES = ["x", "y", "z"] as const
 
-/** Edits a list of 3D points in a dialog (add, remove, per-point coordinates, min/max/exact validation). */
+/** What the list shows: three decimals at most, no float noise. */
+const show = (value: number | undefined): string =>
+  typeof value === "number" && Number.isFinite(value) ? String(Math.round(value * 1000) / 1000) : "0"
+
+/**
+ * Edits a list of 3D points. The editor opens as a centred modal over the whole window:
+ * the list of points on the left, the coordinates of the selected one on the right.
+ */
 export function PointListInput(props: PointListInputProps): JSX.Element {
   const [open, setOpen] = createSignal(false)
   const [points, setPoints] = createSignal<Vector3[]>([])
@@ -24,18 +34,32 @@ export function PointListInput(props: PointListInputProps): JSX.Element {
   const value = () => props.value ?? []
   const min = () => props.minPoints ?? 0
 
-  const openDialog = () => { setPoints([...value()]); setOpen(true) }
+  const openDialog = () => {
+    const list = [...value()]
+    setPoints(list)
+    // The first point is picked straight away, so the coordinates are there to be read.
+    setCurrent(list.length > 0 ? 0 : null)
+    setOpen(true)
+  }
   const close = () => { setOpen(false); setCurrent(null) }
 
+  /** Why the list cannot be saved yet. It is written in the dialog, never behind an alert. */
+  const problem = (): string | undefined => {
+    const count = points().length
+    if (min() > 0 && count < min()) return `At least ${min()} points are needed (${count} now).`
+    if (props.exactPoints !== undefined && count !== props.exactPoints) return `Exactly ${props.exactPoints} points are needed (${count} now).`
+    if (props.maxPoints !== undefined && count > props.maxPoints) return `At most ${props.maxPoints} points are allowed (${count} now).`
+    return undefined
+  }
+
   const save = () => {
-    if (min() > 0 && points().length < min()) { alert(`Sono richiesti almeno ${min()} punti`); return }
-    if (props.exactPoints && points().length !== props.exactPoints) { alert(`Sono richiesti esattamente ${props.exactPoints} punti`); return }
+    if (problem() !== undefined) return
     props.onChange(points())
     close()
   }
 
   const add = () => {
-    if (props.maxPoints && points().length >= props.maxPoints) { alert(`Numero massimo di punti consentito: ${props.maxPoints}`); return }
+    if (props.maxPoints !== undefined && points().length >= props.maxPoints) return
     const last = points()[points().length - 1]
     const next = last ? { x: last.x + 10, y: last.y, z: last.z } : { x: 0, y: 0, z: 0 }
     setCurrent(points().length)
@@ -43,86 +67,126 @@ export function PointListInput(props: PointListInputProps): JSX.Element {
   }
 
   const remove = (index: number) => {
-    if (min() > 0 && points().length <= min()) { alert(`Sono richiesti almeno ${min()} punti`); return }
     setPoints(points().filter((_, i) => i !== index))
     const selected = current()
     if (selected === index) setCurrent(null)
     else if (selected !== null && selected > index) setCurrent(selected - 1)
   }
 
-  const update = (index: number, axis: "x" | "y" | "z", value: number) =>
-    setPoints(points().map((point, i) => (i === index ? { ...point, [axis]: value } : point)))
+  const update = (index: number, axis: "x" | "y" | "z", next: number) =>
+    setPoints(points().map((point, i) => (i === index ? { ...point, [axis]: next } : point)))
 
   return (
     <div class="mb-2">
-      <label class="block text-sm font-medium text-gray-700 dark:text-blue-400 mb-1">
+      <div class={LABEL}>
         {props.label} ({value().length || 0} points)
-        {min() > 0 && ` (Min: ${min()})`}
-        {props.maxPoints ? ` (Max: ${props.maxPoints})` : ""}
-        {props.exactPoints ? ` (Richiesti: ${props.exactPoints})` : ""}
-      </label>
-      <button type="button" onClick={openDialog} disabled={props.disabled ?? false} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-[#F8FBFF] dark:bg-gray-700 dark:hover:bg-gray-600 hover:bg-gray-50 flex justify-between items-center text-gray-700 dark:text-blue-400">
-        <span>Edit Points</span>
-        <Edit2 size={16} />
+        {min() > 0 && ` (min ${min()})`}
+        {props.maxPoints !== undefined && ` (max ${props.maxPoints})`}
+        {props.exactPoints !== undefined && ` (exactly ${props.exactPoints})`}
+      </div>
+      <button type="button" onClick={openDialog} disabled={props.disabled ?? false} class={TRIGGER} data-testid="edit-points">
+        <span class="truncate">Edit points</span>
+        <span class="flex shrink-0 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          {value().length}
+          <Edit2 size={16} />
+        </span>
       </button>
 
-      <Presence>
-        <Show when={open()}>
-          <Motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={(event: MouseEvent) => { if (event.target === event.currentTarget) close() }}>
-            <Motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-auto" onClick={(event: MouseEvent) => event.stopPropagation()}>
-              <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-blue-400">Edit Points</h3>
-                <button type="button" onClick={close} class="text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-300" aria-label="Close"><X size={20} /></button>
+      <PropertyEditorModal
+        open={open()}
+        onClose={close}
+        onSave={save}
+        title="Edit points"
+        subtitle={`${props.label} · ${points().length} ${points().length === 1 ? "point" : "points"}`}
+        error={problem()}
+        saveDisabled={problem() !== undefined}
+        saveLabel="Save points"
+        size="lg"
+      >
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <section class="flex min-w-0 flex-col rounded-lg border border-gray-200 dark:border-gray-700">
+            <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
+              <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Points</h4>
+              <button
+                type="button"
+                onClick={add}
+                disabled={props.maxPoints !== undefined && points().length >= props.maxPoints}
+                class="flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                <Plus size={14} /> Add point
+              </button>
+            </header>
+            <div class="max-h-[46vh] min-h-[6rem] overflow-y-auto p-2">
+              <div class="flex items-center gap-1 px-2 pb-1">
+                <span class="w-20 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Point</span>
+                <span class="grid min-w-0 flex-1 grid-cols-3 gap-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  <span>X</span>
+                  <span>Y</span>
+                  <span>Z</span>
+                </span>
+                <span class="w-7 shrink-0" />
               </div>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="border dark:border-gray-600 rounded-md p-2">
-                  <div class="flex justify-between items-center mb-2">
-                    <h4 class="text-sm font-medium dark:text-blue-400">Points List</h4>
-                    <button type="button" onClick={add} class="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/50 rounded" title="Add Point"><Plus size={16} /></button>
-                  </div>
-                  <div class="max-h-64 overflow-y-auto">
-                    <For each={points()}>{(point, index) =>
-                      <div
-                        class={`flex justify-between items-center p-2 my-1 rounded cursor-pointer ${current() === index() ? "bg-blue-50 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-700" : "hover:bg-gray-50 dark:hover:bg-blue-900/30"}`}
-                        onClick={() => setCurrent(index())}
-                      >
-                        <div class="flex items-center">
-                          <Move size={14} class="text-gray-400 dark:text-gray-500 mr-2" />
-                          <div class="text-xs dark:text-blue-400">Point {index() + 1}: ({point?.x?.toFixed(1) || 0}, {point?.y?.toFixed(1) || 0}, {point?.z?.toFixed(1) || 0})</div>
-                        </div>
-                        <button type="button" onClick={(event) => { event.stopPropagation(); remove(index()) }} class="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/50 rounded" title="Remove Point"><Minus size={14} /></button>
-                      </div>}
-                    </For>
-                    <Show when={points().length === 0}>
-                      <div class="text-center text-gray-500 dark:text-gray-400 py-4">No points added. Click the + button to add a point.</div>
-                    </Show>
-                  </div>
-                </div>
-                <div class="border dark:border-gray-600 rounded-md p-2">
-                  <h4 class="text-sm font-medium mb-2 dark:text-blue-400">Point Editor</h4>
-                  <Show when={current()} keyed fallback={<div class="text-center text-gray-500 dark:text-gray-400 py-10">Select a point from the list to modify its coordinates.</div>}>{(index) =>
-                    <div class="space-y-3">
-                      <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">Editing coordinates for point {index + 1}</div>
-                      <div class="grid grid-cols-3 gap-2">
-                        <For each={["x", "y", "z"] as const}>{(axis) =>
-                          <div>
-                            <label class="block text-xs text-gray-500 dark:text-blue-400 mb-1">{axis.toUpperCase()}</label>
-                            <NumberField label={`Point ${index + 1} ${axis.toUpperCase()}`} value={points()[index]?.[axis] ?? 0} onChange={(value) => update(index, axis, value)} class={COORD} step={0.1} />
-                          </div>}
-                        </For>
-                      </div>
+              <For each={points()}>{(point, index) =>
+                <div data-testid="point-row" class={`flex items-center gap-1 rounded-md border px-2 py-1.5 ${current() === index() ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/40" : "border-transparent hover:bg-gray-50 dark:hover:bg-gray-800"}`}>
+                  <button type="button" onClick={() => setCurrent(index())} class="flex min-w-0 flex-1 items-center gap-3 text-left">
+                    <span class="w-20 shrink-0 text-xs font-semibold text-gray-700 dark:text-gray-200">Point {index() + 1}</span>
+                    <span class="grid min-w-0 flex-1 grid-cols-3 gap-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+                      <span class="truncate">{show(point?.x)}</span>
+                      <span class="truncate">{show(point?.y)}</span>
+                      <span class="truncate">{show(point?.z)}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remove(index())}
+                    class="shrink-0 rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/40 dark:hover:text-red-400"
+                    title={`Remove point ${index() + 1}`}
+                    aria-label={`Remove point ${index() + 1}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>}
+              </For>
+              <Show when={points().length === 0}>
+                <p class="px-2 py-6 text-center text-sm text-gray-500 dark:text-gray-400">No points yet. Add one to get started.</p>
+              </Show>
+            </div>
+          </section>
+
+          <section class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+            <h4 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Coordinates</h4>
+            {/* The picked point is read from the signal, not from `Show`'s condition: point 1 is index 0, which is falsy. */}
+            <Show when={current() !== null} fallback={
+              <p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">Pick a point in the list to change its coordinates.</p>
+            }>
+              <div class="space-y-3">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Point {(current() ?? 0) + 1} of {points().length}</p>
+                <div class="grid grid-cols-3 gap-2">
+                  <For each={AXES}>{(axis) =>
+                    <div>
+                      <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">{axis.toUpperCase()}</label>
+                      <NumberField
+                        label={`Point ${(current() ?? 0) + 1} ${axis.toUpperCase()}`}
+                        value={points()[current() ?? 0]?.[axis] ?? 0}
+                        onChange={(next) => update(current() ?? 0, axis, next)}
+                        class={COORD}
+                        step={0.1}
+                      />
                     </div>}
-                  </Show>
+                  </For>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => remove(current() ?? 0)}
+                  class="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-red-900/40"
+                >
+                  <Trash2 size={14} /> Remove point {(current() ?? 0) + 1}
+                </button>
               </div>
-              <div class="mt-6 flex justify-end space-x-3">
-                <button type="button" onClick={close} class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Cancel</button>
-                <button type="button" onClick={save} class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Save Points</button>
-              </div>
-            </Motion.div>
-          </Motion.div>
-        </Show>
-      </Presence>
+            </Show>
+          </section>
+        </div>
+      </PropertyEditorModal>
     </div>
   )
 }

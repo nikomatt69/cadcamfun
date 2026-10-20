@@ -1,0 +1,70 @@
+{
+  "differential": "passed",
+  "scenarios": [
+    {
+      "name": "bulk_logs",
+      "bytes": 950272,
+      "samples": 15,
+      "baseline_ms": {
+        "p50": 12.81568225,
+        "p95": 63.46302075
+      },
+      "current_ms": {
+        "p50": 6.0881718750000005,
+        "p95": 34.25925
+      },
+      "speedup_p50": 2.1050132146605995
+    },
+    {
+      "name": "fragmented_logs",
+      "bytes": 950272,
+      "samples": 15,
+      "baseline_ms": {
+        "p50": 38.019645875,
+        "p95": 116.44543237500001
+      },
+      "current_ms": {
+        "p50": 16.235911499999997,
+        "p95": 176.06570825
+      },
+      "speedup_p50": 2.3417007338947378
+    },
+    {
+      "name": "single_byte_utf8",
+      "bytes": 303104,
+      "samples": 15,
+      "baseline_ms": {
+        "p50": 23.448494875,
+        "p95": 128.013369875
+      },
+      "current_ms": {
+        "p50": 15.927187499999999,
+        "p95": 78.89014575
+      },
+      "speedup_p50": 1.4722307296878374
+    },
+    {
+      "name": "oversized_recovery",
+      "bytes": 262175,
+      "samples": 15,
+      "baseline_ms": {
+        "p50": 0.865291625,
+        "p95": 7.2108125
+      },
+      "current_ms": {
+        "p50": 0.49213550000000006,
+        "p95": 1.4853125
+      },
+      "speedup_p50": 1.758238584698726
+    }
+  ],
+  "environment": {
+    "os": "macOS-27.2-arm64-arm-64bit",
+    "architecture": "arm64",
+    "logical_cpus": 8,
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)"
+  },
+  "baseline_commit": "7cbf3ad8a049249851b8adb0d90b52f17183827a",
+  "scope": "Optimized output framing only; excludes log redaction, JSON parsing, process IO, UI and GPU",
+  "profile": "opt-level=s, codegen-units=1, lto=true (desktop release settings)"
+}

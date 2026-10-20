@@ -238,6 +238,30 @@ describe("companion gateway", () => {
     expect(routePolicy("POST", "/api/ai/sessions/prompt").maxBody).toBeGreaterThan(30 * 1024 * 1024)
   })
 
+  test("reading the assistant state with a POST spends no write token", async () => {
+    // The write budget refills one token per second; a phone that polls the session state must not
+    // starve its own commits.
+    expect(routePolicy("POST", "/api/ai/sessions/state")).toMatchObject({ kind: "read", maxBody: WRITE_BODY_LIMIT })
+    // Everything that changes something still costs a write token.
+    expect(routePolicy("POST", "/api/ai/sessions/control").kind).toBe("write")
+
+    const token = newToken()
+    const g = startGateway({
+      certificate: cert, port: 0, upstream: () => ({ port: upstream.port!, token: "t" }), tokens: async () => [{ id: token.id, name: "p", hash: hashToken(token.token), createdAt: "", lastSeen: null }],
+      limits: { requests: { capacity: 100, perSecond: 100 }, writes: { capacity: 1, perSecond: 0.01 }, streams: 4 },
+    })
+    try {
+      const post = (path: string) => fetch(`https://127.0.0.1:${g.port}${path}`, { method: "POST", headers: { authorization: `Bearer ${token.token}`, "content-type": "application/json" }, body: "{}", tls: { rejectUnauthorized: false } } as RequestInit)
+      expect((await post("/api/ai/sessions/state")).status).toBe(200)
+      expect((await post("/api/ai/sessions/state")).status).toBe(200)
+      // The single write token is still there for the phone's own commit.
+      expect((await post("/api/projects/p1/vcs/commit")).status).toBe(200)
+      expect((await post("/api/projects/p1/vcs/commit")).status).toBe(429)
+    } finally {
+      g.stop()
+    }
+  })
+
   test("an oversized body is refused with 413 before it reaches the desktop, declared or chunked", async () => {
     const before = seen.length
     const big = "x".repeat(WRITE_BODY_LIMIT + 1)

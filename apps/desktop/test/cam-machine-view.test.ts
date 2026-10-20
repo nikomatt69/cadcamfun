@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test"
 import * as THREE from "three"
 import { cam } from "@cadcamfun/core"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, machineSpatial } from "../src/viewport/view3d/machine-scene.ts"
-import { buildPlayback } from "../src/viewport/view3d/playback.ts"
+import { buildPlayback, playbackSegmentAt, playbackSegments } from "../src/viewport/view3d/playback.ts"
 import { toolObject } from "../src/viewport/view3d/tool-object.ts"
 import { gaugeOfTool, previewToolFor } from "../src/viewport/view3d/tool-models.ts"
 import { previewSetup, resolveMachineKind } from "../src/features/cam/lib/machine-view.ts"
@@ -53,10 +53,10 @@ describe("playback carries the move it plays (motion track index)", () => {
   test("each segment names its toolpath and expanded move; arcs keep one index for all their pieces", () => {
     const a = parsed("M3 S1000\nG0 X10 Y0\nG3 X10 Y0 I-10 J0 F100\nG1 X20")
     const p = buildPlayback(a.program)
-    expect(p.segments[0]).toMatchObject({ path: 0, index: 0 })
-    const arc = p.segments.filter((s) => s.index === 1)
+    expect(playbackSegmentAt(p, 0)).toMatchObject({ path: 0, index: 0 })
+    const arc = [...playbackSegments(p)].filter((s) => s.index === 1)
     expect(arc.length).toBeGreaterThan(10)
-    expect(p.segments[p.segments.length - 1]).toMatchObject({ path: 0, index: 2 })
+    expect(playbackSegmentAt(p, p.segmentCount - 1)).toMatchObject({ path: 0, index: 2 })
     // The same clock as the core timeline the machine scene plays.
     expect(v.buildTimeline(a.program, a.motion).duration).toBeCloseTo(p.duration, 9)
   })

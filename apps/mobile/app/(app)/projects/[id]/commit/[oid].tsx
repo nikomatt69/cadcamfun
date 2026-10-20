@@ -1,6 +1,6 @@
-import { useCallback } from "react"
-import { RefreshControl, Text, View } from "react-native"
-import { Stack, useLocalSearchParams } from "expo-router"
+import { useCallback, useState } from "react"
+import { Alert, RefreshControl, Text, View } from "react-native"
+import { Stack, useLocalSearchParams, useRouter } from "expo-router"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
 import { useTheme } from "@/lib/theme"
@@ -8,9 +8,13 @@ import { commitTime, commitTitle, relativeTime, shortOid } from "@/lib/format"
 import { commitBody } from "@/lib/workspace-filter"
 import { DiffView } from "@/components/DiffView"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
+import { ActionButton } from "@/components/ui/ActionButton"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { PageScroll } from "@/components/layout/page-scroll"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
+import { haptic } from "@/lib/haptics"
+import { errorMessage } from "@/lib/throttle"
+import { toast } from "@/components/ui/ToastHost"
 
 /**
  * One commit, read as the project sees it: message, author, oid, and the CAD-aware property diff
@@ -20,6 +24,8 @@ export default function CommitScreen() {
   const { id, oid } = useLocalSearchParams<{ id: string; oid: string }>()
   const { client } = useServer()
   const { palette } = useTheme()
+  const router = useRouter()
+  const [restoring, setRestoring] = useState(false)
 
   const log = useResource(useCallback((signal) => (client ? client.log(id, 100, signal) : Promise.reject(new Error("Not connected"))), [client, id]), `log:${id}:commit`)
   const commit = (log.data ?? []).find((candidate) => candidate.oid === oid)
@@ -32,6 +38,35 @@ export default function CommitScreen() {
     ),
     `diff:${id}:${oid}`,
   )
+
+  /**
+   * Restore puts this revision back as a *new* commit: history is never rewritten. A dirty working copy
+   * refuses it, exactly like git, so the phone says so instead of pretending it worked.
+   */
+  const restore = () => {
+    if (!client || !oid || restoring) return
+    Alert.alert(
+      "Restore this version?",
+      "The files of this commit come back as a new commit. Nothing in the history is rewritten.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Restore",
+          onPress: () => {
+            setRestoring(true)
+            void client.restore(id, oid).then(() => {
+              haptic("success")
+              toast("Restored as a new commit", "success")
+              router.back()
+            }).catch((error: unknown) => {
+              haptic("error")
+              toast(errorMessage(error, "Could not restore this version"), "error")
+            }).finally(() => setRestoring(false))
+          },
+        },
+      ],
+    )
+  }
 
   if (!client) return null
 
@@ -64,6 +99,13 @@ export default function CommitScreen() {
           {diff.error ? <ErrorBanner message={diff.error} actionLabel="Retry" onAction={() => void diff.reload()} /> : null}
           {diff.data && diff.data.length > 0 ? <DiffView changes={diff.data} /> : diff.data ? (
             <Text style={{ color: palette.muted, fontSize: 14, lineHeight: 20, textAlign: "center", paddingTop: 24 }}>Empty commit</Text>
+          ) : null}
+
+          {/* Restore is a desktop-grade action: the phone may do it, but it says what it does first. */}
+          {commit ? (
+            <View style={{ paddingTop: 20 }}>
+              <ActionButton label="Restore this version" variant="secondary" onPress={restore} loading={restoring} />
+            </View>
           ) : null}
       </PageScroll>
     </View>

@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { combineOperationResults, useCamStore, type OperationResult } from "../src/features/cam/store/camStore.ts"
-import { TOOL_COLORS, buildPlayback, toolColors } from "../src/viewport/view3d/playback.ts"
+import { TOOL_COLORS, buildPlayback, playbackSegments, toolColors } from "../src/viewport/view3d/playback.ts"
 
 const result = (id: string, tool: string, x: number): OperationResult => ({
   id, name: `Operation ${id}`, tool,
@@ -33,7 +33,7 @@ describe("operation results add up on the CAM page", () => {
     const colors = toolColors(state.program)
     expect([...colors.keys()]).toEqual(["endmill Ø6", "drill Ø5", "ballnose Ø4"])
     expect([...colors.values()]).toEqual(TOOL_COLORS.slice(0, 3))
-    const segments = buildPlayback(state.program).segments.filter((s) => !s.rapid)
+    const segments = [...playbackSegments(buildPlayback(state.program))].filter((s) => !s.rapid)
     expect(new Set(segments.map((s) => s.toolId))).toEqual(new Set(["endmill Ø6", "drill Ø5", "ballnose Ø4"]))
   })
 

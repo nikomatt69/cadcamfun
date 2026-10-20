@@ -100,6 +100,25 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
     return user
   })
 
+  /**
+   * The tools the stored program's own toolpaths name, by tool id.
+   *
+   * A program that changes tools has one toolpath per tool (spec 32 §4.8); the phone draws each operation with the
+   * cutter that runs it, so the tool rows travel with the preview.
+   */
+  const programToolsOf = Effect.fn("workspace.programTools")(function*(data: unknown, userId: string) {
+    const record = recordOf(data)
+    const program = recordOf(record?.program)
+    const paths = Array.isArray(program?.toolpaths) ? program.toolpaths : []
+    const ids = idsOf(paths.map((path) => {
+      const entry = recordOf(path)
+      return typeof entry?.toolId === "string" ? entry.toolId : null
+    }))
+    if (ids.length === 0) return [] as ReadonlyArray<{ readonly toolId: string; readonly resource: cam.ToolResource }>
+    const rows = yield* tools.visibleByIds(userId, ids)
+    return rows.map((row) => ({ toolId: row.id, resource: toolResourceOf(row) }))
+  })
+
   const cache = new preview.PreviewCache<Uint8Array>({ maxEntries: PREVIEW_CACHE_ENTRIES, maxWeight: PREVIEW_CACHE_BYTES }, (bytes) => bytes.byteLength)
 
   /**
@@ -126,7 +145,7 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
   })
 
   /** The machine scene of a stored CAM document; absent when the row holds something else (older or partial data). */
-  const documentScene = Effect.fn("workspace.documentScene")(function*(data: unknown, gcode: string, toolRow: ToolRow | undefined) {
+  const documentScene = Effect.fn("workspace.documentScene")(function*(data: unknown, gcode: string, toolRow: ToolRow | undefined, programTools: ReadonlyArray<{ readonly toolId: string; readonly resource: cam.ToolResource }>) {
     const document = yield* Schema.decodeUnknownEffect(CamProgramDocument)(data).pipe(Effect.orElseSucceed(() => undefined))
     if (document === undefined) return undefined
     return preview.machineScenePreview({
@@ -138,7 +157,22 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
       ...(document.gcode !== "" ? { generatorGcode: document.gcode } : {}),
       ...(document.kernelRequest?.machine !== undefined ? { machineId: document.kernelRequest.machine } : {}),
       ...(toolRow !== undefined ? { toolResource: toolResourceOf(toolRow) } : {}),
+      ...(programTools.length > 0 ? { tools: programTools } : {}),
     })
+  })
+
+  /**
+   * The part the program cuts: the drawing the document was made from, as a mesh.
+   *
+   * The phone draws it beside the path, like the desktop's CAM preview draws the workpiece. A document that names no
+   * drawing has no part to draw.
+   */
+  const documentPart = Effect.fn("workspace.documentPart")(function*(data: unknown) {
+    const document = yield* Schema.decodeUnknownEffect(CamProgramDocument)(data).pipe(Effect.orElseSucceed(() => undefined))
+    if (document === undefined) return undefined
+    const elements = preview.elementsOfDocument(document.drawing)
+    if (elements.length === 0) return undefined
+    return preview.meshPreview(elements)
   })
 
   return handlers
@@ -209,12 +243,16 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
         const gcode = row.gcode ?? ""
         // A tool edit changes the scene even when the toolpath row did not change, so its shape values enter the tag.
         const toolRow = row.toolId === null ? undefined : (yield* tools.visibleByIds(user.id, [row.toolId]))[0]
+        // The tools the program's own toolpaths name: a program that changes tools draws each operation with its cutter.
+        const programTools = yield* programToolsOf(row.data, user.id)
         const tag = previewTag("toolpath-path", row.id, row.updatedAt, gcode,
-          toolRow !== undefined ? toolResourceOf(toolRow) : null, row.machineConfigId, sceneTagInputs(row.data))
+          toolRow !== undefined ? toolResourceOf(toolRow) : null, row.machineConfigId, sceneTagInputs(row.data),
+          programTools.map((entry) => entry.resource))
         return yield* conditional(tag, Effect.gen(function*() {
-          const scene = yield* documentScene(row.data, gcode, toolRow)
+          const scene = yield* documentScene(row.data, gcode, toolRow, programTools)
           const path = scene ?? (yield* toolpathPreview(row.data, gcode))
-          return { ...path, revision: row.updatedAt }
+          const part = yield* documentPart(row.data)
+          return { ...path, ...(part !== undefined ? { part } : {}), revision: row.updatedAt }
         }))
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to preview toolpath"))))
     .handle("library", ({ params }) =>

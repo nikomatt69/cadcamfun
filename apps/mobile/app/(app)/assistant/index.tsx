@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native"
 import { SafeAreaView } from "react-native-screens/experimental"
-import { Stack, useFocusEffect } from "expo-router"
+import { Stack, useFocusEffect, useRouter } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
-import { Bot, Check, ChevronDown, CircleGauge, CloudOff, GitPullRequest, Plus, Route, SlidersHorizontal, Sparkles } from "lucide-react-native"
+import { Bot, Check, ChevronDown, CircleGauge, CloudOff, GitPullRequest, History, Plus, Route, SlidersHorizontal, Sparkles } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useResource } from "@/lib/use-resource"
@@ -17,6 +17,7 @@ import { enqueueAssistantOp, queuedTextsForProject } from "@/lib/offline-queue"
 import { CompanionError } from "@/lib/client"
 import { isBusyRefusal } from "@/lib/assistant-outbox"
 import { followSession } from "@/lib/session-stream"
+import { rowsFromMessages } from "@/lib/session-history"
 import { Composer, type AssistantMode } from "@/components/chat/Composer"
 import { TranscriptItemView, type ErrorRecovery, type TranscriptActions } from "@/components/chat/TranscriptItemView"
 import { JumpToLatestPill } from "@/components/chat/JumpToLatestPill"
@@ -33,6 +34,8 @@ import { Skeleton } from "@/components/ui/Skeleton"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ModelPickerSheet } from "@/components/chat/model-picker-sheet"
 import { AssistantInspectorSheet } from "@/components/chat/assistant-inspector-sheet"
+import { CameraSheet } from "@/components/chat/camera-sheet"
+import { acceptAttachments, type PendingAttachment } from "@/lib/attachments"
 import { assistantModels, formatVariantLabel, resolveAssistantPreferences, PERMISSION_MODES, selectedAssistantModel, type AssistantPreferences } from "@/lib/assistant-preferences"
 
 const QUICK_PROMPTS = [
@@ -71,6 +74,7 @@ export default function AssistantScreen() {
   const { palette } = useTheme()
   const headerHeight = useHeaderHeight()
   const content = useContentLayout()
+  const router = useRouter()
   const { width, fontScale } = content
   const stackedContext = fontScale > 1.3 || width < 375
 
@@ -90,9 +94,19 @@ export default function AssistantScreen() {
   const setSelectedAgentId = (agent: string) => setPreferences({ agent })
   const [modelsOpen, setModelsOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  /** Pictures waiting to go with the next message; the desktop's assistant reads them. */
+  const [attachments, setAttachments] = useState<readonly PendingAttachment[]>([])
   const [log, setLogState] = useState<readonly ChatRow[]>(emptyLog)
   const [activity, setActivity] = useState<TurnActivity>(idleActivity)
   const setLog = setLogState
+  /**
+   * The stored past of a conversation the user opened from the list, and the cursor for the page before it.
+   * The live turn appends to `log`, so the two never show the same message twice.
+   */
+  const [historyRows, setHistoryRows] = useState<readonly ChatRow[]>(emptyLog)
+  const [olderBefore, setOlderBefore] = useState<string | null>(null)
+  const [loadingOlder, setLoadingOlder] = useState(false)
   /** Every stream frame feeds both the transcript and the live status strip. */
   const apply = (event: LogEvent) => {
     setLogState((previous) => appendChatEvent(previous, event))
@@ -116,9 +130,18 @@ export default function AssistantScreen() {
   const listRef = useRef<FlatList<TranscriptItem>>(null)
   const generation = useRef(0)
   const stopping = useRef(false)
+  /** Stop was pressed while the prompt was still starting; it is applied as soon as the desktop names the session. */
+  const pendingStop = useRef(false)
   const logs = useRef(new Map<string, readonly ChatRow[]>())
   const logRef = useRef(log)
   logRef.current = log
+  /** The transcript belongs to one conversation: each session keeps its own rows. */
+  const logKeyFor = useCallback(
+    (sessionId: string | undefined) => `${config?.fingerprint ?? ""}|${projectId ?? ""}|${sessionId ?? "new"}`,
+    [config?.fingerprint, projectId],
+  )
+  /** The key the rows on screen belong to, so a switch saves them under the right conversation. */
+  const logKeyRef = useRef("")
   /** Stop was pressed and the desktop has not ended the turn yet. */
   const [stopRequested, setStopRequested] = useState(false)
   /** Transcript length when the user scrolled up to read; `null` while following the newest row. */
@@ -150,9 +173,14 @@ export default function AssistantScreen() {
 
   useEffect(() => {
     generation.current += 1
-    const key = `${config?.fingerprint ?? ""}|${projectId ?? ""}`
     sessionRef.current = projectId ? useUIStore.getState().assistantSessions[projectId] : undefined
+    const key = logKeyFor(sessionRef.current)
+    // The rows on screen belong to the previous conversation until the new one takes them.
+    if (logKeyRef.current) logs.current.set(logKeyRef.current, logRef.current)
+    logKeyRef.current = key
     setLog(logs.current.get(key) ?? emptyLog)
+    setHistoryRows(emptyLog)
+    setOlderBefore(null)
     setActivity(idleActivity)
     setBusy(false)
     stopping.current = false
@@ -161,10 +189,10 @@ export default function AssistantScreen() {
     // Opening a conversation follows its desktop session; leaving it only closes the stream, never the turn.
     setFollowed(sessionRef.current)
     return () => {
-      logs.current.set(key, logRef.current)
+      if (logKeyRef.current) logs.current.set(logKeyRef.current, logRef.current)
       generation.current += 1
     }
-  }, [projectId, client])
+  }, [projectId, client, logKeyFor])
 
   useEffect(() => {
     const pending = draftRef.current
@@ -184,8 +212,61 @@ export default function AssistantScreen() {
   useEffect(() => {
     if (!storedSession || storedSession === sessionRef.current || posting.current) return
     sessionRef.current = storedSession
+    const key = logKeyFor(storedSession)
+    if (logKeyRef.current) logs.current.set(logKeyRef.current, logRef.current)
+    logKeyRef.current = key
+    setLog(logs.current.get(key) ?? emptyLog)
+    setHistoryRows(emptyLog)
+    setOlderBefore(null)
     setFollowed(storedSession)
-  }, [storedSession])
+  }, [storedSession, logKeyFor])
+
+  /**
+   * A conversation opened from the list: its stored past comes from the desktop's own history, so the
+   * phone shows what was said even when the turn finished days ago. The live turn then appends to it.
+   */
+  const opened = useUIStore((state) => state.assistantOpened)
+  useEffect(() => {
+    if (!client || !opened || opened.projectId !== projectId) return
+    const sessionId = opened.sessionId
+    const version = generation.current
+    let cancelled = false
+    void client.sessionMessages(sessionId, null, 30).then((page) => {
+      if (cancelled || version !== generation.current) return
+      sessionRef.current = sessionId
+      const key = logKeyFor(sessionId)
+      if (logKeyRef.current) logs.current.set(logKeyRef.current, logRef.current)
+      logKeyRef.current = key
+      // The stored past replaces the live rows: the desktop's history already holds this conversation.
+      setLog(emptyLog)
+      setHistoryRows(rowsFromMessages(page.messages, sessionId))
+      setOlderBefore(page.before)
+      setActivity(idleActivity)
+      setBusy(false)
+      setFollowed(sessionId)
+    }).catch((error: unknown) => {
+      if (cancelled) return
+      toast(error instanceof Error ? error.message : "Could not open the conversation", "error")
+    })
+    return () => { cancelled = true }
+  }, [opened, client, projectId, logKeyFor])
+
+  /** One page further back in the stored conversation. */
+  const loadOlder = useCallback(async () => {
+    const sessionId = sessionRef.current
+    if (!client || !sessionId || loadingOlder) return
+    setLoadingOlder(true)
+    try {
+      const page = await client.sessionMessages(sessionId, olderBefore, 30)
+      const rows = rowsFromMessages(page.messages, sessionId)
+      setHistoryRows((previous) => [...rows, ...previous])
+      setOlderBefore(page.before)
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not read the older messages", "error")
+    } finally {
+      setLoadingOlder(false)
+    }
+  }, [client, olderBefore, loadingOlder])
 
   // Rows written offline stop showing "waiting" once the outbox no longer holds their text.
   const queueRevision = useUIStore((state) => state.offlineQueueRevision)
@@ -268,6 +349,12 @@ export default function AssistantScreen() {
   const send = async (text: string) => {
     if (!client || !projectId || posting.current || stopping.current) return
     if (connectivity !== "online") {
+      // A photo is a five-megabyte payload: the outbox keeps text, not pictures. The message waits here.
+      if (attachments.length > 0) {
+        toast("A photo needs the desktop online. The message stays here until it is back.", "info")
+        reuse(text)
+        return
+      }
       // nikcli offline outbox: the message waits on this iPhone and is delivered once, in order, when the desktop is back.
       try {
         await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
@@ -286,23 +373,49 @@ export default function AssistantScreen() {
     setBusy(true)
     // A new turn starts its own meter; steering (queue) keeps the running one.
     setActivity(idleActivity)
-    apply({ type: "user", text })
+    const sent = attachments
+    apply({ type: "user", text, ...(sent.length > 0 ? { attachments: sent.map((item) => item.name) } : {}) })
     jumpToLatest(false)
     try {
       // The desktop owns the turn from here; this answers as soon as the host session exists.
-      const started = await client.promptSession({ projectId, message: text, ...(sessionRef.current ? { sessionId: sessionRef.current } : {}), agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model, permissionMode: preferences.permissionMode, includeContext: preferences.includeContext })
+      const started = await client.promptSession({
+        projectId, message: text,
+        ...(sessionRef.current ? { sessionId: sessionRef.current } : {}),
+        agent: currentAgent?.id ?? selectedAgentId, mode, model: preferences.model,
+        permissionMode: preferences.permissionMode, includeContext: preferences.includeContext,
+        ...(sent.length > 0 ? { attachments: sent.map((item) => ({ name: item.name, mime: item.mime, data: item.data, encoding: "base64" as const })) } : {}),
+      })
       if (version !== generation.current) return
       sessionRef.current = started.sessionId
       setAssistantSession(projectId, started.sessionId)
       // A follower already on this session keeps its own cursor; a new one replays the turn from its first event.
       if (followed !== started.sessionId) cursors.current.set(started.sessionId, started.seq)
       setFollowed(started.sessionId)
+      // The pictures are with the desktop now; a failed send keeps them for the retry.
+      if (sent.length > 0) setAttachments([])
+      if (pendingStop.current) {
+        // Stop was pressed while the prompt was still starting; the session exists now, so the turn can end.
+        pendingStop.current = false
+        void client.abortChat(started.sessionId).catch((error: unknown) => {
+          toast(error instanceof Error ? error.message : "Could not stop the desktop turn", "error")
+        })
+      }
     } catch (error) {
       if (version !== generation.current) return
+      pendingStop.current = false
+      setStopRequested(false)
       const running = sessionRef.current
       if (isBusyRefusal(error) && running) {
         // The desktop is already running a turn here (started on the desktop, or the phone missed its start) and
         // refused this prompt before it ran. Steering it into that turn is what the user would have done seeing it.
+        if (sent.length > 0) {
+          // A queued message carries text only: a picture cannot be steered into a running turn.
+          setBusy(false)
+          haptic("error")
+          reuse(text)
+          toast("The desktop is busy. The photo stays with the message until the next turn.", "error")
+          return
+        }
         setFollowed(running)
         setLog((previous) => queueLastUserRow(previous, text))
         try {
@@ -333,11 +446,18 @@ export default function AssistantScreen() {
     if (stopping.current) return
     haptic("selection")
     const version = generation.current
-    stopping.current = true
     const sessionId = sessionRef.current
+    if (!sessionId) {
+      // The turn is still starting: the desktop has no session to abort yet, so the request is remembered
+      // and applied the moment the session exists. Saying "stopped" now would be a lie.
+      pendingStop.current = true
+      setStopRequested(true)
+      return
+    }
+    stopping.current = true
     // The session stream delivers the turn's end; only this request stops the desktop.
-    const stopped = sessionId && client ? client.abortChat(sessionId) : Promise.resolve()
-    setStopRequested(Boolean(sessionId))
+    const stopped = client ? client.abortChat(sessionId) : Promise.resolve({ message: "" })
+    setStopRequested(true)
     void stopped.catch((error: unknown) => {
       if (version === generation.current) {
         setStopRequested(false)
@@ -345,7 +465,6 @@ export default function AssistantScreen() {
       }
     }).finally(() => {
       stopping.current = false
-      if (!sessionId) setBusy(false)
     })
   }
 
@@ -408,9 +527,12 @@ export default function AssistantScreen() {
     useUIStore.getState().startAssistantConversation(projectId)
     logs.current.delete(`${config?.fingerprint ?? ""}|${projectId}`)
     setLog(emptyLog)
+    setHistoryRows(emptyLog)
+    setOlderBefore(null)
     setActivity(idleActivity)
     setBusy(false)
     stopping.current = false
+    pendingStop.current = false
     haptic("selection")
   }
 
@@ -432,7 +554,8 @@ export default function AssistantScreen() {
     refresh: () => handlers.current.refresh(),
   }), [])
 
-  const transcript = useMemo(() => buildTranscript(log), [log])
+  // The stored past comes first, then the live turn: one conversation, oldest row first.
+  const transcript = useMemo(() => buildTranscript([...historyRows, ...log]), [historyRows, log])
   const reversed = useMemo(() => [...transcript].reverse(), [transcript])
   const transcriptLength = useRef(0)
   transcriptLength.current = transcript.length
@@ -470,6 +593,7 @@ export default function AssistantScreen() {
   return (
     <SafeAreaView edges={{ bottom: true, left: true, right: true }} style={{ flex: 1, backgroundColor: palette.background }}>
     <Stack.Screen options={{ headerRight: () => <View style={{ flexDirection: "row", gap: 4 }}>
+      <PressableScale accessibilityRole="button" accessibilityLabel="Conversations" onPress={() => router.push("/assistant/conversations")} disabled={!projectId} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><History size={20} color={palette.accent} /></PressableScale>
       <PressableScale accessibilityRole="button" accessibilityLabel="New conversation" onPress={newConversation} disabled={!projectId} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><Plus size={21} color={palette.accent} /></PressableScale>
       <PressableScale accessibilityRole="button" accessibilityLabel="Assistant controls" onPress={() => setInspectorOpen(true)} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><SlidersHorizontal size={20} color={palette.accent} /></PressableScale>
     </View> }} />
@@ -508,6 +632,13 @@ export default function AssistantScreen() {
 
       {!online ? <LinkStrip offline text="Desktop offline. New messages wait on this iPhone and send when it reconnects." />
         : link === "reconnecting" && !busy ? <LinkStrip text="Reconnecting to the conversation…" /> : null}
+
+      {/* The roster could not be read: the assistant still runs, but the phone cannot show which agent it picked. */}
+      {agents.error ? (
+        <View style={{ paddingHorizontal: content.gutter, paddingBottom: 6 }}>
+          <ErrorBanner message={`The desktop's agent list could not be read: ${agents.error}`} actionLabel="Try again" onAction={() => void agents.reload()} />
+        </View>
+      ) : null}
 
       {/* Transcript */}
       {log.length === 0 ? (
@@ -575,6 +706,20 @@ export default function AssistantScreen() {
             initialNumToRender={14}
             maxToRenderPerBatch={10}
             windowSize={11}
+            // The list is inverted, so its footer is the top of the screen: the older half of a stored conversation.
+            ListFooterComponent={olderBefore ? (
+              <PressableScale
+                onPress={() => void loadOlder()}
+                disabled={loadingOlder}
+                subtle
+                tint
+                accessibilityRole="button"
+                accessibilityLabel="Load older messages"
+                style={{ minHeight: 44, alignItems: "center", justifyContent: "center", marginBottom: 12 }}
+              >
+                <Text style={{ color: palette.accent, fontSize: 13, fontWeight: "600" }}>{loadingOlder ? "Loading…" : "Load older messages"}</Text>
+              </PressableScale>
+            ) : null}
           />
           <JumpToLatestPill visible={readingFrom !== null} count={readingFrom === null ? 0 : Math.max(0, transcript.length - readingFrom)} onPress={() => jumpToLatest()} />
         </View>
@@ -596,6 +741,9 @@ export default function AssistantScreen() {
         onSend={(text) => void send(text)}
         onQueue={(text) => void queue(text)}
         onStop={stop}
+        attachments={attachments}
+        onAddAttachment={() => setCameraOpen(true)}
+        onRemoveAttachment={(index) => setAttachments((previous) => previous.filter((_, at) => at !== index))}
         status={stopRequested ? "Stopping the desktop turn…" : link === "reconnecting" ? "Reconnecting to the desktop… the turn keeps running there" : link === "connecting" && busy ? "Connecting to the desktop…" : activityLabel(activity)}
         seed={promptSeed?.projectId === projectId ? promptSeed.text : undefined}
         seedToken={promptSeed?.projectId === projectId ? promptSeed.token : undefined}
@@ -603,6 +751,17 @@ export default function AssistantScreen() {
 
       <ModelPickerSheet open={modelsOpen} onClose={() => setModelsOpen(false)} models={availableModels} selection={preferences.model} onSelect={(model) => setPreferences({ model })} loading={catalogue.loading} error={catalogue.error} reload={() => { void catalogue.reload(); void refreshBootstrap().catch(() => undefined) }} />
       <AssistantInspectorSheet open={inspectorOpen} onClose={() => setInspectorOpen(false)} client={client} sessionId={sessionRef.current} preferences={preferences} onPreferences={setPreferences} ai={ai} onNewConversation={newConversation} transcript={transcriptText(log)} activity={activity} />
+
+      {/* A picture of the part on the bench: the desktop's assistant reads it like any other attachment. */}
+      <CameraSheet
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={(attachment) => {
+          const { accepted, refused } = acceptAttachments(attachments, [attachment])
+          setAttachments(accepted)
+          for (const item of refused) toast(item.reason, "error")
+        }}
+      />
 
       {/* Project picker */}
       <BottomSheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Assistant project">

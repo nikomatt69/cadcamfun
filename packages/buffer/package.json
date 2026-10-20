@@ -1,0 +1,12 @@
+{
+  "name": "@cadcamfun/buffer",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "bun check -p tsconfig.json",
+    "test": "bun test"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

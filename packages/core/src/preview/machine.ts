@@ -12,7 +12,7 @@ import type { Stock, ToolpathSettings } from "../cam/generator/schema.ts"
 import type { Program } from "../cam/ir.ts"
 import type { CamArtifact } from "../cam/kernel/contracts.ts"
 import type { MachineInference, MachineKind } from "../cam/machine.ts"
-import type { ToolModel } from "../cam/tool-model.ts"
+import { assumedHolderOf, type ToolModel } from "../cam/tool-model.ts"
 import type { Body } from "../cam/viewer/machine-bodies.ts"
 import { latheStockEnds, machineBodies } from "../cam/viewer/machine-bodies.ts"
 import { latheSetupOf, millSetupFromArtifact, millSetupOf, printerSetupOf, withRotary, type AssumedPart, type MachineSetup } from "../cam/viewer/machine-setup.ts"
@@ -232,6 +232,89 @@ export interface PreviewSpinRun {
   readonly rate: number
 }
 
+/**
+ * The cutter the phone draws at the playhead: the real tool of the operation, not a marker.
+ *
+ * The desktop draws the same assembly (`viewport/view3d/tool-object.ts`), so the phone's tool is the tool the
+ * program runs. A mill only: a lathe draws its insert and a printer its nozzle (the `tool` glyph).
+ */
+export interface PreviewCutter {
+  /** Cutting diameter, mm. */
+  readonly diameter: number
+  /** Cutting length from the tip, mm. */
+  readonly fluteLength: number
+  /** Shank diameter, mm. */
+  readonly shankDiameter: number
+  /** Tip to the holder face, mm: the length that reaches below the stock top. */
+  readonly stickout: number
+  /** Nose radius of a ball nose, 0 for a flat cutter. */
+  readonly noseRadius: number
+  readonly holder: {
+    readonly diameter: number
+    readonly length: number
+    /** The holder's kind (`er`, `shrink`, ...); `assumed` when the document names none. */
+    readonly kind: string
+    readonly assumed: boolean
+  }
+}
+
+/** The cutter of a mill tool model, or undefined for anything that is not a mill. */
+export const previewCutterOf = (model: ToolModel | undefined): PreviewCutter | undefined => {
+  if (model === undefined || model.family !== "mill") return undefined
+  const holder = model.holder ?? assumedHolderOf(model)
+  return {
+    diameter: model.diameter,
+    fluteLength: model.fluteLength,
+    shankDiameter: model.shankDiameter,
+    stickout: model.stickout,
+    noseRadius: model.cornerRadius ?? 0,
+    holder: {
+      diameter: holder.diameter,
+      length: holder.length,
+      kind: holder.kind ?? "er",
+      assumed: model.assumed.some((entry) => entry.toLowerCase().includes("holder")),
+    },
+  }
+}
+
+/**
+ * One operation of a program: a toolpath and the run of path segments it drew.
+ *
+ * A program that changes tools is one toolpath per tool (spec 32 §4.8), so the phone can colour, list and hide the
+ * operations apart, exactly like the desktop's operation list.
+ */
+export interface PreviewOperation {
+  /** The toolpath's index in the program. */
+  readonly index: number
+  readonly name: string
+  readonly toolId: string
+  /** First segment of this operation in the payload's `segments`. */
+  readonly startSegment: number
+  /** Last segment of this operation (inclusive). */
+  readonly endSegment: number
+  /** The cutter the operation runs, when the document knows it. */
+  readonly cutter?: PreviewCutter
+}
+
+/**
+ * A contact on the playback clock: the tool into the workholding, into the stock left, or a near miss.
+ *
+ * The phone marks the segment, lists the message and can seek to the moment. `seconds` is the desktop's own clock
+ * (the same one the visualizer plays), so a phone that shows a different estimate still lands on the same move.
+ */
+export interface PreviewCollisionEvent {
+  /** The check's code (`MILL_INTO_VISE`, `HOLDER_IN_STOCK`, `NEAR_MISS`, ...). */
+  readonly code: string
+  readonly severity: "error" | "warning"
+  /** Playback time of the contact, seconds. */
+  readonly seconds: number
+  /** The first payload segment of the move the contact happens on. */
+  readonly segment: number
+  /** The source line, when the program has one. */
+  readonly line?: number
+  readonly message: string
+}
+
 /** The whole machine around the program, as the phone draws it. `segments` are in display coordinates then. */
 export interface PreviewMachine {
   readonly kind: MachineKind
@@ -249,6 +332,10 @@ export interface PreviewMachine {
   readonly spin: ReadonlyArray<PreviewSpinRun>
   /** Indices of the segments whose move runs into a body (drawn red). */
   readonly collisions: ReadonlyArray<number>
+  /** The program's operations, in order; each owns a run of the path's segments. */
+  readonly operations: ReadonlyArray<PreviewOperation>
+  /** Contacts on the playback clock: the tool into the workholding, into the stock left, a near miss. */
+  readonly events: ReadonlyArray<PreviewCollisionEvent>
   readonly tool: PreviewToolGlyph
 }
 
@@ -258,6 +345,8 @@ export interface MachineBlockInputs {
   readonly tool?: ToolModel | undefined
   readonly spin?: ReadonlyArray<PreviewSpinRun>
   readonly collisions?: ReadonlyArray<number>
+  readonly operations?: ReadonlyArray<PreviewOperation>
+  readonly events?: ReadonlyArray<PreviewCollisionEvent>
 }
 
 /** The `machine` block of the phone's toolpath preview. */
@@ -276,6 +365,8 @@ export const previewMachineBlock = (input: MachineBlockInputs): PreviewMachine =
     bodies: previewBodies(setup),
     spin: input.spin ?? [],
     collisions: input.collisions ?? [],
+    operations: input.operations ?? [],
+    events: input.events ?? [],
     tool: previewToolGlyph(setup, input.tool),
   }
 }

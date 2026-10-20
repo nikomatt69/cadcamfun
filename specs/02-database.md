@@ -1,6 +1,6 @@
 # WP0 — Database (`packages/db`)
 
-Status: **in progress** (adding the native `LocalKeyValue` table for persistent AI context, memory and preferences). Owner dir: `packages/db`.
+Status: **in progress** (native `LocalKeyValue` persistence; local storage maintenance and synthetic demo generation implemented and verified). Owner dir: `packages/db`.
 
 ## 1. What exists
 
@@ -45,6 +45,8 @@ const projects = yield* query("projects.list", (db) => db.select().from(schema.p
 - Migration planning/execution failures use operation `migrate`. All pending SQL and journal creation/upgrades run in one SQLite transaction; failure preserves the original logical schema, data, and journal (not byte-identical file contents). WP0 uses Drizzle's installed migration-file reader and name-based pending semantics, with an atomic runner because the installed migrator creates/upgrades its journal outside its migration transaction. Migration SQL must not contain transaction control or non-transactional operations such as `VACUUM`.
 - Connection acquisition is scoped before initialization, so initialization failures release the handle. Graceful scope release attempts `wal_checkpoint(TRUNCATE)` and always closes SQLite; cleanup failures are logged. Other WPs must not close the handle and must retain the layer scope through shutdown. Migration startup assumes a single sidecar owner; concurrent application upgrades are not supported.
 - Snapshot timestamps increase relative to existing snapshots even within one millisecond or after clock rollback, so retention keeps the newest restore point. A busy checkpoint is logged as a cleanup failure without preventing close. Temporary-file tests cover restoration, retention failure, journal rollback, and connection release.
+- Storage maintenance is owned by WP0. Every connection explicitly checkpoints automatically after 1,000 WAL pages and limits retained journal space to 8 MiB after successful resets (not a hard limit during active transactions or blocked readers). `Database.storage()` reports only byte/page counts, including reclaimable free pages; `Database.compact()` explicitly runs checkpoint/VACUUM/checkpoint without deleting logical records. Compaction requires free disk space and an idle app; busy checkpoints fail as `DatabaseError` rather than silently claiming success. No automatic history, project, chat or attachment deletion is permitted.
+- Package commands `storage <existing-path> [--compact]` and `demo <new-path>` use explicit paths and no environment files (`bun --no-env-file run --filter @cadcamfun/db ...` from the repository root). Storage does not apply migrations. Demo builds a new migrated SQLite database containing only fixed synthetic profile/project fixtures, with no source database, credential, attachment, KV, chat or history reads; exclusive creation refuses to overwrite any existing file. Generated databases stay in ignored `data/`; share the demo artifact only, never the real database or backup folder. Remote upload requires a chosen destination; no network/upload is introduced by WP0.
 
 ## 3. Known gaps / follow-ups (not blocking)
 
@@ -63,6 +65,8 @@ See `01-conventions.md` §3. Every schema change ships with: updated `schema.ts`
 `LocalKeyValue` stores JSON-compatible local state (`ai.context.*`, `ai.memory.*`, UI preferences). It is accessed only through the sidecar `KvStore` repository using the shared `Database` Effect service and Drizzle. AI provider credentials remain in the owner-only credentials file and must never be stored in this table.
 
 ## 5. Change log
+
+- 2026-10-20: implemented local byte/page measurement, explicit lossless compaction, 8 MiB retained WAL limit after resets and exclusive synthetic demo creation, with no uploads or real-record export. `bun --no-env-file test src` from `packages/db`: 20 tests / 84 assertions pass; `bun check -p packages/db/tsconfig.json` passes. CLI smoke checks generated `data/cadcamfun-demo.db` and compacted the local database from 757,760 to 581,632 bytes without logical record deletion. See `packages/db/README.md` for commands and storage-limit boundaries.
 
 - 2026-10-14: native CAM Save reuses the existing Toolpath/ToolpathVersion JSON, G-code and project/drawing foreign keys. The versioned document contract is owned by API `CamProgramDocument`; sidecar validates original NC/artifact/source attribution before repository writes. No added columns or migration are required for these integrations.
 

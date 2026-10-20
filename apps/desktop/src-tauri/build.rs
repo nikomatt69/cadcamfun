@@ -2,6 +2,7 @@
 // the webview only if a capability lists its `allow-<command>` permission.
 const COMMANDS: &[&str] = &[
     "get_sidecar_endpoint",
+    "prepare_viewport_edges",
     "get_logs_dir",
     "open_path",
     "secret_get",

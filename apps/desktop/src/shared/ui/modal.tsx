@@ -21,6 +21,8 @@ export interface ModalProps {
   readonly title?: string
   readonly children: JSX.Element
   readonly size?: "sm" | "md" | "lg" | "xl"
+  /** Pinned below the body: the actions stay in sight however far the body is scrolled. */
+  readonly footer?: JSX.Element
 }
 
 const sizeClass = (size: "sm" | "md" | "lg" | "xl"): string => {
@@ -122,6 +124,11 @@ export function Modal(props: ModalProps): JSX.Element {
               </header>
             </Show>
             <div class={props.variant === "workspace" ? "" : "ui-modal-body"}>{props.children}</div>
+            <Show when={props.footer !== undefined}>
+              <footer class={props.variant === "workspace" ? "px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end items-center gap-2" : "ui-modal-footer"}>
+                {props.footer}
+              </footer>
+            </Show>
           </Motion.div>
         </Motion.div>
       </Portal>

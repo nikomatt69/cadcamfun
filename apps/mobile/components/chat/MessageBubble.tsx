@@ -78,6 +78,12 @@ export const MessageBubble = memo(function MessageBubble({ row, onReuse }: { row
         >
           {row.text}
         </Text>
+        {/* The pictures that went with the message: the transcript says they were sent. */}
+        {isUser && row.attachments && row.attachments.length > 0 ? (
+          <Text style={{ marginTop: 6, color: palette.muted, fontSize: 12, fontWeight: "600" }}>
+            {row.attachments.length === 1 ? "1 photo attached" : `${row.attachments.length} photos attached`}
+          </Text>
+        ) : null}
       </View>
       {active ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: isUser ? "flex-end" : "flex-start", gap: 6, marginTop: 8 }}>

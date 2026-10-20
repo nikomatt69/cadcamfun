@@ -268,3 +268,80 @@ describe("companion machine preview (spec 31 §5, the spec 13 §6 payload)", () 
     expect(preview.truncated).toBe(false)
   })
 })
+
+describe("the phone's operations, cutter and contacts (preview format 4)", () => {
+  const millSettings = settings()
+
+  test("a program's operations own their run of path segments, each with its own cutter", () => {
+    const program = makeProgram("job", [
+      {
+        id: "tp-1", name: "face", toolId: "t1", spindleRpm: 1000, coolant: "off",
+        moves: [
+          { _tag: "Rapid", to: { x: 10, y: 0, z: 5 } },
+          { _tag: "Linear", to: { x: 20, y: 0, z: -1 }, feed: 200 },
+        ],
+      },
+      {
+        id: "tp-2", name: "contour", toolId: "t2", spindleRpm: 800, coolant: "off",
+        moves: [
+          { _tag: "Rapid", to: { x: 20, y: 0, z: 5 } },
+          { _tag: "Linear", to: { x: 20, y: 20, z: -1 }, feed: 150 },
+        ],
+      },
+    ])
+    const preview = machineScenePreview({
+      settings: millSettings,
+      stock,
+      program,
+      tools: [
+        { toolId: "t1", resource: { type: "endmill", diameter: 6, numberOfFlutes: 2, cuttingLength: 20, totalLength: 60, shankDiameter: 6 } },
+        { toolId: "t2", resource: { type: "endmill", diameter: 10, numberOfFlutes: 3, cuttingLength: 25, totalLength: 70, shankDiameter: 10, holderDiameter: 32, holderLength: 40, holderType: "shrink" } },
+      ],
+    })
+    const operations = preview.machine.operations
+    expect(operations.map((operation) => [operation.index, operation.name, operation.toolId])).toEqual([
+      [0, "face", "t1"],
+      [1, "contour", "t2"],
+    ])
+    // Each operation owns a contiguous run of the path's segments, and the runs do not overlap.
+    expect(operations[0]?.startSegment).toBe(0)
+    expect(operations[0]?.endSegment).toBeLessThan(operations[1]!.startSegment)
+    expect(operations[1]?.endSegment).toBe(preview.segments.length - 1)
+    // The cutter is the tool the document names, not a generic marker.
+    expect(operations[0]?.cutter?.diameter).toBe(6)
+    expect(operations[1]?.cutter?.diameter).toBe(10)
+    expect(operations[1]?.cutter?.holder).toMatchObject({ diameter: 32, kind: "shrink" })
+  })
+
+  test("a program that changes tools is one operation per tool", () => {
+    const gcode = ["T1 M6", "M3 S600", "G0 X0 Y0 Z5", "G1 X20 F100", "T2 M6", "G0 X0 Y0 Z5", "G1 X30 F100"].join("\n")
+    const preview = machineScenePreview({ settings: millSettings, stock, gcode })
+    expect(preview.machine.operations.map((operation) => operation.toolId)).toEqual(["T1", "T2"])
+    expect(preview.machine.operations[0]?.startSegment).toBe(0)
+    expect(preview.machine.operations[1]?.startSegment).toBeGreaterThan(0)
+  })
+
+  test("a rapid into the stock is a contact on the clock, on the segment that made it", () => {
+    const gcode = ["M3 S600", "G0 X0 Y0 Z5", "G1 X10 F100", "G0 Z-10"].join("\n")
+    const preview = machineScenePreview({ settings: millSettings, stock, gcode })
+    const rapid = preview.machine.events.find((event) => event.code === "RAPID_INTO_STOCK")
+    expect(rapid).toBeDefined()
+    expect(rapid?.severity).toBe("error")
+    expect(rapid?.line).toBe(4)
+    // The clock is the desktop's: the contact happens after the cut that precedes it.
+    expect(rapid?.seconds).toBeGreaterThan(0)
+    // The event points at the segment of the move that crashed, so the phone can seek to it.
+    const segment = preview.segments[rapid!.segment]!
+    expect(segment.kind).toBe("rapid")
+    expect(segment.line).toBe(4)
+    // A contact is a red segment too.
+    expect(preview.machine.collisions).toContain(rapid!.segment)
+  })
+
+  test("a clean program reports no contact", () => {
+    const gcode = ["M3 S600", "G0 X0 Y0 Z5", "G1 X20 F100"].join("\n")
+    const preview = machineScenePreview({ settings: millSettings, stock, gcode })
+    expect(preview.machine.events).toEqual([])
+    expect(preview.machine.collisions).toEqual([])
+  })
+})

@@ -12,6 +12,16 @@ import QuartzCore
  * a display link that advances their display angle while the spindle turns.
  */
 public final class PreviewScene: SharedObject {
+  /// Which solid set a payload belongs to: the bodies that stand still, the ones that turn with the spindle, or the
+  /// cutter at the playhead.
+  enum SolidKind: String {
+    case bodies = "solids"
+    case spindle = "spindle"
+    case tool = "tool"
+
+    var label: String { rawValue }
+  }
+
   let device: MTLDevice? = MTLCreateSystemDefaultDevice()
   let lock = NSLock()
   weak var surface: PreviewSurface?
@@ -40,6 +50,12 @@ public final class PreviewScene: SharedObject {
   var spindleVertices = 0
   var spindleTriangles = 0
   var spindleOpaqueTriangles = 0
+  /// The cutter at the playhead: the real tool of the running operation. It moves with the playhead, so it is its own set.
+  var tool: MTLBuffer?
+  var toolIndices: MTLBuffer?
+  var toolVertices = 0
+  var toolTriangles = 0
+  var toolOpaqueTriangles = 0
   var spinRate: Float = 0
   var spinAngle: Float = 0
   /// Main-thread only; the display link drives the angle while `spinRate` is not zero.
@@ -76,6 +92,8 @@ public final class PreviewScene: SharedObject {
     solidIndices = nil
     spindle = nil
     spindleIndices = nil
+    tool = nil
+    toolIndices = nil
     surface = nil
     lock.unlock()
   }
@@ -154,15 +172,19 @@ public final class PreviewScene: SharedObject {
     redraw()
   }
 
-  /// Machine bodies (spec 31 §5): opaque triangles first, translucent (assumed) triangles after `opaqueTriangles`.
-  /// An empty pair clears the set; a refused payload drops both sets, because half a machine misleads.
+  /// Machine bodies (interleaved xyz / normal xyz / rgba). Opaque triangles come first, translucent after them.
   func replaceSolids(vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) {
-    publishSolidSet(spindle: false, vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
+    publishSolidSet(kind: .bodies, vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
   }
 
   /// The bodies that turn with the spindle (lathe bar and chuck, mill tool): drawn rotated about the display x axis.
   func replaceSpindle(vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) {
-    publishSolidSet(spindle: true, vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
+    publishSolidSet(kind: .spindle, vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
+  }
+
+  /// The cutter at the playhead (preview format 4): the real tool of the running operation, in display coordinates.
+  func replaceTool(vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) {
+    publishSolidSet(kind: .tool, vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
   }
 
   /// Signed display revolutions per second the spindle turns; a display link advances the angle while it is not zero.
@@ -250,6 +272,11 @@ public final class PreviewScene: SharedObject {
       spindleVertices: spindleVertices,
       spindleTriangles: spindleTriangles,
       spindleOpaqueTriangles: spindleOpaqueTriangles,
+      tool: tool,
+      toolIndices: toolIndices,
+      toolVertices: toolVertices,
+      toolTriangles: toolTriangles,
+      toolOpaqueTriangles: toolOpaqueTriangles,
       spinAngle: spinAngle,
       travelledVertices: travelledVertices,
       pathVertices: pathVertices,
@@ -304,13 +331,13 @@ public final class PreviewScene: SharedObject {
     redraw()
   }
 
-  private func publishSolidSet(spindle: Bool, vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) {
+  private func publishSolidSet(kind: SolidKind, vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) {
     guard let device else {
       rejectSolids("This iPhone has no Metal device for the preview")
       return
     }
     if vertices.length == 0 && indices.length == 0 {
-      publishSolids(spindle: spindle, vertices: nil, indices: nil, vertexCount: 0, triangles: 0, opaqueTriangles: 0, fault: nil)
+      publishSolids(kind: kind, vertices: nil, indices: nil, vertexCount: 0, triangles: 0, opaqueTriangles: 0, fault: nil)
       return
     }
     if let rejection = PreviewUpload.solids(vertices, indices, opaqueTriangles: opaqueTriangles) {
@@ -319,14 +346,14 @@ public final class PreviewScene: SharedObject {
       return
     }
     guard
-      let nextVertices = metalBuffer(vertices.rawPointer, vertices.byteLength, device, spindle ? "com.cadcamfun.preview.spindle" : "com.cadcamfun.preview.solids"),
-      let nextIndices = metalBuffer(indices.rawPointer, indices.byteLength, device, spindle ? "com.cadcamfun.preview.spindle-indices" : "com.cadcamfun.preview.solid-indices")
+      let nextVertices = metalBuffer(vertices.rawPointer, vertices.byteLength, device, "com.cadcamfun.preview.\(kind.label)"),
+      let nextIndices = metalBuffer(indices.rawPointer, indices.byteLength, device, "com.cadcamfun.preview.\(kind.label)-indices")
     else {
       rejectSolids(PreviewRejection.meshInvalid.message)
       return
     }
     publishSolids(
-      spindle: spindle,
+      kind: kind,
       vertices: nextVertices,
       indices: nextIndices,
       vertexCount: vertices.length / PreviewLimits.solidVertexFloats,
@@ -336,29 +363,37 @@ public final class PreviewScene: SharedObject {
     )
   }
 
-  /// One refused machine payload drops both sets: a body set and its spindle belong to the same scene.
+  /// One refused machine payload drops every set: a body set, its spindle and the cutter belong to the same scene.
   private func rejectSolids(_ message: String) {
-    publishSolids(spindle: false, vertices: nil, indices: nil, vertexCount: 0, triangles: 0, opaqueTriangles: 0, fault: message)
-    publishSolids(spindle: true, vertices: nil, indices: nil, vertexCount: 0, triangles: 0, opaqueTriangles: 0, fault: message)
+    publishSolids(kind: .bodies, vertices: nil, indices: nil, vertexCount: 0, triangles: 0, opaqueTriangles: 0, fault: message)
+    publishSolids(kind: .spindle, vertices: nil, indices: nil, vertexCount: 0, triangles: 0, opaqueTriangles: 0, fault: message)
+    publishSolids(kind: .tool, vertices: nil, indices: nil, vertexCount: 0, triangles: 0, opaqueTriangles: 0, fault: message)
   }
 
-  private func publishSolids(spindle: Bool, vertices vertexBuffer: MTLBuffer?, indices indexBuffer: MTLBuffer?, vertexCount: Int, triangles: Int, opaqueTriangles: Int, fault: String?) {
+  private func publishSolids(kind: SolidKind, vertices vertexBuffer: MTLBuffer?, indices indexBuffer: MTLBuffer?, vertexCount: Int, triangles: Int, opaqueTriangles: Int, fault: String?) {
     let alive = vertexCount > 0 && triangles > 0
     let count = alive ? triangles : 0
     let opaque = alive ? min(max(opaqueTriangles, 0), triangles) : 0
     lock.lock()
-    if spindle {
-      self.spindle = alive ? vertexBuffer : nil
-      self.spindleIndices = alive ? indexBuffer : nil
-      self.spindleVertices = alive ? vertexCount : 0
-      self.spindleTriangles = count
-      self.spindleOpaqueTriangles = opaque
-    } else {
+    switch kind {
+    case .bodies:
       self.solids = alive ? vertexBuffer : nil
       self.solidIndices = alive ? indexBuffer : nil
       self.solidVertices = alive ? vertexCount : 0
       self.solidTriangles = count
       self.solidOpaqueTriangles = opaque
+    case .spindle:
+      self.spindle = alive ? vertexBuffer : nil
+      self.spindleIndices = alive ? indexBuffer : nil
+      self.spindleVertices = alive ? vertexCount : 0
+      self.spindleTriangles = count
+      self.spindleOpaqueTriangles = opaque
+    case .tool:
+      self.tool = alive ? vertexBuffer : nil
+      self.toolIndices = alive ? indexBuffer : nil
+      self.toolVertices = alive ? vertexCount : 0
+      self.toolTriangles = count
+      self.toolOpaqueTriangles = opaque
     }
     solidFault = fault
     lock.unlock()
@@ -442,6 +477,12 @@ struct PreviewFrame {
   let spindleVertices: Int
   let spindleTriangles: Int
   let spindleOpaqueTriangles: Int
+  /// The cutter at the playhead: the real tool of the running operation.
+  let tool: MTLBuffer?
+  let toolIndices: MTLBuffer?
+  let toolVertices: Int
+  let toolTriangles: Int
+  let toolOpaqueTriangles: Int
   let spinAngle: Float
   let travelledVertices: Int
   let pathVertices: Int
@@ -514,6 +555,9 @@ public class CadPreviewModule: Module {
       }
       Function("setSpindle") { (scene: PreviewScene, vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) in
         scene.replaceSpindle(vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
+      }
+      Function("setTool") { (scene: PreviewScene, vertices: Float32Array, indices: Uint32Array, opaqueTriangles: Int) in
+        scene.replaceTool(vertices: vertices, indices: indices, opaqueTriangles: opaqueTriangles)
       }
       Function("setSpin") { (scene: PreviewScene, rate: Double) in
         scene.replaceSpin(rate: rate)

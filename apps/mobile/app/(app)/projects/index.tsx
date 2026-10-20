@@ -5,6 +5,7 @@ import { Stack, useRouter } from "expo-router"
 import { ArrowUpRight, FolderOpen, Layers3, Search } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
+import { usePoll } from "@/lib/use-poll"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { haptic } from "@/lib/haptics"
@@ -18,14 +19,17 @@ import { Pill } from "@/components/ui/Pill"
 import { relativeTime } from "@/lib/format"
 
 export default function ProjectsScreen() {
-  const { client, config } = useServer()
+  const { client, config, connectivity } = useServer()
   const { palette } = useTheme()
   const { gutter, fontScale, onLayout } = useContentLayout()
   const router = useRouter()
   const [query, setQuery] = useState("")
   const resource = useResource(
     useCallback((signal) => client ? client.projects(signal) : Promise.reject(new Error("Not connected")), [client]), "projects",
+    { cacheKey: `projects:${config?.fingerprint ?? ""}` },
   )
+  // The list spans every project, so no single project stream can keep it fresh.
+  usePoll(() => void resource.reload(), 40_000, connectivity === "online")
   const projects = resource.data ?? []
   const list = useMemo(() => [...projects]
     .filter((project) => `${project.name} ${project.description ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
@@ -53,7 +57,7 @@ export default function ProjectsScreen() {
           <Text style={{ marginTop: 14, color: palette.soft, fontSize: 14, lineHeight: 21 }}>Review designs, inspect toolpaths and move work forward with your assistant.</Text>
           <View style={{ paddingTop: 14, alignItems: "flex-start" }}><Pill>{projects.length} {projects.length === 1 ? "project" : "projects"}</Pill></View>
         </SurfaceCard>
-        {resource.error ? <ErrorBanner message={resource.error} actionLabel="Try again" onAction={() => void resource.reload()} /> : null}
+        {resource.error ? <ErrorBanner message={resource.stale ? `Showing saved projects. ${resource.error}` : resource.error} actionLabel="Try again" onAction={() => void resource.reload()} /> : null}
         <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", columnGap: 12, rowGap: 4 }}>
           <Text accessibilityRole="header" style={{ flexShrink: 1, color: palette.ink, fontSize: 19, lineHeight: 25, fontWeight: "700" }}>{query ? "Search results" : "Recent projects"}</Text>
           <Text style={{ color: palette.muted, fontSize: 12 }}>Last updated</Text>

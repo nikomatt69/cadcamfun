@@ -476,7 +476,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         }
       }
       if (!object) {
-        const built = buildElementObject(element)
+        const built = buildElementObject(element, invalidate)
         if (!built) continue
         objectsById.set(element.id, { object: built, shape })
         scene.add(built)

@@ -17,6 +17,7 @@
   "dependencies": {
     "@cadcamfun/api": "workspace:*",
     "@cadcamfun/core": "workspace:*",
+    "@cadcamfun/buffer": "workspace:*",
     "@kobalte/core": "^0.13.0",
     "@solidjs/router": "^0.15.0",
     "@tauri-apps/api": "^2.0.0",

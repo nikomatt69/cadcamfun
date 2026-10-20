@@ -5,6 +5,7 @@ import { useCustomElementsStore } from "../store/customElementsStore.ts";
 import { evaluateCustomElement } from "./customElements/evaluate.ts";
 import { customElementOf } from "../types/customElements.ts";
 import * as THREE from "three";
+import { createDisplayEdges } from "../../../viewport/native-edges.ts";
 import { initializeElementTransform } from "./element-transform.ts";
 
 interface SolidMesh { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }
@@ -146,8 +147,8 @@ const metricDiameter = (size: unknown, fallback: number): number => {
  */
 const Y_UP_BUILT = new Set(["wall", "floor", "roof", "window", "door", "stair", "column", "spring", "screw", "bolt", "rivet"]);
 
-export const createThreeObject = (element: any, originOffset = useCADStore.getState().originOffset): THREE.Object3D | null => {
-  const object = buildObject(element, originOffset);
+export const createThreeObject = (element: any, originOffset = useCADStore.getState().originOffset, onEdgesReady?: () => void): THREE.Object3D | null => {
+  const object = buildObject(element, originOffset, onEdgesReady);
   if (object === null || !Y_UP_BUILT.has(element.type)) return object;
   object.rotation.set(Math.PI / 2, 0, 0);
   // A wall's z is its base (0 = standing on the ground), so moving it by d moves it by d; everything else is placed by x, y, z.
@@ -156,7 +157,7 @@ export const createThreeObject = (element: any, originOffset = useCADStore.getSt
   return object;
 };
 
-const buildObject = (element: any, originOffset: { x: number; y: number; z: number }): THREE.Object3D | null => {
+const buildObject = (element: any, originOffset: { x: number; y: number; z: number }, onEdgesReady?: () => void): THREE.Object3D | null => {
     const { tolerance: documentTolerance } = useCADStore.getState();
     // Round shapes: the element's own `segments`, else enough for its tolerance (its own, else the drawing's), never coarser than 32.
     const seg = (radius: number): number =>
@@ -898,7 +899,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
         screenshotMesh.position.set((startPoint.x + endPoint.x) / 2, (startPoint.y + endPoint.y) / 2, startPoint.z);
 
         // Add border
-        const borderGeometry = new THREE.EdgesGeometry(screenshotGeometry);
+        const borderGeometry = createDisplayEdges(screenshotGeometry, 1, onEdgesReady);
         const borderMaterial = new THREE.LineBasicMaterial({
           color: 0x2196f3,
           linewidth: 2
@@ -1493,7 +1494,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
 
           // Here we'd create proper chamfer visualization
           // For now just highlight edges
-          const edgesGeometry = new THREE.EdgesGeometry(chamferBaseGeometry);
+          const edgesGeometry = createDisplayEdges(chamferBaseGeometry, 1, onEdgesReady);
           const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
           chamferGroup.add(edges);
         }
@@ -1531,7 +1532,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
 
           // Here we'd create proper fillet visualization
           // For now just highlight edges
-          const edgesGeometry = new THREE.EdgesGeometry(filletBaseGeometry);
+          const edgesGeometry = createDisplayEdges(filletBaseGeometry, 1, onEdgesReady);
           const edges = new THREE.LineSegments(edgesGeometry, filletedEdgesMaterial);
           filletGroup.add(edges);
         }
@@ -2259,7 +2260,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
               x: childElement.x || 0,
               y: childElement.y || 0,
               z: childElement.z || 0
-            }, { x: 0, y: 0, z: 0 });
+            }, { x: 0, y: 0, z: 0 }, onEdgesReady);
 
             if (childThreeObject) {
               initializeElementTransform(childThreeObject, childElement);
@@ -2292,7 +2293,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
         );
 
         if (!element.wireframe) {
-          const edgesGeometry = new THREE.EdgesGeometry(workpieceGeometry);
+          const edgesGeometry = createDisplayEdges(workpieceGeometry, 1, onEdgesReady);
           const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
           const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
           workpiece.add(edges);
@@ -2322,7 +2323,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
               x: childElement.x || 0,
               y: childElement.y || 0,
               z: childElement.z || 0
-            }, { x: 0, y: 0, z: 0 });
+            }, { x: 0, y: 0, z: 0 }, onEdgesReady);
 
             if (childThreeObject) {
               initializeElementTransform(childThreeObject, childElement);
@@ -2342,7 +2343,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
               x: childElement.x || 0,
               y: childElement.y || 0,
               z: childElement.z || 0
-            }, { x: 0, y: 0, z: 0 });
+            }, { x: 0, y: 0, z: 0 }, onEdgesReady);
 
             if (childThreeObject) {
               initializeElementTransform(childThreeObject, childElement);

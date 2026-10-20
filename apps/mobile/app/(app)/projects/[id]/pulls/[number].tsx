@@ -19,6 +19,8 @@ import { BottomSheet } from "@/components/ui/BottomSheet"
 import { TextField } from "@/components/ui/TextField"
 import { PageScroll } from "@/components/layout/page-scroll"
 import { useContentLayout } from "@/components/layout/use-content-layout"
+import { conflictSummary, conflictsOf, type VcsConflict } from "@/lib/vcs-conflicts"
+import { errorMessage } from "@/lib/throttle"
 
 const STATE_TONE: Record<string, PillTone> = { open: "accent", merged: "success", closed: "neutral" }
 
@@ -51,6 +53,8 @@ export default function PullRequestScreen() {
   const [commentOpen, setCommentOpen] = useState(false)
   const [commentBody, setCommentBody] = useState("")
   const [commentVerdict, setCommentVerdict] = useState<ReviewRow["verdict"]>("comment")
+  /** The files a failed merge disagreed on: the user needs to know which ones to settle. */
+  const [conflicts, setConflicts] = useState<readonly VcsConflict[]>([])
 
   const pull = useResource(
     useCallback(
@@ -77,10 +81,14 @@ export default function PullRequestScreen() {
     try {
       await action()
       haptic("success")
+      setConflicts([])
       await pull.reload()
     } catch (error) {
       haptic("error")
-      toast(error instanceof Error ? error.message : `${label} failed`, "error")
+      // A merge that cannot be applied cleanly names the files: show them instead of a bare failure.
+      const found = conflictsOf(error)
+      setConflicts(found)
+      toast(found.length > 0 ? conflictSummary(found) : errorMessage(error, `${label} failed`), "error")
     } finally {
       setBusy(null)
     }
@@ -144,6 +152,28 @@ export default function PullRequestScreen() {
                   ) : null}
                 </View>
               </SurfaceCard>
+
+              {/* The files a merge could not apply: the person has to settle them on the desktop. */}
+              {conflicts.length > 0 ? (
+                <SurfaceCard inset={false}>
+                  <View style={{ padding: 16, gap: 10 }}>
+                    <Text accessibilityRole="header" style={{ color: palette.danger, fontSize: 13, lineHeight: 18, fontWeight: "700", letterSpacing: 0.6 }}>
+                      MERGE CONFLICTS
+                    </Text>
+                    <Text style={{ color: palette.soft, fontSize: 14, lineHeight: 20 }}>
+                      These files changed on both sides. Settle them on the desktop, then merge again.
+                    </Text>
+                    {conflicts.map((conflict) => (
+                      <View key={conflict.path} style={{ gap: 3 }}>
+                        <Text selectable style={{ color: palette.ink, fontFamily: "Menlo", fontSize: 13, lineHeight: 19 }}>{conflict.path}</Text>
+                        {conflict.pointers.length > 0 ? (
+                          <Text selectable style={{ color: palette.muted, fontFamily: "Menlo", fontSize: 12, lineHeight: 17 }}>{conflict.pointers.join("  ")}</Text>
+                        ) : null}
+                      </View>
+                    ))}
+                  </View>
+                </SurfaceCard>
+              ) : null}
 
               {/* Reviews */}
               {(pull.data?.reviews ?? []).length > 0 ? (

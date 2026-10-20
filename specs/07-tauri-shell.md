@@ -5,13 +5,13 @@
 WP5 hardening follows `23-ai-runtime-architecture.md`: bound forced-kill reaping, report unreaped children and suppress restart in that state; move synchronous keychain/path work off async/UI threads; remove blocking waits from the final native exit callback. Keep the 60-second readiness consistent with current code. WP10 updater changes are specified in `10-release-sync.md` before implementation.
 
 
-Status: **M1 done, most of M2 done; lifecycle hardening implemented and unit-tested** (see section 7; the real-binary graceful-shutdown test stays ignored until it can run in CI). Owner dir: `apps/desktop/src-tauri`. Updater wiring is shared with WP10 (WP10 edits only `tauri.conf.json` updater section and `src/updater.rs`).
+Status: **M1 done, most of M2 done; lifecycle hardening and native preview preparation implemented** (see section 7; viewport callers are wired after the owner requested end-to-end integration; the real-binary graceful-shutdown test stays ignored until it can run in CI). Owner dir: `apps/desktop/src-tauri`. Updater wiring is shared with WP10 (WP10 edits only `tauri.conf.json` updater section and `src/updater.rs`).
 
 Tauri v2, Rust 1.96 (installed). Use the Bun-installed CLI: `bunx tauri …` from `apps/desktop` (`@tauri-apps/cli`, `@tauri-apps/api`). No `cargo install tauri-cli`.
 
 ## 1. Responsibilities (keep the Rust small)
 
-1. **Sidecar lifecycle** — spawn the Bun-compiled sidecar (`tauri-plugin-shell`, `externalBin: ["binaries/sidecar"]`), generate a 32-byte random token, pass `CADCAMFUN_TOKEN`, `CADCAMFUN_DATA_DIR` (Tauri `app_data_dir`), `CADCAMFUN_MIGRATIONS_DIR` (bundled resource). Parse the `{"event":"ready","port":N}` stdout line (timeout 15 s). Restart once on crash unless shutting down, then surface an error event to the webview. On exit send `{"event":"shutdown"}\n` on stdin, wait up to 2 seconds before kill fallback, and wait for process reaping before exit; stdin EOF remains the parent-death fallback.
+1. **Sidecar lifecycle** — spawn the Bun-compiled sidecar (`tauri-plugin-shell`, `externalBin: ["binaries/sidecar"]`), generate a 32-byte random token, pass `CADCAMFUN_TOKEN`, `CADCAMFUN_DATA_DIR` (Tauri `app_data_dir`), `CADCAMFUN_MIGRATIONS_DIR` (bundled resource). Parse the `{"event":"ready","port":N}` stdout line (timeout 60 s). Restart once on crash unless shutting down, then surface an error event to the webview. On exit send `{"event":"shutdown"}\n` on stdin, wait up to 2 seconds before kill fallback, and wait for process reaping before exit; stdin EOF remains the parent-death fallback.
 2. **Commands exposed to the webview** (`#[tauri::command]`): `get_sidecar_endpoint() -> { baseUrl, token }`, `get_logs_dir()`, `open_path(path)`, `secret_get/secret_set/secret_delete(key)`, `pick_file(filters)`, `save_file(defaultName, contents)`.
 3. **Secure storage** — OS keychain via the `keyring` crate (macOS Keychain, Windows Credential Manager, Secret Service on Linux) for AI API keys and (later) tokens; service name `com.cadcamfun.app`. Never store secrets in the SQLite DB or in plain files.
 4. **Native menus** (File: New, Open, Save, Export G-code, Quit; Edit: Undo/Redo/Cut/Copy/Paste/Select all; View: zoom, view presets, toggle panels, devtools in debug; Window; Help) emitting `menu` events to the webview with stable ids (`file.new`, `view.zoom_in`, …); the UI maps ids to commands.
@@ -48,8 +48,62 @@ Icons: generate from `public/icon.png` (`bunx tauri icon public/icon.png`). Bund
 - `bunx tauri build` produces a `.app`/`.dmg` on macOS containing the sidecar binary and migrations resource.
 - Secrets round-trip through the keychain on macOS; the commands return typed errors, never panic.
 
+## Rust output throughput (2026-10-20)
+
+Owner-requested scope: WP5 Rust only, independent of the concurrent buffer/WebGPU work.
+Deepen the existing sidecar output module instead of adding a hypothetical process adapter.
+The interface remains `LineBuffer::push`: arbitrary raw byte chunks yield complete UTF-8-lossy
+lines; incomplete lines stay bounded to 16 KiB; an oversized line is discarded through its
+next newline; CRLF, empty lines, ready-line handoff, credential redaction and process reaping
+keep their existing semantics. Scan newline-delimited slices and copy each slice in bulk.
+Complete lines in a chunk should not first be copied into `pending`.
+
+Verification: differential framing tests, the existing Rust suite and Clippy, plus an isolated
+optimized microbenchmark against the Git baseline. The benchmark reports paired p50/p95 on
+the same host, covers fragmented output and oversized lines, and does not claim an FPS or
+end-to-end CAD/CAM gain. No new Rust dependency, renderer or IPC protocol is required.
+The existing release profile remains unchanged: shell logging measurements do not justify
+changing code-generation settings for the whole desktop application.
+
+### Shared viewport preparation
+
+Expose `prepare_viewport_edges` as an additive, raw-byte Tauri command for the CADCanvas
+and ToolpathVisualizer integration owners. This is display-only feature-edge extraction,
+matching the installed Three.js r180 `EdgesGeometry`; it never changes CAD solids, CAM moves,
+units, normals, picking identifiers or export data. The command runs on `spawn_blocking`,
+admits at most one job, has input/triangle limits and a cooperative deadline, and returns a
+typed error on unsupported data or overload. Callers retain their existing Three.js path
+as fallback and must ignore results after geometry disposal/replacement. The owner's follow-up
+request to regenerate and connect everything authorizes narrow WP6 integration in the shared
+display-edge adapter, CAD factory/canvas invalidation and CAM mesh installation. Existing API
+clients are regenerated from the contract; no additional HTTP geometry route is needed.
+There is no automatic renderer switch. The separate native kernel executable
+chosen in spec 36 remains a later increment; this small preview helper adds no process or crate.
+
+Wire contract: request `CGE1`, little-endian u32 vertex count at 4, u32 index count at 8,
+f64 threshold angle in degrees at 12, zero u32 flags at 20, followed by xyz f32 positions
+and optional u32 triangle indices. No indices means non-indexed triangles. Response `CEL1`,
+u32 line-vertex count at 4, followed by xyz f32 endpoints. Degrees are confined to this
+Three.js display interface; the CAD/CAM kernel is untouched. Exact byte length is checked.
+All coordinates must be finite and quantizable to safe integers at Three.js's 1e-4 weld
+precision. Output must agree byte-for-byte with Three.js on the regression corpus, including
+degenerate, duplicate, non-manifold, reversed and non-indexed faces.
+
 ## 6. Change log
 
+- 2026-10-20: Follow-up connected the shared native display adapter to CADCanvas and View3D/ToolpathVisualizer,
+  with existing thresholds, browser/small-mesh fallback, single invalidation and disposal cancellation.
+  Regenerated both API clients (289 Promise / 294 Effect operations), completed packed-playback consumers
+  and fixed precision loss with version-2 double-precision playback sections (GPU buffers remain f32).
+  Rust validation: fmt/clippy passed; 72 tests passed, two existing opt-in tests ignored.
+- 2026-10-20: Owner narrowed this session to Rust/Tauri while another session owns buffer/WebGPU and viewport edits.
+  Added bounded raw-IPC `prepare_viewport_edges`, the main-window permission/registration and a guest adapter for
+  CADCanvas/ToolpathVisualizer integration. Display edge output matches installed Three.js r180 byte-for-byte on
+  50 cases (250 successful runs); an isolated allocation counter returns to baseline after successes, partial-work
+  failures and 10,000 malformed requests. No new crate/plugin or kernel/renderer change. Added repeatable source-level
+  framing benchmarks; process-output framing uses bulk slices with a small-fragment path, and log severity parsing
+  validates metadata without retaining its JSON tree. Memory review and plugin decisions are recorded in
+  `apps/desktop/src-tauri/benches/README.md`. These checks do not prove WebView/GPU leak freedom or viewport FPS gains.
 - v4 focused lifecycle: shell now sends exactly `{"event":"shutdown"}\n` on stdin and gives the child up to 2 seconds to exit before force-kill. It waits for the plugin's process wait/reap notification before allowing exit or restart; shutdown suppresses restart. Raw-byte newline decoding is stateful, bounded to 16 KiB per incomplete line, and survives the ready-to-monitor handoff; errors and logs are redacted before publication. Real-binary graceful shutdown is not verified by this work (the integration test remains ignored).
 - v3 (superseded by v4): the interrupted implementation used `{"command":"shutdown"}\n` and a 5-second grace period, with plugin process wait/reap coordination and stdin EOF as the parent-death fallback.
 - v1: initial spec.
@@ -62,7 +116,7 @@ Focused lifecycle checks: `cargo fmt --check`, `cargo test` (60 passed, 2 ignore
 ### Done and verified (macOS, `bunx tauri dev` with the stub sidecar)
 
 - `src-tauri/`: `Cargo.toml`, `build.rs`, `tauri.conf.json` (strict CSP, no `unsafe-eval`, `devCsp` only adds localhost and `unsafe-inline` scripts for Vite), `capabilities/main.json` (scoped fs, scoped `shell:allow-spawn`, one permission per custom command), icons generated from `public/icon.png`.
-- `sidecar.rs`: spawn through `tauri-plugin-shell`, 32-byte hex token per launch, env `CADCAMFUN_TOKEN/DATA_DIR/MIGRATIONS_DIR`, bounded raw-byte ready-line decoder, 15 s ready timeout, restart once unless shutting down, graceful stdin shutdown with a 2-second kill fallback and process-reap coordination. Logs, process errors and failure status messages redact credential markers or the token. State changes are emitted as the `sidecar-status` event (`{state: starting|ready|restarting|failed, ...}`); `get_sidecar_endpoint` waits for ready. The decoder/lifecycle changes are covered by Rust unit tests, not a new native UI smoke test.
+- `sidecar.rs`: spawn through `tauri-plugin-shell`, 32-byte hex token per launch, env `CADCAMFUN_TOKEN/DATA_DIR/MIGRATIONS_DIR`, bounded raw-byte ready-line decoder, 60 s ready timeout, restart once unless shutting down, graceful stdin shutdown with a 2-second kill fallback and process-reap coordination. Logs, process errors and failure status messages redact credential markers or the token. State changes are emitted as the `sidecar-status` event (`{state: starting|ready|restarting|failed, ...}`); `get_sidecar_endpoint` waits for ready. The decoder/lifecycle changes are covered by Rust unit tests, not a new native UI smoke test.
 - `commands.rs`, `secrets.rs`, `menu.rs`, `tray.rs`, `lib.rs`: all commands from section 1, plus `set_recent_projects(projects)` (rebuilds the tray "Recent projects" submenu; items emit `menu` with id `tray.recent.<projectId>`). Menu ids: `file.new|open|save|export_gcode`, `view.zoom_in|zoom_out|zoom_fit|preset_top|preset_front|preset_right|preset_iso|toggle_left_panel|toggle_right_panel|toggle_console`, `help.documentation|open_logs`. `open-file` event carries paths of `.cadcam/.nc/.gcode` from launch args (single-instance) and macOS open-file events.
 - Stub: `src-tauri/stub/stub-sidecar.ts`, built by `bun apps/desktop/scripts/build-stub-sidecar.ts [--if-missing]` into `src-tauri/binaries/sidecar-<triple>`; hooks `STUB_NO_READY=1`, `STUB_CRASH_AFTER_MS=n`. `tauri:dev` builds it only if no binary exists, so the real sidecar is never overwritten.
 - Verified: window shows "Sidecar: ready ... stub:true"; killing the sidecar once restarts it (new port, UI refreshes via event), a second kill yields `failed`; cmd+Q leaves no sidecar; `kill -9` of the shell leaves no sidecar (stdin EOF); keychain round trip passes (`cargo test -- --ignored`).

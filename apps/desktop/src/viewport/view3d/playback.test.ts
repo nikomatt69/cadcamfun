@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
-import { buildPlayback, positionAt, toolAt } from "./playback.ts"
+import { decodePlaybackBuffer } from "@cadcamfun/buffer"
+import { buildPlayback, playbackSegmentAt, positionAt, toolAt } from "./playback.ts"
 
 const program = (moves: cam.Move[]): cam.Program => ({ name: "Test", units: "mm", workOffset: "G54", toolpaths: [{ id: "path", name: "path", toolId: "tool", spindleRpm: 1000, coolant: "off", moves }] })
 
@@ -15,8 +16,8 @@ test("playback interpolates feed moves and holds through dwell", () => {
 
 test("full-circle helical arcs tessellate and interpolate Z", () => {
   const path = buildPlayback(program([{ _tag: "Rapid", to: { x: 10, y: 0, z: 0 } }, { _tag: "Arc", to: { x: 10, y: 0, z: -5 }, center: { x: 0, y: 0 }, clockwise: false, feed: 60 }]))
-  expect(path.segments.length).toBeGreaterThan(10)
-  const first = path.segments[1]
+  expect(path.segmentCount).toBeGreaterThan(10)
+  const first = playbackSegmentAt(path, 1)
   expect(first).toBeDefined()
   const p = positionAt(path, (first?.start ?? 0) + (path.duration - (first?.start ?? 0)) / 2)
   expect(p.x).toBeCloseTo(-10, 0)
@@ -26,6 +27,23 @@ test("full-circle helical arcs tessellate and interpolate Z", () => {
 
 test("empty programs remain at origin", () => {
   expect(positionAt(buildPlayback(program([])), 10)).toEqual({ x: 0, y: 0, z: 0 })
+})
+
+test("packed playback preserves fractional coordinates and exact segment boundaries", () => {
+  const target = { x: 0.123456789123, y: -0.987654321987, z: 0.314159265359 }
+  const path = buildPlayback(program([
+    { _tag: "Linear", to: target, feed: 73 },
+    { _tag: "Dwell", seconds: 0.123456789123 },
+  ]))
+  const first = playbackSegmentAt(path, 0)!
+  expect(first.to).toEqual(target)
+  expect(playbackSegmentAt(path, 1)?.duration).toBe(0.123456789123)
+  expect(positionAt(path, first.duration / 2)).toEqual({ x: target.x / 2, y: target.y / 2, z: target.z / 2 })
+  const transported = decodePlaybackBuffer(path.bytes)
+  expect(transported.toolIds).toEqual(path.toolIds)
+  expect(transported.views.to[0]).toBe(target.x)
+  expect(positionAt(transported, first.duration / 2)).toEqual(positionAt(path, first.duration / 2))
+  expect(transported.views.starts.buffer).toBe(path.views.starts.buffer)
 })
 
 test("the tool in the spindle follows the toolpaths: each segment knows its toolId", () => {
