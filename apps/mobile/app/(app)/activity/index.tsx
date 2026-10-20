@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { ActionSheetIOS, Alert, Platform, RefreshControl, Text, View } from "react-native"
 import { FlashList } from "@shopify/flash-list"
 import { useRouter } from "expo-router"
 import { Bell, BellOff } from "lucide-react-native"
 import type { NotificationRow } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
+import { accountStore } from "@/lib/account"
 import { useResource } from "@/lib/use-resource"
 import { usePoll } from "@/lib/use-poll"
 import { useUIStore } from "@/lib/store"
@@ -33,6 +34,7 @@ const PAGE = 50
  */
 export default function ActivityScreen() {
   const { client, config, connectivity } = useServer()
+  const account = useSyncExternalStore(accountStore.subscribe, accountStore.account)
   const { palette } = useTheme()
   const router = useRouter()
   const { gutter, fontScale, onLayout } = useContentLayout()
@@ -45,7 +47,7 @@ export default function ActivityScreen() {
   const feed = useResource(
     useCallback((signal) => (client ? client.notifications({ limit: PAGE }, signal) : Promise.reject(new Error("Not connected"))), [client]),
     "notifications",
-    { cacheKey: `notifications:${config?.fingerprint ?? ""}` },
+    { cacheKey: `notifications:${config?.fingerprint ?? ""}:${account?.subject ?? "local"}` },
   )
   // The feed belongs to no project, so no single stream covers it: it refreshes itself while it is open.
   usePoll(() => void feed.reload(), 25_000, connectivity === "online")

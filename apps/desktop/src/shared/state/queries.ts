@@ -6,7 +6,7 @@
  * build two different caches for the same endpoint. Writes go through `useMutation`,
  * which invalidates the prefixes a write can affect so the next read is fresh.
  */
-import { createSignal, type Accessor } from "solid-js"
+import { createSignal, getOwner, onCleanup, type Accessor } from "solid-js"
 import { Effect } from "effect"
 import { invalidatePrefix, queryKey, type QueryCache, type QueryState } from "./query-cache.ts"
 import { ApiClient, type Client } from "./client.ts"
@@ -71,12 +71,18 @@ export const useQuery = <T,>(
       return
     }
     setState({ _tag: "loading" })
+    const startedAt = cache.generation()
     // A screen hands over `(client) => Effect`; bind the client through the
     // `ApiClient` service so `runtime.run` always receives a concrete effect —
     // passing the raw function makes Effect reject with "Not a valid effect".
     void runtime
       .run(Effect.flatMap(Effect.service(ApiClient), (client) => effect(client)))
       .then((value: unknown) => {
+        // The cache was invalidated while this read ran (a delete, a sign-out): the answer is stale, read again.
+        if (cache.generation() !== startedAt && cache.peek<T>(key) === undefined) {
+          fetchIt()
+          return
+        }
         setState({ _tag: "success", value: value as T })
         // A resolved promise stores the value under the key and marks the key in-flight
         // for any component that asks for the same endpoint+params in the same tick.
@@ -86,6 +92,14 @@ export const useQuery = <T,>(
   }
 
   fetchIt()
+
+  // A screen that is already open must not keep showing rows a write or a session change just dropped.
+  if (getOwner() !== null) {
+    const unsubscribe = cache.subscribe((dropped) => {
+      if (dropped === undefined || dropped === key) fetchIt()
+    })
+    onCleanup(unsubscribe)
+  }
 
   return {
     state,
@@ -140,4 +154,18 @@ export const useMutation = <Args extends ReadonlyArray<unknown>, A>(
   }
 
   return { mutate, pending, error }
+}
+
+/**
+ * For screens that load on their own instead of through `useQuery`: runs `reload` once per burst of
+ * invalidations (a write, a delete, a session change) for as long as the screen is mounted.
+ */
+export const onCacheInvalidated = (cache: QueryCache, reload: () => void): void => {
+  let scheduled = false
+  const unsubscribe = cache.subscribe(() => {
+    if (scheduled) return
+    scheduled = true
+    queueMicrotask(() => { scheduled = false; reload() })
+  })
+  if (getOwner() !== null) onCleanup(unsubscribe)
 }

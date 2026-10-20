@@ -1,4 +1,5 @@
 import { Platform } from "react-native"
+import { useUIStore } from "./store"
 import * as SecureStore from "expo-secure-store"
 import * as WebBrowser from "expo-web-browser"
 import * as AuthSession from "expo-auth-session"
@@ -120,5 +121,7 @@ export const signOut = async (): Promise<void> => {
     await manager.logout()
   } finally {
     publish(null)
+    // The assistant's project and conversations belong to the account that just left.
+    useUIStore.setState({ assistantProjectId: null, assistantSessions: {}, assistantPreferences: {}, assistantDraft: null, assistantOpened: null })
   }
 }

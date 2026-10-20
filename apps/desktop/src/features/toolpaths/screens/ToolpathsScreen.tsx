@@ -15,6 +15,7 @@ import { toast } from "../../../shared/ui/feedback.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
+import { onCacheInvalidated } from "../../../shared/state/queries.ts"
 import { PredefinedToolpathsLibrary, type LibraryPick } from "../components/ToolpathLibraryModal.tsx"
 import { ToolpathFormModal, type ToolpathFormValue } from "../components/ToolpathFormModal.tsx"
 import { Modal, TYPE_LABEL, OPERATION_LABEL, formatDate, handOffToCam, type ToolpathRow } from "../components/shared.tsx"
@@ -81,12 +82,18 @@ export function ToolpathsScreen(): JSX.Element {
     }
   }
 
-  onMount(() => {
-    void load()
+  const loadProjects = (): void => {
     void run<ReadonlyArray<{ id: string; name: string }>>(app.client.projects.list())
       .then((list) => setProjects(list.map((p) => ({ id: p.id, name: p.name }))))
       .catch(() => setProjects([]))
+  }
+
+  onMount(() => {
+    void load()
+    loadProjects()
   })
+  // A project or toolpath deleted elsewhere (or a sign-in) must not linger in this open page.
+  onCacheInvalidated(app.cache, () => { void load(); loadProjects() })
 
   // Reload when a filter changes; the search box is debounced so typing does not fire a request per key.
   let debounce: ReturnType<typeof setTimeout> | undefined
@@ -108,7 +115,7 @@ export function ToolpathsScreen(): JSX.Element {
 
   const refresh = (): void => {
     invalidatePrefix(app.cache, "toolpaths")
-    void load()
+    invalidatePrefix(app.cache, "projects")
   }
 
   const openCreate = (): void => { setEditing(undefined); setFormOpen(true) }

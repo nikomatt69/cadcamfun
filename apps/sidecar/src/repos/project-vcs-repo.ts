@@ -123,14 +123,23 @@ export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
               }))
               upsertLibrary(schema.machineConfigTable, s.machineConfigs, (e) => ({ type: String(e.type ?? "mill"), description: str(e.description), config: e.config ?? {} }))
 
-              const exists = (table: typeof schema.materialTable | typeof schema.toolTable | typeof schema.machineConfigTable | typeof schema.drawingTable, id: unknown): string | null =>
-                typeof id === "string" && tx.select({ id: table.id }).from(table).where(eq(table.id, id)).get() ? id : null
+              // A snapshot may only link what this project (a drawing) or this user (library rows, or unowned ones) can see.
+              const exists = (table: typeof schema.materialTable | typeof schema.toolTable | typeof schema.machineConfigTable | typeof schema.drawingTable, id: unknown): string | null => {
+                if (typeof id !== "string") return null
+                if (table === schema.drawingTable) return tx.select({ id: schema.drawingTable.id }).from(schema.drawingTable).where(and(eq(schema.drawingTable.id, id), eq(schema.drawingTable.projectId, projectId))).get() ? id : null
+                const lib = table as typeof schema.materialTable
+                const row = tx.select({ ownerId: lib.ownerId }).from(lib).where(eq(lib.id, id)).get()
+                return row && (row.ownerId === null || row.ownerId === userId) ? id : null
+              }
               const sync = <T extends { id: unknown }>(table: typeof schema.drawingTable | typeof schema.componentTable | typeof schema.toolpathTable, entities: readonly Entity[], values: (e: Entity) => T) => {
                 const keep = new Set(entities.map((e) => e.id))
                 for (const row of tx.select({ id: table.id }).from(table).where(eq(table.projectId, projectId)).all()) {
                   if (!keep.has(row.id)) tx.delete(table).where(eq(table.id, row.id)).run()
                 }
                 for (const e of entities) {
+                  // An id that already lives in another project is not ours to take over.
+                  const taken = typeof e.id === "string" ? tx.select({ projectId: table.projectId }).from(table).where(eq(table.id, e.id)).get() : undefined
+                  if (taken !== undefined && taken.projectId !== projectId) continue
                   const v = values(e) as never
                   tx.insert(table).values(v).onConflictDoUpdate({ target: table.id, set: v }).run()
                 }
@@ -161,6 +170,8 @@ export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
               }
               for (const c of s.costs ?? []) {
                 if (typeof c.toolpathId !== "string" || !toolpathIds.includes(c.toolpathId)) continue
+                const owner = tx.select({ toolpathId: C.toolpathId }).from(C).where(eq(C.id, c.id as string)).get()
+                if (owner !== undefined && !toolpathIds.includes(owner.toolpathId)) continue
                 const num = (k: string) => Number(c[k] ?? 0)
                 const v = {
                   id: c.id, toolpathId: c.toolpathId, materialCost: num("materialCost"), toolWearCost: num("toolWearCost"), machineTime: num("machineTime"), machineTimeCost: num("machineTimeCost"),

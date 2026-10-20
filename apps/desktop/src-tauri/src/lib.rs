@@ -59,6 +59,14 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(viewport_geometry::ViewportPreparation::default());
 
     let data_dir = app.path().app_data_dir()?;
+    // `tauri dev` works on its own database next to the real one, so development never touches real data.
+    let data_dir = if cfg!(debug_assertions) {
+        let mut name = data_dir.file_name().unwrap_or_default().to_os_string();
+        name.push(".dev");
+        data_dir.with_file_name(name)
+    } else {
+        data_dir
+    };
     std::fs::create_dir_all(&data_dir)?;
     let config = SidecarConfig {
         data_dir,

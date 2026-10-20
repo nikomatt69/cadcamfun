@@ -49,6 +49,10 @@ export interface QueryCache {
   invalidate(key?: string): void
   /** Re-runs nothing on its own: callers re-run `run` after invalidating. */
   readonly size: () => number
+  /** Bumped by every invalidation, so a read that started before one can tell its answer is already stale. */
+  readonly generation: () => number
+  /** Called after an invalidation with the dropped key (`undefined` = everything); returns the unsubscribe. */
+  subscribe(listener: (key: string | undefined) => void): () => void
 }
 
 export interface QueryCacheOptions {
@@ -61,6 +65,12 @@ export const createQueryCache = (options: QueryCacheOptions = {}): QueryCache =>
   const now = options.now ?? (() => Date.now())
   const entries = new Map<string, CacheEntry<unknown>>()
   const inFlight = new Map<string, Promise<unknown>>()
+  const listeners = new Set<(key: string | undefined) => void>()
+  let generation = 0
+  const notify = (key: string | undefined): void => {
+    generation += 1
+    for (const listener of [...listeners]) listener(key)
+  }
 
   const cache: QueryCache = {
     peek: <T,>(key: string): CacheEntry<T> | undefined => entries.get(key) as CacheEntry<T> | undefined,
@@ -71,21 +81,30 @@ export const createQueryCache = (options: QueryCacheOptions = {}): QueryCache =>
     },
     keys: () => [...entries.keys()],
     size: () => entries.size,
+    generation: () => generation,
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    },
     invalidate: (key?: string) => {
       if (key === undefined) {
         entries.clear()
         inFlight.clear()
+        notify(undefined)
         return
       }
       entries.delete(key)
       inFlight.delete(key)
+      notify(key)
     },
     run: <T,>(key: string, effect: () => Promise<T>, at?: () => number): Promise<T> => {
       const pending = inFlight.get(key)
       if (pending !== undefined) return pending as Promise<T>
+      const startedAt = generation
       const request = effect()
         .then((value) => {
-          entries.set(key, { state: { _tag: "success", value }, at: at?.() ?? now() })
+          // An invalidation while the read was running makes its answer stale: hand it back but do not keep it.
+          if (generation === startedAt) entries.set(key, { state: { _tag: "success", value }, at: at?.() ?? now() })
           return value
         })
         .finally(() => {
@@ -100,5 +119,8 @@ export const createQueryCache = (options: QueryCacheOptions = {}): QueryCache =>
 
 /** Drops a cache entry whose key starts with `prefix`; `/projects` drops `/projects?limit=1`. */
 export const invalidatePrefix = (cache: QueryCache, prefix: string): void => {
-  for (const key of cache.keys()) if (key === prefix || key.startsWith(`${prefix}?`)) cache.invalidate(key)
+  let dropped = false
+  for (const key of cache.keys()) if (key === prefix || key.startsWith(`${prefix}?`)) { cache.invalidate(key); dropped ||= key === prefix }
+  // Screens that load without the cache still need to hear that this endpoint changed.
+  if (!dropped) cache.invalidate(prefix)
 }

@@ -87,21 +87,23 @@ export function ProjectDetailScreen(): JSX.Element {
     setProject((previous) => ({ ...(previous as Project), ...row })); setModal(undefined); flash("Project updated successfully")
     invalidatePrefix(app.cache, "projects")
   }) }
+  /** Counts on the project cards and the library / toolpath lists change with the project's contents. */
+  const touchContents = (): void => { for (const prefix of ["projects", "drawings", "components", "toolpaths"]) invalidatePrefix(app.cache, prefix) }
   const remove = (): Promise<void> => attempt(async () => {
     await run(app.client.projects.remove({ params: { id: params.id } }))
     app.cache.invalidate(); app.forgetProject(params.id); navigate("/projects")
   })
   const createDrawing = (event: Event): Promise<void> => { event.preventDefault(); return attempt(async () => {
     const row = await run<Card>(app.client.drawings.createForProject({ params: { id: params.id }, payload: { name: form().name.trim(), description: form().description || null, data: { elements: [], version: "1.0" } } }))
-    setDrawings((previous) => [row, ...previous]); setModal(undefined); navigate(`/cad?drawingId=${row.id}`)
+    touchContents(); setDrawings((previous) => [row, ...previous]); setModal(undefined); navigate(`/cad?drawingId=${row.id}`)
   }) }
   const createComponent = (event: Event): Promise<void> => { event.preventDefault(); return attempt(async () => {
     const row = await run<Card>(app.client.components.createForProject({ params: { id: params.id }, payload: { name: form().name.trim(), description: form().description || null, type: "custom" } }))
-    setComponents((previous) => [row, ...previous]); setModal(undefined); navigate(`/components/${row.id}`)
+    touchContents(); setComponents((previous) => [row, ...previous]); setModal(undefined); navigate(`/components/${row.id}`)
   }) }
   const createToolpath = (event: Event): Promise<void> => { event.preventDefault(); return attempt(async () => {
     const row = await run<Card>(app.client.toolpaths.create({ payload: { name: form().name.trim(), description: form().description || null, type: form().type, operationType: form().operationType, projectId: params.id, data: {}, gcode: "", isPublic: false } }))
-    setToolpaths((previous) => [row, ...previous]); setModal(undefined); openToolpath(row)
+    touchContents(); setToolpaths((previous) => [row, ...previous]); setModal(undefined); openToolpath(row)
   }) }
 
   const openToolpath = (row: Card): void => {
@@ -112,12 +114,12 @@ export function ProjectDetailScreen(): JSX.Element {
   const duplicateDrawing = (row: Card): Promise<void> => attempt(async () => {
     const full = await run<{ data: unknown }>(app.client.drawings.get({ params: { id: row.id } }))
     const copy = await run<Card>(app.client.drawings.createForProject({ params: { id: params.id }, payload: { name: `${row.name} (copy)`, description: row.description ?? null, data: full.data } }))
-    setDrawings((previous) => [copy, ...previous]); flash("Drawing duplicated")
+    touchContents(); setDrawings((previous) => [copy, ...previous]); flash("Drawing duplicated")
   })
   const deleteDrawing = (row: Card): Promise<void> => attempt(async () => {
     if (!window.confirm(`Delete drawing "${row.name}"?`)) return
     await run(app.client.drawings.remove({ params: { id: row.id } }))
-    setDrawings((previous) => previous.filter((item) => item.id !== row.id)); flash("Drawing deleted")
+    touchContents(); setDrawings((previous) => previous.filter((item) => item.id !== row.id)); flash("Drawing deleted")
   })
   const downloadDrawing = (row: Card): Promise<void> => attempt(async () => {
     const full = await run<{ data: unknown }>(app.client.drawings.get({ params: { id: row.id } }))

@@ -18,6 +18,7 @@ import { toast } from "../../../shared/ui/feedback.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
+import { onCacheInvalidated } from "../../../shared/state/queries.ts"
 import { Modal, formatDate } from "../../toolpaths/components/shared.tsx"
 import { ResourceGeneratorDialog } from "../components/ResourceGeneratorDialog.tsx"
 import { GENERATION_WRITE_ACTIONS, type ResourceKind } from "../lib/resource-generation.ts"
@@ -164,12 +165,18 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
     return perProject.flat().map(asRecord)
   }
 
-  onMount(() => {
-    void load()
+  const loadProjects = (): void => {
     void run<ReadonlyArray<Project>>(app.client.projects.list())
       .then((list) => setProjects(list.map((p) => ({ id: p.id, name: p.name }))))
       .catch(() => setProjects([]))
+  }
+
+  onMount(() => {
+    void load()
+    loadProjects()
   })
+  // Deleting a project drops its components, and a sign-in changes whose rows these are: reload the open page.
+  onCacheInvalidated(app.cache, () => { void load(); loadProjects() })
 
   const typeOptions = createMemo(() => {
     if (props.kind === "machines") return Object.keys(MACHINE_TYPES)
@@ -189,7 +196,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
 
   const hasFilters = createMemo(() => search() !== "" || type() !== "" || visibility() !== "" || projectId() !== "")
   const clearFilters = (): void => { setSearch(""); setType(""); setVisibility(""); setProjectId("") }
-  const refresh = (): void => { invalidatePrefix(app.cache, props.kind); void load() }
+  const refresh = (): void => { invalidatePrefix(app.cache, props.kind); invalidatePrefix(app.cache, "projects") }
 
   // A generation handed to the assistant lands asynchronously: this page follows the assistant's calls and reloads
   // when one of this kind's rows is created or replaced. The write itself is the assistant's, never a second path.
