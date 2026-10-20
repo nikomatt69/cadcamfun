@@ -84,6 +84,7 @@ export const LibraryMachineConfigInput = Schema.Struct({
   id: Schema.optionalKey(Schema.String),
   name: id,
   kind: Schema.Literals(["mill", "lathe", "3Dprinter"]),
+  description: Schema.optionalKey(Schema.String),
   kinematics: withDefault(Schema.Record(Schema.String, Schema.Struct({ min: Schema.Finite, max: Schema.Finite })), {}),
   postProcessor: Schema.String,
   workOffsets: withDefault(Schema.Array(Schema.String), ["G54", "G55", "G56", "G57", "G58", "G59"]),
