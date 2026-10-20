@@ -34,7 +34,7 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
           query("components.find", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
             const [hit] = await db.select({ c: T, project: { id: P.id, name: P.name, ownerId: P.ownerId } }).from(T).innerJoin(P, eq(T.projectId, P.id))
-              .where(and(eq(T.id, id), or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined, eq(T.isPublic, true))))
+              .where(and(eq(T.id, id), or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined)))
               .limit(1)
             return hit ? { ...toComponentRow(hit.c), project: hit.project } : undefined
           }),
@@ -42,7 +42,7 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
           query("components.listVisible", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
             const hits = await db.select({ c: T, project: { id: P.id, name: P.name, ownerId: P.ownerId } }).from(T).innerJoin(P, eq(T.projectId, P.id))
-              .where(or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined, eq(T.isPublic, true)))
+              .where(or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined))
               .orderBy(desc(T.updatedAt))
             return hits.map((hit) => ({ ...toComponentRow(hit.c), project: hit.project }))
           }),

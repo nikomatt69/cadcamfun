@@ -128,6 +128,8 @@ export function ProjectsScreen(): JSX.Element {
     const row = deleting()
     if (row === undefined) return
     await remove.mutate(row.id)
+    // Deleting a project cascades to its drawings, components, toolpaths and resources: every cached list is stale.
+    app.cache.invalidate()
     refresh()
     app.forgetProject(row.id)
     setDeleting(undefined)

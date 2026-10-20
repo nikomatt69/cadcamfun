@@ -89,7 +89,7 @@ export function ProjectDetailScreen(): JSX.Element {
   }) }
   const remove = (): Promise<void> => attempt(async () => {
     await run(app.client.projects.remove({ params: { id: params.id } }))
-    invalidatePrefix(app.cache, "projects"); app.forgetProject(params.id); navigate("/projects")
+    app.cache.invalidate(); app.forgetProject(params.id); navigate("/projects")
   })
   const createDrawing = (event: Event): Promise<void> => { event.preventDefault(); return attempt(async () => {
     const row = await run<Card>(app.client.drawings.createForProject({ params: { id: params.id }, payload: { name: form().name.trim(), description: form().description || null, data: { elements: [], version: "1.0" } } }))

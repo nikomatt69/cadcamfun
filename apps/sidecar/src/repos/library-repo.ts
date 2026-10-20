@@ -39,7 +39,7 @@ export class LibraryRepo extends Context.Service<LibraryRepo, {
         list: (userId, f) =>
           query("library.list", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
-            const visible = or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined, eq(T.isPublic, true))
+            const visible = or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined)
             // Deviation from legacy: `search` narrows the visible set instead of replacing it.
             const search = f.search ? or(like(T.name, `%${f.search}%`), like(T.description, `%${f.search}%`)) : undefined
             const rows = await db.select().from(T)
@@ -51,7 +51,7 @@ export class LibraryRepo extends Context.Service<LibraryRepo, {
           query("library.find", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
             const [item] = await db.select().from(T)
-              .where(and(eq(T.id, id), or(eq(T.ownerId, userId), eq(T.isPublic, true), orgIds.length ? inArray(T.organizationId, orgIds) : undefined)))
+              .where(and(eq(T.id, id), or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined)))
               .limit(1)
             if (!item) return undefined
             const [m] = item.organizationId
@@ -86,8 +86,9 @@ export class LibraryRepo extends Context.Service<LibraryRepo, {
         remove: (id) => query("library.remove", async (db) => void (await db.delete(T).where(eq(T.id, id)))),
         catalogue: (userId, kind) =>
           query("library.catalogue", async (db) => {
+            const orgIds = await orgIdsOf(db, userId)
             const table = kind === "components" ? schema.libraryItemTable : kind === "materials" ? schema.materialTable : schema.toolTable
-            const rows = await db.select().from(table).where(or(eq(table.ownerId, userId), eq(table.isPublic, true))) as Array<Record<string, unknown> & { ownerId: string | null; createdAt: Date; updatedAt: Date }>
+            const rows = await db.select().from(table).where(or(eq(table.ownerId, userId), orgIds.length ? inArray(table.organizationId, orgIds) : undefined)) as Array<Record<string, unknown> & { ownerId: string | null; createdAt: Date; updatedAt: Date }>
             const owners = await ownerRef(db, rows.map((r) => r.ownerId))
             return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(), owner: owners.get(r.ownerId ?? "") ?? null }))
           })

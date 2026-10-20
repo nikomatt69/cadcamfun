@@ -76,7 +76,7 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
           query("projects.list", async (db) => {
             const orgIds = (await memberships(db, userId)).map((m) => m.organizationId)
             const rows = await db.select().from(T)
-              .where(or(eq(T.ownerId, userId), eq(T.isPublic, true), orgIds.length ? inArray(T.organizationId, orgIds) : undefined))
+              .where(or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined))
               .orderBy(T.updatedAt)
             return hydrate(db, rows.reverse())
           }),
@@ -118,7 +118,19 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
             }).where(eq(T.id, id)).returning()
             return (await hydrate(db, [row!]))[0]!
           }),
-        remove: (id) => query("projects.remove", async (db) => void (await db.delete(T).where(eq(T.id, id))))
+        remove: (id) =>
+          query("projects.remove", async (db) => {
+            // Activity and AI-analysis rows point at items by plain id (no foreign key), so cascades miss them.
+            const ids = [
+              id,
+              ...(await db.select({ id: schema.drawingTable.id }).from(schema.drawingTable).where(eq(schema.drawingTable.projectId, id))).map((r) => r.id),
+              ...(await db.select({ id: schema.componentTable.id }).from(schema.componentTable).where(eq(schema.componentTable.projectId, id))).map((r) => r.id),
+              ...(await db.select({ id: schema.toolpathTable.id }).from(schema.toolpathTable).where(eq(schema.toolpathTable.projectId, id))).map((r) => r.id)
+            ]
+            await db.delete(T).where(eq(T.id, id))
+            await db.delete(schema.activityLogTable).where(inArray(schema.activityLogTable.itemId, ids))
+            await db.delete(schema.aIAnalysisLogTable).where(inArray(schema.aIAnalysisLogTable.objectId, ids))
+          })
       })
     })
   )

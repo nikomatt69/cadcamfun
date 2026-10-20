@@ -43,7 +43,7 @@ const withAuthors = async (db: Db, rows: ReadonlyArray<typeof schema.toolpathCom
 }
 
 export class ToolpathRepo extends Context.Service<ToolpathRepo, {
-  list(userId: string, f: { projectId?: string | undefined; type?: string | undefined; operationType?: string | undefined; search?: string | undefined; includePublic: boolean }): Effect.Effect<ToolpathRow[], DatabaseError>
+  list(userId: string, f: { projectId?: string | undefined; type?: string | undefined; operationType?: string | undefined; search?: string | undefined }): Effect.Effect<ToolpathRow[], DatabaseError>
   /** Visible when created by the user, in one of their organisations' projects, or public. */
   find(userId: string, id: string): Effect.Effect<{ row: ToolpathRow; project: { id: string; name: string; ownerId: string; organizationId: string | null }; canWrite: boolean } | undefined, DatabaseError>
   create(userId: string, d: ToolpathInput & { name: string; projectId: string; drawingId?: string; applyDefaults?: boolean }): Effect.Effect<ToolpathRow, DatabaseError>
@@ -79,7 +79,7 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
         list: (userId, f) =>
           query("toolpaths.list", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
-            const visible = or(eq(T.createdBy, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined, f.includePublic ? eq(T.isPublic, true) : undefined)
+            const visible = or(eq(T.createdBy, userId), eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined)
             // Deviation from legacy: `search` narrows the visible set instead of replacing it.
             const search = f.search ? or(like(T.name, `%${f.search}%`), like(T.description, `%${f.search}%`)) : undefined
             const rows = await db.select({ t: T }).from(T).innerJoin(P, eq(T.projectId, P.id))
@@ -93,7 +93,7 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
             const orgIds = await orgIdsOf(db, userId)
             const [hit] = await db.select({ t: T, p: { id: P.id, name: P.name, ownerId: P.ownerId, organizationId: P.organizationId } })
               .from(T).innerJoin(P, eq(T.projectId, P.id))
-              .where(and(eq(T.id, id), or(eq(T.createdBy, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined, eq(T.isPublic, true))))
+              .where(and(eq(T.id, id), or(eq(T.createdBy, userId), eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined)))
               .limit(1)
             if (!hit) return undefined
             let canWrite = hit.t.createdBy === userId
@@ -148,11 +148,10 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
           }),
         listForProject: (userId, projectId) =>
           query("toolpaths.listForProject", async (db) => {
-            const orgIds = await orgIdsOf(db, userId)
             const [project] = await db.select({ name: P.name, organizationId: P.organizationId }).from(P).where(eq(P.id, projectId)).limit(1)
-            const isOrgMember = !!project?.organizationId && orgIds.includes(project.organizationId)
+            // Access to the project is checked by the handler; every toolpath in it belongs to its owner / organization.
             const rows = await db.select().from(T)
-              .where(and(eq(T.projectId, projectId), or(eq(T.createdBy, userId), eq(T.isPublic, true), isOrgMember ? eq(T.projectId, projectId) : undefined)))
+              .where(eq(T.projectId, projectId))
               .orderBy(desc(T.updatedAt))
             const org = project?.organizationId
               ? (await db.select({ name: schema.organizationTable.name }).from(schema.organizationTable).where(eq(schema.organizationTable.id, project.organizationId)))[0] ?? null

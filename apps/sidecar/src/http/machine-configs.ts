@@ -32,7 +32,7 @@ export const MachineConfigsHandlers = HttpApiBuilder.group(Api, "machineConfigs"
         const user = yield* CurrentUser
         const page = Math.max(1, Number(query.page) || 1)
         const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(query.limit) || DEFAULT_PAGE_SIZE))
-        const { rows, total } = yield* repo.list(user.id, { type: query.type, search: query.search, includePublic: query.public === "true", page, limit })
+        const { rows, total } = yield* repo.list(user.id, { type: query.type, search: query.search, page, limit })
         return okAuth({ data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } })
       }).pipe(Effect.catchTag("DatabaseError", internal)))
     .handle("create", ({ payload }) =>
@@ -95,7 +95,7 @@ export const MachineConfigsHandlers = HttpApiBuilder.group(Api, "machineConfigs"
         const found = yield* repo.find(user.id, params.id)
         if (!found) return yield* envErr(EnvNotFound, "Source machine configuration not found")
         const src = found.row
-        if (!src.isPublic && src.ownerId !== user.id) {
+        if (src.ownerId !== user.id) {
           return yield* envErr(EnvForbidden, "You do not have permission to clone this machine configuration")
         }
         const name = isObj(payload) && typeof payload.name === "string" && payload.name ? payload.name : `${src.name} (Copy)`

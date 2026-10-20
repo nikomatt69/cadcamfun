@@ -18,7 +18,7 @@ export interface ToolInput {
 }
 
 export class ToolRepo extends Context.Service<ToolRepo, {
-  list(userId: string, f: { type?: string | undefined; material?: string | undefined; diameter?: number | undefined; search?: string | undefined; includePublic: boolean }): Effect.Effect<ToolRow[], DatabaseError>
+  list(userId: string, f: { type?: string | undefined; material?: string | undefined; diameter?: number | undefined; search?: string | undefined}): Effect.Effect<ToolRow[], DatabaseError>
   find(userId: string, id: string): Effect.Effect<{ detail: typeof ToolDetail.Type; canWrite: boolean } | undefined, DatabaseError>
   isMember(userId: string, organizationId: string): Effect.Effect<boolean, DatabaseError>
   access(userId: string, id: string): Effect.Effect<{ row: Row; allowed: boolean } | undefined, DatabaseError>
@@ -38,7 +38,7 @@ export class ToolRepo extends Context.Service<ToolRepo, {
         list: (userId, f) =>
           query("tools.list", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
-            const visible = or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined, f.includePublic ? eq(T.isPublic, true) : undefined)
+            const visible = or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined)
             // Deviation from legacy: `search` narrows the visible set instead of replacing it.
             const search = f.search ? or(like(T.name, `%${f.search}%`), like(T.notes, `%${f.search}%`)) : undefined
             const where = and(visible, search, f.type ? eq(T.type, f.type) : undefined, f.material ? eq(T.material, f.material) : undefined,
@@ -49,7 +49,7 @@ export class ToolRepo extends Context.Service<ToolRepo, {
           query("tools.find", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
             const [row] = await db.select().from(T)
-              .where(and(eq(T.id, id), or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined, eq(T.isPublic, true))))
+              .where(and(eq(T.id, id), or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined)))
               .limit(1)
             if (!row) return undefined
             const [owners, orgs] = await Promise.all([userRef(db, row.ownerId ? [row.ownerId] : []), orgRef(db, row.organizationId ? [row.organizationId] : [])])
@@ -61,7 +61,7 @@ export class ToolRepo extends Context.Service<ToolRepo, {
           query("tools.access", async (db) => {
             const [row] = await db.select().from(T).where(eq(T.id, id)).limit(1)
             if (!row) return undefined
-            const allowed = row.ownerId === userId || row.isPublic || (!!row.organizationId && await isOrgMember(db, userId, row.organizationId))
+            const allowed = row.ownerId === userId || (!!row.organizationId && await isOrgMember(db, userId, row.organizationId))
             return { row, allowed }
           }),
         touch: (id) => query("tools.touch", async (db) => void (await db.update(T).set({ updatedAt: new Date() }).where(eq(T.id, id)))),
@@ -70,7 +70,7 @@ export class ToolRepo extends Context.Service<ToolRepo, {
             if (ids.length === 0) return []
             const orgIds = await orgIdsOf(db, userId)
             return (await db.select().from(T).where(and(inArray(T.id, [...ids]),
-              or(eq(T.ownerId, userId), eq(T.isPublic, true), orgIds.length ? inArray(T.organizationId, orgIds) : undefined)))).map(toRow)
+              or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined)))).map(toRow)
           }),
         importMany: (userId, items, mode) =>
           query("tools.importMany", (db) => {

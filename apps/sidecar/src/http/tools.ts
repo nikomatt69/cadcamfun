@@ -15,7 +15,7 @@ export const ToolsHandlers = HttpApiBuilder.group(Api, "tools", Effect.fn(functi
         const d = query.diameter ? parseFloat(query.diameter) : NaN
         return yield* repo.list(user.id, {
           type: query.type, material: query.material, search: query.search,
-          ...(Number.isNaN(d) ? {} : { diameter: d }), includePublic: query.public === "true"
+          ...(Number.isNaN(d) ? {} : { diameter: d })
         })
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch tools"))))
     .handle("create", ({ payload }) =>

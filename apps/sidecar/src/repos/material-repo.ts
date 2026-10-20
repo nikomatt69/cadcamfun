@@ -17,7 +17,7 @@ export interface MaterialInput {
 }
 
 export class MaterialRepo extends Context.Service<MaterialRepo, {
-  list(userId: string, opts: { search?: string | undefined; includePublic: boolean }): Effect.Effect<MaterialRow[], DatabaseError>
+  list(userId: string, opts: { search?: string | undefined }): Effect.Effect<MaterialRow[], DatabaseError>
   /** Visible to the user (own, organisation, public) with owner/organization embedded. */
   find(userId: string, id: string): Effect.Effect<{ material: Row; detail: typeof MaterialDetail.Type; canWrite: boolean } | undefined, DatabaseError>
   isMember(userId: string, organizationId: string): Effect.Effect<boolean, DatabaseError>
@@ -37,13 +37,12 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
       const { query } = yield* Database
       const T = schema.materialTable
       return MaterialRepo.of({
-        list: (userId, { search, includePublic }) =>
+        list: (userId, { search }) =>
           query("materials.list", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
             const visible = or(
               eq(T.ownerId, userId),
-              orgIds.length ? inArray(T.organizationId, orgIds) : undefined,
-              includePublic ? eq(T.isPublic, true) : undefined
+              orgIds.length ? inArray(T.organizationId, orgIds) : undefined
             )
             // Deviation from legacy: `search` narrows the visible set instead of replacing it.
             const where = search ? and(visible, or(like(T.name, `%${search}%`), like(T.description, `%${search}%`))) : visible
@@ -53,7 +52,7 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
           query("materials.find", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
             const [row] = await db.select().from(T)
-              .where(and(eq(T.id, id), or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined, eq(T.isPublic, true))))
+              .where(and(eq(T.id, id), or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined)))
               .limit(1)
             if (!row) return undefined
             const [owners, orgs] = await Promise.all([userRef(db, row.ownerId ? [row.ownerId] : []), orgRef(db, row.organizationId ? [row.organizationId] : [])])
@@ -70,7 +69,7 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
           query("materials.access", async (db) => {
             const [row] = await db.select().from(T).where(eq(T.id, id)).limit(1)
             if (!row) return undefined
-            const allowed = row.ownerId === userId || row.isPublic ||
+            const allowed = row.ownerId === userId ||
               (!!row.organizationId && await isOrgMember(db, userId, row.organizationId))
             return { row, allowed }
           }),
@@ -82,7 +81,7 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
             const orgIds = await orgIdsOf(db, userId)
             return db.select().from(T).where(and(
               inArray(T.id, [...ids]),
-              or(eq(T.ownerId, userId), eq(T.isPublic, true), orgIds.length ? inArray(T.organizationId, orgIds) : undefined)
+              or(eq(T.ownerId, userId), orgIds.length ? inArray(T.organizationId, orgIds) : undefined)
             ))
           }),
         importMany: (userId, items, mode) =>

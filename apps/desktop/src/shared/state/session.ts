@@ -7,6 +7,7 @@
  * lives in a `Ref` — read per request by the client middleware — and is mirrored to
  * `localStorage` so it survives a reload; a blocked storage only costs persistence.
  */
+import { useDocumentStore } from "../../features/cad/store/documentStore.ts"
 import { Effect, Ref } from "effect"
 import { createSignal } from "solid-js"
 import { HttpClientRequest } from "effect/unstable/http"
@@ -50,14 +51,28 @@ export const getSessionToken = (): string | undefined => Effect.runSync(Ref.get(
 export const withSessionToken = (request: HttpClientRequest.HttpClientRequest): Effect.Effect<HttpClientRequest.HttpClientRequest> =>
   Effect.map(Ref.get(sessionTokenRef), (token) => token === undefined ? request : HttpClientRequest.setHeader(request, SESSION_HEADER, token))
 
+/** One-shot editor hand-offs that would otherwise carry the previous account's (or a deleted) item into the next load. */
+const HAND_OFF_KEYS = ["toolpathToLoadInCAM", "componentToLoadInCAD", "componentToLoadInCAD_timestamp"] as const
+
+export const clearHandOffs = (): void => {
+  try { for (const key of HAND_OFF_KEYS) localStorage.removeItem(key) } catch { /* storage unavailable */ }
+}
+
+const resetUserState = (): void => {
+  clearHandOffs()
+  useDocumentStore.getState().clear()
+}
+
 /** Switches the app to the account behind `token` and drops every cached answer of the previous one. */
 export const startSession = (cache: { invalidate(key?: string): void }, token: string): void => {
   setSessionToken(token)
   cache.invalidate()
+  resetUserState()
 }
 
 /** Back to the local profile. */
 export const endSession = (cache: { invalidate(key?: string): void }): void => {
   setSessionToken(undefined)
   cache.invalidate()
+  resetUserState()
 }

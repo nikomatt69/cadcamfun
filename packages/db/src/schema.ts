@@ -329,10 +329,10 @@ export const toolpathTable = sqliteTable(
   createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
   createdBy: text("createdBy").notNull().references((): AnySQLiteColumn => userTable.id),
-  drawingId: text("drawingId").references((): AnySQLiteColumn => drawingTable.id),
-  materialId: text("materialId").references((): AnySQLiteColumn => materialTable.id),
-  toolId: text("toolId").references((): AnySQLiteColumn => toolTable.id),
-  machineConfigId: text("machineConfigId").references((): AnySQLiteColumn => machineConfigTable.id),
+  drawingId: text("drawingId").references((): AnySQLiteColumn => drawingTable.id, { onDelete: "set null" }),
+  materialId: text("materialId").references((): AnySQLiteColumn => materialTable.id, { onDelete: "set null" }),
+  toolId: text("toolId").references((): AnySQLiteColumn => toolTable.id, { onDelete: "set null" }),
+  machineConfigId: text("machineConfigId").references((): AnySQLiteColumn => machineConfigTable.id, { onDelete: "set null" }),
   }
 )
 

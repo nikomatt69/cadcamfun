@@ -7,6 +7,8 @@
  * context instead of importing singletons, so a component test can mount a screen with
  * its own fake client and its own settings.
  */
+import { useDocumentStore } from "../../features/cad/store/documentStore.ts"
+import { clearHandOffs } from "./session.ts"
 import { createContext, createSignal, useContext, type Accessor, type JSX, type Setter } from "solid-js"
 import { emptyDrawing, type Drawing } from "@cadcamfun/core"
 import type { AppRuntime, Client } from "./client.ts"
@@ -89,7 +91,11 @@ export const createAppState = (options: CreateAppStateOptions): AppState => {
     setTool: editor.setTool,
     recents,
     rememberProject: (id, name) => setRecentsAndPersist(pushRecent(recents(), { id, name }, new Date().toISOString())),
-    forgetProject: (id) => setRecentsAndPersist(removeRecent(recents(), id)),
+    forgetProject: (id) => {
+      setRecentsAndPersist(removeRecent(recents(), id))
+      // The editor must not keep working on a project that no longer exists.
+      if (useDocumentStore.getState().projectId === id) { useDocumentStore.getState().clear(); clearHandOffs() }
+    },
     panelOpen,
     setPanelOpen,
     paletteOpen,

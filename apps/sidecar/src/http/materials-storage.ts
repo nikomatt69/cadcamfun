@@ -16,7 +16,7 @@ export const MaterialsStorageHandlers = HttpApiBuilder.group(Api, "materialsStor
     plural: "materials", noun: "materials", title: "Materials", type: "material",
     exportRow: (m, by) => ({ id: m.id, name: m.name, description: m.description, properties: m.properties || {}, metadata: exportMeta(by) }),
     visibleByIds: (userId, ids) => repo.visibleByIds(userId, ids) as never,
-    listAll: (userId) => repo.list(userId, { includePublic: false }),
+    listAll: (userId) => repo.list(userId, {}),
     isMember: repo.isMember,
     importMany: repo.importMany
   }

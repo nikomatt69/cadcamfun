@@ -8375,6 +8375,8 @@ var LAYERS = [
 ];
 var WIDTH = Object.fromEntries(LAYERS.map((l) => [l.id, l.width]));
 var COLOR = Object.fromEntries(LAYERS.map((l) => [l.id, l.color]));
+// packages/core/src/preview/companion.ts
+var FEATURE_STRUCTURE = new Set(["id", "type", "sketch", "plane", "from", "entities", "constraints", "shapes", "history", "profiles"]);
 // packages/plugin-sdk/examples/hello-gear/index.ts
 var gearEntity = (id) => ({
   ...baseEntity(id),

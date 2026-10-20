@@ -22,7 +22,7 @@ export type MachineConfigView = ReturnType<typeof serialize> & { owner: ReturnTy
 export interface Permission { hasAccess: boolean; isOwner: boolean; reason?: string }
 
 export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
-  list(userId: string, f: { type?: string | undefined; search?: string | undefined; includePublic: boolean; page: number; limit: number }):
+  list(userId: string, f: { type?: string | undefined; search?: string | undefined; page: number; limit: number }):
     Effect.Effect<{ rows: Array<MachineConfigView & { isOwner: boolean; usageCount: number }>; total: number }, DatabaseError>
   /** Row + owner + permission (owner, public, or a toolpath of a project the user can reach). */
   find(userId: string, id: string): Effect.Effect<{ row: Row; view: MachineConfigView; permission: Permission; usageCount: number } | undefined, DatabaseError>
@@ -44,7 +44,7 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
       return MachineConfigRepo.of({
         list: (userId, f) =>
           query("machineConfigs.list", async (db) => {
-            const base = or(eq(T.ownerId, userId), f.includePublic ? eq(T.isPublic, true) : undefined)
+            const base = eq(T.ownerId, userId)
             const where = and(base, f.type ? eq(T.type, f.type) : undefined,
               f.search ? or(like(T.name, `%${f.search}%`), like(T.description, `%${f.search}%`)) : undefined)
             const total = (await db.select({ n: count() }).from(T).where(where))[0]?.n ?? 0
@@ -63,7 +63,6 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
             const usageCount = await usageOf(db, id)
             let permission: Permission
             if (row.ownerId === userId) permission = { hasAccess: true, isOwner: true }
-            else if (row.isPublic) permission = { hasAccess: true, isOwner: false }
             else {
               const orgIds = await orgIdsOf(db, userId)
               const projectIds = (await db.select({ p: schema.toolpathTable.projectId }).from(schema.toolpathTable)
@@ -94,7 +93,7 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
         visibleByIds: (userId, ids) =>
           query("machineConfigs.visibleByIds", async (db) => {
             if (ids.length === 0) return []
-            const rows = await db.select().from(T).where(and(inArray(T.id, [...ids]), or(eq(T.ownerId, userId), eq(T.isPublic, true))))
+            const rows = await db.select().from(T).where(and(inArray(T.id, [...ids]), eq(T.ownerId, userId)))
             return rows.map((r) => ({ ...serialize(r), owner: null }))
           }),
         importMany: (userId, items, mode) =>

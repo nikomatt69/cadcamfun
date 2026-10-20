@@ -16,7 +16,7 @@ export const MachineConfigsStorageHandlers = HttpApiBuilder.group(Api, "machineC
     exportRow: (c, by) => ({ id: c.id, name: c.name, description: c.description, type: c.type, config: c.config, metadata: exportMeta(by) }),
     visibleByIds: repo.visibleByIds,
     // Legacy lists via the bucket index; locally: the user's own configs.
-    listAll: (userId) => repo.list(userId, { includePublic: false, page: 1, limit: 100000 }).pipe(Effect.map((r) => r.rows)),
+    listAll: (userId) => repo.list(userId, { page: 1, limit: 100000 }).pipe(Effect.map((r) => r.rows)),
     isMember: () => Effect.succeed(true),
     importMany: repo.importMany
   }
@@ -28,7 +28,7 @@ export const MachineConfigsStorageHandlers = HttpApiBuilder.group(Api, "machineC
     if (!id) return yield* envErr(EnvBadRequest, "Machine configuration ID is required")
     const row = yield* repo.byId(id)
     if (!row) return yield* envErr(EnvNotFound, "Machine configuration not found")
-    if (!(row.ownerId === user.id || row.isPublic)) {
+    if (!(row.ownerId === user.id)) {
       return yield* envErr(EnvForbidden, "You do not have permission to access this machine configuration")
     }
     return { user, row }

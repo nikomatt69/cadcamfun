@@ -866,8 +866,8 @@ const toolHandlers = Effect.gen(function*() {
       const entry = await Effect.runPromise(kv.set(projectContextKey(projectId), text))
       return parseProjectContext(entry.value)
     },
-    lookupMaterial: async (query) => (await Effect.runPromise(materials.list(acting().id, { search: query, includePublic: true }))).slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, properties: m.properties, updatedAt: m.updatedAt })),
-    lookupTool: async (query) => (await Effect.runPromise(tools.list(acting().id, { search: query, includePublic: true }))).slice(0, 10).map((t) => ({ id: t.id, name: t.name, diameter: t.diameter, type: t.type, material: t.material, numberOfFlutes: t.numberOfFlutes, maxRPM: t.maxRPM, coolantType: t.coolantType, cuttingLength: t.cuttingLength, totalLength: t.totalLength, shankDiameter: t.shankDiameter, cornerRadius: t.cornerRadius, tipAngle: t.tipAngle, threadPitch: t.threadPitch, holderDiameter: t.holderDiameter, holderLength: t.holderLength, stickout: t.stickout, notes: t.notes })),
+    lookupMaterial: async (query) => (await Effect.runPromise(materials.list(acting().id, { search: query }))).slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, properties: m.properties, updatedAt: m.updatedAt })),
+    lookupTool: async (query) => (await Effect.runPromise(tools.list(acting().id, { search: query }))).slice(0, 10).map((t) => ({ id: t.id, name: t.name, diameter: t.diameter, type: t.type, material: t.material, numberOfFlutes: t.numberOfFlutes, maxRPM: t.maxRPM, coolantType: t.coolantType, cuttingLength: t.cuttingLength, totalLength: t.totalLength, shankDiameter: t.shankDiameter, cornerRadius: t.cornerRadius, tipAngle: t.tipAngle, threadPitch: t.threadPitch, holderDiameter: t.holderDiameter, holderLength: t.holderLength, stickout: t.stickout, notes: t.notes })),
     lookupComponent: async (query) => {
       const needle = query.trim().toLowerCase()
       const rows = await Effect.runPromise(components.listVisible(acting().id))
@@ -876,7 +876,7 @@ const toolHandlers = Effect.gen(function*() {
         .slice(0, 20)
         .map((c) => ({ id: c.id, name: c.name, description: c.description, type: c.type, projectId: c.projectId, projectName: c.project.name, isPublic: c.isPublic, updatedAt: c.updatedAt }))
     },
-    lookupMachineConfig: async (query) => (await Effect.runPromise(machines.list(acting().id, { ...(query === "" ? {} : { search: query }), includePublic: true, page: 1, limit: 10 }))).rows.slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, type: m.type, config: m.config, isPublic: m.isPublic, isOwner: m.isOwner, usageCount: m.usageCount, updatedAt: m.updatedAt })),
+    lookupMachineConfig: async (query) => (await Effect.runPromise(machines.list(acting().id, { ...(query === "" ? {} : { search: query }), page: 1, limit: 10 }))).rows.slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, type: m.type, config: m.config, isPublic: m.isPublic, isOwner: m.isOwner, usageCount: m.usageCount, updatedAt: m.updatedAt })),
     deleteLibrary: async (input) => {
       const { kind, id } = input
       if (kind === "material" || kind === "tool") {

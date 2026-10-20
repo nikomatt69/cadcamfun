@@ -222,7 +222,7 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
     .handle("toolpaths", ({ params }) =>
       Effect.gen(function*() {
         const user = yield* projectAccess(params.id)
-        const rows = yield* toolpaths.list(user.id, { projectId: params.id, includePublic: true })
+        const rows = yield* toolpaths.list(user.id, { projectId: params.id })
         return rows.map((row) => ({ id: row.id, name: row.name, subtitle: row.operationType ?? row.type, updatedAt: row.updatedAt }))
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch toolpaths"))))
     .handle("toolpath", ({ params }) =>
@@ -271,7 +271,7 @@ export const WorkspaceHandlers = HttpApiBuilder.group(Api, "workspace", Effect.f
         const user = yield* projectAccess(params.id)
         const [componentRows, pathRows] = yield* Effect.all([
           components.listByProject(params.id),
-          toolpaths.list(user.id, { projectId: params.id, includePublic: true }),
+          toolpaths.list(user.id, { projectId: params.id }),
         ], { concurrency: 2 })
         const [materialRows, toolRows, machineRows] = yield* Effect.all([
           materials.visibleByIds(user.id, idsOf(pathRows.map((row) => row.materialId))),

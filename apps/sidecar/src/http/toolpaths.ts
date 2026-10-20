@@ -35,7 +35,7 @@ export const ToolpathsHandlers = HttpApiBuilder.group(Api, "toolpaths", Effect.f
     .handle("list", ({ query }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser
-        return yield* repo.list(user.id, { ...query, includePublic: query.public === "true" })
+        return yield* repo.list(user.id, { ...query })
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch toolpaths"))))
     .handle("create", ({ payload }) =>
       Effect.gen(function*() {

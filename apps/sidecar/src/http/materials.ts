@@ -12,7 +12,7 @@ export const MaterialsHandlers = HttpApiBuilder.group(Api, "materials", Effect.f
     .handle("list", ({ query }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser
-        return yield* repo.list(user.id, { search: query.search, includePublic: query.public === "true" })
+        return yield* repo.list(user.id, { search: query.search })
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch materials"))))
     .handle("create", ({ payload }) =>
       Effect.gen(function*() {

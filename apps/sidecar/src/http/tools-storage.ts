@@ -17,7 +17,7 @@ export const ToolsStorageHandlers = HttpApiBuilder.group(Api, "toolsStorage", Ef
       totalLength: t.totalLength, shankDiameter: t.shankDiameter, cornerRadius: t.cornerRadius ?? null, tipAngle: t.tipAngle ?? null, threadPitch: t.threadPitch ?? null, holderDiameter: t.holderDiameter ?? null, holderLength: t.holderLength ?? null, stickout: t.stickout ?? null, notes: t.notes, metadata: exportMeta(by)
     }),
     visibleByIds: repo.visibleByIds,
-    listAll: (userId) => repo.list(userId, { includePublic: false }),
+    listAll: (userId) => repo.list(userId, {}),
     isMember: repo.isMember,
     importMany: repo.importMany
   }
