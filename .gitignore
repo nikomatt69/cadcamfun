@@ -117,3 +117,8 @@ apps/desktop/tmpprobe/
 .tmp-probe/
 release-local/
 .docs/
+
+# Tool config and local working folders: kept on disk, not versioned
+/.astro/
+/.claude/
+/nikcli.json
