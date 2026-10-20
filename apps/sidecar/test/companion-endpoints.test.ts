@@ -20,7 +20,11 @@ const clientSource = readFileSync(new URL("../../mobile/lib/client.ts", import.m
 /** `(method, path)` of every desktop call in the client, with path parameters filled with a placeholder. */
 const phoneCalls = (): Array<{ method: string; path: string }> => {
   const calls = new Map<string, { method: string; path: string }>()
-  const add = (method: string, raw: string) => {
+  const add = (method: string, source: string) => {
+    // `${entry}` / `${resource}` stand for every kind the phone manages: each combination is checked on its own.
+    const kinds = source.includes("${projectEntry}") ? ["drawings", "components"] : source.includes("${entry}") ? ["drawings", "components", "toolpaths"] : source.includes("${resource}") ? ["materials", "tools", "machine-configs"] : [undefined]
+    for (const kind of kinds) {
+    const raw = kind ? source.replaceAll("${projectEntry}", kind).replaceAll("${entry}", kind).replaceAll("${resource}", kind) : source
     const path = raw
       .replaceAll(/\$\{this\.workspacePath\(\w+\)\}/g, "/api/projects/P/workspace")
       .replaceAll(/\$\{this\.projectPath\(\w+\)\}/g, "/api/projects/P")
@@ -30,6 +34,7 @@ const phoneCalls = (): Array<{ method: string; path: string }> => {
       .replaceAll(/\/\$\{[^}]*\}/g, "/X")
       .replaceAll(/\$\{[^}]*\}/g, "")
     calls.set(`${method} ${path}`, { method, path })
+    }
   }
   for (const match of clientSource.matchAll(/request(?:<[^(]*?>)?\(\s*"(GET|POST|PUT|PATCH|DELETE)",\s*([`"])([^`"?]*)/g)) add(match[1]!, match[3]!)
   for (const match of clientSource.matchAll(/transport\.stream\(\s*([`"])([^`"?]*)\1?[^,]*,\s*"(GET|POST)"/g)) add(match[3]!, match[2]!)

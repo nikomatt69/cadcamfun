@@ -112,7 +112,16 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   // Project list + single-project read so the phone can show a richer header (description, owner, org).
   // Creating a project from the phone: the new project belongs to the signed-in account and starts with its own repository.
   { methods: ["GET", "POST"], path: /^\/api\/projects$/ },
-  { methods: ["GET"], path: /^\/api\/projects\/[^/]+$/ },
+  { methods: ["GET", "PUT", "DELETE"], path: /^\/api\/projects\/[^/]+$/ },
+  // Managing a project's contents from the phone: create, rename and delete drawings, components and toolpaths. The stored
+  // CAD document itself (reading `/api/drawings/:id`, `/api/components/:id`) and the editors stay on the desktop.
+  { methods: ["POST"], path: /^\/api\/projects\/[^/]+\/(drawings|components)$/ },
+  { methods: ["POST"], path: /^\/api\/toolpaths$/ },
+  { methods: ["PUT", "DELETE"], path: /^\/api\/(drawings|components|toolpaths)\/[^/]+$/ },
+  // The user's own resources: materials, tools and machine configurations (storage and export/import stay on the desktop).
+  { methods: ["GET", "POST"], path: /^\/api\/(materials|tools|machine-configs)$/ },
+  { methods: ["GET", "PUT", "DELETE"], path: /^\/api\/(materials|tools|machine-configs)\/(?!export-import$)[^/]+$/ },
+  { methods: ["POST"], path: /^\/api\/machine-configs\/[^/]+\/clone$/ },
   // Read-only workspace: summaries, meshes and toolpath polylines. The stored CAD document and every write stay off the phone.
   { methods: ["GET"], path: /^\/api\/projects\/[^/]+\/workspace(?:\/[^/]+)*$/ },
   // GitHub sync (`vcs/remote|push|pull`) needs the owner's GitHub token and stays on the desktop.

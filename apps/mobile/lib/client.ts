@@ -141,6 +141,18 @@ export interface ChatAttachment {
   readonly encoding?: "base64" | "text"
 }
 
+/** The project contents the phone can create, rename and delete. */
+export type EntryKind = "drawings" | "components" | "toolpaths"
+export type ResourceKind = "materials" | "tools" | "machine-configs"
+export interface ResourceRow { readonly id: string; readonly name: string; readonly description?: string | null; readonly type?: string | null; readonly isPublic?: boolean; readonly updatedAt?: string }
+
+/** Materials and tools answer a bare array; machine configurations answer the legacy `{ data: { data: rows } }` envelope. */
+export const resourceRows = (body: unknown): ResourceRow[] => {
+  const unwrap = (value: unknown): unknown => (value && typeof value === "object" && !Array.isArray(value) && "data" in value ? unwrap((value as { data: unknown }).data) : value)
+  const rows = unwrap(body)
+  return Array.isArray(rows) ? rows.filter((row): row is ResourceRow => !!row && typeof (row as ResourceRow).id === "string") : []
+}
+
 export class CompanionClient {
   constructor(private readonly transport: Transport) {}
 
@@ -168,6 +180,8 @@ export class CompanionClient {
   projects = (signal?: AbortSignal) => this.request<ProjectSummary[]>("GET", "/api/projects", undefined, signal)
   createProject = (name: string, description?: string) =>
     this.request<ProjectSummary>("POST", "/api/projects", { name, ...(description ? { description } : {}) })
+  renameProject = (id: string, name: string) => this.request<ProjectSummary>("PUT", this.projectPath(id), { name })
+  deleteProject = (id: string) => this.request<{ message: string }>("DELETE", this.projectPath(id))
   project = (id: string, signal?: AbortSignal) => this.request<ProjectSummary>("GET", this.projectPath(id), undefined, signal)
 
   // ── Workspace preview (read-only meshes, G-code and library) ────────────
@@ -184,6 +198,26 @@ export class CompanionClient {
   toolpathPreview = (id: string, toolpathId: string, signal?: AbortSignal) =>
     this.request<ToolpathPreview>("GET", `${this.workspacePath(id)}/toolpaths/${encodeURIComponent(toolpathId)}/preview`, undefined, signal)
   workspaceLibrary = (id: string, signal?: AbortSignal) => this.request<LibraryCatalogue>("GET", `${this.workspacePath(id)}/library`, undefined, signal)
+
+  // ── Managing a project's contents (the stored CAD document and the editors stay on the desktop) ──
+
+  createEntry = (id: string, entry: EntryKind, name: string) => entry === "toolpaths"
+    ? this.request<{ id: string; name: string }>("POST", "/api/toolpaths", { name, type: "custom", operationType: "milling", projectId: id, data: {}, gcode: "", isPublic: false })
+    : this.createProjectEntry(id, entry, name)
+  private createProjectEntry = (id: string, projectEntry: "drawings" | "components", name: string) =>
+    this.request<{ id: string; name: string }>("POST", `${this.projectPath(id)}/${projectEntry}`, projectEntry === "drawings" ? { name, data: { elements: [], version: "1.0" } } : { name, type: "custom" })
+  renameEntry = (entry: EntryKind, entryId: string, name: string) => this.request<{ id: string }>("PUT", `/api/${entry}/${encodeURIComponent(entryId)}`, { name })
+  deleteEntry = (entry: EntryKind, entryId: string) => this.request<{ message: string }>("DELETE", `/api/${entry}/${encodeURIComponent(entryId)}`)
+
+  // ── The user's resources ────────────────────────────────────────────────
+
+  resources = (resource: ResourceKind, signal?: AbortSignal) =>
+    this.request<unknown>("GET", `/api/${resource}`, undefined, signal).then((body) => resourceRows(body))
+  createMaterial = (name: string, density: number) => this.request<ResourceRow>("POST", "/api/materials", { name, properties: { density } })
+  createTool = (name: string, diameter: number) =>
+    this.request<ResourceRow>("POST", "/api/tools", { name, type: "endmill", diameter, material: "Carbide", numberOfFlutes: 3, maxRPM: 12000 })
+  cloneMachine = (id: string) => this.request<unknown>("POST", `/api/machine-configs/${encodeURIComponent(id)}/clone`, {})
+  deleteResource = (resource: ResourceKind, id: string) => this.request<unknown>("DELETE", `/api/${resource}/${encodeURIComponent(id)}`)
 
   // ── Version control ─────────────────────────────────────────────────────
 

@@ -111,7 +111,7 @@ describe("companion gateway", () => {
 
   test("refuses everything outside the allow-list", async () => {
     const before = seen.length
-    for (const [method, path] of [["PUT", "/api/ai/credentials"], ["GET", "/api/billing/status"], ["GET", "/api/companion"], ["DELETE", "/api/projects/p1"], ["GET", "/api/projects/p1/drawings"], ["POST", "/api/plugins/install"], ["DELETE", "/api/ai/sessions/s1"]] as const) {
+    for (const [method, path] of [["PUT", "/api/ai/credentials"], ["GET", "/api/billing/status"], ["GET", "/api/companion"], ["GET", "/api/drawings/d1"], ["GET", "/api/materials/m1/storage"], ["GET", "/api/tools/export-import"], ["POST", "/api/plugins/install"], ["DELETE", "/api/ai/sessions/s1"]] as const) {
       expect((await call(path, { method })).status).toBe(403)
     }
     expect(seen.length).toBe(before)
@@ -141,7 +141,14 @@ describe("companion gateway", () => {
   test("route policy", () => {
     expect(isCompanionRoute("GET", "/api/projects")).toBe(true)
     expect(isCompanionRoute("POST", "/api/projects")).toBe(true)
-    expect(isCompanionRoute("DELETE", "/api/projects/x")).toBe(false)
+    expect(isCompanionRoute("DELETE", "/api/projects/x")).toBe(true)
+    expect(isCompanionRoute("PUT", "/api/projects/x")).toBe(true)
+    expect(isCompanionRoute("POST", "/api/projects/x/drawings")).toBe(true)
+    expect(isCompanionRoute("DELETE", "/api/toolpaths/t1")).toBe(true)
+    expect(isCompanionRoute("GET", "/api/drawings/d1")).toBe(false)
+    expect(isCompanionRoute("POST", "/api/materials")).toBe(true)
+    expect(isCompanionRoute("DELETE", "/api/machine-configs/m1")).toBe(true)
+    expect(isCompanionRoute("GET", "/api/materials/export-import")).toBe(false)
     expect(isCompanionRoute("GET", "/api/projects/x/vcs/log")).toBe(true)
     expect(isCompanionRoute("GET", "/api/projects/x/../../billing")).toBe(false)
     // GitHub sync needs the owner's GitHub token and is desktop-only.
@@ -191,6 +198,7 @@ describe("companion gateway", () => {
     }
     // The existing document routes embed the CAD JSON. The phone uses the workspace summaries instead.
     expect(isCompanionRoute("GET", `${project}/drawings`)).toBe(false)
+    expect(isCompanionRoute("POST", `${project}/drawings`)).toBe(true)
     expect(isCompanionRoute("PUT", `${project}/drawings/d1`)).toBe(false)
     expect(isCompanionRoute("POST", "/api/drawings/d1")).toBe(false)
     expect(isCompanionRoute("GET", "/api/library")).toBe(false)

@@ -14,11 +14,13 @@ type RecordCardProps = {
   leading: ReactNode
   status?: ReactNode
   onPress?: () => void
+  /** Opens the row's actions (rename, delete…). */
+  onLongPress?: () => void
   accessibilityLabel?: string
 }
 
 /** Metadata moves below the title at accessibility sizes instead of squeezing the reading column. */
-export function RecordCard({ title, subtitle, meta, leading, status, onPress, accessibilityLabel }: RecordCardProps) {
+export function RecordCard({ title, subtitle, meta, leading, status, onPress, onLongPress, accessibilityLabel }: RecordCardProps) {
   const { palette } = useTheme()
   const { width, fontScale, onLayout } = useContentLayout()
   const stacked = fontScale > 1.3 || width < 320
@@ -43,7 +45,8 @@ export function RecordCard({ title, subtitle, meta, leading, status, onPress, ac
   const style = { padding: 16, gap: 12, borderRadius: layout.cardRadius, borderCurve: "continuous" as const, backgroundColor: palette.surface, borderWidth: 0.5, borderColor: palette.border }
   return onPress ? (
     <PressableScale onLayout={onLayout} subtle tint style={style} accessibilityLabel={accessibilityLabel ?? [title, subtitle, meta].filter(Boolean).join(". ")}
-      onPress={() => { haptic("selection"); onPress() }}>
+      onPress={() => { haptic("selection"); onPress() }}
+      {...(onLongPress ? { onLongPress: () => { haptic("selection"); onLongPress() } } : {})}>
       {content}
     </PressableScale>
   ) : <View onLayout={onLayout} style={style}>{content}</View>

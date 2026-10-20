@@ -27,6 +27,7 @@ export default function ComponentsScreen() {
         emptyTitle="No components"
         emptyDescription="Components in this project open as a read-only 3D preview."
         searchPlaceholder="Search components"
+        manage={{ kind: "components", noun: "component" }}
         onOpen={(entry) => {
           router.push(`/projects/${id}/workspace/components/${entry.id}?name=${encodeURIComponent(entry.name)}`)
         }}

@@ -27,6 +27,7 @@ export default function DrawingsScreen() {
         emptyTitle="No designs"
         emptyDescription="Designs saved on the desktop show up here as a 3D preview."
         searchPlaceholder="Search designs"
+        manage={{ kind: "drawings", noun: "design" }}
         onOpen={(entry) => {
           router.push(`/projects/${id}/workspace/drawings/${entry.id}?name=${encodeURIComponent(entry.name)}`)
         }}

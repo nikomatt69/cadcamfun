@@ -16,6 +16,7 @@ import { usePoll } from "@/lib/use-poll"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { haptic } from "@/lib/haptics"
+import { chooseAction, confirmDelete, promptText } from "@/lib/manage"
 import { PressableScale } from "@/components/ui/PressableScale"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
@@ -51,6 +52,29 @@ export default function ProjectsScreen() {
   const list = useMemo(() => [...projects]
     .filter((project) => `${project.name} ${project.description ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()), [resource.data, query])
+
+  /** Rename or delete a project on the desktop; the list follows the desktop's answer. */
+  const manageProject = async (project: { id: string; name: string }) => {
+    if (!client) return
+    const choice = await chooseAction(project.name, ["Rename", "Delete"], "Delete")
+    try {
+      if (choice === "Rename") {
+        const name = await promptText("Rename project", undefined, project.name)
+        if (!name || name === project.name) return
+        await client.renameProject(project.id, name)
+        toast("Project renamed", "success")
+      } else if (choice === "Delete") {
+        if (!await confirmDelete(`Delete “${project.name}”?`, "Its designs, components, toolpaths and history are removed from the desktop too. This cannot be undone.")) return
+        await client.deleteProject(project.id)
+        toast("Project deleted", "success")
+      } else return
+      haptic("success")
+      await resource.reload()
+    } catch (cause) {
+      haptic("error")
+      toast(cause instanceof Error ? cause.message : "The desktop refused the change", "error")
+    }
+  }
 
   const create = async () => {
     if (!client || !newName.trim()) return
@@ -115,6 +139,7 @@ export default function ProjectsScreen() {
       ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
       renderItem={({ item }) => <PressableScale subtle tint accessibilityLabel={`Open project ${item.name}`}
         onPress={() => { haptic("selection"); router.push(`/projects/${item.id}`) }}
+        onLongPress={() => { haptic("selection"); void manageProject(item) }}
         style={{ padding: 18, borderRadius: 22, borderCurve: "continuous", borderWidth: 0.5, borderColor: palette.border, backgroundColor: palette.surface, gap: 14 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           <IconTile><FolderOpen size={21} color={palette.accent} /></IconTile>
