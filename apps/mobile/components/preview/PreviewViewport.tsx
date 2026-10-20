@@ -77,6 +77,8 @@ interface PreparedScene {
   readonly lines: Prepared<Float32Array>
   readonly edges: ReturnType<typeof meshFeatureEdges>
   readonly solids: Prepared<MachineSolids>
+  /** How many segments the phone shows before each segment of the path (`shown[total]` is the whole path). */
+  readonly shown: Int32Array
 }
 
 /** Below this card width the zoom buttons give way: pinch and the accessibility actions still zoom. */
@@ -153,11 +155,25 @@ export function PreviewViewport(props: PreviewViewportProps) {
     }
   }, [operationOfSegment, colorMode, hiddenOperations])
   const lines = useMemo(() => prepare(() => prepareToolpathLines(segments ?? [], machine ? undefined : stock, collisions, style), PREVIEW_MESSAGE.pathInvalid), [segments, stock, machine, collisions, style])
+  /**
+   * How many segments the phone shows before each segment of the path.
+   *
+   * The playback asks for this on every tick, so it is counted once: `shown[i]` is the number of visible segments
+   * before the segment `i`. The playhead's answer is then a lookup, not a walk over the program.
+   */
+  const shown = useMemo(() => {
+    const total = segments?.length ?? 0
+    const counts = new Int32Array(total + 1)
+    for (let index = 0; index < total; index++) {
+      counts[index + 1] = counts[index]! + (style.hidden?.(index) === true ? 0 : 1)
+    }
+    return counts
+  }, [segments?.length, style])
   const edges = useMemo(() => {
     if (!mesh) return []
     try { return meshFeatureEdges(mesh.positions, mesh.indices) } catch { return [] }
   }, [mesh])
-  const prepared = useMemo<PreparedScene>(() => ({ ...(meshUpload ? { mesh: meshUpload } : {}), lines, edges, solids: machineUpload }), [meshUpload, lines, edges, machineUpload])
+  const prepared = useMemo<PreparedScene>(() => ({ ...(meshUpload ? { mesh: meshUpload } : {}), lines, edges, solids: machineUpload, shown }), [meshUpload, lines, edges, machineUpload, shown])
 
   return <>
     {/* Covered by the full-screen viewer, the inline one stops following the playhead and the camera: no hidden redraws. */}
@@ -336,31 +352,19 @@ function Viewport({
   }, [scene, guides, edges, showGrid, showEdges, prepared.solids])
 
   /** The segments the phone shows, and how many of them the playhead has passed. */
-  const shown = useMemo(() => {
+  const counts = useMemo(() => {
+    const shown = prepared.shown
     const total = segments?.length ?? 0
-    const hidden = hiddenOperations
-    const operationOf = (index: number): number => {
-      if (hidden === undefined || hidden.size === 0) return -1
-      for (const operation of operations ?? []) {
-        if (index >= operation.startSegment && index <= operation.endSegment) return hidden.has(operation.index) ? operation.index : -1
-      }
-      return -1
-    }
-    let visible = 0
-    let travelled = 0
-    for (let index = 0; index < total; index++) {
-      if (operationOf(index) >= 0) continue
-      visible++
-      if (index <= playhead) travelled++
-    }
+    const visible = shown[total] ?? 0
+    const travelled = shown[Math.min(total, Math.max(0, playhead + 1))] ?? 0
     return { visible, travelled }
-  }, [segments?.length, operations, hiddenOperations, playhead])
+  }, [prepared.shown, segments?.length, playhead])
 
   useEffect(() => {
     if (!scene || !active) return
-    const range = progressRange(playhead, shown.visible, simulating, shown.travelled)
+    const range = progressRange(playhead, counts.visible, simulating, counts.travelled)
     scene.setProgress(simulating ? range.travelled : -1, range.path, REMAINING_PATH_FADE)
-  }, [scene, active, playhead, shown, simulating])
+  }, [scene, active, playhead, counts, simulating])
 
   // What turns with the spindle: the native view accumulates the angle while the rate is not zero.
   // A covered viewer stops its spindle so the display link does not redraw a scene nobody sees.
