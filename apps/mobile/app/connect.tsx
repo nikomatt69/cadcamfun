@@ -19,6 +19,7 @@ import { caps, type } from "@/lib/typography"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { IconTile } from "@/components/ui/icon-tile"
+import { BrandMark } from "@/components/layout/BrandMark"
 import { contentGutter, layout } from "@/lib/layout"
 import { usePrefersReducedMotion } from "@/lib/animation"
 
@@ -111,9 +112,8 @@ export default function ConnectScreen() {
         <ScrollView contentInsetAdjustmentBehavior="never" keyboardShouldPersistTaps="handled" style={{ flex: 1 }}
           contentContainerStyle={{ paddingLeft: Math.max(contentGutter(width), insets.left + 16), paddingRight: Math.max(contentGutter(width), insets.right + 16), paddingTop: insets.top + 28, paddingBottom: insets.bottom + 28, gap: 24 }}>
           <View style={{ gap: 24 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <IconTile size={36}><MonitorSmartphone size={20} color={palette.accent} /></IconTile>
-              <Text style={{ color: palette.ink, ...type(15, { weight: "700", trackingBoost: 1 }) }}>CADCAMFUN</Text>
+            <View style={{ alignItems: "center", paddingTop: 8 }}>
+              <BrandMark size={64} />
             </View>
             <View style={{ gap: 12, paddingTop: 12 }}>
               <Text style={{ color: palette.accent, ...caps(12, { weight: "700" }) }}>Your work. With you.</Text>

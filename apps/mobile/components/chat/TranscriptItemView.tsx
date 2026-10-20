@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native"
 import { CircleAlert, PencilLine, RefreshCw } from "lucide-react-native"
 import type { TranscriptItem } from "@/lib/transcript-rows"
 import { hexToRgba, useTheme } from "@/lib/theme"
+import { layout } from "@/lib/layout"
 import { type as typeStyle } from "@/lib/typography"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { MessageBubble } from "./MessageBubble"
@@ -67,7 +68,7 @@ function ErrorRow({ message, recovery, actions }: { message: string; recovery?: 
   const { palette } = useTheme()
   const lastPrompt = recovery?.lastPrompt
   return (
-    <View accessibilityRole="alert" style={{ marginHorizontal: 16, marginVertical: 8, padding: 14, gap: 10, borderRadius: 16, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: hexToRgba(palette.danger, 0.3), backgroundColor: hexToRgba(palette.danger, 0.06) }}>
+    <View accessibilityRole="alert" style={{ marginHorizontal: layout.gutter, marginVertical: 8, padding: 14, gap: 10, borderRadius: layout.controlRadius, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: hexToRgba(palette.danger, 0.3), backgroundColor: hexToRgba(palette.danger, 0.06) }}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
         <CircleAlert size={18} color={palette.danger} style={{ marginTop: 1 }} />
         <Text selectable style={{ flex: 1, minWidth: 0, color: palette.ink, ...typeStyle(14) }}>{message}</Text>

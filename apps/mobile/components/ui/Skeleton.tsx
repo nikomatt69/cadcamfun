@@ -3,6 +3,7 @@ import { View, type ViewStyle } from "react-native"
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming, Easing } from "react-native-reanimated"
 import { usePrefersReducedMotion } from "@/lib/animation"
 import { useTheme } from "@/lib/theme"
+import { layout } from "@/lib/layout"
 
 /**
  * Loading never steals attention or ignores the user's Reduce Motion preference. The sheen pulses the
@@ -19,7 +20,7 @@ export function Skeleton({ style }: { style?: ViewStyle | ViewStyle[] }) {
     return () => cancelAnimation(opacity)
   }, [reduced, opacity])
   const pulse = useAnimatedStyle(() => ({ opacity: opacity.get() }))
-  return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[{ backgroundColor: palette.panel, borderRadius: 16, borderCurve: "continuous", overflow: "hidden" }, style]}>
+  return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[{ backgroundColor: palette.panel, borderRadius: layout.controlRadius, borderCurve: "continuous", overflow: "hidden" }, style]}>
     <Animated.View style={[{ position: "absolute", inset: 0, backgroundColor: palette.border }, pulse]} />
   </View>
 }

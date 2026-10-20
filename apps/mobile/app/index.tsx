@@ -2,6 +2,7 @@ import { ActivityIndicator, Text } from "react-native"
 import { useTheme } from "@/lib/theme"
 import { type } from "@/lib/typography"
 import { PageScroll } from "@/components/layout/page-scroll"
+import { BrandMark } from "@/components/layout/BrandMark"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 /**
@@ -14,7 +15,7 @@ export default function IndexScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}>
       <PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", gap: 14 }}>
-        <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(30, { weight: "800" }) }}>CADCAMFUN</Text>
+        <BrandMark size={72} />
         <ActivityIndicator color={palette.accent} accessibilityLabel="Loading your workspace" />
       </PageScroll>
     </SafeAreaView>

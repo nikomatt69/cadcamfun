@@ -21,6 +21,7 @@ import { rowsFromMessages } from "@/lib/session-history"
 import { Composer, type AssistantMode } from "@/components/chat/Composer"
 import { TranscriptItemView, type ErrorRecovery, type TranscriptActions } from "@/components/chat/TranscriptItemView"
 import { JumpToLatestPill } from "@/components/chat/JumpToLatestPill"
+import { BrandMark } from "@/components/layout/BrandMark"
 import { TypingRow } from "@/components/chat/TypingRow"
 import { hexToRgba } from "@/lib/theme"
 import { caps, type } from "@/lib/typography"
@@ -662,9 +663,7 @@ export default function AssistantScreen() {
             <EmptyState title="What are we working on?" description="Choose a workspace to review designs, inspect manufacturing paths or prepare your next change." icon={<Sparkles size={26} color={palette.accent} />} action={<ActionButton label="Choose a project" onPress={() => setPickerOpen(true)} />} />
           ) : (
             <View style={{ alignItems: "center", gap: 18 }}>
-              <View style={{ width: 58, height: 58, borderRadius: 19, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.accent, 0.1) }}>
-                <Sparkles size={27} color={palette.accent} strokeWidth={1.9} />
-              </View>
+              <BrandMark size={58} wordmark={false} />
               <View style={{ alignItems: "center", gap: 7 }}>
                 <Text selectable style={{ color: palette.ink, textAlign: "center", ...type(28, { weight: "700" }) }}>Build with CADCAMFUN</Text>
                 <Text selectable style={{ maxWidth: 340, color: palette.soft, textAlign: "center", ...type(15) }}>

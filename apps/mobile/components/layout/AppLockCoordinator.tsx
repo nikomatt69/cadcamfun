@@ -12,6 +12,7 @@ import { coverWhenInactive, lockOnResume, lockWhenBackgrounded, unlockFailureMes
 import { haptic } from "@/lib/haptics"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { PageScroll } from "./page-scroll"
+import { BrandMark } from "./BrandMark"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 /**
@@ -128,9 +129,7 @@ export function AppLockCoordinator() {
     <Modal visible transparent={false} animationType="none" presentationStyle="fullScreen" onRequestClose={() => undefined}>
     <SafeAreaView accessibilityViewIsModal style={{ flex: 1, backgroundColor: palette.background }}>
       <PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", gap: 20 }}>
-        <View style={{ width: 64, height: 64, borderRadius: 20, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.accent, 0.08) }}>
-          <Lock size={28} color={palette.accent} />
-        </View>
+        <BrandMark size={64} wordmark={false} />
         <View style={{ alignItems: "center", gap: 8 }}>
           <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(22, { weight: "600" }) }}>CADCAMFUN is locked</Text>
           <Text style={{ maxWidth: 300, color: palette.soft, textAlign: "center", ...type(15) }}>Unlock with {label} or your device passcode to continue.</Text>

@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native"
 import { AlertTriangle } from "lucide-react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import { hexToRgba, useTheme } from "@/lib/theme"
+import { layout } from "@/lib/layout"
 import { type } from "@/lib/typography"
 import { EASE_OUT } from "@/lib/animation"
 
@@ -21,7 +22,7 @@ export function ErrorBanner({ message, actionLabel, onAction }: { message: strin
     <View
       style={{
         padding: 16,
-        borderRadius: 16,
+        borderRadius: layout.controlRadius,
         borderCurve: "continuous",
         borderWidth: 1,
         borderColor: hexToRgba(palette.danger, 0.22),

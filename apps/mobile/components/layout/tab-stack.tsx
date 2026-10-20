@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { Stack } from "expo-router"
 import { useTheme } from "@/lib/theme"
+import { BrandHeaderTitle } from "./BrandMark"
 
 /**
  * Every tab owns a native stack, so titles, status-bar insets and back gestures have one owner.
@@ -20,7 +21,7 @@ export function TabStack({ title, largeTitle = true, children }: { title: string
       headerBackButtonDisplayMode: "minimal",
       contentStyle: { backgroundColor: palette.background },
     }}>
-      <Stack.Screen name="index" options={{ title }} />
+      <Stack.Screen name="index" options={{ title, headerTitle: () => <BrandHeaderTitle /> }} />
       {children}
     </Stack>
   )

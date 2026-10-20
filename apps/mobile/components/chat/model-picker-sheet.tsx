@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/Skeleton"
 import { assistantModelKey, filterAssistantModels, formatVariantLabel, rememberedSelection, selectedAssistantModel, type AssistantModelOption, type AssistantModelSelection } from "@/lib/assistant-preferences"
 import { useUIStore } from "@/lib/store"
 import { hexToRgba, useTheme } from "@/lib/theme"
+import { layout } from "@/lib/layout"
 import { haptic } from "@/lib/haptics"
 import { caps, type as typeStyle } from "@/lib/typography"
 import { useContentLayout } from "@/components/layout/use-content-layout"
@@ -81,7 +82,7 @@ export function ModelPickerSheet({ open, onClose, models, selection, onSelect, l
 
 function Choice({ title, selected, onPress }: { title: string; selected: boolean; onPress(): void }) {
   const { palette } = useTheme()
-  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ selected }} style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 22, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: selected ? palette.accent : palette.border, backgroundColor: hexToRgba(selected ? palette.accent : palette.ink, pressed ? 0.14 : 0.07) })}>
+  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ selected }} style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", paddingHorizontal: 12, paddingVertical: 8, borderRadius: layout.cardRadius, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: selected ? palette.accent : palette.border, backgroundColor: hexToRgba(selected ? palette.accent : palette.ink, pressed ? 0.14 : 0.07) })}>
     <Text style={{ color: selected ? palette.accentStrong : palette.soft, ...typeStyle(13, { weight: "600" }) }}>{title}</Text>
   </Pressable>
 }

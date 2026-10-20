@@ -434,7 +434,7 @@ function OperationLegend({ operations, isolated, colorMode, onIsolate, onColorMo
           accessibilityLabel={`${operation.name}${shown ? "" : ", hidden"}`}
           onPress={() => onIsolate(operation.index)}
           style={({ pressed }) => ({
-            minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, borderRadius: 22,
+            minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, borderRadius: layout.cardRadius,
             borderCurve: "continuous" as const, borderWidth: 0.5,
             borderColor: isolated === operation.index ? palette.accent : palette.border,
             backgroundColor: pressed ? hexToRgba(palette.ink, 0.09) : isolated === operation.index ? hexToRgba(palette.accent, 0.12) : "transparent",
