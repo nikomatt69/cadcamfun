@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { RefreshControl, Text, View } from "react-native"
 import { FlashList } from "@shopify/flash-list"
 import { Stack, useRouter } from "expo-router"
 import { ArrowUpRight, FolderOpen, Layers3, Plus, Search } from "lucide-react-native"
 import { useSyncExternalStore } from "react"
+import { useUIStore } from "@/lib/store"
 import { accountStore } from "@/lib/account"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { BottomSheet } from "@/components/ui/BottomSheet"
@@ -42,6 +43,10 @@ export default function ProjectsScreen() {
   )
   // The list spans every project, so no single project stream can keep it fresh.
   usePoll(() => void resource.reload(), 40_000, connectivity === "online")
+  // A project deleted on the desktop must not stay selected on the phone: follow the fresh list, never the saved copy.
+  useEffect(() => {
+    if (resource.data && !resource.stale && !resource.error) useUIStore.getState().forgetMissingProjects(resource.data.map((project) => project.id))
+  }, [resource.data, resource.stale, resource.error])
   const projects = resource.data ?? []
   const list = useMemo(() => [...projects]
     .filter((project) => `${project.name} ${project.description ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))

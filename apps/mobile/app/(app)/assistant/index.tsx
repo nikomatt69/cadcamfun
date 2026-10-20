@@ -154,6 +154,11 @@ export default function AssistantScreen() {
     "assistant:projects",
   )
 
+  // A project deleted on the desktop must not stay selected on the phone: follow the fresh list, never the saved copy.
+  useEffect(() => {
+    if (projects.data && !projects.stale && !projects.error) useUIStore.getState().forgetMissingProjects(projects.data.map((project) => project.id))
+  }, [projects.data, projects.stale, projects.error])
+
   // Cancelled on unmount and when the pairing changes, so another desktop's roster never lands here.
   const agents = useResource(
     useCallback((signal) => (client ? client.agents(signal) : Promise.reject(new Error("Not connected"))), [client]),
