@@ -2,7 +2,13 @@ import { useCallback, useMemo, useState } from "react"
 import { RefreshControl, Text, View } from "react-native"
 import { FlashList } from "@shopify/flash-list"
 import { Stack, useRouter } from "expo-router"
-import { ArrowUpRight, FolderOpen, Layers3, Search } from "lucide-react-native"
+import { ArrowUpRight, FolderOpen, Layers3, Plus, Search } from "lucide-react-native"
+import { useSyncExternalStore } from "react"
+import { accountStore } from "@/lib/account"
+import { ActionButton } from "@/components/ui/ActionButton"
+import { BottomSheet } from "@/components/ui/BottomSheet"
+import { TextField } from "@/components/ui/TextField"
+import { toast } from "@/components/ui/ToastHost"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
 import { usePoll } from "@/lib/use-poll"
@@ -24,9 +30,15 @@ export default function ProjectsScreen() {
   const { gutter, fontScale, onLayout } = useContentLayout()
   const router = useRouter()
   const [query, setQuery] = useState("")
+  const account = useSyncExternalStore(accountStore.subscribe, accountStore.account)
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [newDescription, setNewDescription] = useState("")
+  const [createBusy, setCreateBusy] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const resource = useResource(
     useCallback((signal) => client ? client.projects(signal) : Promise.reject(new Error("Not connected")), [client]), "projects",
-    { cacheKey: `projects:${config?.fingerprint ?? ""}` },
+    { cacheKey: `projects:${config?.fingerprint ?? ""}:${account?.subject ?? "local"}` },
   )
   // The list spans every project, so no single project stream can keep it fresh.
   usePoll(() => void resource.reload(), 40_000, connectivity === "online")
@@ -35,7 +47,35 @@ export default function ProjectsScreen() {
     .filter((project) => `${project.name} ${project.description ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()), [resource.data, query])
 
+  const create = async () => {
+    if (!client || !newName.trim()) return
+    setCreateBusy(true)
+    setCreateError(null)
+    try {
+      const project = await client.createProject(newName.trim(), newDescription.trim() || undefined)
+      haptic("success")
+      setCreating(false)
+      setNewName("")
+      setNewDescription("")
+      void resource.reload()
+      router.push(`/projects/${project.id}`)
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "Could not create the project")
+      toast("Could not create the project", "error")
+    } finally {
+      setCreateBusy(false)
+    }
+  }
+
   return <>
+    <BottomSheet open={creating} onClose={() => setCreating(false)} title="New project">
+      <View style={{ paddingHorizontal: 20, gap: 12 }}>
+        <TextField label="Name" value={newName} onChangeText={setNewName} placeholder="Gripper assembly" editable={!createBusy} />
+        <TextField label="Description" value={newDescription} onChangeText={setNewDescription} placeholder="Optional" editable={!createBusy} />
+        {createError ? <ErrorBanner message={createError} /> : null}
+        <ActionButton label="Create project" loading={createBusy} disabled={createBusy || !newName.trim()} onPress={() => void create()} />
+      </View>
+    </BottomSheet>
     <Stack.Screen options={{ title: "Projects", headerSearchBarOptions: {
       placeholder: "Search projects", hideWhenScrolling: false,
       onChangeText: (event) => setQuery(event.nativeEvent.text), onCancelButtonPress: () => setQuery(""),
@@ -55,7 +95,9 @@ export default function ProjectsScreen() {
             </View>
           </View>
           <Text style={{ marginTop: 14, color: palette.soft, fontSize: 14, lineHeight: 21 }}>Review designs, inspect toolpaths and move work forward with your assistant.</Text>
-          <View style={{ paddingTop: 14, alignItems: "flex-start" }}><Pill>{projects.length} {projects.length === 1 ? "project" : "projects"}</Pill></View>
+          <View style={{ paddingTop: 14, gap: 12, alignItems: "flex-start" }}>
+            <ActionButton label="New project" icon={<Plus size={19} color={palette.onAccent} />} fullWidth={false} onPress={() => { haptic("selection"); setCreating(true) }} />
+            <Pill>{projects.length} {projects.length === 1 ? "project" : "projects"}</Pill></View>
         </SurfaceCard>
         {resource.error ? <ErrorBanner message={resource.stale ? `Showing saved projects. ${resource.error}` : resource.error} actionLabel="Try again" onAction={() => void resource.reload()} /> : null}
         <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", columnGap: 12, rowGap: 4 }}>
@@ -64,7 +106,7 @@ export default function ProjectsScreen() {
         </View>
       </View>}
       ListEmptyComponent={resource.loading && !resource.data ? <View style={{ gap: 12 }}>{[0, 1, 2].map((key) => <Skeleton key={key} style={{ height: 144, borderRadius: 22 }} />)}</View> : !resource.error ?
-        <EmptyState title={query ? "No matching projects" : "Your workspace starts here"} description={query ? "Try another project name or description." : "Create a project on your Mac. Its designs, history and reviews will appear here."} icon={query ? <Search size={25} color={palette.accent} /> : <FolderOpen size={25} color={palette.accent} />} /> : null}
+        <EmptyState title={query ? "No matching projects" : "Your workspace starts here"} description={query ? "Try another project name or description." : "Tap New project to create one. Its designs, history and reviews will appear here."} icon={query ? <Search size={25} color={palette.accent} /> : <FolderOpen size={25} color={palette.accent} />} /> : null}
       ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
       renderItem={({ item }) => <PressableScale subtle tint accessibilityLabel={`Open project ${item.name}`}
         onPress={() => { haptic("selection"); router.push(`/projects/${item.id}`) }}

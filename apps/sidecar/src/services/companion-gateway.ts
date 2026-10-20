@@ -110,7 +110,8 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["GET"], path: /^\/api\/health$/ },
   { methods: ["GET"], path: /^\/api\/auth\/get-session$/ },
   // Project list + single-project read so the phone can show a richer header (description, owner, org).
-  { methods: ["GET"], path: /^\/api\/projects$/ },
+  // Creating a project from the phone: the new project belongs to the signed-in account and starts with its own repository.
+  { methods: ["GET", "POST"], path: /^\/api\/projects$/ },
   { methods: ["GET"], path: /^\/api\/projects\/[^/]+$/ },
   // Read-only workspace: summaries, meshes and toolpath polylines. The stored CAD document and every write stay off the phone.
   { methods: ["GET"], path: /^\/api\/projects\/[^/]+\/workspace(?:\/[^/]+)*$/ },

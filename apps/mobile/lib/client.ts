@@ -166,6 +166,8 @@ export class CompanionClient {
 
   health = (signal?: AbortSignal) => this.request<{ status?: string }>("GET", "/api/health", undefined, signal)
   projects = (signal?: AbortSignal) => this.request<ProjectSummary[]>("GET", "/api/projects", undefined, signal)
+  createProject = (name: string, description?: string) =>
+    this.request<ProjectSummary>("POST", "/api/projects", { name, ...(description ? { description } : {}) })
   project = (id: string, signal?: AbortSignal) => this.request<ProjectSummary>("GET", this.projectPath(id), undefined, signal)
 
   // ── Workspace preview (read-only meshes, G-code and library) ────────────

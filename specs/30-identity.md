@@ -29,3 +29,5 @@ Owner-requested domain migration applies repository-wide: `cadcam.fun` is the ca
 - Deployment follow-up: exclude serialized DocViewer3D scene data from Tailwind class scanning; this does not alter rendered geometry and prevents the site build from stalling before Cloudflare deployment.
 
 - 2026-10-16: owner consolidated the website on the apex domain; removed separate documentation and site subdomains from Worker routing and identity CORS.
+
+- 2026-10-20: the first identity account that signs in on an installation adopts the installation's local profile (reaching sign-in already needs the desktop's own token), so projects created locally belong to that account on desktop and phone; an adopted-before-this-change empty identity user is moved onto the local profile. Later accounts still get separate users and email never links accounts. The companion gateway now also allows `POST /api/projects`, so the phone can create projects owned by the signed-in account.

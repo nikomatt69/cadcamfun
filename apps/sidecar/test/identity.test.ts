@@ -35,9 +35,17 @@ describe("CADCAMFUN identity account mapping", () => {
     const mobile = await session(await token("cadcamfun-account-1", { client_id: "cadcamfun-mobile" }))
     expect(desktop.status).toBe(200)
     expect(mobile.status).toBe(200)
-    expect(desktop.body.session.user.email).toBe("identity@example.com")
+    expect(desktop.body.session.user.email).toBe("local@cadcamfun.local")
     expect(mobile.body.session.user.id).toBe(desktop.body.session.user.id)
-    expect((await session()).body.session.user.id).not.toBe(desktop.body.session.user.id)
+    // The first account adopts the installation's local profile, so the projects already on this Mac are its projects.
+    expect((await session()).body.session.user.id).toBe(desktop.body.session.user.id)
+  })
+
+  test("a second account on the same installation gets its own empty user", async () => {
+    const first = await session(await token("cadcamfun-account-1"))
+    const second = await session(await token("cadcamfun-account-2", { email: "second@example.com" }))
+    expect(second.status).toBe(200)
+    expect(second.body.session.user.id).not.toBe(first.body.session.user.id)
   })
 
   test("does not take over an existing account based on email alone", async () => {

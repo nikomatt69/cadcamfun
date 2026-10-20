@@ -140,7 +140,8 @@ describe("companion gateway", () => {
 
   test("route policy", () => {
     expect(isCompanionRoute("GET", "/api/projects")).toBe(true)
-    expect(isCompanionRoute("POST", "/api/projects")).toBe(false)
+    expect(isCompanionRoute("POST", "/api/projects")).toBe(true)
+    expect(isCompanionRoute("DELETE", "/api/projects/x")).toBe(false)
     expect(isCompanionRoute("GET", "/api/projects/x/vcs/log")).toBe(true)
     expect(isCompanionRoute("GET", "/api/projects/x/../../billing")).toBe(false)
     // GitHub sync needs the owner's GitHub token and is desktop-only.
