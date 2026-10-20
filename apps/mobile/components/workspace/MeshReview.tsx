@@ -4,6 +4,7 @@ import { Box, Check, Sparkles } from "lucide-react-native"
 import type { MeshPart, MeshPreview, PreviewFeatureTree, PreviewParameter } from "@cadcamfun/api"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { useTheme } from "@/lib/theme"
+import { type } from "@/lib/typography"
 import { haptic } from "@/lib/haptics"
 import { previewHeight, layout } from "@/lib/layout"
 import { formatSize, partBounds } from "@/lib/preview-sim"
@@ -59,7 +60,7 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, f
   }, [selectedPartId])
 
   const viewport = mesh ? <PreviewViewport bounds={mesh.bounds} revision={mesh.revision} mesh={mesh} selectedPartId={selectedPartId} fullscreenTitle={title ?? "Design"}
-    fullscreenFooter={selectedPart ? <Text numberOfLines={2} style={{ color: palette.soft, fontSize: 13, lineHeight: 19 }}>
+    fullscreenFooter={selectedPart ? <Text numberOfLines={2} style={{ color: palette.soft, fontVariant: ["tabular-nums"], ...type(13) }}>
       <Text style={{ color: palette.ink, fontWeight: "600" }}>{selectedPart.name || selectedPart.id}</Text>{selectedSize ? ` · ${selectedSize}` : ""}
     </Text> : undefined}
     accessibilityLabel="Design preview" accessibilityHint="Drag to orbit. Pinch to zoom. Tap an element to select it, double tap to frame it."
@@ -79,13 +80,13 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, f
       contentContainerStyle={{ paddingHorizontal: split ? 16 : gutter, paddingTop: 12, paddingBottom: 16 }}
       ListHeaderComponent={<View>
         {!split && (mesh || loading) ? <View style={{ height: previewHeight(height, fontScale, "mesh"), ...frame }}>{viewport}</View> : null}
-        {mesh ? <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, paddingTop: split ? 0 : 10, fontVariant: ["tabular-nums"] }}>
+        {mesh ? <Text selectable style={{ color: palette.muted, paddingTop: split ? 0 : 10, fontVariant: ["tabular-nums"], ...type(12) }}>
           <Text style={{ color: palette.ink, fontWeight: "600" }}>{formatSize(mesh.bounds)}</Text> · {parts.length.toLocaleString("en")} {parts.length === 1 ? "element" : "elements"} · {triangles.toLocaleString("en")} triangles
           {selectedPart ? `\nSelected ${selectedPart.name || selectedPart.id}${selectedSize ? ` · ${selectedSize}` : ""}` : ""}
         </Text> : null}
-        {mesh && loading ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted, fontSize: 12, lineHeight: 18, paddingTop: 4 }}>Updating to the latest desktop revision…</Text> : null}
+        {mesh && loading ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted, paddingTop: 4, ...type(12) }}>Updating to the latest desktop revision…</Text> : null}
         {error ? <View style={{ paddingTop: 12 }}><ErrorBanner message={error} actionLabel="Retry" onAction={onRetry} /></View> : null}
-        {mesh?.truncated ? <Text style={{ color: palette.warning, fontSize: 13, lineHeight: 20, paddingTop: 12 }}>Showing a simplified preview to keep navigation responsive.</Text> : null}
+        {mesh?.truncated ? <Text style={{ color: palette.warning, paddingTop: 12, ...type(13) }}>Showing a simplified preview to keep navigation responsive.</Text> : null}
         {parameters?.length ? <>
           <SectionHeader padded={false}>Parameters</SectionHeader>
           <SurfaceCard inset={false}>{parameters.map((parameter, index) => <View key={parameter.key}>
@@ -102,7 +103,7 @@ export function MeshReview({ title, mesh, loading, error, onRetry, parameters, f
       ListEmptyComponent={loading && !mesh ? <View style={{ gap: 12 }}>{[0, 1].map((key) => <Skeleton key={key} style={{ height: 74 }} />)}</View> : !error ?
         <EmptyState title={mesh ? "No solid elements" : "No preview available"} description="Solid geometry from your desktop will appear here." icon={<Box size={25} color={palette.accent} />} /> : null}
       ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-      renderItem={({ item }) => <SurfaceCard inset={false}>
+      renderItem={({ item }) => <SurfaceCard inset={false} style={item.id === selectedPartId ? { borderColor: palette.accent, borderWidth: 1 } : undefined}>
         <PartRow part={item} selected={item.id === selectedPartId} onPress={() => { haptic("selection"); onSelectPart(item.id === selectedPartId ? undefined : item.id) }} />
       </SurfaceCard>}
     />
@@ -131,7 +132,7 @@ function FeatureTree({ tree }: { tree: PreviewFeatureTree }) {
   const { palette } = useTheme()
   return <SurfaceCard inset={false}>
     <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
-      <Text style={{ color: palette.ink, fontSize: 14, fontWeight: "600" }}>{tree.name}</Text>
+      <Text style={{ color: palette.ink, ...type(14, { weight: "600" }) }}>{tree.name}</Text>
     </View>
     {tree.features.map((feature, index) => <View key={feature.id}>
       {index ? <Divider inset={16} /> : null}

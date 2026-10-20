@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import type { PreviewMachine, PreviewOperation } from "@cadcamfun/api"
-import { useTheme } from "@/lib/theme"
+import { hexToRgba, useTheme } from "@/lib/theme"
 import { Box, Focus, Grid3x3, Maximize2, Minus, PenLine, Plus, X } from "lucide-react-native"
 import { AdaptiveBlur } from "@/components/GlassView"
 import { haptic } from "@/lib/haptics"
@@ -181,15 +181,15 @@ export function PreviewViewport(props: PreviewViewportProps) {
     {fullscreenTitle !== undefined ? <Modal visible={fullscreen} animationType="slide" presentationStyle="fullScreen" supportedOrientations={["portrait", "landscape"]}
       onRequestClose={() => setFullscreen(false)}>
       <SafeAreaView edges={["top", "bottom", "left", "right"]} style={{ flex: 1, backgroundColor: palette.background }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 20, paddingRight: 8, minHeight: layout.touchTarget + 8 }}>
-          <Text accessibilityRole="header" numberOfLines={1} style={{ flex: 1, color: palette.ink, fontSize: 17, fontWeight: "600" }}>{fullscreenTitle}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: layout.gutter, paddingRight: 8, minHeight: layout.touchTarget + 8 }}>
+          <Text accessibilityRole="header" numberOfLines={1} style={{ flex: 1, minWidth: 0, color: palette.ink, ...type(17, { weight: "600" }) }}>{fullscreenTitle}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Close full-screen viewer" onPress={() => { haptic("selection"); setFullscreen(false) }}
             style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
             <X size={22} color={palette.ink} />
           </Pressable>
         </View>
         <View style={{ flex: 1 }}>{fullscreen ? <Viewport {...props} {...display} prepared={prepared} /> : null}</View>
-        {fullscreenFooter ? <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6, borderTopWidth: 0.5, borderTopColor: palette.border }}>{fullscreenFooter}</View> : null}
+        {fullscreenFooter ? <View style={{ paddingHorizontal: layout.gutter, paddingTop: 12, paddingBottom: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border }}>{fullscreenFooter}</View> : null}
       </SafeAreaView>
     </Modal> : null}
   </>
@@ -559,17 +559,23 @@ function Viewport({
           onError={(event) => setGpuError(event.nativeEvent.message)}
         />
       ) : null}
-      {!failed ? <View pointerEvents="none" accessibilityElementsHidden style={{ position: "absolute", left: 12, right: 12, bottom: 10, flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
-        <Text numberOfLines={2} style={{ flex: 1, color: palette.muted, ...type(11) }}>
-          {viewLabel ? `${viewLabel} · ` : ""}Drag to orbit · pinch to zoom · double tap to frame
-        </Text>
-        <Text numberOfLines={1} style={{ color: selectedBounds ? palette.accent : palette.soft, fontVariant: ["tabular-nums"], ...type(11), fontWeight: "600" }}>
-          {sizeLabel}
-        </Text>
+      {!failed ? <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ position: "absolute", left: 10, right: 10, bottom: 10, flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
+        {/* A scrim behind each readout: the scene under it can be any colour, light or dark. */}
+        <View style={{ flexShrink: 1, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderCurve: "continuous", backgroundColor: hexToRgba(palette.background, 0.78) }}>
+          <Text numberOfLines={2} style={{ color: palette.soft, ...type(11) }}>
+            {viewLabel ? `${viewLabel} · ` : ""}Drag to orbit · pinch to zoom · double tap to frame
+          </Text>
+        </View>
+        <View style={{ flexGrow: 1 }} />
+        <View style={{ flexShrink: 0, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderCurve: "continuous", backgroundColor: hexToRgba(palette.background, 0.78) }}>
+          <Text numberOfLines={1} style={{ color: selectedBounds ? palette.accentStrong : palette.soft, fontVariant: ["tabular-nums"], ...type(11, { weight: "600" }) }}>
+            {sizeLabel}
+          </Text>
+        </View>
       </View> : null}
       {failed ? (
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", padding: 24 }]}>
-          <Text accessibilityLiveRegion="polite" style={{ color: palette.soft, textAlign: "center" }}>
+          <Text accessibilityLiveRegion="polite" style={{ color: palette.soft, textAlign: "center", ...type(14) }}>
             {failed}
           </Text>
         </View>
@@ -579,8 +585,8 @@ function Viewport({
       <AdaptiveBlur tint={isDark ? "dark" : "light"} fallbackColor={glass.shellStrong} opaqueFallbackColor={palette.surface}
         style={{ position: "absolute", top: 10, left: 10, flexDirection: "row", borderRadius: layout.controlRadius, borderCurve: "continuous", overflow: "hidden" }}>
         {toggles.map(({ id, label, Icon, on, toggle }) => <Pressable key={id} accessibilityRole="switch" accessibilityLabel={`Show ${label.toLowerCase()}`} accessibilityState={{ checked: on }}
-          onPress={() => { haptic("selection"); toggle() }} style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : on ? 1 : 0.45 })}>
-          <Icon size={18} color={on ? palette.accent : palette.ink} />
+          onPress={() => { haptic("selection"); toggle() }} style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
+          <Icon size={18} color={on ? palette.accentStrong : palette.muted} />
         </Pressable>)}
       </AdaptiveBlur>
       <AdaptiveBlur tint={isDark ? "dark" : "light"} fallbackColor={glass.shellStrong} opaqueFallbackColor={palette.surface}

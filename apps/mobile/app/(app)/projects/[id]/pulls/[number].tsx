@@ -21,8 +21,11 @@ import { PageScroll } from "@/components/layout/page-scroll"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { conflictSummary, conflictsOf, type VcsConflict } from "@/lib/vcs-conflicts"
 import { errorMessage } from "@/lib/throttle"
+import { Divider } from "@/components/ui/SectionHeader"
+import { caps, mono, type } from "@/lib/typography"
 
 const STATE_TONE: Record<string, PillTone> = { open: "accent", merged: "success", closed: "neutral" }
+const STATE_LABEL: Record<string, string> = { open: "Open", merged: "Merged", closed: "Closed" }
 
 const VERDICT_LABEL: Record<ReviewRow["verdict"], string> = {
   approve: "Approved",
@@ -136,19 +139,19 @@ export default function PullRequestScreen() {
               <SurfaceCard inset={false}>
                 <View style={{ padding: 18, gap: 10 }}>
                   <View style={{ flexDirection: stacked ? "column" : "row", alignItems: stacked ? "flex-start" : "center", gap: 10 }}>
-                    <Text selectable style={{ color: palette.ink, fontSize: 22, lineHeight: 28, fontWeight: "700", letterSpacing: -0.5, flexShrink: 1, minWidth: 0 }} >
+                    <Text selectable accessibilityRole="header" style={{ color: palette.ink, flexShrink: 1, minWidth: 0, ...type(22, { weight: "700" }) }}>
                       {pullRequest.title}
                     </Text>
-                    <Pill tone={stateTone}>{pullRequest.state}</Pill>
+                    <Pill tone={stateTone}>{STATE_LABEL[pullRequest.state] ?? pullRequest.state}</Pill>
                   </View>
-                  <Text selectable style={{ color: palette.soft, fontSize: 13, lineHeight: 18, fontFamily: "Menlo" }}>
+                  <Text selectable style={{ color: palette.soft, ...mono(13) }}>
                     {pullRequest.head} → {pullRequest.base}
                   </Text>
-                  <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18 }}>
+                  <Text style={{ color: palette.muted, ...type(13) }}>
                     {pullRequest.authorKind === "ai" ? "Proposed by the AI" : "Opened by you"} · {relativeTime(pullRequest.createdAt)}
                   </Text>
                   {pullRequest.body ? (
-                    <Text selectable style={{ color: palette.ink, fontSize: 14, lineHeight: 20, paddingTop: 4 }}>{pullRequest.body}</Text>
+                    <Text selectable style={{ color: palette.ink, paddingTop: 4, ...type(14) }}>{pullRequest.body}</Text>
                   ) : null}
                 </View>
               </SurfaceCard>
@@ -157,17 +160,17 @@ export default function PullRequestScreen() {
               {conflicts.length > 0 ? (
                 <SurfaceCard inset={false}>
                   <View style={{ padding: 16, gap: 10 }}>
-                    <Text accessibilityRole="header" style={{ color: palette.danger, fontSize: 13, lineHeight: 18, fontWeight: "700", letterSpacing: 0.6 }}>
-                      MERGE CONFLICTS
+                    <Text accessibilityRole="header" style={{ color: palette.danger, ...caps(12, { weight: "700" }) }}>
+                      Merge conflicts
                     </Text>
-                    <Text style={{ color: palette.soft, fontSize: 14, lineHeight: 20 }}>
+                    <Text style={{ color: palette.soft, ...type(14) }}>
                       These files changed on both sides. Settle them on the desktop, then merge again.
                     </Text>
                     {conflicts.map((conflict) => (
                       <View key={conflict.path} style={{ gap: 3 }}>
-                        <Text selectable style={{ color: palette.ink, fontFamily: "Menlo", fontSize: 13, lineHeight: 19 }}>{conflict.path}</Text>
+                        <Text selectable style={{ color: palette.ink, ...mono(13) }}>{conflict.path}</Text>
                         {conflict.pointers.length > 0 ? (
-                          <Text selectable style={{ color: palette.muted, fontFamily: "Menlo", fontSize: 12, lineHeight: 17 }}>{conflict.pointers.join("  ")}</Text>
+                          <Text selectable style={{ color: palette.muted, ...mono(12) }}>{conflict.pointers.join("  ")}</Text>
                         ) : null}
                       </View>
                     ))}
@@ -178,18 +181,18 @@ export default function PullRequestScreen() {
               {/* Reviews */}
               {(pull.data?.reviews ?? []).length > 0 ? (
                 <SurfaceCard inset={false}>
-                  <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 }}>
-                    <Text accessibilityRole="header" style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textTransform: "uppercase", fontWeight: "600", letterSpacing: 0.6 }}>
+                  <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 }}>
+                    <Text accessibilityRole="header" style={{ color: palette.muted, ...caps(12) }}>
                       Reviews
                     </Text>
                   </View>
                   {pull.data?.reviews.map((review, index) => (
                     <View key={review.id}>
-                      {index > 0 ? <View style={{ height: 0.5, marginLeft: 14, backgroundColor: palette.border }} /> : null}
-                      <View style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 3 }}>
+                      {index > 0 ? <Divider inset={16} /> : null}
+                      <View style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 6 }}>
                         <Pill tone={VERDICT_TONE[review.verdict]}>{VERDICT_LABEL[review.verdict]}</Pill>
-                        {review.body ? <Text style={{ color: palette.soft, fontSize: 13, lineHeight: 18 }}>{review.body}</Text> : null}
-                        <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 16 }}>{relativeTime(review.createdAt)}</Text>
+                        {review.body ? <Text selectable style={{ color: palette.soft, ...type(14) }}>{review.body}</Text> : null}
+                        <Text style={{ color: palette.muted, ...type(12) }}>{relativeTime(review.createdAt)}</Text>
                       </View>
                     </View>
                   ))}
@@ -219,7 +222,7 @@ export default function PullRequestScreen() {
                     <View style={{ flex: stacked ? undefined : 1 }}>
                       <ActionButton label="Request changes" fullWidth
                         variant="danger"
-                        loading={busy === "Changes"}
+                        loading={busy === "Request changes"}
                         disabled={busy !== null}
                         onPress={() => {
                           haptic("selection")
@@ -235,7 +238,7 @@ export default function PullRequestScreen() {
                     disabled={busy !== null || blocked}
                     onPress={confirmMerge} />
                   {blocked ? (
-                    <Text style={{ color: palette.danger, fontSize: 13, lineHeight: 18, textAlign: "center" }}>
+                    <Text accessibilityRole="alert" style={{ color: palette.danger, textAlign: "center", ...type(13) }}>
                       A review requested changes — the merge stays blocked until a new review approves.
                     </Text>
                   ) : null}
@@ -245,13 +248,13 @@ export default function PullRequestScreen() {
 
               {/* Changes */}
               <View style={{ gap: 8 }}>
-                <Text accessibilityRole="header" style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textTransform: "uppercase", fontWeight: "600", letterSpacing: 0.6 }}>
+                <Text accessibilityRole="header" style={{ color: palette.muted, paddingHorizontal: 4, ...caps(12) }}>
                   Changes
                 </Text>
                 {pull.data && pull.data.changes.length > 0 ? (
                   <DiffView changes={pull.data.changes} />
                 ) : (
-                  <Text style={{ color: palette.muted, fontSize: 14, lineHeight: 20, textAlign: "center", paddingVertical: 16 }}>No content changes</Text>
+                  <Text style={{ color: palette.muted, textAlign: "center", paddingVertical: 16, ...type(14) }}>No content changes</Text>
                 )}
               </View>
             </>
@@ -263,7 +266,7 @@ export default function PullRequestScreen() {
         <View style={{ paddingHorizontal: 20, gap: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <MessageSquare size={15} color={palette.muted} />
-            <Text style={{ flex: 1, color: palette.soft, fontSize: 13, lineHeight: 18 }}>Shown to everyone who can review this pull request</Text>
+            <Text style={{ flex: 1, color: palette.soft, ...type(13) }}>Shown to everyone who can review this pull request</Text>
           </View>
           <TextField
             value={commentBody}
@@ -275,9 +278,9 @@ export default function PullRequestScreen() {
           />
           <ActionButton label="Submit" fullWidth disabled={commentBody.trim().length === 0 || busy !== null}
             variant={commentVerdict === "request-changes" ? "danger" : "primary"}
-            loading={busy === "Comment"}
+            loading={busy === (commentVerdict === "request-changes" ? "Request changes" : "Comment")}
             onPress={() => {
-              void act("Comment", async () => {
+              void act(commentVerdict === "request-changes" ? "Request changes" : "Comment", async () => {
                 await client.review(id, Number(number), commentVerdict, commentBody.trim())
                 setCommentOpen(false)
               })

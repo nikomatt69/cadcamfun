@@ -635,8 +635,8 @@ export default function AssistantScreen() {
         </PressableScale>
       </View>
 
-      {!online ? <LinkStrip offline text="Desktop offline. New messages wait on this iPhone and send when it reconnects." />
-        : link === "reconnecting" && !busy ? <LinkStrip text="Reconnecting to the conversation…" /> : null}
+      {!online ? <LinkStrip gutter={content.gutter} offline text="Desktop offline. New messages wait on this iPhone and send when it reconnects." />
+        : link === "reconnecting" && !busy ? <LinkStrip gutter={content.gutter} text="Reconnecting to the conversation…" /> : null}
 
       {/* The roster could not be read: the assistant still runs, but the phone cannot show which agent it picked. */}
       {agents.error ? (
@@ -646,7 +646,7 @@ export default function AssistantScreen() {
       ) : null}
 
       {/* Transcript */}
-      {log.length === 0 ? (
+      {transcript.length === 0 ? (
         <ScrollView
           style={{ flex: 1 }}
           contentInsetAdjustmentBehavior="never"
@@ -658,7 +658,7 @@ export default function AssistantScreen() {
             <EmptyState title="What are we working on?" description="Choose a workspace to review designs, inspect manufacturing paths or prepare your next change." icon={<Sparkles size={26} color={palette.accent} />} action={<ActionButton label="Choose a project" onPress={() => setPickerOpen(true)} />} />
           ) : (
             <View style={{ alignItems: "center", gap: 18 }}>
-              <View style={{ width: 58, height: 58, borderRadius: 19, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: `${palette.accent}18` }}>
+              <View style={{ width: 58, height: 58, borderRadius: 19, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.accent, 0.1) }}>
                 <Sparkles size={27} color={palette.accent} strokeWidth={1.9} />
               </View>
               <View style={{ alignItems: "center", gap: 7 }}>
@@ -667,7 +667,7 @@ export default function AssistantScreen() {
                   Turn an idea into a reviewed change. Your assistant works with the tools and context on your desktop.
                 </Text>
                 {ai?.tools?.length ? (
-                  <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 16 }}>{ai.tools.length} desktop tools available</Text>
+                  <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 17 }}>{ai.tools.length} desktop tools available</Text>
                 ) : null}
               </View>
               <View style={{ alignSelf: "stretch", gap: 8 }}>
@@ -722,7 +722,7 @@ export default function AssistantScreen() {
                 accessibilityLabel="Load older messages"
                 style={{ minHeight: 44, alignItems: "center", justifyContent: "center", marginBottom: 12 }}
               >
-                <Text style={{ color: palette.accent, fontSize: 13, fontWeight: "600" }}>{loadingOlder ? "Loading…" : "Load older messages"}</Text>
+                <Text style={{ color: palette.accent, fontSize: 13, lineHeight: 18, fontWeight: "600" }}>{loadingOlder ? "Loading…" : "Load older messages"}</Text>
               </PressableScale>
             ) : null}
           />
@@ -807,24 +807,25 @@ export default function AssistantScreen() {
                   setAgentPickerOpen(false)
                 }}
                 accessibilityRole="button"
+                accessibilityLabel={`${agent.title}, ${agent.edits ? "can edit" : "read only"}`}
                 accessibilityState={{ selected }}
-                style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 64, borderRadius: 18, borderCurve: "continuous", borderWidth: 0.5, borderColor: selected ? palette.accent : palette.border, backgroundColor: selected ? `${palette.accent}14` : palette.surface, padding: 16 }}
+                style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 64, borderRadius: 18, borderCurve: "continuous", borderWidth: 0.5, borderColor: selected ? palette.accent : palette.border, backgroundColor: selected ? hexToRgba(palette.accent, 0.08) : palette.surface, padding: 16 }}
               >
-                <View style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 12, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: selected ? `${palette.accent}1F` : palette.panel }}>
+                <View style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 12, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: selected ? hexToRgba(palette.accent, 0.12) : palette.panel }}>
                   {agent.id === "general" ? <Sparkles size={17} color={selected ? palette.accent : palette.soft} /> : <Bot size={17} color={selected ? palette.accent : palette.soft} />}
                 </View>
                 <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7 }}>
                     <Text style={{ flexShrink: 1, color: palette.ink, fontSize: 16, lineHeight: 23, fontWeight: "600" }}>{agent.title}</Text>
-                    <Text style={{ color: agent.edits ? palette.warning : palette.muted, fontSize: 10, lineHeight: 13, fontWeight: "700", letterSpacing: 0.5 }}>{agent.edits ? "CAN EDIT" : "READ ONLY"}</Text>
+                    <Text style={{ color: agent.edits ? palette.warning : palette.muted, fontSize: 11, lineHeight: 15, fontWeight: "700", letterSpacing: 0.5 }}>{agent.edits ? "CAN EDIT" : "READ ONLY"}</Text>
                   </View>
-                  <Text selectable style={{ color: palette.soft, fontSize: 13, lineHeight: 18 }}>{agent.description}</Text>
-                  {agent.tools.length > 0 ? <Text selectable style={{ color: palette.muted, fontSize: 11, lineHeight: 15 }}>{agent.tools.length} scoped tools</Text> : null}
+                  <Text selectable style={{ color: palette.soft, fontSize: 13, lineHeight: 19 }}>{agent.description}</Text>
+                  {agent.tools.length > 0 ? <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 17 }}>{agent.tools.length} scoped tools</Text> : null}
                 </View>
               </PressableScale>
             )
           })}
-          {agents.loading && !agents.data ? <Text style={{ color: palette.muted, padding: 16, textAlign: "center" }}>Loading desktop agents…</Text> : null}
+          {agents.loading && !agents.data ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted, fontSize: 15, lineHeight: 21, padding: 16, textAlign: "center" }}>Loading desktop agents…</Text> : null}
           {agents.error ? <ErrorBanner message={agents.error} /> : null}
           {!agents.loading && !agents.error && agents.data?.length === 0 ? <EmptyState title="No agents available" description="Configure an assistant on your desktop to make it available here." /> : null}
         </View>
@@ -835,12 +836,12 @@ export default function AssistantScreen() {
 }
 
 /** One quiet line under the context bar: the conversation is not live, and what that means for a message sent now. */
-function LinkStrip({ text, offline = false }: { text: string; offline?: boolean }) {
+function LinkStrip({ text, gutter, offline = false }: { text: string; gutter: number; offline?: boolean }) {
   const { palette } = useTheme()
   const color = offline ? palette.warning : palette.muted
   return (
     <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={text}
-      style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginHorizontal: 16, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, borderCurve: "continuous", backgroundColor: hexToRgba(color, 0.1) }}>
+      style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginHorizontal: gutter, marginBottom: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderCurve: "continuous", backgroundColor: hexToRgba(color, 0.1) }}>
       {offline ? <CloudOff size={14} color={color} /> : <ActivityIndicator size="small" color={color} />}
       <Text style={{ flexShrink: 1, color: offline ? palette.ink : palette.soft, fontSize: 12, lineHeight: 17, fontWeight: "500" }}>{text}</Text>
     </View>

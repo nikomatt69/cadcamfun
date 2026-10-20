@@ -41,8 +41,8 @@ export const QuestionCard = memo(function QuestionCard({ row, onReply, onReject 
 
   return <SurfaceCard style={{ marginHorizontal: 16, marginVertical: 8 }}>
     <View style={{ gap: layout.gap }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
-        {row.answered ? <CheckCircle2 size={19} color={palette.success} /> : <MessageSquare size={19} color={palette.accent} />}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        {row.answered ? <CheckCircle2 size={19} color={palette.success} style={{ flexShrink: 0 }} /> : <MessageSquare size={19} color={palette.accent} style={{ flexShrink: 0 }} />}
         <Text style={{ flex: 1, minWidth: 0, color: palette.soft, fontSize: 12, lineHeight: 18, fontWeight: "600" }}>{row.answered ? "Response recorded" : "Your input is needed"}</Text>
       </View>
       {row.questions.map((question, index) => <View key={index} style={{ gap: 10 }}>
@@ -58,8 +58,8 @@ export const QuestionCard = memo(function QuestionCard({ row, onReply, onReject 
               accessibilityLabel={[option.label, option.description].filter(Boolean).join(". ")}
               accessibilityState={{ checked, disabled: busy !== null }}
               onPress={() => { haptic("selection"); dispatch({ type: "option", index, label: option.label }) }}
-              style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, minHeight: layout.touchTarget, padding: 14, borderRadius: layout.controlRadius, borderCurve: "continuous", borderWidth: 1, borderColor: checked ? palette.accent : palette.border, backgroundColor: checked ? hexToRgba(palette.accent, STATUS_FILL_ALPHA) : palette.surface }}>
-              <Indicator size={20} color={checked ? palette.accent : palette.muted} style={{ marginTop: 1 }} />
+              style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: layout.touchTarget, padding: 14, borderRadius: layout.controlRadius, borderCurve: "continuous", borderWidth: 1, borderColor: checked ? palette.accent : palette.border, backgroundColor: checked ? hexToRgba(palette.accent, STATUS_FILL_ALPHA) : palette.surface }}>
+              <Indicator size={20} color={checked ? palette.accent : palette.muted} style={{ marginTop: 1, flexShrink: 0 }} />
               <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
                 <Text style={{ color: palette.ink, fontSize: 15, lineHeight: 21, fontWeight: "600" }}>{option.label}</Text>
                 {option.description ? <Text style={{ color: palette.soft, fontSize: 13, lineHeight: 20 }}>{option.description}</Text> : null}

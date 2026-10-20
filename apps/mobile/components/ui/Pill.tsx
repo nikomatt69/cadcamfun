@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { Text, View } from "react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { STATUS_FILL_ALPHA } from "@/lib/palette"
+import { type } from "@/lib/typography"
 
 type Tone = "neutral" | "accent" | "success" | "danger" | "warning" | "info"
 
@@ -41,11 +42,12 @@ export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone
         paddingVertical: 2.5,
         borderRadius: 999,
         borderWidth: 0.5,
-        borderColor: color,
+        borderColor: tone === "neutral" ? palette.border : hexToRgba(color, 0.55),
+        borderCurve: "continuous",
         backgroundColor: hexToRgba(color, STATUS_FILL_ALPHA),
       }}
     >
-      <Text style={{ color, fontSize: 11, lineHeight: 15, fontWeight: "600", letterSpacing: 0.03 }}>{children}</Text>
+      <Text style={{ color, ...type(11, { weight: "600", leadingScale: 1.1 }) }}>{children}</Text>
     </View>
   )
 }

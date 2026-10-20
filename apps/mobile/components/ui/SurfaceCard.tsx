@@ -29,7 +29,7 @@ export function SurfaceCard({ eyebrow, title, description, footer, className, st
 
   const backgroundColor =
     tone === "panel" ? palette.panel : tone === "background" ? hexToRgba(palette.background, 0.9) : palette.surface
-  const borderColor = hexToRgba(palette.ink, 0.08)
+  const borderColor = palette.border
 
   return (
     <View
@@ -49,7 +49,7 @@ export function SurfaceCard({ eyebrow, title, description, footer, className, st
     >
       {eyebrow ? <Text selectable style={{ color: palette.accent, ...type(12, { weight: "600" }) }}>{eyebrow}</Text> : null}
       {title ? (
-        <Text selectable style={{ marginTop: eyebrow ? 6 : 0, color: palette.ink, ...type(compact ? 18 : 19, { weight: "600" }) }}>
+        <Text selectable accessibilityRole="header" style={{ marginTop: eyebrow ? 6 : 0, color: palette.ink, ...type(compact ? 18 : 19, { weight: "600" }) }}>
           {title}
         </Text>
       ) : null}

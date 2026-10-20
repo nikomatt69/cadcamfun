@@ -96,7 +96,7 @@ export function Composer({
   }
 
   return (
-    <View onLayout={content.onLayout} style={{ paddingHorizontal: content.gutter, paddingTop: 8, paddingBottom: 10, backgroundColor: "transparent" }}>
+    <View onLayout={content.onLayout} style={{ paddingHorizontal: content.gutter, paddingTop: 8, paddingBottom: 8, backgroundColor: "transparent" }}>
       {busy ? (
         <View style={{ minHeight: 24, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingBottom: 6 }}>
           <View style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 3, backgroundColor: stopping ? palette.danger : palette.warning }} />
@@ -133,12 +133,13 @@ export function Composer({
             >
               {attachments.map((attachment, index) => (
                 <View key={`${attachment.name}-${index}`} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 10, paddingRight: 4, paddingVertical: 5, borderRadius: 999, backgroundColor: hexToRgba(palette.accent, 0.12) }}>
-                  <Camera size={14} color={palette.accent} />
-                  <Text numberOfLines={1} style={{ maxWidth: 150, color: palette.soft, fontSize: 12, fontWeight: "600" }}>{attachment.name}</Text>
+                  <Camera size={14} color={palette.accent} style={{ flexShrink: 0 }} />
+                  <Text numberOfLines={1} style={{ maxWidth: 150, color: palette.soft, fontSize: 12, lineHeight: 16, fontWeight: "600" }}>{attachment.name}</Text>
                   <Pressable
                     onPress={() => { haptic("selection"); onRemoveAttachment?.(index) }}
                     accessibilityRole="button"
                     accessibilityLabel={`Remove ${attachment.name}`}
+                    hitSlop={8}
                     style={({ pressed }) => ({ width: 28, height: 28, alignItems: "center", justifyContent: "center", borderRadius: 14, opacity: pressed ? 0.6 : 1 })}
                   >
                     <X size={13} color={palette.muted} />
@@ -162,7 +163,7 @@ export function Composer({
                   placeholder={offline ? "Desktop offline · message waits to send" : busy ? "Steer the current turn…" : "Ask CADCAMFUN…"}
                   placeholderTextColor={palette.muted}
                   multiline
-                  editable
+                  scrollEnabled
                   accessibilityLabel="Message to CADCAMFUN assistant"
                   selectionColor={palette.accent}
                   keyboardAppearance={isDark ? "dark" : "light"}
@@ -178,7 +179,7 @@ export function Composer({
               <Pressable
                 onPressIn={stopScale.onPressIn}
                 onPressOut={stopScale.onPressOut}
-                onPress={onStop}
+                onPress={() => { haptic("light"); onStop() }}
                 disabled={stopping}
                 accessibilityRole="button"
                 accessibilityLabel={stopping ? "Stopping the desktop assistant" : "Stop the desktop assistant"}
@@ -227,7 +228,7 @@ export function Composer({
               <Pressable onPress={onAddAttachment} accessibilityRole="button" accessibilityLabel="Take a photo of the part" style={({ pressed }) => ({ minWidth: 44, minHeight: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.ink, pressed ? 0.13 : 0.06) })}><Camera size={19} color={palette.soft} /></Pressable>
             ) : null}
             <Pressable onPress={onOpenModels} accessibilityRole="button" accessibilityLabel={`Model: ${modelLabel}. Change provider, model or thinking effort`} style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 44, paddingHorizontal: 10, gap: 6, flexDirection: "row", alignItems: "center", borderRadius: 16, backgroundColor: pressed ? hexToRgba(palette.ink, 0.06) : "transparent" })}>
-              <Text numberOfLines={stacked ? undefined : 1} style={{ flexShrink: 1, color: palette.soft, fontSize: 12, fontWeight: "600" }}>{modelLabel}</Text><ChevronDown size={13} color={palette.muted} />
+              <Text numberOfLines={stacked ? undefined : 1} style={{ flexShrink: 1, color: palette.soft, fontSize: 12, lineHeight: 17, fontWeight: "600" }}>{modelLabel}</Text><ChevronDown size={13} color={palette.muted} style={{ flexShrink: 0 }} />
             </Pressable>
             <Pressable onPress={onOpenControls} accessibilityRole="button" accessibilityLabel={`Permissions: ${permissionLabel}`} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><Shield size={17} color={palette.muted} /></Pressable>
           </View>
@@ -236,7 +237,7 @@ export function Composer({
             horizontal
             showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ gap: 5, paddingHorizontal: 10, paddingVertical: 8 }}
+            contentContainerStyle={{ gap: 4, paddingHorizontal: 10, paddingVertical: 8 }}
           >
             {MODES.map((item) => {
               const active = item.value === mode
@@ -252,10 +253,11 @@ export function Composer({
                     haptic("selection")
                     onModeChange(item.value)
                   }}
+                  hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
                   style={({ pressed }) => ({
-                    minHeight: 44,
+                    minHeight: 32,
                     justifyContent: "center",
-                    paddingHorizontal: 11,
+                    paddingHorizontal: 12,
                     borderRadius: 999,
                     backgroundColor: active ? hexToRgba(palette.accent, 0.14) : pressed ? hexToRgba(palette.ink, 0.06) : "transparent",
                   })}

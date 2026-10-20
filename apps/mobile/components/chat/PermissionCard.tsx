@@ -33,15 +33,15 @@ export const PermissionCard = memo(function PermissionCard({ row, onReply }: {
   }
   return <SurfaceCard style={{ marginHorizontal: 16, marginVertical: 8 }}>
     <View style={{ gap: layout.gap }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
-        {row.answered ? <CheckCircle2 size={21} color={palette.success} /> : <ShieldAlert size={21} color={palette.warning} />}
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+        {row.answered ? <CheckCircle2 size={21} color={palette.success} style={{ flexShrink: 0 }} /> : <ShieldAlert size={21} color={palette.warning} style={{ flexShrink: 0 }} />}
         <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
-          <Text style={{ color: palette.muted, fontSize: 12, fontWeight: "600" }}>{row.answered ? "Decision recorded" : "Permission required"}</Text>
-          <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 17, lineHeight: 24, fontWeight: "600" }}>{row.permission.replaceAll("_", " ")}</Text>
+          <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 17, fontWeight: "600" }}>{row.answered ? "Decision recorded" : "Permission required"}</Text>
+          <Text accessibilityRole="header" selectable style={{ color: palette.ink, fontSize: 17, lineHeight: 24, fontWeight: "600" }}>{row.permission.replaceAll("_", " ")}</Text>
         </View>
       </View>
-      {row.patterns.length ? <View style={{ gap: 6, padding: 12, borderRadius: 12, backgroundColor: palette.background }}>
-        <Text style={{ color: palette.muted, fontSize: 12, fontWeight: "600" }}>Requested access</Text>
+      {row.patterns.length ? <View style={{ gap: 8, padding: 12, borderRadius: layout.controlRadius - 4, borderCurve: "continuous", backgroundColor: palette.background }}>
+        <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 17, fontWeight: "600" }}>Requested access</Text>
         {row.patterns.map((pattern, index) => <Text key={index} selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 19, fontFamily: "Menlo" }}>{pattern}</Text>)}
       </View> : null}
       {!row.answered ? <>

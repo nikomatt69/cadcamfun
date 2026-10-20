@@ -25,6 +25,8 @@ export type PressableScaleProps = Omit<PressableProps, "style" | "children"> &
     noScale?: boolean
     /** Dim the whole surface on press (buttons); rows only tint. */
     dim?: boolean
+    /** Opacity while disabled (default 0.45); a busy-but-not-dead control reads better closer to 1. */
+    disabledOpacity?: number
   }>
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
@@ -40,6 +42,7 @@ export function PressableScale({
   subtle = false,
   noScale = false,
   dim = false,
+  disabledOpacity = 0.45,
   ...rest
 }: PressableScaleProps) {
   const { palette } = useTheme()
@@ -52,7 +55,7 @@ export function PressableScale({
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.get() }],
-    opacity: disabled ? 0.45 : opacity.get(),
+    opacity: disabled ? disabledOpacity : opacity.get(),
   }))
 
   return (
@@ -61,6 +64,7 @@ export function PressableScale({
       pressRetentionOffset={12}
       hitSlop={4}
       disabled={disabled}
+      accessibilityState={{ disabled: Boolean(disabled) }}
       onPressIn={(event) => {
         onPressIn?.(event)
         if (!interactive) return

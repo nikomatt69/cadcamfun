@@ -8,6 +8,7 @@ import { useResource } from "@/lib/use-resource"
 import { useTheme } from "@/lib/theme"
 import { relativeTime } from "@/lib/format"
 import { filterEntries } from "@/lib/workspace-filter"
+import { type } from "@/lib/typography"
 import { ResourceList } from "@/components/ui/resource-list"
 import { RecordCard } from "@/components/ui/record-card"
 
@@ -37,7 +38,7 @@ export function EntryList({ client, projectId, revision, load, emptyTitle, empty
       emptyTitle={searching && total > 0 ? "No matches" : emptyTitle}
       emptyDescription={searching && total > 0 ? `Nothing named “${query.trim()}”. Try another word.` : emptyDescription}
       emptyIcon={searching && total > 0 ? <Search size={26} color={palette.accent} /> : <Box size={26} color={palette.accent} />}
-      header={total > 0 ? <Text style={{ color: palette.muted, fontSize: 13, fontVariant: ["tabular-nums"] }}>
+      header={total > 0 ? <Text accessibilityRole="summary" style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(13) }}>
         {searching ? `${entries?.length ?? 0} of ${total}` : `${total} ${total === 1 ? "item" : "items"}`} · Synced from your desktop
       </Text> : null}
       renderItem={({ item }) => <RecordCard title={item.name} subtitle={item.subtitle ?? undefined} meta={`Updated ${relativeTime(item.updatedAt)}`}

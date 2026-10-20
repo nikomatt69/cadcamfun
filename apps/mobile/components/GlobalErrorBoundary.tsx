@@ -6,6 +6,8 @@ import * as Clipboard from "expo-clipboard"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { useTheme } from "@/lib/theme"
+import { type } from "@/lib/typography"
+import { layout } from "@/lib/layout"
 
 const MAX_RESTARTS = 3
 
@@ -23,13 +25,13 @@ function CrashFallback({ message, restartCount, onRestart, details }: { message:
   const { palette } = useTheme()
   const [copied, setCopied] = React.useState(false)
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: palette.background, paddingHorizontal: 24, gap: 16 }}>
-      <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 20, lineHeight: 26, fontWeight: "700", textAlign: "center" }}>Something went wrong</Text>
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: palette.background, paddingHorizontal: layout.gutter, gap: 16 }}>
+      <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(20, { weight: "700" }) }}>Something went wrong</Text>
       <ErrorBanner message={message} />
       {restartCount < MAX_RESTARTS ? (
         <ActionButton label="Restart" onPress={onRestart} />
       ) : (
-        <Text selectable style={{ textAlign: "center", color: palette.soft, fontSize: 14, lineHeight: 20 }}>
+        <Text selectable style={{ textAlign: "center", color: palette.soft, ...type(14) }}>
           The app encountered a persistent error. Please close and reopen the app.
         </Text>
       )}

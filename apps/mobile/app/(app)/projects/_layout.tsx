@@ -14,6 +14,7 @@ export default function ProjectsLayout() {
         headerLargeTitle: true,
         headerTintColor: palette.accent,
         headerShadowVisible: false,
+        headerLargeStyle: { backgroundColor: palette.background },
         headerStyle: { backgroundColor: palette.background },
         headerTitleStyle: { color: palette.ink },
         headerLargeTitleStyle: { color: palette.ink, fontWeight: "700" },

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Pressable, ScrollView, Text, View } from "react-native"
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 import { Brain, Check, Search } from "lucide-react-native"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { TextField } from "@/components/ui/TextField"
@@ -13,6 +13,7 @@ import { assistantModelKey, filterAssistantModels, formatVariantLabel, remembere
 import { useUIStore } from "@/lib/store"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
+import { caps } from "@/lib/typography"
 
 export function ModelPickerSheet({ open, onClose, models, selection, onSelect, loading, error, reload }: {
   open: boolean
@@ -44,14 +45,14 @@ export function ModelPickerSheet({ open, onClose, models, selection, onSelect, l
   return <BottomSheet open={open} onClose={close} title="Model & thinking">
     <View style={{ paddingHorizontal: 20, gap: 16 }}>
       <View style={{ gap: 5 }}>
-        <Text selectable style={{ color: palette.ink, fontSize: 18, fontWeight: "700" }}>{selected ? `${selected.providerName} — ${selected.name}` : selection?.model ?? "Automatic model"}</Text>
+        <Text selectable style={{ color: palette.ink, fontSize: 18, lineHeight: 24, fontWeight: "700" }}>{selected ? `${selected.providerName} — ${selected.name}` : selection?.model ?? "Automatic model"}</Text>
         <Text selectable style={{ color: palette.muted, fontSize: 13, lineHeight: 19 }}>Choose a connected provider, model and thinking effort for this project. Uses the credentials on your paired desktop.</Text>
       </View>
       {selected && selected.variants.length > 0 ? <SurfaceCard>
         <View style={{ gap: 10 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}><Brain size={16} color={palette.accent} /><Text style={{ flexShrink: 1, color: palette.ink, fontWeight: "600" }}>Thinking effort · {selected.name}</Text></View>
-          {draft ? <Text style={{ color: palette.muted, fontSize: 12 }}>Choose a thinking effort to use this model</Text> : null}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 7 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}><Brain size={16} color={palette.accent} style={{ flexShrink: 0 }} /><Text style={{ flexShrink: 1, color: palette.ink, fontSize: 15, lineHeight: 21, fontWeight: "600" }}>Thinking effort · {selected.name}</Text></View>
+          {draft ? <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 17 }}>Choose a thinking effort to use this model</Text> : null}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {[undefined, ...selected.variants].map((variant) => <Choice key={variant ?? "default"} title={variant ? formatVariantLabel(variant) : "Default"} selected={current?.variant === variant} onPress={() => apply({ provider: selected.provider, model: selected.model, ...(variant ? { variant } : {}) })} />)}
           </ScrollView>
         </View>
@@ -64,7 +65,7 @@ export function ModelPickerSheet({ open, onClose, models, selection, onSelect, l
       <SurfaceCard inset={false}><ListRow title="Automatic" subtitle="Let the desktop choose from its connected providers" selected={!current} trailing={!current ? <Check size={18} color={palette.accent} /> : undefined} onPress={() => apply(undefined)} /></SurfaceCard>
       {loading && models.length === 0 ? [0, 1, 2].map((key) => <Skeleton key={key} style={{ height: 70 }} />) : null}
       {filtered.map((model, index) => <View key={model.key} style={{ gap: 8 }}>
-        {(index === 0 || filtered[index - 1]?.provider !== model.provider) ? <Text style={{ color: palette.muted, fontSize: 12, fontWeight: "700", marginTop: 8 }}>{model.providerName.toUpperCase()}</Text> : null}
+        {(index === 0 || filtered[index - 1]?.provider !== model.provider) ? <Text accessibilityRole="header" style={{ color: palette.muted, marginTop: 8, paddingHorizontal: 4, ...caps(11) }}>{model.providerName}</Text> : null}
         <SurfaceCard inset={false}><ListRow title={model.name}
           subtitle={[model.badge, model.model, model.contextWindow ? `${Math.round(model.contextWindow / 1000)}k context` : undefined, model.tools ? "Tools" : "Chat only", model.vision ? "Vision" : undefined, model.variants.length ? `${model.variants.length} thinking levels` : undefined].filter(Boolean).join(" · ")}
           selected={selected?.key === model.key} trailing={selected?.key === model.key ? <Check size={18} color={palette.accent} /> : undefined}
@@ -78,7 +79,7 @@ export function ModelPickerSheet({ open, onClose, models, selection, onSelect, l
 
 function Choice({ title, selected, onPress }: { title: string; selected: boolean; onPress(): void }) {
   const { palette } = useTheme()
-  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected }} style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", paddingHorizontal: 13, paddingVertical: 9, borderRadius: 22, borderWidth: 0.5, borderColor: selected ? palette.accent : palette.border, backgroundColor: hexToRgba(selected ? palette.accent : palette.ink, pressed ? 0.18 : 0.07) })}>
-    <Text style={{ color: selected ? palette.accentStrong : palette.soft, fontSize: 13, fontWeight: "600" }}>{title}</Text>
+  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ selected }} style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 22, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: selected ? palette.accent : palette.border, backgroundColor: hexToRgba(selected ? palette.accent : palette.ink, pressed ? 0.18 : 0.07) })}>
+    <Text style={{ color: selected ? palette.accentStrong : palette.soft, fontSize: 13, lineHeight: 18, fontWeight: "600" }}>{title}</Text>
   </Pressable>
 }

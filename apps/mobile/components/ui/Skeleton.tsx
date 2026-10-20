@@ -15,7 +15,7 @@ export function Skeleton({ style }: { style?: ViewStyle | ViewStyle[] }) {
     return () => cancelAnimation(opacity)
   }, [reduced, opacity])
   const pulse = useAnimatedStyle(() => ({ opacity: opacity.get() }))
-  return <View accessibilityLabel="Loading" style={[{ backgroundColor: palette.panel, borderRadius: 20, overflow: "hidden" }, style]}>
+  return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[{ backgroundColor: palette.panel, borderRadius: 16, borderCurve: "continuous", overflow: "hidden" }, style]}>
     <Animated.View style={[{ position: "absolute", inset: 0, backgroundColor: palette.border }, pulse]} />
   </View>
 }

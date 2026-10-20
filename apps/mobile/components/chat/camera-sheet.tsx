@@ -6,6 +6,7 @@ import { RotateCcw, X } from "lucide-react-native"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { PressableScale } from "@/components/ui/PressableScale"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { photoName, type PendingAttachment } from "@/lib/attachments"
@@ -23,6 +24,7 @@ export function CameraSheet({ open, onClose, onCapture }: {
   onCapture: (attachment: PendingAttachment) => void
 }) {
   const { palette } = useTheme()
+  const insets = useSafeAreaInsets()
   const [permission, requestPermission] = useCameraPermissions()
   const cameraRef = useRef<CameraView>(null)
   const [facing, setFacing] = useState<"back" | "front">("back")
@@ -80,7 +82,7 @@ export function CameraSheet({ open, onClose, onCapture }: {
         {shot ? (
           <>
             <Image source={{ uri: shot.uri }} style={{ flex: 1 }} contentFit="contain" accessibilityLabel="Photo to send" />
-            <View style={{ flexDirection: "row", gap: 12, padding: 20, paddingBottom: 36, backgroundColor: "rgba(0,0,0,0.6)" }}>
+            <View style={{ flexDirection: "row", gap: 12, padding: 20, paddingBottom: 16 + Math.max(insets.bottom, 12), backgroundColor: "rgba(0,0,0,0.6)" }}>
               <PressableScale
                 onPress={() => { haptic("selection"); setShot(null) }}
                 accessibilityRole="button"
@@ -103,7 +105,7 @@ export function CameraSheet({ open, onClose, onCapture }: {
         ) : granted ? (
           <>
             <CameraView ref={cameraRef} style={{ flex: 1 }} facing={facing} />
-            <View style={{ alignItems: "center", gap: 18, paddingTop: 18, paddingBottom: 40, backgroundColor: "rgba(0,0,0,0.55)" }}>
+            <View style={{ alignItems: "center", gap: 18, paddingTop: 20, paddingBottom: 16 + Math.max(insets.bottom, 12), backgroundColor: "rgba(0,0,0,0.55)" }}>
               {error ? <View style={{ paddingHorizontal: 20, width: "100%" }}><ErrorBanner message={error} /></View> : null}
               <PressableScale
                 onPress={() => void capture()}
@@ -122,13 +124,13 @@ export function CameraSheet({ open, onClose, onCapture }: {
                 accessibilityLabel="Switch camera"
                 style={{ minHeight: 44, paddingHorizontal: 18, alignItems: "center", justifyContent: "center" }}
               >
-                <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "600" }}>Switch camera</Text>
+                <Text style={{ color: "#FFFFFF", fontSize: 14, lineHeight: 20, fontWeight: "600" }}>Switch camera</Text>
               </PressableScale>
             </View>
           </>
         ) : (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 16, padding: 28 }}>
-            <Text style={{ color: "#FFFFFF", fontSize: 17, fontWeight: "600", textAlign: "center" }}>CADCAMFUN needs the camera to take a photo.</Text>
+            <Text style={{ color: "#FFFFFF", fontSize: 17, lineHeight: 24, fontWeight: "600", textAlign: "center" }}>CADCAMFUN needs the camera to take a photo.</Text>
             {error ? <ErrorBanner message={error} /> : null}
             <ActionButton label="Allow camera" onPress={() => void requestPermission()} />
           </View>
@@ -138,7 +140,7 @@ export function CameraSheet({ open, onClose, onCapture }: {
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Close the camera"
-          style={{ position: "absolute", top: 56, left: 20, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)" }}
+          style={{ position: "absolute", top: Math.max(insets.top, 20) + 8, left: 20, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)" }}
         >
           <X size={20} color="#FFFFFF" />
         </PressableScale>

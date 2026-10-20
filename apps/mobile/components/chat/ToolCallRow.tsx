@@ -1,7 +1,7 @@
 import { memo, useState } from "react"
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
-import { Box, Check, ChevronDown, ChevronRight, CircleGauge, Copy, GitPullRequest, Route, Workflow, Wrench, X, type LucideIcon } from "lucide-react-native"
+import { Box, Check, CircleGauge, Copy, GitPullRequest, Route, Workflow, Wrench, X, type LucideIcon } from "lucide-react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { PressableScale } from "@/components/ui/PressableScale"
@@ -9,6 +9,7 @@ import type { ChatRow } from "@/lib/chat-log"
 import { useCopiedFeedback } from "@/hooks/use-copied-feedback"
 import { layout } from "@/lib/layout"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
+import { DisclosureChevron, Reveal } from "./disclosure"
 
 /**
  * A muted row showing the assistant working — vcs_start_change, cad_*, cam_* tool calls. Watching
@@ -109,7 +110,8 @@ export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<Cha
         onPress={hasDetails ? toggle : undefined}
         subtle
         tint
-        accessibilityRole={hasDetails ? "button" : undefined}
+        accessible
+        accessibilityRole={hasDetails ? "button" : "text"}
         accessibilityState={hasDetails ? { expanded: open } : undefined}
         accessibilityLabel={`${identity.title}, ${row.ok === null ? "running" : row.ok ? "completed" : "failed"}${hasDetails ? ", tool details" : ""}`}
         style={{ minHeight: 58, flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 12, paddingVertical: 10 }}
@@ -119,16 +121,16 @@ export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<Cha
         </View>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text style={{ color: palette.muted, fontSize: 11, lineHeight: 16, fontWeight: "700", letterSpacing: 0.8 }}>{row.agent ? `${identity.category} · ${row.agent.toUpperCase()}` : identity.category}</Text>
-          <Text style={{ color: palette.ink, fontSize: 15, lineHeight: 21, fontWeight: "600" }} >{identity.title}</Text>
+          <Text style={{ color: palette.ink, fontSize: 15, lineHeight: 21, fontWeight: "600" }}>{identity.title}</Text>
         </View>
         {row.ok === null ? <ActivityIndicator size="small" color={statusColor} /> : row.ok ? <Check size={16} color={statusColor} /> : <X size={16} color={statusColor} />}
-        {hasDetails ? open ? <ChevronDown size={15} color={palette.muted} /> : <ChevronRight size={15} color={palette.muted} /> : null}
+        {hasDetails ? <DisclosureChevron open={open} color={palette.muted} /> : null}
       </PressableScale>
 
       {row.images?.length ? <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}><ToolImages images={row.images} tool={row.tool} /></View> : null}
 
       {open ? (
-        <View style={{ gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hexToRgba(palette.ink, 0.09), padding: 12 }}>
+        <Reveal style={{ gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hexToRgba(palette.ink, 0.09), padding: 12 }}>
           {row.diagnostic ? (
             <View style={{ gap: 4, borderRadius: 13, borderCurve: "continuous", backgroundColor: hexToRgba(row.diagnostic.severity === "error" ? palette.danger : palette.warning, 0.1), padding: 11 }}>
               <Text selectable style={{ color: palette.ink, fontSize: 14, lineHeight: 21, fontWeight: "600" }}>{row.diagnostic.message}</Text>
@@ -158,7 +160,7 @@ export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<Cha
               </ScrollView>
             </View>
           ) : null}
-        </View>
+        </Reveal>
       ) : null}
     </View>
   )

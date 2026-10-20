@@ -11,7 +11,8 @@ import { routeParam } from "@/components/workspace/route"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { ListRow } from "@/components/ui/ListRow"
-import { SectionHeader } from "@/components/ui/SectionHeader"
+import { Divider, SectionHeader } from "@/components/ui/SectionHeader"
+import { type } from "@/lib/typography"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { PageScroll } from "@/components/layout/page-scroll"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
@@ -59,7 +60,7 @@ export default function LibraryScreen() {
       } }} />
       <PageScroll refreshControl={<RefreshControl refreshing={library.loading && Boolean(library.data)} onRefresh={() => void library.reload()} tintColor={palette.accent} />}>
       {library.error && catalogue ? <ErrorBanner message={library.error} actionLabel="Retry" onAction={() => void library.reload()} /> : null}
-      {catalogue && total > 0 ? <Text style={{ color: palette.muted, fontSize: 13, fontVariant: ["tabular-nums"] }}>
+      {catalogue && total > 0 ? <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(13) }}>
         {searching ? `${count(catalogue)} of ${total}` : `${total} ${total === 1 ? "entry" : "entries"}`} · Synced from your desktop
       </Text> : null}
       {library.loading && !catalogue ? (
@@ -96,14 +97,13 @@ function Catalogue({
   entries: readonly WorkspaceEntry[]
   onOpen?: (entry: WorkspaceEntry) => void
 }) {
-  const { palette } = useTheme()
   if (entries.length === 0) return null
   return (
     <View>
       <SectionHeader>{title} · {entries.length}</SectionHeader>
       <SurfaceCard inset={false}>{entries.map((entry, index) => (
         <View key={entry.id}>
-          {index > 0 ? <View style={{ height: 0.5, marginLeft: 16, backgroundColor: palette.border }} /> : null}
+          {index > 0 ? <Divider inset={16} /> : null}
           <ListRow
             title={entry.name}
             subtitle={entry.subtitle ?? undefined}

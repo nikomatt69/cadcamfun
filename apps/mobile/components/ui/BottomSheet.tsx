@@ -7,6 +7,7 @@ import { usePrefersReducedMotion } from "@/lib/animation"
 import { ToastHost } from "./ToastHost"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { layout } from "@/lib/layout"
+import { type } from "@/lib/typography"
 
 /** A native presentation owns focus, dismissal, stacking above tabs and keyboard-safe scrolling. */
 export function BottomSheet({ open, onClose, title, children, dragEnabled = true }: PropsWithChildren<{
@@ -22,9 +23,9 @@ export function BottomSheet({ open, onClose, title, children, dragEnabled = true
     allowSwipeDismissal={dragEnabled} onRequestClose={onClose}>
     <SafeAreaView edges={["top", "bottom", "left", "right"]} style={{ flex: 1, backgroundColor: palette.background }}>
       <View onLayout={content.onLayout} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: content.gutter, paddingVertical: 12, gap: 12 }}>
-        <Text accessibilityRole="header" style={{ flex: 1, minWidth: 0, color: palette.ink, fontSize: 22, lineHeight: 28, fontWeight: "700" }}>{title}</Text>
+        <Text accessibilityRole="header" numberOfLines={2} style={{ flex: 1, minWidth: 0, color: palette.ink, ...type(22, { weight: "700" }) }}>{title}</Text>
         <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close sheet"
-          style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 22, backgroundColor: palette.panel, opacity: pressed ? 0.6 : 1 })}>
+          style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: layout.touchTarget / 2, borderCurve: "continuous", backgroundColor: palette.panel, opacity: pressed ? 0.6 : 1 })}>
           <X size={20} color={palette.soft} />
         </Pressable>
       </View>

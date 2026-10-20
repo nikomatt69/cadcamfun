@@ -3,6 +3,7 @@ import { WifiOff } from "lucide-react-native"
 import { useServer, type Connectivity } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useUIStore } from "@/lib/store"
+import { type } from "@/lib/typography"
 
 /**
  * Connection state lives in the native tab accessory on iOS 26+, clear of titles and controls.
@@ -39,12 +40,12 @@ export function NetworkBanner({ accessory = false }: { accessory?: boolean }) {
       }}
     >
       {connectivity === "connecting" ? <ActivityIndicator size="small" color={color} /> : <WifiOff size={15} color={color} />}
-      <Text accessibilityLiveRegion="polite" style={{ flex: 1, minWidth: 0, color: palette.ink, fontSize: 13, lineHeight: 18, fontWeight: "500" }} numberOfLines={accessory ? 1 : undefined}>
+      <Text accessibilityLiveRegion="polite" style={{ flex: 1, minWidth: 0, color: palette.ink, ...type(13, { weight: "500" }) }} numberOfLines={accessory ? 1 : undefined}>
         {label}
       </Text>
       {connectivity !== "connecting" ? (
         <Pressable style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, opacity: pressed ? 0.55 : 1 })} onPress={() => void recheck()} accessibilityRole="button" accessibilityLabel="Retry the desktop connection">
-          <Text style={{ color, fontSize: 13, fontWeight: "600" }}>Retry</Text>
+          <Text style={{ color: palette.accent, ...type(13, { weight: "600" }) }}>Retry</Text>
         </Pressable>
       ) : null}
     </View>

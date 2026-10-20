@@ -43,7 +43,7 @@ export function SegmentedControlFallback<T extends string>({ segments, value, on
       {!stacked && width > 0 ? <Animated.View pointerEvents="none" style={[{
         position: "absolute", left: inset, top: inset, bottom: inset, width: thumbWidth,
         borderRadius: 12, borderCurve: "continuous", backgroundColor: palette.surface,
-        boxShadow: "0 1px 3px rgba(15,23,42,0.12)",
+        boxShadow: "0 1px 3px rgba(15,23,42,0.14), 0 0 0 0.5px rgba(15,23,42,0.06)",
       }, thumb]} /> : null}
       {segments.map((segment) => {
         const selected = segment.value === value
@@ -51,7 +51,7 @@ export function SegmentedControlFallback<T extends string>({ segments, value, on
           accessibilityLabel={segment.label}
           onPress={() => { if (!selected) { haptic("selection"); onChange(segment.value) } }}
           style={({ pressed }) => ({ flex: stacked ? undefined : 1, minWidth: 0, minHeight: layout.touchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: 6, paddingVertical: 8, borderRadius: 12, backgroundColor: stacked && selected ? palette.surface : pressed ? hexToRgba(palette.ink, 0.04) : undefined })}>
-          <Text style={{ color: selected ? palette.ink : palette.soft, fontSize: 13, lineHeight: 18, fontWeight: selected ? "700" : "500", textAlign: "center" }}>{segment.label}</Text>
+          <Text style={{ color: selected ? palette.ink : palette.soft, fontSize: 13, lineHeight: 18, fontWeight: "600", textAlign: "center" }}>{segment.label}</Text>
         </Pressable>
       })}
     </View>

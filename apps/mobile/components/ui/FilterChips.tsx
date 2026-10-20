@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, Text } from "react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
+import { type } from "@/lib/typography"
 
 /**
  * Single-choice filter chips in a horizontal scroller. Each chip may show a count; chips stay 44 pt
@@ -26,8 +27,9 @@ export function FilterChips<T extends string>({ options, value, onChange, counts
           minHeight: 44, justifyContent: "center", paddingHorizontal: 14, borderRadius: 22, borderCurve: "continuous", borderWidth: 0.5,
           borderColor: selected ? palette.accent : palette.border,
           backgroundColor: hexToRgba(selected ? palette.accent : palette.ink, pressed ? 0.18 : selected ? 0.12 : 0.05),
+          opacity: pressed && !selected ? 0.8 : 1,
         })}>
-        <Text style={{ color: selected ? palette.accentStrong : palette.soft, fontSize: 13, fontWeight: "600", fontVariant: ["tabular-nums"] }}>
+        <Text style={{ color: selected ? palette.accentStrong : palette.soft, fontVariant: ["tabular-nums"], ...type(13, { weight: "600" }) }}>
           {option.label}{count === undefined ? "" : ` ${count}`}
         </Text>
       </Pressable>

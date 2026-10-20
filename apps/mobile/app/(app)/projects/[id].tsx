@@ -6,7 +6,8 @@ import { Sparkles } from "lucide-react-native"
 import type { LiveEvent } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
-import { contentGutter } from "@/lib/layout"
+import { contentGutter, layout } from "@/lib/layout"
+import { mono, type } from "@/lib/typography"
 import { useLiveEvents } from "@/lib/live-events"
 import { useResource } from "@/lib/use-resource"
 import { useUIStore } from "@/lib/store"
@@ -259,10 +260,10 @@ export default function ProjectScreen() {
 
       {/* Commit message sheet — a deliberate action; release is snappy, enter is the sheet spring. */}
       <BottomSheet open={commitOpen} onClose={() => setCommitOpen(false)} title="Commit changes">
-        <View style={{ paddingHorizontal: 20, gap: 12 }}>
+        <View style={{ paddingHorizontal: layout.gutter, gap: 12 }}>
           {commitTarget ? (
-            <Text style={{ color: palette.soft, fontSize: 13, lineHeight: 19 }}>
-              {commitTarget.files} {commitTarget.files === 1 ? "file" : "files"} on{" "}
+            <Text style={{ color: palette.soft, ...type(13) }}>
+              <Text style={{ fontVariant: ["tabular-nums"] }}>{commitTarget.files}</Text> {commitTarget.files === 1 ? "file" : "files"} on{" "}
               <Text style={{ fontFamily: "Menlo", color: palette.ink }}>{commitTarget.branch}</Text>
             </Text>
           ) : null}
@@ -280,7 +281,7 @@ export default function ProjectScreen() {
 
       {/* New branch */}
       <BottomSheet open={branchOpen} onClose={() => setBranchOpen(false)} title="New branch">
-        <View style={{ paddingHorizontal: 20, gap: 12 }}>
+        <View style={{ paddingHorizontal: layout.gutter, gap: 12 }}>
           <TextField
             value={branchName}
             onChangeText={setBranchName}
@@ -294,31 +295,35 @@ export default function ProjectScreen() {
 
       {/* A manual workflow run: the ref decides which branch's workflows run. */}
       <BottomSheet open={dispatchOpen} onClose={() => setDispatchOpen(false)} title="Run workflows">
-        <View style={{ paddingHorizontal: 20, gap: 12 }}>
+        <View style={{ paddingHorizontal: layout.gutter, gap: 12 }}>
           {branches.error ? <ErrorBanner message={branches.error} actionLabel="Try again" onAction={() => void branches.reload()} /> : null}
-          {branches.loading && !branches.data ? <Text style={{ color: palette.muted, fontSize: 14, lineHeight: 20, textAlign: "center" }}>Loading branches…</Text> : null}
+          {branches.loading && !branches.data ? <Text accessibilityLiveRegion="polite" style={{ color: palette.muted, textAlign: "center", ...type(14) }}>Loading branches…</Text> : null}
           {(Object.keys(branches.data?.branches ?? {})).sort().map((name) => (
             <PressableScale
               key={name}
               onPress={() => { haptic("selection"); setDispatchRef(name); void doDispatch(name) }}
+              disabled={dispatching}
+              tint
+              subtle
               accessibilityRole="button"
               accessibilityLabel={`Run the workflows of ${name}`}
-              style={{ minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, borderRadius: 16, borderCurve: "continuous", borderWidth: 0.5, borderColor: palette.border, backgroundColor: palette.surface }}
+              accessibilityState={{ disabled: dispatching, busy: dispatching && dispatchRef === name }}
+              style={{ minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 16, paddingVertical: 8, borderRadius: layout.controlRadius, borderCurve: "continuous", borderWidth: 0.5, borderColor: palette.border, backgroundColor: palette.surface }}
             >
-              <Text style={{ color: palette.ink, fontFamily: "Menlo", fontSize: 15 }}>{name}</Text>
-              {dispatchRef === name ? <Text style={{ color: palette.accent, fontSize: 13, fontWeight: "600" }}>Running…</Text> : null}
+              <Text numberOfLines={1} ellipsizeMode="middle" style={{ flex: 1, minWidth: 0, color: palette.ink, ...mono(15) }}>{name}</Text>
+              {dispatching && dispatchRef === name ? <Text style={{ color: palette.accentStrong, ...type(13, { weight: "600" }) }}>Running…</Text> : null}
             </PressableScale>
           ))}
           {branches.data && Object.keys(branches.data.branches).length === 0 ? (
-            <Text style={{ color: palette.muted, fontSize: 14, lineHeight: 20, textAlign: "center" }}>This project has no branches yet.</Text>
+            <Text style={{ color: palette.muted, textAlign: "center", ...type(14) }}>This project has no branches yet.</Text>
           ) : null}
         </View>
       </BottomSheet>
 
       {/* Branch checkout confirmation */}
       <BottomSheet open={checkoutBranch !== null} onClose={() => setCheckoutBranch(null)} title="Switch branch">
-        <View style={{ paddingHorizontal: 20, gap: 14 }}>
-          <Text style={{ color: palette.soft, fontSize: 15, lineHeight: 21, textAlign: "center" }}>
+        <View style={{ paddingHorizontal: layout.gutter, gap: 16 }}>
+          <Text style={{ color: palette.soft, textAlign: "center", ...type(15) }}>
             Check out <Text style={{ fontFamily: "Menlo", color: palette.ink }}>{checkoutBranch}</Text>? Commit your changes first; switching branches requires a clean working copy.
           </Text>
           <View style={{ flexDirection: fontScale > 1.2 || width < 375 ? "column" : "row", gap: 10 }}>

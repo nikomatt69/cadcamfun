@@ -1,12 +1,13 @@
 import { Fragment, useMemo, useState } from "react"
-import { Text, View, useWindowDimensions } from "react-native"
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native"
 import { ChevronRight, Minus, Plus, SquarePen } from "lucide-react-native"
 import type { EntityChange } from "@cadcamfun/api"
 import { SurfaceCard } from "./ui/SurfaceCard"
 import { BottomSheet } from "./ui/BottomSheet"
 import { PressableScale } from "./ui/PressableScale"
 import { Pill, type PillTone } from "./ui/Pill"
-import { useTheme } from "@/lib/theme"
+import { hexToRgba, useTheme } from "@/lib/theme"
+import { mono, type } from "@/lib/typography"
 import { haptic } from "@/lib/haptics"
 import { diffSummary, filterChanges, formatDiffSummary, type ChangeFilter } from "@/lib/workspace-filter"
 import { FilterChips } from "./ui/FilterChips"
@@ -25,16 +26,24 @@ function valueText(value: unknown, full = false): string {
   return !full && text.length > 160 ? `${text.slice(0, 160)}…` : text
 }
 
+/** A removed or added value on its own tinted line: the sign and the tint carry the meaning, not the hue alone. */
+function DiffLine({ sign, color, text, lines }: { sign: "−" | "+"; color: string; text: string; lines?: number }) {
+  return <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderCurve: "continuous", backgroundColor: hexToRgba(color, 0.08) }}>
+    <Text accessibilityElementsHidden importantForAccessibility="no" style={{ width: 10, color, ...mono(12, { weight: "700" }) }}>{sign}</Text>
+    <Text accessibilityLabel={`${sign === "−" ? "Before" : "After"}: ${text}`} numberOfLines={lines} style={{ flex: 1, minWidth: 0, color, ...mono(12) }}>{text}</Text>
+  </View>
+}
+
 function PropertyRow({ change, onOpen }: { change: PropertyChange; onOpen: () => void }) {
   const { palette } = useTheme()
   return <PressableScale subtle tint onPress={onOpen} accessibilityLabel={`Inspect change to ${pointerLabel(change.pointer)}`}
     style={{ paddingHorizontal: 16, paddingVertical: 12, gap: 6, minHeight: 44 }}>
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-      <Text style={{ flex: 1, minWidth: 0, color: palette.soft, fontSize: 13, lineHeight: 20, fontWeight: "600" }}>{pointerLabel(change.pointer)}</Text>
+      <Text numberOfLines={2} style={{ flex: 1, minWidth: 0, color: palette.soft, ...type(13, { weight: "600" }) }}>{pointerLabel(change.pointer)}</Text>
       <ChevronRight size={14} color={palette.muted} />
     </View>
-    {change.before !== undefined ? <Text style={{ color: palette.danger, fontFamily: "Menlo", fontSize: 12, lineHeight: 19 }} numberOfLines={3}>− {valueText(change.before)}</Text> : null}
-    {change.after !== undefined ? <Text style={{ color: palette.success, fontFamily: "Menlo", fontSize: 12, lineHeight: 19 }} numberOfLines={3}>+ {valueText(change.after)}</Text> : null}
+    {change.before !== undefined ? <DiffLine sign="−" color={palette.danger} text={valueText(change.before)} lines={3} /> : null}
+    {change.after !== undefined ? <DiffLine sign="+" color={palette.success} text={valueText(change.after)} lines={3} /> : null}
   </PressableScale>
 }
 function EntityCard({ change, onOpen }: { change: EntityChange; onOpen: (property: PropertyChange) => void }) {
@@ -48,17 +57,17 @@ function EntityCard({ change, onOpen }: { change: EntityChange; onOpen: (propert
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
         <Glyph size={18} color={color} style={{ marginTop: 2 }} />
         <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
-          <Text selectable style={{ color: palette.ink, fontSize: 16, lineHeight: 23, fontWeight: "600" }}>{change.name || change.id || change.path.split("/").pop() || change.path}</Text>
-          <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 19 }}>{change.path}</Text>
+          <Text selectable numberOfLines={fontScale > 1.3 ? undefined : 2} style={{ color: palette.ink, ...type(16, { weight: "600" }) }}>{change.name || change.id || change.path.split("/").pop() || change.path}</Text>
+          <Text selectable numberOfLines={fontScale > 1.3 ? undefined : 2} ellipsizeMode="middle" style={{ color: palette.muted, ...mono(12) }}>{change.path}</Text>
         </View>
         {fontScale <= 1.3 ? <Pill tone={status.tone}>{status.label}</Pill> : null}
       </View>
       {fontScale > 1.3 ? <Pill tone={status.tone}>{status.label}</Pill> : null}
     </View>
     {change.changes.length ? change.changes.map((property, index) => <Fragment key={index}>
-      <View style={{ height: 0.5, marginHorizontal: 16, backgroundColor: palette.border }} />
+      <View style={{ height: StyleSheet.hairlineWidth, marginHorizontal: 16, backgroundColor: palette.border }} />
       <PropertyRow change={property} onOpen={() => onOpen(property)} />
-    </Fragment>) : <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 20, paddingHorizontal: 16, paddingBottom: 16 }}>{change.status === "added" ? "New file" : change.status === "deleted" ? "File removed" : "No property-level changes"}</Text>}
+    </Fragment>) : <Text style={{ color: palette.muted, paddingHorizontal: 16, paddingBottom: 16, ...type(13) }}>{change.status === "added" ? "New file" : change.status === "deleted" ? "File removed" : "No property-level changes"}</Text>}
   </SurfaceCard>
 }
 
@@ -79,7 +88,7 @@ export function DiffView({ changes }: { changes: readonly EntityChange[] }) {
   ]
   return <>
     <View style={{ gap: 12 }}>
-      <Text selectable accessibilityRole="summary" style={{ color: palette.soft, fontSize: 13, lineHeight: 19, fontVariant: ["tabular-nums"] }}>{formatDiffSummary(summary)}</Text>
+      <Text selectable accessibilityRole="summary" style={{ color: palette.soft, fontVariant: ["tabular-nums"], ...type(13) }}>{formatDiffSummary(summary)}</Text>
       {kinds > 1 ? <FilterChips options={options} value={filter} onChange={setFilter}
         counts={{ all: summary.files, added: summary.added, modified: summary.modified, deleted: summary.deleted }} accessibilityLabel="Filter changes" /> : null}
       {visible.map((change, index) => <EntityCard key={`${change.path}-${index}`} change={change}
@@ -87,11 +96,11 @@ export function DiffView({ changes }: { changes: readonly EntityChange[] }) {
     </View>
     <BottomSheet open={selected !== null} onClose={() => setSelected(null)} title="Change details">
       {selected ? <View style={{ paddingHorizontal: 20, gap: 16 }}>
-        <Text selectable style={{ color: palette.soft, fontSize: 15, lineHeight: 22 }}>{pointerLabel(selected.pointer)}</Text>
+        <Text selectable accessibilityRole="header" style={{ color: palette.soft, ...type(15) }}>{pointerLabel(selected.pointer)}</Text>
         {[{ label: "Before", value: selected.before, color: palette.danger }, { label: "After", value: selected.after, color: palette.success }].map(({ label, value, color }) => <SurfaceCard key={label}>
           <View style={{ gap: 10 }}>
-            <Text accessibilityRole="header" style={{ color, fontSize: 15, fontWeight: "600" }}>{label}</Text>
-            <Text selectable style={{ color: palette.ink, fontFamily: "Menlo", fontSize: 13, lineHeight: 21 }}>{valueText(value, true)}</Text>
+            <Text accessibilityRole="header" style={{ color, ...type(15, { weight: "600" }) }}>{label}</Text>
+            <Text selectable style={{ color: palette.ink, ...mono(13) }}>{valueText(value, true)}</Text>
           </View>
         </SurfaceCard>)}
       </View> : null}
