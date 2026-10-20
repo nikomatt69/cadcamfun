@@ -22,7 +22,7 @@ const toc = [
 <DocsLayout title="Technology stack" subtitle="Versions and responsibilities taken from workspace manifests and runtime configuration." description="Versions and responsibilities taken from workspace manifests and runtime configuration." toc={toc}>
   <section id="runtime" class="doc-section">
     <h2>Runtime and service framework</h2>
-    <p>The root manifest selects <code>bun@1.4.2</code> as the package manager. Bun installs the workspaces, runs <code>bun:test</code>, serves the sidecar, provides SQLite and password hashing APIs, and compiles the sidecar binary. Desktop frontend development uses Vite, and native packaging uses Rust and Tauri.</p>
+    <p>The root manifest selects <code>bun@1.4.3</code> as the package manager. Bun installs the workspaces, runs <code>bun:test</code>, type checks with the built-in <code>bun check</code>, serves the sidecar, provides SQLite and password hashing APIs, and compiles the sidecar binary. Desktop frontend development uses Vite, and native packaging uses Rust and Tauri.</p>
     <p>Application services use <code>effect@4.0.0-rc.112</code>. The same exact release is declared across the workspaces that depend on Effect, including the API, database, core, desktop, workflow, and sidecar. Root overrides align the node platform packages to that release. Effect supplies typed errors, schemas, service context, layers, concurrency, and HTTP APIs.</p>
     <p>The code uses the v4 service form <code>Context.Service</code> and HTTP modules under <code>effect/unstable</code>. Version-matched documentation is installed at <code>packages/db/node_modules/effect/ai-docs/src/</code>. Keep dependency upgrades coordinated across consumers.</p>
   </section>
@@ -49,7 +49,7 @@ const toc = [
     <h2>Mobile and documentation</h2>
     <p>The mobile manifest uses Expo <code>~57.0.27</code>, React <code>19.2.3</code>, React Native <code>0.86.3</code>, and Expo Router <code>~57.0.25</code>. Its custom companion transport is a native module. NativeWind, Reanimated, Gesture Handler, SecureStore, and local authentication support the mobile application.</p>
     <p>This site uses Astro <code>^5.14.1</code> with the Cloudflare adapter, MDX and Tailwind integrations. Documentation pages are prerendered; assistant, Markdown, Studio fallback, and artifact routes run on the server. The local Studio API runs in Bun because it uses <code>bun:sqlite</code>.</p>
-    <p>TypeScript tooling includes TypeScript 5.9 and the native preview compiler. Most application workspaces use <code>tsgo</code>; web and mobile use <code>tsc</code>. The manifest ranges describe allowed dependency versions; the lockfile records the installed resolution.</p>
+    <p>Type checking uses Bun's built-in checker, <code>bun check</code>, which reads each workspace's <code>tsconfig.json</code> and reports the same diagnostics as <code>tsc</code>. The manifest ranges describe allowed dependency versions; the lockfile records the installed resolution.</p>
     <p>The documentation site uses Astro 5 with the Cloudflare adapter, MDX, and Tailwind (<code>packages/web/package.json</code>). The desktop webview reaches native code through <code>@tauri-apps/api</code> v2.</p>
   </section>
 
@@ -75,7 +75,7 @@ const toc = [
     <table>
       <thead><tr><th>Layer</th><th>Technology</th><th>Version (from package manifests)</th></tr></thead>
       <tbody>
-        <tr><td>Package manager / runtime</td><td>Bun</td><td>1.4.2 (<code>packageManager</code>)</td></tr>
+        <tr><td>Package manager / runtime</td><td>Bun</td><td>1.4.3 (<code>packageManager</code>)</td></tr>
         <tr><td>Service framework</td><td>Effect</td><td>4.0.0-rc.112 (all workspaces, with platform-bun and opentelemetry at the same version)</td></tr>
         <tr><td>Database</td><td>drizzle-orm / drizzle-kit, <code>bun:sqlite</code></td><td>1.0.0-beta.22</td></tr>
         <tr><td>Desktop shell</td><td>Tauri</td><td>2 (Rust crates and <code>@tauri-apps/*</code> ^2)</td></tr>
@@ -89,7 +89,7 @@ const toc = [
         <tr><td>Telemetry</td><td>OpenTelemetry SDK + OTLP/HTTP exporters</td><td>api 1.9.1, sdk 2.12.0, exporters 0.223.0</td></tr>
         <tr><td>Mobile</td><td>Expo, React Native, React</td><td>~57, 0.86.3, 19.2.3</td></tr>
         <tr><td>Docs</td><td>Astro, Tailwind, Cloudflare adapter, wrangler</td><td>^5.14.1, ^3.4.17, ^12.0.0, 4.103.0</td></tr>
-        <tr><td>Type checking</td><td>TypeScript, tsgo (native preview)</td><td>^5.9.0, 7.0.0-dev</td></tr>
+        <tr><td>Type checking</td><td>Bun <code>bun check</code>, TypeScript (editor support only)</td><td>1.4.3, ^5.9.0</td></tr>
         <tr><td>Monorepo tasks</td><td>turbo</td><td>^2.11.7</td></tr>
         </tbody>
     </table>

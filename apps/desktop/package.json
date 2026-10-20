@@ -6,7 +6,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsgo -p tsconfig.json --noEmit",
+    "typecheck": "bun check -p tsconfig.json",
     "dev": "vite",
     "build": "vite build",
     "stub-sidecar": "bun scripts/build-stub-sidecar.ts",

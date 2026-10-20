@@ -109,7 +109,7 @@ The desktop calls `settle_session` when the user starts a new conversation or cl
 5. `start_session` returns a briefing composition without a model call, refuses a cross-project session id, and reports `started: false` without a host.
 6. `settle_session` refuses while busy or while owned tasks are queued/running; compacts only at or above the threshold; reports the Brain's real failure; prunes only unreferenced, expired notes and lists them.
 7. `removeSession` settles first and stays the only destructive path; a failed settle never blocks the removal.
-8. `bunx tsgo -p packages/{ai,api}/tsconfig.json --noEmit` and the sidecar and desktop typechecks are clean; `packages/ai/test/project-context.test.ts`, `packages/api/test/contracts.test.ts` (snapshot updated), a sidecar handler test and a desktop store test cover the above.
+8. `bun check -p packages/ai/tsconfig.json` and `bun check -p packages/api/tsconfig.json` and the sidecar and desktop typechecks are clean; `packages/ai/test/project-context.test.ts`, `packages/api/test/contracts.test.ts` (snapshot updated), a sidecar handler test and a desktop store test cover the above.
 
 ## 6. Change log
 

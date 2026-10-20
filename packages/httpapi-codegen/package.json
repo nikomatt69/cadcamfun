@@ -5,7 +5,7 @@
   "license": "MIT",
   "exports": { ".": "./src/index.ts" },
   "scripts": {
-    "typecheck": "tsgo -p tsconfig.json --noEmit"
+    "typecheck": "bun check -p tsconfig.json"
   },
   "dependencies": {
     "effect": "4.0.0-rc.112",

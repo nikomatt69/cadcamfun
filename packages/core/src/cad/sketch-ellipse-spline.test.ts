@@ -35,6 +35,45 @@ describe("ellipses and splines in the sketcher (C13)", () => {
     expect(solved.free).toContain("e")
   })
 
+  test("an ellipse sized by an expression follows the parameter", () => {
+    const feature: SketchFeature = {
+      id: "s", type: "sketch", plane: "XY",
+      sketch: {
+        entities: ellipseSketch.entities,
+        constraints: [
+          { type: "fixed", point: "c", x: 0, y: 0 },
+          { type: "ellipseSize", ellipse: "e", radiusX: "rx", radiusY: "ry" }
+        ]
+      }
+    }
+    const history = (rx: number, ry: number): History => ({
+      parameters: { rx, ry },
+      features: [feature, { id: "plate", type: "extrude", sketch: "s", depth: 4, operation: "new" }]
+    })
+    const built = rebuild(history(12, 6))
+    expect(built.issues.filter((i) => i.severity === "error")).toEqual([])
+    expect(rel(meshVolume(built.bodies[0]!.mesh), Math.PI * 12 * 6 * 4)).toBeLessThan(0.01)
+    // The same history with another parameter rebuilds to the other size: the expression is resolved at every rebuild.
+    const other = rebuild(history(20, 10))
+    expect(other.issues.filter((i) => i.severity === "error")).toEqual([])
+    expect(rel(meshVolume(other.bodies[0]!.mesh), Math.PI * 20 * 10 * 4)).toBeLessThan(0.01)
+  })
+
+  test("an ellipse sized by a broken expression is reported, not built", () => {
+    const feature: SketchFeature = {
+      id: "s", type: "sketch", plane: "XY",
+      sketch: {
+        entities: ellipseSketch.entities,
+        constraints: [
+          { type: "fixed", point: "c", x: 0, y: 0 },
+          { type: "ellipseSize", ellipse: "e", radiusX: "missing", radiusY: 6 }
+        ]
+      }
+    }
+    const built = rebuild({ parameters: {}, features: [feature, { id: "plate", type: "extrude", sketch: "s", depth: 4, operation: "new" }] })
+    expect(built.issues.some((i) => i.severity === "error")).toBe(true)
+  })
+
   test("an ellipse profile extrudes in mesh and exact, with the ellipse's volume", () => {
     const feature: SketchFeature = { id: "s", type: "sketch", plane: "XY", sketch: ellipseSketch }
     const h: History = { parameters: {}, features: [feature, { id: "plate", type: "extrude", sketch: "s", depth: 4, operation: "new" }] }

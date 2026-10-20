@@ -103,7 +103,7 @@ No new kernel dependency, pretend simulator, empty strategy or unvalidated postp
 
 ```sh
 bun test packages/core
-bunx tsc -p packages/core/tsconfig.json
+bun check -p packages/core/tsconfig.json
 git diff --check -- packages/core specs/03-core-cad.md specs/04-core-cam.md specs/12-professional-cad-cam.md
 ```
 

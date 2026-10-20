@@ -125,7 +125,7 @@ The saving comes from stating the shared conventions once per tool instead of on
 4. `cad`, `cam`, `library`, `vcs`, `memory` and `research` contain **no action that mutates the document, the operations or the libraries**; `cad_edit`, `cam_edit`, `parts`, `library_edit` and `vcs_edit` contain **no read that a specialist already had read-only**. A test derives both halves from the tool definitions, not from a hand-written list.
 5. The researcher still cannot change anything, the editor still cannot run CAM, the machinist still cannot edit geometry, and no specialist can commit or open a pull request (`agents.test.ts`, restated against the merged ids).
 6. The tool prompt catalogue (everything but the `cam_verify` exposure) is under 31 000 characters; raised from 25 000 by the two mods tools (about 5 200 characters, spec 27 §4.3), so `PROMPT_BUDGETS.descriptions` is 34 000.
-7. `bunx tsgo -p packages/{ai,api}/tsconfig.json --noEmit`, the sidecar and desktop typechecks and `bun test packages apps` are clean; the contract snapshot in `packages/api` is regenerated where tool ids appear.
+7. `bun check -p packages/ai/tsconfig.json` and `bun check -p packages/api/tsconfig.json`, the sidecar and desktop typechecks and `bun test packages apps` are clean; the contract snapshot in `packages/api` is regenerated where tool ids appear.
 
 ## 7. Change log
 

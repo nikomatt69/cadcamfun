@@ -44,10 +44,10 @@ Desktop store is an **adapter** over that HTTP interface, not a second planner.
 ## Verify
 
 ```bash
-bunx tsc -p packages/core/tsconfig.json
-bunx tsc -p packages/api/tsconfig.json
-bunx tsc -p apps/sidecar/tsconfig.json
-bunx tsc -p apps/desktop/tsconfig.json
+bun check -p packages/core/tsconfig.json
+bun check -p packages/api/tsconfig.json
+bun check -p apps/sidecar/tsconfig.json
+bun check -p apps/desktop/tsconfig.json
 bun test packages/core packages/api apps/sidecar
 ```
 

@@ -12,9 +12,9 @@
     "preview": "astro preview",
     "deploy": "bun script/deploy.ts",
     "astro": "astro",
-    "check": "bun run check:docs-index && bun run check:api-reference",
+    "check:freshness": "bun run check:docs-index && bun run check:api-reference",
     "check:docs-index": "bun run script/check-docs-index.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit && bun run check",
+    "typecheck": "bun check -p tsconfig.json && bun run check:freshness",
     "generate:api-reference": "bun script/generate-api-reference.mjs",
     "check:api-reference": "bun script/generate-api-reference.mjs --check"
   },
@@ -34,6 +34,7 @@
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@types/bun": "latest",
     "@types/turndown": "^5.0.6",
     "wrangler": "4.103.0",
     "@types/three": "^0.180.0"

@@ -5716,6 +5716,175 @@
         }
       }
     },
+    "/api/user/git-profile": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "operationId": "user.gitProfile",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "email"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "user"
+        ],
+        "operationId": "user.updateGitProfile",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "email"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/user/{id}": {
       "get": {
         "tags": [
@@ -10787,6 +10956,16 @@
                           }
                         ]
                       },
+                      "defaultModel": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "models": {
                         "type": "array",
                         "items": {
@@ -12602,6 +12781,857 @@
             }
           },
           "required": true
+        }
+      }
+    },
+    "/api/ai/sessions/prompt": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "ai.sessionPrompt",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "seq": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "sessionId",
+                    "seq"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "auto",
+                          "ask",
+                          "approve"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "agent": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "mode": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "attachments": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "mime": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "data": {
+                              "type": "string"
+                            },
+                            "encoding": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "base64",
+                                    "text"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "data"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "message": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "sessionId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "projectId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "drawingId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "context": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "includeContext": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "model": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "tier": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "fast",
+                                  "balanced",
+                                  "best"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "variant": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/ai/sessions/{sessionId}/stream": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "ai.sessionStream",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "string",
+                      "contentMediaType": "application/json"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "event",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                },
+                "x-effect-stream": {
+                  "encoding": "sse",
+                  "causeSchema": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": {
+                              "type": "string",
+                              "enum": [
+                                "Fail"
+                              ]
+                            },
+                            "error": {
+                              "not": {}
+                            }
+                          },
+                          "required": [
+                            "_tag",
+                            "error"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": {
+                              "type": "string",
+                              "enum": [
+                                "Die"
+                              ]
+                            },
+                            "defect": {}
+                          },
+                          "required": [
+                            "_tag",
+                            "defect"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "_tag": {
+                              "type": "string",
+                              "enum": [
+                                "Interrupt"
+                              ]
+                            },
+                            "fiberId": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "_tag",
+                            "fiberId"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "errorSchema": {
+                    "not": {}
+                  },
+                  "failureEvent": "effect/httpapi/stream/failure"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/sessions": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "ai.sessionList",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "projectId": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "updatedAt": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "busy": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "projectId",
+                      "title",
+                      "createdAt",
+                      "updatedAt",
+                      "busy"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/sessions/{sessionId}/messages": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "ai.sessionMessages",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "assistant"
+                            ]
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "agent": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "model": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "error": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "truncated": {
+                            "type": "boolean"
+                          },
+                          "tools": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "callId": {
+                                  "type": "string"
+                                },
+                                "tool": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "running",
+                                    "completed",
+                                    "error"
+                                  ]
+                                },
+                                "input": {
+                                  "anyOf": [
+                                    {},
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "output": {
+                                  "type": "string"
+                                },
+                                "truncated": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "callId",
+                                "tool",
+                                "status",
+                                "output",
+                                "truncated"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "role",
+                          "text",
+                          "createdAt",
+                          "agent",
+                          "model",
+                          "error",
+                          "truncated",
+                          "tools"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "before": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "sessionId",
+                    "messages",
+                    "before"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -34714,6 +35744,21 @@
             "required": false
           },
           {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          },
+          {
             "name": "onlyUnread",
             "in": "query",
             "schema": {
@@ -34863,13 +35908,34 @@
                           ]
                         }
                       ]
+                    },
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
                     "notifications",
-                    "unreadCount"
+                    "unreadCount",
+                    "nextCursor"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
                 }
               }
             }
@@ -48063,6 +49129,17 @@
                               ],
                               "additionalProperties": false
                             },
+                            "setupOrientation": {
+                              "type": "string",
+                              "enum": [
+                                "+Z",
+                                "-Z",
+                                "+X",
+                                "-X",
+                                "+Y",
+                                "-Y"
+                              ]
+                            },
                             "origin": {
                               "type": "object",
                               "properties": {
@@ -48157,7 +49234,8 @@
                                       "thread",
                                       "engrave",
                                       "chamfer",
-                                      "surface"
+                                      "surface",
+                                      "multiaxis"
                                     ]
                                   },
                                   "toolId": {
@@ -48178,7 +49256,9 @@
                                       "spot",
                                       "chamfer",
                                       "engrave",
-                                      "thread-mill"
+                                      "thread-mill",
+                                      "tap",
+                                      "ream"
                                     ]
                                   },
                                   "status": {
@@ -48205,7 +49285,9 @@
                                           "spot",
                                           "chamfer",
                                           "engrave",
-                                          "thread-mill"
+                                          "thread-mill",
+                                          "tap",
+                                          "ream"
                                         ]
                                       },
                                       "rpm": {
@@ -48699,7 +49781,10 @@
                                                     "drill",
                                                     "dwell",
                                                     "peck",
-                                                    "chipBreak"
+                                                    "chipBreak",
+                                                    "tap",
+                                                    "ream",
+                                                    "bore"
                                                   ]
                                                 },
                                                 "to": {
@@ -48736,6 +49821,10 @@
                                                 },
                                                 "retractHeight": {
                                                   "type": "number"
+                                                },
+                                                "pitch": {
+                                                  "type": "number",
+                                                  "exclusiveMinimum": 0
                                                 }
                                               },
                                               "required": [
@@ -48826,7 +49915,9 @@
                                       "drill",
                                       "facemill",
                                       "threadmill",
-                                      "engraver"
+                                      "engraver",
+                                      "tap",
+                                      "reamer"
                                     ]
                                   },
                                   "diameter": {
@@ -48944,7 +50035,9 @@
                                       "material-removed",
                                       "nc-replay",
                                       "machine-travel",
-                                      "machine-clearance"
+                                      "machine-clearance",
+                                      "setup-workholding",
+                                      "part-coverage"
                                     ]
                                   },
                                   "status": {
@@ -49294,6 +50387,17 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "setupOrientation": {
+                    "type": "string",
+                    "enum": [
+                      "+Z",
+                      "-Z",
+                      "+X",
+                      "-X",
+                      "+Y",
+                      "-Y"
+                    ]
+                  },
                   "material": {
                     "type": "string",
                     "minLength": 1,
@@ -50043,7 +51147,9 @@
                               "type": "string",
                               "enum": [
                                 "drill",
-                                "spot"
+                                "spot",
+                                "tap",
+                                "ream"
                               ]
                             }
                           },
@@ -50459,7 +51565,11 @@
                                 "roughing",
                                 "parallel",
                                 "waterline",
-                                "steep-shallow"
+                                "steep-shallow",
+                                "scallop",
+                                "spiral",
+                                "radial",
+                                "flat"
                               ]
                             },
                             "slopeAngle": {
@@ -50489,6 +51599,22 @@
                               "type": "string",
                               "minLength": 1,
                               "maxLength": 80
+                            },
+                            "center": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -50496,6 +51622,94 @@
                             "tool",
                             "strategy",
                             "mode"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            },
+                            "name": {
+                              "type": "string",
+                              "maxLength": 120
+                            },
+                            "tool": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            },
+                            "rpm": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "feed": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "plungeFeed": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "stepdown": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "stepover": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "coolant": {
+                              "type": "string",
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist"
+                              ]
+                            },
+                            "radialEngagement": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "strategy": {
+                              "type": "string",
+                              "enum": [
+                                "multiaxis"
+                              ]
+                            },
+                            "top": {
+                              "type": "number"
+                            },
+                            "angle": {
+                              "type": "number"
+                            },
+                            "toolAxis": {
+                              "type": "string",
+                              "enum": [
+                                "normal",
+                                "lead"
+                              ]
+                            },
+                            "lead": {
+                              "type": "number",
+                              "minimum": -85,
+                              "maximum": 85
+                            },
+                            "tilt": {
+                              "type": "number",
+                              "minimum": -85,
+                              "maximum": 85
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "stepover",
+                            "strategy",
+                            "top"
                           ],
                           "additionalProperties": false
                         }
@@ -50528,7 +51742,9 @@
                             "drill",
                             "facemill",
                             "threadmill",
-                            "engraver"
+                            "engraver",
+                            "tap",
+                            "reamer"
                           ]
                         },
                         "diameter": {
@@ -51067,7 +52283,10 @@
                                             "drill",
                                             "dwell",
                                             "peck",
-                                            "chipBreak"
+                                            "chipBreak",
+                                            "tap",
+                                            "ream",
+                                            "bore"
                                           ]
                                         },
                                         "to": {
@@ -51104,6 +52323,10 @@
                                         },
                                         "retractHeight": {
                                           "type": "number"
+                                        },
+                                        "pitch": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0
                                         }
                                       },
                                       "required": [
@@ -51662,7 +52885,11 @@
                           "roughing",
                           "parallel",
                           "waterline",
-                          "steep-shallow"
+                          "steep-shallow",
+                          "scallop",
+                          "spiral",
+                          "radial",
+                          "flat"
                         ]
                       },
                       "steepAngle": {
@@ -52605,7 +53832,11 @@
                           "roughing",
                           "parallel",
                           "waterline",
-                          "steep-shallow"
+                          "steep-shallow",
+                          "scallop",
+                          "spiral",
+                          "radial",
+                          "flat"
                         ]
                       },
                       "steepAngle": {
@@ -53461,7 +54692,10 @@
                                             "drill",
                                             "dwell",
                                             "peck",
-                                            "chipBreak"
+                                            "chipBreak",
+                                            "tap",
+                                            "ream",
+                                            "bore"
                                           ]
                                         },
                                         "to": {
@@ -53498,6 +54732,10 @@
                                         },
                                         "retractHeight": {
                                           "type": "number"
+                                        },
+                                        "pitch": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0
                                         }
                                       },
                                       "required": [
@@ -54319,7 +55557,10 @@
                                           "drill",
                                           "dwell",
                                           "peck",
-                                          "chipBreak"
+                                          "chipBreak",
+                                          "tap",
+                                          "ream",
+                                          "bore"
                                         ]
                                       },
                                       "to": {
@@ -54356,6 +55597,10 @@
                                       },
                                       "retractHeight": {
                                         "type": "number"
+                                      },
+                                      "pitch": {
+                                        "type": "number",
+                                        "exclusiveMinimum": 0
                                       }
                                     },
                                     "required": [
@@ -65102,6 +66347,607 @@
                       ],
                       "additionalProperties": false
                     },
+                    "machine": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "mill",
+                            "lathe",
+                            "3dprinter"
+                          ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "override",
+                            "kernel",
+                            "generator",
+                            "inferred",
+                            "settings"
+                          ]
+                        },
+                        "mismatch": {
+                          "type": "object",
+                          "properties": {
+                            "inferred": {
+                              "type": "string",
+                              "enum": [
+                                "mill",
+                                "lathe",
+                                "3dprinter"
+                              ]
+                            },
+                            "reasons": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "inferred",
+                            "reasons"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "axes": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN"
+                              ]
+                            }
+                          ]
+                        },
+                        "turns": {
+                          "type": "string"
+                        },
+                        "workholding": {
+                          "type": "string"
+                        },
+                        "assumed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "workholding",
+                              "table",
+                              "stock"
+                            ]
+                          }
+                        },
+                        "xMode": {
+                          "type": "string",
+                          "enum": [
+                            "diameter",
+                            "radius"
+                          ]
+                        },
+                        "turret": {
+                          "type": "string",
+                          "enum": [
+                            "rear",
+                            "front"
+                          ]
+                        },
+                        "bodies": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "stock",
+                                  "jaw",
+                                  "parallel",
+                                  "vise-base",
+                                  "clamp",
+                                  "table",
+                                  "chuck",
+                                  "collet",
+                                  "tailstock",
+                                  "bed",
+                                  "build-volume"
+                                ]
+                              },
+                              "shape": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": [
+                                          "box"
+                                        ]
+                                      },
+                                      "min": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN"
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          "y": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN"
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          "z": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN"
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "max": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN"
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          "y": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN"
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          "z": {
+                                            "anyOf": [
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "Infinity",
+                                                  "-Infinity",
+                                                  "NaN"
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "min",
+                                      "max"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": [
+                                          "cylinder-x"
+                                        ]
+                                      },
+                                      "x0": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "x1": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "radius": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "inner": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "x0",
+                                      "x1",
+                                      "radius",
+                                      "inner"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": [
+                                          "cone-x"
+                                        ]
+                                      },
+                                      "x0": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "x1": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "r0": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "r1": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "x0",
+                                      "x1",
+                                      "r0",
+                                      "r1"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "rotateX": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "spins": {
+                                "type": "boolean"
+                              },
+                              "assumed": {
+                                "type": "boolean"
+                              },
+                              "obstacle": {
+                                "type": "boolean"
+                              },
+                              "wire": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "role",
+                              "shape",
+                              "spins",
+                              "assumed",
+                              "obstacle"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "spin": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "segment": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "rate": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "segment",
+                              "rate"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "collisions": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        "tool": {
+                          "type": "object",
+                          "properties": {
+                            "family": {
+                              "type": "string",
+                              "enum": [
+                                "mill",
+                                "lathe",
+                                "nozzle"
+                              ]
+                            },
+                            "diameter": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            "width": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            "noseRadius": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN"
+                                  ]
+                                }
+                              ]
+                            },
+                            "insert": {
+                              "type": "string"
+                            },
+                            "internal": {
+                              "type": "boolean"
+                            },
+                            "turret": {
+                              "type": "string",
+                              "enum": [
+                                "rear",
+                                "front"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "family",
+                            "diameter",
+                            "width",
+                            "noseRadius",
+                            "insert",
+                            "internal"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "source",
+                        "axes",
+                        "turns",
+                        "workholding",
+                        "assumed",
+                        "bodies",
+                        "spin",
+                        "collisions",
+                        "tool"
+                      ],
+                      "additionalProperties": false
+                    },
                     "revision": {
                       "type": "string"
                     }
@@ -65880,6 +67726,25 @@
         ],
         "additionalProperties": false
       },
+      "ConflictEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "Conflict"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "_tag",
+          "message"
+        ],
+        "additionalProperties": false
+      },
       "GcodeActionErrorEncoded": {
         "type": "object",
         "properties": {
@@ -66491,25 +68356,6 @@
             "type": "string",
             "enum": [
               "Forbidden"
-            ]
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "_tag",
-          "message"
-        ],
-        "additionalProperties": false
-      },
-      "ConflictEncoded": {
-        "type": "object",
-        "properties": {
-          "_tag": {
-            "type": "string",
-            "enum": [
-              "Conflict"
             ]
           },
           "message": {

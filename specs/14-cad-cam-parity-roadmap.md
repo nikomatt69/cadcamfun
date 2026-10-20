@@ -289,7 +289,7 @@ within `1e-6` per revolution.
 ## 6. Acceptance gates for this pass
 
 1. `bun test packages/core` exits 0 with every previous test still passing.
-2. `bunx tsc -p packages/core/tsconfig.json --noEmit` exits 0.
+2. `bun check -p packages/core/tsconfig.json --noEmit` exits 0.
 3. `monaco-editor` removed from `apps/desktop/package.json`; the lockfile is
    not regenerated in this pass (no full `bun install`) but the next natural
    install will not pull the package.

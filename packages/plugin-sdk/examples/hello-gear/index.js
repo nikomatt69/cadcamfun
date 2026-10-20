@@ -7298,7 +7298,7 @@ var OrientSchema = TaggedStruct("Orient", {
   b: optionalKey2(Finite),
   c: optionalKey2(Finite)
 });
-var CycleKindSchema = Literals(["drill", "dwell", "peck", "chipBreak", "tap", "ream"]);
+var CycleKindSchema = Literals(["drill", "dwell", "peck", "chipBreak", "tap", "ream", "bore"]);
 var CycleSchema = TaggedStruct("Cycle", {
   cycle: CycleKindSchema,
   to: Vec3Schema,
@@ -7460,7 +7460,7 @@ class DrillParams extends Class3("cam/DrillParams")(Struct({
   peck: withDefault2(NonNegative3, 0),
   chipBreak: withDefault2(Boolean3, false),
   dwell: withDefault2(NonNegative3, 0),
-  mode: withDefault2(Literals(["drill", "tap", "ream"]), "drill"),
+  mode: withDefault2(Literals(["drill", "tap", "ream", "bore"]), "drill"),
   pitch: optionalKey2(Positive3)
 }).check(heightsOrdered).check(makeFilter2((p) => p.mode !== "tap" || p.pitch !== undefined ? undefined : "a tapping cycle needs the thread pitch"))) {
 }

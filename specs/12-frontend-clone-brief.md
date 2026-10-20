@@ -58,7 +58,7 @@ If your page needs data owned by another vertical, call its endpoint through the
 ## Definition of done (per vertical)
 
 1. Every page file of your vertical is a real screen (no `PageStub`), visually and behaviourally matching the legacy page. `apps/desktop/test/app-mount.test.ts` checks each route mounts over the real sidecar handlers; it must pass for your routes.
-2. `bunx tsc -p apps/desktop/tsconfig.json`, `bunx tsc -p apps/sidecar/tsconfig.json`, `bunx tsc -p packages/api/tsconfig.json` exit 0.
+2. `bun check -p apps/desktop/tsconfig.json`, `bun check -p apps/sidecar/tsconfig.json`, `bun check -p packages/api/tsconfig.json` exit 0.
 3. `bun test apps/desktop apps/sidecar packages/api` passes. New backend routes follow `11-api-parity-brief.md` (same path, methods, payloads, status codes, `{ message }` bodies) with in-process HTTP tests. UI logic that can be tested without pixels (stores, reducers, tool state machines) has `bun:test` tests; screens that submit data have a mount/interaction test using `test/helpers/live-app.ts`.
 4. No browser: do **not** launch Chrome/Helium/Playwright. Verification is typecheck, `bun test`, and `bun run --filter @cadcamfun/desktop build`.
 5. English identifiers/comments/docs; UI copy stays as the legacy app wrote it. No `.env*` reads, no commits, no imports from `.reference/`.

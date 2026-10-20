@@ -295,7 +295,7 @@ Proposed commands once the corresponding Implementation exists:
 ```sh
 bun --no-env-file test packages/core/src/cam/kernel
 bun --no-env-file test packages/core
-bun --no-env-file x tsc -p packages/core/tsconfig.json
+bun --no-env-file check -p packages/core/tsconfig.json
 git diff --check -- packages/core/src/cam specs/04-core-cam.md specs/12-professional-cad-cam.md specs/29-native-cam-kernel.md
 ```
 

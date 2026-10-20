@@ -148,7 +148,7 @@ The agent stays a CAD/CAM colleague, not an HTTP Swiss-army knife. The model-vis
 3. Destructive actions require verifiable native confirmation in-process and over HTTP, alongside authorized project/write scope. Grouped tools use stricter native `ask` until proven action escalation; a model flag/write token alone is not confirmation. Read tokens fail before execute.
 4. External round-trip: with a paired token, a real embedded host plus `@nikoemme_/cadcamfun-nikcli-plugin` performs describe → add elements → create operation → generate G-code → verify against a running sidecar, without any provider key (fake model, as in spec 16 acceptance §6).
 5. Isolation unchanged: the sentinel `~/.config/nikcli` test passes; only the app-owned mod loads; user/project mods and plugin auto-install remain disabled.
-6. `bunx tsc -p packages/{ai,api}/tsconfig.json`, the sidecar and desktop typechecks, and `bun test packages apps` are clean; generated clients are regenerated where ids appear.
+6. `bun check -p packages/ai/tsconfig.json` and `bun check -p packages/api/tsconfig.json`, the sidecar and desktop typechecks, and `bun test packages apps` are clean; generated clients are regenerated where ids appear.
 
 ## 11. Change log
 

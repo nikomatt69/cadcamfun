@@ -35,7 +35,7 @@ Do not treat `20-integral-roadmap.md` or `21-integration-master-plan.md` as the 
 ```bash
 bun install                                   # install workspace deps
 bun test packages apps                        # all tests
-bunx tsc -p packages/<name>/tsconfig.json     # typecheck one package
+bun check -p packages/<name>/tsconfig.json     # typecheck one package
 bun run db:generate                           # drizzle-kit: new migration from schema.ts
 bun run db:migrate                            # apply migrations to ./data/cadcamfun.db
 ```

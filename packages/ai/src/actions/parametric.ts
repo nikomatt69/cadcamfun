@@ -80,7 +80,7 @@ export const runParametricFromElement = (input: Input<"cad.parametric_from_eleme
 export const runParametricConvert = (input: Input<"cad_edit.parametric_convert">, context: ActionContext) =>
   of({ action: "convert", elementId: input.elementId, create: true, ...(input.depth !== undefined ? { depth: input.depth } : {}), ...(input.name !== undefined ? { name: input.name } : {}) }, context)
 
-export const runParametricValidate = (input: Input<"cad.parametric_validate">) => parametricReport(input.history)
+export const runParametricValidate = (input: Input<"cad.parametric_validate">) => parametricReport(input.history as History)
 export const runParametricFastener = (input: Input<"cad.parametric_fastener">) => lookupFastener(input)
 export const runParametricRecipe = (input: Input<"cad.parametric_recipe">, context: ActionContext) => runRecipe(input, context, false)
 export const runParametricRecipeCreate = (input: Input<"cad_edit.parametric_recipe_create">, context: ActionContext) => runRecipe(input, context, true)
@@ -108,7 +108,7 @@ export const runParametricDrawing = async (input: Input<"cad.drawing">, context:
     revision = inspected["revision"]; projectId = inspected["projectId"]; drawingId = inspected["drawingId"]
   }
   try {
-    const sheet = drawing.generateSheet(history!, input.options ?? {})
+    const sheet = drawing.generateSheet(history as History, input.options ?? {})
     return { ok: true, mutated: false, ...sheet, elementId: input.elementId, revision, projectId, drawingId }
   } catch (cause) {
     return { ok: false, error: cause instanceof Error ? cause.message : "The drawing could not be generated." }
@@ -116,12 +116,12 @@ export const runParametricDrawing = async (input: Input<"cad.drawing">, context:
 }
 export const runParametricCreate = (input: Input<"cad_edit.parametric_create">, context: ActionContext) =>
   of({
-    action: "create", history: input.history, name: input.name,
+    action: "create", history: input.history as History, name: input.name,
     ...(input.x !== undefined ? { x: input.x } : {}), ...(input.y !== undefined ? { y: input.y } : {}),
     ...(input.z !== undefined ? { z: input.z } : {}), ...(input.layer !== undefined ? { layer: input.layer } : {})
   }, context)
 export const runParametricUpdate = (input: Input<"cad_edit.parametric_update">, context: ActionContext) =>
-  of({ action: "update", elementId: input.elementId, parameters: input.parameters, expectedRevision: input.expectedRevision }, context)
+  of({ action: "update", elementId: input.elementId, parameters: input.parameters as Input<"cad_edit.parametric_update">["parameters"] as Record<string, string | number>, expectedRevision: input.expectedRevision }, context)
 
 /** The history given inline, or read from an existing parametric part; an error result when neither works. */
 const historyOf = async (input: { elementId?: string; history?: unknown }, context: ActionContext): Promise<{ readonly history: History } | { readonly error: unknown }> => {

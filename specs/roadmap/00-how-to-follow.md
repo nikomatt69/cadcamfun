@@ -50,7 +50,7 @@ Vocabulary: module, interface, implementation, depth, seam, adapter, leverage, l
 
 ## 7. Finish a step
 
-1. `bunx tsc -p <touched package>/tsconfig.json`
+1. `bun check -p <touched package>/tsconfig.json`
 2. `bun test <package dir>`
 3. The step's Verify command in its spec.
 4. Mark the README row `done`. Append Change log on the step spec.

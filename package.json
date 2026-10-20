@@ -3,13 +3,16 @@
   "private": true,
   "version": "6.0.0",
   "type": "module",
-  "packageManager": "bun@1.4.2",
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "bun": ">=1.4.3"
+  },
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "turbo run typecheck && tsgo -p tsconfig.json --noEmit",
+    "typecheck": "turbo run typecheck && bun check -p tsconfig.json",
     "test": "bun test packages apps scripts",
     "build": "bun scripts/build.ts",
     "build:sidecar": "bun scripts/build.ts --only=compile,resources",
@@ -19,13 +22,10 @@
     "generate:check": "bun run --filter @cadcamfun/api generate:check",
     "db:generate": "bun run --filter @cadcamfun/db generate",
     "db:migrate": "bun run --filter @cadcamfun/db migrate",
-    "tsgo": "tsgo",
-    "tsc": "tsc",
     "turbo": "turbo"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "babel-plugin-module-resolver": "^5.0.2",
     "babel-preset-expo": "~57.0.14",
     "nativewind": "^4.1.23",

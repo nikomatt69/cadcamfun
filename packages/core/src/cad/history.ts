@@ -50,7 +50,15 @@ const FRAMES: Readonly<Record<PlaneName, { readonly u: V3; readonly v: V3; reado
   ZX: { u: { x: 0, y: 0, z: 1 }, v: { x: 1, y: 0, z: 0 }, n: { x: 0, y: 1, z: 0 } }
 }
 
-type Dimensioned<C> = C extends { readonly value: number } ? Omit<C, "value"> & { readonly value: Dimension } : C
+/**
+ * A constraint whose dimension may be an expression: the one field that carries the measure (`value` for a distance, a radius or
+ * an angle; the two semi-axes of an `ellipseSize`) becomes a `Dimension`, everything else is left alone.
+ */
+type Dimensioned<C> = C extends { readonly value: number }
+  ? Omit<C, "value"> & { readonly value: Dimension }
+  : C extends { readonly radiusX: number; readonly radiusY: number }
+    ? Omit<C, "radiusX" | "radiusY"> & { readonly radiusX: Dimension; readonly radiusY: Dimension }
+    : C
 /** A constraint whose dimension may be an expression. */
 export type DimConstraint = Dimensioned<Constraint>
 
@@ -871,6 +879,18 @@ export const rebuild = (history: History): RebuildResult => {
           })
           if (!ok) break
           for (const c of expanded.constraints) {
+            if (c.type === "ellipseSize") {
+              const rx = dim(c.radiusX, f.id)
+              const ry = dim(c.radiusY, f.id)
+              if (rx === undefined || ry === undefined) { ok = false; continue }
+              if (!(rx > 0) || !(ry > 0)) {
+                issues.push({ feature: f.id, severity: "error", message: `An ellipseSize constraint needs positive semi-axes (they are ${rx} and ${ry})` })
+                ok = false
+                continue
+              }
+              constraints.push({ ...c, radiusX: rx, radiusY: ry } as Constraint)
+              continue
+            }
             if ("value" in c) {
               const v = dim(c.value as Dimension, f.id)
               if (v === undefined) { ok = false; continue }

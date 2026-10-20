@@ -4,7 +4,7 @@
   "type": "module",
   "exports": { ".": "./src/index.ts", "./schema": "./src/schema.ts" },
   "scripts": {
-    "typecheck": "tsgo -p tsconfig.json --noEmit",
+    "typecheck": "bun check -p tsconfig.json",
     "generate": "drizzle-kit generate",
     "migrate": "bun src/migrate.ts"
   },

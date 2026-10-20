@@ -235,7 +235,7 @@ faces, persistent naming and 2D drafting remain pending, so the professional ker
 claimed complete.
 
 Verification: `bun --no-env-file test packages/core/src/cad/brep`,
-`bun --no-env-file test packages/core`, and `bun --no-env-file x tsc -p packages/core/tsconfig.json`.
+`bun --no-env-file test packages/core`, and `bun --no-env-file check -p packages/core/tsconfig.json`.
 
 ## 8. Change log
 

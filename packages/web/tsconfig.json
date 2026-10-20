@@ -1,10 +1,7 @@
 {
   "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
+    "types": ["bun"],
     "noEmit": true
   },
   "include": ["src/env.d.ts", "src/data", "src/lib", "script"]

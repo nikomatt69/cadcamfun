@@ -413,7 +413,7 @@ Honest limits: a specialist does not see the conversation (the prompt is its who
 5. The 10 skills exist as `<configDir>/skills/<name>/SKILL.md`.
 6. A scripted tool call → handler → result → final text round-trip works through the embedded host (`hostChatStream`) with no real provider (`MockLanguageModelV4`).
 7. The credential file is mode 0600, never written outside `<dataDir>/ai/credentials.json`, and the host's copy clears on shutdown.
-8. `bunx tsc -p packages/ai/tsconfig.json` is clean.
+8. `bun check -p packages/ai/tsconfig.json` is clean.
 9. The schema for `AiEvent` covers `delta`, `tool_call`, `tool_result`, `permission_request`, `done`, `error` plus `step`, `reasoning`, `tool_progress`, `todo`, `goal`, `retry`, `compacted`.
 
 ## 9. Change log

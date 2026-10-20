@@ -135,8 +135,8 @@ curl "$DOCS_ORIGIN/llm?path=/docs/api/projects&format=prompt"`}</DocCode>
         <tr><td><code>studio</code></td><td><code>bun script/studio-server.ts</code></td><td>Local Studio against <code>CADCAMFUN_DB</code>, <code>DATABASE_URL</code> or <code>data/cadcamfun.db</code></td></tr>
         <tr><td><code>build</code> / <code>preview</code></td><td><code>astro build</code> / <code>astro preview</code></td><td>Produce and serve the production build</td></tr>
         <tr><td><code>deploy</code></td><td><code>bun script/deploy.ts</code></td><td>Publish to Cloudflare</td></tr>
-        <tr><td><code>check</code></td><td><code>check:docs-index</code> then <code>check:api-reference</code></td><td>Fail when the search index or API reference is stale</td></tr>
-        <tr><td><code>typecheck</code></td><td><code>tsc --noEmit</code>, then <code>check</code></td><td>Type errors plus both freshness checks</td></tr>
+        <tr><td><code>check:freshness</code></td><td><code>check:docs-index</code> then <code>check:api-reference</code></td><td>Fail when the search index or API reference is stale</td></tr>
+        <tr><td><code>typecheck</code></td><td><code>bun check -p tsconfig.json</code>, then <code>check:freshness</code></td><td>Type errors plus both freshness checks</td></tr>
         <tr><td><code>generate:api-reference</code></td><td><code>script/generate-api-reference.mjs</code></td><td>Regenerate the reference after a contract change</td></tr>
         </tbody>
     </table>

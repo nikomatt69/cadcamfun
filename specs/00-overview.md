@@ -79,7 +79,7 @@ Agents in the same wave never touch the same directory, so they can run concurre
 ## 5. Definition of done (every WP)
 
 1. `bun install` at the repo root succeeds.
-2. `bunx tsc -p <package>/tsconfig.json` exits 0 (strict, `noUncheckedIndexedAccess`).
+2. `bun check -p <package>/tsconfig.json` exits 0 (strict, `noUncheckedIndexedAccess`).
 3. `bun test <package dir>` passes; new behaviour has tests; bug fixes have a regression test.
 4. Public surface documented in the WP's spec (update it if the surface changed).
 5. No imports from `.reference/`, no `any` in exported signatures, no `process.env` reads outside the config module.

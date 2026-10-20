@@ -20,7 +20,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "typecheck": "tsgo -p tsconfig.json --noEmit"
+    "typecheck": "bun check -p tsconfig.json"
   },
   "dependencies": {
     "zod": "^4.1.8"

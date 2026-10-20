@@ -51,7 +51,7 @@ client), `pages/` (one-line route adapters, no logic), `features/<name>/`
 ```bash
 bun install                                   # install workspace deps
 bun test packages apps                        # all tests
-bunx tsc -p packages/<name>/tsconfig.json     # typecheck one package
+bun check -p packages/<name>/tsconfig.json     # typecheck one package
 bun run db:generate                           # new migration from schema.ts
 bun run db:migrate                            # apply migrations to ./data/cadcamfun.db
 bun run desktop:dev                           # build sidecar + Tauri dev window

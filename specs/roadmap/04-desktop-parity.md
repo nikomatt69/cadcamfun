@@ -33,7 +33,7 @@ Bug-for-bug port from `.reference/` (read-only). Append Done/Deviations to `12-f
 ## Verify
 
 ```bash
-bunx tsc -p apps/desktop/tsconfig.json
+bun check -p apps/desktop/tsconfig.json
 bun test apps/desktop
 bun run --filter @cadcamfun/desktop build
 ```

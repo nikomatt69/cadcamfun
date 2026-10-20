@@ -29,7 +29,7 @@ const toc = [
 >
   <section id="before" class="doc-section">
     <h2>Requirements</h2>
-    <p>The workspace declares Bun <code>1.4.2</code> as its package manager. Use the repository lockfile for dependency installation. Native desktop development also requires a Rust toolchain, the platform's Tauri build dependencies, and an installed system webview. The Tauri CLI is already a desktop development dependency.</p>
+    <p>The workspace declares Bun <code>1.4.3</code> as its package manager. Use the repository lockfile for dependency installation. Native desktop development also requires a Rust toolchain, the platform's Tauri build dependencies, and an installed system webview. The Tauri CLI is already a desktop development dependency.</p>
     <ul>
       <li><strong>macOS:</strong> Xcode command-line tools for Rust/native linking and packaging.</li>
       <li><strong>Windows:</strong> the MSVC toolchain and WebView2 runtime/build prerequisites.</li>
@@ -162,7 +162,7 @@ curl --fail-with-body "$CADCAM_URL/api/projects/$CADCAM_PROJECT_ID" \
     <table>
       <thead><tr><th>Tool</th><th>Version</th><th>Needed for</th></tr></thead>
       <tbody>
-        <tr><td>Bun</td><td>1.4.2 (the repository's <code>packageManager</code>)</td><td>Everything: install, tests, sidecar, scripts</td></tr>
+        <tr><td>Bun</td><td>1.4.3 (the repository's <code>packageManager</code>)</td><td>Everything: install, tests, sidecar, scripts</td></tr>
         <tr><td>Rust toolchain + Tauri prerequisites</td><td>stable; platform webview libraries on Linux</td><td>The desktop shell (<code>desktop:dev</code>, builds)</td></tr>
         <tr><td>SQLite CLI</td><td>any</td><td>Optional: read-only database inspection</td></tr>
         <tr><td>Xcode</td><td>—</td><td>Only for the iOS companion</td></tr>

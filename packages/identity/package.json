@@ -11,7 +11,7 @@
     "deploy": "bun script/deploy.ts",
     "migrate:local": "wrangler d1 migrations apply DB --local",
     "migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check -p tsconfig.json",
     "types": "wrangler types",
     "test": "bun test test",
     "deploy:staging": "bun script/deploy.ts --staging"

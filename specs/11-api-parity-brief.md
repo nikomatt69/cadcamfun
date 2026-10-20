@@ -45,7 +45,7 @@ Goal: every legacy route in `specs/api-inventory.md` exists in the sidecar with 
 ## Definition of done
 
 - Every route/method of your groups implemented (or listed under "Deviations" with a reason).
-- `cd packages/api && bunx tsc -p tsconfig.json` and `cd apps/sidecar && bunx tsc -p tsconfig.json` exit 0.
+- `cd packages/api && bun check -p tsconfig.json` and `cd apps/sidecar && bun check -p tsconfig.json` exit 0.
 - `bun test apps/sidecar` passes; per group, tests cover happy path, validation errors, permission failures and not-found with the exact legacy messages.
 - English only. Do not commit. Never read `.env*` files.
 

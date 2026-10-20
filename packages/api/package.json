@@ -7,7 +7,7 @@
     "./sdk": "./src/sdk/generated/index.ts"
   },
   "scripts": {
-    "typecheck": "tsgo -p tsconfig.json --noEmit",
+    "typecheck": "bun check -p tsconfig.json",
     "coverage": "bun scripts/api-coverage.ts",
     "generate": "bun scripts/generate-clients.ts",
     "generate:check": "bun scripts/generate-clients.ts --check"

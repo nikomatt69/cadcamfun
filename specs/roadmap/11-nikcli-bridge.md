@@ -29,8 +29,8 @@ MCP remains **rejected** (`27` §2). Plugin AI-tool contributions (`plugin-sdk` 
 ## Verify
 
 ```bash
-bunx tsc -p packages/ai/tsconfig.json
-bunx tsc -p packages/api/tsconfig.json
+bun check -p packages/ai/tsconfig.json
+bun check -p packages/api/tsconfig.json
 bun test packages/ai apps/sidecar
 ```
 

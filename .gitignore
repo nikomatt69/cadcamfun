@@ -35,8 +35,6 @@ server-control-cnc
 cadcam-sdk
 .turbo
 .prisma
-.yarnrc.yml
-.yarn
 .vscode
 certificates
 .cursor/rules

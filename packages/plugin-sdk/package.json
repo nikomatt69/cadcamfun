@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "scripts": { "typecheck": "tsgo -p tsconfig.json --noEmit" },
+  "scripts": { "typecheck": "bun check -p tsconfig.json" },
   "dependencies": { "effect": "4.0.0-rc.112", "@cadcamfun/core": "workspace:*" },
   "devDependencies": {}
 }

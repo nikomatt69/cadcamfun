@@ -179,7 +179,7 @@ The tests that enforce it:
 ### Definition of done (every phase)
 
 1. `bun install` at the repo root succeeds.
-2. `bunx tsc -p <package>/tsconfig.json` exits 0 for every touched package.
+2. `bun check -p <package>/tsconfig.json` exits 0 for every touched package.
 3. `bun test <package dir>` passes; new behaviour has tests; bug fixes have regression tests.
 4. The spec that owns the surface has its "Change log" entry and "Status" updated (`01-conventions.md` §4).
 5. The AI agent tests in the cross-phase invariant table still pass.
