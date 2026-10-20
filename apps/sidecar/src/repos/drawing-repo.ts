@@ -2,6 +2,7 @@ import type { DrawingDetail, DrawingRow } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import { desc, eq } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
+import { LiveEvents } from "../services/live-events.ts"
 import { cam } from "@cadcamfun/core"
 import { createHash } from "node:crypto"
 
@@ -54,7 +55,11 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
     DrawingRepo,
     Effect.gen(function*() {
       const { query } = yield* Database
+      const events = yield* LiveEvents
       const T = schema.drawingTable
+      const announceDrawing = (id: string) => query("drawings.changedProject", async (db) =>
+        (await db.select({ projectId: T.projectId }).from(T).where(eq(T.id, id)))[0]
+      ).pipe(Effect.flatMap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void))
       return DrawingRepo.of({
         find: (userId, id) =>
           query("drawings.find", async (db) => {
@@ -76,7 +81,7 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
           query("drawings.create", async (db) => {
             const [row] = await db.insert(T).values({ name: d.name, description: d.description ?? null, data: d.data || {}, projectId }).returning()
             return toDrawingRow(row!)
-          }),
+          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         update: (id, d) =>
           query("drawings.update", async (db) => {
             const [row] = await db.update(T).set({
@@ -87,7 +92,7 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
               updatedAt: new Date()
             }).where(eq(T.id, id)).returning()
             return toDrawingRow(row!)
-          }),
+          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         writeIfUnchanged: (id, expectedHash, data) => query("drawings.writeIfUnchanged", (db) => db.transaction((tx): DrawingWrite => {
           const row = tx.select({ data: T.data }).from(T).where(eq(T.id, id)).get()
           if (!row) return { ok: false, reason: "missing", drawingId: id }
@@ -96,7 +101,7 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
           const updatedAt = new Date()
           tx.update(T).set({ data, updatedAt }).where(eq(T.id, id)).run()
           return { ok: true, drawingId: id, previousHash: currentHash, contentHash: drawingContentHash(data), updatedAt: updatedAt.toISOString() }
-        })),
+        })).pipe(Effect.tap((result) => result.ok ? announceDrawing(id) : Effect.void)),
         configureStock: (id, stock, expectedHash) => query("drawings.configureStock", (db) => db.transaction((tx) => {
           const drawing = tx.select().from(T).where(eq(T.id, id)).get()
           if (!drawing) throw new Error("Drawing disappeared before stock update.")
@@ -123,9 +128,9 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
           }
           tx.update(T).set({ data: { ...data, stock }, updatedAt: new Date() }).where(eq(T.id, id)).run()
           return invalidated
-        })),
-        remove: (id) => query("drawings.remove", async (db) => void (await db.delete(T).where(eq(T.id, id))))
+        })).pipe(Effect.tap(() => announceDrawing(id))),
+        remove: (id) => query("drawings.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId }))[0]).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid)
       })
     })
-  )
+  ).pipe(Layer.provide(LiveEvents.layer))
 }

@@ -2,6 +2,7 @@ import { createEffect, createSignal, onCleanup, untrack } from "solid-js"
 import { useApp } from "../shared/state/context.ts"
 import type { Client } from "../shared/state/client.ts"
 import type { Effect } from "effect"
+import { onCacheInvalidated } from "../shared/state/queries.ts"
 
 export function useRead<A>(read: (client: Client) => Effect.Effect<A, unknown>) {
   const app = useApp()
@@ -26,6 +27,7 @@ export function useRead<A>(read: (client: Client) => Effect.Effect<A, unknown>) 
     finally { if (current === generation) setLoading(false) }
   }
   void refetch()
+  onCacheInvalidated(app.cache, () => { void refetch() })
   return { data, error, loading, refetch }
 }
 
@@ -69,5 +71,6 @@ export function useKeyedRead<K, A>(
     finally { if (current === generation) setLoading(false) }
   }
   createEffect(() => { key(); void refetch() })
+  onCacheInvalidated(app.cache, () => { void refetch() })
   return { data, error, loading, refetch }
 }

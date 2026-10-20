@@ -22,6 +22,8 @@ import { HostToolRegistry } from "./tool-registry.ts"
 import { findHostSession } from "./chat.ts"
 import { providerOAuth } from "./provider-oauth.ts"
 import { readOAuthGrants } from "./oauth-store.ts"
+import { toolPermissionPattern } from "./permission-modes.ts"
+import { exposedActions, EXPOSED_TOOL_IDS, nameOf } from "../actions/catalogue.ts"
 
 /** A tool exposed to the model. `execute` receives already zod-validated input. */
 export interface HostToolSpec {
@@ -114,6 +116,8 @@ export interface NikCliRuntime {
    * awaits it; boot never does (the download must not delay the first frame).
    */
   readonly catalogueReady: Promise<CatalogueSeed>
+  /** Download fresh metadata and reload provider state without disposing conversations. */
+  refreshCatalogue(): Effect.Effect<void, AiConfigError>
   /** Get or lazily create the host bound to the project's scratch directory. */
   host(projectId: string): Effect.Effect<ProjectHost, AiConfigError>
   /** Push a key into the host (`provider.api.set`). */
@@ -226,10 +230,24 @@ export const makeNikCliRuntime = (
 
     // The metadata seed shares the first catalogue reader's lifecycle, not application startup.
     const catalogueController = new AbortController()
+    const catalogueHosts = new Set<ProjectHost>()
     let catalogueReady: Promise<CatalogueSeed> | undefined
     const ensureCatalogue = () => {
       assertOpen()
-      return catalogueReady ??= seedModelsCache(paths, { ...options.catalogue, signal: catalogueController.signal })
+      if (catalogueReady !== undefined) return catalogueReady
+      // A failed download must not stick for the process lifetime: the next
+      // catalogue read or host creation tries again.
+      const pending = seedModelsCache(paths, { ...options.catalogue, signal: catalogueController.signal }).then(async (seed) => {
+        // A host may have started during an outage. Loading the file later must also replace its fallback catalogue.
+        if (seed === "seeded" || seed === "bundled") for (const host of catalogueHosts) {
+          await host.client["config-management"].reload()
+          for (const [providerId, key] of pendingKeys) await host.client.provider.api({ providerID: providerId, key })
+        }
+        if (seed === "unavailable" && catalogueReady === pending) catalogueReady = undefined
+        return seed
+      })
+      catalogueReady = pending
+      return pending
     }
 
     let providers = options.providers
@@ -311,7 +329,14 @@ export const makeNikCliRuntime = (
           ...(spec.formatValidationError ? { formatValidationError: spec.formatValidationError } : {}),
           execute: async (args: never, ctx: ToolExecuteContext) => {
             assertOpen()
-            await ctx.ask({ permission: spec.id, patterns: [`project:${projectId}`], always: [`project:${projectId}`], metadata: { input: args } })
+            const pattern = toolPermissionPattern(spec.id, args, projectId, ctx.agent)
+            const action = EXPOSED_TOOL_IDS.includes(spec.id)
+              ? exposedActions(spec.id).find((entry) => nameOf(entry) === (args as { action?: unknown }).action)
+              : undefined
+            await ctx.ask({ permission: spec.id, patterns: [pattern], always: [pattern], metadata: {
+              input: args,
+              context: { application: "CADCAMFUN", projectId, ...(action ? { action: { id: action.id, kind: action.kind, effects: action.effects } } : {}) }
+            } })
             assertOpen()
             const call = { sessionId: ctx.sessionID, projectId, signal: ctx.abort }
             // Under `code_mode` the call id is the program's, not this tool's: record what happened so the program's inner calls
@@ -347,10 +372,11 @@ export const makeNikCliRuntime = (
       const scratch = projectScratchDir(paths, projectId)
       mkdirSync(scratch, { recursive: true })
       const directory = realpathSync(scratch)
-      // A restored external-provider chat can arrive before the model browser.
-      if ([...pendingKeys.keys()].some((id) => !providers.some((provider) => provider.id === id))) {
-        await bootstrapStep("model catalogue", ensureCatalogue)
-      }
+      // The host builds its provider database once, at Instance creation, from
+      // `<cache>/models.json`: a host created before the seed lands would keep
+      // only the declared providers for its whole lifetime. Every host
+      // therefore waits for the seed (instant once the file exists).
+      await bootstrapStep("model catalogue", ensureCatalogue)
       await bootstrapStep("configuration", () => writeConfig(projectId))
       const sdk = await bootstrapStep("SDK import", getSdk)
       assertOpen()
@@ -365,7 +391,9 @@ export const makeNikCliRuntime = (
           await bootstrapStep(`credential replay for ${providerId}`, () => client.provider.api({ providerID: providerId, key }))
         }
         assertOpen()
-        return { projectId, directory, client }
+        const host = { projectId, directory, client }
+        catalogueHosts.add(host)
+        return host
       } catch (cause) {
         registrations.delete(projectId)
         for (const providerId of liveKeys) await client.provider.removeAuth({ providerID: providerId }).catch(() => undefined)
@@ -413,6 +441,23 @@ export const makeNikCliRuntime = (
     }
 
     const runtime: NikCliRuntime = {
+      refreshCatalogue: () => Effect.tryPromise({
+        try: async () => {
+          assertOpen()
+          if (options.catalogue?.network !== true) throw new Error("Model catalogue downloads are disabled in offline mode.")
+          await catalogueReady
+          const result = await seedModelsCache(paths, { network: true, refresh: true, signal: catalogueController.signal })
+          if (result !== "seeded") throw new Error("Could not download the model catalogue. Check the desktop's connection and retry; the previous catalogue was kept.")
+          catalogueReady = Promise.resolve("present")
+          for (const promise of hosts.values()) {
+            const host = await promise
+            assertOpen()
+            await host.client["config-management"].reload()
+            for (const [providerId, key] of pendingKeys) await host.client.provider.api({ providerID: providerId, key })
+          }
+        },
+        catch: toConfigError("Failed to refresh models"),
+      }),
       oauth: providerOAuth(() => Effect.tryPromise({ try: () => getHost("default"), catch: toConfigError("Could not open provider sign-in") }), join(paths.data, "auth.json")),
       toolCatalogue: () => toolRegistry.catalogue("default"),
       paths,

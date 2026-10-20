@@ -169,6 +169,16 @@ export default function AssistantScreen() {
   )
 
   const catalogue = useResource(useCallback((signal) => client ? client.aiProviders(signal) : Promise.reject(new Error("Not connected")), [client, connectivity]), "assistant:models")
+  const [modelsRefreshing, setModelsRefreshing] = useState(false)
+  const refreshModels = async () => {
+    if (!client || modelsRefreshing) return
+    setModelsRefreshing(true)
+    try {
+      await client.refreshModels()
+      await catalogue.reload()
+    } catch (error) { toast(error instanceof Error ? error.message : "Could not refresh the desktop models", "error") }
+    finally { setModelsRefreshing(false) }
+  }
   const availableModels = assistantModels(catalogue.data ?? [])
   const activeModel = selectedAssistantModel(availableModels, preferences.model)
   const modelUnavailable = Boolean(preferences.model && catalogue.data && !catalogue.loading && !activeModel)
@@ -758,7 +768,7 @@ export default function AssistantScreen() {
         seedToken={promptSeed?.projectId === projectId ? promptSeed.token : undefined}
       />
 
-      <ModelPickerSheet open={modelsOpen} onClose={() => setModelsOpen(false)} models={availableModels} selection={preferences.model} onSelect={(model) => setPreferences({ model })} loading={catalogue.loading} error={catalogue.error} reload={() => { void catalogue.reload(); void refreshBootstrap().catch(() => undefined) }} />
+      <ModelPickerSheet open={modelsOpen} onClose={() => setModelsOpen(false)} models={availableModels} selection={preferences.model} onSelect={(model) => setPreferences({ model })} loading={catalogue.loading || modelsRefreshing} error={catalogue.error} reload={() => { void refreshModels() }} />
       <AssistantInspectorSheet open={inspectorOpen} onClose={() => setInspectorOpen(false)} client={client} sessionId={sessionRef.current} preferences={preferences} onPreferences={setPreferences} ai={ai} onNewConversation={newConversation} transcript={transcriptText(log)} activity={activity} />
 
       {/* A picture of the part on the bench: the desktop's assistant reads it like any other attachment. */}

@@ -23,6 +23,9 @@ export type LiveEvent =
   | { readonly type: "workflow.started"; readonly projectId: string; readonly runId: string; readonly workflow: string; readonly event: "push" | "pull-request" | "manual"; readonly at: string }
   | { readonly type: "workflow.finished"; readonly projectId: string; readonly runId: string; readonly workflow: string; readonly status: "success" | "failure" | "cancelled"; readonly at: string }
   | { readonly type: "ai.session"; readonly projectId: string; readonly sessionId: string; readonly phase: "started" | "finished" | "aborted"; readonly at: string }
+  | { readonly type: "workspace.changed"; readonly projectId: string; readonly at: string }
+  | { readonly type: "resources.changed"; readonly userId: string; readonly at: string }
+  | { readonly type: "catalogue.updated"; readonly at: string }
 
 /** How many past events a fresh subscriber is caught up with before it starts receiving live ones. */
 export const LIVE_EVENT_REPLAY = 20
@@ -33,11 +36,13 @@ export interface LiveEventFilter {
 }
 
 export const liveEventMatches = (event: LiveEvent, filter: LiveEventFilter): boolean =>
-  (filter.projectId === undefined || event.projectId === filter.projectId) &&
+  (filter.projectId === undefined || "projectId" in event && event.projectId === filter.projectId) &&
   (filter.types === undefined || filter.types.includes(event.type))
 
 export class LiveEvents extends Context.Service<LiveEvents, {
   publish(event: LiveEvent): Effect.Effect<void>
+  workspaceChanged(projectId: string): Effect.Effect<void>
+  resourcesChanged(userId: string): Effect.Effect<void>
   subscribe(filter: LiveEventFilter): Effect.Effect<Stream.Stream<LiveEvent>, never, Scope.Scope>
 }>()("cadcamfun/LiveEvents") {
   static readonly layer: Layer.Layer<LiveEvents> = Layer.effect(
@@ -53,7 +58,9 @@ export class LiveEvents extends Context.Service<LiveEvents, {
           PubSub.subscribe(bus),
           (subscription) => Stream.fromSubscription(subscription).pipe(Stream.filter((e) => liveEventMatches(e, filter))),
         )
-      return LiveEvents.of({ publish, subscribe })
+      const workspaceChanged = (projectId: string) => publish({ type: "workspace.changed", projectId, at: new Date().toISOString() })
+      const resourcesChanged = (userId: string) => publish({ type: "resources.changed", userId, at: new Date().toISOString() })
+      return LiveEvents.of({ publish, workspaceChanged, resourcesChanged, subscribe })
     })
   )
 }

@@ -2,6 +2,7 @@ import type { ProjectRow, ProjectWithRelations } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import { and, count, eq, inArray, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
+import { LiveEvents } from "../services/live-events.ts"
 
 type Db = Database["Service"]["db"]
 
@@ -70,6 +71,7 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
     ProjectRepo,
     Effect.gen(function*() {
       const { query } = yield* Database
+      const events = yield* LiveEvents
       const T = schema.projectTable
       return ProjectRepo.of({
         list: (userId) =>
@@ -106,7 +108,7 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
               isPublic: input.isPublic || false
             }).returning()
             return toRow(row!)
-          }),
+          }).pipe(Effect.tap((row) => events.resourcesChanged(row.ownerId))),
         update: (id, patch) =>
           query("projects.update", async (db) => {
             const [current] = await db.select().from(T).where(eq(T.id, id)).limit(1)
@@ -117,7 +119,7 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
               updatedAt: new Date()
             }).where(eq(T.id, id)).returning()
             return (await hydrate(db, [row!]))[0]!
-          }),
+          }).pipe(Effect.tap((row) => events.resourcesChanged(row.ownerId))),
         remove: (id) =>
           query("projects.remove", async (db) => {
             // Activity and AI-analysis rows point at items by plain id (no foreign key), so cascades miss them.
@@ -127,11 +129,12 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
               ...(await db.select({ id: schema.componentTable.id }).from(schema.componentTable).where(eq(schema.componentTable.projectId, id))).map((r) => r.id),
               ...(await db.select({ id: schema.toolpathTable.id }).from(schema.toolpathTable).where(eq(schema.toolpathTable.projectId, id))).map((r) => r.id)
             ]
-            await db.delete(T).where(eq(T.id, id))
+            const [deleted] = await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId })
             await db.delete(schema.activityLogTable).where(inArray(schema.activityLogTable.itemId, ids))
             await db.delete(schema.aIAnalysisLogTable).where(inArray(schema.aIAnalysisLogTable.objectId, ids))
-          })
+            return deleted
+          }).pipe(Effect.tap((row) => row ? events.resourcesChanged(row.ownerId) : Effect.void), Effect.asVoid)
       })
     })
-  )
+  ).pipe(Layer.provide(LiveEvents.layer))
 }

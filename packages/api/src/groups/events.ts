@@ -79,9 +79,19 @@ export const AiSession = Schema.Struct({
   phase: Schema.Literals(["started", "finished", "aborted"])
 })
 
+/** A saved working-copy change, including changes that have not been committed. */
+export const WorkspaceChanged = Schema.Struct({
+  type: Schema.Literal("workspace.changed"),
+  at: Schema.String,
+  projectId: Schema.String
+})
+export const ServerConnected = Schema.Struct({ type: Schema.Literal("server.connected"), at: Schema.String })
+export const ResourcesChanged = Schema.Struct({ type: Schema.Literal("resources.changed"), userId: Schema.String, at: Schema.String })
+export const CatalogueUpdated = Schema.Struct({ type: Schema.Literal("catalogue.updated"), at: Schema.String })
+
 export const LiveEvent = Schema.Union([
   PrOpened, PrMerged, PrClosed, PrReviewed, Commit,
-  WorkflowStarted, WorkflowFinished, AiSession
+  WorkflowStarted, WorkflowFinished, AiSession, WorkspaceChanged, ServerConnected, ResourcesChanged, CatalogueUpdated
 ] as const)
 export type LiveEvent = typeof LiveEvent.Type
 
@@ -94,5 +104,10 @@ export class EventsGroup extends HttpApiGroup.make("events").add(
     // The route is authenticated by the group middleware; these are the errors the handler itself
     // raises when the project is not visible to the caller or the bus cannot be read.
     error: [Unauthorized, NotFound, InternalError]
+  })
+).add(
+  HttpApiEndpoint.get("subscribeAll", "/api/events", {
+    success: HttpApiSchema.StreamSse({ data: LiveEvent }),
+    error: [Unauthorized, InternalError]
   })
 ) {}

@@ -264,6 +264,7 @@ export class CompanionClient {
   questionReject = (sessionId: string, requestId: string) => this.request<typeof SessionControlReply.Type>("POST", "/api/ai/sessions/control", { sessionId, action: "reject_question", requestId })
 
   aiProviders = (signal?: AbortSignal) => this.request<AssistantProvider[]>("GET", "/api/ai/providers", undefined, signal)
+  refreshModels = (signal?: AbortSignal) => this.request<AssistantProvider[]>("POST", "/api/ai/models/refresh", undefined, signal)
 
   aiModels = (signal?: AbortSignal) => this.request<Array<{ id: string; provider: string; configured: boolean }>>("GET", "/api/ai/models", undefined, signal)
 
@@ -393,6 +394,14 @@ export class CompanionClient {
   removeNotification = (id: string) => this.request<{ message: string }>("DELETE", `/api/notifications/${encodeURIComponent(id)}`)
 
   // ── Live activity (SSE) ─────────────────────────────────────────────────
+
+  async *hostEvents(signal?: AbortSignal): AsyncGenerator<LiveEvent> {
+    const parse = sseParser<LiveEvent>()
+    for await (const chunk of this.transport.stream("/api/events", "GET", undefined, signal)) {
+      if (signal?.aborted) break
+      yield* parse(chunk)
+    }
+  }
 
   /** Tails the project's live activity stream; aborting the iteration closes the connection. */
   async *events(projectId: string, signal?: AbortSignal): AsyncGenerator<LiveEvent> {

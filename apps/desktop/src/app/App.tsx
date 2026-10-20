@@ -12,9 +12,15 @@ import { watchSystemTheme } from "../shared/state/settings.ts"
 import { routes } from "./routes.tsx"
 import { AiProvider } from "../features/ai/store/context.tsx"
 import { applyGlass, removeGlass, tauriGlassHost, type GlassHost } from "./glass.ts"
+import { startLiveSync } from "./live-sync.ts"
+import { sessionVersion } from "../shared/state/session.ts"
 
 /** The provider, router and shell for a booted app state; `App` renders it once the sidecar answers. */
 export function AppRoutes(props: { readonly state: AppState }) {
+  createEffect(() => {
+    sessionVersion()
+    if (props.state.sidecar() !== "fake") onCleanup(startLiveSync(props.state))
+  })
   return <AppProvider state={props.state}><AiProvider><Router root={(p) => <Shell>{p.children}</Shell>}>
     {routes.map((r) => <Route path={r.path} component={r.component} />)}
   </Router></AiProvider></AppProvider>

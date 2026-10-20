@@ -153,7 +153,8 @@ describe("the assistant from the phone", () => {
     const project = await (await local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Mobile greeting" }) })).json()
     const providers = await phone.aiProviders()
     const provider = providers.find((provider) => provider.id === "minimax" && provider.configured)
-    const model = provider?.models.find((model) => model.tools)
+    // The fixture speaks Chat Completions; other catalogue models can use a different protocol.
+    const model = provider?.models.find((model) => model.id === "MiniMax-M2" && model.tools)
     if (!provider || !model) throw new Error("The phone cannot discover its connected desktop model")
     let sessionId = "s-mobile-greeting-regression"
     for (const message of ["Mobile greeting regression: Hi", "Mobile greeting regression: continue"]) {

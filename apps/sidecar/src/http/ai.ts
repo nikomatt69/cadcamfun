@@ -11,6 +11,7 @@ import { AppConfigService } from "../config.ts"
 import { KvStore } from "../services/kv.ts"
 import { ActingUser } from "../services/acting-user.ts"
 import { AssistantTurns } from "../services/assistant-turns.ts"
+import { LiveEvents } from "../services/live-events.ts"
 import { AiActions } from "../services/ai.ts"
 import { ToolRegistry } from "@cadcamfun/ai"
 import { AiPlugins } from "../services/ai-plugins.ts"
@@ -51,6 +52,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const actions = yield* AiActions
   const bridgeTokens = yield* BridgeTokens
   const turns = yield* AssistantTurns
+  const events = yield* LiveEvents
   /** The scoped grant of the bearer on this request, or undefined for the application's own token. */
   const bridgeGrant = Effect.gen(function*() {
     const request = yield* HttpServerRequest.HttpServerRequest
@@ -99,6 +101,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       if (owner && (owner.userId !== actor.id || owner.projectId !== (payload.projectId ?? "default"))) return yield* new BadRequest({ message: "Session not found or inaccessible" })
     }
     const context = yield* contextFor(payload)
+    let announced = false
     return ai.chat({
       message: payload.message,
       admitSession: (projectId, sessionId) => actingUser.bind(projectId, sessionId, actor, payload.message, payload.drawingId),
@@ -113,7 +116,14 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     }).pipe(Stream.catch((e) => Stream.succeed({
       type: "error" as const, sessionId: payload.sessionId ?? "", code: e._tag === "AiConfigError" ? "config" as const : e._tag === "AiAborted" ? "aborted" as const : "provider" as const,
       message: aiError(e)
-    })))
+    })), Stream.tap((event) => {
+      if (!payload.projectId || !event.sessionId) return Effect.void
+      const finished = event.type === "done" || event.type === "error"
+      if (announced && !finished) return Effect.void
+      announced = true
+      return events.publish({ type: "ai.session", projectId: payload.projectId, sessionId: event.sessionId,
+        phase: finished ? "finished" : "started", at: new Date().toISOString() })
+    }))
   })
   const skillStore = createUserSkillStore(join(appConfig.dataDir, "ai", "skills"))
   const skillInfos = Effect.promise(async () => {
@@ -203,6 +213,15 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     ai.complete({ prompt, ...(system ? { system } : {}), ...(model ? { model: { model } } : {}) })
 
   return handlers
+    .handle("refreshModels", () => Effect.gen(function*() {
+      yield* extensionAccess
+      if (Option.isNone(host)) return yield* new BadRequest({ message: "Refreshing models requires the nikcli host." })
+      yield* host.value.runtime.refreshCatalogue().pipe(Effect.mapError((error) => new InternalError({ message: error.message })))
+      yield* ai.invalidateCatalogue
+      const providers = yield* catalogue
+      yield* events.publish({ type: "catalogue.updated", at: new Date().toISOString() })
+      return [...providers]
+    }))
     .handle("oauthAuthorize", ({ payload }) => Effect.gen(function*() {
       yield* extensionAccess
       if (Option.isNone(host)) return yield* new BadRequest({ message: "Subscription sign-in requires the nikcli host." })

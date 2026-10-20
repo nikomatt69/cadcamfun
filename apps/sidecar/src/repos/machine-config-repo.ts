@@ -2,6 +2,7 @@ import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import type { Db } from "@cadcamfun/db"
 import { and, count, desc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
+import { LiveEvents } from "../services/live-events.ts"
 import { orgIdsOf } from "./access.ts"
 import { type ImportResults, importLoop } from "./import-loop.ts"
 
@@ -40,6 +41,7 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
     MachineConfigRepo,
     Effect.gen(function*() {
       const { query } = yield* Database
+      const events = yield* LiveEvents
       const T = schema.machineConfigTable
       return MachineConfigRepo.of({
         list: (userId, f) =>
@@ -80,13 +82,13 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
           query("machineConfigs.create", async (db) => {
             const [row] = await db.insert(T).values({ name: d.name, description: d.description ?? null, type: d.type, config: d.config, ownerId: userId, isPublic: d.isPublic }).returning()
             return { ...serialize(row!), owner: await ownerOf(db, userId) }
-          }),
+          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void)),
         update: (id, d) =>
           query("machineConfigs.update", async (db) => {
             const [row] = await db.update(T).set({ ...d, updatedAt: new Date() }).where(eq(T.id, id)).returning()
             return { view: { ...serialize(row!), owner: await ownerOf(db, row!.ownerId) }, usageCount: await usageOf(db, id) }
-          }),
-        remove: (id) => query("machineConfigs.remove", async (db) => void (await db.delete(T).where(eq(T.id, id)))),
+          }).pipe(Effect.tap((row) => row.view.ownerId ? events.resourcesChanged(row.view.ownerId) : Effect.void)),
+        remove: (id) => query("machineConfigs.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId }))[0]).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void), Effect.asVoid),
         usage: (id) => query("machineConfigs.usage", (db) => usageOf(db, id)),
         byId: (id) => query("machineConfigs.byId", async (db) => (await db.select().from(T).where(eq(T.id, id)).limit(1))[0]),
         setConfig: (id, config) => query("machineConfigs.setConfig", async (db) => void (await db.update(T).set({ config, updatedAt: new Date() }).where(eq(T.id, id)))),
@@ -116,5 +118,5 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
           }))
       })
     })
-  )
+  ).pipe(Layer.provide(LiveEvents.layer))
 }

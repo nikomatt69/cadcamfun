@@ -139,6 +139,7 @@ export function AssistantControls(): JSX.Element {
         id="permissions"
         icon={<ShieldCheck size={12} aria-hidden="true" />}
         label={t("ai.controls.permissions")}
+        title={ai.permissionMode() === "auto" ? t("ai.controls.permissions.autoHint") : undefined}
         value={ai.permissionMode()}
         showValue={true}
         disabled={running()}

@@ -162,10 +162,11 @@ export const useMutation = <Args extends ReadonlyArray<unknown>, A>(
  */
 export const onCacheInvalidated = (cache: QueryCache, reload: () => void): void => {
   let scheduled = false
+  let active = true
   const unsubscribe = cache.subscribe(() => {
     if (scheduled) return
     scheduled = true
-    queueMicrotask(() => { scheduled = false; reload() })
+    queueMicrotask(() => { scheduled = false; if (active) reload() })
   })
-  if (getOwner() !== null) onCleanup(unsubscribe)
+  if (getOwner() !== null) onCleanup(() => { active = false; unsubscribe() })
 }

@@ -25,6 +25,8 @@ import { appProjectId, persistDrawingContext, prepareWorkspace, verificationStat
 import { loadTranscripts, saveTranscripts, toStored, type StoredMessage } from "./persisted.ts"
 import type { ChatAttachment } from "../lib/attachments.ts"
 import { contextTokensOf } from "../lib/context-metrics.ts"
+import { serverMessages } from "../lib/server-history.ts"
+import { onCacheInvalidated } from "../../../shared/state/queries.ts"
 import { appendTextEvent } from "../lib/timeline.ts"
 import { mirrorCamResult } from "../lib/cam-sync.ts"
 import { actionKey, captureEditorOwner, mirrorToolResult, reconcileCoalesced, reconcileFromStored, type EditorOwner } from "../lib/editor-sync.ts"
@@ -664,6 +666,43 @@ export const createAiStore = (): AiStore => {
     rememberActive()
   }
 
+  let historyRead = 0
+  const historyController = new AbortController()
+  const refreshServerHistory = async (id: string): Promise<void> => {
+    const generation = conversationGeneration, project = projectId(), request = ++historyRead
+    if (!project || status() === "streaming" || status() === "connecting") return
+    try {
+      const page = await app.runtime.run(app.client.ai.sessionMessages({ params: { sessionId: id }, query: { limit: "100" } }), { signal: historyController.signal })
+      if (disposed || request !== historyRead || generation !== conversationGeneration || projectId() !== project || sessionId() !== id || status() === "streaming" || status() === "connecting" || page.messages.length === 0) return
+      transcripts = { ...transcripts, [id]: serverMessages(page.messages, id).flatMap((message) => { const value = toStored(message); return value ? [value] : [] }) }
+      restoreTranscript(id)
+      saveTranscripts(transcripts, sessionsSig().map((session) => session.id))
+    } catch { /* A disconnected host keeps the last locally cached transcript. */ }
+  }
+  let sessionRead = 0
+  const refreshServerSessions = async (): Promise<void> => {
+    const project = projectId(), request = ++sessionRead
+    if (!project) return
+    try {
+      const remote = await app.runtime.run(app.client.ai.sessionList({ query: { projectId: project, limit: "100" } }), { signal: historyController.signal })
+      if (disposed || request !== sessionRead || projectId() !== project) return
+      const current = sessionsSig(), selected = sessionId()
+      const source = remote.find((session) => session.id === selected), cached = current.find((session) => session.id === selected)
+      const needsHistory = selected && source && (!transcripts[selected]?.length || Date.parse(source.updatedAt ?? "") > Date.parse(cached?.updatedAt ?? ""))
+      const merged = new Map(current.map((session) => [session.id, session]))
+      for (const session of remote) {
+        const before = merged.get(session.id)
+        merged.set(session.id, { id: session.id, projectId: project, title: before?.title ?? session.title,
+          startedAt: session.createdAt ?? before?.startedAt ?? "1970-01-01T00:00:00.000Z",
+          updatedAt: session.updatedAt ?? before?.updatedAt ?? "1970-01-01T00:00:00.000Z", exchanges: before?.exchanges ?? 0 })
+      }
+      setSessionsPersisted([...merged.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, MAX_SESSIONS))
+      if (needsHistory && selected) await refreshServerHistory(selected)
+    } catch { /* The persisted local list remains available offline. */ }
+  }
+  onCacheInvalidated(app.cache, () => { void refreshServerSessions() })
+  createEffect(() => { projectId(); untrack(() => { void refreshServerSessions() }) })
+
   const detachStream = (): void => {
      turnGeneration += 1
      handle?.abort()
@@ -722,6 +761,7 @@ export const createAiStore = (): AiStore => {
       restoreTranscript(id)
     })
     rememberActive()
+    void refreshServerHistory(id)
   }
 
   const renameSession: AiStore["renameSession"] = (id, title) => {
@@ -846,6 +886,7 @@ export const createAiStore = (): AiStore => {
   const stopVisionBridge = startVisionBridge(app)
   onCleanup(() => {
     disposed = true
+    historyController.abort()
     controlsGeneration++
     stopVisionBridge()
     stopProjectSubscription()

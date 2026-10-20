@@ -32,7 +32,7 @@ import CustomElementsEditor from "../components/custom-elements/CustomElementsEd
 import AssemblyPanel from "../components/assembly/AssemblyPanel.tsx"
 import { CADAssistantButton } from "../components/CADAssistantButton.tsx"
 import { CADAssistantBridge } from "../../ai/components/CADAssistantBridge.tsx"
-import { FIT_VIEW_EVENT } from "../../ai/lib/editor-sync.ts"
+import { FIT_VIEW_EVENT, rememberPushed } from "../../ai/lib/editor-sync.ts"
 import { restoreDocumentSettings, syncDocumentSettings } from "../../../shared/state/document-settings.ts"
 import { syncProjectContents } from "../lib/projectSnapshot.ts"
 import "../../../styles/workstation.css"
@@ -114,6 +114,7 @@ export default function CadPage(): JSX.Element {
         setDrawingId(row.id)
         setDrawingName(row.name)
         useDocumentStore.getState().setDocument({ projectId: row.project.id, drawingId: row.id, name: row.name })
+        rememberPushed(useElementsStore.getState().elements as unknown as ReadonlyArray<Record<string, unknown>>, row.id)
         app.rememberProject(row.project.id, row.project.name)
         toast.success(`Drawing "${row.name}" opened`)
       }, () => toast.error("The drawing could not be opened"))

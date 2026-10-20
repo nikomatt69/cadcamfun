@@ -8,6 +8,7 @@ import { desktopLabel, firstReachable, parsePairingLink, type Pairing } from "./
 import { drainQueueWith, refreshOfflineQueueCount } from "./offline-queue"
 import { uiPreferencesReady, useUIStore } from "./store"
 import { ServerContext, type Connectivity, type DesktopBootstrap, type ServerValue } from "./server-context"
+import { createHostEvents } from "./host-events"
 
 export type { Connectivity, DesktopBootstrap, ServerValue }
 export { useServer } from "./server-context"
@@ -291,9 +292,13 @@ export function ServerProvider({ children }: PropsWithChildren) {
     if (configRef.current) void checkRef.current(configRef.current)
   }, [accountRevision])
 
+  const hostEvents = useMemo(() => client ? createHostEvents(client) : null, [client])
+  useEffect(() => {
+    if (connectivity === "online") return hostEvents?.start()
+  }, [hostEvents, connectivity])
   const value = useMemo<ServerValue>(
-    () => ({ config, client, connectivity, connectionError, ai, bootstrap, bootstrapLoading, booting, save, clear, recheck, refreshBootstrap }),
-    [config, client, connectivity, connectionError, ai, bootstrap, bootstrapLoading, booting, save, clear, recheck, refreshBootstrap],
+    () => ({ hostEvents, config, client, connectivity, connectionError, ai, bootstrap, bootstrapLoading, booting, save, clear, recheck, refreshBootstrap }),
+    [hostEvents, config, client, connectivity, connectionError, ai, bootstrap, bootstrapLoading, booting, save, clear, recheck, refreshBootstrap],
   )
   return <ServerContext.Provider value={value}>{children}</ServerContext.Provider>
 }

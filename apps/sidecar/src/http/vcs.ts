@@ -149,12 +149,14 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
       Effect.gen(function*() {
         yield* access(params.id, "member")
         yield* wire(vcs.createBranch(params.id, payload.name, payload.from))
+        yield* events.workspaceChanged(params.id)
         return yield* wire(vcs.branches(params.id))
       }))
     .handle("checkout", ({ params, payload }) =>
       Effect.gen(function*() {
         const actor = yield* access(params.id, "maintainer")
         yield* wire(vcs.checkout(params.id, payload.branch, actor))
+        yield* events.workspaceChanged(params.id)
         return yield* wire(statusOf(params.id))
       }))
     .handle("restore", ({ params, payload }) =>
@@ -220,6 +222,7 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
       Effect.gen(function*() {
         const actor = yield* access(params.id, "maintainer")
         const result = yield* wire(vcs.pull(params.id, headers["x-github-token"], actor, payload.branch))
+        yield* events.workspaceChanged(params.id)
         const { current } = yield* wire(vcs.branches(params.id))
         yield* onPush(params.id, actor.userId, current, actor)
         return result

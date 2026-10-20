@@ -403,6 +403,7 @@
   "ai.controls.learnMemory": "Consolidate project memory",
   "ai.controls.permissions": "Permissions",
   "ai.controls.permissions.auto": "Auto",
+  "ai.controls.permissions.autoHint": "The host classifies creation and editing actions. Deletion, VCS writes and extension changes are blocked.",
   "ai.controls.permissions.ask": "Ask",
   "ai.controls.permissions.approve": "Approve",
   "ai.model.search": "Search available models",
@@ -560,5 +561,7 @@
   "ai.providers.connected": "Subscription connected",
   "ai.providers.openCodeGoHint": "Sign in to OpenCode, subscribe to Go, then paste your OpenCode account API key below.",
   "ai.providers.openCodeZenHint": "Sign in to OpenCode Zen, create an API key, then paste it below.",
-  "ai.providers.openCodeAccount": "Connect OpenCode account"
+  "ai.providers.openCodeAccount": "Connect OpenCode account",
+  "ai.catalogue.refresh": "Refresh providers and models",
+  "ai.catalogue.refreshing": "Refreshing catalogue…"
 }

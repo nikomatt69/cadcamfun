@@ -6,7 +6,7 @@
  * price is that the host's permission map is keyed by tool id, so a tool's kind is the strongest kind of its actions:
  * a group with one write is a write tool, which a read-only role never receives, whatever honest `read` actions it
  * also carries (listing delegated tasks is a read, yet `agent` is a write tool). A group that contains a destructive
- * action is registered as `ask` (one native confirmation) rather than an invented action-level permission.
+ * action asks in Standard/Ask. Auto uses the host adapter's native action-pattern rules (permission-modes.ts).
  */
 import { z } from "zod"
 import { defineTool, ToolMediaResult, type ToolContext, type ToolDefinition } from "./define.ts"

@@ -132,6 +132,7 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["GET", "POST"], path: /^\/api\/projects\/[^/]+\/(vcs\/(?!remote$|push$|pull$)[^/]+|pulls|actions)(\/.*)?$/ },
   // Live SSE stream of vcs / workflow / AI activity; the only push channel the phone has.
   { methods: ["GET"], path: /^\/api\/projects\/[^/]+\/events$/ },
+  { methods: ["GET"], path: /^\/api\/events$/ },
   // Notifications (read + mark-read + delete). The phone sees its user's activity across the desktop.
   { methods: ["GET"], path: /^\/api\/notifications\/?$/ },
   { methods: ["POST"], path: /^\/api\/notifications\/mark-all-read$/ },
@@ -140,6 +141,7 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["GET"], path: /^\/api\/ai\/status$/ },
   { methods: ["GET"], path: /^\/api\/ai\/models$/ },
   { methods: ["GET"], path: /^\/api\/ai\/providers$/ },
+  { methods: ["POST"], path: /^\/api\/ai\/models\/refresh$/ },
   { methods: ["GET"], path: /^\/api\/ai\/agents$/ },
   { methods: ["POST"], path: /^\/api\/ai\/(chat\/stream|chat\/abort|chat\/queue|permission\/reply|sessions\/state|sessions\/control|sessions\/prompt)$/ },
   // The phone's per-session SSE stream (spec 13 §5); the handler checks the session owner and project.
@@ -199,6 +201,7 @@ export const WRITE_TIMEOUT_MS = 120_000
 
 const STREAM_ROUTES: readonly Rule[] = [
   { methods: ["GET"], path: /^\/api\/projects\/[^/]+\/events$/ },
+  { methods: ["GET"], path: /^\/api\/events$/ },
   { methods: ["GET"], path: /^\/api\/ai\/sessions\/[^/]+\/stream$/ },
   { methods: ["POST"], path: /^\/api\/ai\/chat\/stream$/ },
 ]

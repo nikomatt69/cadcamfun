@@ -4,6 +4,10 @@ Status: **specified; implementation pending** across WP8 (`packages/ai`), WP4 (`
 
 ## Current contract amendments
 
+- 2026-10-20, owner-requested Auto permissions only: retain the existing tools, actions and prompts. Use nikcli's native Auto classifier for creation and editing through a plain `*` ask rule. Native `action:<name>` patterns deny destructive catalogue actions, including inner Code Mode calls; `action:editor:destructive` denies editor deletion and history operations while safe editor operations reach the classifier. VCS and extension writes are denied. Role/policy limits and external-tool approval remain intact. Ask/Standard retain human approval. This amends the grouped-tool restriction only after a real pinned-host regression proves classifier execution and native deny enforcement. No new tools, duplicate prompts or action implementations. WP8 owns permission configuration, the existing host adapter and regression checks; WP6/WP13 only explain the mode.
+
+  The native classifier retains its default rules and receives CAD/CAM-specific scope, evidence and machining rules plus server-owned project/action/effect metadata. Bulk or ungrounded changes require current evidence; ordinary shape edits, pockets and boolean cuts are not document deletion. The real-host regression drives both native classification stages with simulated verdicts: safe creation/edit executes, a valid but excessive edit is refused before its handler, and deletion/VCS writes remain denied inside Code Mode. This proves context delivery and enforcement, not a real model's judgment quality.
+
 [Spec 28](28-native-ai-architecture.md) and [AI-01](ai/01-actions-and-execution.md) deepen this design under [RM-01](roadmap/01-action-catalogue.md). Counts, savings and any historical verification below are design/historical evidence, not current passing implementation results. Measure the actual catalogue before claiming the 12-application-tool / 24,000-character target is satisfied.
 
 - `cad_grep` is already registered; preserve its capability in the action inventory.

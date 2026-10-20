@@ -3,6 +3,7 @@ import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import type { Db } from "@cadcamfun/db"
 import { and, desc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
+import { LiveEvents } from "../services/live-events.ts"
 import { orgIdsOf } from "./access.ts"
 
 type Row = typeof schema.toolpathTable.$inferSelect
@@ -71,6 +72,7 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
     ToolpathRepo,
     Effect.gen(function*() {
       const { query } = yield* Database
+      const events = yield* LiveEvents
       const T = schema.toolpathTable
       const P = schema.projectTable
       const V = schema.toolpathVersionTable
@@ -117,12 +119,12 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
               drawingId: d.drawingId ?? null, materialId: d.materialId ?? null, machineConfigId: d.machineConfigId ?? null, toolId: d.toolId ?? null
             }).returning()
             return toToolpathRow(row!)
-          }),
+          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         update: (id, patch) =>
           query("toolpaths.update", async (db) => {
             const [row] = await db.update(T).set({ ...patch, updatedAt: new Date() }).where(eq(T.id, id)).returning()
             return toToolpathRow(row!)
-          }),
+          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         updateWhere: (id, guard, patch) =>
           query("toolpaths.updateWhere", (db) => db.transaction((tx) => {
             const current = tx.select().from(T).where(eq(T.id, id)).get()
@@ -132,8 +134,8 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
             if (!guard(row, drawing?.data)) return undefined
             const [updated] = tx.update(T).set({ ...patch(row), updatedAt: new Date() }).where(eq(T.id, id)).returning().all()
             return updated === undefined ? undefined : toToolpathRow(updated)
-          })),
-        remove: (id) => query("toolpaths.remove", async (db) => void (await db.delete(T).where(eq(T.id, id)))),
+          })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
+        remove: (id) => query("toolpaths.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId }))[0]).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid),
         listForDrawing: (drawingId) =>
           query("toolpaths.listForDrawing", async (db) => {
             const rows = await db.select().from(T).where(eq(T.drawingId, drawingId)).orderBy(desc(T.updatedAt))
@@ -208,5 +210,5 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
         removeComment: (commentId) => query("toolpaths.removeComment", async (db) => void (await db.delete(C).where(eq(C.id, commentId))))
       })
     })
-  )
+  ).pipe(Layer.provide(LiveEvents.layer))
 }

@@ -8,7 +8,7 @@ import { t } from "../../../i18n/index.ts"
 import { captureEditorOwner } from "../../ai/lib/editor-sync.ts"
 import { useDocumentStore } from "../../cad/store/documentStore.ts"
 import { combineOperationResults, useCamStore } from "../store/camStore.ts"
-import { downloadCamFile, savedProgramData, snapshotCamProgram, SavedCamProgram } from "../lib/saved-program.ts"
+import { camEditorRevision, downloadCamFile, savedProgramData, snapshotCamProgram, storedProgramRevision, SavedCamProgram } from "../lib/saved-program.ts"
 import { Schema } from "effect"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
 import { useCADStore } from "../../cad/store/cadStore.ts"
@@ -101,7 +101,8 @@ export default function SaveCamModal(props: { readonly code: string; readonly ex
       invalidatePrefix(app.cache, "projects")
       if (!disposed && owner.current() && store.gcode === snapshot.gcode) {
         if (selectedMode === "new" && createdTarget) useDocumentStore.getState().setDocument({ ...createdTarget, name: newName })
-        store.setSavedProgram({ id: row.id, name: row.name, projectId: row.projectId, drawingId: row.drawingId, description: row.description, isPublic: row.isPublic })
+        store.setSavedProgram({ id: row.id, name: row.name, projectId: row.projectId, drawingId: row.drawingId, description: row.description,
+          isPublic: row.isPublic, editorRevision: camEditorRevision(), storedRevision: storedProgramRevision(row) })
       }
       if (!disposed) { toast.success(t("cam.save.saved")); props.onClose() }
     } catch (cause) {

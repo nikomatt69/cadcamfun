@@ -337,6 +337,7 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.get("status", "/api/ai/status", { success: AiStatus, error: InternalError }),
     HttpApiEndpoint.get("models", "/api/ai/models", { query: { configuredOnly: opt(Schema.Literals(["true", "false"])) }, success: Schema.Array(AiModelEntry), error: InternalError }),
     HttpApiEndpoint.get("providers", "/api/ai/providers", { success: Schema.Array(AiProviderEntry), error: InternalError }),
+    HttpApiEndpoint.post("refreshModels", "/api/ai/models/refresh", { success: Schema.Array(AiProviderEntry), error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("prompts", "/api/ai/prompts", { query: { mode: opt(Schema.String) }, success: PromptSuggestionsReply, error: InternalError }),
     HttpApiEndpoint.post("title", "/api/ai/title", { payload: AiTitleBody, success: AiTitleReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("designAnalysis", "/api/ai/design-analysis", { payload: AiDesignAnalysisBody, success: AiDesignAnalysisReply, error: [BadRequest, InternalError] }),

@@ -35,6 +35,35 @@ const deferred = <T>() => {
 }
 
 describe("project-scoped assistant workspace", () => {
+  test("a conversation started on the phone appears on desktop and reopening its evidence never replays edits", async () => {
+    localStorage.clear()
+    const document = await createDocument("Phone conversation")
+    useDocumentStore.getState().setDocument(document)
+    const client = app.state.client.ai, list = client.sessionList, history = client.sessionMessages
+    let updatedAt = "2026-10-20T10:00:00.000Z", answer = "Created from the phone."
+    const sessionId = "ses_phone_shared"
+    Object.assign(client, {
+      sessionList: () => Effect.succeed([{ id: sessionId, projectId: document.projectId, title: "Phone conversation", createdAt: updatedAt, updatedAt, busy: false }]),
+      sessionMessages: () => Effect.succeed({ sessionId, before: null, messages: [
+        { id: "msg_phone", role: "assistant", text: answer, createdAt: updatedAt, agent: "cadcam-auto", model: "fixture", error: null, truncated: false,
+          tools: [{ callId: "phone-add", tool: "cad_edit_auto", status: "completed", input: { action: "add" },
+            output: JSON.stringify({ ok: true, elements: [{ id: "must-not-replay", type: "cube", width: 1, height: 1, depth: 1 }] }), truncated: false }] }
+      ] }),
+    })
+    const { store, dispose } = await mount()
+    const elements = useElementsStore.getState().elements
+    try {
+      await app.wait(() => store.sessions().some((session) => session.id === sessionId))
+      store.openSession(sessionId)
+      await app.wait(() => store.messages().some((message) => message.text === answer))
+      expect(store.toolCalls()["phone-add"]).toMatchObject({ status: "ok", tool: "cad_edit_auto" })
+      expect(useElementsStore.getState().elements).toBe(elements)
+      updatedAt = "2026-10-20T10:01:00.000Z"; answer = "Updated on the phone."
+      app.state.cache.invalidate()
+      await app.wait(() => store.messages().some((message) => message.text === answer))
+      expect(useElementsStore.getState().elements).toBe(elements)
+    } finally { Object.assign(client, { sessionList: list, sessionMessages: history }); dispose() }
+  })
   test("navigation to another drawing in the same project invalidates pending preparation before stream admission", async () => {
     localStorage.clear()
     const a = await createDocument("Pending drawing")

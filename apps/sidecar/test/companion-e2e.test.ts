@@ -6,6 +6,7 @@ import { createFetchTransport } from "../../mobile/modules/companion-net/transpo
 import { CompanionClient } from "../../mobile/lib/client.ts"
 import { parsePairingLink } from "../../mobile/lib/pairing.ts"
 import { fingerprintOf } from "../src/services/companion-gateway.ts"
+import { sseParser } from "../../mobile/lib/sse.ts"
 
 const entry = new URL("../src/main.ts", import.meta.url).pathname
 const migrations = new URL("../../../packages/db/drizzle", import.meta.url).pathname
@@ -31,6 +32,57 @@ async function boot(dataDir: string) {
 }
 
 describe("companion end to end", () => {
+  test("phone writes reach the desktop host stream without a commit, and desktop writes refresh the phone", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "cadcamfun-companion-sync-"))
+    const sidecar = await boot(dataDir)
+    const controller = new AbortController()
+    const tails: Promise<void>[] = []
+    try {
+      const gatewayPort = 20_000 + Math.floor(Math.random() * 20_000)
+      await sidecar.local("/api/companion/enable", { method: "POST", body: JSON.stringify({ port: gatewayPort }) })
+      const paired = await (await sidecar.local("/api/companion/pair", { method: "POST", body: JSON.stringify({ name: "Sync iPhone", host: "127.0.0.1" }) })).json()
+      const pairing = parsePairingLink(paired.link)
+      const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
+      const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
+      const phone = new CompanionClient(createFetchTransport(pairing, pinned))
+      const desktopEvents: Record<string, unknown>[] = [], phoneEvents: Record<string, unknown>[] = []
+      tails.push((async () => {
+        const response = await sidecar.local("/api/events", { signal: controller.signal })
+        expect(response.status).toBe(200)
+        const parse = sseParser<Record<string, unknown>>(), decoder = new TextDecoder()
+        for await (const chunk of response.body!) desktopEvents.push(...parse(decoder.decode(chunk, { stream: true })))
+      })().catch((error) => { if (!controller.signal.aborted) throw error }))
+      tails.push((async () => {
+        for await (const event of phone.hostEvents(controller.signal)) phoneEvents.push(event as Record<string, unknown>)
+      })().catch((error) => { if (!controller.signal.aborted) throw error }))
+      await waitFor(() => desktopEvents.some((event) => event.type === "server.connected") && phoneEvents.some((event) => event.type === "server.connected"), 10_000)
+
+      const project = await phone.createProject("Created on the phone")
+      await waitFor(() => desktopEvents.some((event) => event.type === "resources.changed"), 10_000)
+      expect((await (await sidecar.local("/api/projects")).json()).some((row: { id: string }) => row.id === project.id)).toBe(true)
+      const drawing = await phone.createEntry(project.id, "drawings", "Phone drawing")
+      await waitFor(() => desktopEvents.some((event) => event.type === "workspace.changed" && event.projectId === project.id), 10_000)
+      const before = desktopEvents.length
+      await phone.renameEntry("drawings", drawing.id, "Renamed on the phone")
+      await waitFor(() => desktopEvents.slice(before).some((event) => event.type === "workspace.changed"), 10_000)
+      expect((await (await sidecar.local(`/api/drawings/${drawing.id}`)).json()).name).toBe("Renamed on the phone")
+      expect(desktopEvents.filter((event) => event.type === "commit")).toEqual([])
+
+      const phoneBefore = phoneEvents.length
+      await sidecar.local(`/api/drawings/${drawing.id}`, { method: "PUT", body: JSON.stringify({ name: "Renamed on desktop" }) })
+      await waitFor(() => phoneEvents.slice(phoneBefore).some((event) => event.type === "workspace.changed"), 10_000)
+      expect((await phone.workspaceDrawings(project.id)).some((row) => row.name === "Renamed on desktop")).toBe(true)
+
+      const material = await phone.createMaterial("Phone aluminium", 2.7)
+      expect((await (await sidecar.local("/api/materials")).json()).some((row: { id: string }) => row.id === material.id)).toBe(true)
+    } finally {
+      controller.abort()
+      await Promise.allSettled(tails)
+      sidecar.child.kill("SIGTERM")
+      await sidecar.child.exited
+      rmSync(dataDir, { recursive: true, force: true })
+    }
+  }, 60_000)
   test("a paired phone client drives history, a pull request and the Actions list over HTTPS; nothing else is reachable", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "cadcamfun-companion-"))
     const sidecar = await boot(dataDir)

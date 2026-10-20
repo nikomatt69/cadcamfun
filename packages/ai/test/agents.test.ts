@@ -13,6 +13,21 @@ import { TOOL_IDS } from "../src/tools/registry.ts"
 const REGISTERED = [...TOOL_IDS]
 
 describe("specialist roster", () => {
+  test("Auto classifies creation and edits through existing tools, preserving role and policy denials", () => {
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, unknown> }> }
+    const permission = config.agent["cadcam-auto"]!.permission
+    expect(permission["cad_edit"]).toEqual({ "*": "ask", "action:delete": "deny", "action:editor:destructive": "deny" })
+    expect(permission["cam_edit"]).toEqual({ "*": "ask" })
+    for (const id of ["vcs_edit", "mods_edit"]) expect(permission[id], id).toBe("deny")
+    const edits = permission["cad_edit"] as Record<string, string>
+    expect(edits["action:delete"]).toBe("deny")
+    expect(edits["action:editor"]).toBeUndefined()
+    expect(config.agent["cadcam-cam-auto"]!.permission["cad_edit"]).toBeUndefined()
+    expect(config.agent["cadcam-cad-auto"]!.permission["library_edit"]).toBeUndefined()
+    expect(config.agent["cadcam-reviewer-auto"]!.permission["cad_edit"]).toBeUndefined()
+    const denied = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x", policies: [{ effect: "deny", action: "tool.use", resource: "cad_edit" }] }) as typeof config
+    expect(denied.agent["cadcam-auto"]!.permission["cad_edit"]).toBeUndefined()
+  })
   test("a tool that contains a destructive action requires native approval, in every role", () => {
     expect(DESTRUCTIVE_TOOL_IDS.length).toBeGreaterThan(0)
     const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, unknown> }> }
@@ -151,13 +166,23 @@ describe("specialist roster", () => {
     expect(config.agent["cadcam-modeler-auto"]?.permission["**"]).toBe("deny")
   })
 
-  test("role limits hold in every permission mode: auto never sends a destructive tool to the classifier and keeps denials", () => {
+  test("role limits hold in every permission mode: Auto denies destructive actions and preserves role limits", () => {
     const victim = "vcs_edit"
     const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x", policies: [{ effect: "deny", action: "tool.use", resource: victim }] }) as { agent: Record<string, { permission_mode?: string; permission?: Record<string, unknown> }> }
     for (const [name, agent] of Object.entries(config.agent)) {
       if (agent.permission === undefined) continue
-      // A plain "ask" (pattern *) is routed to the model classifier in auto mode; a destructive tool must reach a person.
-      for (const id of DESTRUCTIVE_TOOL_IDS) if (id !== victim && agent.permission[id] !== undefined) expect(agent.permission[id], `${name} ${id}`).toEqual(HUMAN_APPROVAL)
+      // Auto classifies safe calls; destructive actions are denied before classification.
+      for (const id of DESTRUCTIVE_TOOL_IDS) if (id !== victim && agent.permission[id] !== undefined) {
+        if (name.endsWith("-auto")) {
+          const rule = agent.permission[id]
+          if (rule !== "deny") {
+            expect(rule).toMatchObject({ "*": "ask" })
+            for (const action of exposedActions(id).filter((action) => action.kind === "destructive")) {
+              expect((rule as Record<string, string>)[`action:${action.id.slice(action.id.indexOf(".") + 1)}`]).toBe("deny")
+            }
+          }
+        } else expect(agent.permission[id], `${name} ${id}`).toEqual(HUMAN_APPROVAL)
+      }
       expect(agent.permission[victim], `${name} keeps the policy denial`).not.toBe("allow")
       expect(agent.permission[victim], `${name} keeps the policy denial`).not.toEqual(HUMAN_APPROVAL)
     }

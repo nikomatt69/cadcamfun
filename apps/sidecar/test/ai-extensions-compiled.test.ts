@@ -83,6 +83,13 @@ test("compiled assistant extensions execute hooks, reload consent and deliver co
       method, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(30_000)
     })
+    // A compiled fresh installation has no downloaded catalogue and no standalone nikcli to borrow one from.
+    const catalogueResponse = await request("GET", "/api/ai/providers")
+    expect(catalogueResponse.status).toBe(200)
+    const catalogue = await catalogueResponse.json() as Array<{ id: string; models: unknown[] }>
+    expect(catalogue.length).toBeGreaterThanOrEqual(200)
+    expect(catalogue.some((provider) => provider.id === "openrouter")).toBe(true)
+    expect(catalogue.reduce((count, provider) => count + provider.models.length, 0)).toBeGreaterThan(8000)
     const json = async (method: string, path: string, body?: unknown): Promise<Record<string, unknown>> => {
       const response = await request(method, path, body)
       const value: unknown = await response.json()

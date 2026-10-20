@@ -1,5 +1,6 @@
 import { Stack } from "expo-router"
 import { useTheme } from "@/lib/theme"
+import { BrandHeaderTitle } from "@/components/layout/BrandMark"
 
 /**
  * The Projects stack: list → project → commit diff / pull request. The PR detail presents as a
@@ -22,7 +23,7 @@ export default function ProjectsLayout() {
         headerBackButtonDisplayMode: "minimal",
       }}
     >
-      <Stack.Screen name="index" options={{ title: "Projects" }} />
+      <Stack.Screen name="index" options={{ title: "Projects", headerTitleAlign: "center", headerTitle: () => <BrandHeaderTitle /> }} />
       <Stack.Screen name="[id]" options={{ headerLargeTitle: false }} />
       <Stack.Screen name="[id]/commit/[oid]" options={{ title: "Commit", headerLargeTitle: false }} />
       <Stack.Screen name="[id]/pulls/[number]" options={{ title: "Pull Request", presentation: "formSheet", sheetGrabberVisible: true, sheetAllowedDetents: [0.9, 1], headerLargeTitle: false }} />

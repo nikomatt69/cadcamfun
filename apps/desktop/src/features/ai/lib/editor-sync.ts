@@ -341,7 +341,14 @@ export async function reconcileFromStored(app: { readonly client: unknown; reado
   if (!owner.current()) return none
   const result = applyOps(ops)
   pushedByDrawing.set(drawingId, pushed)
-  for (const element of stored) pushed.set(String(element["id"]), JSON.stringify(useElementsStore.getState().elements.find((candidate) => candidate.id === element["id"]) ?? element))
+  const applied = new Set(ops.flatMap((op) => op.kind === "add" || op.kind === "update" ? op.elements.map((element) => String(element["id"])) : []))
+  for (const element of stored) {
+    const id = String(element["id"])
+    // Preserve the last shared version on conflicts; using the local edit as a baseline would overwrite it on refresh.
+    if (applied.has(id) || !pushed.has(id) && live.some((candidate) => JSON.stringify(candidate) === JSON.stringify(element))) {
+      pushed.set(id, JSON.stringify(useElementsStore.getState().elements.find((candidate) => candidate.id === element["id"]) ?? element))
+    }
+  }
   for (const op of ops) if (op.kind === "delete") for (const id of op.ids) pushed.delete(id)
   return result
 }

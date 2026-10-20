@@ -37,6 +37,10 @@ const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
 /** Which panels a live frame refreshes: the events map onto the tab that shows them. */
 const TABS_FOR_EVENT = (event: LiveEvent): ReadonlyArray<Tab> => {
   switch (event.type) {
+    case "server.connected":
+      return ["history", "overview", "pulls", "actions"]
+    case "workspace.changed":
+      return ["history", "overview", "pulls"]
     case "pr.opened":
     case "pr.merged":
     case "pr.closed":

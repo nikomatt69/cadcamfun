@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useContext, useEffect, useRef, useState } from "react"
 import { readWithBackoff } from "./throttle"
 import { readCache, writeCache } from "./offline-cache"
+import { ServerContext } from "./server-context"
 
 /**
  * The newest value of one thing (`scope`, e.g. a drawing id) across its revisions: while a new commit's payload loads,
@@ -33,6 +34,7 @@ export interface Resource<T> {
 
 /** Initial data and explicit refreshes share one cancellable request owner. */
 export function useResource<T>(fetcher: (signal: AbortSignal) => Promise<T>, key: string, options: ResourceOptions = {}): Resource<T> {
+  const hostEvents = useContext(ServerContext)?.hostEvents
   const [data, setData] = useState<T | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(true)
@@ -93,5 +95,13 @@ export function useResource<T>(fetcher: (signal: AbortSignal) => Promise<T>, key
     }
   }, [key, fetcher, load])
 
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const unsubscribe = hostEvents?.subscribe(() => {
+      if (timer !== undefined) return
+      timer = setTimeout(() => { timer = undefined; void load() }, 50)
+    })
+    return () => { unsubscribe?.(); clearTimeout(timer) }
+  }, [hostEvents, load])
   return { data, error, loading, stale, reload: load }
 }

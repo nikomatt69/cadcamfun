@@ -12,6 +12,7 @@ import { Modal } from "../../../shared/ui/modal.tsx"
 import { PANEL, TOOLBAR_BUTTON, WorkspaceDetail } from "../../../shared/components/WorkspacePage.tsx"
 import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
+import { onCacheInvalidated } from "../../../shared/state/queries.ts"
 
 interface Project { readonly id: string; readonly name: string; readonly description: string | null; readonly updatedAt: string; readonly ownerId: string; readonly organizationId: string | null }
 interface Card { readonly id: string; readonly name: string; readonly description?: string | null; readonly thumbnail?: string | null; readonly updatedAt?: string; readonly gcode?: string | null; readonly operationType?: string | null }
@@ -70,6 +71,7 @@ export function ProjectDetailScreen(): JSX.Element {
     } finally { setLoading(false) }
   }
   onMount(() => { void load() })
+  onCacheInvalidated(app.cache, () => { void load() })
 
   const open = (kind: ModalKind): void => {
     setProblem(undefined)

@@ -14,6 +14,15 @@ import { makeToolpathGenerator } from "../api/generator.ts"
 export const SavedCamProgram = CamProgramDocument
 export type SavedCamProgram = typeof SavedCamProgram.Type
 
+/** Shared-state refreshes may replace a clean program; a local code, settings or stock edit keeps its ownership. */
+export const camEditorRevision = (): string => {
+  const store = useCamStore.getState(), generator = useGeneratorStore.getState()
+  return cam.kernel.sha256(JSON.stringify([store.gcode, generator.settings, generator.printer,
+    useCADStore.getState().workpiece, store.operationResults, store.kernelArtifact, store.kernelRequest]))
+}
+export const storedProgramRevision = (row: { readonly gcode?: string | null; readonly data: unknown }): string =>
+  cam.kernel.sha256(JSON.stringify([row.gcode ?? "", row.data]))
+
 export const snapshotCamProgram = async (app: AppState, gcode: string): Promise<SavedCamProgram> => {
   const store = useCamStore.getState(), generator = useGeneratorStore.getState()
   const artifact = store.kernelArtifact?.nc === gcode && cam.kernel.sha256(gcode) === store.kernelArtifact.identity.nc ? store.kernelArtifact : undefined
@@ -64,7 +73,6 @@ export const restoreCamProgram = async (app: AppState, row: Pick<ToolpathRow, "i
   useVerifyStore.getState().reset()
   store.setKernelArtifact(artifact)
   store.setKernelRequest(data["kernelRequest"] !== undefined ? Schema.decodeUnknownSync(CamKernelRequest)(data["kernelRequest"]) : undefined)
-  store.setSavedProgram(row.id ? { id: row.id, name: row.name, projectId: row.projectId, drawingId: row.drawingId, description: row.description ?? null, isPublic: row.isPublic ?? false } : undefined)
   store.setGcode(code)
   store.setProgram(program)
   store.setActiveTab("editor")
@@ -76,6 +84,17 @@ export const restoreCamProgram = async (app: AppState, row: Pick<ToolpathRow, "i
   }
   generator.setResult(code, [])
   if (store.kernelRequest) restoreKernelSettings(store.kernelRequest)
+  store.setSavedProgram(row.id ? { id: row.id, name: row.name, projectId: row.projectId, drawingId: row.drawingId,
+    description: row.description ?? null, isPublic: row.isPublic ?? false, editorRevision: camEditorRevision(), storedRevision: storedProgramRevision(row) } : undefined)
+}
+
+export const reconcileSavedProgram = async (app: AppState, current: () => boolean): Promise<void> => {
+  const saved = useCamStore.getState().savedProgram
+  const clean = () => current() && useCamStore.getState().savedProgram?.id === saved?.id && saved?.editorRevision === camEditorRevision()
+  if (!saved?.editorRevision || !clean()) return
+  const row = await app.runtime.run(app.client.toolpaths.get({ params: { id: saved.id } }))
+  if (!clean() || saved.storedRevision === storedProgramRevision(row)) return
+  await restoreCamProgram(app, row, clean)
 }
 
 export const downloadCamFile = (contents: string, filename: string, type: string): void => {

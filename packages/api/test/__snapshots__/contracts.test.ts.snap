@@ -6623,6 +6623,263 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/ai/models/refresh": {
+      "post": {
+        "operationId": "ai.refreshModels",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "auth": {
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "baseUrl": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "configured": {
+                        "type": "boolean",
+                      },
+                      "defaultModel": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "id": {
+                        "type": "string",
+                      },
+                      "models": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "contextWindow": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            "cost": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "input": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                "output": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                              },
+                              "required": [
+                                "input",
+                                "output",
+                              ],
+                              "type": "object",
+                            },
+                            "id": {
+                              "type": "string",
+                            },
+                            "inputWindow": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                            "maxOutput": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            "name": {
+                              "type": "string",
+                            },
+                            "provider": {
+                              "type": "string",
+                            },
+                            "reasoning": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                            "tools": {
+                              "type": "boolean",
+                            },
+                            "variants": {
+                              "anyOf": [
+                                {
+                                  "items": {
+                                    "type": "string",
+                                  },
+                                  "type": "array",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                            "vision": {
+                              "type": "boolean",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "provider",
+                            "contextWindow",
+                            "maxOutput",
+                            "tools",
+                            "vision",
+                            "cost",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "source": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "source",
+                      "auth",
+                      "configured",
+                      "models",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
     "/api/ai/modes": {
       "get": {
         "operationId": "ai.modes",
@@ -19835,6 +20092,160 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
         "tags": [
           "toolpaths",
+        ],
+      },
+    },
+    "/api/events": {
+      "get": {
+        "operationId": "events.subscribeAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "contentMediaType": "application/json",
+                      "type": "string",
+                    },
+                    "event": {
+                      "type": "string",
+                    },
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "event",
+                    "data",
+                  ],
+                  "type": "object",
+                },
+                "x-effect-stream": {
+                  "causeSchema": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "_tag": {
+                              "enum": [
+                                "Fail",
+                              ],
+                              "type": "string",
+                            },
+                            "error": {
+                              "not": {},
+                            },
+                          },
+                          "required": [
+                            "_tag",
+                            "error",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "_tag": {
+                              "enum": [
+                                "Die",
+                              ],
+                              "type": "string",
+                            },
+                            "defect": {},
+                          },
+                          "required": [
+                            "_tag",
+                            "defect",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "_tag": {
+                              "enum": [
+                                "Interrupt",
+                              ],
+                              "type": "string",
+                            },
+                            "fiberId": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                          },
+                          "required": [
+                            "_tag",
+                            "fiberId",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "type": "array",
+                  },
+                  "encoding": "sse",
+                  "errorSchema": {
+                    "not": {},
+                  },
+                  "failureEvent": "effect/httpapi/stream/failure",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnauthorizedEncoded",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "events",
         ],
       },
     },

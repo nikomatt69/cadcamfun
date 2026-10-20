@@ -2713,6 +2713,29 @@ export type AiProvidersOutput = Array<{
   }>
 }>
 
+export type AiRefreshModelsOutput = Array<{
+  id: string
+  name: string
+  source: string
+  auth: Array<string>
+  configured: boolean
+  baseUrl?: string | undefined
+  defaultModel?: string | undefined
+  models: Array<{
+    id: string
+    name: string
+    provider: string
+    contextWindow: number
+    maxOutput: number
+    inputWindow?: number | undefined
+    reasoning?: boolean | undefined
+    variants?: Array<string> | undefined
+    tools: boolean
+    vision: boolean
+    cost: { input: number; output: number }
+  }>
+}>
+
 export type AiPromptsInput = { readonly mode?: { readonly mode?: string | undefined }["mode"] }
 
 export type AiPromptsOutput = { prompts: Array<string> }
@@ -7016,6 +7039,61 @@ export type EventsSubscribeOutput =
       status: "success" | "failure" | "cancelled"
     }
   | { type: "ai.session"; at: string; projectId: string; sessionId: string; phase: "started" | "finished" | "aborted" }
+  | { type: "workspace.changed"; at: string; projectId: string }
+  | { type: "server.connected"; at: string }
+  | { type: "resources.changed"; userId: string; at: string }
+  | { type: "catalogue.updated"; at: string }
+
+export type EventsSubscribeAllOutput =
+  | {
+      type: "pr.opened"
+      at: string
+      projectId: string
+      number: number
+      title: string
+      authorKind: "user" | "ai"
+      head: string
+      base: string
+    }
+  | { type: "pr.merged"; at: string; projectId: string; number: number; title: string }
+  | { type: "pr.closed"; at: string; projectId: string; number: number }
+  | {
+      type: "pr.reviewed"
+      at: string
+      projectId: string
+      number: number
+      verdict: "comment" | "approve" | "request-changes"
+    }
+  | {
+      type: "commit"
+      at: string
+      projectId: string
+      oid: string
+      branch: string
+      authorKind: "user" | "ai"
+      message: string
+    }
+  | {
+      type: "workflow.started"
+      at: string
+      projectId: string
+      runId: string
+      workflow: string
+      event: "push" | "pull-request" | "manual"
+    }
+  | {
+      type: "workflow.finished"
+      at: string
+      projectId: string
+      runId: string
+      workflow: string
+      status: "success" | "failure" | "cancelled"
+    }
+  | { type: "ai.session"; at: string; projectId: string; sessionId: string; phase: "started" | "finished" | "aborted" }
+  | { type: "workspace.changed"; at: string; projectId: string }
+  | { type: "server.connected"; at: string }
+  | { type: "resources.changed"; userId: string; at: string }
+  | { type: "catalogue.updated"; at: string }
 
 export type CompanionStatusOutput = {
   enabled: boolean

@@ -1,7 +1,7 @@
-import { existsSync } from "node:fs"
-import { mkdir, rename, rm, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import type { IsolatedPaths } from "./isolation.ts"
+import { bundledCatalogue } from "./models-snapshot.ts"
 
 /**
  * The host's model catalogue on disk (`<cache>/models.json`).
@@ -13,13 +13,15 @@ import type { IsolatedPaths } from "./isolation.ts"
  * gives the full provider/model list with **zero** host network access: nikcli
  * only ever reads this file.
  *
- * The download is our own single request to a public metadata endpoint (no
- * credentials are sent); it runs only when the file is missing and only when
- * the caller explicitly allows it, so tests stay offline.
+ * A new installation restores the pinned SDK's full bundled catalogue before starting
+ * the host. Only an explicit refresh downloads metadata; no standalone nikcli is needed.
  */
 export const MODELS_DEV_URL = "https://models.dev/api.json"
 
-export type CatalogueSeed = "present" | "seeded" | "skipped" | "unavailable"
+/** The catalogue is ~6 MB; on a slow or proxied connection 10 s is not enough, and a timed-out seed used to leave the host with only the declared providers. */
+export const CATALOGUE_FETCH_TIMEOUT_MS = 30_000
+
+export type CatalogueSeed = "present" | "seeded" | "bundled" | "skipped" | "unavailable"
 
 /** Minimum plausible provider count, so a truncated/placeholder body is rejected. */
 const MIN_PROVIDERS = 20
@@ -50,14 +52,28 @@ export const modelsCacheFile = (paths: IsolatedPaths): string => join(paths.cach
 
 export const seedModelsCache = async (
   paths: IsolatedPaths,
-  options?: { readonly network?: boolean; readonly signal?: AbortSignal }
+  options?: { readonly network?: boolean; readonly signal?: AbortSignal; readonly refresh?: boolean }
 ): Promise<CatalogueSeed> => {
   const file = modelsCacheFile(paths)
-  if (existsSync(file)) return "present"
-  if (options?.network !== true) return "skipped"
   const temporary = `${file}.${crypto.randomUUID()}.tmp`
   try {
-    const signal = options?.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(10_000)]) : AbortSignal.timeout(10_000)
+    let present = false
+    try {
+      const cached: unknown = JSON.parse(await readFile(file, "utf8"))
+      present = typeof cached === "object" && cached !== null && !Array.isArray(cached) && Object.keys(cached).length > 0 &&
+        Object.values(cached).every((provider) => provider !== null && typeof provider === "object" &&
+          "models" in provider && provider.models !== null && typeof provider.models === "object" && !Array.isArray(provider.models))
+    } catch { /* Missing or corrupt metadata is repaired from the application, never from a user's nikcli installation. */ }
+    if (!present) {
+      options?.signal?.throwIfAborted()
+      await mkdir(dirname(file), { recursive: true })
+      await writeFile(temporary, bundledCatalogue())
+      options?.signal?.throwIfAborted()
+      await rename(temporary, file)
+    }
+    if (!options?.refresh) return present ? "present" : "bundled"
+    if (options.network !== true) return "skipped"
+    const signal = options?.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(CATALOGUE_FETCH_TIMEOUT_MS)]) : AbortSignal.timeout(CATALOGUE_FETCH_TIMEOUT_MS)
     const response = await fetch(MODELS_DEV_URL, { signal })
     if (!response.ok) return "unavailable"
     const body = await readCatalogueBody(response)
@@ -65,6 +81,8 @@ export const seedModelsCache = async (
     const parsed: unknown = JSON.parse(body)
     if (typeof parsed !== "object" || parsed === null) return "unavailable"
     if (Object.keys(parsed).length < MIN_PROVIDERS) return "unavailable"
+    if (!Object.values(parsed).every((provider) => provider !== null && typeof provider === "object" &&
+      "models" in provider && provider.models !== null && typeof provider.models === "object" && !Array.isArray(provider.models))) return "unavailable"
     signal.throwIfAborted()
     await mkdir(dirname(file), { recursive: true })
     signal.throwIfAborted()

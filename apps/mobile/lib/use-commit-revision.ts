@@ -1,13 +1,13 @@
 import { useCallback, useState } from "react"
 import { useLiveEvents } from "./live-events"
 
-/** Bumps when the desktop commits, so an open preview refetches the new mesh or toolpath. */
+/** Bumps on saved workspace changes and reconnection, including changes without a commit. */
 export function useCommitRevision(projectId: string): number {
   const [revision, setRevision] = useState(0)
   useLiveEvents(
     projectId,
     useCallback((event) => {
-      if (event.type === "commit") setRevision((current) => current + 1)
+      if (["commit", "workspace.changed", "pr.merged", "server.connected", "resources.changed"].includes(event.type)) setRevision((current) => current + 1)
     }, []),
   )
   return revision

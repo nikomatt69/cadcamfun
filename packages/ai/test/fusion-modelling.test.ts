@@ -159,8 +159,9 @@ describe("nikcli's policy and permission layers govern the new capabilities", ()
       expect(can(name, "cad_edit"), `${name} must not create parts`).toBeUndefined()
       expect(can(name, "cad"), `${name} reads the drawing and validates histories`).toBe("allow")
     }
-    // The permission modes keep the person in the loop for the whole tool.
-    for (const mode of ["auto", "ask"]) expect(can(`cadcam-modeler-${mode}`, "cad_edit")).toEqual(HUMAN_APPROVAL)
+    // Ask retains human approval; Auto delegates creation to the native classifier and denies deletion.
+    expect(can("cadcam-modeler-ask", "cad_edit")).toEqual(HUMAN_APPROVAL)
+    expect(can("cadcam-modeler-auto", "cad_edit")).toMatchObject({ "*": "ask", "action:delete": "deny" })
   })
 
   test("the catalogue marks the parametric writes as writes and the validation as a read, which is what the bridge and code_mode scope by", async () => {

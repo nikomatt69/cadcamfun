@@ -7,7 +7,7 @@ import { useCamStore } from "../src/features/cam/store/camStore.ts"
 import { useGeneratorStore } from "../src/features/cam/store/generatorStore.ts"
 import { useElementsStore } from "../src/features/cad/store/elementsStore.ts"
 import { useDocumentStore } from "../src/features/cad/store/documentStore.ts"
-import { SavedCamProgram, snapshotCamProgram, savedProgramData, restoreCamProgram } from "../src/features/cam/lib/saved-program.ts"
+import { SavedCamProgram, snapshotCamProgram, savedProgramData, restoreCamProgram, reconcileSavedProgram } from "../src/features/cam/lib/saved-program.ts"
 
 setDefaultTimeout(120_000)
 let app: Awaited<ReturnType<typeof bootLiveApp>>
@@ -37,6 +37,25 @@ const prepareNative = () => {
   store.setKernelRequest({ schemaVersion: 1, id: "save-fixture", name: "Plate", material: "6061", elements: [plate] })
   useGeneratorStore.getState().setResult(artifact.nc, [])
 }
+
+test("a shared program refreshes from the phone while clean and preserves local code or settings edits", async () => {
+  const project = await app.state.runtime.run(app.client.projects.create({ payload: { name: "Shared CAM" } }))
+  const row = await app.state.runtime.run(app.client.toolpaths.create({ payload: { name: "Shared program", projectId: project.id, data: {}, gcode: "G0 X1" } }))
+  await restoreCamProgram(app.state, row, () => true)
+  await app.state.runtime.run(app.client.toolpaths.update({ params: { id: row.id }, payload: { gcode: "G0 X2" } }))
+  await reconcileSavedProgram(app.state, () => true)
+  expect(useCamStore.getState().gcode).toBe("G0 X2")
+  useCamStore.getState().setGcode("G0 X99")
+  await app.state.runtime.run(app.client.toolpaths.update({ params: { id: row.id }, payload: { gcode: "G0 X3" } }))
+  await reconcileSavedProgram(app.state, () => true)
+  expect(useCamStore.getState().gcode).toBe("G0 X99")
+  await restoreCamProgram(app.state, await app.state.runtime.run(app.client.toolpaths.get({ params: { id: row.id } })), () => true)
+  useGeneratorStore.setState({ settings: { ...useGeneratorStore.getState().settings, toolDiameter: 17 } })
+  await app.state.runtime.run(app.client.toolpaths.update({ params: { id: row.id }, payload: { gcode: "G0 X4" } }))
+  await reconcileSavedProgram(app.state, () => true)
+  expect(useGeneratorStore.getState().settings.toolDiameter).toBe(17)
+  expect(useCamStore.getState().gcode).toBe("G0 X3")
+})
 
 test("a composite CAM resource saves and reopens every operation and displays its saved component", async () => {
   useElementsStore.setState({ elements: [plate], selectedElement: null })

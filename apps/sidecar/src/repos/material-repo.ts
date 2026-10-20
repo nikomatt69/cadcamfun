@@ -2,6 +2,7 @@ import type { MaterialDetail, MaterialRow } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import { and, asc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
+import { LiveEvents } from "../services/live-events.ts"
 import { type ImportResults, importLoop } from "./import-loop.ts"
 import { hasOrgWriteAccess, isOrgMember, orgIdsOf, orgRef, userRef } from "./access.ts"
 
@@ -35,6 +36,7 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
     MaterialRepo,
     Effect.gen(function*() {
       const { query } = yield* Database
+      const events = yield* LiveEvents
       const T = schema.materialTable
       return MaterialRepo.of({
         list: (userId, { search }) =>
@@ -114,7 +116,7 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
               isPublic: input.isPublic || false
             }).returning()
             return toRow(row!)
-          }),
+          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void)),
         update: (id, input) =>
           query("materials.update", async (db) => {
             const [row] = await db.update(T).set({
@@ -125,9 +127,9 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
               updatedAt: new Date()
             }).where(eq(T.id, id)).returning()
             return toRow(row!)
-          }),
-        remove: (id) => query("materials.remove", async (db) => void (await db.delete(T).where(eq(T.id, id))))
+          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void)),
+        remove: (id) => query("materials.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId }))[0]).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void), Effect.asVoid)
       })
     })
-  )
+  ).pipe(Layer.provide(LiveEvents.layer))
 }

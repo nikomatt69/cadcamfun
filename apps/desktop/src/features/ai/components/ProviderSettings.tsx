@@ -220,6 +220,11 @@ export function ProviderSettings(): JSX.Element {
   return (
     <div class="space-y-2" data-testid="ai-provider-settings">
       <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("ai.providers.title")}</h4>
+      <button type="button" class="assistant-btn assistant-btn-secondary" data-testid="ai-models-refresh"
+        disabled={ai.catalogueRefreshing()} onClick={() => void ai.refreshCatalogue()}>
+        {ai.catalogueRefreshing() ? t("ai.catalogue.refreshing") : t("ai.catalogue.refresh")}
+      </button>
+      <Show when={ai.catalogueError()}>{(error) => <p role="alert" class="text-xs text-red-500">{error()}</p>}</Show>
       <Show when={ai.providers().length > 0}>
         <div class="text-xs text-gray-500" data-testid="ai-catalogue-counts">
           {t("ai.catalogue.providerCount", { count: ai.providers().length })} ·{" "}

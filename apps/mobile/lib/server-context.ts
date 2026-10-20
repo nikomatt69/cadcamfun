@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react"
 import type { CompanionClient, AiStatusInfo, ProjectSummary } from "./client"
 import type { Pairing } from "./pairing"
+import type { HostEvents } from "./host-events"
 
 /**
  * Shared server state, split from the provider so screens import types without
@@ -21,6 +22,7 @@ export interface DesktopBootstrap {
 }
 
 export interface ServerValue {
+  hostEvents: HostEvents | null
   config: Pairing | null
   client: CompanionClient | null
   connectivity: Connectivity

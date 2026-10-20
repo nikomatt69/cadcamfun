@@ -118,6 +118,7 @@ import type {
   AiModelsInput,
   AiModelsOutput,
   AiProvidersOutput,
+  AiRefreshModelsOutput,
   AiPromptsInput,
   AiPromptsOutput,
   AiTitleInput,
@@ -508,6 +509,7 @@ import type {
   VcsWorkflowOutput,
   EventsSubscribeInput,
   EventsSubscribeOutput,
+  EventsSubscribeAllOutput,
   CompanionStatusOutput,
   CompanionEnableInput,
   CompanionEnableOutput,
@@ -1527,6 +1529,17 @@ export function make(options: ClientOptions) {
       providers: (requestOptions?: RequestOptions) =>
         request<AiProvidersOutput>(
           { method: "GET", path: `/api/ai/providers`, successStatus: 200, declaredStatuses: [500, 401], empty: false },
+          requestOptions,
+        ),
+      refreshModels: (requestOptions?: RequestOptions) =>
+        request<AiRefreshModelsOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/models/refresh`,
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
           requestOptions,
         ),
       prompts: (input?: AiPromptsInput, requestOptions?: RequestOptions) =>
@@ -4305,6 +4318,11 @@ export function make(options: ClientOptions) {
             declaredStatuses: [401, 404, 500],
             empty: false,
           },
+          requestOptions,
+        ),
+      subscribeAll: (requestOptions?: RequestOptions): AsyncIterable<EventsSubscribeAllOutput> =>
+        sse<EventsSubscribeAllOutput>(
+          { method: "GET", path: `/api/events`, successStatus: 200, declaredStatuses: [401, 500], empty: false },
           requestOptions,
         ),
     },

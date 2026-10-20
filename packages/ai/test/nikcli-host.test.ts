@@ -32,18 +32,23 @@ const probeTool: HostToolSpec = {
 const viewportPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQAAAABJRU5ErkJggg=="
 
 const added: Array<{ projectId: string; elements: ReadonlyArray<Record<string, unknown>> }> = []
+const modified: Array<{ projectId: string; changes: ReadonlyArray<Record<string, unknown>> }> = []
 const handlerCalls: string[] = []
 const stubHandlers = new Proxy({} as ToolHandlersShape, {
   get: (_target, name: string) => async (projectId: string, elements: ReadonlyArray<Record<string, unknown>>) => {
     handlerCalls.push(name)
     if (name === "vision") return { ok: true, capture: { data: viewportPng, mime: "image/png", width: 1, height: 1 }, evidence: { ok: true, sceneRevision: "fixture-revision", image: { width: 1, height: 1 } } }
     if (name === "addElements") { added.push({ projectId, elements }); return { ok: true, ids: elements.map((_, i) => `id-${i}`), elements } }
+    if (name === "modifyEntities") modified.push({ projectId, changes: elements })
     return { ok: true }
   }
 })
 
 let script: (index: number, turn: number, lastRole: string) => Completion = () => ({ text: "hi" })
+let classify: ((prompt: string) => Completion) | undefined
 const fake = startFakeOpenAi((request, index) => {
+  const prompt = request.messages.map((message) => typeof message.content === "string" ? message.content : JSON.stringify(message.content)).join("\n")
+  if (classify && prompt.includes("<pending_action>") && /Stage [12] —/.test(prompt)) return classify(prompt)
   const turn = chatTurns(request ? [request] : []).length
   const lastRole = request.messages.at(-1)?.role ?? ""
   return script(index, turn, lastRole)
@@ -80,6 +85,68 @@ const PROGRESS = new Set(["step", "tool_progress", "reasoning", "todo", "retry",
 const content = (events: ReadonlyArray<AiEvent>) => events.filter((e) => !PROGRESS.has(e.type))
 
 describe("embedded nikcli host", () => {
+  test("Auto creates and edits without approval, while Code Mode cannot delete or write version control", async () => {
+    const host = await Effect.runPromise(runtime.host("project-auto-edits"))
+    let stage = 0
+    const reviews: string[] = []
+    classify = (prompt) => {
+      reviews.push(prompt)
+      // Force both native stages: the classifier reviews the actual action and user's request.
+      if (prompt.includes("Stage 1 —")) return { text: "block" }
+      const pending = prompt.match(/<pending_action>([\s\S]*?)<\/pending_action>/)?.[1] ?? ""
+      if (pending.includes('"width": 99999')) return { text: "<thinking>The user requested a scoped part edit. Resizing the existing part to width 99999 is disproportionate and unsupported by the request.</thinking><verdict>block</verdict><rule>Unscoped CAD modification</rule><reason>The extreme dimension is outside the requested modification and would damage the part.</reason>" }
+      return { text: "<thinking>The user requested creating and modifying CAD geometry. This action stays within that request.</thinking><verdict>allow</verdict><rule>CAD editing</rule><reason>The requested creation or modification is authorized.</reason>" }
+    }
+    const program = `const blocked = {};
+for (const [tool, input] of [["cad_edit", {action:"delete", ids:["id-0"], confirm:true}], ["vcs_edit", {action:"commit", message:"Forbidden"}], ["mods_edit", {action:"remove", id:"x", confirm:true}]]) {
+  try { const value = await tools[tool](input); blocked[tool] = value && value.ok === false ? "refused" : "ran" } catch { blocked[tool] = "refused" }
+}
+return blocked;`
+    script = () => {
+      stage++
+      if (stage === 1) return { toolCalls: [{ name: "search_tools", args: { query: "cad_edit" } }] }
+      if (stage === 2) return { toolCalls: [{ name: "cad_edit", args: { action: "add", elements: [{ type: "cube", width: 10, height: 10, depth: 10 }] } }] }
+      if (stage === 3) return { toolCalls: [{ name: "cad_edit", args: { action: "modify", changes: [{ id: "id-0", changes: { width: 20 } }] } }] }
+      if (stage === 4) return { toolCalls: [{ name: "cad_edit", args: { action: "modify", changes: [{ id: "id-0", changes: { width: 99999 } }] } }] }
+      if (stage === 5) return { toolCalls: [{ name: "code_mode", args: { code: program } }] }
+      return { text: "Created and edited; forbidden changes refused." }
+    }
+    const sessionId = await Effect.runPromise(createHostSession(host, "Auto permissions"))
+    handlerCalls.length = 0
+    modified.length = 0
+    const events: AiEvent[] = []
+    try {
+      await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, agent: "cadcam-auto", message: "Create and edit the part", model, autoContinues: 0 }), (event) => Effect.promise(async () => {
+        events.push(event)
+        // Never hang the test if a regression introduces an approval wait.
+        if (event.type === "permission_request") await host.client.permission.reply({ requestID: event.requestId, reply: "reject" })
+      })))
+    } finally {
+      classify = undefined
+    }
+    const carefulReviews = reviews.filter((prompt) => prompt.includes("Stage 2 —"))
+    for (const action of ["add", "modify"]) {
+      expect(carefulReviews.some((prompt) => {
+        const pending = prompt.match(/<pending_action>([\s\S]*?)<\/pending_action>/)?.[1] ?? ""
+        return pending.includes("permission: cad_edit") && pending.includes(`"action": "${action}"`)
+      })).toBe(true)
+    }
+    const deniedReview = carefulReviews.map((prompt) => prompt.match(/<pending_action>([\s\S]*?)<\/pending_action>/)?.[1] ?? "")
+      .find((pending) => pending.includes('"width": 99999'))
+    expect(deniedReview).toContain('"application": "CADCAMFUN"')
+    expect(deniedReview).toContain('"projectId": "project-auto-edits"')
+    expect(deniedReview).toContain('"id": "cad_edit.modify"')
+    expect(deniedReview).toContain('"kind": "write"')
+    expect(deniedReview).toMatch(/"effects":\s*\[\s*"drawing"\s*\]/)
+    expect(modified).toEqual([{ projectId: "project-auto-edits", changes: [{ id: "id-0", changes: { width: 20 } }] }])
+    expect(events.filter((event) => event.type === "permission_request")).toEqual([])
+    expect(handlerCalls).toContain("addElements")
+    expect(handlerCalls).toContain("modifyEntities")
+    expect(handlerCalls).not.toContain("deleteEntities")
+    const result = events.find((event) => event.type === "tool_result" && event.tool === "code_mode")
+    expect(result?.type === "tool_result" && result.ok).toBe(true)
+    if (result?.type === "tool_result") expect(JSON.parse(result.output)).toEqual({ cad_edit: "refused", vcs_edit: "refused", mods_edit: "refused" })
+  })
   test("one runtime single-flights project clients and rejects cross-workspace worker parents", async () => {
     const peers = await Effect.runPromise(Effect.all([runtime.host("workspace-single"), runtime.host("workspace-single"), runtime.host("workspace-other")], { concurrency: "unbounded" }))
     expect(peers[0]).toBe(peers[1])

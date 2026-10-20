@@ -14,6 +14,7 @@ import { createAiStore, type AiStore } from "./store.ts"
 import { makeCatalog, type AiCatalogService, type OAuthAuthorization } from "../lib/models.ts"
 import type { AiStatus, ModelInfo, ProviderId, ProviderInfo } from "../lib/types.ts"
 import { useApp, type AppState } from "../../../shared/state/context.ts"
+import { onCacheInvalidated } from "../../../shared/state/queries.ts"
 
 export interface AiContextValue {
   readonly store: AiStore
@@ -24,6 +25,9 @@ export interface AiContextValue {
   readonly providers: Accessor<ReadonlyArray<ProviderInfo>>
   readonly providersPending: Accessor<boolean>
   readonly refresh: () => void
+  readonly refreshCatalogue: () => Promise<void>
+  readonly catalogueRefreshing: Accessor<boolean>
+  readonly catalogueError: Accessor<string | undefined>
   readonly saveCredentials: (provider: ProviderId, key: string, baseUrl?: string) => Promise<void>
   readonly removeCredentials: (provider: ProviderId) => Promise<void>
   readonly authorizeOAuth: (provider: "openai" | "xai") => Promise<OAuthAuthorization>
@@ -62,6 +66,19 @@ export const AiProvider = (props: { readonly children: JSX.Element }): JSX.Eleme
     if (modelsEnabled()) void modelsActions.refetch()
     if (providersEnabled()) void providersActions.refetch()
   }
+  onCacheInvalidated(app.cache, refresh)
+  const [catalogueRefreshing, setCatalogueRefreshing] = createSignal(false)
+  const [catalogueError, setCatalogueError] = createSignal<string>()
+  const refreshCatalogue = async (): Promise<void> => {
+    if (catalogueRefreshing()) return
+    setCatalogueRefreshing(true); setCatalogueError(undefined)
+    try {
+      await app.runtime.run(app.client.ai.refreshModels(), { signal: controller.signal })
+      await Promise.all([providersActions.refetch(), modelsEnabled() ? modelsActions.refetch() : undefined])
+    } catch (error) {
+      if (!controller.signal.aborted) setCatalogueError(error instanceof Error ? error.message : String(error))
+    } finally { if (!controller.signal.aborted) setCatalogueRefreshing(false) }
+  }
 
   const saveCredentials = async (provider: ProviderId, key: string, baseUrl?: string): Promise<void> => {
     await app.runtime.run(catalog.setCredentials({ provider, key, ...(baseUrl ? { baseUrl } : {}) }))
@@ -81,6 +98,7 @@ export const AiProvider = (props: { readonly children: JSX.Element }): JSX.Eleme
       providers: () => { enableProviders(true); return (providersResource() as ReadonlyArray<ProviderInfo> | undefined) ?? [] },
       providersPending: () => { enableProviders(true); return providersResource.state === "pending" },
       refresh,
+      refreshCatalogue, catalogueRefreshing, catalogueError,
       saveCredentials,
       removeCredentials,
       authorizeOAuth: (provider) => app.runtime.run(catalog.authorizeOAuth(provider)),

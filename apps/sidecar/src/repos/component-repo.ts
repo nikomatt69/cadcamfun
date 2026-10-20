@@ -2,6 +2,7 @@ import type { ComponentDetail, ComponentRow } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import { and, desc, eq, inArray, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
+import { LiveEvents } from "../services/live-events.ts"
 import { orgIdsOf } from "./access.ts"
 
 type Row = typeof schema.componentTable.$inferSelect
@@ -27,6 +28,7 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
     ComponentRepo,
     Effect.gen(function*() {
       const { query } = yield* Database
+      const events = yield* LiveEvents
       const T = schema.componentTable
       const P = schema.projectTable
       return ComponentRepo.of({
@@ -52,18 +54,18 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
           query("components.create", async (db) => {
             const [row] = await db.insert(T).values({ name: d.name, description: d.description ?? null, data: d.data || {}, type: d.type ?? null, isPublic: d.isPublic ?? false, projectId }).returning()
             return toComponentRow(row!)
-          }),
+          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         update: (id, patch) =>
           query("components.update", async (db) => {
             const [row] = await db.update(T).set({ ...patch, updatedAt: new Date() }).where(eq(T.id, id)).returning()
             return toComponentRow(row!)
-          }),
-        remove: (id) => query("components.remove", async (db) => void (await db.delete(T).where(eq(T.id, id)))),
+          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
+        remove: (id) => query("components.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId }))[0]).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid),
         projectOrganization: (projectId) =>
           query("components.projectOrganization", async (db) => (await db.select({ o: P.organizationId }).from(P).where(eq(P.id, projectId)).limit(1))[0]?.o ?? null),
         userName: (userId) =>
           query("components.userName", async (db) => (await db.select({ n: schema.userTable.name }).from(schema.userTable).where(eq(schema.userTable.id, userId)).limit(1))[0]?.n ?? null)
       })
     })
-  )
+  ).pipe(Layer.provide(LiveEvents.layer))
 }

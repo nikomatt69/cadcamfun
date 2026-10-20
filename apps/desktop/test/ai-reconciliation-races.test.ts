@@ -111,6 +111,17 @@ test("pushed snapshots cannot delete or update identical element ids in another 
   expect(await reconcileFromStored(drawingApp(Promise.resolve({ data: { elements: [] } })))).toEqual({ ...none, removed: 1 })
 })
 
+test("repeated mobile refreshes never promote a conflicting local edit to the shared baseline", async () => {
+  useElementsStore.getState().addElements([element])
+  rememberPushed(useElementsStore.getState().elements as unknown as ReadonlyArray<Record<string, unknown>>)
+  useElementsStore.getState().updateElement(element.id, { x: 42 })
+  const remote = drawingApp(Promise.resolve({ data: { elements: [{ ...element, x: 99 }] } }))
+  for (let i = 0; i < 3; i++) {
+    expect(await reconcileFromStored(remote)).toEqual(none)
+    expect(useElementsStore.getState().elements[0]?.x).toBe(42)
+  }
+})
+
 const operation = { gcode: "G0 X10", data: { request: { settings: cam.generator.decodeSettings({ toolDiameter: 8 }) }, verification: { report: {} } } }
 const parsed = { program: cam.makeProgram("parsed", [], {}) }
 const camApp = (run: () => Promise<unknown>) => ({

@@ -15,7 +15,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 - Actions: **91** in **15** tools (read 51, write 35, destructive 5).
 - Actions with an identified execution path: **91/91**.
 - Actions named in their tool prompt: **91/91**.
-- Actions mentioned by at least one test file: **89/91**.
+- Actions mentioned by at least one test file: **90/91**.
 - Actions with a declared result schema: **91/91**.
 - Prompt files: **56** (base layers 8, modes 5); one-shot workflows: **5**.
 - Built-in skills: **18** (plus user skills from the store); composer commands: **32**.
@@ -72,12 +72,12 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `cad_edit.add` (was `cad_add_elements`) | write | drawing | elements* | handler `addElements` → `apps/sidecar/src/services/ai.ts:578` | yes | declared, partial on `skipped` | action-contracts.test.ts, action-outcome.test.ts, bridge.test.ts, nikcli-host.test.ts, post-edit-diagnostics.test.ts, program-calls.test.ts, ai-actions.test.ts, ai-bridge-policy.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-fusion-governance.test.ts, ai-resource-generator.test.ts, ai-stock-inspection.test.ts, assistant-history.test.ts, nikcli-plugin.test.ts, ai-chat-loop.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-timeline.test.ts, ai-tool-facts.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
+| `cad_edit.add` (was `cad_add_elements`) | write | drawing | elements* | handler `addElements` → `apps/sidecar/src/services/ai.ts:578` | yes | declared, partial on `skipped` | action-contracts.test.ts, action-outcome.test.ts, bridge.test.ts, nikcli-host.test.ts, post-edit-diagnostics.test.ts, program-calls.test.ts, ai-actions.test.ts, ai-bridge-policy.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-fusion-governance.test.ts, ai-resource-generator.test.ts, ai-stock-inspection.test.ts, assistant-history.test.ts, nikcli-plugin.test.ts, ai-chat-loop.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-project-sessions.test.ts, ai-reconciliation-races.test.ts, ai-timeline.test.ts, ai-tool-facts.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
 | `cad_edit.add_entities` (was `cad_add_entities`) | write | drawing | entities* | handler `addEntities` → `apps/sidecar/src/services/ai.ts:572` | yes | declared | action-inputs-cad.test.ts, service.test.ts, ai-cam-tools.test.ts, companion-chat-e2e.test.ts, ai-editor-sync.test.ts, ai-workspace.test.ts, ai.test.ts |
-| `cad_edit.modify` (was `cad_modify_entities`) | write | drawing | changes* | handler `modifyEntities` → `apps/sidecar/src/services/ai.ts:602` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, agents.test.ts, bridge.test.ts, ai-bridge-policy.test.ts, ai-cam-tools.test.ts, ai-editor-sync.test.ts, ai-tool-views.test.ts |
+| `cad_edit.modify` (was `cad_modify_entities`) | write | drawing | changes* | handler `modifyEntities` → `apps/sidecar/src/services/ai.ts:602` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, agents.test.ts, bridge.test.ts, nikcli-host.test.ts, ai-bridge-policy.test.ts, ai-cam-tools.test.ts, ai-editor-sync.test.ts, ai-tool-views.test.ts |
 | `cad_edit.transform` (was `cad_transform_entities`) | write | drawing | ids*, dx, dy, dz, rotateAxis, rotateDegrees, scale, about, copies | handler `transformEntities` → `apps/sidecar/src/services/ai.ts:631` | yes | declared | action-inputs-cad.test.ts, ai-stock-inspection.test.ts, ai-workspace.test.ts |
 | `cad_edit.group` (was `cad_group_entities`) | write | drawing | ids*, name, ungroup, layer | handler `groupEntities` → `apps/sidecar/src/services/ai.ts:641` | yes | declared | action-inputs-cad.test.ts, ai-stock-inspection.test.ts, ai-workspace.test.ts |
-| `cad_edit.delete` (was `cad_delete_entities`) | destructive | drawing | ids*, confirm* | handler `deleteEntities` → `apps/sidecar/src/services/ai.ts:625` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, bridge.test.ts, service.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, nikcli-plugin.test.ts, ai-editor-sync.test.ts, ai-tool-views.test.ts |
+| `cad_edit.delete` (was `cad_delete_entities`) | destructive | drawing | ids*, confirm* | handler `deleteEntities` → `apps/sidecar/src/services/ai.ts:625` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, bridge.test.ts, nikcli-host.test.ts, service.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, nikcli-plugin.test.ts, ai-editor-sync.test.ts, ai-tool-views.test.ts |
 | `cad_edit.editor` (was `cad_editor`) | write | interface, drawing | actions* | local (in-package implementation) — `packages/ai/src/actions/cad-edit.ts` | yes | declared | action-inputs-cad.test.ts, ai-workspace.test.ts, cad-section.test.ts |
 | `cad_edit.import` (was `cad_import_drawing`) | write | drawing | format, content, attachment, depth, up, scale, gap, tolerance, name, color, layer | handler `addElements` → `apps/sidecar/src/services/ai.ts:578` | yes | declared | action-inputs-cad.test.ts, attachments.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, ai-attachments.test.ts |
 | `cad_edit.parametric_create` (was `cad_parametric`) | write | drawing | history*, name*, x, y, z, layer | handler `parametric` → `apps/sidecar/src/services/ai.ts:530` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering-2.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-drawing-binding.test.ts, ai-drawing.test.ts, ai-fusion-governance.test.ts, ai-parametric-acceptance.test.ts |
@@ -179,7 +179,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `vcs_edit.start_change` (was `vcs_start_change`) | write | history | topic* | contribution `vcs_edit.start_change` → `apps/sidecar/src/services/ai-vcs-tools.ts:66` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
-| `vcs_edit.commit` (was `vcs_commit`) | write | history | message* | contribution `vcs_edit.commit` → `apps/sidecar/src/services/ai-vcs-tools.ts:75` | yes | declared | action-inputs.test.ts, bridge.test.ts, ai-bridge-policy.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-tool-facts.test.ts |
+| `vcs_edit.commit` (was `vcs_commit`) | write | history | message* | contribution `vcs_edit.commit` → `apps/sidecar/src/services/ai-vcs-tools.ts:75` | yes | declared | action-inputs.test.ts, bridge.test.ts, nikcli-host.test.ts, ai-bridge-policy.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-tool-facts.test.ts |
 | `vcs_edit.restore` (was `vcs_restore_paths`) | destructive | history, drawing | paths*, from*, confirm* | contribution `vcs_edit.restore` → `apps/sidecar/src/services/ai-vcs-tools.ts:77` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts |
 | `vcs_edit.open_pull_request` (was `vcs_open_pull_request`) | write | history | title*, body | contribution `vcs_edit.open_pull_request` → `apps/sidecar/src/services/ai-vcs-tools.ts:83` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
 | `vcs_edit.run_workflows` (was `actions_run`) | write | workflow | trigger | contribution `vcs_edit.run_workflows` → `apps/sidecar/src/services/ai-vcs-tools.ts:90` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
@@ -206,7 +206,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `mods_edit.save` (was `mods_save`) | write | mod | id*, name, description*, source*, enable | contribution `mods_edit.save` → `packages/ai/src/nikcli/mod-tools.ts:195` | yes | declared | mod-tools.test.ts |
 | `mods_edit.set_enabled` (was `mods_set_enabled`) | write | mod | id*, enabled* | contribution `mods_edit.set_enabled` → `packages/ai/src/nikcli/mod-tools.ts:196` | yes | declared | **none** |
-| `mods_edit.remove` (was `mods_remove`) | destructive | mod | id* | contribution `mods_edit.remove` → `packages/ai/src/nikcli/mod-tools.ts:197` | yes | declared | **none** |
+| `mods_edit.remove` (was `mods_remove`) | destructive | mod | id* | contribution `mods_edit.remove` → `packages/ai/src/nikcli/mod-tools.ts:197` | yes | declared | nikcli-host.test.ts |
 
 ## Prompt files
 
@@ -249,11 +249,11 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/tools/prompts/memory.txt` | tool description | tools/prompts/index.ts toolPrompt | 789 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/memory_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 998 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/mods.txt` | tool description | tools/prompts/index.ts toolPrompt | 1624 | prompt-corpus.test.ts |
-| `packages/ai/src/tools/prompts/mods_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3200 | prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/mods_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3200 | nikcli-host.test.ts, prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/parts.txt` | tool description | tools/prompts/index.ts toolPrompt | 1395 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/research.txt` | tool description | tools/prompts/index.ts toolPrompt | 1070 | prompt-corpus.test.ts |
 | `packages/ai/src/tools/prompts/vcs.txt` | tool description | tools/prompts/index.ts toolPrompt | 1307 | prompt-corpus.test.ts |
-| `packages/ai/src/tools/prompts/vcs_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1808 | ai-specialists.test.ts, prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/vcs_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1808 | ai-specialists.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts |
 | `packages/ai/src/prompts/family/autonomous.txt` | model-family style | prompts/system.ts modelFamilyPrompt | 637 | modes.test.ts, prompt-corpus.test.ts |
 | `packages/ai/src/prompts/family/codex.txt` | model-family style | prompts/system.ts modelFamilyPrompt | 306 | modes.test.ts, prompt-corpus.test.ts |
 | `packages/ai/src/prompts/family/gemini.txt` | model-family style | prompts/system.ts modelFamilyPrompt | 247 | modes.test.ts, prompt-corpus.test.ts |

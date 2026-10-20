@@ -30,7 +30,7 @@ const PERMISSION_IDS = new Set<string>(["approve", "ask", "auto"])
 export const PERMISSION_MODES: readonly { id: AssistantPermissionMode; title: string; description: string }[] = [
   { id: "approve", title: "Standard", description: "Run routine tools. Ask before destructive changes and external tools." },
   { id: "ask", title: "Ask every time", description: "Ask for approval before each tool action." },
-  { id: "auto", title: "Auto review", description: "Let the host review routine actions. Destructive changes and external tools still need your approval." },
+  { id: "auto", title: "Auto review", description: "Let the host classify creation and editing actions. Deletion, VCS writes and extension changes are blocked; external tools still need approval." },
 ]
 
 export interface AssistantModelOption extends AssistantModelSelection {
