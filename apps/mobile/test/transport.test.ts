@@ -52,3 +52,13 @@ test("browser/test transport preserves split UTF-8 and releases stream reader", 
   for await (const chunk of transport.stream("/api/events", "GET")) text += chunk
   expect(text).toBe("café 🛠️")
 })
+
+test("the account's access token travels as x-identity-token and the pairing keeps the bearer", async () => {
+  const seen: Record<string, string>[] = []
+  const module = { ...moduleFor({ readNext: async () => ({ done: true }), cancel() {} }), request: async (_b: string, _p: string, _m: string, headers: Record<string, string>) => { seen.push(headers); return { status: 200, body: "{}" } } }
+  await createPinnedTransport(pairing, module, async () => "jwt-1").request("/api/projects", "GET")
+  await createPinnedTransport(pairing, module, async () => undefined).request("/api/projects", "GET")
+  expect(seen[0]?.["x-identity-token"]).toBe("jwt-1")
+  expect(seen[0]?.authorization).toBe(`Bearer ${pairing.token}`)
+  expect(seen[1]?.["x-identity-token"]).toBeUndefined()
+})

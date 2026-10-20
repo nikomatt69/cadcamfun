@@ -12,6 +12,7 @@ import { desktopLabel, parsePairingLink, type Pairing } from "@/lib/pairing"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { ActionButton } from "@/components/ui/ActionButton"
+import { AccountCard } from "@/components/layout/AccountCard"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { TextField } from "@/components/ui/TextField"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
@@ -132,6 +133,8 @@ export default function ConnectScreen() {
               </View>)}
             </View>
           </SurfaceCard>
+
+          <AccountCard />
 
           <View style={{ gap: 10 }}>
             <ActionButton label={busy ? "Connecting to your desktop…" : "Scan pairing code"} icon={<ScanLine size={20} color={palette.onAccent} />} fullWidth loading={busy} onPress={() => void openScanner()} />

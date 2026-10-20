@@ -137,6 +137,7 @@ describe("mobile pairing provider lifecycle", () => {
     pairingStore: { load: () => load(), save: async () => undefined, clear: async () => { clears += 1 } },
     pinnedTransport: () => ({ request: (path: string) => path === "/api/health" ? health() : Promise.resolve({ status: 200, body: JSON.stringify({ configured: false, host: "nikcli" }) }), async *stream() {} })
   }))
+  mock.module("../lib/account", () => ({ accountStore: { subscribe: () => () => undefined, revision: () => 0, account: () => null }, restoreAccount: async () => null }))
   mock.module("../lib/store", () => ({ uiPreferencesReady: Promise.resolve(), useUIStore: { getState: () => ({ setAssistantDesktop() {} }) } }))
   mock.module("../lib/storage", () => ({
     pairingStore: { load: () => load(), save: async () => undefined, clear: async () => { clears += 1 } },

@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/ToastHost"
 import { SegmentedControl } from "@/components/ui/SegmentedControl"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ListRow } from "@/components/ui/ListRow"
+import { AccountCard } from "@/components/layout/AccountCard"
 import { ConnectionStatus } from "@/components/layout/ConnectionStatus"
 import { usePrefersReducedMotion } from "@/lib/animation"
 import { PageScroll } from "@/components/layout/page-scroll"
@@ -126,6 +127,8 @@ export default function SettingsScreen() {
         {offlineQueueCount > 0 ? <Text style={{ color: palette.muted, fontSize: 13 }}>{offlineQueueCount} queued</Text> : null}
       </View>
     </SurfaceCard>
+
+    <AccountCard />
 
     <SettingsGroup title="Desktop">
       <ListRow leading={<IconTile size={36}><MonitorSmartphone size={18} color={palette.accent} /></IconTile>}

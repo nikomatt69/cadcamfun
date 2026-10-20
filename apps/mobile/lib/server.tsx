@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PropsWithChildren } from "react"
 import { AppState, Platform } from "react-native"
 import { CompanionClient, CompanionError, type AiStatusInfo } from "./client"
 import { launchPairLink, nativeAvailable, pinnedTransport, warmLocalNetwork } from "./native"
 import { pairingStore } from "./storage"
+import { accountStore, restoreAccount } from "./account"
 import { desktopLabel, firstReachable, parsePairingLink, type Pairing } from "./pairing"
 import { drainQueueWith, refreshOfflineQueueCount } from "./offline-queue"
 import { uiPreferencesReady, useUIStore } from "./store"
@@ -46,9 +47,12 @@ export function ServerProvider({ children }: PropsWithChildren) {
   const currentClient = useRef<CompanionClient | null>(null)
   const checkRef = useRef<(pairing: Pairing) => Promise<Pairing | null>>(async () => null)
 
+  // Signing in or out changes which projects the desktop returns: a new client and a fresh probe, never cached lists of the old account.
+  const accountRevision = useSyncExternalStore(accountStore.subscribe, accountStore.revision)
   const client = useMemo(
     () => (config && (nativeAvailable || Platform.OS === "web") ? new CompanionClient(pinnedTransport(config)) : null),
-    [config],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [config, accountRevision],
   )
   currentClient.current = client
 
@@ -147,6 +151,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
     void (async () => {
       try {
         await uiPreferencesReady
+        await restoreAccount()
         const launched = await launchPairLink()
         if (!mounted.current || version !== generation.current) return
         let pairing: Pairing | undefined
@@ -277,6 +282,14 @@ export function ServerProvider({ children }: PropsWithChildren) {
       if (currentClient.current === live) setBootstrapLoading(false)
     }
   }, [])
+
+  const seenRevision = useRef(accountRevision)
+  useEffect(() => {
+    if (seenRevision.current === accountRevision) return
+    seenRevision.current = accountRevision
+    setBootstrap(null)
+    if (configRef.current) void checkRef.current(configRef.current)
+  }, [accountRevision])
 
   const value = useMemo<ServerValue>(
     () => ({ config, client, connectivity, connectionError, ai, bootstrap, bootstrapLoading, booting, save, clear, recheck, refreshBootstrap }),

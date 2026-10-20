@@ -3,6 +3,7 @@ import CompanionNet from "@/modules/companion-net"
 import type { Pairing } from "./pairing"
 import { createFetchTransport, createPinnedTransport } from "../modules/companion-net/transport"
 import type { Transport } from "./client"
+import { identityToken } from "./account"
 
 export { pairingStore } from "./storage"
 
@@ -43,7 +44,7 @@ export const warmLocalNetwork = (): void => {
 
 /** Never downgrade a native device to an unpinned browser connection. */
 export const pinnedTransport = (pairing: Pairing): Transport => {
-  if (Platform.OS === "web") return createFetchTransport(pairing)
+  if (Platform.OS === "web") return createFetchTransport(pairing, fetch, identityToken)
   if (!nativeAvailable || !CompanionNet) throw new Error("Certificate pinning requires the CADCAMFUN iOS development build. Expo Go cannot connect to a paired desktop.")
-  return createPinnedTransport(pairing, CompanionNet)
+  return createPinnedTransport(pairing, CompanionNet, identityToken)
 }

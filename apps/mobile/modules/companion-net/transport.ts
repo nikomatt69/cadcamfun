@@ -43,24 +43,27 @@ export const exposedHeaders = (raw: Readonly<Record<string, string>> | Headers |
 /** Caller headers are conditional-request headers only: they can never replace the pairing's credentials or framing. */
 const CALLER_HEADERS = new Set(["if-none-match"])
 
-const headers = (pairing: Pairing, body: unknown, extra?: Readonly<Record<string, string>>) => {
+/** Supplies the CADCAMFUN account's access JWT; undefined means the phone acts as the desktop's local profile. */
+export type IdentityToken = () => Promise<string | undefined>
+
+const headers = (pairing: Pairing, body: unknown, extra?: Readonly<Record<string, string>>, identity?: string) => {
   const allowed = Object.fromEntries(Object.entries(extra ?? {}).filter(([name]) => CALLER_HEADERS.has(name.toLowerCase())).map(([name, value]) => [name.toLowerCase(), value]))
-  return { ...allowed, authorization: `Bearer ${pairing.token}`, accept: "application/json, text/event-stream", ...(body !== undefined ? { "content-type": "application/json" } : {}) }
+  return { ...allowed, ...(identity ? { "x-identity-token": identity } : {}), authorization: `Bearer ${pairing.token}`, accept: "application/json, text/event-stream", ...(body !== undefined ? { "content-type": "application/json" } : {}) }
 }
 
 /** A refused stream carries the gateway's back-off (`retry-after`, seconds) so reconnecting waits for it. */
 const streamRefusal = (status: number, retryAfter: string | undefined) => new CompanionError(status, `HTTP ${status}`, retryAfterMs(retryAfter))
 
-export const createPinnedTransport = (pairing: Pairing, module: PinnedModule): Transport => ({
+export const createPinnedTransport = (pairing: Pairing, module: PinnedModule, identity?: IdentityToken): Transport => ({
   async request(path, method, body, signal, extra) {
     if (signal?.aborted) throw new Error("Request cancelled")
-    const response = await abortable(signal, module.request(pairing.baseUrl, path, method, headers(pairing, body, extra), body === undefined ? null : JSON.stringify(body), pairing.fingerprint))
+    const response = await abortable(signal, module.request(pairing.baseUrl, path, method, headers(pairing, body, extra, (identity ? await identity() : undefined)), body === undefined ? null : JSON.stringify(body), pairing.fingerprint))
     return { status: response.status, body: response.body, headers: exposedHeaders(response.headers) }
   },
   async *stream(path, method, body, signal) {
     if (signal?.aborted) return
     // Await the native AsyncFunction; cancellation while it starts must still release its handle.
-    const handle = await module.streamStart(pairing.baseUrl, path, method, headers(pairing, body), body === undefined ? null : JSON.stringify(body), pairing.fingerprint)
+    const handle = await module.streamStart(pairing.baseUrl, path, method, headers(pairing, body, undefined, (identity ? await identity() : undefined)), body === undefined ? null : JSON.stringify(body), pairing.fingerprint)
     const cancel = () => handle.cancel()
     signal?.addEventListener("abort", cancel, { once: true })
     try {
@@ -79,13 +82,13 @@ export const createPinnedTransport = (pairing: Pairing, module: PinnedModule): T
 })
 
 /** Browser/test transport. Native callers must explicitly select certificate pinning instead. */
-export const createFetchTransport = (pairing: Pairing, fetcher: typeof fetch = fetch): Transport => ({
+export const createFetchTransport = (pairing: Pairing, fetcher: typeof fetch = fetch, identity?: IdentityToken): Transport => ({
   async request(path, method, body, signal, extra) {
-    const response = await fetcher(`${pairing.baseUrl}${path}`, { method, headers: headers(pairing, body, extra), body: body === undefined ? undefined : JSON.stringify(body), signal, redirect: "error" })
+    const response = await fetcher(`${pairing.baseUrl}${path}`, { method, headers: headers(pairing, body, extra, (identity ? await identity() : undefined)), body: body === undefined ? undefined : JSON.stringify(body), signal, redirect: "error" })
     return { status: response.status, body: await response.text(), headers: exposedHeaders(response.headers) }
   },
   async *stream(path, method, body, signal) {
-    const response = await fetcher(`${pairing.baseUrl}${path}`, { method, headers: headers(pairing, body), body: body === undefined ? undefined : JSON.stringify(body), signal, redirect: "error" })
+    const response = await fetcher(`${pairing.baseUrl}${path}`, { method, headers: headers(pairing, body, undefined, (identity ? await identity() : undefined)), body: body === undefined ? undefined : JSON.stringify(body), signal, redirect: "error" })
     if (!response.ok) throw streamRefusal(response.status, response.headers.get("retry-after") ?? undefined)
     if (!response.body) throw new Error("The desktop returned no stream")
     const reader = response.body.getReader()
