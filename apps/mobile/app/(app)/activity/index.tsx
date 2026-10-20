@@ -11,6 +11,7 @@ import { usePoll } from "@/lib/use-poll"
 import { useUIStore } from "@/lib/store"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
+import { layout } from "@/lib/layout"
 import { relativeTime } from "@/lib/format"
 import { activityCategory, activityTarget, appendFeedPage, firstFeedPage, nextPageQuery, groupActivity, markAllInFeed, markLocally, removeFromFeed, type ActivityTone, type FeedPages } from "@/lib/activity-feed"
 import { toast } from "@/components/ui/ToastHost"
@@ -168,7 +169,8 @@ export default function ActivityScreen() {
       </View>
       <SegmentedControl segments={[{ value: "all", label: "All updates" }, { value: "unread", label: unreadCount ? `Unread (${unreadCount})` : "Unread" }]} value={filter} onChange={setFilter} />
       {unreadCount > 0 ? <ActionButton label="Mark all as read" small variant="secondary" loading={marking} onPress={() => void markAll()} /> : null}
-      {feed.error ? <ErrorBanner message={feed.data ? `Showing saved updates. ${feed.error}` : feed.error} actionLabel="Retry" onAction={() => void feed.reload()} /> : null}    </View>}
+      {feed.error ? <ErrorBanner message={feed.data ? `Showing saved updates. ${feed.error}` : feed.error} actionLabel="Retry" onAction={() => void feed.reload()} /> : null}
+    </View>}
     ListEmptyComponent={feed.loading && !data ? <View accessible accessibilityLabel="Loading updates" style={{ gap: 12 }}>{[0, 1, 2].map((key) => <Skeleton key={key} style={{ height: 104 }} />)}</View> : !feed.error ?
       <EmptyState icon={<BellOff size={26} color={palette.accent} />} title={filter === "unread" ? "All caught up" : "No updates yet"} description={filter === "unread" ? "You've read every update. New activity will appear here." : "Project reviews, workflow results and assistant changes will appear here."} /> : null}
     ListFooterComponent={mayHaveMore && filter === "all" ? <View style={{ paddingTop: 16, gap: 10 }}>
@@ -179,9 +181,9 @@ export default function ActivityScreen() {
     onEndReached={() => { if (filter === "all" && mayHaveMore && !older.error) void loadOlder() }}
     renderItem={({ item }) => {
       if (item.kind === "section") {
-        return <View accessibilityRole="header" style={{ flexDirection: "row", alignItems: "baseline", gap: 8, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 4 }}>
+        return <View accessibilityRole="header" accessible style={{ flexDirection: "row", alignItems: "baseline", gap: 8, paddingTop: 18, paddingBottom: 8, paddingHorizontal: 4 }}>
           <Text style={{ color: palette.ink, fontSize: 15, fontWeight: "700" }}>{item.title}</Text>
-          {item.unread ? <Text style={{ color: palette.accent, fontSize: 12, fontWeight: "600" }}>{item.unread} new</Text> : null}
+          {item.unread ? <Text style={{ color: palette.accentStrong, fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] }}>{item.unread} new</Text> : null}
         </View>
       }
       const row = item.row
@@ -189,15 +191,15 @@ export default function ActivityScreen() {
       const color = toneColor(category.tone)
       return <View style={{ paddingBottom: 10 }}>
         <PressableScale subtle tint onPress={() => open(row)} onLongPress={() => actions(row)}
-          accessibilityLabel={`${row.isRead ? "" : "Unread. "}${category.label}. ${row.title}. ${row.content}. ${relativeTime(row.createdAt)}`}
+          accessibilityLabel={`${row.isRead ? "" : "Unread. "}${[category.label, row.title, row.content, relativeTime(row.createdAt)].filter(Boolean).join(". ")}`}
           accessibilityHint={activityTarget(row) ? "Opens the update. Long press for more actions." : "Marks as read. Long press for more actions."}
           accessibilityActions={[{ name: "toggle", label: row.isRead ? "Mark as unread" : "Mark as read" }, { name: "delete", label: "Delete" }]}
           onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === "toggle") void setRead(row, !row.isRead); else if (event.nativeEvent.actionName === "delete") remove(row) }}
-          style={{ padding: 16, borderRadius: 20, borderCurve: "continuous", backgroundColor: palette.surface, borderColor: row.isRead ? palette.border : hexToRgba(palette.accent, 0.35), borderWidth: 0.5, gap: 10 }}>
+          style={{ padding: 16, borderRadius: layout.cardRadius, borderCurve: "continuous", backgroundColor: palette.surface, borderColor: row.isRead ? palette.border : hexToRgba(palette.accent, 0.35), borderWidth: 0.5, gap: 10 }}>
           <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 }}>
-            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: row.isRead ? palette.border : palette.accent }} />
-            <Text style={{ flexGrow: 1, color, fontSize: 12, fontWeight: "600" }}>{category.label}</Text>
-            <Text style={{ color: palette.muted, fontSize: 12 }}>{relativeTime(row.createdAt)}</Text>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: row.isRead ? palette.border : palette.accent }} />
+            <Text numberOfLines={1} style={{ flexGrow: 1, flexShrink: 1, color, fontSize: 12, fontWeight: "600" }}>{category.label}</Text>
+            <Text style={{ color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>{relativeTime(row.createdAt)}</Text>
           </View>
           <Text style={{ color: palette.ink, fontSize: 16, lineHeight: 23, fontWeight: row.isRead ? "500" : "600" }} numberOfLines={fontScale > 1.2 ? undefined : 3}>{row.title}</Text>
           {row.content ? <Text style={{ color: palette.soft, fontSize: 14, lineHeight: 21 }} numberOfLines={fontScale > 1.2 ? undefined : 3}>{row.content}</Text> : null}

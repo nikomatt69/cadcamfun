@@ -15,6 +15,7 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { haptic } from "@/lib/haptics"
 import { errorMessage } from "@/lib/throttle"
 import { toast } from "@/components/ui/ToastHost"
+import { mono, type } from "@/lib/typography"
 
 /**
  * One commit, read as the project sees it: message, author, oid, and the CAD-aware property diff
@@ -79,18 +80,18 @@ export default function CommitScreen() {
           {log.error ? <ErrorBanner message={log.error} actionLabel="Retry" onAction={() => void log.reload()} /> : null}
           {commit ? (
             <SurfaceCard eyebrow="COMMIT DETAILS">
-              <Text selectable style={{ color: palette.ink, fontSize: 22, lineHeight: 27, fontWeight: "700", letterSpacing: -0.5 }}>{commitTitle(commit.message)}</Text>
-              {commitBody(commit.message) ? <Text selectable style={{ marginTop: 10, color: palette.soft, fontSize: 14, lineHeight: 21 }}>{commitBody(commit.message)}</Text> : null}
-              <Text selectable style={{ marginTop: 10, color: palette.muted, fontSize: 13, lineHeight: 19 }}>
+              <Text selectable accessibilityRole="header" style={{ color: palette.ink, ...type(22, { weight: "700" }) }}>{commitTitle(commit.message)}</Text>
+              {commitBody(commit.message) ? <Text selectable style={{ marginTop: 10, color: palette.soft, ...type(14) }}>{commitBody(commit.message)}</Text> : null}
+              <Text selectable style={{ marginTop: 10, color: palette.muted, fontVariant: ["tabular-nums"], ...type(13) }}>
                 {commit.author.name} · {relativeTime(commitTime(commit.author.time))}
                 {commitTime(commit.author.time) ? ` · ${new Date(commitTime(commit.author.time)).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}` : ""}
               </Text>
-              <Text selectable style={{ marginTop: 4, color: palette.muted, fontSize: 12, lineHeight: 18, fontFamily: "Menlo" }}>
+              <Text selectable style={{ marginTop: 6, color: palette.muted, ...mono(12) }}>
                 {commit.oid}{parent ? `\nparent ${shortOid(parent)}` : "\nroot commit"}
               </Text>
             </SurfaceCard>
           ) : log.data && !log.loading ? (
-            <Text selectable style={{ color: palette.muted, fontSize: 13, lineHeight: 19 }}>
+            <Text selectable style={{ color: palette.muted, ...type(13) }}>
               Commit <Text style={{ fontFamily: "Menlo" }}>{shortOid(oid)}</Text> is older than the latest 100 commits; its changes are shown below.
             </Text>
           ) : null}
@@ -98,12 +99,12 @@ export default function CommitScreen() {
           {diff.loading && !diff.data ? <Skeleton style={{ height: 160 }} /> : null}
           {diff.error ? <ErrorBanner message={diff.error} actionLabel="Retry" onAction={() => void diff.reload()} /> : null}
           {diff.data && diff.data.length > 0 ? <DiffView changes={diff.data} /> : diff.data ? (
-            <Text style={{ color: palette.muted, fontSize: 14, lineHeight: 20, textAlign: "center", paddingTop: 24 }}>Empty commit</Text>
+            <Text style={{ color: palette.muted, textAlign: "center", paddingTop: 24, ...type(14) }}>Empty commit</Text>
           ) : null}
 
           {/* Restore is a desktop-grade action: the phone may do it, but it says what it does first. */}
           {commit ? (
-            <View style={{ paddingTop: 20 }}>
+            <View style={{ paddingTop: 4 }}>
               <ActionButton label="Restore this version" variant="secondary" onPress={restore} loading={restoring} />
             </View>
           ) : null}

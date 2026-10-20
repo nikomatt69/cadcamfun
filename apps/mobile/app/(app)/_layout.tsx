@@ -38,6 +38,7 @@ export default function AppLayout() {
         tintColor={palette.accent}
         iconColor={{ default: palette.muted, selected: palette.accent }}
         backgroundColor={palette.background}
+        labelStyle={{ default: { color: palette.muted }, selected: { color: palette.accent } }}
       >
         <NativeTabs.Trigger name="projects" disableAutomaticContentInsets={Platform.OS === "ios"}>
           <NativeTabs.Trigger.Icon sf={{ default: "square.stack.3d.up", selected: "square.stack.3d.up.fill" }} md="folder" />

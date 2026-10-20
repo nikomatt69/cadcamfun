@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react"
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native"
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native"
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import * as Clipboard from "expo-clipboard"
@@ -15,10 +15,11 @@ import { ActionButton } from "@/components/ui/ActionButton"
 import { AccountCard } from "@/components/layout/AccountCard"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { TextField } from "@/components/ui/TextField"
+import { caps, type } from "@/lib/typography"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { IconTile } from "@/components/ui/icon-tile"
-import { contentGutter } from "@/lib/layout"
+import { contentGutter, layout } from "@/lib/layout"
 import { usePrefersReducedMotion } from "@/lib/animation"
 
 /**
@@ -112,12 +113,12 @@ export default function ConnectScreen() {
           <View style={{ gap: 24 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
               <IconTile size={36}><MonitorSmartphone size={20} color={palette.accent} /></IconTile>
-              <Text style={{ color: palette.ink, fontSize: 15, fontWeight: "700", letterSpacing: 1 }}>CADCAMFUN</Text>
+              <Text style={{ color: palette.ink, ...type(15, { weight: "700", trackingBoost: 1 }) }}>CADCAMFUN</Text>
             </View>
             <View style={{ gap: 12, paddingTop: 12 }}>
-              <Text style={{ color: palette.accent, fontSize: 12, fontWeight: "700", letterSpacing: 1.2 }}>YOUR WORK. WITH YOU.</Text>
-              <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: width < 375 ? 34 : 38, fontWeight: "700", letterSpacing: -1.1, lineHeight: width < 375 ? 40 : 44 }}>A closer connection to your workspace.</Text>
-              <Text style={{ color: palette.soft, fontSize: 17, lineHeight: 25 }}>Review designs, check toolpaths and work with your assistant. Start by pairing with CADCAMFUN on your Mac.</Text>
+              <Text style={{ color: palette.accent, ...caps(12, { weight: "700" }) }}>Your work. With you.</Text>
+              <Text accessibilityRole="header" style={{ color: palette.ink, ...type(width < 375 ? 34 : 38, { weight: "700" }) }}>A closer connection to your workspace.</Text>
+              <Text style={{ color: palette.soft, ...type(17, { leadingScale: 1.05 }) }}>Review designs, check toolpaths and work with your assistant. Start by pairing with CADCAMFUN on your Mac.</Text>
             </View>
           </View>
 
@@ -128,8 +129,8 @@ export default function ConnectScreen() {
                 ["2", "Show the pairing code", "Turn on the companion and display its QR code."],
                 ["3", "Connect your iPhone", "Scan the code below while on the same network."],
               ].map(([step, title, detail]) => <View key={step} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-                <IconTile size={30}><Text style={{ color: palette.accent, fontSize: 13, fontWeight: "700" }}>{step}</Text></IconTile>
-                <View style={{ flex: 1, gap: 4 }}><Text style={{ color: palette.ink, fontSize: 15, fontWeight: "600" }}>{title}</Text><Text style={{ color: palette.muted, fontSize: 13, lineHeight: 19 }}>{detail}</Text></View>
+                <IconTile size={30}><Text style={{ color: palette.accent, ...type(13, { weight: "700" }) }}>{step}</Text></IconTile>
+                <View style={{ flex: 1, gap: 4 }}><Text style={{ color: palette.ink, ...type(15, { weight: "600" }) }}>{title}</Text><Text style={{ color: palette.soft, ...type(13, { leadingScale: 1.05 }) }}>{detail}</Text></View>
               </View>)}
             </View>
           </SurfaceCard>
@@ -139,20 +140,20 @@ export default function ConnectScreen() {
           <View style={{ gap: 10 }}>
             <ActionButton label={busy ? "Connecting to your desktop…" : "Scan pairing code"} icon={<ScanLine size={20} color={palette.onAccent} />} fullWidth loading={busy} onPress={() => void openScanner()} />
             <ActionButton label="Paste a pairing link" icon={<Link2 size={19} color={palette.accent} />} fullWidth variant="secondary" disabled={busy} onPress={() => void paste()} />
-            <Pressable disabled={busy} accessibilityRole="button" onPress={() => {
+            <Pressable disabled={busy} accessibilityRole="button" accessibilityLabel="Enter connection details" accessibilityState={{ disabled: busy }} onPress={() => {
               haptic("selection")
               if (!supported) { setError("Open the installed CADCAMFUN app to pair securely."); return }
               setManualOpen(true)
-            }} style={({ pressed }) => ({ minHeight: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.6 : 1 })}>
-              <Text style={{ color: palette.accent, fontSize: 14, fontWeight: "600" }}>Enter connection details</Text>
+            }} style={({ pressed }) => ({ minHeight: 44, alignItems: "center", justifyContent: "center", opacity: busy ? 0.45 : pressed ? 0.6 : 1 })}>
+              <Text style={{ color: palette.accent, ...type(15, { weight: "600" }) }}>Enter connection details</Text>
             </Pressable>
           </View>
 
           {!supported ? <ErrorBanner message="Secure pairing requires the installed CADCAMFUN app. Expo Go does not include the native connection module." /> : null}
           {error || connectionError ? <ErrorBanner message={error ?? connectionError!} /> : null}
           <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, paddingHorizontal: 4 }}>
-            <ShieldCheck size={20} color={palette.success} />
-            <Text style={{ flex: 1, color: palette.muted, fontSize: 12, lineHeight: 19 }}>A private, encrypted connection to your Mac. Use the same Wi-Fi, Personal Hotspot or a private network such as Tailscale.</Text>
+            <ShieldCheck size={20} color={palette.success} style={{ marginTop: 1 }} />
+            <Text style={{ flex: 1, color: palette.muted, ...type(12, { leadingScale: 1.1 }) }}>A private, encrypted connection to your Mac. Use the same Wi-Fi, Personal Hotspot or a private network such as Tailscale.</Text>
           </View>
         </ScrollView>
       )}
@@ -189,9 +190,9 @@ function ScannerOverlay({ busy, error, onScanned, onClose }: { busy: boolean; er
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Close scanner"
-          style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.6)", opacity: pressed ? 0.65 : 1 })}
+          style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.6)", opacity: pressed ? 0.65 : 1 })}
         >
-          <X size={18} color="#FFFFFF" />
+          <X size={18} color="#FFFFFF" strokeWidth={2.2} />
         </Pressable>
       </View>
       <View pointerEvents="none" onLayout={(event) => setViewfinderSpace(event.nativeEvent.layout.height)} style={{ flex: 1, minHeight: 0, alignItems: "center", justifyContent: "center" }}>
@@ -201,7 +202,7 @@ function ScannerOverlay({ busy, error, onScanned, onClose }: { busy: boolean; er
         {error ? <ErrorBanner message={error} /> : null}
         <View style={{ backgroundColor: "rgba(0,0,0,0.72)", borderRadius: 18, borderCurve: "continuous", padding: 16, gap: 10, alignItems: "center" }}>
           {busy ? <ActivityIndicator color="#FFFFFF" accessibilityLabel="Connecting to desktop" /> : null}
-          <Text accessibilityLiveRegion="polite" style={{ textAlign: "center", color: "#FFFFFF", fontSize: 15, lineHeight: 22, fontWeight: "600" }}>
+          <Text accessibilityLiveRegion="polite" style={{ textAlign: "center", color: "#FFFFFF", ...type(15, { weight: "600", leadingScale: 1.05 }) }}>
             {busy ? "Connecting to your desktop…" : "Point at the QR code on your Mac"}
           </Text>
         </View>
@@ -216,6 +217,9 @@ function ManualSheet({ open, busy, error, onClose, onPair }: { open: boolean; bu
   const [address, setAddress] = useState("")
   const [token, setToken] = useState("")
   const [fingerprint, setFingerprint] = useState("")
+  const tokenRef = useRef<TextInput>(null)
+  const fingerprintRef = useRef<TextInput>(null)
+  const ready = Boolean(address.trim() && token.trim() && fingerprint.trim())
 
   /**
    * Several addresses may be typed, one per line or separated by commas: the phone races them exactly like
@@ -231,13 +235,13 @@ function ManualSheet({ open, busy, error, onClose, onPair }: { open: boolean; bu
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Manual pairing">
-      <View style={{ paddingHorizontal: 20, gap: 12 }}>
-        <TextField label="Desktop address" value={address} onChangeText={setAddress} placeholder="https://192.168.1.10:8443" autoCapitalize="none" autoCorrect={false} keyboardType="url" editable={!busy} />
-        <TextField label="Pairing token" value={token} onChangeText={setToken} placeholder="Token from your desktop" autoCapitalize="none" autoCorrect={false} secureTextEntry editable={!busy} />
-        <TextField label="Certificate fingerprint" value={fingerprint} onChangeText={setFingerprint} placeholder="64 hexadecimal characters" autoCapitalize="none" autoCorrect={false} editable={!busy} />
+      <View style={{ paddingHorizontal: layout.gutter, gap: 16 }}>
+        <TextField label="Desktop address" value={address} onChangeText={setAddress} placeholder="https://192.168.1.10:8443" autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => tokenRef.current?.focus()} editable={!busy} />
+        <TextField ref={tokenRef} label="Pairing token" value={token} onChangeText={setToken} placeholder="Token from your desktop" autoCapitalize="none" autoCorrect={false} secureTextEntry returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => fingerprintRef.current?.focus()} editable={!busy} />
+        <TextField ref={fingerprintRef} label="Certificate fingerprint" value={fingerprint} onChangeText={setFingerprint} placeholder="64 hexadecimal characters" autoCapitalize="none" autoCorrect={false} returnKeyType="go" onSubmitEditing={() => { if (ready && !busy) submit() }} editable={!busy} />
         {/* The failure belongs inside the sheet: the screen behind it cannot be seen while it is open. */}
         {error ? <ErrorBanner message={error} /> : null}
-        <ActionButton label="Pair" fullWidth loading={busy} disabled={busy || !address.trim() || !token.trim() || !fingerprint.trim()} onPress={submit} />
+        <ActionButton label="Pair" fullWidth loading={busy} disabled={busy || !ready} onPress={submit} />
       </View>
     </BottomSheet>
   )

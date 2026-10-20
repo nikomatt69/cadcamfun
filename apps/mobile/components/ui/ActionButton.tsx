@@ -20,7 +20,8 @@ type ActionButtonProps = {
 /**
  * Rounded action button. Primary is a solid accent fill with contrasting text;
  * the other variants sit on raised surface with a hairline border. All colors derive from the
- * active palette. Loading preserves the label's geometry under a spinner. Pressed state dims to 0.72
+ * active palette. Loading preserves the label's geometry under a spinner. Pressed state dims to 0.88
+ * (the lowest opacity that keeps the primary label above 4.5:1 in both themes, measured)
  * and scales — the same feedback as every other pressable, so the app reads as one material.
  */
 export function ActionButton({ label, icon, loading, disabled, variant = "primary", small = false, fullWidth = true, onPress }: ActionButtonProps) {
@@ -29,9 +30,9 @@ export function ActionButton({ label, icon, loading, disabled, variant = "primar
 
   const tone =
     variant === "secondary"
-      ? { backgroundColor: palette.surface, borderColor: hexToRgba(palette.ink, 0.12), textColor: palette.ink }
+      ? { backgroundColor: palette.surface, borderColor: palette.border, textColor: palette.ink }
       : variant === "ghost"
-        ? { backgroundColor: "transparent", borderColor: hexToRgba(palette.ink, 0.08), textColor: palette.ink }
+        ? { backgroundColor: "transparent", borderColor: palette.border, textColor: palette.ink }
         : variant === "danger"
           ? { backgroundColor: hexToRgba(palette.danger, 0.1), borderColor: hexToRgba(palette.danger, 0.22), textColor: palette.danger }
           : { backgroundColor: palette.accent, borderColor: "transparent", textColor: palette.onAccent }
@@ -44,6 +45,8 @@ export function ActionButton({ label, icon, loading, disabled, variant = "primar
       accessibilityLabel={label}
       accessibilityState={{ disabled: inactive, busy: Boolean(loading) }}
       dim
+      dimOpacity={0.88}
+      disabledOpacity={loading ? 0.85 : 0.45}
       style={{
         minHeight: small ? layout.touchTarget : 52,
         alignSelf: fullWidth ? "stretch" : "center",

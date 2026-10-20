@@ -5,6 +5,7 @@ import { parsePairingLink } from "@/lib/pairing"
 import { nativeAvailable } from "@/lib/native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
+import { type } from "@/lib/typography"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { PageScroll } from "@/components/layout/page-scroll"
@@ -39,14 +40,14 @@ export default function PairLinkScreen() {
     }).finally(() => { if (active) setBusy(false) })
     return () => { active = false }
   }, [connect, attempt, booting, router])
-  return <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}><PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center" }}>
+  return <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }}><PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", gap: 16 }}>
     <Stack.Screen options={{ headerShown: false }} />
-    <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 24, lineHeight: 30, fontWeight: "700", textAlign: "center" }}>Pair with your desktop</Text>
-    {busy || booting ? <ActivityIndicator color={palette.accent} /> : null}
+    <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(24, { weight: "700" }) }}>Pair with your desktop</Text>
+    {busy || booting ? <ActivityIndicator color={palette.accent} accessibilityLabel="Pairing with your desktop" /> : null}
     {error ? <>
       <ErrorBanner message={error} />
       {supported ? <ActionButton label="Retry" fullWidth onPress={() => setAttempt((previous) => previous + 1)} /> : null}
       <ActionButton label="Back to pairing" fullWidth variant="secondary" onPress={() => router.replace("/connect")} />
-    </> : <Text style={{ color: palette.soft, fontSize: 15, lineHeight: 22, textAlign: "center" }}>Checking the secure connection…</Text>}
+    </> : <Text style={{ color: palette.soft, textAlign: "center", ...type(15, { leadingScale: 1.05 }) }}>Checking the secure connection…</Text>}
   </PageScroll></SafeAreaView>
 }

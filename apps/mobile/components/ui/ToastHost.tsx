@@ -6,6 +6,7 @@ import { CheckCircle2, Info, X, XCircle } from "lucide-react-native"
 import { usePrefersReducedMotion } from "@/lib/animation"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { useContentLayout } from "@/components/layout/use-content-layout"
+import { type } from "@/lib/typography"
 
 export type ToastKind = "info" | "success" | "error"
 interface ToastEntry { id: number; kind: ToastKind; message: string }
@@ -17,6 +18,8 @@ const emit = () => { for (const listener of listeners) listener(queue) }
 export function toast(message: string, kind: ToastKind = "info"): void {
   queue = [...queue.slice(-2), { id: nextId++, kind, message }]
   emit()
+  // VoiceOver does not read a view that merely appears; announce once here, not per mounted host.
+  AccessibilityInfo.announceForAccessibility(message)
 }
 function dismiss(id: number) { queue = queue.filter((entry) => entry.id !== id); emit() }
 
@@ -55,9 +58,9 @@ function ToastItem({ entry }: { entry: ToastEntry }) {
     <Pressable onPress={() => dismiss(entry.id)} onPressIn={() => setHeld(true)} onPressOut={() => setHeld(false)}
       accessibilityRole="button" accessibilityLabel={entry.message} accessibilityHint="Dismiss notification"
       accessibilityLiveRegion="polite"
-      style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 56 }}>
+      style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 56, opacity: pressed ? 0.7 : 1 })}>
       <Icon size={20} color={color} />
-      <Text style={{ flex: 1, minWidth: 0, color: palette.ink, fontSize: 14, lineHeight: 21, fontWeight: "500" }}>{entry.message}</Text>
+      <Text style={{ flex: 1, minWidth: 0, color: palette.ink, ...type(14, { weight: "500", leadingScale: 1.1 }) }}>{entry.message}</Text>
       <X size={17} color={palette.muted} />
     </Pressable>
   </Animated.View>

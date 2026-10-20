@@ -1,7 +1,7 @@
 import { useState, type PropsWithChildren } from "react"
 import { Pressable, StyleSheet, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native"
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
-import { PRESS_SPRING, spring, usePrefersReducedMotion, useStable } from "@/lib/animation"
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated"
+import { DIM_IN_MS, DIM_OUT_MS, EASE_OUT, PRESS_SPRING, spring, usePrefersReducedMotion, useStable } from "@/lib/animation"
 import { hexToRgba, useTheme } from "@/lib/theme"
 
 /**
@@ -25,6 +25,16 @@ export type PressableScaleProps = Omit<PressableProps, "style" | "children"> &
     noScale?: boolean
     /** Dim the whole surface on press (buttons); rows only tint. */
     dim?: boolean
+    /** Opacity while dimmed (default 0.72). Pass a higher value where the label must stay AA-readable mid-press. */
+    dimOpacity?: number
+    /**
+     * Extra tap area around the surface. Defaults to 4pt for free-standing controls and 0 for
+     * `tint`/`subtle` surfaces (rows, cards), which are large and stacked edge to edge: a slop there
+     * would steal taps from the neighbour.
+     */
+    hitSlop?: PressableProps["hitSlop"]
+    /** Opacity while disabled (default 0.45); a busy-but-not-dead control reads better closer to 1. */
+    disabledOpacity?: number
   }>
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
@@ -40,6 +50,9 @@ export function PressableScale({
   subtle = false,
   noScale = false,
   dim = false,
+  dimOpacity = 0.72,
+  hitSlop,
+  disabledOpacity = 0.45,
   ...rest
 }: PressableScaleProps) {
   const { palette } = useTheme()
@@ -52,27 +65,28 @@ export function PressableScale({
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.get() }],
-    opacity: disabled ? 0.45 : opacity.get(),
+    opacity: disabled ? disabledOpacity : opacity.get(),
   }))
 
   return (
     <AnimatedPressable
       accessibilityRole={rest.onPress ? "button" : undefined}
       pressRetentionOffset={12}
-      hitSlop={4}
+      hitSlop={hitSlop ?? (tint || subtle ? 0 : 4)}
       disabled={disabled}
+      accessibilityState={{ disabled: Boolean(disabled) }}
       onPressIn={(event) => {
         onPressIn?.(event)
         if (!interactive) return
         setPressed(true)
         if (!noScale) scale.set(reduced ? 1 : withSpring(subtle ? 0.985 : 0.97, pressSpring))
-        if (dim) opacity.set(0.72)
+        if (dim) opacity.set(withTiming(dimOpacity, { duration: DIM_IN_MS, easing: EASE_OUT }))
       }}
       onPressOut={(event) => {
         onPressOut?.(event)
         setPressed(false)
         if (!noScale) scale.set(reduced ? 1 : withSpring(1, pressSpring))
-        opacity.set(1)
+        if (dim) opacity.set(withTiming(1, { duration: DIM_OUT_MS, easing: EASE_OUT }))
       }}
       {...rest}
       style={[style, animatedStyle]}

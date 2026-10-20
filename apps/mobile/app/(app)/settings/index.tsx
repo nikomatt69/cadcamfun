@@ -21,6 +21,7 @@ import { IconTile } from "@/components/ui/icon-tile"
 import { Divider } from "@/components/ui/SectionHeader"
 import { LOCK_AFTER_OPTIONS, lockAfterLabel } from "@/lib/app-lock"
 import { buildDiagnostics, formatFingerprint, originOnly } from "@/lib/diagnostics"
+import { mono, type } from "@/lib/typography"
 import { PERMISSION_MODES } from "@/lib/assistant-preferences"
 import { clearOfflineQueue } from "@/lib/offline-queue"
 
@@ -124,7 +125,7 @@ export default function SettingsScreen() {
     <SurfaceCard eyebrow="CONNECTED WORKSPACE" title={config?.name ?? "Your desktop"} description="Manage your connection and make the companion your own.">
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
         <ConnectionStatus connectivity={connectivity} />
-        {offlineQueueCount > 0 ? <Text style={{ color: palette.muted, fontSize: 13 }}>{offlineQueueCount} queued</Text> : null}
+        {offlineQueueCount > 0 ? <Text style={{ color: palette.muted, ...type(13) }}>{offlineQueueCount} queued</Text> : null}
       </View>
     </SurfaceCard>
 
@@ -138,15 +139,15 @@ export default function SettingsScreen() {
     <SettingsGroup title="Desktop">
       <ListRow leading={<IconTile size={36}><MonitorSmartphone size={18} color={palette.accent} /></IconTile>}
         title={config?.name ?? "Not paired"} subtitle={config?.baseUrl} onPress={() => void recheck()}
-        trailing={<Text style={{ color: palette.accent, fontSize: 13, fontWeight: "600" }}>Reconnect</Text>} />
+        trailing={<Text style={{ color: palette.accent, ...type(13, { weight: "600" }) }}>Reconnect</Text>} />
       {offlineQueueCount > 0 ? <><Divider inset={16} /><ListRow title="Queued messages" subtitle={`${offlineQueueCount === 1 ? "1 message sends" : `${offlineQueueCount} messages send`} when the desktop reconnects`} showChevron={false}
         accessibilityHint="Discards the messages waiting for the desktop" onPress={clearQueue}
-        trailing={<Text style={{ color: palette.danger, fontSize: 13, fontWeight: "600" }}>Discard</Text>} /></> : null}
+        trailing={<Text style={{ color: palette.danger, ...type(13, { weight: "600" }) }}>Discard</Text>} /></> : null}
       {config ? <><Divider inset={16} />
         <ListRow leading={<IconTile size={36}><Fingerprint size={18} color={palette.accent} /></IconTile>} title="Certificate fingerprint"
           subtitle="Matches the fingerprint under the QR code on your Mac. Tap to copy." onPress={() => void copy(config.fingerprint, "Fingerprint copied")}
 />
-        <Text selectable accessibilityLabel={`Fingerprint ${config.fingerprint.split("").join(" ")}`} style={{ color: palette.soft, fontSize: 12, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 14, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}>{formatFingerprint(config.fingerprint)}</Text>
+        <Text selectable accessibilityLabel={`Fingerprint ${config.fingerprint.split("").join(" ")}`} style={{ color: palette.soft, paddingHorizontal: 16, paddingBottom: 14, ...mono(12), ...(Platform.OS === "ios" ? null : { fontFamily: "monospace" }) }}>{formatFingerprint(config.fingerprint)}</Text>
         {(config.hosts?.length ?? 0) > 1 ? <><Divider inset={16} /><ListRow title="Desktop addresses" subtitle={(config.hosts ?? []).map(originOnly).join("\n")} showChevron={false} /></> : null}
       </> : null}
       <Divider inset={16} />
@@ -157,8 +158,8 @@ export default function SettingsScreen() {
       <View style={{ padding: 16, gap: 14 }}>
         <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 10, rowGap: 6 }}>
           <Palette size={19} color={palette.accent} />
-          <Text style={{ flexGrow: 1, color: palette.ink, fontSize: 16, lineHeight: 22, fontWeight: "600" }}>Theme</Text>
-          <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18 }}>{colorScheme === "dark" ? "Dark" : "Light"}</Text>
+          <Text style={{ flexGrow: 1, color: palette.ink, ...type(16, { weight: "600" }) }}>Theme</Text>
+          <Text style={{ color: palette.muted, ...type(13) }}>{colorScheme === "dark" ? "Dark" : "Light"}</Text>
         </View>
         <SegmentedControl segments={[{ value: "system", label: "System" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} value={themeMode} onChange={setThemeMode} />
       </View>
@@ -209,15 +210,15 @@ export default function SettingsScreen() {
       <ListRow title="Copy diagnostics" subtitle="Version, connection and assistant status for support. Never includes your pairing token." leading={<IconTile size={36}><ClipboardCopy size={18} color={palette.accent} /></IconTile>}
         onPress={() => void copy(diagnostics(), "Diagnostics copied")} />
     </SettingsGroup>
-    <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 18, textAlign: "center", paddingVertical: 12 }}>Designed for the work you care about.</Text>
+    <Text style={{ color: palette.muted, textAlign: "center", paddingVertical: 12, ...type(12) }}>Designed for the work you care about.</Text>
   </PageScroll>
 }
 
 function SettingsGroup({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   const { palette } = useTheme()
   return <View style={{ gap: 8, paddingTop: 6 }}>
-    <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 18, lineHeight: 24, fontWeight: "600", paddingHorizontal: 4 }}>{title}</Text>
+    <Text accessibilityRole="header" style={{ color: palette.ink, paddingHorizontal: 4, ...type(18, { weight: "600" }) }}>{title}</Text>
     <SurfaceCard inset={false}>{children}</SurfaceCard>
-    {description ? <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 19, paddingHorizontal: 4 }}>{description}</Text> : null}
+    {description ? <Text style={{ color: palette.muted, paddingHorizontal: 4, ...type(13, { leadingScale: 1.05 }) }}>{description}</Text> : null}
   </View>
 }

@@ -16,6 +16,7 @@ export function TabStack({ title, largeTitle = true, children }: { title: string
       headerLargeTitleStyle: { color: palette.ink, fontWeight: "700" },
       headerLargeTitle: largeTitle,
       headerShadowVisible: false,
+      headerLargeStyle: { backgroundColor: palette.background },
       headerBackButtonDisplayMode: "minimal",
       contentStyle: { backgroundColor: palette.background },
     }}>

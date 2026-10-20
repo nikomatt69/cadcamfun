@@ -3,16 +3,19 @@ import { AlertTriangle } from "lucide-react-native"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { type } from "@/lib/typography"
-import { usePrefersReducedMotion } from "@/lib/animation"
+import { EASE_OUT } from "@/lib/animation"
+
+// Layout-animation builders live at module scope: building them in render re-creates them on every re-render.
+const ENTER = FadeIn.duration(180).easing(EASE_OUT)
+const EXIT = FadeOut.duration(120).easing(EASE_OUT)
 
 /**
  * Inline error strip (nikcli-grade): a tinted card with an eyebrow, the message and an optional
  * action — validation happens where the problem is, not in a modal (Apple §16). Enters with a
- * soft fade + 4pt rise; Reduce Motion collapses that to a cross-fade.
+ * 180ms ease-out fade (exit 120ms). Opacity only, so it is also the Reduce Motion presentation.
  */
 export function ErrorBanner({ message, actionLabel, onAction }: { message: string; actionLabel?: string; onAction?: () => void }) {
   const { palette } = useTheme()
-  const reduced = usePrefersReducedMotion()
 
   const content = (
     <View
@@ -47,5 +50,5 @@ export function ErrorBanner({ message, actionLabel, onAction }: { message: strin
     </View>
   )
 
-  return reduced ? <>{content}</> : <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)}>{content}</Animated.View>
+  return <Animated.View entering={ENTER} exiting={EXIT}>{content}</Animated.View>
 }

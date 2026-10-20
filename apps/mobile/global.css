@@ -3,23 +3,25 @@
 @tailwind utilities;
 
 :root {
-  /* iOS system palette, light — material hierarchy via luminance steps */
-  --color-background: 242 242 247;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  /* Fallback mirror of lib/palette.ts (ThemeProvider overrides these at runtime); keep in sync */
+  --color-background: 244 245 248;
   --color-surface: 255 255 255;
-  --color-panel: 235 235 240;
-  --color-border: 210 210 216;
-  --color-accent: 10 132 255;
-  --color-accent-strong: 0 64 221;
-  --color-accent-soft: 10 132 255;
-  --color-muted: 142 142 147;
-  --color-ink: 0 0 0;
-  --color-soft: 60 60 67;
-  --color-user-bubble: 10 132 255;
+  --color-panel: 233 237 243;
+  --color-border: 211 217 227;
+  --color-accent: 0 96 219;
+  --color-accent-strong: 0 80 200;
+  --color-accent-soft: 90 200 250;
+  --color-muted: 86 101 121;
+  --color-ink: 23 33 51;
+  --color-soft: 71 85 105;
+  --color-user-bubble: 0 96 219;
   --color-assistant-bubble: 255 255 255;
-  --color-success: 52 199 89;
-  --color-danger: 255 59 48;
-  --color-warning: 255 149 0;
-  --color-info: 90 200 250;
+  --color-success: 20 112 74;
+  --color-danger: 185 38 31;
+  --color-warning: 147 81 0;
+  --color-info: 0 110 156;
   --color-focus-ring: 10 132 255;
 
   /* Glass material tokens */
@@ -31,27 +33,27 @@
 }
 
 .dark {
-  --color-background: 0 0 0;
-  --color-surface: 28 28 30;
-  --color-panel: 36 36 40;
-  --color-border: 56 56 60;
-  --color-accent: 10 132 255;
-  --color-accent-strong: 100 170 255;
+  --color-background: 11 16 24;
+  --color-surface: 21 30 43;
+  --color-panel: 32 45 62;
+  --color-border: 56 72 94;
+  --color-accent: 76 158 255;
+  --color-accent-strong: 111 180 255;
   --color-accent-soft: 10 132 255;
-  --color-muted: 142 142 147;
+  --color-muted: 148 165 188;
   --color-ink: 255 255 255;
-  --color-soft: 199 199 204;
-  --color-user-bubble: 10 132 255;
-  --color-assistant-bubble: 28 28 30;
+  --color-soft: 197 207 222;
+  --color-user-bubble: 10 103 230;
+  --color-assistant-bubble: 27 38 53;
   --color-success: 48 209 88;
-  --color-danger: 255 69 58;
+  --color-danger: 255 105 97;
   --color-warning: 255 179 64;
   --color-info: 100 210 255;
   --color-focus-ring: 10 132 255;
 
-  --color-glass-shell: 28 28 30;
-  --color-glass-shell-strong: 36 36 40;
-  --color-glass-panel: 36 36 40;
+  --color-glass-shell: 21 30 43;
+  --color-glass-shell-strong: 21 30 43;
+  --color-glass-panel: 32 45 62;
   --color-glass-border: 255 255 255;
   --color-overlay: 0 0 0;
 }

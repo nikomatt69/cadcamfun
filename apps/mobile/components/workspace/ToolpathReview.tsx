@@ -1,12 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { FlatList, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native"
+import { FlatList, Pressable, ScrollView, Switch, Text, View, useWindowDimensions } from "react-native"
 import { ChevronDown, ChevronUp, Eye, EyeOff, Pause, Play, SkipBack, SkipForward } from "lucide-react-native"
 import type { PreviewCollisionEvent, PreviewMachine, PreviewOperation, ToolpathPreview, ToolpathReview as ToolpathReviewPayload, ToolpathSegment } from "@cadcamfun/api"
-import { useTheme } from "@/lib/theme"
+import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { MACHINE_LABELS, MACHINE_SOURCE_LABELS } from "@/lib/machine-bodies"
 import { clampPlayhead, segmentIndexForLine } from "@/lib/preview-math"
-import { operationColor } from "@/lib/preview-scene"
+import { LINE_COLOR, operationColor, rgbFromHex } from "@/lib/preview-scene"
 import { cutterAt, describeCutter, orderedContacts } from "@/lib/toolpath-review"
 import {
   PLAYBACK_SPEEDS,
@@ -22,20 +22,35 @@ import {
   spinRateAt,
   startTimeOf,
 } from "@/lib/preview-sim"
-import { mono } from "@/lib/typography"
+import { mono, type } from "@/lib/typography"
 import { PreviewViewport } from "@/components/preview/PreviewViewport"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
+import { PressableScale } from "@/components/ui/PressableScale"
 import { SectionHeader } from "@/components/ui/SectionHeader"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { previewHeight, layout } from "@/lib/layout"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { SafeAreaView } from "react-native-screens/experimental"
 
-const KIND_COLOR = {
-  rapid: "#6194F5",
-  linear: "#47C775",
-  circular: "#A875F0",
-} as const
+type MoveKind = ToolpathSegment["kind"]
+
+/** How a move class is named to VoiceOver; the colour alone never carries it. */
+const KIND_LABEL: Record<MoveKind, string> = { rapid: "rapid move", linear: "cutting move", circular: "arc" }
+
+/**
+ * The 3D path's move-class colours (`LINE_COLOR`), so the legend and the listing keys match what the viewer draws.
+ * On the light page the pale greens and blues fall under 3:1, so they are deepened toward the ink there (still the
+ * same hue); on the dark page they are used as drawn.
+ */
+function kindColors(isDark: boolean, ink: string): Record<MoveKind, string> {
+  const toward = rgbFromHex(ink)
+  const amount = isDark ? 0 : 0.4
+  const css = (kind: MoveKind) => {
+    const [r, g, b] = LINE_COLOR[kind].map((channel, index) => Math.round((channel * (1 - amount) + toward[index]! * amount) * 255))
+    return `rgb(${r}, ${g}, ${b})`
+  }
+  return { rapid: css("rapid"), linear: css("linear"), circular: css("circular") }
+}
 
 /** Playback publishes the block at most this often; the Metal view and the listing do not need 60 Hz. */
 const PLAYBACK_TICK_MS = 50
@@ -60,7 +75,8 @@ export function ToolpathReview({
   error: string | undefined
   onRetry: () => void
 }) {
-  const { palette } = useTheme()
+  const { palette, isDark } = useTheme()
+  const kindColor = useMemo(() => kindColors(isDark, palette.ink), [isDark, palette.ink])
   const { width: windowWidth, height } = useWindowDimensions()
   // Landscape phones and iPads: the viewer and transport take the left, the summary and listing the right.
   const split = windowWidth >= 700 && windowWidth > height
@@ -185,6 +201,9 @@ export function ToolpathReview({
     seekRef.current(segmentIndexForLine(segmentsRef.current, lineNumber))
   }, [])
   const listingDisabled = segments.length === 0 || loading
+  const blockReadout = segments.length
+    ? `Block ${(playhead + 1).toLocaleString("en")} of ${segments.length.toLocaleString("en")} · NC line ${activeLine.toLocaleString("en")}`
+    : loading ? "Loading the program…" : "No motion blocks"
 
   const bar = <SimulationBar
     count={segments.length}
@@ -231,43 +250,43 @@ export function ToolpathReview({
         {stats ? (
           <View accessibilityRole="summary" style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
             {[
-              { label: "Rapid", count: stats.rapidMoves, color: KIND_COLOR.rapid },
-              { label: "Linear", count: stats.linearMoves, color: KIND_COLOR.linear },
-              { label: "Arcs", count: stats.circularMoves, color: KIND_COLOR.circular },
-            ].map(({ label, count, color }) => <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <View style={{ width: 8, height: 3, borderRadius: 1.5, backgroundColor: color }} />
-              <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>{label} {count.toLocaleString("en")}</Text>
+              { label: "Rapid", count: stats.rapidMoves, color: kindColor.rapid },
+              { label: "Linear", count: stats.linearMoves, color: kindColor.linear },
+              { label: "Arcs", count: stats.circularMoves, color: kindColor.circular },
+            ].map(({ label, count, color }) => <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View style={{ width: 14, height: 4, borderRadius: 2, backgroundColor: color }} />
+              <Text selectable style={{ color: palette.soft, fontVariant: ["tabular-nums"], ...type(12) }}>{label} {count.toLocaleString("en")}</Text>
             </View>)}
           </View>
         ) : null}
         {machine ? (
           <View accessibilityRole="summary" style={{ gap: 3 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: `${palette.accent}1f` }}>
-                <Text style={{ color: palette.accent, fontSize: 12, fontWeight: "700" }}>{MACHINE_LABELS[machine.kind]}</Text>
+              <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: hexToRgba(palette.accent, 0.12) }}>
+                <Text style={{ color: palette.accentStrong, ...type(12, { weight: "700" }) }}>{MACHINE_LABELS[machine.kind]}</Text>
               </View>
-              <Text selectable style={{ color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>
+              <Text selectable style={{ flexShrink: 1, color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>
                 {MACHINE_SOURCE_LABELS[machine.source]} · {machine.axes} axes
                 {machine.turret ? ` · ${machine.turret} turret` : ""}{machine.xMode ? ` · X is a ${machine.xMode}` : ""}
               </Text>
             </View>
-            <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 18 }}>{machine.turns}.</Text>
-            <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 18 }}>{machine.workholding}.</Text>
+            <Text selectable style={{ color: palette.soft, ...type(12) }}>{machine.turns}.</Text>
+            <Text selectable style={{ color: palette.soft, ...type(12) }}>{machine.workholding}.</Text>
             {machine.assumed.length ? (
-              <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 18 }}>Assumed: {machine.assumed.join(", ")}.</Text>
+              <Text style={{ color: palette.muted, ...type(12) }}>Assumed: {machine.assumed.join(", ")}.</Text>
             ) : null}
             {machine.mismatch ? (
-              <Text style={{ color: palette.warning, fontSize: 12, lineHeight: 17 }}>
+              <Text accessibilityRole="alert" style={{ color: palette.warning, ...type(12) }}>
                 The G-code reads like a {MACHINE_LABELS[machine.mismatch.inferred].toLowerCase()} program, not this one. {machine.mismatch.reasons.join("; ")}
               </Text>
             ) : null}
             {machine.collisions.length ? (
-              <Text style={{ color: palette.warning, fontSize: 12, lineHeight: 17 }}>
+              <Text accessibilityRole="alert" style={{ color: palette.warning, ...type(12) }}>
                 {machine.collisions.length === 1 ? "One move runs" : `${machine.collisions.length.toLocaleString("en")} moves run`} into the workholding (red on the path).
               </Text>
             ) : null}
             {machine.spin.length ? (
-              <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 17, fontVariant: ["tabular-nums"] }}>{spinText(machine, machineSpin)}</Text>
+              <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>{spinText(machine, machineSpin)}</Text>
             ) : null}
           </View>
         ) : null}
@@ -275,17 +294,17 @@ export function ToolpathReview({
           {[
             { label: "Cycle", value: `≈ ${formatDuration(totals.seconds)}` },
             { label: "Cutting", value: `${formatLength(totals.cutLength)} mm` },
-            { label: "Rapid", value: `${formatLength(totals.rapidLength)} mm` },
+            { label: "Rapid travel", value: `${formatLength(totals.rapidLength)} mm` },
             { label: machine?.kind === "3dprinter" ? "Build volume" : machine?.kind === "lathe" ? "Bar" : "Stock", value: formatSize(preview.stock) },
-          ].map(({ label, value }) => <Text key={label} selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>
+          ].map(({ label, value }) => <Text key={label} selectable style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>
             {label} <Text style={{ color: palette.ink, fontWeight: "600" }}>{value}</Text>
           </Text>)}
         </View> : null}
         {preview?.truncated ? (
-          <Text style={{ color: palette.warning, fontSize: 12, lineHeight: 16 }}>Path truncated so it fits on the phone. The G-code listing is complete.</Text>
+          <Text style={{ color: palette.warning, ...type(12) }}>Path truncated so it fits on the phone. The G-code listing is complete.</Text>
         ) : null}
         {cutter ? (
-          <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 18 }}>
+          <Text selectable style={{ color: palette.soft, fontVariant: ["tabular-nums"], ...type(12) }}>
             Tool at the playhead: <Text style={{ color: palette.ink, fontWeight: "600" }}>{describeCutter(cutter)}</Text>
           </Text>
         ) : null}
@@ -318,8 +337,8 @@ export function ToolpathReview({
   </>
   const listing = <>
       <View style={{ paddingHorizontal: gutter, paddingVertical: 10, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: palette.border }}>
-        <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 14, fontWeight: "600" }}>G-code</Text>
-        <Text style={{ color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>{lines.length.toLocaleString("en")} lines</Text>
+        <Text accessibilityRole="header" style={{ color: palette.ink, ...type(14, { weight: "600" }) }}>G-code</Text>
+        <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>{lines.length.toLocaleString("en")} {lines.length === 1 ? "line" : "lines"}</Text>
       </View>
       <FlatList
         ref={listRef}
@@ -331,12 +350,12 @@ export function ToolpathReview({
         initialNumToRender={30}
         windowSize={9}
         contentContainerStyle={{ paddingHorizontal: Math.max(0, gutter - 12), paddingBottom: 16 }}
-        ListEmptyComponent={loading ? <View style={{ padding: 16, gap: 8 }}><Skeleton style={{ height: 44 }} /><Skeleton style={{ height: 44 }} /></View> : <Text style={{ color: palette.muted, fontSize: 14, lineHeight: 21, padding: 20 }}>No G-code in this program yet.</Text>}
+        ListEmptyComponent={loading ? <View style={{ padding: 16, gap: 8 }}><Skeleton style={{ height: 44 }} /><Skeleton style={{ height: 44 }} /></View> : <Text style={{ color: palette.muted, padding: 20, ...type(14) }}>No G-code in this program yet.</Text>}
         onScrollToIndexFailed={(info) => {
           listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false })
         }}
         renderItem={({ item, index }) => (
-          <GcodeRow lineNumber={index + 1} text={item} kind={kindByLine.get(index + 1)} active={index + 1 === activeLine} disabled={listingDisabled} onSeekLine={seekLine} />
+          <GcodeRow lineNumber={index + 1} text={item} kind={kindByLine.get(index + 1)} kindColors={kindColor} active={index + 1 === activeLine} disabled={listingDisabled} onSeekLine={seekLine} />
         )}
       />
   </>
@@ -351,10 +370,8 @@ export function ToolpathReview({
         <View style={{ flex: 1, maxWidth: 460 }}>
           <ScrollView contentInsetAdjustmentBehavior="never" style={{ flexGrow: 0, maxHeight: Math.max(140, availableHeight * 0.45) }}
             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, gap: 10 }}>
-            <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 15, fontWeight: "600" }}>Simulation</Text>
-            <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>
-              {segments.length ? `Block ${(playhead + 1).toLocaleString("en")} of ${segments.length.toLocaleString("en")} · NC line ${activeLine}` : loading ? "Loading the program…" : "No motion blocks"}
-            </Text>
+            <Text accessibilityRole="header" style={{ color: palette.ink, ...type(15, { weight: "600" }) }}>Simulation</Text>
+            <Text selectable style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>{blockReadout}</Text>
             {summary}
           </ScrollView>
           {listing}
@@ -369,16 +386,14 @@ export function ToolpathReview({
         contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 10, paddingBottom: 12, gap: 10 }}>
       <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <View style={{ flex: 1, minWidth: 120, gap: 3 }}>
-          <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 15, fontWeight: "600" }}>Simulation</Text>
-          <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 18, fontVariant: ["tabular-nums"] }}>
-            {segments.length ? `Block ${(playhead + 1).toLocaleString("en")} of ${segments.length.toLocaleString("en")} · NC line ${activeLine}` : loading ? "Loading the program…" : "No motion blocks"}
-          </Text>
+          <Text accessibilityRole="header" style={{ color: palette.ink, ...type(15, { weight: "600" }) }}>Simulation</Text>
+          <Text selectable style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>{blockReadout}</Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel={expanded ? "Hide 3D preview" : "Show 3D preview"}
-          onPress={() => { haptic("selection"); setPreviewExpanded(!expanded) }}
-          style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", borderRadius: layout.controlRadius, backgroundColor: palette.surface, borderWidth: 0.5, borderColor: palette.border, opacity: pressed ? 0.55 : 1 })}>
+        <PressableScale accessibilityRole="button" accessibilityLabel={expanded ? "Hide 3D preview" : "Show 3D preview"} accessibilityState={{ expanded }}
+          onPress={() => setPreviewExpanded(!expanded)}
+          style={{ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", borderRadius: layout.controlRadius, borderCurve: "continuous", backgroundColor: palette.surface, borderWidth: 0.5, borderColor: palette.border }}>
           {expanded ? <ChevronUp size={18} color={palette.accent} /> : <ChevronDown size={18} color={palette.accent} />}
-        </Pressable>
+        </PressableScale>
       </View>
       {expanded ? <View style={{ height: Math.min(previewHeight(height, fontScale, "toolpath"), Math.max(180, availableHeight * 0.32)), ...frame }}>
         {viewer}
@@ -422,11 +437,11 @@ function OperationLegend({ operations, isolated, colorMode, onIsolate, onColorMo
             minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, borderRadius: 22,
             borderCurve: "continuous" as const, borderWidth: 0.5,
             borderColor: isolated === operation.index ? palette.accent : palette.border,
-            backgroundColor: pressed ? `${palette.ink}18` : isolated === operation.index ? `${palette.accent}1f` : "transparent",
+            backgroundColor: pressed ? hexToRgba(palette.ink, 0.09) : isolated === operation.index ? hexToRgba(palette.accent, 0.12) : "transparent",
             opacity: shown ? 1 : 0.45,
           })}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: swatch(operation.index) }} />
-          <Text numberOfLines={1} style={{ color: palette.ink, fontSize: 13, fontWeight: "600" }}>{operation.name}</Text>
+          <Text numberOfLines={1} ellipsizeMode="tail" style={{ maxWidth: 180, color: palette.ink, fontSize: 13, fontWeight: "600" }}>{operation.name}</Text>
           {operation.cutter ? (
             <Text style={{ color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>
               Ø{operation.cutter.diameter}
@@ -440,11 +455,12 @@ function OperationLegend({ operations, isolated, colorMode, onIsolate, onColorMo
       <Text style={{ color: palette.muted, fontSize: 12 }}>Path colour</Text>
       {(["move", "operation"] as const).map((mode) => <Pressable key={mode} accessibilityRole="radio" accessibilityState={{ checked: colorMode === mode }}
         accessibilityLabel={`Colour the path by ${mode}`}
+        hitSlop={{ top: 6, bottom: 6 }}
         onPress={() => { haptic("selection"); onColorMode(mode) }}
         style={({ pressed }) => ({
           minHeight: 32, justifyContent: "center", paddingHorizontal: 12, borderRadius: 16, borderWidth: 0.5,
           borderColor: colorMode === mode ? palette.accent : palette.border,
-          backgroundColor: colorMode === mode ? `${palette.accent}1f` : pressed ? `${palette.ink}12` : "transparent",
+          backgroundColor: colorMode === mode ? hexToRgba(palette.accent, 0.12) : pressed ? hexToRgba(palette.ink, 0.07) : "transparent",
         })}>
         <Text style={{ color: colorMode === mode ? palette.accentStrong : palette.soft, fontSize: 12, fontWeight: "600" }}>
           {mode === "move" ? "Move" : "Operation"}
@@ -472,10 +488,11 @@ function ContactList({ contacts, playhead, stopAtContact, onToggleStop, onSeek }
       accessibilityLabel="Stop the simulation at a contact"
       onPress={onToggleStop}
       style={({ pressed }) => ({
-        minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, opacity: pressed ? 0.6 : 1,
+        minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, opacity: pressed ? 0.6 : 1,
       })}>
-      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: stopAtContact ? palette.accent : palette.border }} />
-      <Text style={{ color: palette.soft, fontSize: 13 }}>Stop the simulation at a contact</Text>
+      <Text style={{ flex: 1, minWidth: 0, color: palette.soft, fontSize: 13, lineHeight: 18 }}>Stop the simulation at a contact</Text>
+      <Switch pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" value={stopAtContact} onValueChange={onToggleStop}
+        trackColor={{ true: palette.accent, false: palette.border }} />
     </Pressable>
     {contacts.map((event) => {
       const current = event.segment === playhead
@@ -486,12 +503,12 @@ function ContactList({ contacts, playhead, stopAtContact, onToggleStop, onSeek }
         style={({ pressed }) => ({
           minHeight: 44, flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 8,
           paddingHorizontal: 10, borderRadius: 10, borderCurve: "continuous" as const,
-          backgroundColor: current ? `${tone}18` : pressed ? `${palette.ink}12` : "transparent",
+          backgroundColor: current ? hexToRgba(tone, 0.12) : pressed ? hexToRgba(palette.ink, 0.07) : "transparent",
         })}>
         <View style={{ width: 8, height: 8, borderRadius: 4, marginTop: 5, backgroundColor: tone }} />
         <View style={{ flex: 1, gap: 2 }}>
           <Text selectable style={{ color: palette.ink, fontSize: 13, lineHeight: 18 }}>{event.message}</Text>
-          <Text style={{ color: palette.muted, fontSize: 11, fontVariant: ["tabular-nums"] }}>
+          <Text style={{ color: palette.muted, fontSize: 11, lineHeight: 16, fontVariant: ["tabular-nums"] }}>
             {event.code}{event.line !== undefined ? ` · line ${event.line}` : ""} · {formatDuration(event.seconds)}
           </Text>
         </View>
@@ -515,7 +532,7 @@ function SimulationBar({ count, playhead, playing, speed, elapsed, total, onSeek
   const { palette } = useTheme()
   const button = { width: layout.touchTarget, height: layout.touchTarget, alignItems: "center" as const, justifyContent: "center" as const }
   return <View style={{ gap: 4 }}>
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 4 }}>
       <Pressable accessibilityRole="button" accessibilityLabel="Previous block" accessibilityState={{ disabled: !count || playhead <= 0 }} disabled={!count || playhead <= 0}
         onPress={() => { haptic("selection"); onSeek(playhead - 1) }} style={({ pressed }) => ({ ...button, opacity: !count || playhead <= 0 ? 0.35 : pressed ? 0.55 : 1 })}>
         <SkipBack size={18} color={palette.accent} />
@@ -528,12 +545,12 @@ function SimulationBar({ count, playhead, playing, speed, elapsed, total, onSeek
         onPress={() => { haptic("selection"); onSeek(playhead + 1) }} style={({ pressed }) => ({ ...button, opacity: !count || playhead >= count - 1 ? 0.35 : pressed ? 0.55 : 1 })}>
         <SkipForward size={18} color={palette.accent} />
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Playback speed ${speed} times. Change speed`} disabled={!count} onPress={onCycleSpeed}
+      <Pressable accessibilityRole="button" accessibilityLabel={`Playback speed ${speed} times. Change speed`} accessibilityState={{ disabled: !count }} disabled={!count} onPress={onCycleSpeed} hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
         style={({ pressed }) => ({ minWidth: 52, height: 32, paddingHorizontal: 10, marginLeft: 4, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 0.5, borderColor: palette.border, backgroundColor: palette.surface, opacity: !count ? 0.35 : pressed ? 0.6 : 1 })}>
-        <Text style={{ color: palette.ink, fontSize: 13, fontWeight: "600", fontVariant: ["tabular-nums"] }}>{speed}×</Text>
+        <Text style={{ color: palette.ink, fontVariant: ["tabular-nums"], ...type(13, { weight: "600" }) }}>{speed}×</Text>
       </Pressable>
       <Text accessibilityLabel={`Elapsed ${formatDuration(elapsed)} of about ${formatDuration(total)}`} numberOfLines={1}
-        style={{ flex: 1, textAlign: "right", color: palette.muted, fontSize: 12, fontVariant: ["tabular-nums"] }}>
+        style={{ flexGrow: 1, flexShrink: 1, minWidth: 104, textAlign: "right", color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>
         {formatDuration(elapsed)} / ≈ {formatDuration(total)}
       </Text>
     </View>
@@ -578,7 +595,7 @@ function Scrubber({ count, value, onChange }: { count: number; value: number; on
       onResponderGrant={(event) => move(event.nativeEvent.locationX)}
       onResponderMove={(event) => move(event.nativeEvent.locationX)}
     >
-      <View style={{ height: 4, borderRadius: 2, backgroundColor: palette.panel, overflow: "hidden" }}>
+      <View style={{ height: 4, borderRadius: 2, backgroundColor: hexToRgba(palette.ink, 0.2), overflow: "hidden" }}>
         <View style={{ width: `${fraction * 100}%`, height: 4, backgroundColor: palette.accent }} />
       </View>
       <View pointerEvents="none" style={{ position: "absolute", left: `${fraction * 100}%`, top: 13, width: 18, height: 18, borderRadius: 9, backgroundColor: palette.accent, transform: [{ translateX: -9 }] }} />
@@ -590,6 +607,7 @@ const GcodeRow = memo(function GcodeRow({
   lineNumber,
   text,
   kind,
+  kindColors: colors,
   active,
   disabled,
   onSeekLine,
@@ -597,6 +615,7 @@ const GcodeRow = memo(function GcodeRow({
   lineNumber: number
   text: string
   kind: ToolpathSegment["kind"] | undefined
+  kindColors: Record<MoveKind, string>
   active: boolean
   disabled: boolean
   onSeekLine: (lineNumber: number) => void
@@ -605,22 +624,22 @@ const GcodeRow = memo(function GcodeRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Line ${lineNumber}${text.trim() ? `, ${text.trim()}` : ""}`}
+      accessibilityLabel={`Line ${lineNumber}${kind ? `, ${KIND_LABEL[kind]}` : ""}${text.trim() ? `, ${text.trim()}` : ""}`}
       accessibilityState={{ selected: active, disabled }}
       disabled={disabled}
       onPress={() => onSeekLine(lineNumber)}
-      style={{
+      style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
         paddingHorizontal: 12,
         paddingVertical: 10,
         minHeight: 44,
-        backgroundColor: active ? `${palette.accent}18` : "transparent",
-      }}
+        backgroundColor: active ? hexToRgba(palette.accent, 0.1) : pressed ? hexToRgba(palette.ink, 0.05) : "transparent",
+      })}
     >
-      <View style={{ width: 4, alignSelf: "stretch", borderRadius: 2, backgroundColor: kind ? KIND_COLOR[kind] : "transparent" }} />
-      <Text style={{ width: 44, color: palette.muted, ...mono(12) }}>{lineNumber}</Text>
+      <View style={{ width: 4, alignSelf: "stretch", borderRadius: 2, backgroundColor: kind ? colors[kind] : "transparent" }} />
+      <Text style={{ width: 44, textAlign: "right", color: palette.muted, ...mono(12) }}>{lineNumber}</Text>
       <Text style={{ flex: 1, color: active ? palette.ink : palette.soft, ...mono(13) }}>{text || " "}</Text>
     </Pressable>
   )

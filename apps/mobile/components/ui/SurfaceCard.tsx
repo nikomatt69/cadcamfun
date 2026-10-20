@@ -3,7 +3,7 @@ import type { PropsWithChildren, ReactNode } from "react"
 import { Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from "react-native"
 import { cn } from "@/lib/cn"
 import { hexToRgba, useTheme } from "@/lib/theme"
-import { type } from "@/lib/typography"
+import { caps, type } from "@/lib/typography"
 
 type SurfaceCardProps = PropsWithChildren<{
   eyebrow?: string
@@ -17,7 +17,7 @@ type SurfaceCardProps = PropsWithChildren<{
 }>
 
 /**
- * The grouped card (nikcli-grade): 22pt continuous-curve radius, hairline ink border, and the
+ * The grouped card (nikcli-grade): 22pt continuous-curve radius, hairline border, 16pt padding and the
  * eyebrow/title/description/footer slots so a card's hierarchy is built from one vocabulary.
  * `tone` picks the material weight — raised surface by default, panel and translucent background
  * for nested content.
@@ -29,7 +29,7 @@ export function SurfaceCard({ eyebrow, title, description, footer, className, st
 
   const backgroundColor =
     tone === "panel" ? palette.panel : tone === "background" ? hexToRgba(palette.background, 0.9) : palette.surface
-  const borderColor = hexToRgba(palette.ink, 0.08)
+  const borderColor = palette.border
 
   return (
     <View
@@ -37,7 +37,7 @@ export function SurfaceCard({ eyebrow, title, description, footer, className, st
       style={[
         {
           overflow: "hidden",
-          padding: inset ? 18 : 0,
+          padding: inset ? 16 : 0,
           borderRadius: layout.cardRadius,
           borderCurve: "continuous",
           borderWidth: 0.5,
@@ -47,9 +47,9 @@ export function SurfaceCard({ eyebrow, title, description, footer, className, st
         style,
       ]}
     >
-      {eyebrow ? <Text selectable style={{ color: palette.accent, ...type(12, { weight: "600" }) }}>{eyebrow}</Text> : null}
+      {eyebrow ? <Text selectable style={{ color: palette.accent, ...caps(12) }}>{eyebrow}</Text> : null}
       {title ? (
-        <Text selectable style={{ marginTop: eyebrow ? 6 : 0, color: palette.ink, ...type(compact ? 18 : 19, { weight: "600" }) }}>
+        <Text selectable accessibilityRole="header" style={{ marginTop: eyebrow ? 4 : 0, color: palette.ink, ...type(compact ? 18 : 19, { weight: "600" }) }}>
           {title}
         </Text>
       ) : null}

@@ -19,6 +19,7 @@ import { PressableScale } from "@/components/ui/PressableScale"
 import { Divider } from "@/components/ui/SectionHeader"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { layout } from "@/lib/layout"
+import { caps, mono, type } from "@/lib/typography"
 
 const WORKSPACE = [
   { screen: "drawings", title: "Designs", detail: "Explore your geometry", Icon: Box },
@@ -52,33 +53,33 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         <IconTile><GitBranch size={22} color={palette.accent} /></IconTile>
         <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-          <Text style={{ color: palette.muted, fontSize: 12, fontWeight: "600", letterSpacing: 0.6 }}>WORKING BRANCH</Text>
-          <Text selectable style={{ color: palette.ink, fontSize: 21, lineHeight: 27, fontWeight: "700" }}>{vcs?.branch ?? "Unavailable"}</Text>
+          <Text style={{ color: palette.muted, ...caps(11) }}>Working branch</Text>
+          <Text selectable numberOfLines={2} ellipsizeMode="middle" style={{ color: palette.ink, ...type(21, { weight: "700" }) }}>{vcs?.branch ?? "Unavailable"}</Text>
         </View>
       </View>
       <View style={{ marginVertical: 16, gap: 8 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
           {vcs && dirtyCount === 0 ? <CheckCircle2 size={16} color={palette.success} /> : null}
-          <Text style={{ flex: 1, minWidth: 0, color: dirtyCount ? palette.warning : palette.soft, fontSize: 14, lineHeight: 21 }}>{!vcs ? "Could not load working copy" : dirtyCount ? `${dirtyCount} ${dirtyCount === 1 ? "file has" : "files have"} uncommitted changes` : "All changes committed"}</Text>
+          <Text accessibilityLiveRegion="polite" style={{ flex: 1, minWidth: 0, color: dirtyCount ? palette.warning : palette.soft, fontVariant: ["tabular-nums"], ...type(14) }}>{!vcs ? "Could not load working copy" : dirtyCount ? `${dirtyCount} ${dirtyCount === 1 ? "file has" : "files have"} uncommitted changes` : "All changes committed"}</Text>
         </View>
-        {vcs?.head ? <Text selectable style={{ color: palette.muted, fontSize: 12, fontFamily: "Menlo" }}>Latest commit {shortOid(vcs.head)}</Text> : null}
-        {vcs?.dirty.slice(0, 4).map((path) => <Text key={path} selectable style={{ color: palette.soft, fontFamily: "Menlo", fontSize: 12, lineHeight: 18 }}>{path}</Text>)}
-        {dirtyCount > 4 ? <Text style={{ color: palette.muted, fontSize: 12 }}>+{dirtyCount - 4} more files</Text> : null}
+        {vcs?.head ? <Text selectable style={{ color: palette.muted, ...type(12) }}>Latest commit <Text style={mono(12)}>{shortOid(vcs.head)}</Text></Text> : null}
+        {vcs?.dirty.slice(0, 4).map((path) => <Text key={path} selectable numberOfLines={1} ellipsizeMode="middle" style={{ color: palette.soft, ...mono(12) }}>{path}</Text>)}
+        {dirtyCount > 4 ? <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(12) }}>+{dirtyCount - 4} more {dirtyCount - 4 === 1 ? "file" : "files"}</Text> : null}
       </View>
       <ActionButton label="Commit changes" variant={dirtyCount ? "primary" : "secondary"} disabled={!vcs || !dirtyCount} onPress={() => onCommit({ branch: vcs?.branch ?? "", files: dirtyCount })} />
     </SurfaceCard>}
 
-    <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 19, fontWeight: "700", marginTop: 6 }}>Explore workspace</Text>
+    <Text accessibilityRole="header" style={{ color: palette.ink, marginTop: 8, ...type(19, { weight: "700" }) }}>Explore workspace</Text>
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
       {WORKSPACE.map(({ screen, title, detail, Icon }) => <PressableScale key={screen} subtle tint accessibilityLabel={`Open ${title.toLowerCase()}`} onPress={() => router.push(`/projects/${projectId}/workspace/${screen}`)}
         style={{ width: stacked ? "100%" : "48%", flexGrow: 1, minHeight: 140, padding: 16, borderRadius: layout.cardRadius, borderCurve: "continuous", backgroundColor: palette.surface, borderWidth: 0.5, borderColor: palette.border, gap: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}><IconTile size={40}><Icon size={21} color={palette.accent} /></IconTile><ArrowUpRight size={16} color={palette.muted} /></View>
-        <View style={{ gap: 3 }}><Text style={{ color: palette.ink, fontSize: 17, fontWeight: "600" }}>{title}</Text><Text style={{ color: palette.muted, fontSize: 12, lineHeight: 18 }}>{detail}</Text></View>
+        <View style={{ gap: 3 }}><Text numberOfLines={1} style={{ color: palette.ink, ...type(17, { weight: "600" }) }}>{title}</Text><Text style={{ color: palette.muted, ...type(12) }}>{detail}</Text></View>
       </PressableScale>)}
     </View>
 
     <View style={{ gap: 10 }}>
-      <Text accessibilityRole="header" style={{ color: palette.ink, fontSize: 19, fontWeight: "700", marginTop: 6 }}>Branches</Text>
+      <Text accessibilityRole="header" style={{ color: palette.ink, marginTop: 8, ...type(19, { weight: "700" }) }}>Branches</Text>
       {branchList.length ? <SurfaceCard inset={false}>{branchList.map(([name, oid], index) => <View key={name}>
         {index ? <Divider inset={16} /> : null}
         <ListRow title={name} subtitle={shortOid(oid)} leading={<GitBranch size={18} color={palette.muted} />}

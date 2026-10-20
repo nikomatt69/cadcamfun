@@ -36,6 +36,13 @@ export const SHEET_SPRING: SpringDescriptor = { duration: 300, dampingRatio: 0.8
 /** Press feedback — fast and dead-flat so it catches up with the finger. */
 export const PRESS_SPRING: SpringDescriptor = { duration: 140, dampingRatio: 1 }
 
+/**
+ * Opacity dim on press (buttons): quick in so it lands with the finger, a touch slower out so the
+ * release does not read as a flicker. Both ease-out, both well under 300ms (Emil: asymmetric timing).
+ */
+export const DIM_IN_MS = 80
+export const DIM_OUT_MS = 160
+
 /** Reanimated 4 takes Apple's two designer parameters directly. */
 export const spring = (d: SpringDescriptor): WithSpringConfig => {
   "worklet"
