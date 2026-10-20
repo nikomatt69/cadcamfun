@@ -18,6 +18,7 @@ const words = (text: string): number => text.trim() ? text.trim().split(/\s+/).l
 export const ReasoningRow = memo(function ReasoningRow({ row, live }: { row: Extract<ChatRow, { kind: "reasoning" }>; live: boolean }) {
   const { palette, isDark } = useTheme()
   const [open, setOpen] = useState(false)
+  const body = row.text.trim()
   const count = words(row.text)
   const title = live ? "Thinking…" : `Reasoning · ${count.toLocaleString("en")} ${count === 1 ? "word" : "words"}`
   return (
@@ -36,10 +37,12 @@ export const ReasoningRow = memo(function ReasoningRow({ row, live }: { row: Ext
         {live ? <ActivityIndicator size="small" color={palette.muted} /> : null}
         <DisclosureChevron open={open} size={14} color={palette.muted} />
       </PressableScale>
-      <Text selectable={open} numberOfLines={open ? undefined : 2}
-        style={{ color: palette.soft, paddingHorizontal: 12, paddingBottom: 12, marginTop: -2, fontStyle: "italic", ...typeStyle(14) }}>
-        {open ? row.text.trim() : row.text.trim().split(/\n+/).slice(-2).join(" ")}
-      </Text>
+      {body ? (
+        <Text selectable={open} numberOfLines={open ? undefined : 2}
+          style={{ color: palette.soft, paddingHorizontal: 12, paddingBottom: 12, marginTop: -2, fontStyle: "italic", ...typeStyle(14) }}>
+          {open ? body : body.split(/\n+/).slice(-2).join(" ")}
+        </Text>
+      ) : null}
     </View>
   )
 })

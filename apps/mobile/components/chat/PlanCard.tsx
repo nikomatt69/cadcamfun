@@ -27,7 +27,7 @@ export const PlanCard = memo(function PlanCard({ row }: { row: Extract<ChatRow, 
         return (
           <View key={`${index}:${item.content}`} style={{ flexDirection: "row", alignItems: "flex-start", gap: 9 }}>
             <View style={{ paddingTop: 3, flexShrink: 0 }}><Icon size={14} color={color} /></View>
-            <Text selectable style={{ flex: 1, color: item.status === "in_progress" ? palette.ink : palette.soft, fontSize: 14, lineHeight: 21, fontWeight: item.status === "in_progress" ? "600" : "400", textDecorationLine: item.status === "cancelled" ? "line-through" : "none" }}>{item.content}</Text>
+            <Text selectable style={{ flex: 1, color: item.status === "in_progress" ? palette.ink : palette.soft, ...typeStyle(14, { weight: item.status === "in_progress" ? "600" : "400", leadingScale: 1.08 }), textDecorationLine: item.status === "cancelled" ? "line-through" : "none" }}>{item.content}</Text>
           </View>
         )
       })}
@@ -42,7 +42,7 @@ export const NoticeRow = memo(function NoticeRow({ row }: { row: Extract<ChatRow
   return (
     <View accessible accessibilityLiveRegion="polite" accessibilityLabel={row.text} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, paddingHorizontal: 20, paddingVertical: 8 }}>
       <View style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 3, backgroundColor: color }} />
-      <Text selectable style={{ flexShrink: 1, color, fontSize: 12, lineHeight: 17, textAlign: "center" }}>{row.text}</Text>
+      <Text selectable style={{ flexShrink: 1, color, textAlign: "center", ...typeStyle(12) }}>{row.text}</Text>
     </View>
   )
 })

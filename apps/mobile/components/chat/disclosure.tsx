@@ -28,7 +28,7 @@ export function Reveal({ children, style }: PropsWithChildren<{ style?: StylePro
   return (
     <Animated.View
       entering={reduced ? undefined : FadeIn.duration(180).easing(EASE_OUT)}
-      exiting={reduced ? undefined : FadeOut.duration(120)}
+      exiting={reduced ? undefined : FadeOut.duration(120).easing(EASE_OUT)}
       style={style}
     >
       {children}

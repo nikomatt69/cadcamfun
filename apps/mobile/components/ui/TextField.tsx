@@ -1,7 +1,7 @@
 import { layout } from "@/lib/layout"
 import { forwardRef, useState } from "react"
 import { Text, TextInput, View, type TextInputProps } from "react-native"
-import { useTheme } from "@/lib/theme"
+import { hexToRgba, useTheme } from "@/lib/theme"
 import { type } from "@/lib/typography"
 
 type TextFieldProps = TextInputProps & {
@@ -25,7 +25,9 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   const [focused, setFocused] = useState(false)
   const { colorScheme, palette } = useTheme()
 
-  const borderColor = error ? palette.danger : focused ? palette.accent : palette.border
+  // Resting boundary is muted@0.7 over the surface: 3.1:1 (light) / 4.0:1 (dark), the WCAG 1.4.11 floor for a
+  // control edge. The hairline `palette.border` is only 1.4:1 / 1.8:1 and would leave the field's extent unmarked.
+  const borderColor = error ? palette.danger : focused ? palette.accent : hexToRgba(palette.muted, 0.7)
 
   return (
     <View style={{ gap: 8 }}>

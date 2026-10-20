@@ -5,6 +5,7 @@ import type { ChatRow } from "@/lib/chat-log"
 import { editQuestion, questionAnswers, type QuestionEdit, type QuestionForm } from "@/lib/question-form"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { layout } from "@/lib/layout"
+import { type as typeStyle } from "@/lib/typography"
 import { STATUS_FILL_ALPHA } from "@/lib/palette"
 import { haptic } from "@/lib/haptics"
 import { TextField } from "@/components/ui/TextField"
@@ -43,13 +44,13 @@ export const QuestionCard = memo(function QuestionCard({ row, onReply, onReject 
     <View style={{ gap: layout.gap }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         {row.answered ? <CheckCircle2 size={19} color={palette.success} style={{ flexShrink: 0 }} /> : <MessageSquare size={19} color={palette.accent} style={{ flexShrink: 0 }} />}
-        <Text style={{ flex: 1, minWidth: 0, color: palette.soft, fontSize: 12, lineHeight: 18, fontWeight: "600" }}>{row.answered ? "Response recorded" : "Your input is needed"}</Text>
+        <Text style={{ flex: 1, minWidth: 0, color: palette.soft, ...typeStyle(12, { weight: "600" }) }}>{row.answered ? "Response recorded" : "Your input is needed"}</Text>
       </View>
       {row.questions.map((question, index) => <View key={index} style={{ gap: 10 }}>
-        {question.header ? <Text accessibilityRole="header" style={{ color: palette.ink, fontWeight: "600", fontSize: 17, lineHeight: 24 }}>{question.header}</Text> : null}
-        <Text selectable style={{ color: palette.soft, fontSize: 15, lineHeight: 22 }}>{question.question}</Text>
-        {row.answered ? (answers[index]?.length ? <Text selectable style={{ color: palette.muted, fontSize: 14, lineHeight: 21 }}>{answers[index]!.join(", ")}</Text> : null) : <>
-          {question.options.length ? <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 18 }}>{question.multiple ? "Select all that apply" : "Choose one option"}</Text> : null}
+        {question.header ? <Text accessibilityRole="header" style={{ color: palette.ink, ...typeStyle(17, { weight: "600" }) }}>{question.header}</Text> : null}
+        <Text selectable style={{ color: palette.soft, ...typeStyle(15) }}>{question.question}</Text>
+        {row.answered ? (answers[index]?.length ? <Text selectable style={{ color: palette.muted, ...typeStyle(14) }}>{answers[index]!.join(", ")}</Text> : null) : <>
+          {question.options.length ? <Text style={{ color: palette.muted, ...typeStyle(12) }}>{question.multiple ? "Select all that apply" : "Choose one option"}</Text> : null}
           {question.options.map((option) => {
             const checked = form[index]?.choices.includes(option.label) ?? false
             const Indicator = question.multiple ? checked ? SquareCheck : Square : checked ? CheckCircle2 : Circle
@@ -61,8 +62,8 @@ export const QuestionCard = memo(function QuestionCard({ row, onReply, onReject 
               style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: layout.touchTarget, padding: 14, borderRadius: layout.controlRadius, borderCurve: "continuous", borderWidth: 1, borderColor: checked ? palette.accent : palette.border, backgroundColor: checked ? hexToRgba(palette.accent, STATUS_FILL_ALPHA) : palette.surface }}>
               <Indicator size={20} color={checked ? palette.accent : palette.muted} style={{ marginTop: 1, flexShrink: 0 }} />
               <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-                <Text style={{ color: palette.ink, fontSize: 15, lineHeight: 21, fontWeight: "600" }}>{option.label}</Text>
-                {option.description ? <Text style={{ color: palette.soft, fontSize: 13, lineHeight: 20 }}>{option.description}</Text> : null}
+                <Text style={{ color: palette.ink, ...typeStyle(15, { weight: "600" }) }}>{option.label}</Text>
+                {option.description ? <Text style={{ color: palette.soft, ...typeStyle(13) }}>{option.description}</Text> : null}
               </View>
             </PressableScale>
           })}

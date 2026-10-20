@@ -9,11 +9,11 @@ export function Divider({ inset = 0 }: { inset?: number }) {
   return <View style={{ height: StyleSheet.hairlineWidth, marginLeft: inset, backgroundColor: palette.border }} />
 }
 
-/** An iOS grouped-list section header: small caps label with the section's tracking. */
+/** A grouped-list section title: 18pt semibold on the size-derived tracking, 24pt above and 8pt below so it binds to the group it names. */
 export function SectionHeader({ children, padded = true }: { children: ReactNode; padded?: boolean }) {
   const { palette } = useTheme()
   return (
-    <View style={{ paddingHorizontal: padded ? 4 : 0, paddingTop: 24, paddingBottom: 10 }}>
+    <View style={{ paddingHorizontal: padded ? 4 : 0, paddingTop: 24, paddingBottom: 8 }}>
       <Text accessibilityRole="header" style={{ color: palette.ink, ...type(18, { weight: "600" }) }}>{children}</Text>
     </View>
   )

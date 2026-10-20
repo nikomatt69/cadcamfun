@@ -21,6 +21,7 @@ import { rowsFromMessages } from "@/lib/session-history"
 import { Composer, type AssistantMode } from "@/components/chat/Composer"
 import { TranscriptItemView, type ErrorRecovery, type TranscriptActions } from "@/components/chat/TranscriptItemView"
 import { JumpToLatestPill } from "@/components/chat/JumpToLatestPill"
+import { TypingRow } from "@/components/chat/TypingRow"
 import { hexToRgba } from "@/lib/theme"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { PressableScale } from "@/components/ui/PressableScale"
@@ -567,6 +568,8 @@ export default function AssistantScreen() {
   const lastErrorId = useMemo(() => transcript.findLast((item) => item.kind === "row" && item.row.kind === "error")?.id, [transcript])
   const newest = transcript[transcript.length - 1]
   const liveReasoningId = busy && newest?.kind === "row" && newest.row.kind === "reasoning" ? newest.id : undefined
+  // Between sending and the first reply row there is nothing to read yet: show the typing row at the newest end.
+  const awaitingFirstRow = busy && newest?.kind === "row" && newest.row.kind === "user"
   const lastPrompt = useMemo(() => lastUserPrompt(log), [log])
   const recovery = useMemo<ErrorRecovery | undefined>(() => busy ? undefined : { refresh: Boolean(followed), ...(lastPrompt ? { lastPrompt } : {}) }, [busy, followed, lastPrompt])
   const renderItem = useCallback(({ item }: { item: TranscriptItem }) => (
@@ -703,6 +706,7 @@ export default function AssistantScreen() {
             contentInsetAdjustmentBehavior="never"
             contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: Math.max(0, contentGutter(width) - 16) }}
             renderItem={renderItem}
+            ListHeaderComponent={awaitingFirstRow ? <TypingRow /> : null}
             maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 80 }}
             keyboardDismissMode="interactive"
             onScroll={onTranscriptScroll}

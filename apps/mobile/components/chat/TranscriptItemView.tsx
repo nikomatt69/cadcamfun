@@ -27,19 +27,21 @@ export interface ErrorRecovery {
   readonly lastPrompt?: string
 }
 
-export const TranscriptItemView = memo(function TranscriptItemView({ item, actions, live = false, recovery }: {
+export const TranscriptItemView = memo(function TranscriptItemView({ item, actions, live = false, recovery, startsTurn = false }: {
   item: TranscriptItem
   actions: TranscriptActions
   /** The newest reasoning row while the turn runs: it is still being written. */
   live?: boolean
   recovery?: ErrorRecovery
+  /** A user prompt that follows something else (an answer, a tool run): a new turn starts here. */
+  startsTurn?: boolean
 }) {
   if (item.kind === "tools") return <ToolRunGroup rows={item.rows} />
   const row = item.row
   switch (row.kind) {
     case "user":
     case "assistant":
-      return <MessageBubble row={row} onReuse={actions.reuse} />
+      return <MessageBubble row={row} onReuse={actions.reuse} startsTurn={startsTurn} />
     case "reasoning":
       return <ReasoningRow row={row} live={live} />
     case "plan":

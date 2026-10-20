@@ -1,5 +1,5 @@
 import { memo, useState } from "react"
-import { StyleSheet, Text, View } from "react-native"
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native"
 import { Layers } from "lucide-react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
@@ -17,6 +17,7 @@ import { DisclosureChevron, Reveal } from "./disclosure"
  */
 export const ToolRunGroup = memo(function ToolRunGroup({ rows }: { rows: readonly ToolRow[] }) {
   const { palette, isDark } = useTheme()
+  const { fontScale } = useWindowDimensions()
   const [open, setOpen] = useState(false)
   const summary = toolRunSummary(rows)
   const latestImages = rows.findLast((row) => row.images?.length)
@@ -39,7 +40,7 @@ export const ToolRunGroup = memo(function ToolRunGroup({ rows }: { rows: readonl
           </View>
           <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
             <Text style={{ color: palette.ink, ...typeStyle(15, { weight: "600" }) }}>{summary.title}</Text>
-            <Text numberOfLines={1} style={{ color: summary.failed ? palette.danger : palette.muted, ...typeStyle(12) }}>
+            <Text numberOfLines={fontScale > 1.3 ? undefined : 1} style={{ color: summary.failed ? palette.danger : palette.muted, ...typeStyle(12) }}>
               {summary.failed ? `${summary.failed} failed · ` : ""}{domains}
             </Text>
           </View>

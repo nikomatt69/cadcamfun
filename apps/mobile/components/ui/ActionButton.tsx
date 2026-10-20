@@ -20,7 +20,8 @@ type ActionButtonProps = {
 /**
  * Rounded action button. Primary is a solid accent fill with contrasting text;
  * the other variants sit on raised surface with a hairline border. All colors derive from the
- * active palette. Loading preserves the label's geometry under a spinner. Pressed state dims to 0.72
+ * active palette. Loading preserves the label's geometry under a spinner. Pressed state dims to 0.88
+ * (the lowest opacity that keeps the primary label above 4.5:1 in both themes, measured)
  * and scales — the same feedback as every other pressable, so the app reads as one material.
  */
 export function ActionButton({ label, icon, loading, disabled, variant = "primary", small = false, fullWidth = true, onPress }: ActionButtonProps) {
@@ -44,6 +45,7 @@ export function ActionButton({ label, icon, loading, disabled, variant = "primar
       accessibilityLabel={label}
       accessibilityState={{ disabled: inactive, busy: Boolean(loading) }}
       dim
+      dimOpacity={0.88}
       disabledOpacity={loading ? 0.85 : 0.45}
       style={{
         minHeight: small ? layout.touchTarget : 52,

@@ -8,6 +8,7 @@ import { PressableScale } from "@/components/ui/PressableScale"
 import type { ChatRow } from "@/lib/chat-log"
 import { useCopiedFeedback } from "@/hooks/use-copied-feedback"
 import { layout } from "@/lib/layout"
+import { caps, mono, type as typeStyle } from "@/lib/typography"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { DisclosureChevron, Reveal } from "./disclosure"
 
@@ -26,6 +27,9 @@ function toolIdentity(raw: string | undefined, label: string): { icon: LucideIco
   if (value.includes("verify") || value.includes("analy")) return { icon: CircleGauge, category: "ANALYSIS", title }
   return { icon: Wrench, category: "TOOL", title }
 }
+
+/** The full-screen render viewer is always black, so its chrome is white in both themes. */
+const ON_DARK = "#FFFFFF"
 
 function stringify(value: unknown): string {
   if (typeof value === "string") return value
@@ -55,12 +59,12 @@ export function ToolImages({ images, tool }: { images: readonly string[]; tool: 
       </Pressable>)}
     </View>
     <Modal visible={shown !== null} animationType="fade" presentationStyle="fullScreen" supportedOrientations={["portrait", "landscape"]} onRequestClose={() => setShown(null)}>
-      <SafeAreaView edges={["top", "bottom", "left", "right"]} style={{ flex: 1, backgroundColor: "#000" }}>
+      <SafeAreaView edges={["top", "bottom", "left", "right"]} style={{ flex: 1, backgroundColor: palette.overlay }}>
         <View style={{ flexDirection: "row", alignItems: "center", minHeight: layout.touchTarget + 8, paddingLeft: 20, paddingRight: 8 }}>
-          <Text accessibilityRole="header" numberOfLines={1} style={{ flex: 1, color: "#fff", fontSize: 17, fontWeight: "600" }}>{name}</Text>
+          <Text accessibilityRole="header" numberOfLines={1} style={{ flex: 1, color: ON_DARK, ...typeStyle(17, { weight: "600" }) }}>{name}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Close image" onPress={() => setShown(null)}
             style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
-            <X size={22} color="#fff" />
+            <X size={22} color={ON_DARK} />
           </Pressable>
         </View>
         {/* iOS pinch-zooms a ScrollView natively; a double tap is not needed to read a render. */}
@@ -72,10 +76,28 @@ export function ToolImages({ images, tool }: { images: readonly string[]; tool: 
   </>
 }
 
+/**
+ * Tool input/output: monospaced, scrolls sideways instead of wrapping (G-code and JSON lose their shape when wrapped)
+ * and stops growing at a fixed height so one huge result cannot push the whole transcript away.
+ */
+function CodeBlock({ text, color }: { text: string; color: string }) {
+  const { palette, isDark } = useTheme()
+  return (
+    <View style={{ borderRadius: 12, borderCurve: "continuous", backgroundColor: hexToRgba(palette.ink, isDark ? 0.07 : 0.045), maxHeight: 260, overflow: "hidden" }}>
+      <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 10 }}>
+        <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false}>
+          <Text selectable style={{ color, ...mono(12) }}>{text}</Text>
+        </ScrollView>
+      </ScrollView>
+    </View>
+  )
+}
+
 export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<ChatRow, { kind: "tool" }> }) {
   const { palette, isDark } = useTheme()
   const [open, setOpen] = useState(false)
   const { copied, error: copyError, copy } = useCopiedFeedback()
+  const { fontScale } = useWindowDimensions()
   const identity = toolIdentity(row.rawTool, row.tool)
   const Icon = identity.icon
   const hasDetails = row.input !== undefined || Boolean(row.output) || Boolean(row.diagnostic)
@@ -120,8 +142,8 @@ export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<Cha
           <Icon size={17} color={statusColor} strokeWidth={2.1} />
         </View>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text style={{ color: palette.muted, fontSize: 11, lineHeight: 16, fontWeight: "700", letterSpacing: 0.8 }}>{row.agent ? `${identity.category} · ${row.agent.toUpperCase()}` : identity.category}</Text>
-          <Text style={{ color: palette.ink, fontSize: 15, lineHeight: 21, fontWeight: "600" }}>{identity.title}</Text>
+          <Text numberOfLines={fontScale > 1.3 ? undefined : 1} style={{ color: palette.muted, ...caps(11, { weight: "700" }) }}>{row.agent ? `${identity.category} · ${row.agent}` : identity.category}</Text>
+          <Text style={{ color: palette.ink, ...typeStyle(15, { weight: "600" }) }}>{identity.title}</Text>
         </View>
         {row.ok === null ? <ActivityIndicator size="small" color={statusColor} /> : row.ok ? <Check size={16} color={statusColor} /> : <X size={16} color={statusColor} />}
         {hasDetails ? <DisclosureChevron open={open} color={palette.muted} /> : null}
@@ -133,31 +155,27 @@ export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<Cha
         <Reveal style={{ gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hexToRgba(palette.ink, 0.09), padding: 12 }}>
           {row.diagnostic ? (
             <View style={{ gap: 4, borderRadius: 13, borderCurve: "continuous", backgroundColor: hexToRgba(row.diagnostic.severity === "error" ? palette.danger : palette.warning, 0.1), padding: 11 }}>
-              <Text selectable style={{ color: palette.ink, fontSize: 14, lineHeight: 21, fontWeight: "600" }}>{row.diagnostic.message}</Text>
-              {row.diagnostic.recovery ? <Text selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 17 }}>{row.diagnostic.recovery}</Text> : null}
+              <Text selectable style={{ color: palette.ink, ...typeStyle(14, { weight: "600" }) }}>{row.diagnostic.message}</Text>
+              {row.diagnostic.recovery ? <Text selectable style={{ color: palette.soft, ...typeStyle(13) }}>{row.diagnostic.recovery}</Text> : null}
             </View>
           ) : null}
           {row.input !== undefined ? (
             <View style={{ gap: 6 }}>
-              <Text style={{ color: palette.muted, fontSize: 11, lineHeight: 16, fontWeight: "700", letterSpacing: 0.8 }}>INPUT</Text>
-              <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false}>
-                <Text selectable style={{ color: palette.soft, fontFamily: "Menlo", fontSize: 12, lineHeight: 19 }}>{stringify(row.input)}</Text>
-              </ScrollView>
+              <Text accessibilityRole="header" style={{ color: palette.muted, ...caps(11, { weight: "700" }) }}>Input</Text>
+              <CodeBlock text={stringify(row.input)} color={palette.soft} />
             </View>
           ) : null}
           {row.output ? (
             <View style={{ gap: 6 }}>
               {copyError ? <ErrorBanner message={copyError} /> : null}
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
-                <Text style={{ flexShrink: 1, color: palette.muted, fontSize: 11, lineHeight: 16, fontWeight: "700", letterSpacing: 0.8 }}>OUTPUT</Text>
+                <Text accessibilityRole="header" style={{ flexShrink: 1, color: palette.muted, ...caps(11, { weight: "700" }) }}>Output</Text>
                 <PressableScale onPress={() => void copyOutput()} subtle accessibilityRole="button" accessibilityLabel={copied ? "Tool output copied" : "Copy tool output"} style={{ minHeight: layout.touchTarget, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8 }}>
                   <Copy size={12} color={palette.muted} />
-                  <Text style={{ color: palette.soft, fontSize: 12, lineHeight: 18, fontWeight: "600" }}>{copied ? "Copied" : "Copy"}</Text>
+                  <Text style={{ color: palette.soft, ...typeStyle(12, { weight: "600" }) }}>{copied ? "Copied" : "Copy"}</Text>
                 </PressableScale>
               </View>
-              <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false}>
-                <Text selectable style={{ color: row.ok === false ? palette.ink : palette.soft, fontFamily: "Menlo", fontSize: 12, lineHeight: 19 }}>{row.output}</Text>
-              </ScrollView>
+              <CodeBlock text={row.output} color={row.ok === false ? palette.ink : palette.soft} />
             </View>
           ) : null}
         </Reveal>

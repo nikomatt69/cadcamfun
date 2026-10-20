@@ -39,7 +39,7 @@ export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone
         alignSelf: "flex-start",
         maxWidth: "100%",
         paddingHorizontal: 8,
-        paddingVertical: 2.5,
+        paddingVertical: 3,
         borderRadius: 999,
         borderWidth: 0.5,
         borderColor: tone === "neutral" ? palette.border : hexToRgba(color, 0.55),
@@ -47,7 +47,7 @@ export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone
         backgroundColor: hexToRgba(color, STATUS_FILL_ALPHA),
       }}
     >
-      <Text style={{ color, ...type(11, { weight: "600", leadingScale: 1.1 }) }}>{children}</Text>
+      <Text style={{ color, ...type(12, { weight: "600", leadingScale: 1.05 }) }}>{children}</Text>
     </View>
   )
 }

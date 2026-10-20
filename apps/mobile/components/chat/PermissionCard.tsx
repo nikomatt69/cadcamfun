@@ -7,6 +7,7 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { layout } from "@/lib/layout"
+import { mono, type as typeStyle } from "@/lib/typography"
 import type { ChatRow } from "@/lib/chat-log"
 
 type Decision = "once" | "always" | "reject"
@@ -36,16 +37,16 @@ export const PermissionCard = memo(function PermissionCard({ row, onReply }: {
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
         {row.answered ? <CheckCircle2 size={21} color={palette.success} style={{ flexShrink: 0 }} /> : <ShieldAlert size={21} color={palette.warning} style={{ flexShrink: 0 }} />}
         <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
-          <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 17, fontWeight: "600" }}>{row.answered ? "Decision recorded" : "Permission required"}</Text>
-          <Text accessibilityRole="header" selectable style={{ color: palette.ink, fontSize: 17, lineHeight: 24, fontWeight: "600" }}>{row.permission.replaceAll("_", " ")}</Text>
+          <Text style={{ color: palette.muted, ...typeStyle(12, { weight: "600" }) }}>{row.answered ? "Decision recorded" : "Permission required"}</Text>
+          <Text accessibilityRole="header" selectable style={{ color: palette.ink, ...typeStyle(17, { weight: "600" }) }}>{row.permission.replaceAll("_", " ")}</Text>
         </View>
       </View>
       {row.patterns.length ? <View style={{ gap: 8, padding: 12, borderRadius: layout.controlRadius - 4, borderCurve: "continuous", backgroundColor: palette.background }}>
-        <Text style={{ color: palette.muted, fontSize: 12, lineHeight: 17, fontWeight: "600" }}>Requested access</Text>
-        {row.patterns.map((pattern, index) => <Text key={index} selectable style={{ color: palette.soft, fontSize: 12, lineHeight: 19, fontFamily: "Menlo" }}>{pattern}</Text>)}
+        <Text style={{ color: palette.muted, ...typeStyle(12, { weight: "600" }) }}>Requested access</Text>
+        {row.patterns.map((pattern, index) => <Text key={index} selectable style={{ color: palette.soft, ...mono(12) }}>{pattern}</Text>)}
       </View> : null}
       {!row.answered ? <>
-        <Text style={{ color: palette.soft, fontSize: 14, lineHeight: 21 }}>Allow this action once, allow matching actions for this session, or deny access.</Text>
+        <Text style={{ color: palette.soft, ...typeStyle(14) }}>Allow this action once, allow matching actions for this session, or deny access.</Text>
         {error ? <ErrorBanner message={error} /> : null}
         <View style={{ gap: 8 }}>
           <ActionButton label="Allow once" disabled={busy !== null} loading={busy === "once"} onPress={() => void reply("once")} />
