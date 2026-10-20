@@ -4,6 +4,7 @@ import { Pressable, Text, View, useWindowDimensions } from "react-native"
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 import { SPRING, spring, usePrefersReducedMotion } from "@/lib/animation"
 import { hexToRgba, useTheme } from "@/lib/theme"
+import { type } from "@/lib/typography"
 import { haptic } from "@/lib/haptics"
 
 export type SegmentedControlProps<T extends string> = {
@@ -51,7 +52,7 @@ export function SegmentedControlFallback<T extends string>({ segments, value, on
           accessibilityLabel={segment.label}
           onPress={() => { if (!selected) { haptic("selection"); onChange(segment.value) } }}
           style={({ pressed }) => ({ flex: stacked ? undefined : 1, minWidth: 0, minHeight: layout.touchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: 6, paddingVertical: 8, borderRadius: 12, backgroundColor: stacked && selected ? palette.surface : pressed ? hexToRgba(palette.ink, 0.04) : undefined })}>
-          <Text style={{ color: selected ? palette.ink : palette.soft, fontSize: 13, lineHeight: 18, fontWeight: "600", textAlign: "center" }}>{segment.label}</Text>
+          <Text style={{ color: selected ? palette.ink : palette.soft, textAlign: "center", ...type(13, { weight: "600" }) }}>{segment.label}</Text>
         </Pressable>
       })}
     </View>
