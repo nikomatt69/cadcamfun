@@ -2,7 +2,7 @@
  * Drill operation (spec 04-core-cam.md §3): drills at points, optionally pecking; or taps (`mode: "tap"`, rigid tapping at
  * `pitch` x spindle speed) or reams / bores to size (`mode: "ream"`, fed in and out).
  *
- * Holes are ordered by nearest neighbour from the work origin (deterministic).
+ * Holes are ordered from the work origin by nearest neighbour improved with 2-opt (deterministic).
  * Every hole is a canned-cycle intent in the IR (`Cycle`); the post emits
  * `G81/G82/G83/G73` when its dialect supports them and `useCannedCycles` is set,
  * otherwise `expandCycle` turns it into plain moves. Depth is validated
@@ -13,7 +13,7 @@ import type { Entity } from "../../cad/entities.ts"
 import type { Vec2 } from "../../cad/vec.ts"
 import type { Stock, Tool } from "../tool.ts"
 import type { CycleKind, Toolpath } from "../ir.ts"
-import { nearestNeighbourOrder } from "../geometry.ts"
+import { optimizedOrder } from "../geometry.ts"
 import { OperationFields, NonNegative, Positive, heightsOrdered, levelsOf, withDefault } from "../params.ts"
 import { MoveBuilder, finish } from "./common.ts"
 
@@ -28,8 +28,8 @@ export class DrillParams extends Schema.Class<DrillParams>("cam/DrillParams")(
     chipBreak: withDefault(Schema.Boolean, false),
     /** Dwell at the hole bottom, seconds. */
     dwell: withDefault(NonNegative, 0),
-    /** What the cycle does: drill (peck / dwell as above), rigid tap, or ream (feed in and out). */
-    mode: withDefault(Schema.Literals(["drill", "tap", "ream"]), "drill"),
+    /** What the cycle does: drill (peck / dwell as above), rigid tap, ream (feed in and out), or bore (feed in, rapid out). */
+    mode: withDefault(Schema.Literals(["drill", "tap", "ream", "bore"]), "drill"),
     /** `tap`: thread pitch, mm; the feed is pitch x `spindleRpm` (`plungeFeed` is ignored). */
     pitch: Schema.optionalKey(Positive)
   }).check(heightsOrdered).check(Schema.makeFilter((p: { readonly mode: string; readonly pitch?: number }) => (p.mode !== "tap" || p.pitch !== undefined ? undefined : "a tapping cycle needs the thread pitch")))
@@ -66,7 +66,7 @@ export const generateDrill = (params: DrillParams, geometry: DrillGeometry, tool
   const levels = levelsOf({ ...params, stepdown: params.totalDepth }, stock.origin.z)
   const b = new MoveBuilder()
   b.comment(`Drill: ${params.name}`)
-  const holes = nearestNeighbourOrder(holePoints(geometry))
+  const holes = optimizedOrder(holePoints(geometry))
   const cycle: CycleKind = params.mode !== "drill" ? params.mode
     : params.peck > 0 ? (params.chipBreak ? "chipBreak" : "peck") : params.dwell > 0 ? "dwell" : "drill"
   const feed = params.mode === "tap" ? params.pitch! * params.spindleRpm : params.plungeFeed

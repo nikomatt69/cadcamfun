@@ -456,6 +456,31 @@ describe("Manufacturability", () => {
   }, SLOW)
 })
 
+describe("sheet metal in the panel", () => {
+  test("a sheet feature shows its flat pattern with a DXF download", async () => {
+    await open({
+      parameters: {},
+      features: [
+        {
+          id: "profile", type: "sketch", plane: "XY",
+          sketch: {
+            entities: [
+              { id: "a", kind: "point", x: 0, y: 0 }, { id: "b", kind: "point", x: 30, y: 0 }, { id: "c", kind: "point", x: 30, y: 20 },
+              { id: "l1", kind: "line", p1: "a", p2: "b" }, { id: "l2", kind: "line", p1: "b", p2: "c" }
+            ],
+            constraints: [{ type: "fixed", point: "a", x: 0, y: 0 }, { type: "fixed", point: "b", x: 30, y: 0 }, { type: "fixed", point: "c", x: 30, y: 20 }]
+          }
+        },
+        { id: "flange1", type: "sheet", sketch: "profile", thickness: 2, width: 25, bendRadius: 3, operation: "new" }
+      ]
+    } as History)
+    const flat = byId("flat-pattern-flange1")
+    expect(flat).not.toBeNull()
+    expect(flat!.textContent).toMatch(/flat pattern .* mm, 1 bend/)
+    close()
+  }, SLOW)
+})
+
 describe("what the panel cannot do while the part is locked", () => {
   test("every shortcut and the recipe button are disabled", async () => {
     const { render } = await import("solid-js/web")

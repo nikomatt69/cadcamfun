@@ -124,10 +124,13 @@ export const millSetupOf = (settings: ToolpathSettings, stock: Stock, table?: { 
 export const millSetupFromArtifact = (artifact: CamArtifact, settings: ToolpathSettings, table?: { readonly length: number; readonly width: number }): MillSetup => {
   const { min, max } = artifact.stockBounds
   const o = artifact.origin
+  // The original fixture cannot be reused as evidence after a manual refixture.
+  const manual = artifact.setupOrientation !== undefined && artifact.setupOrientation !== "+Z"
+  const setupSettings = manual ? { ...settings, workholding: "none" as const, workholdingConfigured: false } : settings
   const box: StockBox = { min: { x: min.x - o.x, y: min.y - o.y, z: min.z - o.z }, max: { x: max.x - o.x, y: max.y - o.y, z: max.z - o.z } }
   return {
-    kind: "mill", axes: 3, workholding: millWorkholdingOf(settings, box), table: table ?? ASSUMED_TABLE, stock: box, workOffset: settings.workOffset,
-    assumed: [...(settings.workholdingConfigured ? [] : ["workholding" as const]), ...(table === undefined ? ["table" as const] : [])]
+    kind: "mill", axes: 3, workholding: millWorkholdingOf(setupSettings, box), table: table ?? ASSUMED_TABLE, stock: box, workOffset: artifact.program.workOffset,
+    assumed: [...(setupSettings.workholdingConfigured ? [] : ["workholding" as const]), ...(table === undefined ? ["table" as const] : [])]
   }
 }
 

@@ -13,6 +13,8 @@
  *
  * Pure and synchronous: no I/O, no clock, no global state. The same job gives byte-identical NC and evidence.
  */
+import { applyPoint } from "../../cad/brep/math.ts"
+import { SETUP_ORIENTATIONS, setupTransform } from "../setup.ts"
 import { Schema } from "effect"
 import type { Mesh } from "../../cad/solid.ts"
 import type { Vec2, Vec3 } from "../../cad/vec.ts"
@@ -78,7 +80,7 @@ export interface PreparedJob {
   readonly meshes: ReadonlyArray<Mesh64>
   readonly bounds: { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] }
   readonly stock: StockBox
-  /** Work zero in CAD world coordinates. */
+  /** Work zero in oriented setup coordinates. */
   readonly origin: Vec3
   readonly operations: ReadonlyArray<OperationSpec>
   readonly plan: Plan | undefined
@@ -96,9 +98,23 @@ const boundsOf = (meshes: ReadonlyArray<Mesh64>): PreparedJob["bounds"] => {
   return { min, max }
 }
 
+/** Downward-facing triangles above the underside cannot be reached by a vertical cutter from this setup. */
+const hiddenSurfaces = (meshes: ReadonlyArray<Mesh64>, bottom: number, tolerance: number): number => {
+  let count = 0
+  for (const { positions: p, indices: ix } of meshes) for (let i = 0; i + 2 < ix.length; i += 3) {
+    const a = ix[i]! * 3, b = ix[i + 1]! * 3, c = ix[i + 2]! * 3
+    const ux = p[b]! - p[a]!, uy = p[b + 1]! - p[a + 1]!, uz = p[b + 2]! - p[a + 2]!
+    const vx = p[c]! - p[a]!, vy = p[c + 1]! - p[a + 1]!, vz = p[c + 2]! - p[a + 2]!
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx
+    if (nz < -1e-6 * Math.hypot(nx, ny, nz) && Math.max(p[a + 2]!, p[b + 2]!, p[c + 2]!) > bottom + tolerance) count++
+  }
+  return count
+}
+
 /** Resolves the job: everything the run needs, or the reasons it cannot run. */
 export const prepareJob = (job: ManufacturingJob): CamResult<PreparedJob> => {
   const issues: CamIssue[] = []
+  if (job.setupOrientation !== undefined && !SETUP_ORIENTATIONS.includes(job.setupOrientation)) return { status: "failed", issues: [issue("InvalidInput", "prepare", "Unknown manual setup orientation")] }
   if (job.schemaVersion !== KERNEL_SCHEMA_VERSION) return { status: "failed", issues: [issue("InvalidInput", "prepare", `Unsupported job schema version ${String(job.schemaVersion)}`)] }
   const material = findMaterial(job.material)
   if (material === undefined) issues.push(issue("UnknownMaterial", "prepare", `Unknown material '${job.material}'`))
@@ -125,8 +141,25 @@ export const prepareJob = (job: ManufacturingJob): CamResult<PreparedJob> => {
   for (const m of meshes) if (!m.positions.every(Number.isFinite)) { issues.push(issue("InvalidInput", "prepare", "The part mesh has non-finite coordinates")); break }
   if (issues.length > 0 || material === undefined) return { status: "failed", issues }
 
+  const transform = setupTransform(job.setupOrientation ?? "+Z")
+  if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") meshes = meshes.map((mesh) => {
+    const positions = new Float64Array(mesh.positions.length)
+    for (let i = 0; i < positions.length; i += 3) {
+      const p = applyPoint(transform, { x: mesh.positions[i]!, y: mesh.positions[i + 1]!, z: mesh.positions[i + 2]! })
+      positions.set([p.x, p.y, p.z], i)
+    }
+    return { positions, indices: mesh.indices }
+  })
   const bounds = boundsOf(meshes)
-  const stock: StockBox = job.stock ?? {
+  const rawStock = job.stock
+  const orientedStock = rawStock === undefined ? undefined : (() => {
+    const corners = [rawStock.min.x, rawStock.max.x].flatMap((x) => [rawStock.min.y, rawStock.max.y].flatMap((y) => [rawStock.min.z, rawStock.max.z].map((z) => applyPoint(transform, { x, y, z }))))
+    return {
+      min: { x: Math.min(...corners.map((p) => p.x)), y: Math.min(...corners.map((p) => p.y)), z: Math.min(...corners.map((p) => p.z)) },
+      max: { x: Math.max(...corners.map((p) => p.x)), y: Math.max(...corners.map((p) => p.y)), z: Math.max(...corners.map((p) => p.z)) }
+    }
+  })()
+  const stock: StockBox = orientedStock ?? {
     min: { x: bounds.min[0] - 2, y: bounds.min[1] - 2, z: bounds.min[2] },
     max: { x: bounds.max[0] + 2, y: bounds.max[1] + 2, z: bounds.max[2] + 1 }
   }
@@ -142,6 +175,7 @@ export const prepareJob = (job: ManufacturingJob): CamResult<PreparedJob> => {
   const scallop = job.quality?.scallop ?? 0.01
   const plan = job.operations === undefined
     ? planJob({
+        ...(job.setupOrientation !== undefined ? { setupOrientation: job.setupOrientation } : {}),
         elements, bounds, stock, tools, material, rigidity: machine.limits.rigidity ?? "standard", finishAllowance, scallop, flats: horizontalFaces(meshes),
         rigidTap: dialectOf(machine.post)?.rigidTap !== undefined, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {})
       })
@@ -541,7 +575,7 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
   }
   const program: Program = makeProgram(job.name, toolpaths, {
     ...(job.workOffset !== undefined ? { workOffset: job.workOffset } : {}),
-    metadata: { material: material.name, machine: machine.name, stock: `${width.toFixed(2)} x ${depthY.toFixed(2)} x ${(sMax.z - sMin.z).toFixed(2)} mm` }
+    metadata: { ...(job.setupOrientation !== undefined && job.setupOrientation !== "+Z" ? { setup: `Manual ${job.setupOrientation} setup - refixture and touch off; workholding unverified` } : {}), material: material.name, machine: machine.name, stock: `${width.toFixed(2)} x ${depthY.toFixed(2)} x ${(sMax.z - sMin.z).toFixed(2)} mm` }
   })
   const post = getPost(machine.post) ?? genericPost
   let nc = ""
@@ -825,6 +859,16 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
       detail: table === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves turn the table (A/B/C): the rotating part body is not modelled, so they are not checked` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table`
     }
   ]
+  const hidden = hiddenSurfaces(prepared.meshes, prepared.bounds.min[2], Math.max(1e-6, prepared.tolerance))
+  if (hidden > 0) {
+    const detail = `${hidden} downward-facing mesh triangles above the underside are hidden from this setup; prepare another manual setup or a supported rotary process. Height-field replay does not verify these surfaces`
+    claims.push({ id: "part-coverage", status: "unresolved", detail })
+    issues.push(issue("UnsupportedCapability", "evidence", detail, { severity: "warning" }))
+  }
+  if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") claims.push(
+    { id: "setup-workholding", status: "unresolved", detail: "Manual refixture requires independently configured and checked workholding; no fixture is assumed by this program" },
+    ...(hidden === 0 ? [{ id: "part-coverage" as const, status: "unresolved" as const, detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" }] : [])
+  )
   const hardFailure = issues.some((i) => i.severity === "error")
   const release: ReleaseLevel = hardFailure || nc === "" ? "blocked" : claims.every((c) => c.status === "passed" || (c.status === "unsupported" && c.id === "machine-travel")) ? "verified-program" : "preview"
 
@@ -842,6 +886,7 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
       schemaVersion: KERNEL_SCHEMA_VERSION, jobId: job.id,
       material: { id: material.id, name: material.name, iso: material.iso },
       machine: { id: machine.id, name: machine.name, post: post.id },
+      ...(job.setupOrientation !== undefined ? { setupOrientation: job.setupOrientation } : {}),
       origin, stockBounds: prepared.stock, operations: finalOutcomes, program, tools: usedTools, nc, claims, issues, release,
       stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume()), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000 },
       cycleTimeSeconds,
@@ -868,5 +913,11 @@ export const runJob = (job: ManufacturingJob): CamResult<CamArtifact> => {
 export const planOnly = (job: ManufacturingJob): CamResult<{ readonly operations: ReadonlyArray<OperationSpec>; readonly notes: ReadonlyArray<string>; readonly unmachined: ReadonlyArray<string> }> => {
   const prepared = prepareJob(job)
   if (prepared.status === "failed") return prepared
-  return { status: "ok", value: { operations: prepared.value.operations, notes: prepared.value.plan?.notes ?? [], unmachined: prepared.value.plan?.unmachined ?? [] } }
+  const p = prepared.value
+  const hidden = hiddenSurfaces(p.meshes, p.bounds.min[2], Math.max(1e-6, p.tolerance))
+  return { status: "ok", value: {
+    operations: p.operations,
+    notes: [...(p.plan?.notes ?? []), ...(job.setupOrientation !== undefined && job.setupOrientation !== "+Z" ? [`Manual ${job.setupOrientation} setup: separate NC, refixture and touch off required; workholding and full-part coverage unverified`] : [])],
+    unmachined: [...(p.plan?.unmachined ?? []), ...(hidden > 0 ? [`${hidden} downward-facing mesh triangles above the underside need another setup or a supported rotary process; their coverage is unverified`] : [])]
+  } }
 }

@@ -236,12 +236,25 @@ const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().sign
 const start = (manager: BackgroundTaskManager) => backgroundToolContributions(manager)["agent.start"]!
 
 describe("agent.start", () => {
-  test("an editing specialist is waited for and its report is the call's result", async () => {
+  test("an editing specialist waits only when the call says background false", async () => {
     const seen: BackgroundTaskRunnerInput[] = []
     const manager = new BackgroundTaskManager({ runner: async (input) => (seen.push(input), "moved the bracket") })
-    const result = await start(manager)({ description: "move", prompt: "move box-1 up 20", agent: "editor" } as never, ctx)
+    const result = await start(manager)({ description: "move", prompt: "move box-1 up 20", agent: "editor", background: false } as never, ctx)
     expect(result).toMatchObject({ status: "completed", text: "moved the bracket", agent: "editor" })
     expect(seen[0]).toMatchObject({ agent: "editor", edits: true, background: false })
+    await manager.dispose()
+  })
+
+  test("every specialist returns at once unless the call waits: the default is background", async () => {
+    const hold = gate()
+    const seen: BackgroundTaskRunnerInput[] = []
+    const manager = new BackgroundTaskManager({ runner: async (input) => (seen.push(input), await hold.promise, "moved the bracket") })
+    const queued = await start(manager)({ description: "move", prompt: "move box-1 up 20", agent: "editor" } as never, ctx)
+    expect(queued).toMatchObject({ agent: "editor", background: true })
+    expect(["queued", "running"]).toContain((queued as { status: string }).status)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(seen[0]).toMatchObject({ agent: "editor", edits: true, background: true })
+    hold.open()
     await manager.dispose()
   })
 
@@ -328,10 +341,8 @@ describe("the nikcli-style roster for CAD/CAM", () => {
     }
   })
 
-  test("the roles that gate the next step are waited for; the rest of the read-only roster runs in the background", () => {
-    expect(SUBAGENTS.planner.background).toBe(false)
-    expect(SUBAGENTS.diagnostician.background).toBe(false)
-    expect(SUBAGENTS.researcher.background).toBe(true)
+  test("the roster carries no per-role background default: delegation always defaults to the background", () => {
+    for (const id of SUBAGENT_IDS) expect(Object.hasOwn(SUBAGENTS[id], "background"), id).toBe(false)
   })
 
   test("the agent tool names every role it can start", () => {

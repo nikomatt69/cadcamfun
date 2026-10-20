@@ -6,18 +6,26 @@
  *
  * One screen serves the four kinds; `RESOURCES` holds what differs (typed client calls, card facts, create form).
  * Navigation between the kinds lives in the sidebar's Resources group, replacing the old tabbed "Unified Library Manager".
+ *
+ * Each page also carries the Resources generator: a dialog that hands a complete, kind-specific brief to the
+ * assistant (`ResourceGeneratorDialog.tsx` + `lib/resource-generation.ts`), and a watch on the assistant's writes
+ * that reloads the list as soon as a generated row lands.
  */
 import { For, Show, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js"
 import { useNavigate, useSearchParams } from "@solidjs/router"
-import { Box, Cpu, Grid3x3, Layers, List, Plus, Search, Trash2, Wrench, X, Edit } from "lucide-solid"
+import { Box, Cpu, Grid3x3, Layers, List, Plus, Search, Sparkles, Trash2, Wrench, X, Edit } from "lucide-solid"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
 import { Modal, formatDate } from "../../toolpaths/components/shared.tsx"
+import { ResourceGeneratorDialog } from "../components/ResourceGeneratorDialog.tsx"
+import { GENERATION_WRITE_ACTIONS, type ResourceKind } from "../lib/resource-generation.ts"
+import { useAiStore } from "../../ai/store/context.tsx"
+import { actionKey } from "../../ai/lib/editor-sync.ts"
 import { CARD as GLASS_CARD, FIELD, ICON_BUTTON, INPUT, LABEL, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 
-export type ResourceKind = "materials" | "tools" | "machines" | "components"
+export type { ResourceKind }
 type Row = Readonly<Record<string, unknown>>
 type ViewMode = "grid" | "list"
 type Project = { readonly id: string; readonly name: string }
@@ -36,7 +44,7 @@ interface ResourceMeta {
 
 const TH = "px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400"
 
-const MACHINE_TYPES: Readonly<Record<string, string>> = { mill: "Mill", lathe: "Lathe", printer: "3D Printer", laser: "Laser" }
+const MACHINE_TYPES: Readonly<Record<string, string>> = { mill: "Mill", lathe: "Lathe", printer: "3D Printer", "3Dprinter": "3D Printer", laser: "Laser" }
 
 const str = (value: unknown): string => (value === null || value === undefined ? "" : String(value))
 const asRecord = (value: unknown): Record<string, unknown> => (typeof value === "object" && value !== null && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : {})
@@ -48,6 +56,36 @@ const machineRows = (value: unknown, depth = 0): ReadonlyArray<unknown> => {
   if (depth > 1) return []
   const record = asRecord(value)
   return machineRows(record["data"] ?? record["configs"], depth + 1)
+}
+
+const number = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) ? value : undefined)
+
+/**
+ * The travel envelope of a machine, read from both shapes the app stores: the Resources form writes
+ * `config.workVolume {x,y,z}` plus `maxSpindleSpeed` / `controller`, while the assistant's `upsert_machine_config`
+ * writes the canonical per-axis `config.kinematics {x: {min,max}}` plus `maxRPM` / `postProcessor` (spec 18 §4).
+ */
+const machineFacts = (row: Row): ReadonlyArray<Fact> => {
+  const config = asRecord(row["config"])
+  const volume = asRecord(config["workVolume"])
+  const kinematics = asRecord(config["kinematics"])
+  const axisMax = (axis: string): number | undefined => number(volume[axis]) ?? number(asRecord(kinematics[axis])["max"])
+  const x = axisMax("x")
+  const y = axisMax("y")
+  const z = axisMax("z")
+  const envelope = x !== undefined && y !== undefined && z !== undefined ? `${x}×${y}×${z} mm` : ""
+  const controller = str(config["controller"]) || str(config["postProcessor"])
+  const spindle = config["maxSpindleSpeed"] ?? config["maxRPM"]
+  return [
+    { label: "Controller", value: dash(controller) },
+    { label: "Max spindle", value: `${dash(spindle)} rpm` },
+    ...(envelope === "" ? [] : [{ label: "Envelope", value: envelope }])
+  ]
+}
+
+/** The assistant is optional at render time (the list also mounts without the AI provider, e.g. in isolation). */
+const maybeAi = (): ReturnType<typeof useAiStore> | undefined => {
+  try { return useAiStore() } catch { return undefined }
 }
 
 const RESOURCES: Readonly<Record<ResourceKind, ResourceMeta>> = {
@@ -67,10 +105,7 @@ const RESOURCES: Readonly<Record<ResourceKind, ResourceMeta>> = {
   machines: {
     singular: "Configuration", plural: "Configurations", path: "/machine", icon: Cpu,
     badge: (row) => MACHINE_TYPES[str(row["type"])] ?? (cap(str(row["type"])) || "Machine"),
-    facts: (row) => {
-      const c = asRecord(row["config"])
-      return [{ label: "Controller", value: dash(c["controller"]) }, { label: "Max spindle", value: `${dash(c["maxSpindleSpeed"])} rpm` }]
-    }
+    facts: machineFacts
   },
   components: {
     singular: "Component", plural: "Components", path: "/components", icon: Box,
@@ -99,6 +134,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
   const [error, setError] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
   const [createOpen, setCreateOpen] = createSignal(false)
+  const [generateOpen, setGenerateOpen] = createSignal(false)
   const [deleting, setDeleting] = createSignal<Row>()
 
   const load = async (): Promise<void> => {
@@ -154,6 +190,30 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
   const hasFilters = createMemo(() => search() !== "" || type() !== "" || visibility() !== "" || projectId() !== "")
   const clearFilters = (): void => { setSearch(""); setType(""); setVisibility(""); setProjectId("") }
   const refresh = (): void => { invalidatePrefix(app.cache, props.kind); void load() }
+
+  // A generation handed to the assistant lands asynchronously: this page follows the assistant's calls and reloads
+  // when one of this kind's rows is created or replaced. The write itself is the assistant's, never a second path.
+  const ai = maybeAi()
+  const seenWrites = new Set<string>()
+  createEffect(() => {
+    const calls = ai?.toolCalls() ?? {}
+    let wrote = false
+    for (const [callId, call] of Object.entries(calls)) {
+      if (call.status !== "ok" || seenWrites.has(callId)) continue
+      if (GENERATION_WRITE_ACTIONS[props.kind].includes(actionKey(call.tool, call.input))) {
+        seenWrites.add(callId)
+        wrote = true
+      }
+    }
+    if (wrote) refresh()
+  })
+
+  /** The project the assistant works in, named in the component brief (the generator dialog knows it). */
+  const activeProjectName = (): string | undefined => {
+    const id = ai?.projectId()
+    if (id === undefined) return undefined
+    return projects().find((project) => project.id === id)?.name ?? app.recents().find((recent) => recent.id === id)?.name
+  }
 
   // The project filter is kept in the URL so the project page can link here (`/components?projectId=`).
   createEffect(on(projectId, (id) => { if (props.kind === "components") setUrlParams({ projectId: id || undefined }, { replace: true }) }, { defer: true }))
@@ -217,6 +277,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
     <WorkspacePage
       title={`${meta.plural} Library`}
       actions={<>
+            <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />Generate</button>
             <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}><Plus size={16} aria-hidden="true" />New {meta.singular}</button>
       </>}
       rail={<>
@@ -331,6 +392,13 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
           <button type="button" class="rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50" disabled={busy()} onClick={() => void confirmDelete()}>Delete</button>
         </div>
       </Modal>
+
+      <ResourceGeneratorDialog
+        kind={props.kind}
+        open={generateOpen()}
+        onClose={() => setGenerateOpen(false)}
+        projectName={activeProjectName()}
+      />
       </>}
     >
             <Show when={!loading()} fallback={<p class="p-8 text-center text-sm text-slate-500 dark:text-slate-400" role="status">Loading {lower}...</p>}>
@@ -343,7 +411,10 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                       <h3 class="mb-2 text-lg font-medium text-slate-900 dark:text-white">No {lower} found</h3>
                       <p class="mb-4 text-sm text-slate-600 dark:text-slate-400">{hasFilters() ? `No ${lower} match your search criteria.` : `Create your first ${meta.singular.toLowerCase()} to get started.`}</p>
                       <div class="flex flex-wrap justify-center gap-2">
-                        <Show when={hasFilters()} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}>Create {meta.singular}</button>}>
+                        <Show when={hasFilters()} fallback={<>
+                          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}>Create {meta.singular}</button>
+                          <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />Generate with AI</button>
+                        </>}>
                           <button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>Clear filters</button>
                         </Show>
                       </div>

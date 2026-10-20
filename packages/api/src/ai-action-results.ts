@@ -190,7 +190,7 @@ const partInserted = Schema.Struct({ ok: Schema.Literal(true), ids: strings, com
 const partDeleted = Schema.Struct({ ok: Schema.Literal(true), deleted: str })
 const upserted = Schema.Struct({ ok: Schema.Literal(true), id: str, created: Schema.Boolean })
 const defaultsSet = Schema.Struct({ ok: Schema.Literal(true), projectId: str, defaults: record })
-const libraryDeleted = Schema.Struct({ ok: Schema.Literal(true), kind: Schema.Literals(["material", "tool", "machine_config"]), id: str })
+const libraryDeleted = Schema.Struct({ ok: Schema.Literal(true), kind: Schema.Literals(["material", "tool", "machine_config", "library_item"]), id: str })
 
 // ---------------------------------------------------------------- `memory`, `memory_edit`, `research`
 
@@ -328,6 +328,8 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "library_edit.upsert_material": write(["library"], upserted),
   "library_edit.upsert_tool": write(["library"], upserted),
   "library_edit.upsert_machine_config": write(["library"], upserted),
+  "library_edit.upsert_library_item": write(["library"], upserted),
+  "library_edit.set_cost": write(["library"], upserted),
   "library_edit.set_default": write(["library"], defaultsSet),
   "library_edit.delete": write(["library"], libraryDeleted),
 

@@ -1,4 +1,4 @@
-Hand a job to a subagent that has only the tools that job needs. The subagent does not see this conversation. The person talks to one of three primary agents (general, cad, cam); everything this tool starts is a subagent of that agent, and a background job shows in the chat as a task card.
+Hand a job to a subagent that has only the tools that job needs. The subagent does not see this conversation. The job shows in the chat as a task card that follows it to its report.
 
 Actions
 - start: give one bounded job to a specialist (researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier or optimizer).
@@ -7,17 +7,18 @@ Actions
 - cancel: stop a task that is no longer needed.
 
 Parameters
-- start: description (one line), prompt (the whole job: the entity ids, values, constraints and what to report), agent (or subagent_type), background (true or false; the default follows the specialist).
+- start: description (one line), prompt (the whole job: the entity ids, values, constraints and what to report), agent (or subagent_type), background (default true: the call returns at once and the completion wakes this conversation; pass false only when the next step needs the report before it can start).
 - list: none.
 - read, cancel: taskId (the id the call returned).
 
 Result (JSON)
-- start: the task; with background the call returns at once and the findings arrive later, otherwise it waits and returns the report. read: the task with its status and findings. cancel: the cancelled task.
+- start: the task (its report arrives on the completion wake); with background false the finished task. read: the task with its status and findings. cancel: the cancelled task.
 
 Do not use it
-- To do the job yourself: delegate only when the work is separable and the specialist has the right tools.
+- To do the job yourself: delegate only separable work the specialist has tools for.
 - Verify what an editing specialist reports (cad.describe, cad.check) before telling the user it is done.
 
 Rules
-- Give real ids, units, constraints, setup and the report you expect; a specialist that has to guess wastes the turn.
-- Editing subagents run one at a time per project; a read-only one runs in the background. Start independent jobs with background true and carry on: each report comes back on its own.
+- Always background: start returns at once; never block waiting on a subagent. Start independent jobs together so they run concurrently, and the completion wakes this conversation with each report.
+- Give real ids, units, constraints and the report you expect; a specialist that has to guess wastes the turn.
+- Editing subagents run one at a time per project; the scheduler queues them.

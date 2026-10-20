@@ -56,7 +56,8 @@ const CYCLE_CODE: Record<CycleMove["cycle"], string> = {
   peck: "G83",
   chipBreak: "G73",
   tap: "G84",
-  ream: "G85"
+  ream: "G85",
+  bore: "G86"
 }
 
 /** Pocket of every tool id: the override where it has a usable number, then the first free number in order of first use. */

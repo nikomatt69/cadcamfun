@@ -18,6 +18,7 @@ import { signedArea } from "../../cad/shapes.ts"
 import type { Vec2 } from "../../cad/vec.ts"
 import { distanceToChain, pointInRing } from "../geometry.ts"
 import { threadMinorDiameter } from "../operations/thread.ts"
+import { setupTransform, type SetupOrientation } from "../setup.ts"
 import { exactFeatures } from "../brep-part.ts"
 import { historyFeatures, type HistoryFeatures, type MachiningHole } from "../generator/history-features.ts"
 import type { CadElement } from "../generator/schema.ts"
@@ -27,6 +28,7 @@ import { suitability, type Rigidity } from "./cutting-data.ts"
 import type { WorkpieceMaterial } from "./materials.ts"
 
 export interface PlanInput {
+  readonly setupOrientation?: SetupOrientation
   readonly elements: ReadonlyArray<CadElement> | undefined
   /** Part bounds, world mm. */
   readonly bounds: { readonly min: readonly [number, number, number]; readonly max: readonly [number, number, number] }
@@ -163,12 +165,13 @@ export const planJob = (input: PlanInput): Plan => {
   const features: HistoryFeatures[] = []
   const freeform: CadElement[] = []
   const byId = new Map((input.elements ?? []).map((e) => [String(e["id"] ?? ""), e] as const))
+  const transform = input.setupOrientation !== undefined && input.setupOrientation !== "+Z" ? setupTransform(input.setupOrientation) : undefined
   for (const e of input.elements ?? []) {
     if (e["type"] === "workpiece") continue
-    let f = historyFeatures(e)
+    let f = transform !== undefined ? undefined : historyFeatures(e)
     if (f === undefined) {
       // No walkable history (a STEP solid, a part the editor rotated): the features come from the exact B-rep, or the reason it is a surface job.
-      const exact = exactFeatures(e, byId)
+      const exact = exactFeatures(e, byId, transform)
       if (exact?.features !== undefined) f = exact.features
       else if (exact !== undefined) notes.push(`${exact.reason}; machined with the 3D surface strategies`)
     }

@@ -17,7 +17,7 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
   /** Reusable components across every project the user can read, plus public components. */
   listVisible(userId: string): Effect.Effect<Array<typeof ComponentDetail.Type>, DatabaseError>
   listByProject(projectId: string): Effect.Effect<ComponentRow[], DatabaseError>
-  create(projectId: string, d: { name: string; description?: string | null | undefined; data?: unknown }): Effect.Effect<ComponentRow, DatabaseError>
+  create(projectId: string, d: { name: string; description?: string | null | undefined; data?: unknown; type?: string | null | undefined; isPublic?: boolean | undefined }): Effect.Effect<ComponentRow, DatabaseError>
   update(id: string, patch: ComponentPatch): Effect.Effect<ComponentRow, DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
   projectOrganization(projectId: string): Effect.Effect<string | null, DatabaseError>
@@ -50,7 +50,7 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
           query("components.listByProject", async (db) => (await db.select().from(T).where(eq(T.projectId, projectId)).orderBy(desc(T.updatedAt))).map(toComponentRow)),
         create: (projectId, d) =>
           query("components.create", async (db) => {
-            const [row] = await db.insert(T).values({ name: d.name, description: d.description ?? null, data: d.data || {}, projectId }).returning()
+            const [row] = await db.insert(T).values({ name: d.name, description: d.description ?? null, data: d.data || {}, type: d.type ?? null, isPublic: d.isPublic ?? false, projectId }).returning()
             return toComponentRow(row!)
           }),
         update: (id, patch) =>

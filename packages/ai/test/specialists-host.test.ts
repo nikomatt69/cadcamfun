@@ -40,7 +40,7 @@ const script = (request: ChatRequestBody): Completion => {
   if (isParent(request)) {
     return lastRole === "tool"
       ? { text: "The editor finished." }
-      : { toolCalls: [{ name: "agent", args: { action: "start", description: "Make hole-1 8 mm", prompt: "Set hole-1 diameter to 8 mm and change nothing else.", agent: "editor" } }] }
+      : { toolCalls: [{ name: "agent", args: { action: "start", description: "Make hole-1 8 mm", prompt: "Set hole-1 diameter to 8 mm and change nothing else.", agent: "editor", background: false } }] }
   }
   editorRequests.push(request)
   if (failChildOnce) { failChildOnce = false; return { status: 503, body: "overloaded" } }

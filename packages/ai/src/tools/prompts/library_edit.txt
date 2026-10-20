@@ -4,15 +4,21 @@ Actions
 - upsert_material: create a material row, or replace an existing one when id names a row you may write.
 - upsert_tool: create a cutter row, or replace one.
 - upsert_machine_config: create a machine configuration, or replace one.
+- upsert_library_item: create or replace a generic item (template, setup sheet, fixture).
+- set_cost: create or update a price: material cost, cutter wear, operation rates.
 - set_default: the project's default material, tool and machine, used to seed new operations.
 - delete: remove one row of the user's libraries. Destructive: send confirm true only after the user asked for it, and the host still asks before the tool runs.
 
 Parameters
 - upsert_material: id (omit to create), name, description, properties ({name: number|string|boolean}), isPublic.
-- upsert_tool: id, name, type, diameter (mm), material, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, notes, isPublic.
+- upsert_tool: id, name, type, diameter (mm), material, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, cornerRadius (mm, 0 is sharp), tipAngle (degrees), threadPitch (mm), holderDiameter, holderLength, stickout (mm), notes, isPublic.
 - upsert_machine_config: id, name, kind (mill|lathe|3Dprinter), kinematics ({axis: {min, max}}), postProcessor, workOffsets, probing, maxRPM, maxFeed, isPublic.
+- upsert_library_item: id, name, category, type, data ({...}), description, properties, tags, isPublic.
+- set_cost: kind (material|tool_wear|operation), id (omit to create). material: materialId, costPerUnit, wasteFactor, minimumCharge. tool_wear: toolId, wearRatePerMeter, replacementCost, replacementThreshold. operation: name, machineHourlyRate, operatorHourlyRate, setupTime (min). currencyCode.
 - set_default: materialId, toolId, machineConfigId (any subset; the open project is the one that changes).
-- delete: kind (material|tool|machine_config), id, confirm (true, only when the user asked).
+- delete: kind (material|tool|machine_config|library_item), id, confirm (true, only when the user asked).
+
+Fill every parameter the row stores: a library row with empty fields is incomplete, not a draft. Give values with the units the parameters name (mm, rpm, mm/min) and keep them consistent (a cutting length that fits the total length, a shank no smaller than the cutter, an RPM the holder allows). The shape parameters (cornerRadius, tipAngle, threadPitch, holder*) are what draws the tool's 3D model; set the ones the cutter type has and leave the others out.
 
 Result (JSON)
 - ok, id, created (true when a row was created, false when an existing one was replaced); the store's answer, not the intention. delete also returns what still refers to the row.

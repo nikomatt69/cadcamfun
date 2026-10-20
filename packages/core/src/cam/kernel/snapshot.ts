@@ -6,6 +6,7 @@
  */
 import { meshBounds } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
+import type { SetupOrientation } from "../setup.ts"
 import type { WorkOffset } from "../ir.ts"
 import { KERNEL_SCHEMA_VERSION, type CamResult, type ManufacturingJob, type OperationSpec, type WorkOrigin } from "./contracts.ts"
 import type { Cutter } from "./cutters.ts"
@@ -17,6 +18,7 @@ export interface KernelSnapshot {
   readonly name: string
   readonly material: string
   readonly machine?: string
+  readonly setupOrientation?: SetupOrientation
   readonly origin?: WorkOrigin
   readonly workOffset?: WorkOffset
   readonly finishAllowance?: number
@@ -54,6 +56,7 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
     value: {
       schemaVersion: s.schemaVersion, id: s.id, name: s.name, material: s.material,
       part: { kind: "elements", elements: s.elements }, ...(machine !== undefined ? { machine } : {}), ...(stock !== undefined ? { stock } : {}),
+      ...(s.setupOrientation !== undefined ? { setupOrientation: s.setupOrientation } : {}),
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.workOffset !== undefined ? { workOffset: s.workOffset } : {}),
       ...(s.operations !== undefined ? { operations: s.operations } : {}), ...(s.tools !== undefined ? { tools: s.tools } : {}),
       ...(s.subprograms === true ? { post: { options: { subprograms: true } } } : {}),

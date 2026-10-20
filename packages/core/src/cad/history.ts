@@ -140,7 +140,9 @@ export interface PatternFeature {
    * patterned), placed like the copies of a feature pattern. Join them to their source with a `combine` when one part is meant.
    */
   readonly bodies?: ReadonlyArray<string>
-  readonly kind: "linear" | "circular" | "grid"
+  readonly kind: "linear" | "circular" | "grid" | "path"
+  /** `path`: the sketch whose open chain the copies ride, spaced by arc length and turned with its tangent. */
+  readonly path?: string
   readonly count: Dimension
   /** `linear` and `grid`: the offset between two copies. */
   readonly step?: readonly [Dimension, Dimension, Dimension]
@@ -761,7 +763,7 @@ const mateMesh = (mesh: Mesh, mine: PlanarFace, theirs: PlanarFace, offset: numb
 }
 
 /** The corners of a sketched chain: its points where the direction turns by more than a degree (the points of an arc's chords drop out only when straight). */
-const cornersOf = (line: ReadonlyArray<Vec2>): Vec2[] => {
+export const cornersOf = (line: ReadonlyArray<Vec2>): Vec2[] => {
   const pts = line.filter((p, i) => i === 0 || Math.hypot(p.x - line[i - 1]!.x, p.y - line[i - 1]!.y) > 1e-9)
   return pts.filter((p, i) => {
     if (i === 0 || i === pts.length - 1) return true
@@ -1593,6 +1595,38 @@ export const rebuild = (history: History): RebuildResult => {
             const step = (f.step ?? [0, 0, 0]).map((d) => dim(d, f.id))
             if (step.some((s) => s === undefined)) break
             for (let i = 1; i < count; i++) emit((m) => translateMesh(m, step[0]! * i, step[1]! * i, step[2]! * i), `${f.id}#${i}`)
+          } else if (f.kind === "path") {
+            const routeSketch = f.path === undefined ? undefined : sketches[f.path]
+            if (routeSketch === undefined) { issues.push({ feature: f.id, severity: "error", message: "A path pattern needs `path`: the id of an earlier sketch with an open chain" }); break }
+            const { open } = sketchProfiles(routeSketch.solve.sketch)
+            if (open.length === 0) { issues.push({ feature: f.id, severity: "error", message: `Sketch '${f.path}' has no open chain for the pattern to ride` }); break }
+            const chain = open[0]!
+            const F = routeSketch.frame
+            const at3 = (p: Vec2): { x: number; y: number; z: number } => ({ x: F.origin.x + F.u.x * p.x + F.v.x * p.y, y: F.origin.y + F.u.y * p.x + F.v.y * p.y, z: F.origin.z + F.u.z * p.x + F.v.z * p.y })
+            const segLens = chain.slice(1).map((p, i) => Math.hypot(p.x - chain[i]!.x, p.y - chain[i]!.y))
+            const total = segLens.reduce((a, b) => a + b, 0)
+            if (!(total > 0)) { issues.push({ feature: f.id, severity: "error", message: "The pattern path has no length" }); break }
+            const sample = (s: number): { point: Vec2; angle: number } => {
+              let left = s
+              for (let i = 0; i < segLens.length; i++) {
+                const a = chain[i]!, b = chain[i + 1]!
+                if (left <= segLens[i]! || i === segLens.length - 1) {
+                  const t = segLens[i]! === 0 ? 0 : Math.min(1, Math.max(0, left / segLens[i]!))
+                  return { point: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, angle: Math.atan2(b.y - a.y, b.x - a.x) }
+                }
+                left -= segLens[i]!
+              }
+              return { point: chain[chain.length - 1]!, angle: 0 }
+            }
+            const startAngle = Math.atan2(chain[1]!.y - chain[0]!.y, chain[1]!.x - chain[0]!.x)
+            const p0 = at3(chain[0]!)
+            for (let i = 1; i < count; i++) {
+              const { point, angle } = sample((total * i) / (count - 1))
+              const pi = at3(point)
+              const d = { x: pi.x - p0.x, y: pi.y - p0.y, z: pi.z - p0.z }
+              const turn = angle - startAngle
+              emit((m) => translateMesh(rotateMesh(m, F.n, turn, p0), d.x, d.y, d.z), `${f.id}#${i}`)
+            }
           } else {
             const c = (f.centre ?? [0, 0]).map((d) => dim(d, f.id))
             const span = f.span === undefined ? 360 : dim(f.span, f.id)

@@ -38,6 +38,9 @@ export const CamCuttingDataInput = Schema.Struct({
   depth: Schema.optionalKey(positive), ae: Schema.optionalKey(positive), ap: Schema.optionalKey(positive), scallop: Schema.optionalKey(positive)
 })
 export const CamManufactureInput = Schema.Struct({
+  /** Separate manual setup: CAD direction facing the spindle, never a rotary cycle. */
+  setupOrientation: Schema.optionalKey(cam.kernel.SetupOrientationSchema),
+  workOffset: Schema.optionalKey(cam.WorkOffsetSchema),
   material: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
   machine: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(60))),
   origin: Schema.optionalKey(Schema.Literals(["stock-center", "stock-corner"])),
@@ -53,6 +56,8 @@ export const CamManufactureInput = Schema.Struct({
   subprograms: Schema.optionalKey(Schema.Boolean)
 })
 export const CamManufactureOperationInput = Schema.Struct({
+  setupOrientation: CamManufactureInput.fields.setupOrientation,
+  workOffset: CamManufactureInput.fields.workOffset,
   material: CamManufactureInput.fields.material, machine: CamManufactureInput.fields.machine,
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance,
   scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision),

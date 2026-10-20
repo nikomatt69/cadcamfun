@@ -1,14 +1,8 @@
 import { For, Show, createEffect, createSignal, onMount, type JSX } from "solid-js"
 import { useApp } from "../../../shared/state/context.ts"
-import { useCADStore } from "../store/cadStore.ts"
+import { useCADStore, type MachineConfig } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
-
-interface MachineConfig {
-  id: string
-  name: string
-  config: { workVolume?: { x: number; y: number; z: number }; type: string; maxSpindleSpeed?: number; maxFeedRate?: number }
-}
 
 const FIELD = "block w-full py-2 px-3 border border-gray-300 bg-[#F8FBFF] dark:bg-gray-800 dark:text-white dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
 const LABEL = "block text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -90,7 +84,7 @@ export default function WorkpieceSetup(): JSX.Element {
         <label class={LABEL}>Machine Configuration</label>
         <select name="machine" value={machineId()} onChange={(e) => changeMachine(e.currentTarget.value)} class={`mt-1 ${FIELD}`}>
           <option value="">Select a machine</option>
-          <For each={machines()}>{(config) => <option value={config.id}>{config.name} ({config.config.type})</option>}</For>
+          <For each={machines()}>{(config) => <option value={config.id}>{config.name} ({config.type ?? config.config.type ?? "machine"})</option>}</For>
         </select>
       </div>
       <div class="grid grid-cols-3 gap-4">{number("width", "Width", true)}{number("height", "Height", true)}{number("depth", "Depth", true)}</div>
@@ -107,7 +101,7 @@ export default function WorkpieceSetup(): JSX.Element {
         <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-md text-sm">
           <h4 class="font-medium text-gray-700 dark:text-gray-300 mb-1">Machine Information</h4>
           <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
-            <div>Type: <span class="font-medium">{machine().config.type}</span></div>
+            <div>Type: <span class="font-medium">{machine().type ?? machine().config.type ?? "machine"}</span></div>
             <div>Work Volume: <span class="font-medium">{machine().config.workVolume?.x}×{machine().config.workVolume?.y}×{machine().config.workVolume?.z} mm</span></div>
             <Show when={machine().config.maxSpindleSpeed}><div>Spindle Speed: <span class="font-medium">{machine().config.maxSpindleSpeed} rpm</span></div></Show>
             <Show when={machine().config.maxFeedRate}><div>Feed Rate: <span class="font-medium">{machine().config.maxFeedRate} mm/min</span></div></Show>

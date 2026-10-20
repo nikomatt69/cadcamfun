@@ -10,17 +10,17 @@ Actions
 - inspect_layers: the workspace layers and the active one.
 - inspect_search: elements whose text matches a query, paged.
 - inspect_property: one property of one element by path, paged by characters.
-- inspect_origins: where each element sits: origin and its meaning for the type, bounds, distance from the CAD zero, children.
+- inspect_origins: each element's origin and meaning, bounds, distance from the CAD zero, children.
 - parametric_validate: rebuild a parametric history and report what it cannot build.
 - parametric_inspect: history, parameters and report of one parametric part.
 - drawing: technical sheet from an elementId or history; SVG with dimensions, callouts, warnings; view options in the schema.
 - parametric_test: run parameter variants; report bodies, volumes and dimensional checks.
 - parametric_dfm: manufacturability findings for a history or part.
 - parametric_exact: exact B-rep per body (volume, area, centroid, throughHoles, faces, surfaces) or why mesh-only; STEP on request.
-- exact: every solid on the exact kernel: validity, volume, bounds, holes, and whether CAM machines it by features or 3D surface.
+- exact: every solid on the exact kernel: validity, volume, bounds, holes, CAM by features or 3D surface.
 - assembly: exact interference (clash volumes), bill of materials with mass, hole joints, fasteners still missing.
 - parametric_fastener: thread, tap drill, clearance and counterbore of a metric size.
-- parametric_recipe: part history from `recipe` (mounting_plate, flange, l_bracket, stepped_shaft, pipe_bend, duct_transition, enclosure) and `params`; cad_edit.parametric_recipe_create stores it.
+- parametric_recipe: history from `recipe` (mounting_plate, flange, l_bracket, stepped_shaft, pipe_bend, duct_transition, enclosure) and `params`; stored by cad_edit.parametric_recipe_create.
 - parametric_from_element: history with named parameters from a solid, flat shape or component; cad_edit.parametric_convert stores it.
 
 Parameters (mm, radians; ids are read, never invented)
@@ -40,7 +40,7 @@ Parameters (mm, radians; ids are read, never invented)
 - parametric_from_element: elementId, depth (mm, only for a flat shape: its extrusion, default 10).
 
 Result (JSON)
-- ok; describe: elements, counts, bounds; inspect: page, total, nextOffset; origins: the CAD 0,0,0 then per element origin, convention, bounds, distanceFromZeroMm, gizmo, children; parametric: report with bodyCount, volumeMm3, problems. Element ids are the edit ids.
+- ok; describe: elements, counts, bounds; inspect: page, total, nextOffset; origins: per element origin, bounds, distanceFromZeroMm, children; parametric: bodyCount, volumeMm3, problems. Element ids are the edit ids.
 
 Do not use it
 - To change something: cad_edit. To machine: cam and cam_edit.

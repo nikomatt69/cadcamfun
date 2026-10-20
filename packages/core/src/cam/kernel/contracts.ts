@@ -3,6 +3,7 @@
  * returns. Everything is plain readonly data in millimetres, CAD world coordinates for the inputs and work coordinates
  * (zero at the chosen origin on the stock top) for the toolpaths and the NC.
  */
+import type { SetupOrientation } from "../setup.ts"
 import type { Vec2, Vec3 } from "../../cad/vec.ts"
 import type { Coolant, Program, Toolpath, WorkOffset } from "../ir.ts"
 import type { PostId, PostOptions } from "../post/types.ts"
@@ -131,12 +132,14 @@ export interface ManufacturingJob {
   readonly part: PartSource
   /** Stock block in CAD world coordinates; default: the part bounds plus 2 mm on the sides and 1 mm on top. */
   readonly stock?: StockBox
+  /** Manual refixture: CAD direction facing the spindle; operations use the oriented setup coordinates. */
+  readonly setupOrientation?: SetupOrientation
   readonly origin?: WorkOrigin
   readonly workOffset?: WorkOffset
   /** Cutter library; default `DEFAULT_CUTTERS`. */
   readonly tools?: ReadonlyArray<Cutter>
   readonly machine?: KernelMachine
-  /** Operations in machining order; when absent the planner derives them from the part (`planner.ts`). */
+  /** Operations in machining order, in oriented setup coordinates when specified; otherwise CAD world coordinates. Planned from the part when absent. */
   readonly operations?: ReadonlyArray<OperationSpec>
   readonly quality?: QualityRequirement
   readonly post?: { readonly options?: Partial<PostOptions> }
@@ -173,7 +176,7 @@ export interface CamIssue {
 export type ClaimStatus = "passed" | "failed" | "unsupported" | "unresolved"
 
 export interface Claim {
-  readonly id: "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance"
+  readonly id: "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance" | "setup-workholding" | "part-coverage"
   readonly status: ClaimStatus
   readonly detail: string
 }
@@ -216,9 +219,11 @@ export interface CamArtifact {
   readonly jobId: string
   readonly material: { readonly id: string; readonly name: string; readonly iso: string }
   readonly machine: { readonly id: string; readonly name: string; readonly post: PostId }
-  /** Work zero in CAD world coordinates (toolpaths are relative to it). */
+  /** Manual setup orientation; omitted for legacy artifacts. */
+  readonly setupOrientation?: SetupOrientation
+  /** Work zero in oriented setup coordinates (toolpaths are relative to it). */
   readonly origin: Vec3
-  /** Resolved raw stock in CAD world coordinates; subtract `origin` to display it alongside the work-coordinate NC. */
+  /** Resolved raw stock in oriented setup coordinates; subtract `origin` to display it alongside the work-coordinate NC. */
   readonly stockBounds: StockBox
   readonly operations: ReadonlyArray<OperationOutcome>
   readonly program: Program

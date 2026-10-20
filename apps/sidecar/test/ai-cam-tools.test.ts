@@ -330,9 +330,12 @@ describe("library and chain tools (spec 22 §3)", () => {
         { type: "cube", name: "A", width: 10, height: 10, depth: 10, x: 0, y: 0, z: 5 },
         { type: "cylinder", name: "B", radius: 3, height: 10, x: 20, y: 0, z: 5 }
       ]) as { ids: string[] }
-      const saved = await h.saveComponent(project, added.ids, "Bracket pair") as { ok: boolean; componentId: string; children: number }
+      const saved = await h.saveComponent(project, added.ids, "Bracket pair", { description: "Two blocks on a 20 mm pitch", type: "mechanical", isPublic: true }) as { ok: boolean; componentId: string; children: number }
       expect(saved.ok).toBe(true)
       expect(saved.children).toBe(2)
+      // The library metadata travels with the save: a generated component is not a name and geometry with empty fields.
+      const savedDetail = (await fresh.call(`/api/components/${saved.componentId}`)).body
+      expect(savedDetail).toMatchObject({ name: "Bracket pair", description: "Two blocks on a 20 mm pitch", type: "mechanical", isPublic: true })
       const canvas = await h.addElements(project, [{ type: "component", name: "Canvas fixture", elements: [{ type: "cube", width: 8, height: 8, depth: 8 }] }]) as { ids: string[] }
       const list = await h.listComponents(project) as Array<{ id: string; name: string; children: number }>
       expect(list).toContainEqual(expect.objectContaining({ id: canvas.ids[0], name: "Canvas fixture", children: 1 }))
@@ -380,15 +383,39 @@ describe("library and chain tools (spec 22 §3)", () => {
       const mat = await h.upsertMaterial({ name: "Al 6061", properties: { density: 2.7 }, isPublic: false }) as { ok: boolean; id: string; created: boolean }
       expect(mat).toMatchObject({ ok: true, created: true })
       expect((await h.upsertMaterial({ id: mat.id, name: "Al 6061 T6", properties: { density: 2.7 } })) as { created: boolean }).toMatchObject({ created: false })
-      const tool = await h.upsertTool({ name: "6mm endmill", type: "endmill", diameter: 6, material: "carbide", numberOfFlutes: 3 }) as { ok: boolean; id: string; created: boolean }
+      const tool = await h.upsertTool({ name: "6mm endmill", type: "endmill", diameter: 6, material: "carbide", numberOfFlutes: 3, cuttingLength: 18, totalLength: 60, shankDiameter: 6, cornerRadius: 0.5, tipAngle: 90, threadPitch: 1.25, holderDiameter: 25, holderLength: 40, stickout: 30 }) as { ok: boolean; id: string; created: boolean }
       expect(tool.created).toBe(true)
+      expect(await h.upsertTool({ name: "bad", type: "endmill", diameter: 6, material: "carbide", cuttingLength: 40, totalLength: 30 })).toMatchObject({ ok: false, error: expect.stringContaining("cuttingLength") })
+      expect(await h.lookupTool("bad")).toEqual([])
       const machine = await h.upsertMachineConfig({ name: "Mill", kind: "mill", postProcessor: "linuxcnc", kinematics: { x: { min: -300, max: 300 } } }) as { ok: boolean; id: string; created: boolean }
       expect(machine.created).toBe(true)
       expect(await h.lookupMaterial("Al 6061 T6")).toContainEqual(expect.objectContaining({ id: mat.id, name: "Al 6061 T6" }))
-      expect(await h.lookupTool("6mm endmill")).toContainEqual(expect.objectContaining({ id: tool.id, diameter: 6 }))
+      expect(await h.lookupTool("6mm endmill")).toContainEqual(expect.objectContaining({ id: tool.id, diameter: 6, cuttingLength: 18, cornerRadius: 0.5, tipAngle: 90, threadPitch: 1.25, holderDiameter: 25, holderLength: 40, stickout: 30 }))
       expect(await h.lookupMachineConfig("Mill")).toContainEqual(expect.objectContaining({ id: machine.id, name: "Mill", type: "mill" }))
       const defaults = await h.setProjectDefault({ projectId: project, materialId: mat.id, toolId: tool.id, machineConfigId: machine.id })
       expect(defaults).toMatchObject({ ok: true, projectId: project })
+    } finally { await fresh.dispose() }
+  })
+
+  test("library items and cost rows are created, replaced and refused like the other library rows", async () => {
+    const fresh = await makeApp()
+    try {
+      const h = await fresh.toolHandlers()
+      const item = await h.upsertLibraryItem({ name: "Vise setup", category: "setup", type: "fixture", data: { jawWidth: 150 }, tags: ["vise"] }) as { ok: boolean; id: string; created: boolean }
+      expect(item).toMatchObject({ ok: true, created: true })
+      expect(await h.upsertLibraryItem({ id: item.id, name: "Vise setup 150", category: "setup", type: "fixture", data: { jawWidth: 150 } })).toMatchObject({ ok: true, id: item.id, created: false })
+      expect(await h.upsertLibraryItem({ id: "nope", name: "x", category: "c", type: "t", data: {} })).toMatchObject({ ok: false })
+      const mat = await h.upsertMaterial({ name: "Al 6061", properties: { density: 2.7 } }) as { id: string }
+      const tool = await h.upsertTool({ name: "6mm endmill", type: "endmill", diameter: 6, material: "carbide" }) as { id: string }
+      expect(await h.setCost({ kind: "material" })).toMatchObject({ ok: false })
+      const materialCost = await h.setCost({ kind: "material", materialId: mat.id, costPerUnit: 4.2, wasteFactor: 0.1 }) as { ok: boolean; id: string; created: boolean }
+      expect(materialCost).toMatchObject({ ok: true, created: true })
+      expect(await h.setCost({ kind: "material", id: materialCost.id, costPerUnit: 5 })).toMatchObject({ ok: true, id: materialCost.id, created: false })
+      expect(await h.setCost({ kind: "tool_wear", toolId: tool.id, wearRatePerMeter: 0.02, replacementCost: 18 })).toMatchObject({ ok: true, created: true })
+      expect(await h.setCost({ kind: "operation", name: "Milling", machineHourlyRate: 60, operatorHourlyRate: 35 })).toMatchObject({ ok: true, created: true })
+      expect(await h.setCost({ kind: "operation", name: "Milling" })).toMatchObject({ ok: false })
+      expect(await h.deleteLibrary({ kind: "library_item", id: item.id })).toMatchObject({ ok: true })
+      expect(await h.deleteLibrary({ kind: "library_item", id: item.id })).toMatchObject({ ok: false })
     } finally { await fresh.dispose() }
   })
 

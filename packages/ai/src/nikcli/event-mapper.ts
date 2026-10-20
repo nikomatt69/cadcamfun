@@ -125,6 +125,19 @@ const toolDiagnostics = (sessionId: string, callId: string, tool: string, output
   if (partial) return [{ type: "tool_diagnostic", ...shared, kind: "partial", severity: "warning", message: partial,
     recovery: str(value?.["recovery"]) ?? "Inspect confirmed changes; correct and retry only skipped items.",
     ...(typeof value?.["mutationApplied"] === "boolean" ? { mutationApplied: value["mutationApplied"] } : tool === "cad_edit" && Array.isArray(value?.["elements"]) && value["elements"].length > 0 ? { mutationApplied: true } : {}) }]
+  // Post-edit diagnostics (`diagnostics.ts`, the LSP step after an edit): findings the edit's own
+  // result carries under `diagnostics` surface exactly like a check's findings.
+  const postEdit = rec(value?.["diagnostics"])
+  if (postEdit !== undefined && Array.isArray(postEdit["issues"])) {
+    return postEdit["issues"].slice(0, 8).flatMap((item): AiEvent[] => {
+      const issue = rec(item)
+      const message = str(issue?.["message"])
+      if (!message) return []
+      const severity = issue?.["severity"] === "error" ? "error" : issue?.["severity"] === "warning" ? "warning" : "info"
+      const where = typeof issue?.["line"] === "number" ? ` (line ${issue["line"]})` : typeof issue?.["elementId"] === "string" ? ` (${issue["elementId"]})` : ""
+      return [{ type: "tool_diagnostic", ...shared, kind: "verification", severity, message: `${str(issue?.["code"]) ?? "Finding"}: ${message}${where}`.slice(0, 2_000) }]
+    })
+  }
   if (!["cad", "cam", "cam_edit"].includes(tool) || !Array.isArray(value?.["issues"])) return []
   return value["issues"].slice(0, 8).flatMap((item): AiEvent[] => {
     const issue = rec(item)

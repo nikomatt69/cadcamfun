@@ -53,7 +53,9 @@ const entity = Schema.Union([
   described(Schema.Struct({ id, kind: Schema.Literal("point"), x: n, y: n }), "Sketch point: discriminator kind, numeric x/y in mm; parameterize through constraints."),
   described(Schema.Struct({ id, kind: Schema.Literal("line"), p1: id, p2: id }), "Sketch line: kind, p1/p2 are IDs of points in this sketch, not coordinates."),
   described(Schema.Struct({ id, kind: Schema.Literal("circle"), center: id, radius: positive }), "Sketch circle: kind, center is a point ID; radius is a positive number in mm."),
-  described(Schema.Struct({ id, kind: Schema.Literal("arc"), center: id, start: id, end: id }), "Sketch arc: kind, center/start/end are point IDs in this sketch.")
+  described(Schema.Struct({ id, kind: Schema.Literal("arc"), center: id, start: id, end: id }), "Sketch arc: kind, center/start/end are point IDs in this sketch."),
+  described(Schema.Struct({ id, kind: Schema.Literal("ellipse"), center: id, radiusX: positive, radiusY: positive, rotation: optional(n) }), "Sketch ellipse: kind, center is a point ID; radiusX/radiusY are the semi-axes in mm, rotation tilts the x axis (radians). Size it with an ellipseSize constraint."),
+  described(Schema.Struct({ id, kind: Schema.Literal("spline"), points: between(Schema.Array(id), 2, 50), closed: optional(Schema.Boolean) }), "Sketch spline: kind, a Catmull-Rom curve through the named points in order; closed:true makes a smooth closed profile.")
 ])
 const named = { id: optional(id) }
 const unaryLine = (type: "horizontal" | "vertical") => Schema.Struct({ ...named, type: Schema.Literal(type), line: id })
@@ -72,7 +74,9 @@ const constraint = Schema.Union([
   Schema.Struct({ ...named, type: Schema.Literal("pointOnCircle"), point: id, circle: id }),
   Schema.Struct({ ...named, type: Schema.Literal("symmetric"), a: id, b: id, line: id }),
   Schema.Struct({ ...named, type: Schema.Literal("tangentLineCircle"), line: id, circle: id }),
-  Schema.Struct({ ...named, type: Schema.Literal("tangentCircles"), a: id, b: id, internal: optional(Schema.Boolean) })
+  Schema.Struct({ ...named, type: Schema.Literal("tangentCircles"), a: id, b: id, internal: optional(Schema.Boolean) }),
+  Schema.Struct({ ...named, type: Schema.Literal("ellipseSize"), ellipse: id, radiusX: dimension, radiusY: dimension }),
+  Schema.Struct({ ...named, type: Schema.Literal("pointOnEllipse"), point: id, ellipse: id })
 ])
 const shape = Schema.Union([
   described(Schema.Struct({ id, kind: Schema.Literal("rectangle"), at: pair, width: dimension, height: dimension, centered: optional(Schema.Boolean) }), "at = corner, or centre when centered."),
@@ -134,7 +138,8 @@ const feature = Schema.Union([
   Schema.Struct({
     id, type: Schema.Literal("pattern"), feature: optional(id),
     bodies: optional(described(Schema.Array(id).check(Schema.isMinLength(1), Schema.isMaxLength(50)), "instead of feature: body ids copied whole, each copy a new body <id>#<k>.")),
-    kind: Schema.Literals(["linear", "circular", "grid"]), count: dimension, step: optional(triple), centre: optional(pair), span: optional(dimension),
+    kind: Schema.Literals(["linear", "circular", "grid", "path"]), count: dimension, step: optional(triple), centre: optional(pair), span: optional(dimension),
+    path: optional(described(id, "path only: the sketch whose open chain the copies ride, spaced by arc length and turned with its tangent.")),
     countB: optional(described(dimension, "grid only: the number of rows (count is the number along step).")),
     stepB: optional(described(triple, "grid only: the offset between two rows [dx,dy,dz]."))
   }),
@@ -276,6 +281,7 @@ const historyIssues = (features: ReadonlyArray<Feature>): Array<Schema.FilterIss
     if ((f.type === "extrude" || f.type === "revolve" || f.type === "rib" || f.type === "sheet") && seen.get(f.sketch)?.type !== "sketch") issue(index, `Sketch '${f.sketch}' must precede this feature`)
     if (f.type === "pattern" && (f.kind === "linear" || f.kind === "grid") && f.step === undefined) issue(index, `${f.kind === "grid" ? "Grid" : "Linear"} patterns need step [dx,dy,dz]`)
     if (f.type === "pattern" && f.kind === "grid" && (f.countB === undefined || f.stepB === undefined)) issue(index, "Grid patterns need countB (rows) and stepB [dx,dy,dz]")
+    if (f.type === "pattern" && f.kind === "path" && (f.path === undefined || seen.get(f.path)?.type !== "sketch")) issue(index, "Path patterns need `path`: an earlier sketch with an open chain")
     if ((f.type === "pattern" || f.type === "mirror") && (f.feature === undefined) === (f.bodies === undefined)) issue(index, `A ${f.type} takes either feature (copy its tool) or bodies (copy them whole), not both or neither`)
     if (f.type === "pattern" && f.feature !== undefined && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Pattern source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft, primitive, coil, rib, sheet, thread, text or mirror`)
     if (f.type === "mirror" && f.feature !== undefined && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Mirror source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft, primitive, coil, rib, sheet, thread, text or mirror`)
@@ -312,15 +318,15 @@ const historyIssues = (features: ReadonlyArray<Feature>): Array<Schema.FilterIss
       if (entities.size !== all.length) issue(index, "Duplicate sketch entity ids")
       const isPoint = (ref: string) => entities.get(ref)?.kind === "point"
       for (const e of f.sketch.entities) {
-        const refs = e.kind === "line" ? [e.p1, e.p2] : e.kind === "circle" ? [e.center] : e.kind === "arc" ? [e.center, e.start, e.end] : []
+        const refs = e.kind === "line" ? [e.p1, e.p2] : e.kind === "circle" ? [e.center] : e.kind === "arc" ? [e.center, e.start, e.end] : e.kind === "ellipse" ? [e.center] : e.kind === "spline" ? [...e.points] : []
         if (refs.some((ref) => !isPoint(ref))) issue(index, `Entity '${e.id}' references a missing point`)
       }
-      for (const c of f.sketch.constraints) for (const key of ["point", "line", "circle", "a", "b"] as const) {
+      for (const c of f.sketch.constraints) for (const key of ["point", "line", "circle", "a", "b", "ellipse"] as const) {
         const ref = (c as Record<string, unknown>)[key]
         if (typeof ref !== "string") continue
         if (curveIds.some((prefix) => ref.startsWith(prefix))) continue
         const found = entities.get(ref)
-        if (found === undefined || (key === "point" && found.kind !== "point") || (key === "line" && found.kind !== "line") || (key === "circle" && found.kind !== "circle" && found.kind !== "arc")) issue(index, `Constraint references invalid ${key} '${ref}'`)
+        if (found === undefined || (key === "point" && found.kind !== "point") || (key === "line" && found.kind !== "line") || (key === "circle" && found.kind !== "circle" && found.kind !== "arc") || (key === "ellipse" && found.kind !== "ellipse")) issue(index, `Constraint references invalid ${key} '${ref}'`)
       }
     }
     seen.set(f.id, f)

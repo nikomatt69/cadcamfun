@@ -1,4 +1,4 @@
-Record the work in the project's history. Edit and commit on the checked-out branch, main included; no branch is required. The assistant never merges.
+Record the work in the project's history. Version control is optional: never block the job on it. Edit and commit on the checked-out branch, main included; no branch is required. The assistant never merges.
 
 Actions
 - start_change: optional. Create an ai/<topic> branch from main and check it out, only when the user wants a reviewable change or a pull request.
@@ -23,3 +23,6 @@ Do not use it
 
 After it
 - Check what you wrote with vcs.diff. Open a pull request only when you are on an ai/* branch.
+
+When it fails
+- Report it in one line and continue the CAD/CAM work; never retry the same failing call in a loop. No history, no profile, a refused call: none of them is a reason to stop.

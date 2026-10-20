@@ -58,8 +58,8 @@ const clusters = (boxes: ReadonlyArray<ReturnType<typeof boundsOf>>): number[][]
   return [...groups.values()]
 }
 
-/** The solid of `spec.text`. `mesh` is undefined when nothing could be drawn (empty text, or no letter with a glyph). */
-export const textSolid = (spec: TextSpec): TextSolid => {
+/** The bar rectangles of `spec.text` in the plane's own coordinates (the exact model's profile source). */
+export const textBars = (spec: TextSpec): { readonly bars: Vec2[][]; readonly width: number; readonly height: number; readonly unsupported: ReadonlyArray<string> } => {
   if (!(spec.height > 0 && spec.strokeWidth > 0 && spec.depth > 0)) throw new RangeError("Text needs a positive height, stroke width and depth")
   const laid = textStrokes(spec.text, spec.height, spec.spacing ?? 1)
   const shift: Vec2 = spec.align === "centre" ? { x: -laid.width / 2, y: -spec.height / 2 + (laid.height - spec.height) / 2 } : { x: 0, y: 0 }
@@ -69,9 +69,15 @@ export const textSolid = (spec: TextSpec): TextSolid => {
     if (pts.length === 1) { const p = pts[0]!; bars.push(bar({ x: p.x, y: p.y }, { x: p.x + 1e-6, y: p.y }, spec.strokeWidth)); continue }
     for (let i = 0; i + 1 < pts.length; i++) bars.push(bar(pts[i]!, pts[i + 1]!, spec.strokeWidth))
   }
-  if (bars.length === 0) return { mesh: undefined, width: laid.width, height: laid.height, unsupported: laid.unsupported }
+  return { bars, width: laid.width, height: laid.height, unsupported: laid.unsupported }
+}
+
+/** The solid of `spec.text`. `mesh` is undefined when nothing could be drawn (empty text, or no letter with a glyph). */
+export const textSolid = (spec: TextSpec): TextSolid => {
+  const { bars, width, height, unsupported } = textBars(spec)
+  if (bars.length === 0) return { mesh: undefined, width, height, unsupported }
   const solids = bars.map((ring) => meshOf({ _tag: "Extrude", profile: ring, height: spec.depth, origin: { x: 0, y: 0, z: 0 } }, 0.01))
   const groups = clusters(bars.map(boundsOf))
   const pieces = groups.map((g) => g.slice(1).reduce((acc, i) => booleanMesh(acc, solids[i]!, "union"), solids[g[0]!]!))
-  return { mesh: pieces.length === 1 ? pieces[0]! : mergeMeshes(pieces), width: laid.width, height: laid.height, unsupported: laid.unsupported }
+  return { mesh: pieces.length === 1 ? pieces[0]! : mergeMeshes(pieces), width, height, unsupported }
 }

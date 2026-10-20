@@ -33,7 +33,11 @@ export interface SketchLine { readonly id: string; readonly kind: "line"; readon
 export interface SketchCircle { readonly id: string; readonly kind: "circle"; readonly center: PointId; readonly radius: number }
 /** Counter-clockwise from `start` to `end` about `center`. */
 export interface SketchArc { readonly id: string; readonly kind: "arc"; readonly center: PointId; readonly start: PointId; readonly end: PointId }
-export type SketchEntity = SketchPoint | SketchLine | SketchCircle | SketchArc
+/** An ellipse: centre point, two semi-axes (unknowns of their own) and a fixed rotation of the x axis, radians. */
+export interface SketchEllipse { readonly id: string; readonly kind: "ellipse"; readonly center: PointId; readonly radiusX: number; readonly radiusY: number; readonly rotation?: number }
+/** A Catmull-Rom spline through its points (which are ordinary point entities, so constraints move the curve). */
+export interface SketchSpline { readonly id: string; readonly kind: "spline"; readonly points: ReadonlyArray<PointId>; readonly closed?: boolean }
+export type SketchEntity = SketchPoint | SketchLine | SketchCircle | SketchArc | SketchEllipse | SketchSpline
 
 /** A constraint, optionally named so a conflict can point at it. */
 export type Constraint = (
@@ -64,6 +68,10 @@ export type Constraint = (
   | { readonly type: "tangentCircles"; readonly a: string; readonly b: string; readonly internal?: boolean }
   /** The centre of a circle or arc lies on a point (or: the circle is concentric with another). */
   | { readonly type: "concentric"; readonly a: string; readonly b: string }
+  /** The semi-axes of an ellipse. */
+  | { readonly type: "ellipseSize"; readonly ellipse: string; readonly radiusX: number; readonly radiusY: number }
+  /** A point lies on an ellipse. */
+  | { readonly type: "pointOnEllipse"; readonly point: string; readonly ellipse: string }
 ) & { readonly id?: string }
 
 export interface Sketch {
@@ -117,6 +125,7 @@ const layoutOf = (sketch: Sketch): Layout => {
     if (e.kind === "point") { add(`${e.id}.x`, e.x); add(`${e.id}.y`, e.y) }
   }
   for (const e of sketch.entities) if (e.kind === "circle") add(`${e.id}.r`, e.radius)
+  for (const e of sketch.entities) if (e.kind === "ellipse") { add(`${e.id}.rx`, e.radiusX); add(`${e.id}.ry`, e.radiusY) }
   return { index, names, x: Float64Array.from(values) }
 }
 
@@ -258,6 +267,27 @@ const buildSystem = (sketch: Sketch, layout: Layout): { readonly equations: Resi
       case "concentric": {
         const a = round(c.a), b = round(c.b)
         add(name, (v) => [a.c.x(v) - b.c.x(v)], (v) => [a.c.y(v) - b.c.y(v)])
+        break
+      }
+      case "ellipseSize": {
+        const e = byId.get(c.ellipse)
+        if (e === undefined || e.kind !== "ellipse") throw new SketchError(`'${c.ellipse}' is not an ellipse of the sketch`)
+        const ix = idx(`${e.id}.rx`), iy = idx(`${e.id}.ry`), rx0 = c.radiusX, ry0 = c.radiusY
+        add(name, (v) => [v[ix]! - rx0], (v) => [v[iy]! - ry0])
+        break
+      }
+      case "pointOnEllipse": {
+        const e = byId.get(c.ellipse)
+        if (e === undefined || e.kind !== "ellipse") throw new SketchError(`'${c.ellipse}' is not an ellipse of the sketch`)
+        const p = point(c.point), centre = point(e.center)
+        const ix = idx(`${e.id}.rx`), iy = idx(`${e.id}.ry`), rot = e.rotation ?? 0
+        const cos = Math.cos(rot), sin = Math.sin(rot)
+        add(name, (v) => {
+          const rx = Math.abs(v[ix]!), ry = Math.abs(v[iy]!)
+          const dx = p.x(v) - centre.x(v), dy = p.y(v) - centre.y(v)
+          const lx = dx * cos + dy * sin, ly = -dx * sin + dy * cos
+          return [((lx / rx) ** 2 + (ly / ry) ** 2 - 1) * Math.min(rx, ry)]
+        })
         break
       }
     }
@@ -440,12 +470,13 @@ export const solveSketch = (sketch: Sketch, options: SolveOptions = {}): SolveRe
   const moved = (e: SketchEntity): SketchEntity => {
     if (e.kind === "point") return { ...e, x: x[layout.index.get(`${e.id}.x`)!]!, y: x[layout.index.get(`${e.id}.y`)!]! }
     if (e.kind === "circle") return { ...e, radius: Math.abs(x[layout.index.get(`${e.id}.r`)!]!) }
+    if (e.kind === "ellipse") return { ...e, radiusX: Math.abs(x[layout.index.get(`${e.id}.rx`)!]!), radiusY: Math.abs(x[layout.index.get(`${e.id}.ry`)!]!) }
     return e
   }
   return {
     sketch: { entities: sketch.entities.map(moved), constraints: sketch.constraints },
     status, dof, iterations, residual,
-    free: [...freePoints].filter((id) => sketch.entities.some((e) => e.id === id && (e.kind === "point" || e.kind === "circle"))).sort(),
+    free: [...freePoints].filter((id) => sketch.entities.some((e) => e.id === id && (e.kind === "point" || e.kind === "circle" || e.kind === "ellipse"))).sort(),
     conflicts: solved ? [] : conflicts,
     redundant,
     ...(status === "conflicting" ? { message: `The constraints cannot all hold; the worst miss is ${conflicts[0] ?? "unknown"}` } : status === "failed" ? { message: "The solver did not converge" } : {})
@@ -465,6 +496,46 @@ const arcPoints = (c: Vec2, s: Vec2, e: Vec2, tolerance: number): Vec2[] => {
   return Array.from({ length: n + 1 }, (_, k) => k === 0 ? { x: s.x, y: s.y } : k === n ? { x: e.x, y: e.y } : { x: c.x + r * Math.cos(a0 + (sweep * k) / n), y: c.y + r * Math.sin(a0 + (sweep * k) / n) })
 }
 
+/** Points round an ellipse, counter-clockwise, at most `tolerance` from the true curve. */
+export const ellipseLoopPoints = (centre: Vec2, radiusX: number, radiusY: number, rotation = 0, tolerance = 0.01): Vec2[] => {
+  const maxR = Math.max(radiusX, radiusY, 1e-9)
+  const step = 2 * Math.acos(Math.max(0, 1 - tolerance / maxR))
+  const n = Math.max(16, Math.ceil((2 * Math.PI) / Math.max(step, 1e-3)))
+  const cos = Math.cos(rotation), sin = Math.sin(rotation)
+  return Array.from({ length: n }, (_, k) => {
+    const t = (2 * Math.PI * k) / n
+    const lx = radiusX * Math.cos(t), ly = radiusY * Math.sin(t)
+    return { x: centre.x + lx * cos - ly * sin, y: centre.y + lx * sin + ly * cos }
+  })
+}
+
+/**
+ * Points along a Catmull-Rom spline through `pts`. Open splines are padded by reflecting the end spans; closed ones wrap.
+ * The sampled curve passes through every point of `pts`.
+ */
+export const splinePoints = (pts: ReadonlyArray<Vec2>, closed = false, tolerance = 0.01): Vec2[] => {
+  if (pts.length < 2) return pts.map((p) => ({ ...p }))
+  const at = (i: number): Vec2 => {
+    if (closed) return pts[((i % pts.length) + pts.length) % pts.length]!
+    return pts[Math.max(0, Math.min(pts.length - 1, i))]!
+  }
+  const spans = closed ? pts.length : pts.length - 1
+  const out: Vec2[] = []
+  for (let s = 0; s < spans; s++) {
+    const p0 = at(s - 1), p1 = at(s), p2 = at(s + 1), p3 = at(s + 2)
+    const chord = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+    const n = Math.max(4, Math.min(64, Math.ceil(chord / Math.max(8 * tolerance, 1e-6))))
+    for (let k = s === 0 ? 0 : 1; k <= n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t
+      out.push({
+        x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+        y: 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+      })
+    }
+  }
+  return out
+}
+
 /**
  * The closed profiles of a (solved) sketch: lines and arcs chained end to end through their shared points, and every circle on its
  * own, as polygons within `tolerance` of the true outline. An open chain (a dangling end) is returned in `open`.
@@ -479,6 +550,7 @@ export const sketchProfiles = (sketch: Sketch, tolerance = 0.01): { readonly loo
   interface Edge { readonly a: string; readonly b: string; readonly points: (forward: boolean) => Vec2[] }
   const edges: Edge[] = []
   const loops: Vec2[][] = []
+  const open: Vec2[][] = []
   for (const e of sketch.entities) {
     if (e.kind === "line") edges.push({ a: e.p1, b: e.p2, points: (f) => (f ? [at(e.p1), at(e.p2)] : [at(e.p2), at(e.p1)]) })
     else if (e.kind === "arc") edges.push({ a: e.start, b: e.end, points: (f) => { const p = arcPoints(at(e.center), at(e.start), at(e.end), tolerance); return f ? p : [...p].reverse() } })
@@ -488,9 +560,14 @@ export const sketchProfiles = (sketch: Sketch, tolerance = 0.01): { readonly loo
       const n = Math.max(8, Math.ceil((2 * Math.PI) / Math.max(step, 1e-3)))
       loops.push(Array.from({ length: n }, (_, k) => ({ x: c.x + e.radius * Math.cos((2 * Math.PI * k) / n), y: c.y + e.radius * Math.sin((2 * Math.PI * k) / n) })))
     }
+    else if (e.kind === "ellipse") loops.push(ellipseLoopPoints(at(e.center), e.radiusX, e.radiusY, e.rotation ?? 0, tolerance))
+    else if (e.kind === "spline") {
+      const sampled = splinePoints(e.points.map(at), e.closed === true, tolerance)
+      if (e.closed === true) { if (sampled.length > 1 && Math.hypot(sampled[0]!.x - sampled[sampled.length - 1]!.x, sampled[0]!.y - sampled[sampled.length - 1]!.y) < 1e-9) sampled.pop(); loops.push(sampled) }
+      else open.push(sampled)
+    }
   }
   const used = new Set<number>()
-  const open: Vec2[][] = []
   const incident = (pid: string): number[] => edges.flatMap((ed, i) => (!used.has(i) && (ed.a === pid || ed.b === pid) ? [i] : []))
   for (let i = 0; i < edges.length; i++) {
     if (used.has(i)) continue

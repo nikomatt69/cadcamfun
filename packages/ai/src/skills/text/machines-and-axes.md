@@ -60,5 +60,11 @@ Set it with the operation's params (cam_edit create / update), then the preview 
 - cam_edit action verify simulates mills only; it includes the configured vise / clamps as fixtures.
 - Set-up findings: MILL_INTO_VISE / CLAMP / PARALLEL / TABLE, LATHE_INTO_CHUCK / TAILSTOCK, PRINTER_OFF_BED / ABOVE_VOLUME / FIRST_LAYER_HIGH.
 
+## Separate lateral and bottom programs
+
+The native `cam manufacture` / `cam_edit manufacture` actions accept `setupOrientation`: +Z (default), -Z, +X, -X, +Y, -Y. It is the CAD direction facing the spindle after a **manual refixture**. Plan with `planOnly: true`, then adjust the returned operations (coordinates are in that oriented setup, before stock-origin subtraction), feeds, speeds and cutters before generating. Save each setup as a separate operation/program with its own `workOffset` (G54..G59) and touch-off; never concatenate full programs or call this a rotary cycle. The drawing itself is unchanged.
+
+The artifact's origin and stock bounds are in the oriented setup coordinates. Lateral/bottom artifacts carry unresolved `setup-workholding` and `part-coverage` claims and remain preview programs. Ask for the user's actual workholding and machine resources; never invent them or say a part is complete from a single setup's replay. Six directions do not prove access to helical grooves, thin fins, hidden surfaces or undercuts. If these remain inaccessible, name the unsupported surfaces and the required indexed/simultaneous process; never replace the original CAD or mark existing NC verified just to remove a warning.
+
 ## Simulation (what the player shows)
 cam action machine with `gcode` also answers `operations` (each tool's band on the clock: a program is split at its tool changes, each tool read from a `T1 D=6. - … - flat end mill` header), `moveClasses` (rapid, retract, plunge, ramp, lead-in/out, cut, link, cycle, probe, dwell), `collisions` (RAPID_INTO_STOCK, SHANK_IN_STOCK, HOLDER_IN_STOCK, MACHINE_COLLISION, with time and line) and, on a mill, `machineModel`: the machine class (params.machinePreset: vmc-3, vmc-4a, trunnion-ac, trunnion-bc, head-table-bc, head-head-ac, router-gantry; params.machineTravel {x,y,z}), its axis values at `at` and its travel / rotary limit findings. Say which sizes are assumed.

@@ -1,4 +1,5 @@
 import { cross3, dot3, length3, type Vec3 } from "../cad/vec.ts"
+import type { Transform } from "../cad/brep/math.ts"
 import type { SolidBounds } from "../cad/solid.ts"
 
 export interface WorkFrame {
@@ -102,4 +103,18 @@ export const validateSetup = (setup: ManufacturingSetup): ReadonlyArray<SetupIss
     if (tool.cuttingLength > tool.stickout) add(field, "Cutting length must not exceed stickout")
   }
   return issues
+}
+
+/** CAD direction facing the spindle after a manual refixture. Each choice is a separate three-axis program. */
+export const SETUP_ORIENTATIONS = ["+Z", "-Z", "+X", "-X", "+Y", "-Y"] as const
+export type SetupOrientation = typeof SETUP_ORIENTATIONS[number]
+
+/** Right-handed world-to-setup rotations, exact signed permutations (no trigonometric roundoff). */
+export const setupTransform = (orientation: SetupOrientation): Transform => {
+  const matrices: Record<SetupOrientation, Transform["m"]> = {
+    "+Z": [1, 0, 0, 0, 1, 0, 0, 0, 1], "-Z": [1, 0, 0, 0, -1, 0, 0, 0, -1],
+    "+X": [0, 1, 0, 0, 0, 1, 1, 0, 0], "-X": [0, -1, 0, 0, 0, 1, -1, 0, 0],
+    "+Y": [-1, 0, 0, 0, 0, 1, 0, 1, 0], "-Y": [1, 0, 0, 0, 0, 1, 0, -1, 0]
+  }
+  return { m: matrices[orientation], t: { x: 0, y: 0, z: 0 } }
 }

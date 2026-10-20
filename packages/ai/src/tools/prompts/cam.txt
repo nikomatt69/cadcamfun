@@ -25,7 +25,7 @@ Parameters (mm, mm/min, rpm)
 - vision: focus.
 - chain_suggest: fromOperationId, materialHint, toolHint.
 - chain_status: operationId.
-- materials: query. cutting_data: material, cut, tool, machine, depth/ae/ap/scallop. manufacture: material, machine, origin, finishAllowance, scallop, deburr, planOnly, operations, tools, subprograms (M98 for repeated toolpaths).
+- materials: query. cutting_data: material, cut, tool, machine, depth/ae/ap/scallop. manufacture: material, machine, origin, setupOrientation (+Z default|-Z|+X|-X|+Y|-Y: the CAD side facing the spindle after a manual refixture; one program and workOffset per setup), finishAllowance, scallop, deburr, planOnly, operations, tools, subprograms (M98 for repeated toolpaths).
 
 Result (JSON)
 - ok and data/findings. Empty analyze issues means "no static findings", never "safe".

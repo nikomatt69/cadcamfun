@@ -42,6 +42,10 @@ Stack: **SolidJS** (`solid-js`, `@solidjs/router`, `vite-plugin-solid`), TypeScr
 
 Legacy reference (behaviour/layout inspiration only): `.reference/src/components/{cad,cam,layout,library,materials,production-costs,simulation,settings,ai}/`, `.reference/public/cursors/`, `.reference/src/store/`, `.reference/src/hooks/canvas/`.
 
+## Library visual refinement (2026-10-19)
+
+Status: in progress. Owner-requested WP6 redesign owns the library dialog frame, CAD library browser, CAM library manager/browser, library stylesheet, library locale and desktop tests. Replace layered glass gradients, decorative animation and repeated headers with opaque theme-aware workstation surfaces, a single dialog heading, compact category/source navigation, aligned search/actions, restrained cards and explicit loading/empty/error states. Preserve selection, local-save callbacks and document events; filters must narrow displayed rows. Include keyboard navigation, dialog focus containment/return and reduced-motion support. API and persistence contracts stay unchanged.
+
 ## 1. App shell (WP6)
 
 - Boot sequence: Tauri command `get_sidecar_endpoint` → `{ baseUrl, token }` → build `ApiClient.layer` → `GET /health` → render. Show a splash with error and "Retry"/"View logs" only after the sidecar has stayed unreachable for 150 s: until then the splash keeps re-resolving the endpoint and retrying (the shell waits up to 60 s for each start, and the host's SDK is loaded lazily so the API answers first), showing the seconds waited and a readable reason.

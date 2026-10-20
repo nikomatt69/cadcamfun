@@ -73,6 +73,8 @@ export interface StockInfo {
   readonly remaining: number
   readonly cell: number
   readonly missingTools: ReadonlyArray<string>
+  /** Against the part (spec 32 E3): the deepest gouge and the most material left above it, mm, and the tolerance. */
+  readonly deviation?: { readonly maxGouge: number; readonly gougeVolume: number; readonly maxUncut: number; readonly tolerance: number }
 }
 
 /** The mesh of the remaining stock, ready to be drawn. */
@@ -81,11 +83,23 @@ export interface LiveStock {
   readonly simulation: cam.sim.StockSimulation
   /** Redraws the geometry when the stock changed; returns whether it did. */
   readonly update: () => boolean
+  /** The comparison with the part, when it is coloured by it. */
+  readonly deviation: () => StockInfo["deviation"]
 }
 
 /** Builds the mesh of a simulation and keeps its buffers for the updates. */
-export const createLiveStock = (simulation: cam.sim.StockSimulation, options: { readonly color?: number; readonly opacity?: number } = {}): LiveStock => {
+export const createLiveStock = (simulation: cam.sim.StockSimulation, options: { readonly color?: number; readonly opacity?: number; readonly target?: Float64Array; readonly tolerance?: number } = {}): LiveStock => {
   const shape = simulation.mesh()
+  // Coloured by the deviation from the part when its top surface (`target`, one height per column) is given.
+  const tolerance = options.tolerance ?? 0.05
+  const colors = options.target !== undefined ? new THREE.BufferAttribute(new Float32Array(shape.positions.length), 3) : undefined
+  let deviation: cam.sim.DeviationResult | undefined
+  const paint = () => {
+    if (colors === undefined || options.target === undefined) return
+    deviation = simulation.deviation(options.target, tolerance)
+    cam.sim.deviationColors(deviation, tolerance, colors.array as Float32Array)
+    colors.needsUpdate = true
+  }
   const geometry = new THREE.BufferGeometry()
   const positions = new THREE.BufferAttribute(shape.positions, 3)
   const normals = new THREE.BufferAttribute(shape.normals, 3)
@@ -94,8 +108,10 @@ export const createLiveStock = (simulation: cam.sim.StockSimulation, options: { 
   geometry.setAttribute("position", positions)
   geometry.setAttribute("normal", normals)
   geometry.setIndex(new THREE.BufferAttribute(shape.indices, 1))
+  if (colors !== undefined) { colors.setUsage(THREE.DynamicDrawUsage); geometry.setAttribute("color", colors); paint() }
   const material = new THREE.MeshStandardMaterial({
-    color: options.color ?? 0xc8a878,
+    color: colors !== undefined ? 0xffffff : options.color ?? 0xc8a878,
+    vertexColors: colors !== undefined,
     metalness: 0.25,
     roughness: 0.65,
     side: THREE.DoubleSide,
@@ -107,12 +123,14 @@ export const createLiveStock = (simulation: cam.sim.StockSimulation, options: { 
   return {
     mesh,
     simulation,
+    deviation: () => (deviation === undefined ? undefined : { maxGouge: deviation.maxGouge, gougeVolume: deviation.gougeVolume, maxUncut: deviation.maxUncut, tolerance }),
     update: () => {
       if (simulation.version === version) return false
       version = simulation.version
       simulation.sim.writeMesh(shape.positions, shape.normals)
       positions.needsUpdate = true
       normals.needsUpdate = true
+      paint()
       geometry.computeBoundingSphere()
       return true
     }

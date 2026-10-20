@@ -79,7 +79,7 @@ export interface ToolHandlersShape {
   /** The user's saved machine configurations (kinematics, post, work offsets, ceilings), searched like the other libraries. */
   lookupMachineConfig(query: string): Promise<unknown>
   /** Removes one library row by id (`confirm: true` is enforced by the tool schema, not here). */
-  deleteLibrary(input: { kind: "material" | "tool" | "machine_config"; id: string }): Promise<unknown>
+  deleteLibrary(input: { kind: "material" | "tool" | "machine_config" | "library_item"; id: string }): Promise<unknown>
   machine?(projectId: string): Promise<MachineProfile | undefined>
   /** Persistent notes the assistant keeps between sessions (the `ai.memory.*` keys of the key-value store). */
   remember(key: string, value: string): Promise<unknown>
@@ -90,13 +90,15 @@ export interface ToolHandlersShape {
   saveProjectContext(projectId: string, text: string): Promise<unknown>
   /** Components that are instantiated in the active CAD drawing. */
   listComponents(projectId: string): Promise<unknown>
-  saveComponent(projectId: string, ids: ReadonlyArray<string>, name: string): Promise<unknown>
+  saveComponent(projectId: string, ids: ReadonlyArray<string>, name: string, metadata?: { readonly description?: string; readonly type?: string; readonly isPublic?: boolean }): Promise<unknown>
   insertComponent(projectId: string, componentId: string, transform?: cad.ElementTransform): Promise<unknown>
   deleteComponent(componentId: string): Promise<unknown>
   /** Library writes: create or replace a material, tool or machine config, and set a project's defaults. */
   upsertMaterial(input: Record<string, unknown>): Promise<unknown>
   upsertTool(input: Record<string, unknown>): Promise<unknown>
   upsertMachineConfig(input: Record<string, unknown>): Promise<unknown>
+  upsertLibraryItem(input: Record<string, unknown>): Promise<unknown>
+  setCost(input: Record<string, unknown>): Promise<unknown>
   setProjectDefault(input: { projectId?: string; materialId?: string; toolId?: string; machineConfigId?: string }): Promise<unknown>
   /** Next recommended operation from the current chain state, and one operation's chain state. */
   suggestChain(input: { projectId: string; fromOperationId?: string; materialHint?: string; toolHint?: string }): Promise<unknown>

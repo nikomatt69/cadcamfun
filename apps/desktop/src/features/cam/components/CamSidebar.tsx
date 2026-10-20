@@ -4,7 +4,7 @@
  * Three tabs, as in the reference:
  *  - **explorer** — the CAD elements: select what the generator machines, link the raw piece.
  *  - **settings** — view mode, grid / axis and snap settings.
- *  - **machine** — origin, workpiece (stock + material) and the saved toolpaths.
+ *  - **machine** — the machine of the job (from the Resources library), origin, workpiece (stock + material) and the saved toolpaths.
  *
  * The Generator itself lives in the right-hand panel, not here. The sidebar is collapsible; collapsed it shows
  * only icon buttons. The bottom row has the collapse toggle, matching the CAD editor.
@@ -17,6 +17,7 @@ import OriginControls from "../../cad/components/OriginControls.tsx"
 import { useCamStore } from "../store/camStore.ts"
 import { t } from "../../../i18n/index.ts"
 import WorkpieceSetup from "./WorkpieceSetup.tsx"
+import MachineSelect from "./MachineSelect.tsx"
 import CamElementExplorer from "./explorer/CamElementExplorer.tsx"
 import ViewSettings from "./explorer/ViewSettings.tsx"
 import OperationsList from "./OperationsList.tsx"
@@ -157,6 +158,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
             </Show>
             <Show when={props.activeTab === "machine"}>
               <Motion.div class="w-full space-y-6" {...rise} transition={{ duration: 0.4, delay: 0.2 }}>
+                <MachineSelect />
                 <OriginControls />
                 <WorkpieceSetup
                   workpiece={cam.workpiece}

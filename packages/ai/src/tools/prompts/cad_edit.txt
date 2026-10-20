@@ -1,7 +1,7 @@
-Change the open drawing. This tool is never given to a read-only role: it may add, move, replace and remove geometry.
+Change the open drawing.
 
 Actions
-- add: build 3D geometry in the editor's element format (solids, revolutions, extrusions, booleans, lofts, sweeps, curves, standard parts). This is THE way to create objects.
+- add: build 3D geometry in the editor's element format (solids, revolutions, extrusions, booleans, lofts, sweeps, curves, standard parts).
 - add_entities: flat 2D sketch entities, only for a sketch the user explicitly asks for.
 - modify: change fields of existing elements by id.
 - transform: move, turn, scale, or lay out copies of existing elements by id.
@@ -12,7 +12,7 @@ Actions
 - parametric_create: store a parametric history as an element. Sketches take `shapes` (rectangle, circle, polygon, ellipse, slot, polyline, spline/bezier/nurbs curve); features include extrude, revolve, sweep, loft, coil, hole, pattern, mirror, shell, fillet, primitive (3D catalogue solids), combine, split, move, scale. The `fusion-360-modelling` skill has the map.
 - parametric_update: change the parameters of a parametric part, keeping its features.
 - parametric_recipe_create: build a standard part and store it in one call.
-- parametric_convert: make an existing element parametric: stores its parametric twin (same solid, measures as named parameters, same place, name, colour and layer) and leaves the original, which you remove with delete once the twin is checked.
+- parametric_convert: make an existing element parametric: stores its parametric twin (same solid, measures as named parameters, same place, name, colour and layer) and keeps the original (delete it once the twin is checked).
 
 Parameters (mm, radians; ids are read from cad, never invented)
 - add: elements - 1 to 40 flat objects, each {"type": <element type>, ...fields}; components and layers name parts instead of nesting. Valid elements are added, invalid ones come back under skipped.
@@ -30,11 +30,11 @@ Parameters (mm, radians; ids are read from cad, never invented)
 
 Result (JSON)
 - ok, ids, elements (what was stored, defaults filled), projectId, drawingId; import adds stats and warnings, parametric writes add revision and report.
-- ok:false is a result, not a crash: the reason and, for add, the skipped elements with their errors.
+- ok:false is a result: the reason and, for add, the skipped elements with errors.
 
 Do not use it
-- To look at the model first: cad (describe, inspect, check) changes nothing and is cheaper than a wrong edit.
-- To move or turn something, use transform; to change one property, use modify. Do not delete and rebuild.
+- To look at the model first: use cad.
+- To move or change something: transform or modify, never delete and rebuild.
 
 After it
 - cad.check the result, or cad.describe it, before telling the user it is done. For several parts also cad.exact (validity, how CAM will machine each solid) and cad.assembly (clashes, missing fasteners).

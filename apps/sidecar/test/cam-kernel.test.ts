@@ -91,3 +91,29 @@ test("assistant native manufacture stores the original artifact only through a w
   expect(await handlers.reviewOperation!(project, done.body.result.operationId)).toMatchObject({ ok: false, status: "stale" })
   expect(await handlers.operationProgram!(project, done.body.result.operationId)).toMatchObject({ ok: false })
 })
+
+test("manual side manufacturing survives HTTP, assistant persistence and later review", async () => {
+  const response = await post({ ...input, setupOrientation: "+X", workOffset: "G55" })
+  expect(response.status).toBe(200)
+  const result = Schema.decodeUnknownSync(CamKernelResult)(response.body)
+  if (result.status !== "ok") throw new Error(JSON.stringify(result.issues))
+  expect(result.value.setupOrientation).toBe("+X")
+  expect(result.value.release).toBe("preview")
+  expect(result.value.program.workOffset).toBe("G55")
+  expect(result.value.claims.find((c) => c.id === "setup-workholding")?.status).toBe("unresolved")
+  const project = (await app.call("/api/projects", { method: "POST", json: { name: "Manual side" } })).body.id
+  await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Part", data: { elements: input.elements } } })
+  const handlers = await app.toolHandlers()
+  const plan = await handlers.manufacture!(project, { material: "6061", setupOrientation: "+X", planOnly: true }) as { ok: boolean; notes: string[] }
+  expect(plan.ok).toBe(true)
+  expect(plan.notes.join(" ")).toContain("Manual +X setup")
+  const saved = await handlers.manufactureOperation!(project, { material: "6061", setupOrientation: "+X", workOffset: "G56" }) as { ok: boolean; operationId: string; release: string }
+  expect(saved.ok).toBe(true)
+  expect(saved.release).toBe("preview")
+  const stored = await app.call(`/api/toolpaths/${saved.operationId}`)
+  expect(stored.body.name).toContain("+X")
+  expect(stored.body.data.kernelRequest.setupOrientation).toBe("+X")
+  expect(stored.body.data.kernelArtifact.program.workOffset).toBe("G56")
+  expect(stored.body.data.kernelArtifact.setupOrientation).toBe("+X")
+  expect(await handlers.reviewOperation!(project, saved.operationId)).toMatchObject({ status: "preview" })
+})

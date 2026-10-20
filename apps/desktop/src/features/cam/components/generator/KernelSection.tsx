@@ -63,14 +63,16 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
     const value = artifact(), current = request()
     if (!value) return false
     const source = store.kernelRequest, stock = current?.stock
-    const stockChanged = stock !== undefined ? (
+    const stockChanged = (current?.setupOrientation ?? "+Z") === "+Z" && (stock !== undefined ? (
       Math.abs(stock.width - (value.stockBounds.max.x - value.stockBounds.min.x)) > 1e-9 ||
       Math.abs(stock.height - (value.stockBounds.max.y - value.stockBounds.min.y)) > 1e-9 ||
       Math.abs(stock.depth - (value.stockBounds.max.z - value.stockBounds.min.z)) > 1e-9 ||
       Math.abs(stock.x - (value.stockBounds.max.x + value.stockBounds.min.x) / 2) > 1e-9 ||
       Math.abs(stock.y - (value.stockBounds.max.y + value.stockBounds.min.y) / 2) > 1e-9
-    ) : source?.stock !== undefined
+    ) : source?.stock !== undefined)
     return !current || value.nc !== store.gcode || value.material.id !== (cam.kernel.findMaterial(current.material)?.id ?? current.material) || value.machine.id !== current.machine ||
+      (value.setupOrientation ?? "+Z") !== (current.setupOrientation ?? "+Z") ||
+      cam.kernel.canonicalJson(source?.stock ?? null) !== cam.kernel.canonicalJson(current.stock ?? null) ||
       stockChanged || value.program.workOffset !== (current.workOffset ?? "G54") ||
       source !== undefined && ((source.tolerance ?? 0.01) !== (current.tolerance ?? 0.01) || (source.origin ?? "stock-center") !== (current.origin ?? "stock-center") || source.finishAllowance !== current.finishAllowance || source.scallop !== current.scallop || source.resolution !== current.resolution) ||
       value.identity.part !== cam.kernel.digestOf("cam-kernel/part@1", { kind: "elements", elements: current.elements }) ||
@@ -178,6 +180,18 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
           <For each={cam.kernel.MACHINES}>{(item) => <option value={item.id}>{item.name} · {item.post}</option>}</For>
         </select>
       </label>
+      <label class={LABEL}>{t("cam.kernel.setupOrientation")}
+        <select class={INPUT} value={settings().setupOrientation ?? "+Z"} onChange={(event) => {
+          gen.patchKernelSettings({ setupOrientation: event.currentTarget.value as cam.kernel.SetupOrientation, operations: undefined })
+          gen.updateSettings("workholdingConfigured", false)
+          setPlanNotes([])
+        }} data-testid="kernel-setup-orientation">
+          <For each={cam.kernel.SETUP_ORIENTATIONS}>{(orientation) => <option value={orientation}>{orientation}</option>}</For>
+        </select>
+      </label>
+      <Show when={settings().setupOrientation !== undefined && settings().setupOrientation !== "+Z"}>
+        <p class="text-xs text-amber-700 dark:text-amber-300" data-testid="kernel-manual-setup-hint">{t("cam.kernel.manualSetupHint")}</p>
+      </Show>
       <details class="border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="kernel-settings">
         <summary class="cursor-pointer text-sm font-medium">{t("cam.kernel.settings")}</summary>
         <div class="space-y-3 pt-3">

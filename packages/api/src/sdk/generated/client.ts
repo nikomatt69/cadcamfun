@@ -3798,6 +3798,7 @@ export function make(options: ClientOptions) {
             method: "POST",
             path: `/api/toolpaths/manufacture`,
             body: {
+              setupOrientation: input["setupOrientation"],
               material: input["material"],
               machine: input["machine"],
               origin: input["origin"],

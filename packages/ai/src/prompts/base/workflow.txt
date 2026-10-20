@@ -1,5 +1,5 @@
 Workflow:
-1. Read cad describe; vcs status when retaining work.
+1. Read cad describe; vcs status when history matters.
 2. Build or change in steps with the tools above; make visible progress early rather than one large call at the end.
 3. Check: cad action check, then the machining checks when there is G-code.
 4. Report what changed with ids, positions and numbers (millimetres), what you checked and what you did not.
@@ -9,9 +9,8 @@ Working as an agent:
 - For a multi-part request, `create_goal` with the full objective; `update_goal` to `complete` only after verification, or `blocked` after the same obstacle stops you three times.
 - Act on announcements in this turn. Open plan items or failed calls mean unfinished work; continue requested steps, verify and report.
 
-Subagents (agent action start): child sessions with scoped tools, no conversation context.
+Subagents (agent action start): child sessions with scoped tools, no conversation context. Always background: the call returns at once; the completion wake arrives here. Never block on one.
 - `editor`: a narrow change to existing entities. `modeler`: geometry for one part. `machinist`: operations and G-code. `planner`, `diagnostician`, `verifier`, `optimizer`, `researcher`: plan, root cause, checks, faster cycle, investigation.
 - Brief with objective, ids, values, units, limits and expected report. One editing specialist per project; verify reports, take over failures, and use agent list/read/cancel.
 
-Version control:
-- vcs action status/vcs action diff show state. For retained work, vcs_edit action start_change before edits, vcs_edit action commit after checks, vcs_edit action open_pull_request when finished. vcs_edit action run_workflows runs workflows. Never write to `main`: a person merges.
+Version control (optional): vcs action status/diff when history matters. Commit on the checked-out branch, `main` included. vcs_edit action start_change only for a reviewable change, then commit and vcs_edit action open_pull_request; never merge or push. A failing vcs call never blocks the job.

@@ -7298,14 +7298,15 @@ var OrientSchema = TaggedStruct("Orient", {
   b: optionalKey2(Finite),
   c: optionalKey2(Finite)
 });
-var CycleKindSchema = Literals(["drill", "dwell", "peck", "chipBreak"]);
+var CycleKindSchema = Literals(["drill", "dwell", "peck", "chipBreak", "tap", "ream"]);
 var CycleSchema = TaggedStruct("Cycle", {
   cycle: CycleKindSchema,
   to: Vec3Schema,
   feed: Positive,
   peckDepth: NonNegative,
   dwellSeconds: NonNegative,
-  retractHeight: Finite
+  retractHeight: Finite,
+  pitch: optionalKey2(Positive)
 });
 var MoveSchema = Union2([
   RapidSchema,
@@ -7385,6 +7386,8 @@ var StockSchema = Struct({
 });
 var decodeStock = decodeUnknownEffect2(StockSchema);
 var encodeStock = encodeEffect(StockSchema);
+// packages/core/src/cam/setup.ts
+var SETUP_ORIENTATIONS = ["+Z", "-Z", "+X", "-X", "+Y", "-Y"];
 // packages/core/src/cam/indexing.ts
 var DEG2 = 180 / Math.PI;
 var RAD = Math.PI / 180;
@@ -7456,8 +7459,10 @@ class DrillParams extends Class3("cam/DrillParams")(Struct({
   ...commonFields,
   peck: withDefault2(NonNegative3, 0),
   chipBreak: withDefault2(Boolean3, false),
-  dwell: withDefault2(NonNegative3, 0)
-}).check(heightsOrdered)) {
+  dwell: withDefault2(NonNegative3, 0),
+  mode: withDefault2(Literals(["drill", "tap", "ream"]), "drill"),
+  pitch: optionalKey2(Positive3)
+}).check(heightsOrdered).check(makeFilter2((p) => p.mode !== "tap" || p.pitch !== undefined ? undefined : "a tapping cycle needs the thread pitch"))) {
 }
 // packages/core/src/cam/operations/face.ts
 class FaceParams extends Class3("cam/FaceParams")(Struct({
@@ -7485,7 +7490,7 @@ class AdaptiveParams extends Class3("cam/AdaptiveParams")(Struct({
 }
 
 // packages/core/src/cam/operations/surface.ts
-var SurfaceStrategySchema = Literals(["roughing", "parallel", "waterline", "rest", "steep-shallow"]);
+var SurfaceStrategySchema = Literals(["roughing", "parallel", "waterline", "rest", "steep-shallow", "scallop", "spiral", "radial", "flat"]);
 var RestFromSchema = Struct({
   diameter: Positive3,
   kind: withDefault2(ToolKindSchema, "endmill"),
@@ -7511,7 +7516,8 @@ class SurfaceParams extends Class3("cam/SurfaceParams")(Struct({
   clearing: withDefault2(Literals(["contour", "adaptive"]), "contour"),
   engagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12),
   slopeAngle: withDefault2(Finite.check(isBetween({ minimum: 5, maximum: 85 })), 45),
-  overlap: withDefault2(Finite.check(isBetween({ minimum: 0, maximum: 20 })), 3)
+  overlap: withDefault2(Finite.check(isBetween({ minimum: 0, maximum: 20 })), 3),
+  center: optionalKey2(Struct({ x: Finite, y: Finite }))
 }).check(heightsOrdered)) {
 }
 // packages/core/src/cam/operations/thread.ts
@@ -7565,6 +7571,8 @@ class MultiaxisParams extends Class3("cam/MultiaxisParams")(Struct({
 }).check(heightsOrdered)) {
 }
 var RAD2 = Math.PI / 180;
+// packages/core/src/cam/testing/gcode-interpreter.ts
+var SILENT_STATEMENTS = new Set(["MSG", "TRAORI", "TRAFOOF", "SOFT", "BRISK", "FFWON", "FFWOF", "CFC", "CFTCP", "CFIN", "STOPRE", "WORKPIECE", "DIAMON", "DIAMOF", "DIAM90", "CYCLE832", "COMPCAD", "COMPCURV", "COMPOF", "SUPA", "TOFFON", "TOFFOF", "SETMS", "SPOS", "WAIT", "DEF", "PRINT_START", "PRINT_END", "START_PRINT", "END_PRINT"]);
 // packages/core/src/cam/generator/cycles.ts
 var FixedCycleType = {
   DRILLING: "drilling",
@@ -7741,8 +7749,11 @@ var drill2 = (d) => ({
   stickout: Math.round(d * 5 + 15),
   holder: HOLDER
 });
+var REAMER_SIZES = [3, 4, 5, 6, 8, 10, 12];
+var reamDrill = (d) => Math.round((d - (d <= 6 ? 0.2 : 0.3)) * 10) / 10;
 var DRILL_SIZES = [...new Set([
   ...METRIC_THREADS.filter((t) => t.d <= 20).flatMap((t) => [t.tapDrill, t.clearance.medium]),
+  ...REAMER_SIZES.map(reamDrill),
   2,
   3,
   4,
@@ -7753,6 +7764,33 @@ var DRILL_SIZES = [...new Set([
   10,
   12
 ])].sort((a, b) => a - b);
+var tap2 = (d, pitch) => ({
+  id: `tap-m${d}`,
+  name: `Machine tap M${d}x${pitch} HSS-E TiCN form C`,
+  kind: "tap",
+  diameter: d,
+  flutes: d <= 5 ? 3 : 4,
+  material: "hss-co",
+  coating: "ticn",
+  pitch,
+  fluteLength: Math.round(d * 2.5 + 4),
+  shankDiameter: Math.max(3.5, Math.round(d * 0.8 * 10) / 10),
+  stickout: Math.round(d * 6 + 25),
+  holder: HOLDER
+});
+var reamer = (d) => ({
+  id: `reamer-${d}`,
+  name: `Reamer \xD8${d} H7 carbide 6F`,
+  kind: "reamer",
+  diameter: d,
+  flutes: 6,
+  material: "carbide",
+  coating: "tin",
+  fluteLength: Math.round(d * 3 + 6),
+  shankDiameter: Math.max(3, Math.ceil(d)),
+  stickout: Math.round(d * 5 + 20),
+  holder: HOLDER
+});
 var DEFAULT_CUTTERS = [
   ...[1, 2, 3, 4, 6, 8, 10, 12, 16].map((d) => flat(d, d < 3 ? 2 : d <= 12 ? 3 : 4)),
   ...[2, 3, 4, 6, 8, 10, 12, 16].map((d) => flat(d, d < 3 ? 2 : 3, "carbide", "zrn", "-n")),
@@ -7769,6 +7807,8 @@ var DEFAULT_CUTTERS = [
     const d = pitch <= 0.8 ? 2.4 : pitch <= 1 ? 4.6 : pitch <= 1.5 ? 6.4 : 8.8;
     return { id: `threadmill-p${pitch}`, name: `Thread mill \xD8${d} P${pitch}`, kind: "threadmill", diameter: d, flutes: 3, material: "carbide", coating: "tin", pitch, fluteLength: Math.round(d * 2.5), shankDiameter: Math.max(4, Math.ceil(d)), stickout: Math.round(d * 4 + 15), holder: HOLDER };
   }),
+  ...METRIC_THREADS.filter((t) => t.d >= 3 && t.d <= 12).map((t) => tap2(t.d, t.pitch)),
+  ...REAMER_SIZES.map(reamer),
   ...DRILL_SIZES.map(drill2)
 ];
 
@@ -7837,7 +7877,7 @@ var ToolpathSettingsSchema = Struct({
   finishingPass: withDefault2(Boolean3, false),
   finishingAllowance: withDefault2(NonNegative3, 0.2),
   finishingStrategy: withDefault2(Literals(["contour", "parallel", "spiral", "radial"]), "contour"),
-  surfaceStrategy: withDefault2(Literals(["roughing", "parallel", "waterline", "steep-shallow"]), "roughing"),
+  surfaceStrategy: withDefault2(Literals(["roughing", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"]), "roughing"),
   steepAngle: withDefault2(Finite.check(isBetween({ minimum: 5, maximum: 85 })), 45),
   surfaceClearing: withDefault2(Literals(["contour", "adaptive"]), "contour"),
   adaptiveEngagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12),
@@ -8078,11 +8118,17 @@ var SOLID_TYPES2 = new Set([
   "imported"
 ]);
 
+// packages/core/src/cam/viewer/rotary.ts
+var RAD3 = Math.PI / 180;
+
 // packages/core/src/cam/viewer/machine-setup.ts
 var INTERNAL_TOOLS = new Set(["boring"]);
 
 // packages/core/src/cam/generator/evidence.ts
 var PART_TYPES = new Set(["parametric", "brep", "mesh"]);
+// packages/core/src/cam/viewer/collisions.ts
+var HEAD_SIDE = new Set(["head", "spindle", "fork"]);
+var PART_SIDE = new Set(["table", "cradle", "platter"]);
 // packages/core/src/cam/verify/schema.ts
 var VerifyToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
 var VerifyToolSchema = Struct({
@@ -8178,6 +8224,8 @@ var VerifyResponseSchema = Struct({
   stats: VerifyStatsSchema,
   preview: VerifyPreviewSchema
 });
+// packages/core/src/cam/kernel/contracts.ts
+var SURFACE_MODES = ["roughing", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"];
 // packages/core/src/cam/kernel/machines.ts
 var MACHINES = [
   {
@@ -8217,6 +8265,16 @@ var MACHINES = [
     toolChangeSeconds: 30
   },
   {
+    id: "trunnion-5ax",
+    name: "5-axis trunnion (BT40, 12 000 rpm, A/C table, 11 kW)",
+    post: "fanuc",
+    limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
+    table: { length: 600, width: 400, gap: 30 },
+    fiveAxis: { layout: "table-AC", pivot: { x: 0, y: 0, z: -100 }, tilt: [-120, 120] },
+    rapidFeed: 30000,
+    toolChangeSeconds: 6
+  },
+  {
     id: "cnc-router",
     name: "CNC router (24 000 rpm spindle, 2.2 kW)",
     post: "grbl",
@@ -8233,6 +8291,7 @@ var DEG3 = Math.PI / 180;
 // packages/core/src/cam/kernel/collision.ts
 var DEG4 = Math.PI / 180;
 // packages/core/src/cam/kernel/schema.ts
+var SetupOrientationSchema = Literals(SETUP_ORIENTATIONS);
 var positive = Finite.check(isGreaterThan2(0));
 var nonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
 var id = String4.check(isMinLength(1), isMaxLength(80));
@@ -8241,7 +8300,7 @@ var ring2 = ArraySchema(point).check(isMinLength(3), isMaxLength(20000));
 var CutterSchema = Struct({
   id,
   name: String4.check(isMaxLength(120)),
-  kind: Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver"]),
+  kind: Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer"]),
   diameter: positive,
   flutes: Int.check(isBetween({ minimum: 1, maximum: 24 })),
   material: Literals(["hss", "hss-co", "carbide", "pcd"]),
@@ -8276,20 +8335,31 @@ var OperationSpecSchema = Union2([
   Struct({ ...overrides, strategy: Literal2("pocket"), region, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative), finish: optionalKey2(Boolean3) }),
   Struct({ ...overrides, strategy: Literal2("profile"), loop: ring2, side: Literals(["outside", "inside"]), top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative), finish: optionalKey2(Boolean3) }),
   Struct({ ...overrides, strategy: Literal2("bore"), center: point, diameter: positive, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative) }),
-  Struct({ ...overrides, strategy: Literal2("drill"), points: ArraySchema(point).check(isMinLength(1), isMaxLength(5000)), top: Finite, bottom: Finite, cut: optionalKey2(Literals(["drill", "spot"])) }),
+  Struct({ ...overrides, strategy: Literal2("drill"), points: ArraySchema(point).check(isMinLength(1), isMaxLength(5000)), top: Finite, bottom: Finite, cut: optionalKey2(Literals(["drill", "spot", "tap", "ream"])) }),
   Struct({ ...overrides, strategy: Literal2("thread"), center: point, diameter: positive, pitch: positive, internal: Boolean3, top: Finite, length: positive, rightHand: optionalKey2(Boolean3) }),
   Struct({ ...overrides, strategy: Literal2("engrave"), paths: ArraySchema(Struct({ points: ArraySchema(point).check(isMinLength(2)), closed: Boolean3 })).check(isMinLength(1), isMaxLength(2000)), top: Finite, depth: positive }),
   Struct({ ...overrides, strategy: Literal2("chamfer"), loops: ArraySchema(Struct({ points: ring2, side: Literals(["outside", "inside"]) })).check(isMinLength(1), isMaxLength(2000)), top: Finite, width: positive, tipOffset: optionalKey2(nonNegative) }),
   Struct({
     ...overrides,
     strategy: Literal2("surface"),
-    mode: Literals(["roughing", "parallel", "waterline", "steep-shallow"]),
+    mode: Literals(SURFACE_MODES),
     slopeAngle: optionalKey2(Finite.check(isBetween({ minimum: 5, maximum: 85 }))),
     allowance: optionalKey2(nonNegative),
     scallop: optionalKey2(positive),
     clearing: optionalKey2(Literals(["contour", "adaptive"])),
     angle: optionalKey2(Finite),
-    restFrom: optionalKey2(id)
+    restFrom: optionalKey2(id),
+    center: optionalKey2(point)
+  }),
+  Struct({
+    ...overrides,
+    strategy: Literal2("multiaxis"),
+    top: Finite,
+    stepover: positive,
+    angle: optionalKey2(Finite),
+    toolAxis: optionalKey2(Literals(["normal", "lead"])),
+    lead: optionalKey2(Finite.check(isBetween({ minimum: -85, maximum: 85 }))),
+    tilt: optionalKey2(Finite.check(isBetween({ minimum: -85, maximum: 85 })))
   })
 ]);
 // packages/core/src/drawing/sheet.ts

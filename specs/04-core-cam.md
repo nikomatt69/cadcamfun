@@ -208,3 +208,9 @@ The `3d_surface` operation no longer follows each element's outline: the selecte
 - v6: Added adaptive (engagement-bounded) clearing for surface roughing and rest, `clearing` / `engagement`, and the generator's `surfaceClearing` / `adaptiveEngagement`.
 - v6: Added `rest` surface strategy (rest roughing from a previous tool) and wired the generator's `useRestMachining`, which previously was a checkbox connected to nothing.
 - v6: Added §12 3D surface machining (part model from solids, drop-cutter, roughing / parallel / waterline strategies, generator integration, real finishing pass for outlines and surfaces).
+
+## Oriented manual setups (2026-10-19)
+
+Status: implemented; verification tracked in [spec 34](34-oriented-cam-setups.md). The native kernel accepts six CAD directions facing the spindle, rotates meshes/stock/exact features together and emits a separate three-axis program. Lateral/bottom workholding and full-part coverage remain unresolved. Downward-facing triangles above the underside prevent height-field replay from certifying hidden surfaces, including explicit-operation jobs. This does not implement rotary helical machining or certify multi-setup stock transfer.
+
+Change log: 2026-10-19 — added manual setup orientation across the existing kernel/snapshot interface and evidence for inaccessible surfaces; global RM statuses unchanged.

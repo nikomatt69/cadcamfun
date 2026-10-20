@@ -2668,6 +2668,7 @@ const adaptGroup26 = (raw: RawClient["toolpathExtras"]) => ({
 
 type Endpoint27_0Request = Parameters<RawClient["toolpathGenerator"]["manufacture"]>[0]
 type Endpoint27_0Input = {
+  readonly setupOrientation?: Endpoint27_0Request["payload"]["setupOrientation"]
   readonly material: Endpoint27_0Request["payload"]["material"]
   readonly machine?: Endpoint27_0Request["payload"]["machine"]
   readonly origin?: Endpoint27_0Request["payload"]["origin"]
@@ -2689,6 +2690,7 @@ type Endpoint27_0Input = {
 const Endpoint27_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_0Input) =>
   raw["manufacture"]({
     payload: {
+      setupOrientation: input["setupOrientation"],
       material: input["material"],
       machine: input["machine"],
       origin: input["origin"],

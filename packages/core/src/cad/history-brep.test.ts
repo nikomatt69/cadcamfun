@@ -288,8 +288,8 @@ describe("exact replay of a parametric history", () => {
   })
 
   test("features without an exact counterpart are never skipped silently", () => {
-    const lettered = rebuildExact(plate([{ id: "t", type: "text", plane: "XY", offset: 6, at: [5, 5], text: "A", height: 5, depth: 1, operation: "union" }]))
-    expect(lettered.bodies[0]!.reason).toContain("text")
+    const threaded = rebuildExact(plate([{ id: "t", type: "thread", kind: "internal", diameter: 8, pitch: 1.25, length: 6, at: [20, 12.5] }]))
+    expect(threaded.bodies[0]!.reason).toContain("thread")
     // A hole wall is curved: its draft says so instead of leaving the body as it was.
     const bored = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, { id: "lean", type: "draft", near: [24, 12.5, 3], angle: 3 }])
     expect(rebuildExact(bored).bodies[0]!.reason).toContain("curved face")

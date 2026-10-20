@@ -44,6 +44,36 @@ describe("rib, sheet metal, thread, text and press/pull reach the assistant", ()
     expect(report.flatPatterns["sh"]!.bends).toBe(1)
   })
 
+  test("ellipse and spline sketch entities pass the schema and build", () => {
+    const ellipse = parse([{ id: "s", type: "sketch", plane: "XY", sketch: { entities: [{ id: "c", kind: "point", x: 0, y: 0 }, { id: "e", kind: "ellipse", center: "c", radiusX: 12, radiusY: 6 }], constraints: [{ type: "fixed", point: "c", x: 0, y: 0 }, { type: "ellipseSize", ellipse: "e", radiusX: 12, radiusY: 6 }] } }, { id: "plate", type: "extrude", sketch: "s", depth: 4, operation: "new" }])
+    expect(ellipse.success).toBe(true)
+    if (ellipse.success) expect(parametricReport(ellipse.data as History).ok).toBe(true)
+    const spline = parse([{ id: "s", type: "sketch", plane: "XY", sketch: { entities: [{ id: "p1", kind: "point", x: 0, y: 0 }, { id: "p2", kind: "point", x: 20, y: 0 }, { id: "p3", kind: "point", x: 20, y: 20 }, { id: "p4", kind: "point", x: 0, y: 20 }, { id: "sp", kind: "spline", points: ["p1", "p2", "p3", "p4"], closed: true }], constraints: [{ type: "fixed", point: "p1", x: 0, y: 0 }, { type: "fixed", point: "p2", x: 20, y: 0 }, { type: "fixed", point: "p3", x: 20, y: 20 }, { type: "fixed", point: "p4", x: 0, y: 20 }] } }, { id: "plate", type: "extrude", sketch: "s", depth: 4, operation: "new" }])
+    expect(spline.success).toBe(true)
+    if (spline.success) expect(parametricReport(spline.data as History).ok).toBe(true)
+  })
+
+  test("a pattern along a path passes the schema and builds its copies", () => {
+    const parsed = parse([...base, line("route", 0, [[2, 2], [22, 2], [22, 22]]), { id: "pat", type: "pattern", feature: "e", kind: "path", path: "route", count: 3 }])
+    expect(parsed.success).toBe(true)
+    if (!parsed.success) return
+    const report = parametricReport(parsed.data as History)
+    expect(report.issues.filter((i) => i.severity === "error")).toEqual([])
+    expect(report.bodyCount).toBe(3)
+  })
+
+  test("the flat pattern DXF reaches the assistant", () => {
+    const parsed = parse([line("p", 0, [[0, 0], [30, 0], [30, 20]]), { id: "sh", type: "sheet", sketch: "p", thickness: 2, width: 25, bendRadius: 3, operation: "new" }])
+    expect(parsed.success).toBe(true)
+    if (!parsed.success) return
+    const report = parametricReport(parsed.data as History)
+    const dxf = report.flatPatternDxf["sh"]
+    expect(dxf).toBeDefined()
+    expect(dxf).toContain("SECTION")
+    expect(dxf).toContain("CUT")
+    expect(dxf).toContain("BEND")
+  })
+
   test("an internal thread cuts a tapped hole and an external one is a rod, both sized in the report", () => {
     const parsed = parse([...base, { id: "tap", type: "thread", kind: "internal", diameter: 8, pitch: 1.25, length: 6, at: [20, 15], offset: 2 }, { id: "stud", type: "thread", kind: "external", diameter: 6, pitch: 1, length: 8, at: [5, 5], offset: 10, operation: "union" }])
     expect(parsed.success).toBe(true)

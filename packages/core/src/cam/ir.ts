@@ -72,7 +72,7 @@ export const OrientSchema = Schema.TaggedStruct("Orient", {
   c: Schema.optionalKey(Schema.Finite)
 })
 
-export const CycleKindSchema = Schema.Literals(["drill", "dwell", "peck", "chipBreak", "tap", "ream"])
+export const CycleKindSchema = Schema.Literals(["drill", "dwell", "peck", "chipBreak", "tap", "ream", "bore"])
 export type CycleKind = typeof CycleKindSchema.Type
 
 /**
@@ -83,6 +83,7 @@ export type CycleKind = typeof CycleKindSchema.Type
  * `tap` is rigid tapping: the feed is `pitch` x spindle speed, the spindle reverses at the bottom and the tap feeds out; it has
  * no expansion a control without the cycle could run (the reversal is the control's), so such a post refuses it. `ream` feeds in
  * and back out at the cutting feed (reaming, boring to size), so the edge does not mark the finished bore on a rapid exit.
+ * `bore` feeds in and rapids out (G86: the control stops the spindle at the bottom), the cycle of a boring bar.
  */
 export const CycleSchema = Schema.TaggedStruct("Cycle", {
   cycle: CycleKindSchema,
@@ -223,6 +224,7 @@ export const expandCycle = (cycle: CycleMove, from: Vec3): ReadonlyArray<Move> =
   }
   switch (cycle.cycle) {
     case "drill":
+    case "bore":
       feed(bottom)
       break
     case "dwell":

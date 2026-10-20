@@ -15,6 +15,7 @@ import type { ActionContribution, ToolContext } from "../tools/define.ts"
 import { nikcliWireSchema } from "../tools/wire-schema.ts"
 import { schemaProblems } from "../tool-validation.ts"
 import { classifyOutcome, failure, outcomeWire, type ActionOutcome } from "./outcome.ts"
+import { withPostEditDiagnostics } from "../diagnostics.ts"
 
 /** What an action does to domain data. Derived from the implementation, never from the tool's name. */
 export type ActionKind = "read" | "write" | "destructive"
@@ -159,7 +160,7 @@ const failureOutcome = (action: ActionSpec, error: ActionFailure): ActionOutcome
 export const executeActionOutcome = async (action: ActionSpec, input: unknown, context: ActionContext): Promise<ActionOutcome> => {
   let started = false
   try {
-    return await Effect.runPromise(
+    const outcome = await Effect.runPromise(
       Effect.sync(() => { started = !context.signal?.aborted }).pipe(
         Effect.andThen(action.run(input as never, context)),
         Effect.map((raw) => classifyOutcome(action, raw)),
@@ -167,6 +168,11 @@ export const executeActionOutcome = async (action: ActionSpec, input: unknown, c
       ),
       { signal: context.signal }
     )
+    // Post-edit diagnostics (the CAD/CAM LSP step, `diagnostics.ts`): a successful mutation is checked
+    // against what it touched and the findings ride on its own result, in this same step.
+    if (outcome.kind !== "succeeded" && outcome.kind !== "partial") return outcome
+    const diagnosed = await withPostEditDiagnostics(action, outcome.value, context)
+    return diagnosed === outcome.value ? outcome : { ...outcome, value: diagnosed }
   } catch (cause) {
     if (context.signal?.aborted) {
       return started && action.kind !== "read"

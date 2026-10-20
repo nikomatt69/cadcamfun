@@ -1,6 +1,6 @@
 /** Validated boundary for the existing feature-history engine; no second modeller. */
 import { ParametricDimension, ParametricHistory, ParametricParameters } from "@cadcamfun/api"
-import { brep, cam, cleanMesh, describeTopology, exactSummary, meshTopology, rebuild, rebuildExact, meshVolume, type History } from "@cadcamfun/core"
+import { brep, cam, cleanMesh, describeTopology, dimensionValue, exactSummary, flatPatternDxf, meshTopology, rebuild, rebuildExact, meshVolume, type History } from "@cadcamfun/core"
 import { schemaDecoder } from "./tool-validation.ts"
 
 /** The history schema is declared once in Effect (`ParametricHistory` in `@cadcamfun/api`); these are its decoders. */
@@ -63,6 +63,12 @@ const computeParametricReport = (history: History) => {
     bounds: result.bodies.length > 0 && finite ? { min, max } : null,
     issues: result.issues.slice(0, 40), omittedIssues: Math.max(0, result.issues.length - 40),
     flatPatterns: Object.fromEntries(Object.entries(result.flatPatterns).map(([id, d]) => [id, { straightMm: d.straight, bends: d.bends.length, lengthMm: d.length }])),
+    flatPatternDxf: Object.fromEntries(history.features.flatMap((f) => {
+      if (f.type !== "sheet") return []
+      const developed = result.flatPatterns[f.id]
+      if (developed === undefined) return []
+      try { return [[f.id, flatPatternDxf(developed, dimensionValue(f.width, result.parameters), f.id)] as const] } catch { return [] }
+    })),
     sketches: Object.entries(result.sketches).map(([id, s]) => ({ id, status: s.solve.status, degreesOfFreedom: s.solve.dof, residual: s.solve.residual })),
     // What each body is as a solid (welded first): closed or with open/non-manifold edges, its shells and through holes (genus), so a
     // defect the CAM or an STL export would trip on is reported, and the hole count can be checked against what was asked.

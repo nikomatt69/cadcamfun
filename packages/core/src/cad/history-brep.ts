@@ -9,15 +9,18 @@
  * coaxial rims (plane, cylinder, cone), shells of extrusions, full revolutions and sweeps, the draft and the push/pull of a
  * planar face, mates (the rigid motion from the exact faces), the analytic catalogue primitives (cube, cylinder, cone,
  * sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split and combine,
- * and the union / subtract / intersect of every tool. A body that went through anything else (loft, coil, rib, sheet,
- * text, a modelled thread, drafts and push/pulls of curved faces, blends of non-coaxial curved edges, a non-uniform scale,
+ * ribs, sheets, text and coils, and the union / subtract / intersect of every tool. A body that went through anything else
+ * (loft, a modelled thread, drafts and push/pulls of curved faces, blends of non-coaxial curved edges, a non-uniform scale,
  * another catalogue element) keeps its mesh and says why it has no exact model; nothing is approximated behind the
  * caller's back.
  */
 import { dimensionValue, type Dimension } from "./expr.ts"
-import { polygonArea, sketchProfiles, type Sketch } from "./sketch.ts"
+import { ellipseLoopPoints, polygonArea, sketchProfiles, splinePoints, type Sketch } from "./sketch.ts"
 import { add3, cross3, dot3, length3, normalize3, scale3, sub3 } from "./vec.ts"
-import { rebuild, type Feature, type History, type PlaneName, type RebuildResult } from "./history.ts"
+import { cornersOf, rebuild, type Feature, type History, type PlaneName, type RebuildResult } from "./history.ts"
+import { sheetOutline, thickenPath, withHems } from "./sheet-metal.ts"
+import { textBars } from "./text-solid.ts"
+import { coilGeometry } from "./helix.ts"
 import {
   blendBrep,
   blendCandidates,
@@ -61,6 +64,7 @@ import {
   treatLoopCorners,
   tessellateBrep,
   massProperties,
+  mergeBreps,
   validateBrep,
   writeStepBreps,
   type StepWriteOptions,
@@ -118,6 +122,16 @@ export const exactSketchLoops = (sketch: Sketch): { readonly loops: ProfileLoop[
       while (sweep <= 1e-12) sweep += 2 * Math.PI
       pieces.push({ a: e.start, b: e.end, seg: { kind: "arc", center: c, radius: Math.hypot(s.x - c.x, s.y - c.y), start: a0, end: a0 + sweep } })
     } else if (e.kind === "circle") loops.push([{ kind: "arc", center: at(e.center), radius: e.radius, start: 0, end: 2 * Math.PI }])
+    // Ellipses and closed splines have no analytic profile segment in this kernel: the exact loop carries the same
+    // sampled chords the mesh is cut from, so the two views agree by construction.
+    else if (e.kind === "ellipse") {
+      const ring = ellipseLoopPoints(at(e.center), e.radiusX, e.radiusY, e.rotation ?? 0)
+      loops.push(ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! })))
+    } else if (e.kind === "spline" && e.closed === true) {
+      const ring = splinePoints(e.points.map(at), true)
+      if (ring.length > 1 && Math.hypot(ring[0]!.x - ring[ring.length - 1]!.x, ring[0]!.y - ring[ring.length - 1]!.y) < 1e-9) ring.pop()
+      loops.push(ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! })))
+    }
   }
   const reverse = (s: ProfileSegment): ProfileSegment => (s.kind === "line" ? { kind: "line", a: s.b, b: s.a } : s.kind === "arc" ? { ...s, start: s.end, end: s.start } : s)
   const used = new Set<number>()
@@ -880,6 +894,36 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
           } else if (f.kind === "linear") {
             const step = (f.step ?? [0, 0, 0]).map(dim)
             for (let i = 1; i < count; i++) emit(translation({ x: step[0]! * i, y: step[1]! * i, z: step[2]! * i }), `${f.id}#${i}`)
+          } else if (f.kind === "path") {
+            const routeSketch = f.path === undefined ? undefined : sketchOf(f.path)
+            if (routeSketch === undefined) break
+            const { open } = sketchProfiles(routeSketch.solve.sketch)
+            if (open.length === 0) break
+            const chain = open[0]!
+            const F = routeSketch.frame
+            const at3 = (p: Vec2): Vec3 => ({ x: F.origin.x + F.u.x * p.x + F.v.x * p.y, y: F.origin.y + F.u.y * p.x + F.v.y * p.y, z: F.origin.z + F.u.z * p.x + F.v.z * p.y })
+            const segLens = chain.slice(1).map((p, i) => Math.hypot(p.x - chain[i]!.x, p.y - chain[i]!.y))
+            const total = segLens.reduce((a, b) => a + b, 0)
+            if (!(total > 0)) break
+            const sample = (s: number): { point: Vec2; angle: number } => {
+              let left = s
+              for (let i = 0; i < segLens.length; i++) {
+                const a = chain[i]!, b = chain[i + 1]!
+                if (left <= segLens[i]! || i === segLens.length - 1) {
+                  const t = segLens[i]! === 0 ? 0 : Math.min(1, Math.max(0, left / segLens[i]!))
+                  return { point: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, angle: Math.atan2(b.y - a.y, b.x - a.x) }
+                }
+                left -= segLens[i]!
+              }
+              return { point: chain[chain.length - 1]!, angle: 0 }
+            }
+            const startAngle = Math.atan2(chain[1]!.y - chain[0]!.y, chain[1]!.x - chain[0]!.x)
+            const p0 = at3(chain[0]!)
+            for (let i = 1; i < count; i++) {
+              const { point, angle } = sample((total * i) / (count - 1))
+              const pi = at3(point)
+              emit(compose(rotation(F.n, angle - startAngle, p0), translation({ x: pi.x - p0.x, y: pi.y - p0.y, z: pi.z - p0.z })), `${f.id}#${i}`)
+            }
           } else {
             const c = (f.centre ?? [0, 0]).map(dim)
             const span = f.span === undefined ? 360 : dim(f.span)
@@ -1155,14 +1199,141 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
           apply(f.id, ok(solid), f.operation, f.targets, f.id)
           break
         }
-        case "coil":
-        case "rib":
-        case "sheet":
-        case "text":
-          unsupported(f, `a ${f.type} has no exact model yet`)
+        case "rib": {
+          const sk = sketchOf(f.sketch)
+          if (sk === undefined) break
+          const thickness = dim(f.thickness), depth = dim(f.depth)
+          if (!(thickness > 0 && depth > 0)) break
+          const { open } = sketchProfiles(sk.solve.sketch)
+          if (open.length === 0) break
+          const dir = f.direction ?? "up"
+          const from = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
+          const F = sk.frame
+          const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
+          let webs: Brep[]
+          try {
+            webs = open.map((line) => {
+              const ring = thickenPath(line, -thickness / 2, thickness / 2)
+              const loop: ProfileLoop = ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! }))
+              return extrudeProfile({ loops: [loop] }, depth, { placement, name: f.id })
+            })
+          } catch (e) {
+            unsupported(f, e instanceof Error ? e.message : String(e))
+            break
+          }
+          const tool = ok(unionAll(webs))
+          const operation = f.operation ?? "union"
+          tools.set(f.id, { exact: [tool], operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, operation, f.targets, f.id)
           break
+        }
+        case "sheet": {
+          const sk = sketchOf(f.sketch)
+          if (sk === undefined) break
+          const thickness = dim(f.thickness), width = dim(f.width)
+          const radius = f.bendRadius === undefined ? 0 : dim(f.bendRadius)
+          if (!(thickness > 0 && width > 0)) break
+          const { open } = sketchProfiles(sk.solve.sketch)
+          if (open.length !== 1) break
+          const side = f.side ?? "centre"
+          let line = open[0]!
+          if (f.hems !== undefined && f.hems.length > 0) {
+            const specs = f.hems.map((h) => ({ end: h.end, length: dim(h.length), gap: h.gap === undefined ? 0 : dim(h.gap), fold: h.fold ?? "left" as const }))
+            try {
+              line = withHems(cornersOf(line), thickness, specs)
+            } catch (e) {
+              unsupported(f, e instanceof Error ? e.message : String(e))
+              break
+            }
+          }
+          const dir = f.direction ?? "up"
+          const from = dir === "up" ? 0 : dir === "down" ? -width : -width / 2
+          const F = sk.frame
+          const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
+          let solid: Brep
+          try {
+            const outline = sheetOutline(line, thickness, side, radius)
+            const loop: ProfileLoop = outline.map((a, i) => ({ kind: "line", a, b: outline[(i + 1) % outline.length]! }))
+            solid = extrudeProfile({ loops: [loop] }, width, { placement, name: f.id })
+          } catch (e) {
+            unsupported(f, e instanceof Error ? e.message : String(e))
+            break
+          }
+          const tool = ok(solid)
+          tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, f.operation, f.targets, f.id)
+          break
+        }
+        case "text": {
+          const height = dim(f.height), depth = dim(f.depth)
+          const stroke = f.strokeWidth === undefined ? undefined : dim(f.strokeWidth)
+          const offset = f.offset === undefined ? 0 : dim(f.offset)
+          const at = f.at === undefined ? [0, 0] : [dim(f.at[0]), dim(f.at[1])]
+          const spacing = f.spacing === undefined ? 1 : dim(f.spacing)
+          if (!(height > 0 && depth > 0) || f.text.trim().length === 0 || f.text.length > 200) break
+          let bars: ReturnType<typeof textBars>["bars"]
+          try {
+            bars = textBars({ text: f.text, height, strokeWidth: stroke ?? height / 9, depth, spacing, align: f.align ?? "left" }).bars
+          } catch (e) {
+            unsupported(f, e instanceof Error ? e.message : String(e))
+            break
+          }
+          if (bars.length === 0) break
+          const P = planeFrame(f.plane, offset)
+          if (P === undefined) { unsupported(f, `a text on the work plane '${f.plane}' has no exact model yet`); break }
+          const dir = f.direction ?? "up"
+          const z0 = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
+          const origin = {
+            x: P.origin.x + P.u.x * at[0]! + P.v.x * at[1]! + P.n.x * z0,
+            y: P.origin.y + P.u.y * at[0]! + P.v.y * at[1]! + P.n.y * z0,
+            z: P.origin.z + P.u.z * at[0]! + P.v.z * at[1]! + P.n.z * z0
+          }
+          const placement = frame(origin, P.n, P.u)
+          let solid: Brep
+          try {
+            const pieces = bars.map((ring) => {
+              const loop: ProfileLoop = ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! }))
+              return extrudeProfile({ loops: [loop] }, depth, { placement, name: f.id })
+            })
+            solid = pieces.slice(1).reduce((acc, p) => {
+              try { return booleanBrep(acc, p, "union").brep } catch { return mergeBreps([acc, p]) }
+            }, pieces[0]!)
+          } catch (e) {
+            unsupported(f, e instanceof Error ? e.message : String(e))
+            break
+          }
+          const tool = ok(solid)
+          tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, f.operation, f.targets, f.id)
+          break
+        }
+        case "coil": {
+          const radius = dim(f.radius), pitch = dim(f.pitch), turns = dim(f.turns), wire = dim(f.wireDiameter)
+          const cx = f.centre === undefined ? 0 : dim(f.centre[0]), cy = f.centre === undefined ? 0 : dim(f.centre[1])
+          const z0 = f.offset === undefined ? 0 : dim(f.offset)
+          if (!(wire > 0 && radius > 0 && pitch > 0 && turns > 0) || !(radius > wire / 2 + 1e-9) || !(pitch > wire + 1e-9)) break
+          const g = coilGeometry({ cx, cy, z0, radius, pitch, turns, wire, square: f.section === "square", left: f.handedness === "left" })
+          const pieces: PathPiece[] = g.path.slice(1).map((b, i) => ({ kind: "line", a: g.path[i]!, b }))
+          // The wire profile is the polygon `coilGeometry` cuts the mesh from: a true helicoid is not an analytic
+          // surface of this kernel, so the exact coil carries the same chords and says so by construction.
+          const loop: ProfileLoop = g.ring2d.map((a, i) => ({ kind: "line", a, b: g.ring2d[(i + 1) % g.ring2d.length]! }))
+          const t = g.normal, radial = { x: 1, y: 0, z: 0 }
+          const binormal = { x: t.y * radial.z - t.z * radial.y, y: t.z * radial.x - t.x * radial.z, z: t.x * radial.y - t.y * radial.x }
+          const start = sweepStartFrame({ origin: g.centre, u: radial, v: binormal, n: t }, pieceTangent(pieces[0]!, false))
+          let solid: Brep
+          try {
+            solid = sweepPath({ loops: [loop] }, start, pieces, { closed: false, name: f.id })
+          } catch (e) {
+            unsupported(f, e instanceof Error ? e.message : String(e))
+            break
+          }
+          const tool = ok(solid)
+          tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, f.operation, f.targets, f.id)
+          break
+        }
         case "thread":
-          unsupported({ ...f, operation: f.cut === true ? "subtract" : f.operation ?? "new" }, "a modelled (helical) thread has no exact model yet")
+          unsupported({ ...f, operation: f.cut === true ? "subtract" : f.operation ?? (f.kind === "internal" ? "subtract" : "new") }, "a modelled (helical) thread has no exact model yet")
           break
         case "pushpull": {
           const distance = dim(f.distance)

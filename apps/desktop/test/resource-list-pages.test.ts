@@ -45,6 +45,33 @@ describe("resource list pages", () => {
     }, PAGE_TIMEOUT)
   }
 
+  test("the Generate button opens the assistant brief with every parameter", async () => {
+    resetStores()
+    const { dispose } = app.visit("/tools")
+    try {
+      await find(".cam-workspace")
+      await app.wait(() => byText("h3", "Endmill List"), 30000)
+      const generate = await app.wait(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.trim() === "Generate"), 30000)
+      generate?.click()
+      expect(await app.wait(() => byText("h3", "Generate Tools"), 30000)).toBeDefined()
+      const request = document.querySelector<HTMLTextAreaElement>("#generate-request")
+      const submit = document.querySelector<HTMLButtonElement>('[data-testid="generate-submit"]')
+      expect(request).not.toBeNull()
+      expect(submit?.disabled).toBe(true)
+      request!.value = "Ø6 mm 3-flute end mill"
+      request!.dispatchEvent(new window.Event("input", { bubbles: true }))
+      expect(submit?.disabled).toBe(false)
+      const parameters = await app.wait(() => [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes("Parameters the assistant fills")), 30000)
+      parameters?.click()
+      expect(await app.wait(() => byText("code", "cornerRadius"), 30000)).toBeDefined()
+      expect(document.body.textContent).toContain("stickout")
+      // Sending hands the brief to the assistant: the panel opens and the form starts clean next time.
+      submit!.click()
+      expect(await app.wait(() => document.querySelector('[data-testid="ai-panel"]'), 30000)).not.toBeNull()
+      expect(await app.wait(() => document.querySelector('[data-testid="generate-submit"]') === null, 30000)).toBe(true)
+    } finally { dispose() }
+  }, PAGE_TIMEOUT)
+
   test("search filters the cards and a card opens its detail page", async () => {
     resetStores()
     // happy-dom's pushState cannot serialise an undefined state, which the router passes on navigation.

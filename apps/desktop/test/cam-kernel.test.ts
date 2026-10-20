@@ -174,3 +174,33 @@ test("the kernel plan is editable: remove an operation, override a stepdown, giv
     expect(useGeneratorStore.getState().kernelSettings.operations).toBeUndefined()
   } finally { view.dispose(); useGeneratorStore.getState().patchKernelSettings({ operations: undefined, tools: undefined }) }
 })
+
+test("manual side setup controls clear the old plan, preserve the request and restore the chosen side", async () => {
+  const { restoreKernelSettings } = await import("../src/features/cam/store/generatorStore.ts")
+  useElementsStore.getState().addElements([{ id: "p", type: "cube", width: 20, height: 12, depth: 6, x: 0, y: 0, z: 0, layerId: "default" }])
+  useElementsStore.setState({ selectedElement: null })
+  const view = app.visit("/cam")
+  try {
+    const select = await app.wait(() => document.querySelector<HTMLSelectElement>("[data-testid='kernel-setup-orientation']"), 30_000)
+    useGeneratorStore.getState().patchKernelSettings({ operations: [{ id: "old", strategy: "face", bottom: 3, tool: "flat-6" }] })
+    useGeneratorStore.getState().updateSettings("workholdingConfigured", true)
+    select.value = "+X"
+    select.dispatchEvent(new window.Event("change", { bubbles: true }))
+    expect(useGeneratorStore.getState().kernelSettings.setupOrientation).toBe("+X")
+    expect(useGeneratorStore.getState().kernelSettings.operations).toBeUndefined()
+    expect(useGeneratorStore.getState().settings.workholdingConfigured).toBe(false)
+    expect(document.querySelector("[data-testid='kernel-manual-setup-hint']")?.textContent).toContain("Separate manual setup")
+    document.querySelector<HTMLButtonElement>("[data-testid='kernel-generate']")!.click()
+    await app.wait(() => useCamStore.getState().kernelArtifact?.setupOrientation === "+X" ? true : null, 60_000)
+    const store = useCamStore.getState(), request = store.kernelRequest!
+    expect(request.setupOrientation).toBe("+X")
+    expect(store.kernelArtifact!.release).toBe("preview")
+    expect(document.querySelector("[data-testid='kernel-stale']")).toBeNull()
+    expect(store.kernelArtifact!.claims.find((c) => c.id === "part-coverage")?.status).toBe("unresolved")
+    restoreKernelSettings(request)
+    expect(useGeneratorStore.getState().kernelSettings.setupOrientation).toBe("+X")
+    select.value = "-X"
+    select.dispatchEvent(new window.Event("change", { bubbles: true }))
+    expect(document.querySelector("[data-testid='kernel-stale']")).not.toBeNull()
+  } finally { view.dispose() }
+})

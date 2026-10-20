@@ -69,6 +69,13 @@ export const LibraryToolInput = Schema.Struct({
   cuttingLength: Schema.optionalKey(positive),
   totalLength: Schema.optionalKey(positive),
   shankDiameter: Schema.optionalKey(positive),
+  // The shape of the cutter's 3D model (spec 31): the same fields the Resources page edits.
+  cornerRadius: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  tipAngle: Schema.optionalKey(positive),
+  threadPitch: Schema.optionalKey(positive),
+  holderDiameter: Schema.optionalKey(positive),
+  holderLength: Schema.optionalKey(positive),
+  stickout: Schema.optionalKey(positive),
   notes: Schema.optionalKey(Schema.String),
   isPublic: withDefault(Schema.Boolean, false)
 })
@@ -86,22 +93,63 @@ export const LibraryMachineConfigInput = Schema.Struct({
   isPublic: withDefault(Schema.Boolean, false)
 })
 
+/** A generic library item (a stored template, setup sheet, fixture, post snippet...): the category and type name what it is, `data` is its content. */
+export const LibraryItemInput = Schema.Struct({
+  id: Schema.optionalKey(Schema.String),
+  name: id,
+  category: id,
+  type: id,
+  data: Schema.Record(Schema.String, Schema.Unknown),
+  description: Schema.optionalKey(Schema.String),
+  properties: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+  tags: Schema.optionalKey(Schema.Array(Schema.String)),
+  isPublic: withDefault(Schema.Boolean, false)
+})
+
+/** Shop-floor prices: what a material, a cutter's wear or an operation (machine and operator hour) costs. */
+export const LibraryCostInput = Schema.Struct({
+  kind: Schema.Literals(["material", "tool_wear", "operation"]),
+  id: Schema.optionalKey(Schema.String),
+  materialId: Schema.optionalKey(Schema.String),
+  toolId: Schema.optionalKey(Schema.String),
+  name: Schema.optionalKey(Schema.String),
+  costPerUnit: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  wasteFactor: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  minimumCharge: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  wearRatePerMeter: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  replacementCost: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  replacementThreshold: Schema.optionalKey(positive),
+  machineHourlyRate: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  operatorHourlyRate: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  setupTime: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  currencyCode: Schema.optionalKey(Schema.String)
+})
+
 export const LIBRARY_ACTION_INPUTS = {
   "library.component_list": empty,
   "library.lookup_component": optionalQuery,
   "library.lookup_material": query,
   "library.lookup_tool": query,
   "library.lookup_machine_config": optionalQuery,
-  "parts.save": Schema.Struct({ ids: Schema.Array(id).check(Schema.isMinLength(1)), name: id }),
+  /** Gathering elements into a reusable part carries its library metadata with it, not only its name. */
+  "parts.save": Schema.Struct({
+    ids: Schema.Array(id).check(Schema.isMinLength(1)),
+    name: id,
+    description: Schema.optionalKey(Schema.String),
+    type: Schema.optionalKey(Schema.String),
+    isPublic: withDefault(Schema.Boolean, false)
+  }),
   "parts.insert": Schema.Struct({ componentId: id, transform: Schema.optionalKey(PartsTransform) }),
   "parts.delete": Schema.Struct({ componentId: id, confirm }),
   "library_edit.upsert_material": LibraryMaterialInput,
   "library_edit.upsert_tool": LibraryToolInput,
   "library_edit.upsert_machine_config": LibraryMachineConfigInput,
+  "library_edit.upsert_library_item": LibraryItemInput,
+  "library_edit.set_cost": LibraryCostInput,
   "library_edit.set_default": Schema.Struct({
     materialId: Schema.optionalKey(Schema.String), toolId: Schema.optionalKey(Schema.String), machineConfigId: Schema.optionalKey(Schema.String)
   }),
-  "library_edit.delete": Schema.Struct({ kind: Schema.Literals(["material", "tool", "machine_config"]), id, confirm })
+  "library_edit.delete": Schema.Struct({ kind: Schema.Literals(["material", "tool", "machine_config", "library_item"]), id, confirm })
 } as const
 
 // ---------------------------------------------------------------- `memory`, `memory_edit`, `research`

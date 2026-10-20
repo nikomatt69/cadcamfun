@@ -14,7 +14,9 @@ const refuse = (message: string) => ({ ok: false, error: message })
 /**
  * The `background` flag as a boolean. The action schema coerces `"true"` before an implementation sees it, but this
  * contribution is also called directly, and a strict `=== true` there would read the string `"true"` as false and
- * silently block the caller on a background job. A flag is never worth a wrong answer about whether to wait.
+ * silently block the caller on a background job. A flag is never worth a wrong answer about whether to wait. It is
+ * `undefined` only when the call said nothing, so the caller can apply nikcli's default (`true`): the job returns at
+ * once and the completion wakes this conversation.
  */
 const backgroundFlag = (value: unknown): boolean | undefined =>
   value === undefined ? undefined : value === true || value === "true"
@@ -32,12 +34,14 @@ export const backgroundToolContributions = (manager: BackgroundTaskManagerInterf
       const normalized = (name ?? "researcher").trim().toLowerCase().replace(/^cadcam-/, "").replace(/^worker$/, "researcher")
       if (!isSubagentId(normalized)) return { ok: false, error: `Unknown agent "${String(name)}". Use one of: ${SUBAGENT_IDS.join(", ")}.` }
       const spec = SUBAGENTS[normalized]
-      const background = backgroundFlag(value["background"]) ?? spec.background
+      // nikcli's `background` is optional and defaults to true: start returns at once and the completion wakes this
+      // conversation. Only an explicit false makes the call wait for the report.
+      const background = backgroundFlag(value["background"]) ?? true
       const task = manager.enqueue({
         description: String(value["description"]), prompt: String(value["prompt"]),
         ...owner, agent: spec.id, edits: spec.edits, background
       })
-      // The specialist works inside this tool call: its result comes back as this call's result.
+      // The caller asked to wait: the specialist works inside this tool call and its report is the call's result.
       if (background) return task
       return { ...(await manager.wait(owner, task.id, context.signal)), specialists: subagentCatalogue() }
     }

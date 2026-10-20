@@ -182,6 +182,40 @@ describe("BackgroundToolsRunner", () => {
     await drain(80)
     expect(runner.manager.read({ projectId: "project-wake", parentSessionId: parentId }, task.id).status).toBe("completed")
     await runner.dispose()
-    expect(seen.some((entry) => entry.sessionID === parentId && entry.agent === "cadcam" && entry.text.startsWith("[CADCAM_AGENT background findings]"))).toBe(true)
+    // nikcli's wake format: what finished, its status and id, the result, and how to read the rest.
+    const wake = seen.find((entry) => entry.sessionID === parentId && entry.agent === "cadcam")
+    expect(wake?.text).toBe([
+      `Background task "probe" finished.`,
+      "Status: completed",
+      `Task ID: ${task.id}`,
+      "",
+      "Result:",
+      "verify toolpath notes",
+      "",
+      "",
+      `Use agent action read (taskId="${task.id}") for the full result.`
+    ].join("\n"))
+  })
+
+  test("a long report is truncated at 100 lines with a pointer to the full result", async () => {
+    const seen: string[] = []
+    const stub = stubHost({
+      promptAsync: async (input: unknown) => {
+        const next = input as { parts: Array<{ type: string; text: string }> }
+        seen.push(next.parts.find((p) => p.type === "text")?.text ?? "")
+        return undefined
+      }
+    })
+    const report = Array.from({ length: 120 }, (_, index) => `line ${index + 1}`).join("\n")
+    const runner = new BackgroundToolsRunner(stub, { runner: async () => report })
+    const task = runner.manager.enqueue({ description: "long scan", prompt: "p", projectId: "project-long", parentSessionId: "parent-long" })
+    await drain(80)
+    await runner.dispose()
+    const body = seen[0] ?? ""
+    expect(body).toContain(`Task ID: ${task.id}`)
+    expect(body).toContain("line 100")
+    expect(body).not.toContain("line 101")
+    expect(body).toContain("\n...(truncated)")
+    expect(body).toContain(`Use agent action read (taskId="${task.id}") for the full result.`)
   })
 })

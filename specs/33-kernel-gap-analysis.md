@@ -29,18 +29,18 @@ state.
 | # | Gap | Today | Why it matters |
 | --- | --- | --- | --- |
 | C1 | **Mirror / pattern of whole bodies** | only the tool of a feature | half-part modelling, multi-body layouts — **closed in this pass** (§5) |
-| C2 | Exact model of `coil`, `rib`, `sheet`, `text`, modelled `thread` | mesh only, with a reason | STEP export and B-rep CAM features lose these bodies |
+| C2 | Exact model of `coil`, `rib`, `sheet`, `text`, modelled `thread` | rib/sheet/text/coil exact (this pass); modelled thread still mesh only, with a reason | STEP export and B-rep CAM features lose these bodies |
 | C3 | Fillets of non-coaxial curved edges, variable radius, setback vertex blends | refused or mitred | pipe T-junctions, cast parts, consumer products |
 | C4 | Chamfer by two distances / distance-angle | mesh and exact, shared callout geometry; API/AI and desktop controls | **closed in this continuation** (§5); unequal callouts require a uniquely more horizontal first face |
 | C5 | Shell of a Boolean result, a loft, a partial revolution; per-face thickness | refused | housings built from several features |
 | C6 | Persistent naming (topological naming) | selections by point / box | edits upstream re-pick faces silently or fail |
 | C7 | Surface modelling: patch, trim, stitch, thicken, offset surface | absent | class-A and freeform parts |
 | C8 | Direct editing: offset / delete / replace face on any body | planar push-pull only (exact), curved by mesh | imported STEP editing |
-| C9 | Pattern along a path, pattern of faces | absent | chains, ribs on curves |
+| C9 | Pattern along a path, pattern of faces | pattern along a path done (mesh + exact + API/AI schema); pattern of faces still absent | chains, ribs on curves |
 | C10 | Sheet metal: flange on an edge, reliefs, corner closures, multi-bend unfold of a 3D part | base flange + hems + flat pattern | real sheet-metal parts |
 | C11 | Assembly joint solver (several joints, motion limits, cam/gear joints), motion study | one rigid `mate` per body | mechanisms (the rack-and-pinion target of the harness goal) |
 | C12 | Exact holes on work planes | mesh only on work planes | tilted / face holes lose exactness and CAM features — **closed in this pass** (§5) |
-| C13 | Sketch: splines, ellipses, offset/trim/extend/project tools in the solver | lines, arcs, circles | freeform profiles must be approximated |
+| C13 | Sketch: splines, ellipses, offset/trim/extend/project tools in the solver | splines (Catmull-Rom through points) and ellipses (semi-axis unknowns, `ellipseSize`/`pointOnEllipse`) in the solver, profiles and exact loops (sampled chords); offset/trim/extend/project tools still absent | freeform profiles must be approximated |
 | C14 | Drawings: GD&T beyond flatness, balloons/BOM, assembly drawings, exact silhouettes | partial | production sheets |
 
 ## 2. CAM kernel
@@ -67,7 +67,7 @@ state.
 | M4 | Stock-aware rest: operation B consumes the stock A left (spec 29 §6) | rest from a previous tool diameter | voxel stock exists for 5-axis only |
 | M5 | 5-axis strategies: swarf, 5x contour, multi-axis roughing, automatic tilting from a 3-axis path (collision avoidance) | parallel/contour lean on a trunnion | head-table and head-head machines in the kernel |
 | M6 | Pencil as a standalone strategy (bi-tangency), morph / flowline / projection finishing | pencil = rest finish after a larger ball | |
-| M7 | Toolpath linking optimisation (2-opt/TSP over rapids, stay-down links in 2.5D) | nearest neighbour | cycle time |
+| M7 | Toolpath linking optimisation (2-opt/TSP over rapids, stay-down links in 2.5D) | 2-opt over nearest neighbour for point ordering (`optimizedOrder`, used by drill); stay-down links in 2.5D still open | cycle time |
 | M8 | Holder-aware automatic tool length (minimum stick-out) | fixed stick-out per cutter | rigidity, chatter |
 | M9 | Machine simulation parity (right tool per operation, interpreter words, machine model, live removal) | **spec 32, in progress in the collaborating session** | P1/P2 landed; P3 player/P4 S1 removal partial, including cutter profiles and deterministic rewind; full gates open |
 
@@ -79,7 +79,7 @@ state.
 | STEP import | `stepToElements` | `cad_edit` read | — | Import dialog |
 | Drawings | `generateSheet` | `cad.drawing` | companion previews | Drawing panel |
 | DFM, fasteners, recipes | yes | `cad_parametric` actions | via AI | Manufacturability / Recipes sections |
-| Sheet-metal flat pattern DXF | `flatPatternDxf` | **not exposed** | **not exposed** | **not exposed** |
+| Sheet-metal flat pattern DXF | `flatPatternDxf` | `flatPatternDxf` per sheet feature in the parametric report | via AI actions | Parametric panel: developed length, bend count, DXF download per sheet feature |
 | Sketch solver | `solveSketch` | inside rebuild | — | no interactive drag-to-edit sketcher |
 | Kernel CAM job | `runJob`, `planOnly` | `cam.manufacture`, `cam_edit.manufacture` | `POST /api/toolpaths/manufacture` | Kernel section (plan, cutters, evidence) |
 | Legacy generator | `generator/*` | `cam_edit` create | `POST /api/toolpaths/generate` | Operation generator |
@@ -103,7 +103,7 @@ WP8 modelling guidance/tests and WP6 existing parametric panel only. CAM simulat
 remain a separate scope. Geometry modules receive radians; history/UI callouts retain degrees.
 
 1. M2 hole making in the kernel (tap/ream cycles in the IR, posts, cutters, cutting data, planner choice tap vs thread mill) — **done**.
-2. C12 exact holes on work planes and C4 chamfer variants — **done**; next C2 exact rib/text/coil.
+2. C12 exact holes on work planes and C4 chamfer variants — **done**; C2 exact rib/sheet/text/coil — **done** (modelled thread deferred: the exact sweep cannot yet keep the thread profile radial about the axis, and the per-segment Booleans of a 58-turn helix exceed the replay budget).
 3. M4 stock-aware rest between operations (voxel stock for 3-axis too).
 4. M3 turning in the kernel.
 5. C6 persistent naming before any wider direct-editing work (C8), C11 joint solver for the harness target.
@@ -122,6 +122,8 @@ remain a separate scope. Geometry modules receive radians; history/UI callouts r
 
 Known unrelated failures seen while testing: `packages/ai/test/harness-inventory.test.ts` (sidecar `workspace.ts` handler
 resolution; the two assertions disagree with each other) and the AI MCP test helper typecheck; both predate this pass.
+
+| Uncommitted continuation | C2 (partial): exact rib, sheet, text and coil in `history-brep.ts` — rib/sheet extrude the same thickened outlines the mesh cuts, text extrudes the stroke bars (`textBars`, extracted from `textSolid` so mesh and exact share one source), coil sweeps the wire polygon along the helix chords (a true helicoid is not an analytic surface of this kernel). Also fixed: an internal thread's exact replay was labelled `new` instead of `subtract`, so the cut body kept its exact model silently. Modelled thread remains mesh-only (see §4). | `history-rib-exact.test.ts` (3), `history-sheet-exact.test.ts` (2), `history-text-exact.test.ts` (2), `history-coil-exact.test.ts` (3): valid B-reps, exact/mesh volumes agree; full core suite 2213/2213, core typecheck clean |
 
 ## 6. Continuation verification and change log
 

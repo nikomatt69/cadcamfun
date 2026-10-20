@@ -34,6 +34,8 @@ export const LIBRARY_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
   contributedAction({ id: "library_edit.upsert_material", kind: "write", replaces: "lib_upsert_material", contribution: "library_edit.upsert_material", parameters: INPUTS["library_edit.upsert_material"] }),
   contributedAction({ id: "library_edit.upsert_tool", kind: "write", replaces: "lib_upsert_tool", contribution: "library_edit.upsert_tool", parameters: INPUTS["library_edit.upsert_tool"] }),
   contributedAction({ id: "library_edit.upsert_machine_config", kind: "write", replaces: "lib_upsert_machine_config", contribution: "library_edit.upsert_machine_config", parameters: INPUTS["library_edit.upsert_machine_config"] }),
+  contributedAction({ id: "library_edit.upsert_library_item", kind: "write", contribution: "library_edit.upsert_library_item", parameters: INPUTS["library_edit.upsert_library_item"] }),
+  contributedAction({ id: "library_edit.set_cost", kind: "write", contribution: "library_edit.set_cost", parameters: INPUTS["library_edit.set_cost"] }),
   contributedAction({ id: "library_edit.set_default", kind: "write", replaces: "lib_set_default", contribution: "library_edit.set_default", parameters: INPUTS["library_edit.set_default"] }),
   // Removing a library row cannot be undone from the assistant's side.
   contributedAction({ id: "library_edit.delete", kind: "destructive", replaces: "lib_delete", contribution: "library_edit.delete", parameters: INPUTS["library_edit.delete"] })

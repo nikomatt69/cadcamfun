@@ -8,23 +8,15 @@ Authoring (the only shape the store accepts)
 - A hook is `async ($, e, next)` and `e` is frozen: `return next(e)` observes, `return next({ ...e, field })` rewrites,
   `return { deny: "reason" }` refuses, `await next(e)` and returning a changed result wraps. A hook that throws or runs
   long is skipped; add `.catch(...)` on the object `on(...)` returns when the rule must fail closed.
-- Events (fields of `e`, what a hook may answer): tool.call (tool, input, plus the arguments top-level -> a result, a
-  `{ deny }` or a `{ result }`; the place for "never allow this"), tool.check (patterns, rule -> a decision allow, ask
-  or deny with a reason; the place for "always confirm"), prompt.submit (text, context[] -> add text only the model
-  reads), session.start and session.end, turn.start/step/complete, session.compact (a skip keeps the conversation),
-  skill.prompt, command.run/describe, the delegation events spawn/offer, ui.render/press/input/select.
-- The `$` API (each item is also an event name, e.g. `fs.read`): ui (log, toast, notice, ask, copy, panes, resolve),
-  tool.register (a tool the model can call; dispose() removes it), command.register, prompt.submit and prompt.fill,
-  turn.abort, session (id, messages, model, usage), model.complete/classify (one completion on the user's model),
-  mcp.call, settings.read, env.get/set, fs read/write/list/exists/stat, process.run/spawn, http.fetch, store
-  (machine-wide key-value, 4 MiB), state (reload-surviving), clock (now, sleep, after, every).
+- Events (fields of `e`; what a hook may answer): tool.call (tool, input -> a result, `{ deny }` or `{ result }`; "never allow this"), tool.check (patterns, rule -> allow, ask or deny with a reason; "always confirm"), prompt.submit (text, context[] -> add text only the model reads), session.start/end, turn.start/step/complete, session.compact, skill.prompt, command.run/describe, spawn/offer, ui.render/press/input/select.
+- The `$` API (each item is also an event name, e.g. `fs.read`): ui, tool.register (dispose() removes it), command.register, prompt.submit/fill, turn.abort, session, model.complete/classify, mcp.call, settings.read, env.get/set, fs, process.run/spawn, http.fetch, store (machine-wide, 4 MiB), state, clock.
 
 Actions
 - save: write or replace one mod's source. A new mod stays disabled unless `enable: true`; `enable: false` stops a
   running one; an absent flag keeps the current state. Replacing source you did not write: ask first.
 - set_enabled: arm or stop one mod; an armed mod is consent to run it.
 - remove: delete the module and its record. Not reversible.
-- (This tool carries remove, so it is destructive: every call is confirmed by the person first.)
+- Every call is confirmed by the person first (remove is destructive).
 
 Parameters
 - save: id (lower-case file name, e.g. `confirm_deletes`), name?, description (what it hooks and why), source, enable?.
@@ -35,13 +27,11 @@ Result (JSON)
 - remove: ok, id, removed: true. A refused source: ok:false with every problem the checker found.
 - A mod that was armed but did not load (the host refused it) answers ok:false and is disabled again; read it back,
   fix the source, then enable it.
-- If reload or live inspection fails, the stored enabled state is preserved and a note explains what remains unverified.
-  Read it again before assuming its hooks are active.
+- If reload or inspection fails, the stored state is kept with a note; read it again before assuming its hooks are active.
 
 Rules
 - Enable, change or remove a mod only when the user asks or after they agree to your offer. `mods` shows what exists.
-- The user reads every mod's source in Extensions and can switch it off or delete it; write source a person can follow.
-- Changes reach the running host at once: the next turn already runs under the new rule.
+- The user reads every mod's source in Extensions and can switch it off or delete it; write readable source. Changes apply from the next turn.
 - Keep it small and single-purpose; never store secrets in it.
 
 Do not use it

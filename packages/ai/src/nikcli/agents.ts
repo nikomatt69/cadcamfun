@@ -7,9 +7,10 @@
  * the catalogue: `cad`, `cam`, `library`, `vcs` and `memory` cannot change anything, while `cad_edit`, `cam_edit`,
  * `parts`, `library_edit`, `memory_edit`, `vcs_edit` and `agent` always do (`agents.test.ts` derives both halves).
  *
- * An agent that edits the document (`edits`) runs in the parent's turn by default, one at a time per project, and its
- * tool results reach the editor live through the parent's stream (`adoptChildSession`). A read-only agent runs in the
- * background and wakes the parent with its findings.
+ * Every specialist starts in the background (nikcli's `background` defaults true): the call returns at once and the
+ * completion wakes the parent with the report, unless the call passes `background: false` and waits. An agent that
+ * edits the document (`edits`) still runs one at a time per project, and its tool calls reach the editor live through
+ * the parent's stream (`adoptChildSession`).
  */
 
 import { specialistPrompt } from "./prompts/index.ts"
@@ -32,8 +33,6 @@ export interface SubagentSpec {
   readonly tools: ReadonlyArray<string>
   /** Changes the drawing or the operations (so it runs alone, and its results are mirrored into the editor). */
   readonly edits: boolean
-  /** Runs without the parent waiting for it unless the call says otherwise (nikcli's `background`). */
-  readonly background: boolean
   readonly steps: number
   readonly timeoutMs: number
 }
@@ -53,7 +52,6 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     // Verification stores a program and a report (`cam_edit`), so it is not here: this role reads reports, it does not make them.
     tools: [...READS],
     edits: false,
-    background: true,
     steps: 40,
     timeoutMs: 5 * MINUTE
   },
@@ -66,7 +64,6 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     // It edits and places saved parts; the libraries stay read-only for this role.
     tools: ["cad", "cad_edit", "library", "parts", "memory", "research", "vcs"],
     edits: true,
-    background: false,
     steps: 40,
     timeoutMs: 8 * MINUTE
   },
@@ -79,7 +76,6 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     // A reusable part comes from the project's components; a new cutter or machine is a decision for the machinist or the user.
     tools: ["cad", "cad_edit", "library", "parts", "memory", "research", "vcs"],
     edits: true,
-    background: false,
     steps: 60,
     timeoutMs: 10 * MINUTE
   },
@@ -95,7 +91,6 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     // specialist may commit (spec 08 §specialists, spec 26 §6.5). The main agent runs the workflows.
     tools: ["cad", "cam", "cam_edit", "library", "library_edit", "memory", "research", "vcs"],
     edits: true,
-    background: false,
     steps: 60,
     timeoutMs: 10 * MINUTE
   },
@@ -107,7 +102,6 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     prompt: specialistPrompt("reviewer"),
     tools: ["cad", "cam", "library", "vcs", "memory", "mods"],
     edits: false,
-    background: true,
     steps: 40,
     timeoutMs: 5 * MINUTE
   },
@@ -119,8 +113,7 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     prompt: specialistPrompt("planner"),
     tools: [...READS],
     edits: false,
-    // The main agent needs the plan before it can act, so it is waited for unless the call says otherwise.
-    background: false,
+    // A plan can gate the next step: the caller passes `background: false` when it must wait for it.
     steps: 40,
     timeoutMs: 5 * MINUTE
   },
@@ -132,7 +125,6 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     prompt: specialistPrompt("diagnostician"),
     tools: [...READS],
     edits: false,
-    background: false,
     steps: 40,
     timeoutMs: 5 * MINUTE
   },
@@ -145,7 +137,6 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     // `cam_verify`, not `cam_edit`: it generates and verifies an existing program; it cannot create, update, set stock or release.
     tools: ["cad", "cam", "cam_verify", "library", "vcs", "memory"],
     edits: true,
-    background: false,
     steps: 40,
     timeoutMs: 10 * MINUTE
   },
@@ -157,7 +148,6 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     prompt: specialistPrompt("optimizer"),
     tools: ["cad", "cam", "cam_edit", "library", "memory", "research", "vcs"],
     edits: true,
-    background: false,
     steps: 60,
     timeoutMs: 10 * MINUTE
   }

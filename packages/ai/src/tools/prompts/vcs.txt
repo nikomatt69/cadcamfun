@@ -1,7 +1,7 @@
-Read-only version control: where the project stands and what a person is being asked to review.
+Read-only version control: where the project stands and what a person is being asked to review. Optional: a job never depends on it.
 
 Actions
-- status: the checked-out branch, uncommitted files, branches and open pull requests. Call it before changing anything.
+- status: the checked-out branch, uncommitted files, branches and open pull requests. Call it when the request involves history; the job never waits on it.
 - diff: entity-level changes between two revisions (property path, before, after); `from` defaults to main.
 - list_pull_requests: the project's pull requests with their review verdicts.
 
@@ -19,3 +19,6 @@ Do not use it
 
 After it
 - Read the diff before writing a pull-request body; cite what changed by name.
+
+When it fails
+- Say it in one line and continue the CAD/CAM work; a missing history or a refused call is never a reason to stop, and it is not retried in a loop.

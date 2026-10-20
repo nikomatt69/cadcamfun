@@ -12,7 +12,6 @@ import { isTransientFailure } from "./chat.ts"
 import type { NikCliRuntime } from "./runtime.ts"
 
 export const CADCAM_WORKER_AGENT = SUBAGENTS.researcher.host
-export const BACKGROUND_FINDINGS_PREFIX = "[CADCAM_AGENT background findings] "
 /** A specialist whose provider call failed for a reason that passes is asked again this many times. */
 const WORKER_RESUMES = 2
 const WORKER_BACKOFF_MS = 3_000
@@ -188,10 +187,10 @@ export class BackgroundToolsRunner {
   }
 
   /**
-   * Wakes the parent with a synthetic queued text part. The host's `prompt_async`
-   * endpoint returns 204 and admits the message to the native pending queue; if
-   * the parent session is busy, the message waits for the parent's agent loop
-   * to be idle. Cancelled tasks do not wake the parent.
+   * Wakes the parent with a synthetic queued text part, in nikcli's own wake format (`tool/task.ts` `wakeParentSession`):
+   * what finished, its status and id, the result up to 100 lines, and how to read the rest. The host's `prompt_async`
+   * endpoint returns 204 and admits the message to the native pending queue; if the parent session is busy, the message
+   * waits for the parent's agent loop to be idle. Cancelled tasks do not wake the parent.
    */
   private async deliver(task: BackgroundTask): Promise<void> {
     if (this.disposed || this.retired.has(this.ownerKey(task))) return
@@ -200,10 +199,19 @@ export class BackgroundToolsRunner {
     if (task.background === false) return
     const host = await runPromise(this.runtime.host(task.projectId))
     if (this.disposed || this.retired.has(this.ownerKey(task))) return
-    const body =
-      task.status === "completed"
-        ? `${BACKGROUND_FINDINGS_PREFIX}agent=${task.agent ?? "researcher"}; task=${task.description}\n${task.text ?? ""}`
-        : `${BACKGROUND_FINDINGS_PREFIX}agent=${task.agent ?? "researcher"}; status=${task.status}${task.error ? `; error=${task.error}` : ""}`
+    const summary = task.status === "completed" ? task.text ?? "" : task.error ?? ""
+    const summaryLines = summary.split("\n")
+    const body = [
+      `Background task "${task.description}" finished.`,
+      `Status: ${task.status}`,
+      `Task ID: ${task.id}`,
+      "",
+      "Result:",
+      summaryLines.slice(0, 100).join("\n"),
+      summaryLines.length > 100 ? "\n...(truncated)" : "",
+      "",
+      `Use agent action read (taskId="${task.id}") for the full result.`
+    ].join("\n")
     try {
       await host.client["session-prompt"].promptAsync({
         sessionID: task.parentSessionId,

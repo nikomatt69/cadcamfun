@@ -1,5 +1,5 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
-import { Box, Cpu, Layers, Package, Search, Wrench } from "lucide-solid"
+import { For, Show, createEffect, createMemo, createSignal, createUniqueId, onCleanup, type JSX } from "solid-js"
+import { Cpu, Layers, Package, Search, Wrench, X } from "lucide-solid"
 import { useApp } from "../../../shared/state/context.ts"
 import { useLocalComponentsLibraryStore } from "../store/localComponentsLibraryStore.ts"
 import { predefinedComponents } from "../lib/predefinedLibraries.ts"
@@ -13,7 +13,7 @@ interface Props { onSelectComponent?: (component: LibraryComponent) => void }
 /** What the library row is, in the words the assistant uses (`lib_lookup_material`, `lib_lookup_tool`, `lib_lookup_machine_config`). */
 type Kind = "components" | "materials" | "tools" | "machines"
 
-const KINDS: ReadonlyArray<{ readonly id: Kind; readonly label: string; readonly icon: typeof Box }> = [
+const KINDS: ReadonlyArray<{ readonly id: Kind; readonly label: string; readonly icon: typeof Package }> = [
   { id: "components", label: "Components", icon: Package },
   { id: "materials", label: "Materials", icon: Layers },
   { id: "tools", label: "Tools", icon: Wrench },
@@ -43,6 +43,7 @@ const rowId = (row: Row): string => str(row["id"])
  */
 export default function LibraryBrowser(props: Props): JSX.Element {
   const app = useApp()
+  const id = createUniqueId()
   const local = useLocalComponentsLibraryStore()
   const [kind, setKind] = createSignal<Kind>("components")
   const [query, setQuery] = createSignal("")
@@ -149,66 +150,53 @@ export default function LibraryBrowser(props: Props): JSX.Element {
     if (component) props.onSelectComponent?.(component)
   }
 
+  const count = (entry: Kind): number => entry === "components" ? components().length : entry === "materials" ? materials().length : entry === "tools" ? tools().length : machines().length
+  const ActiveIcon = (): JSX.Element => {
+    const Icon = KINDS.find((entry) => entry.id === kind())!.icon
+    return <Icon size={20} aria-hidden="true" />
+  }
+
   return (
-    <div class="h-full flex flex-col p-6 gap-4">
-      <div class="flex flex-wrap items-center gap-2">
-        <For each={KINDS}>{(entry) => {
-          const Icon = entry.icon
-          return (
-            <button
-              type="button"
-              data-kind={entry.id}
-              onClick={() => { setKind(entry.id); setQuery("") }}
-              class={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${kind() === entry.id ? "bg-blue-600 text-white" : "bg-white/70 dark:bg-gray-800/70 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-700"}`}
-            >
-              <Icon size={14} />{entry.label}
-            </button>
-          )
-        }}</For>
+    <div class="library-browser flex flex-col">
+      <div class="library-navigation">
+        <div class="library-kind-tabs" role="tablist" aria-label={t("library.categories")} onKeyDown={(event) => {
+          const index = KINDS.findIndex((entry) => entry.id === kind())
+          const next = event.key === "ArrowRight" ? (index + 1) % KINDS.length : event.key === "ArrowLeft" ? (index + KINDS.length - 1) % KINDS.length : event.key === "Home" ? 0 : event.key === "End" ? KINDS.length - 1 : -1
+          if (next < 0) return
+          event.preventDefault()
+          setKind(KINDS[next]!.id); setQuery("")
+          event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+        }}>
+          <For each={KINDS}>{(entry) => {
+            const Icon = entry.icon
+            return <button type="button" role="tab" id={`${id}-${entry.id}`} aria-controls={`${id}-panel`} aria-selected={kind() === entry.id} tabIndex={kind() === entry.id ? 0 : -1} data-kind={entry.id} onClick={() => { setKind(entry.id); setQuery("") }}><Icon size={16} aria-hidden="true" />{t(`library.tab.${entry.id}`)}<span class="library-count">{count(entry.id)}</span></button>
+          }}</For>
+        </div>
       </div>
-
-      <div class="relative">
-        <Search size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          data-library-search
-          placeholder={`Search ${kind()}...`}
-          value={query()}
-          onInput={(event) => setQuery(event.currentTarget.value)}
-          class="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/80 dark:bg-gray-700/80 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div class="library-browser-toolbar">
+        <div class="library-controls">
+          <div class="library-search-field">
+            <Search size={16} aria-hidden="true" />
+            <input type="search" data-library-search aria-label={t("library.searchKind", { type: kind() })} placeholder={t("library.searchKind", { type: kind() })} value={query()} onInput={(event) => setQuery(event.currentTarget.value)} />
+            <Show when={query()}><button type="button" class="library-icon-button" aria-label={t("library.clear")} onClick={() => setQuery("")}><X size={14} /></button></Show>
+          </div>
+          <span class="library-result-count" role="status">{t("library.items", { count: filtered().length })}</span>
+        </div>
       </div>
-
-      <Show when={error() !== null}>
-        <p class="text-sm text-red-600 dark:text-red-400">The library could not be read: {error()}</p>
-      </Show>
-
-      <div class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
-        <For each={filtered()}>{(row) =>
-          <button
-            type="button"
-            disabled={kind() !== "components"}
-            onClick={() => selectComponent(row)}
-            class={`text-left p-4 rounded-xl border border-white/40 dark:border-gray-600/40 bg-white/70 dark:bg-gray-800/70 shadow-sm transition-colors ${kind() === "components" ? "hover:bg-white dark:hover:bg-gray-700 cursor-pointer" : "cursor-default"}`}
-          >
-            <div class="flex items-center gap-2 mb-1">
-              <Box size={16} class="text-blue-500" />
-              <span class="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{str(row["name"]) || "Unnamed"}</span>
-            </div>
-            <For each={facts(row)}>{(line) => <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{line}</p>}</For>
-            <Show when={kind() === "components"}>
-              <span class="mt-2 inline-block text-[10px] uppercase tracking-wide text-gray-400">{str(row["origin"])} · click to place</span>
-            </Show>
-          </button>}
-        </For>
-        <Show when={filtered().length === 0}>
-          <div class="col-span-full text-center text-sm text-gray-500 py-10">{error() === null ? `No ${kind()} found` : ""}</div>
-        </Show>
+      <Show when={error() !== null}><p class="library-error" role="alert">{t("library.readError", { error: error() ?? "" })}</p></Show>
+      <div class="library-results" role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${kind()}`}>
+        <div class="library-item-grid library-catalogue-grid">
+          <For each={filtered()}>{(row) =>
+            <button type="button" disabled={kind() !== "components"} onClick={() => selectComponent(row)} class="library-catalogue-card">
+              <div class="library-catalogue-card-heading"><span class="library-catalogue-icon"><ActiveIcon /></span><h3>{str(row["name"]) || t("library.unnamed")}</h3></div>
+              <div class="library-catalogue-facts"><For each={facts(row)}>{(line) => <p>{line}</p>}</For></div>
+              <Show when={kind() === "components"}><div class="library-catalogue-card-footer"><span class="library-count">{str(row["origin"])}</span><span>{t("library.place")}</span></div></Show>
+            </button>}
+          </For>
+        </div>
+        <Show when={filtered().length === 0 && error() === null}><div class="library-state"><div class="library-state-icon"><ActiveIcon /></div><h3>{t("library.emptyKind", { type: kind() })}</h3><p>{query() ? t("library.emptySearch") : t("library.emptySource")}</p><Show when={query()}><button type="button" class="library-control-button" onClick={() => setQuery("")}>{t("library.clear")}</button></Show></div></Show>
       </div>
-
-      <p class="text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-600 pt-3">
-        {t("cad.library.note")} Materials, tools, machines and components are the same rows the assistant reads with its `lib_lookup_*` tools; create or edit them on the Resources pages.
-      </p>
+      <footer class="library-browser-footer">{t("library.catalogueNote")}</footer>
     </div>
   )
 }

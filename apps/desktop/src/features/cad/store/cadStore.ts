@@ -12,18 +12,36 @@ type OriginPreset =
   | "bottomRight"
   | "topLeft";
 
-interface MachineConfig {
+/**
+ * A machine configuration of the Resources library (`/machine`), as the CAD and CAM panels
+ * select it. The resources pages store `{ workVolume, maxSpindleSpeed, maxFeedRate, controller }`;
+ * the assistant's `lib_upsert_machine_config` stores `{ kinematics, maxRPM, maxFeed, postProcessor }`.
+ * Both shapes are readable, so every field but the id is optional.
+ */
+export interface MachineConfig {
   id: string;
   name: string;
+  /** The resources' machine kind: `mill`, `lathe`, `printer` or `laser`. */
+  type?: string;
+  description?: string | null;
   config: {
     workVolume?: {
       x: number;
       y: number;
       z: number;
     };
-    type: string;
+    type?: string;
     maxSpindleSpeed?: number;
     maxFeedRate?: number;
+    controller?: string;
+    postProcessor?: string;
+    maxRPM?: number;
+    maxFeed?: number;
+    kinematics?: {
+      x?: number;
+      y?: number;
+      z?: number;
+    };
   };
 }
 

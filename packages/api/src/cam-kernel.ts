@@ -8,6 +8,7 @@ const id = Schema.NonEmptyString
 
 /** An explicit CAD snapshot: no stored document or AI session is mutated by this endpoint. */
 export const CamKernelRequest = Schema.Struct({
+  setupOrientation: CamManufactureInput.fields.setupOrientation,
   material: CamManufactureInput.fields.material, machine: CamManufactureInput.fields.machine,
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance, scallop: CamManufactureInput.fields.scallop,
   schemaVersion: Schema.Literal(1), id, name: id,
@@ -55,6 +56,7 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
   schemaVersion: Schema.Literal(1), jobId: id,
   material: Schema.Struct({ id, name: Schema.String, iso: Schema.String }),
   machine: Schema.Struct({ id, name: Schema.String, post: Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas"]) }),
+  setupOrientation: Schema.optionalKey(cam.kernel.SetupOrientationSchema),
   origin: cad.Vec3Schema,
   stockBounds: Schema.Struct({ min: cad.Vec3Schema, max: cad.Vec3Schema }),
   operations: Schema.Array(Schema.Struct({
@@ -65,7 +67,7 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
   })),
   program: cam.ProgramSchema, tools: Schema.Array(cutter), nc: Schema.String,
   claims: Schema.Array(Schema.Struct({
-    id: Schema.Literals(["cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel", "machine-clearance"]),
+    id: Schema.Literals(["cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel", "machine-clearance", "setup-workholding", "part-coverage"]),
     status: Schema.Literals(["passed", "failed", "unsupported", "unresolved"]), detail: Schema.String
   })),
   issues: Schema.Array(CamKernelIssue), release: Schema.Literals(["blocked", "preview", "verified-program"]),

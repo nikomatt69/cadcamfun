@@ -3,10 +3,13 @@
  * and an explicit operation. The application edges (HTTP, the assistant's actions) validate with these once; the kernel then
  * works on the plain readonly records of `contracts.ts` / `cutters.ts`.
  */
+import { SETUP_ORIENTATIONS } from "../setup.ts"
 import { Schema } from "effect"
 import { CoolantSchema } from "../ir.ts"
 import type { Cutter } from "./cutters.ts"
 import { SURFACE_MODES, type OperationSpec } from "./contracts.ts"
+
+export const SetupOrientationSchema = Schema.Literals(SETUP_ORIENTATIONS)
 
 const positive = Schema.Finite.check(Schema.isGreaterThan(0))
 const nonNegative = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))

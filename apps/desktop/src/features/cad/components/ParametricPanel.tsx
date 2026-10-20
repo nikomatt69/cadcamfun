@@ -1,6 +1,6 @@
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import {
-  RECIPES, analyzeManufacturability, buildRecipe, runModelScript, dimensionValue, dimensionsOf, historyVolume, meshBounds, moveFeature, rebuild, removeFeature, removeParameter, renameParameter, resolveParameters, setDimension, setParameter, usesOf,
+  RECIPES, analyzeManufacturability, buildRecipe, runModelScript, dimensionValue, dimensionsOf, flatPatternDxf, historyVolume, meshBounds, moveFeature, rebuild, removeFeature, removeParameter, renameParameter, resolveParameters, setDimension, setParameter, usesOf,
   type DfmMaterial, type DfmProcess, type DfmReport, type Feature, type History, type RecipeResult
 } from "@cadcamfun/core"
 import { useElementsStore, type Element } from "../store/elementsStore.ts"
@@ -362,6 +362,24 @@ export default function ParametricPanel(props: { readonly element: Element; read
                     </label>
                   </Show>
                 </div>
+              </Show>
+              <Show when={feature.type === "sheet" ? built()?.flatPatterns[feature.id] : undefined}>{(developed) =>
+                <div class="mb-1 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300" data-testid={`flat-pattern-${feature.id}`}>
+                  <span>flat pattern {format(developed().length)} mm, {developed().bends.length} bend{developed().bends.length === 1 ? "" : "s"}</span>
+                  <button type="button" class={SMALL} disabled={props.locked} aria-label={`${feature.id} flat pattern DXF`}
+                    onClick={() => {
+                      const sheet = feature as Feature & { type: "sheet" }
+                      const dxf = flatPatternDxf(developed(), numeric(sheet.width), feature.id)
+                      const url = URL.createObjectURL(new Blob([dxf], { type: "application/dxf" }))
+                      const a = document.createElement("a")
+                      a.href = url
+                      a.download = `${feature.id}-flat-pattern.dxf`
+                      document.body.appendChild(a)
+                      a.click()
+                      document.body.removeChild(a)
+                      URL.revokeObjectURL(url)
+                    }}>Flat pattern DXF</button>
+                </div>}
               </Show>
               <Show when={feature.type === "shell"}>
                 <label class="mb-1 block text-xs text-gray-600 dark:text-gray-300" data-testid={`shell-${feature.id}`}><span class="block">open face</span>

@@ -10,9 +10,9 @@ import { actionInventory, hasExecutionPath, INVENTORY_PATH, renderInventory } fr
 /**
  * Optional handlers the actions call that no host implements, so the action silently runs without them. Recorded rather
  * than hidden: removing an entry requires the implementation, adding one requires a decision.
- * - `machine`: `cam.analyze` analyses without the project's machine and `cam.cutting_data` clamps to the default machine.
+ * Empty: the sidecar implements the `machine` handler, so every route resolves.
  */
-const KNOWN_MISSING: ReadonlyArray<string> = ["cam.analyze → handler machine", "cam.cutting_data → handler machine"]
+const KNOWN_MISSING: ReadonlyArray<string> = []
 
 describe("harness inventory", () => {
   const inventory = actionInventory()
@@ -26,8 +26,8 @@ describe("harness inventory", () => {
     const missing = inventory.flatMap((entry) =>
       entry.routes.filter((route) => route.at.length === 0).map((route) => `${entry.id} → ${route.kind} ${route.name}`))
     expect(missing).toEqual([...KNOWN_MISSING])
-    // The gaps are optional handlers: the action still has a path for everything else it does.
-    expect(inventory.filter((entry) => !hasExecutionPath(entry)).map((entry) => entry.id)).toEqual(["cam.analyze", "cam.cutting_data"])
+    // Every action reaches every route it declares; the optional-handler gaps above are closed.
+    expect(inventory.filter((entry) => !hasExecutionPath(entry)).map((entry) => entry.id)).toEqual([])
   })
 
   test("every action is named in its tool prompt", () => {

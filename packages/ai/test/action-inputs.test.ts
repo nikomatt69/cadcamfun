@@ -21,7 +21,7 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "library.lookup_material": { accept: [{ query: "6061" }], refuse: [{}, { query: null }] },
   "library.lookup_tool": { accept: [{ query: "6mm" }], refuse: [{}] },
   "library.lookup_machine_config": { accept: [{}, { query: "haas" }], refuse: [{ query: [] }] },
-  "parts.save": { accept: [{ ids: ["a"], name: "Bracket" }], refuse: [{ ids: [], name: "B" }, { ids: [""], name: "B" }, { ids: ["a"], name: "" }] },
+  "parts.save": { accept: [{ ids: ["a"], name: "Bracket" }, { ids: ["a"], name: "Bracket", description: "L-bracket", type: "mechanical", isPublic: true }], refuse: [{ ids: [], name: "B" }, { ids: [""], name: "B" }, { ids: ["a"], name: "" }] },
   "parts.insert": {
     accept: [{ componentId: "c" }, { componentId: "c", transform: { move: { x: 1, y: 2, z: 3 }, rotate: { axis: "z", degrees: 90 } } }],
     refuse: [{ componentId: "" }, { componentId: "c", transform: { rotate: { axis: "w", degrees: 90 } } }, { componentId: "c", transform: { move: { x: 1 } } }]
@@ -32,12 +32,20 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
     refuse: [{ name: "" }, { name: "x", properties: { density: { value: 1 } } }]
   },
   "library_edit.upsert_tool": {
-    accept: [{ name: "6mm flat", type: "flat", diameter: 6, material: "carbide", numberOfFlutes: 3 }],
-    refuse: [{ name: "x", type: "flat", diameter: 0, material: "carbide" }, { name: "x", type: "flat", diameter: 6, material: "carbide", numberOfFlutes: 2.5 }, { name: "x", type: "flat", material: "carbide" }]
+    accept: [{ name: "6mm flat", type: "flat", diameter: 6, material: "carbide", numberOfFlutes: 3 }, { name: "ball", type: "ballendmill", diameter: 6, material: "carbide", cornerRadius: 0, tipAngle: 90, holderDiameter: 25, holderLength: 40, stickout: 30 }],
+    refuse: [{ name: "x", type: "flat", diameter: 6, material: "carbide", cornerRadius: -1 }, { name: "x", type: "flat", diameter: 6, material: "carbide", stickout: 0 }, { name: "x", type: "flat", diameter: 0, material: "carbide" }, { name: "x", type: "flat", diameter: 6, material: "carbide", numberOfFlutes: 2.5 }, { name: "x", type: "flat", material: "carbide" }]
   },
   "library_edit.upsert_machine_config": {
     accept: [{ name: "VF2", kind: "mill", postProcessor: "haas" }, { name: "VF2", kind: "mill", postProcessor: "haas", kinematics: { x: { min: 0, max: 762 } }, maxFeed: 25_400 }],
     refuse: [{ name: "VF2", kind: "laser", postProcessor: "haas" }, { name: "VF2", kind: "mill" }, { name: "VF2", kind: "mill", postProcessor: "haas", maxRPM: 0 }]
+  },
+  "library_edit.upsert_library_item": {
+    accept: [{ name: "Vise", category: "setup", type: "fixture", data: { jawWidth: 150 } }],
+    refuse: [{ name: "Vise", category: "setup", type: "fixture" }, { name: "Vise", category: "", type: "fixture", data: {} }]
+  },
+  "library_edit.set_cost": {
+    accept: [{ kind: "material", materialId: "m", costPerUnit: 4 }, { kind: "operation", name: "Mill", machineHourlyRate: 60, operatorHourlyRate: 35 }],
+    refuse: [{ kind: "paint" }, { kind: "material", costPerUnit: -1 }]
   },
   "library_edit.set_default": { accept: [{}, { materialId: "m", toolId: "t" }], refuse: [{ materialId: 1 }] },
   "library_edit.delete": { accept: [{ kind: "tool", id: "t", confirm: true }], refuse: [{ kind: "tool", id: "t" }, { kind: "part", id: "t", confirm: true }] },

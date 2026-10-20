@@ -1181,6 +1181,7 @@ export type ToolpathExtrasCreateCommentPayload = { readonly content: string }
 export type ToolpathExtrasUpdateCommentPayload = { readonly content: string }
 
 export type ToolpathGeneratorManufacturePayload = {
+  readonly setupOrientation?: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
   readonly material: string
   readonly machine?: string
   readonly origin?: "stock-center" | "stock-corner"
@@ -1493,7 +1494,7 @@ export type ToolpathGeneratorVerifyPayload = {
         | { readonly _tag: "Comment"; readonly text: string }
         | {
             readonly _tag: "Cycle"
-            readonly cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream"
+            readonly cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream" | "bore"
             readonly to: { readonly x: number; readonly y: number; readonly z: number }
             readonly feed: number
             readonly peckDepth: number
@@ -5894,6 +5895,7 @@ export type ToolpathExtrasRemoveCommentInput = {
 export type ToolpathExtrasRemoveCommentOutput = { message: string }
 
 export type ToolpathGeneratorManufactureInput = {
+  readonly setupOrientation?: ToolpathGeneratorManufacturePayload["setupOrientation"]
   readonly material: ToolpathGeneratorManufacturePayload["material"]
   readonly machine?: ToolpathGeneratorManufacturePayload["machine"]
   readonly origin?: ToolpathGeneratorManufacturePayload["origin"]
@@ -5921,6 +5923,7 @@ export type ToolpathGeneratorManufactureOutput =
         jobId: string
         material: { id: string; name: string; iso: string }
         machine: { id: string; name: string; post: "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" }
+        setupOrientation?: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
         origin: { x: number; y: number; z: number }
         stockBounds: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
         operations: Array<{
@@ -6048,7 +6051,7 @@ export type ToolpathGeneratorManufactureOutput =
               | { _tag: "Comment"; text: string }
               | {
                   _tag: "Cycle"
-                  cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream"
+                  cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream" | "bore"
                   to: { x: number; y: number; z: number }
                   feed: number
                   peckDepth: number
@@ -6104,6 +6107,8 @@ export type ToolpathGeneratorManufactureOutput =
             | "nc-replay"
             | "machine-travel"
             | "machine-clearance"
+            | "setup-workholding"
+            | "part-coverage"
           status: "passed" | "failed" | "unsupported" | "unresolved"
           detail: string
         }>
@@ -6214,7 +6219,7 @@ export type ToolpathGeneratorParseOutput = {
         | { _tag: "Comment"; text: string }
         | {
             _tag: "Cycle"
-            cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream"
+            cycle: "drill" | "dwell" | "peck" | "chipBreak" | "tap" | "ream" | "bore"
             to: { x: number; y: number; z: number }
             feed: number
             peckDepth: number

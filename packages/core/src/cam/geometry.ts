@@ -223,6 +223,34 @@ export const nearestNeighbourOrder = (points: ReadonlyArray<Vec2>, from: Vec2 = 
   return out
 }
 
+/**
+ * Nearest-neighbour order improved by 2-opt: reversing a span of the visit order whenever that shortens the total
+ * rapid travel from `from`, until no reversal helps. Deterministic (the first improving reversal, scanned in
+ * order, wins each pass) and never longer than the nearest-neighbour order it starts from.
+ */
+export const optimizedOrder = (points: ReadonlyArray<Vec2>, from: Vec2 = { x: 0, y: 0 }): Vec2[] => {
+  const order = nearestNeighbourOrder(points, from)
+  const n = order.length
+  if (n < 3) return order
+  const at = (i: number): Vec2 => (i < 0 ? from : order[i]!)
+  let improved = true
+  while (improved) {
+    improved = false
+    for (let i = 0; i < n - 1 && !improved; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const before = distance(at(i - 1), at(i)) + (j + 1 < n ? distance(at(j), at(j + 1)) : 0)
+        const after = distance(at(i - 1), at(j)) + (j + 1 < n ? distance(at(i), at(j + 1)) : 0)
+        if (after < before - 1e-9) {
+          for (let a = i, b = j; a < b; a++, b--) { const held = order[a]!; order[a] = order[b]!; order[b] = held }
+          improved = true
+          break
+        }
+      }
+    }
+  }
+  return order
+}
+
 /** Whether `p` lies within the axis-aligned box. */
 export const insideBox = (p: Vec2, minX: number, minY: number, maxX: number, maxY: number, margin = 0): boolean =>
   p.x >= minX - margin && p.x <= maxX + margin && p.y >= minY - margin && p.y <= maxY + margin

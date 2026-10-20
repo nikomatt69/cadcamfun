@@ -16,7 +16,8 @@
  * The result has the shape of `historyFeatures` (`generator/history-features.ts`), so the planner, the generator and the DFM
  * see one kind of feature whatever the part came from. Everything is in the element's world coordinates, millimetres.
  */
-import { recognizeHoles, tessellateBrep, type Brep, type RecognizedHole } from "../cad/brep/index.ts"
+import { recognizeHoles, tessellateBrep, transformBrep, type Brep, type RecognizedHole } from "../cad/brep/index.ts"
+import type { Transform } from "../cad/brep/math.ts"
 import { elementBrep } from "../cad/scene-step.ts"
 import type { Vec2 } from "../cad/vec.ts"
 import { signedArea } from "../cad/shapes.ts"
@@ -258,21 +259,22 @@ const cache = new WeakMap<object, ExactFeatures>()
 /**
  * The features of a drawing element that has an exact model and no feature history the generator can read: a `brep` element
  * (STEP import), or a parametric part the editor rotated / scaled. Undefined for every other element. The element is placed
- * exactly as the viewport and the CAM place its mesh (`elementBrep`).
+ * exactly as the viewport and the CAM place its mesh (`elementBrep`). An explicit setup transform also enables exact
+ * recognition of catalogue solids, so a refixtured box is not needlessly routed through ball-nose surface finishing.
  */
-export const exactFeatures = (e: CadElement, byId: ReadonlyMap<string, CadElement> = new Map()): ExactFeatures | undefined => {
+export const exactFeatures = (e: CadElement, byId: ReadonlyMap<string, CadElement> = new Map(), transform?: Transform): ExactFeatures | undefined => {
   const type = e["type"]
-  if (type !== "brep" && type !== "parametric") return undefined
-  const hit = cache.get(e)
+  if (type !== "brep" && type !== "parametric" && transform === undefined) return undefined
+  const hit = transform === undefined ? cache.get(e) : undefined
   if (hit !== undefined) return hit
   const name = typeof e["name"] === "string" && e["name"] !== "" ? (e["name"] as string) : String(e["id"] ?? type)
   let result: ExactFeatures
   try {
     const placed = elementBrep(e, byId)
-    result = placed.brep === undefined ? { reason: `${name}: no exact model (${placed.reason})` } : brepFeatures(placed.brep, name)
+    result = placed.brep === undefined ? { reason: `${name}: no exact model (${placed.reason})` } : brepFeatures(transform === undefined ? placed.brep : transformBrep(placed.brep, transform), name)
   } catch (cause) {
     result = { reason: `${name}: exact feature recognition failed (${cause instanceof Error ? cause.message : String(cause)})` }
   }
-  cache.set(e, result)
+  if (transform === undefined) cache.set(e, result)
   return result
 }

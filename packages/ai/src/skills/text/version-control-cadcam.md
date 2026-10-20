@@ -1,6 +1,6 @@
 # Version control for the agent
 
-Every project has a repository with a first commit on `main`. The cadcam agent edits and commits on the checked-out branch, `main` included. A branch is never required before editing.
+Version control is optional: the CAD/CAM work never depends on it, and no step of a job is gated on a repository. Every project normally has a repository with a first commit on `main`. The cadcam agent edits and commits on the checked-out branch, `main` included. A branch is never required before editing.
 
 ## Order of operations
 
@@ -22,3 +22,7 @@ vcs action diff returns entity-level changes (property path, before, after). Rea
 ## Restore
 
 vcs_edit action restore rolls named ids back to an earlier commit on the checked-out branch. Use it when a `RebuildFailed` is faster to revert than to repair.
+
+## When version control fails
+
+Version control is optional, so a failure is never a reason to stop. No history, a profile that cannot be resolved, a refused call: say it in one line, continue the CAD/CAM work with the same care, and do not retry the same failing call in a loop. An uncommitted result is still a finished result: the commit is bookkeeping, not the deliverable.
