@@ -590,6 +590,15 @@ const unionBounds = (a: PreviewBounds, b: PreviewBounds): PreviewBounds => {
 const MAX_COLLISION_MOVES = MAX_PREVIEW_SEGMENTS
 
 /**
+ * The longest program the contacts are checked against the stock left.
+ *
+ * The live check replays the program on a height field: one cut per move, over the cells the cutter covers. It is the
+ * desktop's own check, but the desktop computes it once for its own view while the phone fetches it over the network,
+ * so the phone's payload keeps it for a program it can draw without a long wait.
+ */
+const MAX_LIVE_CHECK_MOVES = 4_000
+
+/**
  * The program's operations as the phone needs them: the toolpath, the run of path segments it drew and its cutter.
  *
  * A toolpath that drew nothing (a tool change, a dwell-only path) is left out: the phone lists operations it can
@@ -661,8 +670,9 @@ const eventsOf = (
       message: finding.message,
     })
   }
-  // The live stock replay is a 3-axis program's: a rotary one has no height field to cut.
-  const live = setup.kind === "mill" && setup.rotary === undefined && timeline.moves.length <= MAX_PREVIEW_SEGMENTS
+  // The live stock replay costs one height field and a cut per move, so it runs only for a program the phone can
+  // draw in one go; a bigger one still reports the fixture contacts.
+  const live = setup.kind === "mill" && setup.rotary === undefined && timeline.moves.length <= MAX_LIVE_CHECK_MOVES
   for (const event of checkCollisions({
     setup,
     timeline,
