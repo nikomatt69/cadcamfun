@@ -161,6 +161,7 @@ export type CamIssueTag =
   | "Gouge"
   | "RemainingStock"
   | "ReplayMismatch"
+  | "Cancelled"
 
 export interface CamIssue {
   readonly tag: CamIssueTag

@@ -26,6 +26,7 @@ import {
   blendCandidates,
   booleanBrep,
   BooleanError,
+  uniqueFaceNames,
   brepLocator,
   compose,
   edgePointAt,
@@ -1397,7 +1398,7 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
   const out: ExactBody[] = result.bodies.map((mb) => {
     const b = byId.get(mb.id)
     if (b === undefined) return { id: mb.id, feature: mb.feature, reason: stopped ?? "the exact replay has no body of this id" }
-    return b.exact.brep !== undefined ? { id: mb.id, feature: mb.feature, brep: b.exact.brep } : { id: mb.id, feature: mb.feature, reason: b.exact.reason ?? "no exact model" }
+    return b.exact.brep !== undefined ? { id: mb.id, feature: mb.feature, brep: uniqueFaceNames(b.exact.brep) } : { id: mb.id, feature: mb.feature, reason: b.exact.reason ?? "no exact model" }
   })
   return { result, bodies: out, warnings }
 }

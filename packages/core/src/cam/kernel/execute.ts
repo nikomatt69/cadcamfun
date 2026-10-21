@@ -332,8 +332,38 @@ interface Generated {
   readonly warnings: ReadonlyArray<string>
 }
 
+/** Where a running job is, reported before each operation and each stage after them. */
+export interface KernelProgress {
+  readonly stage: "operations" | "post" | "replay" | "evidence"
+  /** The operation about to run (stage `operations`). */
+  readonly operation?: { readonly id: string; readonly index: number; readonly count: number }
+}
+
+/**
+ * Optional hooks of a run. The kernel is synchronous, so `signal` is read at the checkpoints (before each operation and stage);
+ * a host that must stop a job mid-operation runs it in a worker and terminates it (`runKernelJob` in `@cadcamfun/ai`).
+ */
+export interface RunOptions {
+  readonly onProgress?: (progress: KernelProgress) => void
+  readonly signal?: { readonly aborted: boolean }
+}
+
+class Cancelled extends Error {}
+
 /** Runs a prepared job to its artifact. */
-export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
+export const executeJob = (prepared: PreparedJob, options: RunOptions = {}): CamResult<CamArtifact> => {
+  try {
+    return executeJobWith(prepared, (progress) => {
+      if (options.signal?.aborted === true) throw new Cancelled()
+      options.onProgress?.(progress)
+    })
+  } catch (error) {
+    if (error instanceof Cancelled) return { status: "failed", issues: [issue("Cancelled", "prepare", "The job was cancelled before it finished; no artifact was produced")] }
+    throw error
+  }
+}
+
+const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProgress) => void): CamResult<CamArtifact> => {
   const { job, material, tools, machine, origin, stock, operations } = prepared
   const issues: CamIssue[] = []
   const o = origin
@@ -367,7 +397,8 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
   const opOfToolpath: number[] = []
   const toolOf = (id: string): Cutter => tools.find((t) => t.id === id)!
 
-  operations.forEach((op) => {
+  operations.forEach((op, opIndex) => {
+    checkpoint({ stage: "operations", operation: { id: op.id, index: opIndex, count: operations.length } })
     const tool = toolOf(op.tool)
     const cut = cutOf(op, tool)
     const legacy = legacyTool(tool, machine.limits.maxRpm)
@@ -572,6 +603,7 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
   })
 
   // ------------------------------------------------------------ post
+  checkpoint({ stage: "post" })
   const numbers: Record<string, number> = {}
   let next = 1
   const taken = new Set(tools.filter((t) => t.number !== undefined).map((t) => t.number!))
@@ -594,6 +626,7 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
   }
 
   // ------------------------------------------------------------ replay of the emitted NC
+  checkpoint({ stage: "replay" })
   const hf = field()
   const initialVolume = hf.volume()
   const target = hf.rasterise(workMeshes as unknown as ReadonlyArray<Mesh>)
@@ -822,6 +855,7 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
   }
 
   // ------------------------------------------------------------ evidence
+  checkpoint({ stage: "evidence" })
   const failedOps = finalOutcomes.filter((x) => x.status === "failed")
   const unmachined = prepared.plan?.unmachined ?? []
   for (const m of unmachined) issues.push(issue("UnsupportedCapability", "plan", m, { severity: "warning" }))
@@ -912,9 +946,9 @@ const subprogramNotes = (nc: string): ReadonlyArray<string> => {
 }
 
 /** Prepares and runs a job. */
-export const runJob = (job: ManufacturingJob): CamResult<CamArtifact> => {
+export const runJob = (job: ManufacturingJob, options: RunOptions = {}): CamResult<CamArtifact> => {
   const prepared = prepareJob(job)
-  return prepared.status === "ok" ? executeJob(prepared.value) : prepared
+  return prepared.status === "ok" ? executeJob(prepared.value, options) : prepared
 }
 
 /** Only the plan: the operations the kernel would run, with their cutters, and what it cannot machine. */
