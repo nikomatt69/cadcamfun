@@ -51,3 +51,26 @@ describe("persistent face names of the exact replay", () => {
     expect([...a].sort()).toEqual([...b].sort())
   })
 })
+
+import { faceByName, matchFaces } from "./brep/index.ts"
+
+describe("finding faces again after a rebuild", () => {
+  test("every face of the plate is found by name after a width edit, and the bore wall follows", () => {
+    const a = rebuildExact(base(40)).bodies[0]!.brep!, b = rebuildExact(base(55)).bodies[0]!.brep!
+    const m = matchFaces(a, b)
+    expect(m.every((x) => x.by === "name" && x.to !== undefined)).toBe(true)
+    expect(faceByName(b, "bore.side0.0")).toBeDefined()
+    expect(faceByName(b, "nothing")).toBeUndefined()
+  })
+  test("a renamed feature's faces are found by what surrounds them and by kind", () => {
+    const renamed = base(40)
+    const swap = (s: string) => s.replaceAll("plate", "base")
+    const b = rebuildExact(JSON.parse(swap(JSON.stringify(renamed))) as History).bodies[0]!.brep!
+    const a = rebuildExact(base(40)).bodies[0]!.brep!
+    const m = matchFaces(a, b)
+    expect(m.every((x) => x.to !== undefined)).toBe(true)
+    const top = a.faces.findIndex((f) => f.name === "plate.top")
+    expect(b.faces[m[top]!.to!]!.name).toBe("base.top")
+    expect(new Set(m.map((x) => x.to)).size).toBe(a.faces.length)
+  })
+})

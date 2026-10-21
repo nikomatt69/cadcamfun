@@ -41,3 +41,53 @@ export const uniqueFaceNames = (b: Brep): Brep => {
   }
   return { ...b, faces: b.faces.map((f, i) => (names[i] === f.name ? f : { ...f, name: names[i]! })) }
 }
+
+/** Index of the face called `name`, or undefined (names are unique after `uniqueFaceNames`). */
+export const faceByName = (b: Brep, name: string): number | undefined => {
+  const i = b.faces.findIndex((f) => f.name === name)
+  return i < 0 ? undefined : i
+}
+
+export interface FaceMatch {
+  /** Face of the old body. */
+  readonly from: number
+  /** Face of the new body, or undefined when nothing in it corresponds. */
+  readonly to: number | undefined
+  /** `name`: the same name. `neighbours`: renamed, found by surface kind and the faces around it. `position`: nearest same-kind face. */
+  readonly by: "name" | "neighbours" | "position" | "none"
+}
+
+const kindOf = (b: Brep, fi: number): string => b.faces[fi]!.surface.kind
+
+/**
+ * Where the faces of a body went after it was rebuilt (an upstream edit, a renamed feature): a selection stored as a name or
+ * an index follows the body. A face keeps its name when the new body has it; otherwise it is found by surface kind and the
+ * names of the faces around it, and last by the nearest face of the same kind. Each new face is taken once.
+ */
+export const matchFaces = (before: Brep, after: Brep): ReadonlyArray<FaceMatch> => {
+  const taken = new Set<number>()
+  const out: FaceMatch[] = before.faces.map((_, from) => ({ from, to: undefined, by: "none" as const }))
+  const nbr = (b: Brep, fi: number) => [...new Set(adjacentFaces(b, fi).map((n) => b.faces[n]!.name ?? "?"))].sort().join("+")
+  const result: FaceMatch[] = out.map((m) => {
+    const name = before.faces[m.from]!.name
+    const to = name === undefined ? undefined : faceByName(after, name)
+    if (to === undefined || taken.has(to)) return m
+    taken.add(to)
+    return { from: m.from, to, by: "name" as const }
+  })
+  const centres = before.faces.map((_, i) => centre(before, i)), centresAfter = after.faces.map((_, i) => centre(after, i))
+  const dist = (a: Vec3, c: Vec3) => Math.hypot(a.x - c.x, a.y - c.y, a.z - c.z)
+  for (const pass of ["neighbours", "position"] as const) {
+    for (const m of result) {
+      if (m.to !== undefined) continue
+      const kind = kindOf(before, m.from)
+      const cands = after.faces.map((_, j) => j).filter((j) => !taken.has(j) && kindOf(after, j) === kind)
+      const pool = pass === "neighbours" ? cands.filter((j) => nbr(after, j) === nbr(before, m.from)) : cands
+      if (pool.length === 0) continue
+      const best = pool.reduce((p, j) => (dist(centresAfter[j]!, centres[m.from]!) < dist(centresAfter[p]!, centres[m.from]!) ? j : p))
+      taken.add(best)
+      result[m.from] = { from: m.from, to: best, by: pass }
+    }
+  }
+  return result
+}
