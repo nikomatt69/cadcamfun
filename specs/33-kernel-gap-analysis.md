@@ -256,3 +256,18 @@ Measured before: the features already name their faces (`plate.top`, `bore.side0
 ### 7.10 E7 first step: variable-radius fillet on a straight edge (2026-10-21)
 
 `brep/blend.ts` `variableFillet(brep, candidate, radiusA, radiusB)`: the radius runs linearly along a straight edge between two planes; the circular cross-section is kept in every plane square to the edge (the surface is the cone through the two end arcs; the rolling-ball envelope of a linearly changing radius differs from it by the second order of the taper). The tool is the exact loft of two homothetic cross-sections — the margin scales with the radius, so the lines of one section pair with the lines of the other and the arc with the arc — extended past a free end along the taper, then one exact Boolean. Test (`blend.test.ts`): box edge 30 mm from 1 to 3 mm removes `L (1 - pi/4)(r0² + r0 r1 + r1²)/3` to 1e-6 relative, valid B-rep, equal radii equal the constant fillet, STEP round trip, refusals (face too narrow, curved edge, non-positive radii). Not wired into the parametric history yet because the mesh rebuild has no variable-radius counterpart (the exact and mesh bodies must agree). Still open for E7: radius laws other than linear (smooth, per-point), variable radius meeting other blended edges (end cuts), setback vertex blends, curved non-coaxial edges, face-face blends.
+
+### 7.11 Silent wrong results: found by a wider fuzz, guarded (2026-10-21)
+
+A wider aligned sweep (seeds 17-90, off-line script; the CI test keeps 16 + 16 + 12) found what the validity checks cannot see: **valid, closed solids with the wrong volume**.
+
+- seed 41 (sphere r 4.5 x cylinder r 3.5, aligned): the displaced recovery returned a solid 8.7 % off (intersection 106.6, truth 171.5 by Monte Carlo with exact membership) because one of the two displacement directions made the pipeline produce a wrong but valid result.
+- seed 81 (torus R 4.5 r 2.5 x sphere r 4.5 whose south pole lies exactly on the torus): intersection 102.67 against 101.845 by a 360^3 grid (+0.8 %), difference A-B 0.8 low, union and B-A right; displaced by 1e-4 / 1e-3 mm the intersection is **10.27**, valid. Cause not found yet: a sphere pole on or near the other solid's surface makes a fragment misclassified; the exact volume of each result is right, the fragment set is not.
+
+Guards added in `booleanBrep` (the strict pipeline `booleanStrict` is unchanged):
+1. a **pole or apex on the other solid's surface** (sphere poles, cone apexes, `poleOnOther`) goes straight to the recovery, not through the strict pipeline;
+2. every **recovered** result is checked against the operands by a 3000-point low-discrepancy sample of their box (exact point location in each operand) against the result's exact volume (6 sigma);
+3. and by the **volume identities** of the displaced pair, `V(A u B) + V(A n B) = V(A) + V(B)` and `V(A - B) + V(A n B) = V(A)`, which resolve what the sample cannot (the 0.8 % case): the three operations are computed once per displaced pair and shared (`displacedSet`), the exact volume of each result is cached.
+With these seed 41 is correct (the bad direction is rejected) and seed 81 returns the intersection 101.824 (grid 101.845); the first operation on a pole-on-surface pair costs ~30 s (three booleans and four exact masses), the others come from the cache. `fuzz.test.ts` displaced tolerance is 1e-3 because the three operations may be displaced differently.
+
+Open, in order of value: the misclassification itself (a fragment touching a sphere pole), a Boolean-level identity check cheap enough to run on every result of a history replay (today only on the recovery path), and the 10-15 s torus x torus / torus x sphere cases (seeds 74, 80, 82: `SLOW` in the sweep).

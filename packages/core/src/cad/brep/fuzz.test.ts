@@ -40,7 +40,7 @@ describe("Boolean fuzzing: valid results and inclusion-exclusion", () => {
           const u = booleanBrep(A, B, "union"), i = booleanBrep(A, B, "intersect"), d = booleanBrep(A, B, "subtract")
           for (const x of [u, i, d]) if (x.brep.faces.length > 0 && validateBrep(x.brep).issues.length > 0) throw new Error("invalid result")
           const displaced = [u, i, d].some((x) => x.warnings.length > 0)
-          const tol = displaced ? 2e-4 : 1e-6
+          const tol = displaced ? 1e-3 : 1e-6
           const va = volume(A), vb = volume(B)
           const e1 = Math.abs(volume(u.brep) + volume(i.brep) - va - vb) / (va + vb)
           const e2 = Math.abs(volume(d.brep) - (va - volume(i.brep))) / va

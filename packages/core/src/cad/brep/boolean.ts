@@ -21,6 +21,7 @@ import { interpolateCurve } from "./nurbs.ts"
 import { compactBrep, edgeUses, EMPTY_BREP, transformBrep, type Brep, type Coedge, type Edge, type Face, type Loop } from "./topology.ts"
 import { faceBoundaries, tessellateBrep, type FaceBoundaries, type UvSample } from "./tessellate.ts"
 import { brepLocator, type BrepLocator } from "./classify.ts"
+import { massProperties } from "./mass.ts"
 import { Cdt } from "./cdt.ts"
 import { checkBudget } from "./budget.ts"
 import {
@@ -1122,7 +1123,11 @@ void refineSurfaceSurface
  * million of the model size, which breaks an exact tangency; that last result is reported in `warnings`.
  */
 export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOptions = {}): BooleanResult => {
+  // A pole of a sphere or the apex of a cone on the other solid's surface is a degenerate contact the pipeline can get wrong
+  // without noticing (a sphere's south pole on a torus left the union 0.1 % too big and still valid): go straight to the recovery.
+  const poleContact = poleOnOther(A, B) || poleOnOther(B, A)
   try {
+    if (poleContact) throw new BooleanError("a pole or apex of one operand lies on the surface of the other", [], { stage: "prepare", hint: DEGENERATE_HINT, attempts: [] })
     return booleanStrict(A, B, op, options)
   } catch (e) {
     if (!(e instanceof BooleanError)) throw e
@@ -1133,10 +1138,17 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     // Growing displacements: an exact tangency needs a few ppm, a near-tangency (two curves 1e-4 apart) needs more.
     for (const scale of [3e-6, 3e-5, 3e-4]) {
       const eps = Math.max(1e-6, extent * scale)
-      for (const d of dirs) {
+      for (const [di, d] of dirs.entries()) {
         try {
-          const r = booleanStrict(A, transformBrep(B, translation(scale3(normalize3(d), eps))), op, options)
-          return { ...r, warnings: [...r.warnings, `degenerate alignment: the second operand was displaced by ${eps.toExponential(1)} mm to break an exact tangency or coincidence`] }
+          const set = displacedSet(A, B, `${scale}:${di}`, () => transformBrep(B, translation(scale3(normalize3(d), eps))), options)
+          const r = set.get(op)
+          // A displaced operand can make the pipeline return a valid solid that is not the answer. Two checks: a sample of the
+          // operands' box against the result's volume, and the identities that union, intersection and difference of the same
+          // pair must satisfy (V(A u B) + V(A n B) = V(A) + V(B) and V(A - B) + V(A n B) = V(A)), which catch a small error the
+          // sample cannot.
+          if (!agreesWithOperands(A, set.B, op, r)) continue
+          if (!set.identitiesHold()) continue
+          return { brep: r, warnings: [`degenerate alignment: the second operand was displaced by ${eps.toExponential(1)} mm to break an exact tangency or coincidence`], stats: set.stats(op) }
         } catch (e3) {
           if (!(e3 instanceof BooleanError)) throw e3
         }
@@ -1145,4 +1157,122 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     const tried = [3e-6, 3e-5, 3e-4].map((k) => Math.max(1e-6, extent * k))
     throw new BooleanError(`${first.message} (also failed with the second operand displaced by up to ${tried[2]!.toExponential(1)} mm)`, first.issues, { ...(first.diagnostic ?? { stage: "validate" as const, hint: DEGENERATE_HINT }), attempts: tried })
   }
+}
+
+/** Poles of spheres and apexes of cones of `a` (the points where a surface's parametrisation degenerates). */
+const poles = (a: Brep): Vec3[] => {
+  const out: Vec3[] = []
+  const seen = new Set<string>()
+  for (const f of a.faces) {
+    const sf = f.surface
+    const add = (p: Vec3) => { const k = `${p.x.toFixed(6)},${p.y.toFixed(6)},${p.z.toFixed(6)}`; if (!seen.has(k)) { seen.add(k); out.push(p) } }
+    if (sf.kind === "sphere") { add(add3(sf.frame.origin, scale3(sf.frame.z, sf.radius))); add(add3(sf.frame.origin, scale3(sf.frame.z, -sf.radius))) }
+    else if (sf.kind === "cone" && Math.abs(Math.tan(sf.semiAngle)) > 1e-12) add(add3(sf.frame.origin, scale3(sf.frame.z, -sf.radius / Math.tan(sf.semiAngle))))
+  }
+  return out
+}
+
+/** Whether a pole of `a` lies on the boundary of `b`. */
+const poleOnOther = (a: Brep, b: Brep): boolean => {
+  const ps = poles(a)
+  if (ps.length === 0) return false
+  const loc = brepLocator(b)
+  return ps.some((p) => loc.closest(p).distance < 1e-6)
+}
+
+/**
+ * Whether a Boolean result has the volume the operands say: the fraction of a low-discrepancy sample of the operands' box that
+ * lies in the result by the operation's rule (exact point location in each operand), against the result's exact volume. Used on
+ * the recovery path only, where a valid-looking wrong solid has been seen.
+ */
+const agreesWithOperands = (A: Brep, B: Brep, op: BooleanOp, result: Brep): boolean => {
+  const la = brepLocator(A), lb = brepLocator(B)
+  const pts: Vec3[] = []
+  for (const b of [A, B]) {
+    const t = tessellateBrep(b, { angleTolDeg: 20 })
+    for (let i = 0; i < t.positions.length; i += 3) pts.push({ x: t.positions[i]!, y: t.positions[i + 1]!, z: t.positions[i + 2]! })
+  }
+  const tight = boxOf(pts)
+  const pad = 0.01 * dist3(tight.lo, tight.hi)
+  const box = { lo: { x: tight.lo.x - pad, y: tight.lo.y - pad, z: tight.lo.z - pad }, hi: { x: tight.hi.x + pad, y: tight.hi.y + pad, z: tight.hi.z + pad } }
+  const size = { x: box.hi.x - box.lo.x, y: box.hi.y - box.lo.y, z: box.hi.z - box.lo.z }
+  const boxVolume = size.x * size.y * size.z
+  const tol = Math.max(1e-7, Math.max(size.x, size.y, size.z) * 1e-8)
+  const N = 3000
+  const halton = (i: number, base: number): number => { let f = 1, r = 0; for (let k = i; k > 0; k = Math.floor(k / base)) { f /= base; r += f * (k % base) } return r }
+  let hits = 0
+  for (let i = 1; i <= N; i++) {
+    const p = { x: box.lo.x + size.x * halton(i, 2), y: box.lo.y + size.y * halton(i, 3), z: box.lo.z + size.z * halton(i, 5) }
+    const a = la.classify(p, tol) !== "out", b = lb.classify(p, tol) !== "out"
+    if (op === "union" ? a || b : op === "intersect" ? a && b : a && !b) hits++
+  }
+  const f = hits / N
+  const estimate = f * boxVolume
+  const sigma = boxVolume * Math.sqrt(Math.max(f * (1 - f), 1 / N) / N)
+  const actual = exactVolume(result)
+  return Math.abs(actual - estimate) <= 6 * sigma + 1e-3 * boxVolume
+}
+
+/** Exact volume of a solid, kept per solid: the recovery asks for it several times. */
+const VOLUMES = new WeakMap<Brep, number>()
+const exactVolume = (b: Brep): number => {
+  if (b.faces.length === 0) return 0
+  let v = VOLUMES.get(b)
+  if (v === undefined) { v = massProperties(b).volume; VOLUMES.set(b, v) }
+  return v
+}
+
+const SETS = new WeakMap<Brep, WeakMap<Brep, Map<string, DisplacedSet>>>()
+
+interface DisplacedSet {
+  readonly B: Brep
+  /** The operation's result on the displaced pair (computed once, whoever asks first); throws the pipeline's `BooleanError`. */
+  get(op: BooleanOp): Brep
+  stats(op: BooleanOp): BooleanStats
+  /** The volume identities of union, intersection and difference (computes the three). */
+  identitiesHold(): boolean
+}
+
+/** The three operations on A and a displaced copy of B, kept for the next ask: a union, an intersection and a difference of one pair share them. */
+const displacedSet = (A: Brep, B: Brep, key: string, displace: () => Brep, options: BooleanOptions): DisplacedSet => {
+  let byB = SETS.get(A)
+  if (byB === undefined) { byB = new WeakMap(); SETS.set(A, byB) }
+  let sets = byB.get(B)
+  if (sets === undefined) { sets = new Map(); byB.set(B, sets) }
+  const hit = sets.get(key)
+  if (hit !== undefined) return hit
+  const B2 = displace()
+  const done = new Map<BooleanOp, BooleanResult | BooleanError>()
+  const run = (op: BooleanOp): BooleanResult => {
+    let r = done.get(op)
+    if (r === undefined) {
+      try { r = booleanStrict(A, B2, op, options) } catch (err) { if (!(err instanceof BooleanError)) throw err; r = err }
+      done.set(op, r)
+    }
+    if (r instanceof BooleanError) throw r
+    return r
+  }
+  const vol = exactVolume
+  let holds: boolean | undefined
+  const set: DisplacedSet = {
+    B: B2,
+    get: (op) => run(op).brep,
+    stats: (op) => run(op).stats,
+    identitiesHold: () => {
+      if (holds === undefined) {
+        try {
+          const u = vol(run("union").brep), i = vol(run("intersect").brep), d = vol(run("subtract").brep)
+          const va = vol(A), vb = vol(B2)
+          const tol = 1e-5 * (va + vb)
+          holds = Math.abs(u + i - va - vb) <= tol && Math.abs(d + i - va) <= tol
+        } catch (err) {
+          if (!(err instanceof BooleanError)) throw err
+          holds = false
+        }
+      }
+      return holds
+    }
+  }
+  sets.set(key, set)
+  return set
 }
