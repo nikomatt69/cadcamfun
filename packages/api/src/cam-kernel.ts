@@ -21,7 +21,9 @@ export const CamKernelRequest = Schema.Struct({
   /** Cutter library with holders (the kernel's default crib when absent). */
   tools: CamManufactureInput.fields.tools,
   deburr: CamManufactureInput.fields.deburr,
-  subprograms: CamManufactureInput.fields.subprograms
+  subprograms: CamManufactureInput.fields.subprograms,
+  /** Where to announce progress (a `cam.progress` frame per operation and stage on the project's live stream); never stored with the program. */
+  progress: Schema.optionalKey(Schema.Struct({ projectId: id, runId: id }))
 })
 export type CamKernelRequest = typeof CamKernelRequest.Type
 

@@ -80,6 +80,22 @@ export const AiSession = Schema.Struct({
   phase: Schema.Literals(["started", "finished", "aborted"])
 })
 
+/**
+ * Where a CAM kernel run is (spec 29): before each operation and each stage after them, then `done` or `cancelled`. Frames follow
+ * project access like every other project frame; `runId` is chosen by the caller (or the assistant) so a screen can pick its own run.
+ */
+export const CamProgress = Schema.Struct({
+  type: Schema.Literal("cam.progress"),
+  at: Schema.String,
+  projectId: Schema.String,
+  runId: Schema.String,
+  phase: Schema.Literals(["running", "done", "cancelled"]),
+  stage: Schema.optional(Schema.Literals(["operations", "post", "replay", "evidence"])),
+  operationId: Schema.optional(Schema.String),
+  index: Schema.optional(Schema.Number),
+  count: Schema.optional(Schema.Number)
+})
+
 /** A saved working-copy change, including changes that have not been committed. */
 export const WorkspaceChanged = Schema.Struct({
   type: Schema.Literal("workspace.changed"),
@@ -129,7 +145,7 @@ export const CatalogueUpdated = Schema.Struct({ type: Schema.Literal("catalogue.
 
 export const LiveEvent = Schema.Union([
   PrOpened, PrMerged, PrClosed, PrReviewed, Commit,
-  WorkflowStarted, WorkflowFinished, AiSession, WorkspaceChanged, ServerConnected, ServerHeartbeat, ResourcesChanged, CatalogueUpdated,
+  WorkflowStarted, WorkflowFinished, AiSession, CamProgress, WorkspaceChanged, ServerConnected, ServerHeartbeat, ResourcesChanged, CatalogueUpdated,
   NotificationCreated, NotificationUpdated, NotificationDeleted, NotificationReadAll, OrganizationsChanged
 ] as const)
 export type LiveEvent = typeof LiveEvent.Type

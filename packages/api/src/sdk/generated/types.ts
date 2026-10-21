@@ -1456,6 +1456,7 @@ export type ToolpathGeneratorManufacturePayload = {
   }>
   readonly deburr?: number
   readonly subprograms?: boolean
+  readonly progress?: { readonly projectId: string; readonly runId: string }
 }
 
 export type ToolpathGeneratorParsePayload = { readonly gcode: string; readonly name?: string }
@@ -5937,6 +5938,7 @@ export type ToolpathGeneratorManufactureInput = {
   readonly tools?: ToolpathGeneratorManufacturePayload["tools"]
   readonly deburr?: ToolpathGeneratorManufacturePayload["deburr"]
   readonly subprograms?: ToolpathGeneratorManufacturePayload["subprograms"]
+  readonly progress?: ToolpathGeneratorManufacturePayload["progress"]
 }
 
 export type ToolpathGeneratorManufactureOutput =
@@ -6421,6 +6423,7 @@ export type CadExactAssemblyOutput = {
     undetermined: Array<{ a: string; b: string; reason: string }>
     checked: number
   }
+  clearance?: Array<{ a: string; b: string; aName: string; bName: string; distance: number; overlap: boolean }>
   bom: Array<{
     item: number
     name: string
@@ -7042,6 +7045,17 @@ export type EventsSubscribeOutput =
       status: "success" | "failure" | "cancelled"
     }
   | { type: "ai.session"; at: string; projectId: string; sessionId: string; phase: "started" | "finished" | "aborted" }
+  | {
+      type: "cam.progress"
+      at: string
+      projectId: string
+      runId: string
+      phase: "running" | "done" | "cancelled"
+      stage?: "operations" | "post" | "replay" | "evidence" | undefined
+      operationId?: string | undefined
+      index?: number | undefined
+      count?: number | undefined
+    }
   | { type: "workspace.changed"; at: string; projectId: string }
   | { type: "server.connected"; at: string }
   | { type: "server.heartbeat"; at: string }
@@ -7155,6 +7169,17 @@ export type EventsSubscribeAllOutput =
       status: "success" | "failure" | "cancelled"
     }
   | { type: "ai.session"; at: string; projectId: string; sessionId: string; phase: "started" | "finished" | "aborted" }
+  | {
+      type: "cam.progress"
+      at: string
+      projectId: string
+      runId: string
+      phase: "running" | "done" | "cancelled"
+      stage?: "operations" | "post" | "replay" | "evidence" | undefined
+      operationId?: string | undefined
+      index?: number | undefined
+      count?: number | undefined
+    }
   | { type: "workspace.changed"; at: string; projectId: string }
   | { type: "server.connected"; at: string }
   | { type: "server.heartbeat"; at: string }

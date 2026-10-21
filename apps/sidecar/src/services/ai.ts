@@ -11,6 +11,8 @@ import { DESIGN_SPACE, cad, cam, checkModel, type History } from "@cadcamfun/cor
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { CamKernelArtifact, CamKernelRequest, CamProgramDocument, ToolpathRow, type CamManufactureInput, type SessionUser } from "@cadcamfun/api"
 import { drawingRevision } from "./cam-program.ts"
+import { camProgressReporter } from "./cam-progress.ts"
+import { LiveEvents } from "./live-events.ts"
 import { z } from "zod"
 import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
@@ -117,8 +119,17 @@ const toolHandlers = Effect.gen(function*() {
   const { user: local } = yield* LocalProfile
   const kv = yield* KvStore
   const actingCell = yield* ActingUser
+  const liveEvents = yield* LiveEvents
   /** The account of the chat turn that called a tool (the local profile until one has). */
   const acting = () => actingCell.get(local)
+  /** Runs the kernel in its worker, announcing the run on the project's live stream (desktop and phone follow the same progress). */
+  const manufactureRun = async (projectId: string, job: Parameters<typeof runKernelJob<"cam-manufacture">>[1], signal?: AbortSignal) => {
+    const runId = crypto.randomUUID()
+    const report = camProgressReporter(liveEvents, projectId, runId)
+    const result = await runKernelJob("cam-manufacture", job, { ...(signal !== undefined ? { signal } : {}), onProgress: report }).catch(cancelled)
+    report(result.status === "failed" && result.issues.some((i) => i.tag === "Cancelled") ? "cancelled" : "done")
+    return result
+  }
 
   /**
    * Reads never provision a workspace. Only an authorized write may create the default project or drawing.
@@ -246,7 +257,7 @@ const toolHandlers = Effect.gen(function*() {
         const plan = await runKernelJob("cam-plan", job, signal === undefined ? {} : { signal }).catch(cancelled)
         return plan.status === "ok" ? { ok: true, mutated: false, stockNote, ...plan.value, ...where(loaded) } : { ok: false, error: "The kernel could not plan this job; see issues.", issues: plan.issues, ...where(loaded) }
       }
-      const run = await runKernelJob("cam-manufacture", job, signal === undefined ? {} : { signal }).catch(cancelled)
+      const run = await manufactureRun(projectId, job, signal)
       if (run.status === "failed") return { ok: false, error: "The kernel could not machine this job; see issues.", issues: run.issues, ...where(loaded) }
       const a = run.value
       const lines = a.nc.split("\n")
@@ -270,7 +281,7 @@ const toolHandlers = Effect.gen(function*() {
       if (input.expectedRevision !== undefined && input.expectedRevision !== revision) return { ok: false, status: "stale", error: "The drawing changed. Inspect the current part before manufacturing." }
       const built = manufacturingJob(loaded, input)
       if (!built.ok) return { ...built, ...where(loaded) }
-      const result = await runKernelJob("cam-manufacture", built.job, signal === undefined ? {} : { signal }).catch(cancelled)
+      const result = await manufactureRun(projectId, built.job, signal)
       if (result.status === "failed") return { ok: false, error: "The kernel could not machine this job; nothing was stored.", issues: result.issues, ...where(loaded) }
       if (result.value.release === "blocked") return { ok: false, error: "The program is blocked by its own replay claims; nothing was stored.", release: "blocked", issues: result.value.issues, claims: result.value.claims, ...where(loaded) }
       const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(result.value)

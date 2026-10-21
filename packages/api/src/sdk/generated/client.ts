@@ -3829,6 +3829,7 @@ export function make(options: ClientOptions) {
               tools: input["tools"],
               deburr: input["deburr"],
               subprograms: input["subprograms"],
+              progress: input["progress"],
             },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],

@@ -15,15 +15,16 @@ export const drawingRevision = (loaded: { readonly id: string; readonly elements
 }
 
 /** The same request adapter serves preview generation and persistence revalidation. */
-export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payload: CamKernelRequest) {
+export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payload: CamKernelRequest, report?: (progress: cam.kernel.KernelProgress | "done" | "cancelled") => void) {
   const job = cam.kernel.jobOfSnapshot(payload)
   if (job.status === "failed") return yield* new BadRequest({ message: job.issues.map((i) => i.message).join("; ") })
   // In a scoped worker: the event loop keeps serving while the kernel works, a dropped request interrupts the fiber (its signal
   // terminates the worker) and a job that runs past its deadline is stopped.
   const result = yield* Effect.tryPromise({
-    try: (signal) => runKernelJob("cam-manufacture", job.value, { signal }),
+    try: (signal) => runKernelJob("cam-manufacture", job.value, { signal, ...(report !== undefined ? { onProgress: report } : {}) }),
     catch: (error) => new BadRequest({ message: error instanceof KernelJobError && error.reason !== "failed" && error.reason !== "crashed" ? error.message : "The CAM kernel request could not be evaluated" })
   })
+  report?.(result.status === "failed" && result.issues.some((i) => i.tag === "Cancelled") ? "cancelled" : "done")
   return yield* Schema.decodeUnknownEffect(CamKernelResult)(result).pipe(Effect.mapError(() => new BadRequest({ message: "The CAM kernel returned an invalid artifact" })))
 })
 

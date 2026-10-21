@@ -4,6 +4,7 @@ import { startLiveSync } from "../src/app/live-sync.ts"
 import { createQueryCache } from "../src/shared/state/query-cache.ts"
 import type { AppState } from "../src/shared/state/context.ts"
 import type { LiveEvent } from "@cadcamfun/api"
+import { useCamStore } from "../src/features/cam/store/camStore.ts"
 
 test("one desktop host connection coalesces phone changes, reloads on greeting and stops on disposal", async () => {
   let push!: (event: LiveEvent) => void
@@ -39,6 +40,13 @@ test("one desktop host connection coalesces phone changes, reloads on greeting a
     for (let i = 0; i < 20; i++) push({ type: "workspace.changed", projectId: "phone-project", at: "now" })
     await until(() => invalidations === 2)
     expect(reads).toBe(1)
+    // Kernel progress moves the CAM panel's label and never reloads the project, even for the open one.
+    const before = invalidations
+    push({ type: "cam.progress", projectId: "phone-project", runId: "r1", phase: "running", stage: "operations", operationId: "rough", index: 0, count: 3, at: "now" })
+    await until(() => useCamStore.getState().kernelProgress?.runId === "r1")
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    expect(useCamStore.getState().kernelProgress).toMatchObject({ operationId: "rough", index: 0, count: 3 })
+    expect(invalidations).toBe(before)
     stop()
     push({ type: "workspace.changed", projectId: "phone-project", at: "now" })
     await new Promise((resolve) => setTimeout(resolve, 40))

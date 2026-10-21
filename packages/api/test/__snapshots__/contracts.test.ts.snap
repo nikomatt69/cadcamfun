@@ -16012,6 +16012,41 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       },
                       "type": "array",
                     },
+                    "clearance": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "a": {
+                            "type": "string",
+                          },
+                          "aName": {
+                            "type": "string",
+                          },
+                          "b": {
+                            "type": "string",
+                          },
+                          "bName": {
+                            "type": "string",
+                          },
+                          "distance": {
+                            "type": "number",
+                          },
+                          "overlap": {
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "a",
+                          "b",
+                          "aName",
+                          "bName",
+                          "distance",
+                          "overlap",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
                     "fasteners": {
                       "additionalProperties": false,
                       "properties": {
@@ -56966,6 +57001,24 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "stock-corner",
                     ],
                     "type": "string",
+                  },
+                  "progress": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "projectId": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      "runId": {
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "projectId",
+                      "runId",
+                    ],
+                    "type": "object",
                   },
                   "resolution": {
                     "exclusiveMinimum": 0,

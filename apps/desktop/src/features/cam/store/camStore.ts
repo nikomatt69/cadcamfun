@@ -14,7 +14,7 @@
  */
 import { Schema } from "effect"
 import { cam } from "@cadcamfun/core"
-import { combineCamOperations, type CamKernelRequest, type CamProgramOperation } from "@cadcamfun/api"
+import { combineCamOperations, type CamKernelRequest, type CamProgramOperation, type LiveEvent } from "@cadcamfun/api"
 import { create } from "../../../shared/state/zustand.ts"
 import { useCADStore } from "../../cad/store/cadStore.ts"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
@@ -45,7 +45,12 @@ export interface DerivedWorkpieceDimensions {
   readonly depth: number
 }
 
+/** Where the kernel run the sidecar announced is (a `cam.progress` frame); the panel shows the one it started. */
+export type KernelProgress = Extract<LiveEvent, { readonly type: "cam.progress" }>
+
 interface CAMState {
+  kernelProgress: KernelProgress | undefined
+  setKernelProgress(progress: KernelProgress | undefined): void
   kernelRequest: CamKernelRequest | undefined
   setKernelRequest(request: CamKernelRequest | undefined): void
   savedProgram: { readonly id: string; readonly projectId: string; readonly drawingId: string | null; readonly name: string; readonly description?: string | null; readonly isPublic?: boolean; readonly editorRevision?: string; readonly storedRevision?: string } | undefined
@@ -161,6 +166,8 @@ const initialWorkpiece: Workpiece = { x: 300, y: 180, z: 10 }
 const initialProgram = cam.makeProgram("untitled", [], {})
 
 export const useCamStore = create<CAMState>((set, get) => ({
+  kernelProgress: undefined,
+  setKernelProgress: (kernelProgress) => set({ kernelProgress }),
   kernelRequest: undefined,
   setKernelRequest: (kernelRequest) => set({ kernelRequest }),
   savedProgram: undefined,

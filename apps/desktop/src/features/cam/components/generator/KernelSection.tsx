@@ -48,6 +48,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
   const [result, setResult] = createSignal<CamKernelResult>()
   const [error, setError] = createSignal<string>()
   let controller: AbortController | undefined
+  let runId = ""
   let disposed = false
   const request = createMemo(() => {
     try {
@@ -84,6 +85,14 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
     controller?.abort()
   })
   onCleanup(() => { disposed = true; controller?.abort(); if (controller) gen.setGenerating(false) })
+
+  /** What the run this panel started is doing now, from the sidecar's `cam.progress` frames. */
+  const progressLabel = (): string | undefined => {
+    const p = store.kernelProgress
+    if (p === undefined || p.runId !== runId) return undefined
+    if (p.stage === "operations" && p.operationId !== undefined) return t("cam.kernel.progress.operation", { index: (p.index ?? 0) + 1, count: p.count ?? 1, id: p.operationId })
+    return p.stage === undefined ? undefined : t(`cam.kernel.progress.${p.stage}`)
+  }
 
   /** The kernel's plan for the current part, into the editable list. */
   const plan = (): void => {
@@ -147,7 +156,11 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
     setError(undefined)
     gen.setGenerating(true)
     try {
-      const value = await app.runtime.run(api.manufacture(input), { signal: signal.signal })
+      // The sidecar announces this run on the project's stream; the panel follows it under its own run id.
+      const projectId = owner.projectId
+      runId = crypto.randomUUID()
+      store.setKernelProgress(undefined)
+      const value = await app.runtime.run(api.manufacture(projectId == null ? input : { ...input, progress: { projectId, runId } }), { signal: signal.signal })
       if (disposed || signal.signal.aborted || !owner.current() || request()?.id !== input.id || store.gcode !== previousCode) return
       setResult(value)
       if (value.status !== "ok" || value.value.release === "blocked") return
@@ -285,6 +298,9 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
       <button type="button" class="ui-btn ui-btn-primary w-full justify-center" disabled={!request() || gen.isGenerating} onClick={() => void generate()} data-testid="kernel-generate">
         {t(gen.isGenerating && controller ? "cam.kernel.generating" : "cam.kernel.generate")}
       </button>
+      <Show when={gen.isGenerating && progressLabel() !== undefined}>
+        <p class="text-[10px] text-gray-500" data-testid="kernel-progress" aria-live="polite">{progressLabel()}</p>
+      </Show>
       <Show when={!request()}><p class="text-xs text-gray-500">{t("cam.kernel.select")}</p></Show>
       <Show when={error()}><p role="alert" class="text-xs text-red-600">{error()}</p></Show>
       <Show when={result()?.status === "failed" ? result() : undefined}>{(value) => <ul class="text-xs text-red-600" role="alert"><For each={value().status === "failed" ? (value() as Extract<CamKernelResult, { status: "failed" }>).issues : []}>{(issue) => <li>{issue.message}</li>}</For></ul>}</Show>

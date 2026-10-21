@@ -24,6 +24,7 @@ export type LiveEvent =
   | { readonly type: "workflow.started"; readonly projectId: string; readonly runId: string; readonly workflow: string; readonly event: "push" | "pull-request" | "manual"; readonly at: string }
   | { readonly type: "workflow.finished"; readonly projectId: string; readonly runId: string; readonly workflow: string; readonly status: "success" | "failure" | "cancelled"; readonly at: string }
   | { readonly type: "ai.session"; readonly projectId: string; readonly sessionId: string; readonly phase: "started" | "finished" | "aborted"; readonly at: string }
+  | { readonly type: "cam.progress"; readonly projectId: string; readonly runId: string; readonly phase: "running" | "done" | "cancelled"; readonly stage?: "operations" | "post" | "replay" | "evidence"; readonly operationId?: string; readonly index?: number; readonly count?: number; readonly at: string }
   | { readonly type: "workspace.changed"; readonly projectId: string; readonly at: string }
   | { readonly type: "resources.changed"; readonly userId: string; readonly organizationId?: string; readonly at: string }
   | { readonly type: "catalogue.updated"; readonly at: string }

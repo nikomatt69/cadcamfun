@@ -13,6 +13,8 @@ export function startLiveSync(app: AppState): () => void {
   const refresh = (event: LiveEvent) => {
     // A keep-alive proves the pipe is alive; it never means data changed.
     if (event.type === "server.heartbeat") return
+    // Kernel progress only moves a label: it must not reload the project the way a saved change does.
+    if (event.type === "cam.progress") { useCamStore.getState().setKernelProgress(event); return }
     app.notifications.handleLiveEvent(event)
     if (event.type === "server.connected") void app.notifications.refresh()
     if (event.type === "organizations.changed") app.cache.invalidate()
