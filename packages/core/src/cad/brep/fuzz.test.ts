@@ -51,10 +51,7 @@ describe("Boolean fuzzing: valid results and inclusion-exclusion", () => {
         }
       }
       if (failures.length > 0) console.log(failures.join("\n"))
-      // Known open case: generic seed 14 (a torus and a sphere whose intersection curve folds back within 1e-4 mm of itself;
-      // see spec 33 §7.4). Anything beyond it is a regression.
-      expect(failures.filter((f) => !f.startsWith("seed 14:")).length).toBe(0)
-      expect(failures.length).toBeLessThanOrEqual(aligned ? 0 : 1)
+      expect(failures).toEqual([])
     })
   }
 })

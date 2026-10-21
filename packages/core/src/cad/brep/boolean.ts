@@ -17,7 +17,7 @@
  */
 import { add3, cross3, dist3, dot3, length3, normalize3, scale3, sub3, translation, unwrapNear, type Frame, type Vec2, type Vec3 } from "./math.ts"
 import { curvePoint, curveProject, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Curve3, type Surface } from "./geom.ts"
-import { interpolateCurve } from "./nurbs.ts"
+import { interpolateCurve, nurbsCurvePoint, type NurbsCurveData } from "./nurbs.ts"
 import { compactBrep, edgeUses, EMPTY_BREP, transformBrep, type Brep, type Coedge, type Edge, type Face, type Loop } from "./topology.ts"
 import { faceBoundaries, tessellateBrep, type FaceBoundaries, type UvSample } from "./tessellate.ts"
 import { brepLocator, type BrepLocator } from "./classify.ts"
@@ -271,8 +271,30 @@ const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number, conic?
   }
   // Cubic B-spline interpolation (closed curves repeat the first point).
   const data = closed ? [...pts, pts[0]!] : pts
-  const { curve, params } = interpolateCurve(data.map((p) => [p.x, p.y, p.z]), 3)
+  const rows = data.map((p) => [p.x, p.y, p.z])
+  let { curve, params } = interpolateCurve(rows, 3)
+  // At a tight turn (two nearly tangent surfaces) the points are far apart compared with the radius, and a cubic through them
+  // hooks out past the data and back. Between two data points the curve must stay near their chord; where it does not, the
+  // curve through the same points is made of straight spans (degree 1), which cannot overshoot.
+  if (hooks(curve, params, data)) ({ curve, params } = interpolateCurve(rows, 1))
   return { curve: { kind: "nurbs", data: curve }, t0: 0, t1: 1, params: closed ? params.slice(0, n) : params }
+}
+
+/** Whether a fitted curve strays from the chord of some span of its data by more than a quarter of the span. */
+const hooks = (curve: NurbsCurveData, params: ReadonlyArray<number>, data: ReadonlyArray<Vec3>): boolean => {
+  for (let i = 0; i + 1 < data.length; i++) {
+    const a = data[i]!, b = data[i + 1]!
+    const d = sub3(b, a), len2 = dot3(d, d)
+    if (len2 < 1e-24) continue
+    const limit = 0.25 * Math.sqrt(len2)
+    for (const f of [0.25, 0.5, 0.75]) {
+      const q = nurbsCurvePoint(curve, params[i]! + (params[i + 1]! - params[i]!) * f)
+      const p = { x: q[0]!, y: q[1]!, z: q[2]! }
+      const t = Math.max(0, Math.min(1, dot3(sub3(p, a), d) / len2))
+      if (dist3(p, add3(a, scale3(d, t))) > limit) return true
+    }
+  }
+  return false
 }
 
 // ================================================================ the Boolean
@@ -527,9 +549,13 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
       if (raw.length > 1) seg.push(raw[raw.length - 1]!)
       // A refined sample that sits off the curve and makes it turn back on itself is dropped (a spur of the mesh seed); the
       // spline would otherwise loop there.
-      for (let k = seg.length - 2; k >= 1; k--) {
-        if (seg[k]!.vid !== undefined) continue
-        if (dot3(sub3(seg[k]!.q.p, seg[k - 1]!.q.p), sub3(seg[k + 1]!.q.p, seg[k]!.q.p)) < 0) seg.splice(k, 1)
+      // A spur of several samples (out along the curve and back) loses its tip point by point until nothing turns back.
+      for (let pass = 0, changed = true; changed && pass < 200; pass++) {
+        changed = false
+        for (let k = seg.length - 2; k >= 1; k--) {
+          if (seg[k]!.vid !== undefined) continue
+          if (dot3(sub3(seg[k]!.q.p, seg[k - 1]!.q.p), sub3(seg[k + 1]!.q.p, seg[k]!.q.p)) < 0) { seg.splice(k, 1); changed = true }
+        }
       }
       const v0 = seg[0]!.vid!, v1 = seg[seg.length - 1]!.vid!
       const pieceClosed = v0 === v1
@@ -1136,7 +1162,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     const extent = dist3(box.lo, box.hi)
     const dirs: Vec3[] = [{ x: 0.53, y: 0.31, z: 0.79 }, { x: -0.61, y: 0.43, z: -0.66 }]
     // Growing displacements: an exact tangency needs a few ppm, a near-tangency (two curves 1e-4 apart) needs more.
-    for (const scale of [3e-6, 3e-5, 3e-4]) {
+    for (const scale of [3e-6, 3e-5, 3e-4, 3e-3]) {
       const eps = Math.max(1e-6, extent * scale)
       for (const [di, d] of dirs.entries()) {
         try {
@@ -1154,8 +1180,8 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
         }
       }
     }
-    const tried = [3e-6, 3e-5, 3e-4].map((k) => Math.max(1e-6, extent * k))
-    throw new BooleanError(`${first.message} (also failed with the second operand displaced by up to ${tried[2]!.toExponential(1)} mm)`, first.issues, { ...(first.diagnostic ?? { stage: "validate" as const, hint: DEGENERATE_HINT }), attempts: tried })
+    const tried = [3e-6, 3e-5, 3e-4, 3e-3].map((k) => Math.max(1e-6, extent * k))
+    throw new BooleanError(`${first.message} (also failed with the second operand displaced by up to ${tried[3]!.toExponential(1)} mm)`, first.issues, { ...(first.diagnostic ?? { stage: "validate" as const, hint: DEGENERATE_HINT }), attempts: tried })
   }
 }
 
