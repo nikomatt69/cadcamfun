@@ -1389,6 +1389,7 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly strategy: "surface"
         readonly mode:
           | "roughing"
+          | "rest"
           | "parallel"
           | "waterline"
           | "steep-shallow"

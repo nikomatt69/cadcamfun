@@ -79,10 +79,19 @@ export const distanceTo = (mask: Uint8Array, w: number, h: number, dx: number, d
 
 export interface RestSetup {
   readonly surface: Surface
-  /** The previous tool's cutter (with the allowance it left on the part). */
-  readonly previous: Cutter
+  /** The previous tool's cutter (with the allowance it left on the part). Unused when `remaining` is given. */
+  readonly previous?: Cutter
   /** Physical radii of the previous and of the current tool: what each one sweeps. */
-  readonly previousRadius: number
+  readonly previousRadius?: number
+  /**
+   * The stock really left, from the operations before (spec 29 §6): its top height at (x, y). When given it replaces the model of
+   * a single previous tool, so any chain of cutters, entries and rest passes is accounted for. `allowance` is the layer the earlier
+   * passes meant to leave on the part (floors and walls); it is not remnant, and `threshold` is the thickness below which material
+   * is not chased.
+   */
+  readonly remaining?: (x: number, y: number) => number
+  readonly allowance?: number
+  readonly threshold?: number
   readonly radius: number
   /** Where a tool centre may be, and the grid the contour is traced on. */
   readonly keep: Rect
@@ -110,14 +119,21 @@ export interface RestLevel {
 export const restField = (s: RestSetup): ((level: number) => RestLevel) => {
   const { nx, ny, dx, dy } = nodeGrid(s.rect, s.step)
   const w = nx + 1, h = ny + 1
-  const nodesPrevious = sampleNodes((x, y) => (x < s.keep.x0 || x > s.keep.x1 || y < s.keep.y0 || y > s.keep.y1 ? Infinity : s.surface.tip(s.previous, x, y)), s.rect, s.step)
+  const { remaining } = s
+  const previous = s.previous
+  const nodesPrevious = remaining !== undefined || previous === undefined ? new Float64Array(w * h) : sampleNodes((x, y) => (x < s.keep.x0 || x > s.keep.x1 || y < s.keep.y0 || y > s.keep.y1 ? Infinity : s.surface.tip(previous, x, y)), s.rect, s.step)
   const slack = 0.75 * Math.max(dx, dy)
-  const sweptReach = s.previousRadius + slack
+  const sweptReach = (s.previousRadius ?? 0) + slack
+  const allowance = s.allowance ?? 0, thickness = s.threshold ?? 0.02
   const trigger = s.radius - s.margin
   return (level) => {
     const allowed = new Uint8Array(w * h)
-    for (let k = 0; k < allowed.length; k++) allowed[k] = nodesPrevious[k]! <= level + 1e-9 ? 1 : 0
-    const fromAllowed = distanceTo(allowed, w, h, dx, dy)
+    const solid = new Uint8Array(w * h)
+    if (remaining === undefined) for (let k = 0; k < allowed.length; k++) allowed[k] = nodesPrevious[k]! <= level + 1e-9 ? 1 : 0
+    else for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) solid[j * w + i] = s.surface.at(s.rect.x0 + i * dx, s.rect.y0 + j * dy) > level + 1e-9 ? 1 : 0
+    const fromAllowed = remaining === undefined ? distanceTo(allowed, w, h, dx, dy) : new Float64Array(0)
+    // Remaining-stock mode: the wall layer is the allowance, measured from the part solid at this level.
+    const fromSolid = remaining === undefined ? new Float64Array(0) : distanceTo(solid, w, h, dx, dy)
     const unswept = new Uint8Array(w * h)
     let count = 0
     for (let j = 0; j < h; j++) {
@@ -129,7 +145,11 @@ export const restField = (s: RestSetup): ((level: number) => RestLevel) => {
         const k = j * w + i
         // The part occupies the slice when its top is above the level; there is no material there to leave behind.
         if (s.surface.at(x, y) > level + 1e-9) continue
-        if (fromAllowed[k]! > sweptReach) { unswept[k] = 1; count++ }
+        if (remaining === undefined) {
+          if (fromAllowed[k]! > sweptReach) { unswept[k] = 1; count++ }
+        } else if (fromSolid[k]! > allowance + slack && remaining(x, y) > Math.max(level, s.surface.at(x, y) + allowance) + thickness) {
+          unswept[k] = 1; count++
+        }
       }
     }
     // Nothing left by the previous tool at this level: no centre needs a visit (and no distance to interpolate).

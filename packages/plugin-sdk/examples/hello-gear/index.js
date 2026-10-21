@@ -8225,7 +8225,7 @@ var VerifyResponseSchema = Struct({
   preview: VerifyPreviewSchema
 });
 // packages/core/src/cam/kernel/contracts.ts
-var SURFACE_MODES = ["roughing", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"];
+var SURFACE_MODES = ["roughing", "rest", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"];
 // packages/core/src/cam/kernel/machines.ts
 var MACHINES = [
   {

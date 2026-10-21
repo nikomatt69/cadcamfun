@@ -206,7 +206,7 @@ const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
     case "thread": return "thread-mill"
     case "engrave": return "engrave"
     case "chamfer": return "chamfer"
-    case "surface": return op.mode === "roughing" ? (op.clearing === "contour" ? "rough-side" : "adaptive") : op.mode === "flat" ? "finish-floor" : "finish-3d"
+    case "surface": return op.mode === "roughing" || op.mode === "rest" ? (op.clearing === "contour" ? "rough-side" : "adaptive") : op.mode === "flat" ? "finish-floor" : "finish-3d"
     case "multiaxis": return "finish-3d"
   }
 }
@@ -528,12 +528,14 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
           const restTool = op.restFrom !== undefined ? tools.find((t) => t.id === op.restFrom) : undefined
           if (op.restFrom !== undefined && restTool === undefined) { fail("UnknownTool", `${op.id}: rest-from cutter '${op.restFrom}' is not in the library`, data); return }
           const params = decode(SurfaceParams, {
-            ...common, strategy: op.mode, stepover: Math.max(1, Math.min(100, stepover)), scallop: op.mode === "roughing" ? 0 : (op.scallop ?? prepared.scallop),
+            ...common, strategy: op.mode, stepover: Math.max(1, Math.min(100, stepover)), scallop: op.mode === "roughing" || op.mode === "rest" ? 0 : (op.scallop ?? prepared.scallop),
             angle: op.angle ?? 0, ...(op.slopeAngle !== undefined ? { slopeAngle: op.slopeAngle } : {}), ...(op.center !== undefined ? { center: shift2(op.center, o) } : {}), allowance: allowance ?? 0, tolerance: prepared.tolerance, entry: "helix", helixPitch: data.helixPitch,
             rampAngle: Math.max(0.1, Math.min(45, data.rampAngle)), clearing: op.clearing ?? "adaptive", engagement: Math.max(1, Math.min(50, stepover)),
             ...(restTool !== undefined ? { restFrom: { diameter: restTool.diameter, kind: legacyTool(restTool).kind, ...(restTool.kind === "bull" && restTool.cornerRadius !== undefined ? { tipRadius: restTool.cornerRadius } : {}) } } : {})
           })
-          const r = generateSurface(params, model, legacy, workStock(start))
+          // The stock the operations before left (the carried height field): rest works from it, not from one previous tool's reach.
+          const remaining = (x: number, y: number): number => { const k = grid.index(x, y); return k >= 0 ? provisional.top[k]! : -Infinity }
+          const r = generateSurface(params, model, legacy, workStock(start), op.mode === "rest" || op.restFrom !== undefined ? remaining : undefined)
           generated = { toolpath: r.toolpath, warnings: r.warnings }
           break
         }

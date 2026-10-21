@@ -202,7 +202,11 @@ const startNear = (ring: ReadonlyArray<Vec2>, from: Vec2 | undefined): Vec2[] =>
   return [...ring.slice(best), ...ring.slice(0, best)]
 }
 
-export const generateSurface = (params: SurfaceParams, part: PartModel, tool: Tool, stock: Stock): SurfaceResult => {
+/**
+ * `remaining` is the top of the stock left by the operations before (spec 29 §6), in the same frame as `stock`. With it, rest
+ * roughing and rest finishing work from the material really there instead of the model of one previous tool (`restFrom`).
+ */
+export const generateSurface = (params: SurfaceParams, part: PartModel, tool: Tool, stock: Stock, remaining?: (x: number, y: number) => number): SurfaceResult => {
   const levels = levelsOf(params, stock.origin.z)
   const warnings: string[] = [...part.warnings]
   const b = new MoveBuilder()
@@ -230,11 +234,18 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
   }
   const previous: Cutter | undefined = previousTool === undefined ? undefined : cutterOf(previousTool, params.restFrom?.allowance ?? params.allowance)
   const finishing = params.strategy === "parallel" || params.strategy === "waterline" || params.strategy === "scallop" || params.strategy === "spiral" || params.strategy === "radial"
-  if (finishing && params.restFrom !== undefined && params.restFrom.diameter < tool.diameter) {
+  if (finishing && remaining === undefined && params.restFrom !== undefined && params.restFrom.diameter < tool.diameter) {
     warnings.push(`The previous tool (${params.restFrom.diameter} mm) is smaller than this one (${tool.diameter} mm): there is nothing a larger tool left behind.`)
   }
+  // Rest finishing (a `restFrom` on a finishing strategy) works from the stock really left when the caller supplies it.
+  const stockRest = remaining !== undefined && params.restFrom !== undefined
   /** Where this tool can go lower than the previous one did: there is material for it (always true without a previous tool). */
   const leftAt = (x: number, y: number, tip: number): boolean => {
+    if (stockRest) {
+      if (tip === -Infinity) return false
+      if (x < stock.origin.x - 1e-9 || x > stock.origin.x + stock.x + 1e-9 || y < stock.origin.y - 1e-9 || y > stock.origin.y + stock.y + 1e-9) return false
+      return remaining(x, y) - tip > params.restThreshold
+    }
     if (previous === undefined) return true
     if (tip === -Infinity) return false
     // Past the edge of the stock there is nothing to leave behind, however differently two cutters ride a cliff there.
@@ -275,15 +286,15 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     let restAt: ReturnType<typeof restField> | undefined
     if (isRest) {
       const from = params.restFrom
-      if (from === undefined || previous === undefined) {
-        warnings.push("A rest operation needs `restFrom`: the previous tool it continues.")
+      if (remaining === undefined && (from === undefined || previous === undefined)) {
+        warnings.push("A rest operation needs `restFrom` (the previous tool it continues) or the stock the earlier operations left.")
         b.comment("nothing to cut: no previous tool given for the rest machining")
         return done(b.moves)
       }
-      if (from.diameter < tool.diameter) warnings.push(`The previous tool (${from.diameter} mm) is smaller than this one (${tool.diameter} mm): there is nothing a larger tool left behind.`)
+      if (remaining === undefined && from !== undefined && from.diameter < tool.diameter) warnings.push(`The previous tool (${from.diameter} mm) is smaller than this one (${tool.diameter} mm): there is nothing a larger tool left behind.`)
       restAt = restField({
-        surface, previous, previousRadius: from.diameter / 2, radius: tool.diameter / 2,
-        keep, rect, step, stock: s, margin: 2 * cell, nodes, value
+        surface, ...(remaining === undefined ? { previous, previousRadius: from!.diameter / 2 } : { remaining, allowance: params.allowance, threshold: params.restThreshold }),
+        radius: tool.diameter / 2, keep, rect, step, stock: s, margin: 2 * cell, nodes, value
       })
     }
     let zPrev = levels.topZ
@@ -394,7 +405,7 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
       // With a previous tool only the stretches it left material on are cut, as open pieces.
       const remaining = loops
         .map((l) => (params.climb ? l : [...l].reverse()))
-        .flatMap((l) => (previous === undefined && region === undefined ? [{ pts: l, closed: true }] : piecesWhere(l, l.map((p) => leftAt(p.x, p.y, level) && (region === undefined || region(p.x, p.y))))))
+        .flatMap((l) => (previous === undefined && !stockRest && region === undefined ? [{ pts: l, closed: true }] : piecesWhere(l, l.map((p) => leftAt(p.x, p.y, level) && (region === undefined || region(p.x, p.y))))))
       while (remaining.length > 0) {
         let bi = 0, bd = Infinity
         remaining.forEach((l, i) => { const d = at === undefined ? 0 : Math.min(...l.pts.map((p) => distance(p, at!))); if (d < bd) { bd = d; bi = i } })

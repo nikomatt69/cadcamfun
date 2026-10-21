@@ -5,7 +5,7 @@ A real part has many operations. Plan them in this order and do not skip ahead.
 1. Probe the work offset (cam_edit action create with `type: "probing"`). Use the result as the zero.
 2. Face the top (`face`) to establish a reference plane.
 3. Rough (`roughing` or `adaptive`), leaving a small allowance (0.1 to 0.3 mm).
-4. Rest-machine what the big tool could not reach (`rest`) with a smaller tool.
+4. Rest-machine what the big tool could not reach (`rest`) with a smaller tool. In `cam.manufacture` a surface operation with `mode: "rest"` works from the stock the earlier operations really left (no `restFrom` needed).
 5. Finish floors and ledges first (`flat`, flat end mill), then the surface (`steep-shallow`, `scallop`, `parallel`, `waterline`, `spiral`, `radial`), cusp height from the scallop setting, climb milling.
 6. Drill before tapping or reaming or thread milling (`drill`; peck cycle for deep holes, `cut: "ream"` for a fitted bore, `cut: "tap"` when the control taps rigidly).
 7. Chamfer (kernel `deburr` width: 2D chamfer on outlines, pockets and holes) or engrave last.

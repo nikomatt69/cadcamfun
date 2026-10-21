@@ -56797,6 +56797,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "mode": {
                               "enum": [
                                 "roughing",
+                                "rest",
                                 "parallel",
                                 "waterline",
                                 "steep-shallow",

@@ -107,7 +107,7 @@ export type OperationSpec =
 
 export type Strategy = OperationSpec["strategy"]
 
-export const SURFACE_MODES = ["roughing", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"] as const
+export const SURFACE_MODES = ["roughing", "rest", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"] as const
 export type SurfaceMode = typeof SURFACE_MODES[number]
 
 export interface QualityRequirement {
