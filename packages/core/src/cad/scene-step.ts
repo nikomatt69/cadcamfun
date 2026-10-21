@@ -10,6 +10,7 @@ import { catalogueBrep, rebuildExact, brepBox } from "./history-brep.ts"
 import type { History } from "./history.ts"
 import {
   booleanBrep,
+  healBrep,
   polyhedron,
   readStepBreps,
   transformBrep,
@@ -121,7 +122,7 @@ export const elementBrep = (e: Element, byId: ReadonlyMap<string, Element> = new
 export interface StepImport {
   /** One `brep` element per solid (assembly instances included), in millimetres, at the origin of the file. */
   readonly elements: ReadonlyArray<{ readonly type: "brep"; readonly name: string; readonly brep: Brep; readonly x: 0; readonly y: 0; readonly z: 0 }>
-  readonly report: ReadonlyArray<{ readonly name: string; readonly faces: number; readonly valid: boolean; readonly volume: number; readonly issues: ReadonlyArray<string> }>
+  readonly report: ReadonlyArray<{ readonly name: string; readonly faces: number; readonly valid: boolean; readonly volume: number; readonly issues: ReadonlyArray<string>; readonly healed?: { readonly verticesWelded: number; readonly edgesWelded: number } }>
   readonly warnings: ReadonlyArray<string>
   readonly lengthScale: number
 }
@@ -132,14 +133,21 @@ export interface StepImport {
  */
 export const stepToElements = (text: string): StepImport => {
   const read = readStepBreps(text)
-  const report = read.parts.map((p) => {
+  // A solid that does not validate is healed (vertices and edges the exporter wrote per face are stitched); the healed body
+  // replaces it only when it validates, otherwise the original and its issues are reported.
+  const parts = read.parts.map((p) => {
     const rep = validateBrep(p.brep)
-    return { name: p.name, faces: p.brep.faces.length, valid: rep.valid, volume: rep.volume ?? 0, issues: rep.issues.slice(0, 5).map((i) => i.message) }
+    if (rep.valid) return { name: p.name, brep: p.brep, rep }
+    const h = healBrep(p.brep)
+    return h.report.after.valid
+      ? { name: p.name, brep: h.brep, rep: h.report.after, healed: { verticesWelded: h.report.verticesWelded, edgesWelded: h.report.edgesWelded } }
+      : { name: p.name, brep: p.brep, rep }
   })
+  const warnings = [...read.warnings, ...parts.flatMap((p) => ("healed" in p && p.healed !== undefined ? [`${p.name}: healed on import (${p.healed.verticesWelded} vertices and ${p.healed.edgesWelded} edges welded)`] : []))]
   return {
-    elements: read.parts.map((p) => ({ type: "brep" as const, name: p.name, brep: p.brep, x: 0 as const, y: 0 as const, z: 0 as const })),
-    report,
-    warnings: read.warnings,
+    elements: parts.map((p) => ({ type: "brep" as const, name: p.name, brep: p.brep, x: 0 as const, y: 0 as const, z: 0 as const })),
+    report: parts.map((p) => ({ name: p.name, faces: p.brep.faces.length, valid: p.rep.valid, volume: p.rep.volume ?? 0, issues: p.rep.issues.slice(0, 5).map((i) => i.message), ...("healed" in p && p.healed !== undefined ? { healed: p.healed } : {}) })),
+    warnings,
     lengthScale: read.lengthScale
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { elementBrep, sceneToStep, stepToElements } from "./scene-step.ts"
 import { brepBox } from "./history-brep.ts"
-import { massProperties, readStepBreps, validateBrep } from "./brep/index.ts"
+import { massProperties, readStepBreps, validateBrep, writeStepBreps } from "./brep/index.ts"
 import { elementMesh, volumeOf } from "../cam/model/element-mesh.ts"
 
 setDefaultTimeout(60_000)
@@ -113,5 +113,25 @@ describe("the drawing as a STEP file", () => {
     const mp = massProperties(again.parts[0]!.brep)
     expect(rel(mp.volume, 12000 - PI * 250)).toBeLessThan(1e-9)
     expect(mp.centroid.x).toBeCloseTo(100, 9)
+  })
+})
+
+describe("STEP import heals what a foreign exporter left open", () => {
+  test("a file whose faces carry their own vertices and edges imports as one valid solid", () => {
+    const brep = elementBrep({ id: "b", type: "cube", width: 10, height: 20, depth: 30, x: 0, y: 0, z: 0 }).brep!
+    // Write each face as its own shell-less piece: the STEP writer shares edges, so rebuild a Brep with per-face copies.
+    const vertices: typeof brep.vertices[number][] = []
+    const edges: typeof brep.edges[number][] = []
+    const faces = brep.faces.map((f) => {
+      const map = new Map<number, number>()
+      const v = (i: number) => { let m = map.get(i); if (m === undefined) { m = vertices.length; vertices.push(brep.vertices[i]!); map.set(i, m) } return m }
+      return { ...f, loops: f.loops.map((l) => ({ coedges: l.coedges.map((c) => { const e = brep.edges[c.edge]!; edges.push({ ...e, v0: v(e.v0), v1: v(e.v1) }); return { edge: edges.length - 1, reversed: c.reversed } }) })) }
+    })
+    const text = writeStepBreps([{ name: "exploded", brep: { vertices, edges, faces, shells: [{ faces: faces.map((_, i) => i), closed: true }] } }])
+    const imported = stepToElements(text)
+    expect(imported.report[0]!.valid).toBe(true)
+    expect(imported.report[0]!.healed).toBeDefined()
+    expect(imported.warnings.some((w) => w.includes("healed on import"))).toBe(true)
+    expect(rel(imported.report[0]!.volume, 6000)).toBeLessThan(1e-9)
   })
 })

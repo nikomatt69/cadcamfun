@@ -226,3 +226,9 @@ Measured: aligned 16/16, generic 15/16. **Open (E1b):** generic seed 14, a torus
 (the ring of the torus face self-crosses in (u, v); displacement up to 3e-4 does not separate it). It is pinned in the test as the single allowed failure.
 
 Evidence: core `bun check` clean; brep suites boolean 17, blend 12, loft 4, offset 5, path-sweep 5, face-edit 2, step 7, drawing-edges 7, gates 23, history-brep 31 and the exact-feature suites all pass.
+
+### 7.5 E3, E4 landed; E12 re-read (2026-10-21)
+
+- **E4** structured diagnostics: `BooleanError.diagnostic` = `{ stage: prepare | arrange | validate, operand?, face?, hint, attempts }`; `booleanBrep` throws it with the displacements it tried; the exact replay reason now ends with `(stage: hint)`. Test: `degenerate.test.ts`.
+- **E3** healing: `brep/heal.ts` `healBrep` welds vertices within a tolerance (grid bucketed), welds edges that are the same curve between the same vertices (flipping coedge senses), drops collapsed uses, snaps a welded vertex to the mean of the curve ends meeting there, and returns a before/after validation report. `stepToElements` heals an invalid part and reports `healed` (vertices/edges welded) and a warning; a part that stays invalid is reported unchanged. Tests: `heal.test.ts` (5: box and cylinder written per face, 2e-5 mm jitter, Boolean on a healed body, unrepairable body reported), `scene-step.test.ts` (import of an exploded STEP).
+- **E12 correction:** §7.2 said STEP import is limited to 14 entity kinds. That is the legacy prismatic reader (`import-step.ts`); the desktop import dialog already uses `stepToElements` (full `readStepBreps`, assembly placement, units, validation), so exact import into the scene exists. Still open: colours/layers (`STYLED_ITEM`), PMI (AP242), and importing an exact body into a *history* (as a base feature) rather than a scene element.
