@@ -31,30 +31,6 @@ const meshOf = (part: cam.kernel.AssemblyMesh, color: number): THREE.Mesh => {
   return mesh
 }
 
-/** Flutes (or face-mill inserts): dark strips round the cutting part, so their number shows and the tool's turning is visible. */
-const flutes = (m: cam.MillModel): THREE.Group => {
-  const group = new THREE.Group()
-  group.name = "flutes"
-  const R = m.diameter / 2
-  const count = Math.max(1, Math.min(m.flutes, 24))
-  const insert = m.shape === "facemill"
-  const material = new THREE.MeshBasicMaterial({ color: insert ? 0xfacc15 : 0x0f172a })
-  for (let i = 0; i < count; i++) {
-    const a = (i / count) * Math.PI * 2
-    const strip = insert
-      ? new THREE.Mesh(new THREE.BoxGeometry(Math.max(1, R * 0.12), Math.max(1, R * 0.12), Math.max(0.8, m.fluteLength * 0.8)), material)
-      : new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.15, R * 0.08), Math.max(0.15, R * 0.18), Math.max(0.5, m.fluteLength * 0.92)), material)
-    const r = insert ? R * 0.97 : R * 1.002
-    strip.position.set(Math.cos(a) * r, Math.sin(a) * r, Math.max(0.25, m.fluteLength * 0.5))
-    strip.rotation.z = a
-    // A helix angle on an end mill's flutes; straight on reamers, drills' flutes twist too.
-    if (!insert && m.shape !== "reamer") strip.rotation.x = 0.35
-    strip.name = "flute-marker"
-    group.add(strip)
-  }
-  return group
-}
-
 const latheInsert = (m: cam.LatheModel, turret: "rear" | "front"): THREE.Group => {
   const group = new THREE.Group()
   group.name = "lathe-tool"
@@ -118,7 +94,6 @@ export const toolObject = (model: cam.ToolModel, options: ToolObjectOptions = {}
   for (const part of cam.toolMeshes(model, { assumeHolder: options.assumeHolder ?? true, segments: options.segments ?? 40 })) {
     group.add(meshOf(part, part.part === "cutting" ? cutting : part.part === "shank" ? 0xb8bec6 : 0x4b5563))
   }
-  if (model.family === "mill" && model.shape !== "boringBar") group.add(flutes(model))
   if (model.family === "mill" && model.shape === "boringBar") {
     // The boring head's single insert, off the axis at the cutting radius.
     const insert = new THREE.Mesh(new THREE.BoxGeometry(Math.max(1.5, model.diameter * 0.15), 3, 3), new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.7, roughness: 0.3 }))

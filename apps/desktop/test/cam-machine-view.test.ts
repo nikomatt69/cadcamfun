@@ -196,7 +196,7 @@ describe("what the assistant reads from a CAM frame", () => {
 })
 
 describe("one 3D object per tool (spec 31): Resources page, CAM preview and machine scene", () => {
-  test("every mill type of the Resources: cutting, shank, holder and its flutes", () => {
+  test("every mill type of the Resources: cutting, shank and holder, with no flute strips drawn on it", () => {
     for (const type of cam.TOOL_TYPES.mill.filter((t) => t !== "probe" && t !== "toolsetter")) {
       const model = cam.toolModelOf({ type, diameter: 10, numberOfFlutes: 4 }, "mill")
       const object = toolObject(model)
@@ -204,7 +204,9 @@ describe("one 3D object per tool (spec 31): Resources page, CAM preview and mach
       expect(all, type).toContain("cutting")
       expect(all, type).toContain("shank")
       expect(all.some((n) => n.startsWith("holder")), type).toBe(true)
-      expect(all.filter((n) => n === "flute-marker").length, type).toBe(type === "boringbar" ? 1 : 4)
+      // No black flute bars on the tool (only a boring bar keeps its single yellow insert).
+      expect(all.filter((n) => n === "flute-marker").length, type).toBe(type === "boringbar" ? 1 : 0)
+      expect(all, type).not.toContain("flutes")
     }
   })
 
