@@ -1,5 +1,6 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { blendBrep, blendCandidates, selectBlendEdges, type BlendCandidate } from "./blend.ts"
+import { blendBrep, blendCandidates, selectBlendEdges, variableFillet, type BlendCandidate } from "./blend.ts"
+import { readStepBreps, writeStepBreps } from "./step.ts"
 import { booleanBrep } from "./boolean.ts"
 import { massProperties } from "./mass.ts"
 import { frame } from "./math.ts"
@@ -150,5 +151,37 @@ describe("what is not blended is reported, never approximated", () => {
 
   test("a non-positive size throws", () => {
     expect(() => blendBrep(makeBox(1, 1, 1), [], 0)).toThrow()
+  })
+})
+
+describe("variable-radius fillet", () => {
+  const box = makeBox(30, 20, 20)
+  const pick = (b: Brep, pred: (c: ReturnType<typeof blendCandidates>[number]) => boolean) => blendCandidates(b).find(pred)!
+  test("a straight edge filleted from 1 to 3 mm removes the cone-section volume and leaves a valid solid", () => {
+    // The edge along x at y = 0, z = 20 (the top front edge).
+    const e = pick(box, (c) => Math.abs(c.a.y) < 1e-9 && Math.abs(c.a.z - 20) < 1e-9 && Math.abs(c.b.y) < 1e-9 && Math.abs(c.b.z - 20) < 1e-9)
+    const r0 = e.a.x < e.b.x ? 1 : 3, r1 = e.a.x < e.b.x ? 3 : 1
+    const out = variableFillet(box, e, r0, r1)
+    expect(out.rejected).toBeUndefined()
+    expect(validateBrep(out.brep).issues.map((i) => i.message)).toEqual([])
+    const removed = massProperties(box).volume - massProperties(out.brep).volume
+    const expected = 30 * (1 - Math.PI / 4) * (1 + 3 + 9) / 3
+    expect(Math.abs(removed - expected) / expected).toBeLessThan(1e-6)
+    // Smaller radius at one end, larger at the other: the section area follows.
+    expect(out.brep.faces.some((f) => f.surface.kind === "nurbs" || f.surface.kind === "cone")).toBe(true)
+  })
+  test("equal radii give the constant fillet's volume, and the exact STEP round trip holds", () => {
+    const e = pick(box, (c) => Math.abs(c.a.y) < 1e-9 && Math.abs(c.a.z - 20) < 1e-9 && Math.abs(c.b.y) < 1e-9 && Math.abs(c.b.z - 20) < 1e-9)
+    const v = variableFillet(box, e, 2, 2)
+    const c = blendBrep(box, [e], 2, "fillet")
+    expect(Math.abs(massProperties(v.brep).volume - massProperties(c.brep).volume)).toBeLessThan(1e-6)
+    const again = readStepBreps(writeStepBreps([{ name: "v", brep: variableFillet(box, e, 1, 4).brep }])).parts[0]!.brep
+    expect(validateBrep(again).valid).toBe(true)
+  })
+  test("a radius the faces cannot hold, a curved edge and bad radii are refused with a reason", () => {
+    const e = pick(box, (c) => Math.abs(c.a.y) < 1e-9 && Math.abs(c.a.z - 20) < 1e-9 && Math.abs(c.b.y) < 1e-9 && Math.abs(c.b.z - 20) < 1e-9)
+    expect(variableFillet(box, e, 1, 25).rejected).toContain("needs")
+    expect(() => variableFillet(box, e, 0, 2)).toThrow()
+    expect(variableFillet(makeCylinder(5, 10), { ...e, curve: "circle" }, 1, 2).rejected).toContain("straight")
   })
 })

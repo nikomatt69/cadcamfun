@@ -30,6 +30,7 @@ import { makeSphere, polyhedron } from "./primitives.ts"
 import { extrudeProfile, revolveProfile, type ProfileLoop, type ProfileSegment } from "./sweep.ts"
 import { edgeUses, mergeBreps, type Brep } from "./topology.ts"
 import { chamferRefusal, chamferSetbacks } from "../blend-spec.ts"
+import { loftBrep, loftSection } from "./loft.ts"
 import { BudgetExceeded } from "./budget.ts"
 
 interface Box { readonly lo: Vec3; readonly hi: Vec3 }
@@ -319,6 +320,20 @@ const ballCentre = (b: Brep, faces: ReadonlyArray<number>, V: Vec3, r: number): 
   return scale3(add3(add3(scale3(cross3(n[1], n[2]), d[0]), scale3(cross3(n[2], n[0]), d[1])), scale3(cross3(n[0], n[1]), d[2])), 1 / det)
 }
 
+/** How far a line edge's tool runs past an end: `g` past a free end, 0 up to the plane of a wall square to the edge, a reason otherwise. */
+const lineEndRun = (b: Brep, uses: ReturnType<typeof edgeUses>, e: BlendCandidate, vtx: number, out: Vec3, g: number): number | string => {
+  let run = g
+  for (const n of otherFacesAt(b, uses, vtx, [e.faceA, e.faceB])) {
+    if (n === undefined) continue
+    const d = dot3(out, n)
+    if (d < -1e-9) {
+      if (d > -1 + 1e-9) return "the edge ends against a wall that is not square to it"
+      run = 0
+    }
+  }
+  return run
+}
+
 /** The tool of one edge, or the reason there is none. */
 const edgeTool = (b: Brep, uses: ReturnType<typeof edgeUses>, e: BlendCandidate, size: number, style: "fillet" | "chamfer", g: number, cuts: [HalfSpace[], HalfSpace[]] = [[], []], chamfer?: { readonly secondDistance?: number; readonly angle?: number }): Brep | string => {
   const alpha = Math.acos(Math.max(-1, Math.min(1, dot3(e.nA, e.nB))))
@@ -348,19 +363,7 @@ const edgeTool = (b: Brep, uses: ReturnType<typeof edgeUses>, e: BlendCandidate,
     const loop = crossSection(to2(e.nA), to2(e.nB), e.convex, onA, style, g, onB)
     if (typeof loop === "string") return loop
     const edge = b.edges[e.edge]!
-    // Past a free end by g; up to the plane of a wall square to the edge.
-    const endRun = (vtx: number, out: Vec3): number | string => {
-      let run = g
-      for (const n of otherFacesAt(b, uses, vtx, [e.faceA, e.faceB])) {
-        if (n === undefined) continue
-        const d = dot3(out, n)
-        if (d < -1e-9) {
-          if (d > -1 + 1e-9) return "the edge ends against a wall that is not square to it"
-          run = 0
-        }
-      }
-      return run
-    }
+    const endRun = (vtx: number, out: Vec3): number | string => lineEndRun(b, uses, e, vtx, out, g)
     // A cut end runs on far enough to cross its cut planes; the cell of the cuts trims it.
     const long = 4 * (size + g)
     const r0 = cuts[0].length > 0 ? long : endRun(edge.v0, neg3(dir)), r1 = cuts[1].length > 0 ? long : endRun(edge.v1, dir)
@@ -554,4 +557,58 @@ export const blendBrep = (b: Brep, edges: ReadonlyArray<BlendCandidate>, size: n
     }
   }
   return { brep: current, blended, vertices, rejected, failures }
+}
+
+// ================================================================ variable radius
+
+export interface VariableFilletResult {
+  readonly brep: Brep
+  /** Why the edge was not filleted (the body is then unchanged). */
+  readonly rejected?: string
+}
+
+/**
+ * A fillet whose radius runs linearly from `radiusA` at the edge's `a` end to `radiusB` at its `b` end (a straight edge between
+ * two planes). The circular cross-section is kept in every plane square to the edge, so the surface is the cone through the two end
+ * arcs; the rolling-ball envelope of a linearly changing radius differs from it by the second order of the taper. The tool is the
+ * exact loft of two homothetic sections (the margins scale with the radius, so lines pair with lines and the arc with the arc),
+ * run a little past a free end by extending the taper. An end against a wall that is not square to the edge is refused; the neighbouring edges are not blended with it (use constant-radius blends for corners).
+ */
+export const variableFillet = (b: Brep, e: BlendCandidate, radiusA: number, radiusB: number, options: { readonly margin?: number } = {}): VariableFilletResult => {
+  if (e.curve !== "line") return { brep: b, rejected: "a variable radius needs a straight edge" }
+  if (!(radiusA > 0) || !(radiusB > 0) || !Number.isFinite(radiusA + radiusB)) throw new RangeError("a variable fillet needs finite positive radii at both ends")
+  const alpha = Math.acos(Math.max(-1, Math.min(1, dot3(e.nA, e.nB))))
+  const limit = Math.min(e.reachA, e.reachB)
+  const need = Math.max(radiusA, radiusB) * Math.tan(alpha / 2)
+  if (need > limit + 1e-9) return { brep: b, rejected: `a radius of ${Math.max(radiusA, radiusB)} mm needs ${need.toFixed(3)} mm of face on each side; the faces reach only ${limit.toFixed(3)} mm` }
+  const uses = edgeUses(b)
+  const dir = normalize3(sub3(e.b, e.a))
+  const u = normalize3(add3(e.nA, e.nB)), v = cross3(dir, u)
+  const to2 = (n: Vec3): Vec2 => ({ x: dot3(n, u), y: dot3(n, v) })
+  const edge = b.edges[e.edge]!
+  // The taper's slope per mm of edge; the margin is a tenth of the radius at each station, like the constant fillet's.
+  const slope = (radiusB - radiusA) / e.length
+  const g = options.margin ?? 0.1
+  const r0 = lineEndRun(b, uses, e, edge.v0, neg3(dir), 0.1 * Math.min(radiusA, radiusB))
+  const r1 = lineEndRun(b, uses, e, edge.v1, dir, 0.1 * Math.min(radiusA, radiusB))
+  if (typeof r0 === "string") return { brep: b, rejected: r0 }
+  if (typeof r1 === "string") return { brep: b, rejected: r1 }
+  const station = (s: number): { readonly loop: ProfileLoop; readonly at: Vec3 } | string => {
+    const r = Math.max(radiusA + slope * s, 1e-6)
+    const loop = crossSection(to2(e.nA), to2(e.nB), e.convex, r, "fillet", Math.max(g * r, 1e-6) * 1, r)
+    if (typeof loop === "string") return loop
+    return { loop, at: madd3(e.a, dir, s) }
+  }
+  const stations = [-r0, e.length + r1].map(station)
+  const bad = stations.find((x) => typeof x === "string")
+  if (typeof bad === "string") return { brep: b, rejected: bad }
+  try {
+    const sections = (stations as Array<{ loop: ProfileLoop; at: Vec3 }>).map((x) => loftSection(x.loop, frame(x.at, dir, u)))
+    const tool = loftBrep(sections, { name: "blend" })
+    const out = booleanBrep(b, tool, e.convex ? "subtract" : "union").brep
+    return { brep: out }
+  } catch (err) {
+    if (err instanceof BudgetExceeded) throw err
+    return { brep: b, rejected: err instanceof Error ? err.message : String(err) }
+  }
 }
