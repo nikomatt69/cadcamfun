@@ -47,6 +47,8 @@ import type { CadElement } from "../generator/schema.ts"
 import {
   KERNEL_SCHEMA_VERSION,
   type CamArtifact,
+  type ToleranceBudget,
+  type ToleranceTerm,
   type CamIssue,
   type CamResult,
   type Claim,
@@ -973,6 +975,17 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     part: job.part.kind === "meshes" ? { kind: "meshes", meshes: job.part.meshes.map((m) => ({ positions: Array.from(m.positions), indices: Array.from(m.indices) })) } : job.part,
     resolved: { material: material.id, machine: machine.id, tools: tools.map((t) => t.id) }
   })
+  const modelCell = Math.min(0.25, cell)
+  const budgetTerms: ToleranceTerm[] = [
+    ...(job.part.kind === "elements" ? [{ id: "source-tessellation" as const, mm: prepared.tolerance, basis: "CAD solids are meshed with a chord error of the tolerance" }] : []),
+    { id: "part-model", mm: modelCell, basis: "the part surface is sampled on a grid of this cell; the cutter contact errs by up to one cell" },
+    { id: "path", mm: prepared.tolerance, basis: "toolpaths are simplified within the tolerance" },
+    { id: "nc-rounding", mm: (Math.sqrt(3) / 2) * Math.pow(10, -decimals), basis: `coordinates are written with ${decimals} decimals` },
+    { id: "stock-replay", mm: Math.max(hf.cellX, hf.cellY) / 2, basis: "the replayed stock is a height field of this cell; a column is read at its centre" }
+  ]
+  const unbounded = job.part.kind === "meshes" ? ["the part is a mesh of unknown accuracy"] : []
+  const achieved = budgetTerms.reduce((s, t) => s + t.mm, 0)
+  const tolerance: ToleranceBudget = { requested: prepared.tolerance, terms: budgetTerms.map((t) => ({ ...t, mm: Math.round(t.mm * 1e6) / 1e6 })), achieved: Math.round(achieved * 1e6) / 1e6, unbounded, met: unbounded.length === 0 && achieved <= prepared.tolerance }
   return {
     status: "ok",
     value: {
@@ -984,7 +997,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume()), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000 },
       cycleTimeSeconds,
       identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
-      notes: [...(prepared.plan?.notes ?? []), ...subprogramNotes(nc)]
+      notes: [...(prepared.plan?.notes ?? []), ...subprogramNotes(nc)],
+      tolerance
     }
   }
 }

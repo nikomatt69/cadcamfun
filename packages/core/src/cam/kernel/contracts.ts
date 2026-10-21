@@ -215,6 +215,26 @@ export interface StockSummary {
   readonly cellSize: number
 }
 
+/** One term of the tolerance budget: what it bounds, in mm, and where the bound comes from. */
+export interface ToleranceTerm {
+  readonly id: "source-tessellation" | "part-model" | "path" | "nc-rounding" | "stock-replay"
+  readonly mm: number
+  readonly basis: string
+}
+
+/**
+ * The deviation the program can be promised (spec 29 §3): the terms add, worst case, because nothing here shows they cancel.
+ * `unbounded` names a source of error with no known bound (an imported mesh of unknown accuracy): the promise then does not hold.
+ * Informational: it does not change the release level, which rests on the replay claims.
+ */
+export interface ToleranceBudget {
+  readonly requested: number
+  readonly terms: ReadonlyArray<ToleranceTerm>
+  readonly achieved: number
+  readonly unbounded: ReadonlyArray<string>
+  readonly met: boolean
+}
+
 export interface CamArtifact {
   readonly schemaVersion: typeof KERNEL_SCHEMA_VERSION
   readonly jobId: string
@@ -238,6 +258,7 @@ export interface CamArtifact {
   readonly identity: { readonly job: string; readonly part: string; readonly nc: string; readonly algorithm: string }
   /** Notes of the planner (features it could not machine and why). */
   readonly notes: ReadonlyArray<string>
+  readonly tolerance?: ToleranceBudget
 }
 
 export type CamResult<T> =

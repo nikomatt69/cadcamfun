@@ -309,6 +309,12 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
           <div class="flex justify-between font-semibold"><span>{t("cam.kernel.release")}</span><span>{value().release}</span></div>
           <Show when={stale()}><p role="status" class="text-amber-600" data-testid="kernel-stale">{t("cam.kernel.stale")}</p></Show>
           <p>{t("cam.kernel.summary", { operations: value().operations.length, tools: value().tools.length, seconds: value().cycleTimeSeconds.toFixed(1) })}</p>
+          <Show when={value().tolerance}>{(budget) => (
+            <p class="text-gray-500" data-testid="kernel-tolerance-budget" title={budget().terms.map((term) => `${term.id} ${term.mm} mm: ${term.basis}`).join("\n")}>
+              {t(budget().met ? "cam.kernel.tolerance.met" : "cam.kernel.tolerance.notMet", { requested: budget().requested, achieved: budget().achieved.toFixed(3) })}
+              {budget().unbounded.length > 0 ? ` ${budget().unbounded.join("; ")}.` : ""}
+            </p>
+          )}</Show>
           <div class="flex flex-wrap gap-2" data-testid="kernel-tools">
             <For each={value().tools}>
               {(tool) => (

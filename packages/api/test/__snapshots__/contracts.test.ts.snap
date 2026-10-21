@@ -58344,6 +58344,64 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               ],
                               "type": "object",
                             },
+                            "tolerance": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "achieved": {
+                                  "type": "number",
+                                },
+                                "met": {
+                                  "type": "boolean",
+                                },
+                                "requested": {
+                                  "type": "number",
+                                },
+                                "terms": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "basis": {
+                                        "type": "string",
+                                      },
+                                      "id": {
+                                        "enum": [
+                                          "source-tessellation",
+                                          "part-model",
+                                          "path",
+                                          "nc-rounding",
+                                          "stock-replay",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "mm": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "id",
+                                      "mm",
+                                      "basis",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
+                                },
+                                "unbounded": {
+                                  "items": {
+                                    "type": "string",
+                                  },
+                                  "type": "array",
+                                },
+                              },
+                              "required": [
+                                "requested",
+                                "terms",
+                                "achieved",
+                                "unbounded",
+                                "met",
+                              ],
+                              "type": "object",
+                            },
                             "tools": {
                               "items": {
                                 "additionalProperties": false,

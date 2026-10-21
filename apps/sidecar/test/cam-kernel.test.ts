@@ -30,6 +30,9 @@ test("the sidecar returns the full kernel artifact for the actual NC without cre
   expect(result.value.tools.length).toBeGreaterThan(0)
   expect(result.value.operations.length).toBeGreaterThan(0)
   expect(result.value.identity.nc).toBe(cam.kernel.sha256(result.value.nc))
+    // The tolerance budget crosses the contract with its terms (the schema would drop a field it did not list).
+    expect(result.value.tolerance?.terms.map((t: { id: string }) => t.id)).toContain("nc-rounding")
+    expect(result.value.tolerance?.achieved).toBeGreaterThan(0)
   expect(result.value.claims.find((claim) => claim.id === "nc-replay")?.status).toBe("passed")
   expect(result.value.machine.post).toBe("fanuc")
   expect((await app.call("/api/projects")).body).toEqual(before.body)

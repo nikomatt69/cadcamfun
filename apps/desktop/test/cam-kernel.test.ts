@@ -26,6 +26,10 @@ test("the additive kernel section runs through the real sidecar and fills the ex
     button.click()
     const evidence = await app.wait(() => document.querySelector("[data-testid='kernel-evidence']"), 30_000)
     expect(evidence.textContent).toContain("nc-replaypassed")
+    // The deviation the program can be promised, term by term, from the artifact the sidecar returned.
+    const budget = document.querySelector("[data-testid='kernel-tolerance-budget']")
+    expect(budget?.textContent).toMatch(/Promised deviation \d+\.\d+ mm/)
+    expect(budget?.getAttribute("title")).toContain("nc-rounding")
     // Each cutter the kernel used is drawn to scale: cutting zone, shank and (generic, dashed) holder.
     const silhouettes = document.querySelectorAll("[data-testid='kernel-tools'] [data-testid='tool-silhouette']")
     expect(silhouettes.length).toBeGreaterThan(0)

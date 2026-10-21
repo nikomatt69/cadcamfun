@@ -74,7 +74,13 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
   })),
   issues: Schema.Array(CamKernelIssue), release: Schema.Literals(["blocked", "preview", "verified-program"]),
   stock: Schema.Struct({ initialVolume: Schema.Finite, finalVolume: Schema.Finite, partVolume: Schema.Finite, remainingVolume: Schema.Finite, maxRemaining: Schema.Finite, cellSize: Schema.Finite }),
-  cycleTimeSeconds: Schema.Finite, identity: Schema.Struct({ job: id, part: id, nc: id, algorithm: id }), notes: strings
+  cycleTimeSeconds: Schema.Finite, identity: Schema.Struct({ job: id, part: id, nc: id, algorithm: id }), notes: strings,
+  /** The deviation the program can be promised, term by term; informational, it does not move the release level. */
+  tolerance: Schema.optionalKey(Schema.Struct({
+    requested: Schema.Finite,
+    terms: Schema.Array(Schema.Struct({ id: Schema.Literals(["source-tessellation", "part-model", "path", "nc-rounding", "stock-replay"]), mm: Schema.Finite, basis: Schema.String })),
+    achieved: Schema.Finite, unbounded: strings, met: Schema.Boolean
+  }))
 })
 export type CamKernelArtifact = typeof CamKernelArtifact.Type
 

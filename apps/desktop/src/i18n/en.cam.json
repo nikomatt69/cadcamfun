@@ -405,6 +405,8 @@
   "cam.kernel.qualityHint": "Allowance follows the material preset until edited. A smaller cell size increases replay detail and processing time. Tolerance and work offset are shared with the operation generator.",
   "cam.kernel.generate": "Generate from CAD",
   "cam.kernel.generating": "Planning and verifying…",
+  "cam.kernel.tolerance.met": "Promised deviation {achieved} mm, within the requested {requested} mm.",
+  "cam.kernel.tolerance.notMet": "Promised deviation {achieved} mm (requested {requested} mm): refine the resolution or accept the larger bound.",
   "cam.kernel.progress.operation": "Operation {index} of {count}: {id}",
   "cam.kernel.progress.operations": "Planning operations…",
   "cam.kernel.progress.post": "Writing the NC…",

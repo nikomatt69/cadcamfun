@@ -6173,6 +6173,17 @@ export type ToolpathGeneratorManufactureOutput =
         cycleTimeSeconds: number
         identity: { job: string; part: string; nc: string; algorithm: string }
         notes: Array<string>
+        tolerance?: {
+          requested: number
+          terms: Array<{
+            id: "source-tessellation" | "part-model" | "path" | "nc-rounding" | "stock-replay"
+            mm: number
+            basis: string
+          }>
+          achieved: number
+          unbounded: Array<string>
+          met: boolean
+        }
       }
     }
   | {
