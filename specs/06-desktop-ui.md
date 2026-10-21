@@ -89,6 +89,8 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 
 ## 5. Change log
 
+- 2026-10-21: the Toolpath Generator can select CAD parts directly from its selected-geometry panel for mills, lathes and printers. The picker replaces both CAD selections, includes hidden/locked/grouped parts, follows CAD edits and preserves complete element data in generation requests. Regression tests cover selection, stale multi-selection, clearing and live drawing updates.
+
 - 2026-10-17: added the compact CAM simulation player immediately before Fullscreen (play/pause, ±5 seconds, scrub position and time). Uses the shared CAM state in Preview and Toolpath, including fullscreen. Mini-player, viewport DOM and real-sidecar CAM page checks: 12 pass; desktop typecheck clean.
 
 - 2026-10-16: Added ChatGPT/Codex and SuperGrok browser connections with xAI manual-code completion, plus OpenCode Zen/Go console links and account-key instructions. Provider settings tests cover all connection forms and clear entered secrets after success.
@@ -190,3 +192,9 @@ Secondary resources follow nikcli ownership: queries accept cancellation through
 ## Account identity integration (2026-10-16)
 
 Owner-requested cross-WP scope and verification are defined in `30-identity.md`. Add dedicated CADCAMFUN OAuth account sign-in to desktop and mobile while retaining scoped companion pairing and local profile access.
+
+## Generator CAD selection (2026-10-21)
+
+Status: implemented; 21 targeted tests pass, including DOM selection flows for all three machine families; desktop typecheck passes (1,122 files). API reference regenerated and its freshness check passes.
+
+WP6 owns a CAD element picker directly in the Toolpath Generator's selected-geometry panel, shared by milling, turning and printing. List every CAD part in the live drawing, including hidden, locked and grouped elements; exclude stock and scene helpers. Choosing a part replaces both CAD selection stores so an earlier multi-selection cannot override the choice. Generation keeps the complete current element through the existing JSON-safe request boundary. External CAD selections and edits remain reactive; no new geometry or API contract is introduced. Verify with automated DOM selection-to-request flows.

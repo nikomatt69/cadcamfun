@@ -105,6 +105,14 @@ export class Surface {
     const bmax = this.blockMax()
     const bnx = Math.ceil(nx / BLOCK)
     let best = -Infinity
+    // A real column near the axis gives a lower bound immediately. Starting at -Infinity makes a ball cutter scan
+    // progressively closer columns before it can reject any blocks, even on a flat surface.
+    const si = Math.max(i0, Math.min(i1, ci)), sj = Math.max(j0, Math.min(j1, cj))
+    if (si <= i1 && sj <= j1) {
+      const ox = (si + 0.5 - gx) * cellX, oy = (sj + 0.5 - gy) * cellY
+      const d = Math.sqrt(ox * ox + oy * oy) - half
+      if (d <= R) best = this.height[sj * nx + si]! - cutter.profile(d > 0 ? d : 0)
+    }
     for (let bj = Math.floor(j0 / BLOCK); bj <= Math.floor(j1 / BLOCK); bj++) {
       // Nearest the block's rows come to the axis along y (distance between cell centres, 0 when the axis is inside).
       const ja = Math.max(j0, bj * BLOCK), jb = Math.min(j1, bj * BLOCK + BLOCK - 1)

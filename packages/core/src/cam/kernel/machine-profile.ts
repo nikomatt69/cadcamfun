@@ -19,6 +19,28 @@ import type { Rigidity } from "./cutting-data.ts"
 /** The post ids the kernel can write; the controller's name picks one when the profile does not name it. */
 export const POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain"] as const
 
+/**
+ * The controllers the kernel has a post for, and the control families that speak one of them. A controller's name picks
+ * the post that writes its NC; an unknown control gets the plain ISO post, never a silent mismatch.
+ */
+const POSTS: Readonly<Record<string, (typeof POST_IDS)[number]>> = {
+  fanuc: "fanuc", "fanuc 0i": "fanuc", "fanuc 0i-md": "fanuc", mazatrol: "fanuc", smoothai: "fanuc", mazak: "fanuc",
+  haas: "haas", grbl: "grbl", linuxcnc: "generic", generic: "generic", iso: "generic",
+  sinumerik: "siemens", "840d": "siemens", siemens: "siemens",
+  osp: "fanuc", okuma: "fanuc", doosan: "fanuc", dmgmori: "fanuc", dmu: "fanuc",
+  heidenhain: "heidenhain", tnc: "heidenhain", tnc7: "heidenhain", klartext: "heidenhain"
+}
+
+/** The post a controller's name asks for; an unknown control gets the plain ISO post, never a silent mismatch. */
+export const postOfController = (controller: string | undefined): (typeof POST_IDS)[number] => {
+  const key = (controller ?? "").trim().toLowerCase()
+  if (key === "") return "generic"
+  const direct = POSTS[key]
+  if (direct !== undefined) return direct
+  const partial = Object.entries(POSTS).find(([name]) => name !== "" && key.includes(name))
+  return partial?.[1] ?? "generic"
+}
+
 /** The kinds of machine the library knows; the kernel machines the mill and the lathe. */
 export const MACHINE_KINDS = ["mill", "lathe", "printer", "laser"] as const
 export type MachineKind = (typeof MACHINE_KINDS)[number]
@@ -363,12 +385,15 @@ const axesOf = (config: Record<string, unknown>, extra: Record<string, unknown>)
     })
     return axes.length > 0 ? axes : undefined
   }
-  // The assistant's shape: a record of axis name to `{ min, max }`.
+  // The assistant's shape: a record of axis name to `{ min, max }`, or to the plain travel of the axis.
   const kinematics = record(config["kinematics"])
   const axes = Object.entries(kinematics).flatMap(([name, value]): MachineAxis[] => {
     const id = name.trim().toUpperCase()
     if (!(AXIS_IDS as readonly string[]).includes(id)) return []
-    const travel = rangeOf(value)
+    const travel = rangeOf(value) ?? (() => {
+      const size = numberOf(value)
+      return size !== undefined && size > 0 ? { min: 0, max: size } : undefined
+    })()
     if (travel === undefined) return []
     return [{ id: id as AxisId, kind: "XYZ".includes(id) ? "linear" : "rotary", min: travel.min, max: travel.max, sense: 1 }]
   })
@@ -391,6 +416,20 @@ const travelOf = (config: Record<string, unknown>, extra: Record<string, unknown
   if (minX === undefined || maxX === undefined || minY === undefined || maxY === undefined || minZ === undefined || maxZ === undefined) return undefined
   if (minX > maxX || minY > maxY || minZ > maxZ) return undefined
   return { minX, maxX, minY, maxY, minZ, maxZ }
+}
+
+/**
+ * The travel of the machine read from its axis table: the linear axes give the box the moves are checked against. A
+ * configuration that names its axes but no travel box still bounds the program.
+ */
+const travelOfAxes = (axes: readonly MachineAxis[] | undefined): MachineTravel | undefined => {
+  if (axes === undefined) return undefined
+  const x = axes.find((axis) => axis.id === "X")
+  const y = axes.find((axis) => axis.id === "Y")
+  const z = axes.find((axis) => axis.id === "Z")
+  if (x === undefined || y === undefined || z === undefined) return undefined
+  if (x.kind !== "linear" || y.kind !== "linear" || z.kind !== "linear") return undefined
+  return { minX: x.min, maxX: x.max, minY: y.min, maxY: y.max, minZ: z.min, maxZ: z.max }
 }
 
 const tableOf = (config: Record<string, unknown>, extra: Record<string, unknown>): MachineTable | undefined => {
@@ -561,14 +600,16 @@ export const profileOfConfig = (config: unknown, type?: string): MachineProfile 
   const controller = typeof source["controller"] === "string" && source["controller"].trim() !== ""
     ? source["controller"].trim()
     : typeof source["postProcessor"] === "string" && source["postProcessor"].trim() !== "" ? source["postProcessor"].trim() : undefined
-  const post = (["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain"] as const).find((entry) => source["post"] === entry)
+  // The post the profile names, else the one its controller asks for: the control decides the dialect.
+  const named = POST_IDS.find((entry) => source["post"] === entry)
+  const post = named ?? (controller !== undefined ? postOfController(controller) : undefined)
   const axes = source["axes"] === 3 || source["axes"] === 4 || source["axes"] === 5 || source["axes"] === 6 ? source["axes"] : undefined
   const axisTable = axesOf(source, extra)
   const spindle = spindleOf(source, extra)
   const feed = feedOf(source, extra)
   const rigidity = rigidityOf(source["rigidity"]) ?? rigidityOf(extra["rigidity"])
   const workVolume = pointOf(source["workVolume"])
-  const travel = travelOf(source, extra)
+  const travel = travelOf(source, extra) ?? travelOfAxes(axisTable)
   const table = tableOf(source, extra)
   const rotary = rotaryOf(source)
   const turning = turningOf(source, extra)
@@ -577,8 +618,10 @@ export const profileOfConfig = (config: unknown, type?: string): MachineProfile 
   const toolChanger = toolChangerOf(source, extra)
   const coolant = coolantOf(source)
   const accuracy = accuracyOf(source)
-  const referenceSource = typeof source["source"] === "string" ? source["source"] : undefined
-  const referenceNotes = typeof source["notes"] === "string" ? source["notes"] : undefined
+  // Where the figures come from: the canonical `reference` block, else the flat `source` / `notes` a row may carry.
+  const referenceBlock = record(source["reference"])
+  const referenceSource = typeof referenceBlock["source"] === "string" ? referenceBlock["source"] : typeof source["source"] === "string" ? source["source"] : undefined
+  const referenceNotes = typeof referenceBlock["notes"] === "string" ? referenceBlock["notes"] : typeof source["notes"] === "string" ? source["notes"] : undefined
   const reference = referenceSource !== undefined || referenceNotes !== undefined
     ? { ...(referenceSource !== undefined ? { source: referenceSource } : {}), ...(referenceNotes !== undefined ? { notes: referenceNotes } : {}) }
     : undefined

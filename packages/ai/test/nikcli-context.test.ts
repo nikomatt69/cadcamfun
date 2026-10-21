@@ -1,11 +1,20 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import { buildHostConfig } from "../src/nikcli/config.ts"
+import { buildHostConfig, defaultProviderSpecs } from "../src/nikcli/config.ts"
 import { compactHostSession, readHostContextPolicy } from "../src/nikcli/context.ts"
 import { mapHostEvent, newMapperState } from "../src/nikcli/event-mapper.ts"
 import type { ProjectHost } from "../src/nikcli/runtime.ts"
 
 describe("host context management", () => {
+  test("primary loops and provider inactivity are bounded without overriding catalogue routing", () => {
+    const config = buildHostConfig({ providers: defaultProviderSpecs(), toolIds: [], systemPrompt: "CAD" }) as {
+      agent: Record<string, { steps?: number }>; provider: Record<string, { options: Record<string, unknown> }>
+    }
+    for (const id of ["cadcam", "cadcam-cad", "cadcam-cam", "cadcam-auto", "cadcam-cad-ask"]) expect(config.agent[id]?.steps).toBe(25)
+    for (const provider of Object.values(config.provider)) {
+      expect(provider.options).toEqual({ headerTimeout: 120_000, chunkTimeout: 120_000 })
+    }
+  })
   test("preserves automatic host defaults and disabled billing helpers", () => {
     const config = buildHostConfig({ providers: [], toolIds: [], systemPrompt: "CAD" })
     expect(config["compaction"]).toEqual({ auto: true, prune: true })

@@ -22,6 +22,10 @@ import { ACTION_EXPOSURES } from "../actions/catalogue.ts"
  */
 export const CADCAM_AGENT = PRIMARIES.general.host
 export const CADCAM_WORKER = SUBAGENTS.researcher.host
+/** A primary yields after this many model steps; bounded continuation can carry genuine unfinished work forward. */
+export const PRIMARY_STEP_LIMIT = 25
+/** Inactivity limits apply to provider traffic, not the time spent running a kernel tool. */
+export const PROVIDER_INACTIVITY_MS = 120_000
 export const BACKGROUND_TOOL_IDS = ["agent"] as const
 
 /** What the read-only researcher may call (verification persists operation metadata, so it is not a worker tool). */
@@ -180,15 +184,14 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
     })
   )
 
-  // The three agents a person talks to (`primaries.ts`). No step cap, as in nikcli (`agent.steps ?? Infinity`): one request runs
-  // from the model through the machining to the check for as long as it takes. What ends it is the host's doom-loop guard,
-  // the goal budget, or the user's abort.
+  // Bound each model loop even when the model keeps calling different tools and never reaches the host's identical-call guard.
   const primaries = Object.fromEntries(
     PRIMARY_IDS.map((id) => {
       const spec = PRIMARIES[id]
       const held = Object.fromEntries(Object.entries(permission).filter(([tool]) => !spec.without.includes(tool)))
       return [spec.host, {
         mode: "primary",
+        steps: PRIMARY_STEP_LIMIT,
         description: spec.description,
         prompt: spec.focus === "" ? input.systemPrompt : `${input.systemPrompt}\n\n${spec.focus}`,
         permission: held
@@ -206,8 +209,11 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
       ...(!p.catalogueRouting ? {
         api: p.baseURL,
         npm: p.protocol === "anthropic" ? "@ai-sdk/anthropic" : p.protocol === "openai-responses" ? "@ai-sdk/openai" : "@ai-sdk/openai-compatible",
-        options: { baseURL: p.baseURL, protocol: p.protocol }
       } : {}),
+      options: {
+        headerTimeout: PROVIDER_INACTIVITY_MS, chunkTimeout: PROVIDER_INACTIVITY_MS,
+        ...(!p.catalogueRouting ? { baseURL: p.baseURL, protocol: p.protocol } : {})
+      },
       models: Object.fromEntries(
         p.models.map((m) => [
           m.id,

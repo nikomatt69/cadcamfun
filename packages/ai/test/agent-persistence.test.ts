@@ -59,8 +59,8 @@ const lastIsTool = (request: ChatRequestBody): boolean => request.messages.at(-1
 
 describe("announcements and open work are recognised", () => {
   test("only an announcement without action counts", () => {
-    for (const yes of ["I'll build the base first.", "Ok. Now I will add the wheels.", "Procedo con le ruote.", "Here is the plan:", "Let me check the result.", "Adesso creo il corpo."]) expect(announcesWork(yes), yes).toBe(true)
-    for (const no of ["The plate is 40 mm wide with two 6 mm holes.", "Done: hole-1 radius 3 -> 4.", "Which material should I use?", "", "Let me know if you want it thicker?"]) expect(announcesWork(no), no).toBe(false)
+    for (const yes of ["I'll build the base first.", "Ok. Now I will add the wheels.", "Procedo con le ruote.", "Let me check the result.", "Adesso creo il corpo."]) expect(announcesWork(yes), yes).toBe(true)
+    for (const no of ["The plate is 40 mm wide with two 6 mm holes.", "Here is the plan:", "Supported operations:", "Done: hole-1 radius 3 -> 4.", "Which material should I use?", "", "Let me know if you want it thicker?"]) expect(announcesWork(no), no).toBe(false)
   })
   test("an open plan item or an unfixed failure asks to go on; a finished answer does not", () => {
     const base = { todos: [], lastToolError: undefined }
@@ -133,7 +133,7 @@ describe("the turn does not end on words", () => {
     let prompts = 0
     script = () => { prompts += 1; return { text: "Let me start:" } }
     const events = await run("build it", "persist-5")
-    expect(events.at(-1)).toMatchObject({ type: "done" })
+    expect(events.at(-1)).toMatchObject({ type: "error", code: "internal" })
     expect(prompts).toBeLessThanOrEqual(4)
   })
 
@@ -157,7 +157,7 @@ describe("the turn does not end on words", () => {
       if (lastIsTool(request)) return nudges < 9 ? { text: `Stage ${nudges + 1} is done. Next, I will start stage ${nudges + 2}:` } : { text: "All nine stages are done and checked." }
       return { text: "Let me start stage 1:" }
     }
-    const events = await run("machine the whole part", "persist-long")
+    const events = await run("machine the whole part", "persist-long", { autoContinues: 50 })
     expect(nudges).toBe(9)
     expect(events.at(-1)).toMatchObject({ type: "done" })
     expect((events.at(-1) as Extract<AiEvent, { type: "done" }>).text).toContain("All nine stages are done and checked.")
@@ -169,14 +169,36 @@ describe("the turn does not end on words", () => {
     await run("build it", "persist-8", { autoContinues: 0 })
     expect(prompts).toBe(1)
   })
+
+  test("a repeated tool failure stops recovery instead of counting failed calls as progress", async () => {
+    script = (request) => lastIsTool(request)
+      ? { text: "I could not read the drawing." }
+      : { toolCalls: [{ name: "cad", args: { action: "describe" } }] }
+    failing = true
+    try {
+      const events = await run("describe it", "persist-repeat-error")
+      expect(events.filter((event) => event.type === "tool_result")).toHaveLength(3)
+      expect(events.at(-1)).toMatchObject({ type: "error", code: "internal", message: expect.stringContaining("no progress") })
+      expect(events.some((event) => event.type === "done")).toBe(false)
+    } finally { failing = false }
+  })
+
+  test("ordinary chat cannot continue indefinitely even when every nudge calls a tool", async () => {
+    script = (request) => lastIsTool(request) ? { text: "I'll check the next stage:" }
+      : { toolCalls: [{ name: "cad", args: { action: "describe" } }] }
+    const events = await run("check the part", "persist-budget")
+    expect(events.filter((event) => event.type === "tool_result")).toHaveLength(DEFAULT_AUTO_CONTINUES + 1)
+    expect(events.at(-1)).toMatchObject({ type: "error", message: expect.stringContaining("continuation limit") })
+    expect(events.some((event) => event.type === "done")).toBe(false)
+  })
 })
 
 describe("the loop's limits are nikcli's", () => {
   test("resumes follow nikcli's retry curve: 2 s, doubling, never past 30 s", () => {
     expect([1, 2, 3, 4, 5, 6, 10].map(resumeDelay)).toEqual([2_000, 4_000, 8_000, 16_000, 30_000, 30_000, 30_000])
   })
-  test("one request may be carried on as often as nikcli's goal loop iterates", () => {
-    expect(DEFAULT_AUTO_CONTINUES).toBe(50)
+  test("ordinary chat has a bounded continuation budget", () => {
+    expect(DEFAULT_AUTO_CONTINUES).toBe(8)
   })
 })
 

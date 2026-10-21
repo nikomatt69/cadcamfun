@@ -5,6 +5,27 @@ import { Schema } from "effect"
 import { continuationFor, hostChatStream, queueHostMessage } from "../src/nikcli/chat.ts"
 import { toolFailure } from "../src/nikcli/event-mapper.ts"
 import type { ProjectHost } from "../src/nikcli/runtime.ts"
+import { PRIMARY_STEP_LIMIT } from "../src/nikcli/config.ts"
+
+test("a model that ignores the host step hint is aborted and the stream closes once", async () => {
+  let started!: () => void
+  const prompting = new Promise<void>((resolve) => { started = resolve })
+  let aborted = 0
+  const host = { client: {
+    session: { messages: async () => [], abort: async () => { aborted++; return true } },
+    events: { subscribe: async function* () {
+      yield { type: "server.connected", properties: {} }
+      await prompting
+      for (let step = 1; step <= PRIMARY_STEP_LIMIT + 5; step++) yield { type: "message.part.updated", properties: { part: { type: "step-start", id: `step-${step}`, sessionID: "s", messageID: "answer" } } }
+    } },
+    "session-prompt": { prompt: async () => { started(); return new Promise(() => {}) } }
+  } } as unknown as ProjectHost
+  const events = await Effect.runPromise(Stream.runCollect(hostChatStream({ host, sessionId: "s", message: "Check", model: { providerID: "fake", modelID: "fake" } })))
+  expect(events.filter((event) => event.type === "step")).toHaveLength(PRIMARY_STEP_LIMIT)
+  expect(events.filter((event) => event.type === "error")).toHaveLength(1)
+  expect(events.at(-1)).toMatchObject({ type: "error", code: "internal", message: expect.stringContaining("step limit") })
+  expect(aborted).toBe(1)
+}, 10_000)
 
 describe("native processor ownership", () => {
   test("retry admission belongs to nikcli and usage covers every completed step", async () => {

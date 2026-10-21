@@ -1,10 +1,10 @@
 /// <reference path="./sdk-next.d.ts" />
 import { Effect, Queue, Stream } from "effect"
-import type { HostPromptResult, HostSession } from "@nikcli-ai/sdk-next"
+import type { HostClient, HostPromptResult, HostSession } from "@nikcli-ai/sdk-next"
 import { AiConfigError, AiProviderError } from "../errors.ts"
 import type { AiEvent } from "../events.ts"
 import { isContextOverflowError } from "../provider-error.ts"
-import { CADCAM_AGENT } from "./config.ts"
+import { CADCAM_AGENT, PRIMARY_STEP_LIMIT } from "./config.ts"
 import { mapHostEvent, newMapperState, type EventMapperState } from "./event-mapper.ts"
 import type { ProjectHost } from "./runtime.ts"
 import { formatGoalStatus, goalSubcommandTexts, parseGoalArguments, type GoalCommand, type GoalSubcommand } from "./goal.ts"
@@ -32,7 +32,8 @@ export interface HostChatInput {
    * How many times the turn is continued on its own when the agent stopped with work left (see `continuationFor`). nikcli's host
    * ends a turn as soon as the model answers without a tool call, so a plan announced in prose, a plan with items left or a
    * failed call that was not retried would end the work there. Like nikcli's goal loop it runs up to 50 iterations, and it stops
-   * earlier whenever a nudge brings no tool call (see `MAX_STALLS`). `0` leaves the host's behaviour.
+   * earlier whenever recovery stalls (see `MAX_STALLS`). Ordinary chat permits eight continuations; explicit goals retain 50.
+   * `0` leaves the host's behaviour.
    */
   readonly autoContinues?: number
 }
@@ -43,7 +44,6 @@ const ANNOUNCES = /^(?:ok(?:ay)?[,.:]?\s+)?(?:let me|let['’]s|i['’]ll|i will
 export const announcesWork = (text: string): boolean => {
   const trimmed = text.trim()
   if (trimmed === "") return false
-  if (/:\s*$/.test(trimmed)) return true
   const sentences = trimmed.split(/(?<=[.!?\n])\s+/).map((s) => s.trim()).filter((s) => s !== "")
   const last = sentences.at(-1) ?? ""
   return !/\?$/.test(last) && ANNOUNCES.test(last)
@@ -98,8 +98,8 @@ const RESUME_BACKOFF_MS = 2_000
 const RESUME_BACKOFF_MAX_MS = 30_000
 export const resumeDelay = (attempt: number): number => Math.min(RESUME_BACKOFF_MS * 2 ** (attempt - 1), RESUME_BACKOFF_MAX_MS)
 
-/** nikcli's `SessionGoal.MAX_ITERATIONS`: how many times one request is carried on after the agent stopped with work left. */
-export const DEFAULT_AUTO_CONTINUES = 50
+/** Automatic continuation is bounded independently of native goal iterations. */
+export const DEFAULT_AUTO_CONTINUES = 8
 export const DEFAULT_RESUMES = 5
 
 const CONNECT_TIMEOUT_MS = 5_000
@@ -244,42 +244,49 @@ const readContinuationState = (host: ProjectHost, sessionId: string): Promise<Ev
     return state
   })
 
-export const readHostSessionState = (host: ProjectHost, sessionId: string): Effect.Effect<HostSessionState, AiConfigError> =>
+export const readHostSessionSnapshot = (host: ProjectHost, sessionId: string): Effect.Effect<{ readonly messages: Awaited<ReturnType<HostClient["session"]["messages"]>>; readonly state: HostSessionState }, AiConfigError> =>
   Effect.tryPromise({
     try: async () => {
       const messages = await host.client.session.messages({ sessionID: sessionId, limit: 40 })
-      const visible = messages.filter((m) => m.info.summary !== true && m.info.agent !== "compaction")
-      const last = visible.at(-1)
-      if (last === undefined) return { busy: false, text: "" } satisfies HostSessionState
-      let firstOfTurn = 0
-      for (const [index, message] of visible.entries()) {
-        // The pinned host marks automatic continuation text parts as synthetic, not the user message itself.
-        const synthetic = message.parts.length > 0 && message.parts.every((p) => p.type === "text" && "synthetic" in p && p.synthetic === true)
-        if (message.info.role === "user" && !synthetic) firstOfTurn = index + 1
-      }
-      const answer = visible.slice(firstOfTurn).filter((m) => m.info.role === "assistant")
-      const text = answer.flatMap((m) => m.parts.filter((p) => p.type === "text").map((p) => p.text ?? "")).join("")
-      const error = last.info.error?.data?.message ?? last.info.error?.name
-      // `tool-calls` closes a step, not the turn: the model goes on once the tools have answered.
-      const stepOnly = last.info.finish === undefined || last.info.finish === "tool-calls" || last.info.finish === "tool_calls"
-      const busy = last.info.role === "user" || (error === undefined && stepOnly)
-      const recovered: Array<Extract<AiEvent, { type: "tool_call" | "tool_result" | "todo" | "tool_diagnostic" }>> = []
-      const mapper = newMapperState()
-      for (const message of answer) {
-        for (const part of message.parts) {
-          if (part.type !== "tool" || !part.tool || !part.callID) continue
-          for (const event of mapHostEvent(sessionId, { type: "message.part.updated", properties: { part: { ...part, sessionID: sessionId, messageID: message.info.id } } }, mapper)) {
-            if (event.type === "tool_call" || event.type === "todo" || event.type === "tool_diagnostic") recovered.push(event)
-            if (event.type === "tool_result") recovered.push(event)
-          }
-        }
-      }
-      const tokens = answer.flatMap((message) => message.info.tokens ? [message.info.tokens] : [])
-      const usage = tokens.reduce((total, item) => ({ inputTokens: total.inputTokens + item.input, outputTokens: total.outputTokens + item.output }), { inputTokens: 0, outputTokens: 0 })
-      return { busy, text, ...(error !== undefined ? { error } : {}), ...(recovered.length ? { events: recovered } : {}), ...(tokens.length ? { usage } : {}) } satisfies HostSessionState
+      return { messages, state: sessionStateFromMessages(sessionId, messages) }
     },
     catch: (cause) => new AiConfigError({ message: `Failed to read the session: ${describeHostFailure(cause)}` })
   })
+
+export const readHostSessionState = (host: ProjectHost, sessionId: string): Effect.Effect<HostSessionState, AiConfigError> =>
+  readHostSessionSnapshot(host, sessionId).pipe(Effect.map((snapshot) => snapshot.state))
+
+const sessionStateFromMessages = (sessionId: string, messages: Awaited<ReturnType<HostClient["session"]["messages"]>>): HostSessionState => {
+  const visible = messages.filter((m) => m.info.summary !== true && m.info.agent !== "compaction")
+  const last = visible.at(-1)
+  if (last === undefined) return { busy: false, text: "" } satisfies HostSessionState
+  let firstOfTurn = 0
+  for (const [index, message] of visible.entries()) {
+    // The pinned host marks automatic continuation text parts as synthetic, not the user message itself.
+    const synthetic = message.parts.length > 0 && message.parts.every((p) => p.type === "text" && "synthetic" in p && p.synthetic === true)
+    if (message.info.role === "user" && !synthetic) firstOfTurn = index + 1
+  }
+  const answer = visible.slice(firstOfTurn).filter((m) => m.info.role === "assistant")
+  const text = answer.flatMap((m) => m.parts.filter((p) => p.type === "text").map((p) => p.text ?? "")).join("")
+  const error = last.info.error?.data?.message ?? last.info.error?.name
+  // `tool-calls` closes a step, not the turn: the model goes on once the tools have answered.
+  const stepOnly = last.info.finish === undefined || last.info.finish === "tool-calls" || last.info.finish === "tool_calls"
+  const busy = last.info.role === "user" || (error === undefined && stepOnly)
+  const recovered: Array<Extract<AiEvent, { type: "tool_call" | "tool_result" | "todo" | "tool_diagnostic" }>> = []
+  const mapper = newMapperState()
+  for (const message of answer) {
+    for (const part of message.parts) {
+      if (part.type !== "tool" || !part.tool || !part.callID) continue
+      for (const event of mapHostEvent(sessionId, { type: "message.part.updated", properties: { part: { ...part, sessionID: sessionId, messageID: message.info.id } } }, mapper)) {
+        if (event.type === "tool_call" || event.type === "todo" || event.type === "tool_diagnostic") recovered.push(event)
+        if (event.type === "tool_result") recovered.push(event)
+      }
+    }
+  }
+  const tokens = answer.flatMap((message) => message.info.tokens ? [message.info.tokens] : [])
+  const usage = tokens.reduce((total, item) => ({ inputTokens: total.inputTokens + item.input, outputTokens: total.outputTokens + item.output }), { inputTokens: 0, outputTokens: 0 })
+  return { busy, text, ...(error !== undefined ? { error } : {}), ...(recovered.length ? { events: recovered } : {}), ...(tokens.length ? { usage } : {}) } satisfies HostSessionState
+}
 
 export const abortHostSession = (host: ProjectHost, sessionId: string): Effect.Effect<void> =>
   Effect.promise(() => host.client.session.abort({ sessionID: sessionId }).then(() => undefined, () => undefined))
@@ -327,26 +334,42 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       // explicit abort (`abortHostSession`) stops a turn; the client recovers the result with `readHostSessionState`.
 
       const state = newMapperState()
+      let stepCeiling = input.goalArguments === undefined ? PRIMARY_STEP_LIMIT : PRIMARY_STEP_LIMIT * 10
+      let limitReached!: (result: HostPromptResult) => void
+      const stepLimit = new Promise<HostPromptResult>((resolve) => { limitReached = resolve })
+      let terminal = false
       state.ownTexts.add(input.message.trim())
       state.ownTexts.add(RESUME_PROMPT)
       let connected!: () => void
       const connectedPromise = new Promise<void>((resolve) => (connected = resolve))
       const offer = (event: AiEvent) => {
+        if (terminal || subscriber.signal.aborted) return
+        if (event.type === "done" || event.type === "error") terminal = true
         if (event.type === "done" || event.type === "error") Queue.offerUnsafe(queue, { type: "turn", sessionId, phase: "finish", reason: event.type === "done" ? "completed" : event.code })
         Queue.offerUnsafe(queue, event)
       }
 
       const pump = (async () => {
         try {
-          for await (const event of host.client.events.subscribe({ signal: subscriber.signal })) {
+          for await (const event of host.client.events.subscribe({ signal: controller.signal })) {
             // The in-process SSE body ignores the abort signal once headers are out, so the
             // loop only notices cancellation when the next bus event (telemetry, heartbeat) arrives.
-            if (controller.signal.aborted || subscriber.signal.aborted) break
+            if (controller.signal.aborted) break
             if (event.type === "server.connected") {
               connected()
               continue
             }
-            for (const mapped of mapHostEvent(sessionId, event, state)) offer(mapped)
+            for (const mapped of mapHostEvent(sessionId, event, state)) {
+              if (mapped.type === "step" && mapped.phase === "start" && mapped.index > stepCeiling) {
+                const message = "The assistant reached its model step limit and was stopped. Completed changes were preserved. Review the last tool result before continuing."
+                offer({ type: "error", sessionId, code: "internal", message })
+                controller.abort()
+                limitReached({ name: "StepLimitError", data: { message } })
+                void Promise.resolve().then(() => host.client.session.abort({ sessionID: sessionId })).catch(() => undefined)
+                break
+              }
+              offer(mapped)
+            }
           }
         } catch {
           // Aborted or transport closed: the prompt result decides the outcome.
@@ -402,9 +425,10 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         offer({ type: "turn", sessionId, phase: "start" })
         const resumes = input.continues ?? DEFAULT_RESUMES
         let attempt = 0
-        const maxContinues = input.autoContinues ?? DEFAULT_AUTO_CONTINUES
+        const maxContinues = input.autoContinues ?? (input.goalArguments !== undefined ? 50 : DEFAULT_AUTO_CONTINUES)
         let continuations = 0
         let callsAtNudge: number | undefined
+        let errorAtNudge: string | undefined
         let stalls = 0
         const answers: string[] = []
         let parts: Array<{ type: "text"; text: string; synthetic?: boolean } | { type: "file"; mime: string; filename: string; url: string }> = [
@@ -481,19 +505,20 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             const snapshot = await readMessages(1)
             beforePromptKnown = snapshot !== undefined
             beforePrompt = snapshot?.at(-1)?.info.id
+            stepCeiling = state.step + (input.goalArguments === undefined ? PRIMARY_STEP_LIMIT : PRIMARY_STEP_LIMIT * 10)
             usedGoalCommand = false
             if (goalPending !== undefined) {
               goalPending = undefined
               usedGoalCommand = true
-              result = await host.client.session.command(
+              result = await Promise.race([stepLimit, host.client.session.command(
                 { sessionID: sessionId, command: "goal", arguments: input.goalArguments!, agent: input.agent ?? CADCAM_AGENT, model: hostModel, ...(input.variant ? { variant: input.variant } : {}) },
                 { signal: controller.signal }
-              )
+              )])
             } else
-            result = await host.client["session-prompt"].prompt(
+            result = await Promise.race([stepLimit, host.client["session-prompt"].prompt(
               { sessionID: sessionId, agent: input.agent ?? CADCAM_AGENT, model: input.model, ...(input.variant ? { variant: input.variant } : {}), ...(input.system ? { system: input.system } : {}), parts },
               { signal: controller.signal }
-            )
+            )])
           } catch (cause) {
             const message = describeHostFailure(cause)
             // The host started the goal and ran its loop, then failed to encode the command's reply: the work is in the session.
@@ -541,16 +566,25 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             return
           }
           const answerOf = (): string => (result.parts ?? []).filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
-          if (!failure && !controller.signal.aborted && continuationState !== undefined && continuations < maxContinues) {
+          if (!failure && !controller.signal.aborted && continuationState !== undefined && maxContinues > 0) {
             const text = answerOf()
             // A nudge that produced no tool call at all did not help: stop nudging rather than loop on words.
-            stalls = callsAtNudge !== undefined && continuationState.toolCalls === callsAtNudge ? stalls + 1 : 0
-            const nudge = stalls < MAX_STALLS ? continuationFor(continuationState, text, result.info?.finish) : undefined
+            const repeatedError = errorAtNudge !== undefined && continuationState.lastToolError === errorAtNudge
+            stalls = callsAtNudge !== undefined && (continuationState.toolCalls === callsAtNudge || repeatedError) ? stalls + 1 : 0
+            const nudge = continuationFor(continuationState, text, result.info?.finish)
             if (nudge !== undefined) {
+              if (stalls >= MAX_STALLS || continuations >= maxContinues) {
+                offer({ type: "error", sessionId, code: "internal", message: stalls >= MAX_STALLS
+                  ? "The assistant stopped because automatic recovery made no progress. Completed changes were preserved. Review the last tool result before trying again."
+                  : "The assistant reached its automatic continuation limit with work still open. Completed changes were preserved. Review the remaining plan before continuing." })
+                controller.abort()
+                return
+              }
               if (text.trim() !== "") answers.push(text)
               continuations += 1
               offer({ type: "turn", sessionId, phase: "continuing", reason: nudge })
               callsAtNudge = continuationState.toolCalls
+              errorAtNudge = continuationState.lastToolError
               state.idle = false
               state.retry = undefined
               state.sessionError = undefined

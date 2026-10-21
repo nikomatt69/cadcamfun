@@ -80,15 +80,113 @@ export const LibraryToolInput = Schema.Struct({
   isPublic: withDefault(Schema.Boolean, false)
 })
 
+/**
+ * A machine configuration the assistant writes. The fields are the machine profile's (the kernel reads a configuration
+ * through it), so what the assistant writes is what the kernel plans against. The legacy spellings (`kinematics`,
+ * `maxRPM`, `maxFeed`, `postProcessor`) are still accepted, so a configuration written before the profile keeps working.
+ */
 export const LibraryMachineConfigInput = Schema.Struct({
   id: Schema.optionalKey(Schema.String),
   name: id,
   kind: Schema.Literals(["mill", "lathe", "3Dprinter"]),
   description: Schema.optionalKey(Schema.String),
-  kinematics: withDefault(Schema.Record(Schema.String, Schema.Struct({ min: Schema.Finite, max: Schema.Finite })), {}),
-  postProcessor: Schema.String,
-  workOffsets: withDefault(Schema.Array(Schema.String), ["G54", "G55", "G56", "G57", "G58", "G59"]),
-  probing: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+  /** The control, in the shop's words ("Fanuc 0i-MD", "Heidenhain TNC7"). */
+  controller: Schema.optionalKey(Schema.String),
+  /** The post that writes the NC, when the controller's name does not decide it. */
+  post: Schema.optionalKey(Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain"])),
+  /** How many axes the machine has. */
+  axes: Schema.optionalKey(Schema.Literals([3, 4, 5, 6])),
+  /** Each axis and its travel: the linear ones in millimetres, the rotary ones in degrees. */
+  axisTable: Schema.optionalKey(Schema.Array(Schema.Struct({
+    id: Schema.Literals(["X", "Y", "Z", "A", "B", "C", "U", "V", "W"]),
+    kind: Schema.Literals(["linear", "rotary"]),
+    min: Schema.Finite,
+    max: Schema.Finite,
+    sense: Schema.optionalKey(Schema.Literals([1, -1])),
+    continuous: Schema.optionalKey(Schema.Boolean)
+  }))),
+  /** The spindle: its ceilings and the power it holds by speed band. */
+  spindle: Schema.optionalKey(Schema.Struct({
+    maxRpm: positiveInt,
+    minRpm: Schema.optionalKey(positiveInt),
+    powerKw: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+    torqueNm: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+    efficiency: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 }))),
+    powerCurve: Schema.optionalKey(Schema.Array(Schema.Struct({ rpm: positiveInt, kW: Schema.Finite.check(Schema.isGreaterThan(0)) })))
+  })),
+  /** The feeds the machine takes, mm/min. */
+  feed: Schema.optionalKey(Schema.Struct({ max: positive, rapid: Schema.optionalKey(positive) })),
+  /** How rigid the machine is: it scales the depth and the feed the cutting data may take. */
+  rigidity: Schema.optionalKey(Schema.Literals(["hobby", "light", "standard", "heavy"])),
+  /** The space the part takes, mm. It is not the travel of the machine. */
+  workVolume: Schema.optionalKey(point3),
+  /** The travel of the machine in work coordinates, mm. */
+  travel: Schema.optionalKey(Schema.Struct({
+    minX: Schema.Finite, maxX: Schema.Finite, minY: Schema.Finite, maxY: Schema.Finite, minZ: Schema.Finite, maxZ: Schema.Finite
+  })),
+  /** The table the spindle must clear: its footprint and the gap under the stock. */
+  table: Schema.optionalKey(Schema.Struct({ length: positive, width: positive, gap: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)) })),
+  /** The rotary table of a 4/5-axis machine. */
+  rotary: Schema.optionalKey(Schema.Struct({
+    layout: Schema.Literals(["table-AC", "table-BC"]),
+    tilt: Schema.optionalKey(Schema.Struct({ min: Schema.Finite, max: Schema.Finite })),
+    rotation: Schema.optionalKey(Schema.Struct({ min: Schema.Finite, max: Schema.Finite })),
+    pivot: Schema.optionalKey(point3),
+    tcp: Schema.optionalKey(Schema.Literals(["control", "program"]))
+  })),
+  /** What a turning centre holds and turns. */
+  turning: Schema.optionalKey(Schema.Struct({
+    maxBarDiameter: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+    maxBarLength: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+    chuckDiameter: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+    b: Schema.optionalKey(Schema.Struct({ min: Schema.Finite, max: Schema.Finite })),
+    c: Schema.optionalKey(Schema.Struct({ min: Schema.Finite, max: Schema.Finite })),
+    continuousC: Schema.optionalKey(Schema.Boolean),
+    yTravel: Schema.optionalKey(positive),
+    turret: Schema.optionalKey(Schema.Literals(["rear", "front"]))
+  })),
+  /**
+   * The work offsets the control has, and the one the machine starts in. The list of offsets alone is the older spelling
+   * and is still read.
+   */
+  workOffsets: Schema.optionalKey(Schema.Union([
+    Schema.Struct({
+      available: Schema.Array(Schema.Literals(["G54", "G55", "G56", "G57", "G58", "G59"])),
+      default: Schema.optionalKey(Schema.Literals(["G54", "G55", "G56", "G57", "G58", "G59"]))
+    }),
+    Schema.Array(Schema.Literals(["G54", "G55", "G56", "G57", "G58", "G59"]))
+  ])),
+  /** The touch probe: what it can measure and how. */
+  probing: Schema.optionalKey(Schema.Struct({
+    cycles: Schema.optionalKey(Schema.Array(Schema.String)),
+    stylusRadius: Schema.optionalKey(positive),
+    feed: Schema.optionalKey(positive),
+    dialect: Schema.optionalKey(Schema.Literals(["linuxcnc", "fanuc"]))
+  })),
+  /** The tool changer: what it holds and how long a change takes. */
+  toolChanger: Schema.optionalKey(Schema.Struct({
+    type: Schema.optionalKey(Schema.Literals(["manual", "carousel", "chain", "umbrella", "rack"])),
+    capacity: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
+    changeSeconds: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+    maxToolDiameter: Schema.optionalKey(positive),
+    maxToolLength: Schema.optionalKey(positive)
+  })),
+  /** The coolant the machine can deliver. */
+  coolant: Schema.optionalKey(Schema.Struct({ modes: Schema.Array(Schema.Literals(["off", "flood", "mist"])) })),
+  /** How accurately the machine holds a position. */
+  accuracy: Schema.optionalKey(Schema.Struct({
+    positioningMm: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+    repeatabilityMm: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+    runoutMm: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)))
+  })),
+  /** Where the machine's figures come from. */
+  reference: Schema.optionalKey(Schema.Struct({
+    source: Schema.optionalKey(Schema.String),
+    notes: Schema.optionalKey(Schema.String)
+  })),
+  // The legacy spellings, still read so a configuration written before the profile keeps working.
+  kinematics: Schema.optionalKey(Schema.Record(Schema.String, Schema.Struct({ min: Schema.Finite, max: Schema.Finite }))),
+  postProcessor: Schema.optionalKey(Schema.String),
   maxRPM: Schema.optionalKey(positiveInt),
   maxFeed: Schema.optionalKey(positive),
   isPublic: withDefault(Schema.Boolean, false)

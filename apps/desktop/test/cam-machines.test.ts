@@ -68,6 +68,26 @@ describe("machine facts", () => {
   test("a half-written envelope is not an envelope", () => {
     expect(machineEnvelopeOf({ id: "m", name: "m", config: { workVolume: { x: 300, y: 200 } } as never })).toBeUndefined()
   })
+
+  test("the canonical machine profile is read like the other shapes", () => {
+    const machine = machinesFromResponse({ data: [{
+      id: "m1", name: "KERN Micro HD", type: "mill",
+      config: {
+        kind: "mill", controller: "Heidenhain TNC7", post: "heidenhain", axes: 5,
+        spindle: { maxRpm: 50000 }, feed: { max: 60000 },
+        axisTable: [
+          { id: "X", kind: "linear", min: -175, max: 175, sense: 1 },
+          { id: "Y", kind: "linear", min: -110, max: 110, sense: 1 },
+          { id: "Z", kind: "linear", min: -250, max: 250, sense: 1 }
+        ]
+      }
+    }] })[0]!
+    expect(machineSpindleOf(machine)).toBe(50000)
+    expect(machineFeedOf(machine)).toBe(60000)
+    expect(machineControllerOf(machine)).toBe("Heidenhain TNC7")
+    // The envelope of a machine that states its axes is the travel of the linear ones.
+    expect(machineEnvelopeOf(machine)).toEqual({ x: 350, y: 220, z: 500 })
+  })
 })
 
 describe("machine kinds", () => {

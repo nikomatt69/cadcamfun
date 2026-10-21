@@ -56,19 +56,30 @@ export interface MachineLimits {
 }
 
 /**
- * The power the spindle can deliver at `rpm`, kW: the band of the power curve the speed falls in, else the flat ceiling.
- * The curve is read as "this power up to this speed": the band with the highest `rpm` at or below the speed wins, and a
- * speed below the first band takes the first band's power.
+ * The power the spindle can deliver at `rpm`, kW: the curve read at that speed, bounded by the flat ceiling.
+ *
+ * The curve is the power the spindle holds at the speeds it names, and between two named speeds it falls the way a
+ * constant-torque spindle does: linearly, because the power is what the torque divided by the speed gives. A speed below
+ * the first point takes the first point's power, a speed above the last takes the last one's. The flat `powerKw` is the
+ * rated power: the curve never raises it.
  */
 export const powerLimitAt = (machine: MachineLimits, rpm: number): number | undefined => {
   const curve = machine.powerCurve
   if (curve === undefined || curve.length === 0) return machine.powerKw
-  let chosen = curve[0]!
-  for (const band of curve) {
-    if (rpm >= band.rpm) chosen = band
-    else break
+  const first = curve[0]!
+  if (curve.length === 1) return Math.min(machine.powerKw ?? first.kW, first.kW)
+  if (rpm <= first.rpm) return Math.min(machine.powerKw ?? first.kW, first.kW)
+  for (let i = 1; i < curve.length; i++) {
+    const low = curve[i - 1]!
+    const high = curve[i]!
+    if (rpm <= high.rpm) {
+      const span = high.rpm - low.rpm
+      const kW = span > 0 ? low.kW + ((high.kW - low.kW) * (rpm - low.rpm)) / span : high.kW
+      return Math.min(machine.powerKw ?? kW, kW)
+    }
   }
-  return chosen.kW
+  const last = curve[curve.length - 1]!
+  return Math.min(machine.powerKw ?? last.kW, last.kW)
 }
 
 export interface CuttingRequest {

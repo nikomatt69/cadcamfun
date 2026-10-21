@@ -44,7 +44,7 @@ test("OpenCode Zen and Go fallback models use separate documented endpoints with
   for (const id of ["opencode", "opencode-go"]) {
     const provider = config.provider[id]!
     expect(provider.npm).toBeUndefined()
-    expect(provider.options).toBeUndefined()
+    expect(provider.options).toEqual({ headerTimeout: 120_000, chunkTimeout: 120_000 })
     expect(provider.models["minimax-m3"]!.provider).toEqual({ npm: "@ai-sdk/openai-compatible", api: `https://opencode.ai/inference/${id === "opencode-go" ? "go/" : ""}openai/v1` })
   }
 })

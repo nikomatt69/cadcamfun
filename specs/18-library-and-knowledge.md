@@ -127,6 +127,32 @@ Source: `packages/core/src/cam/machine.ts`. The agent reads the project's active
 
 **The agent reads this before any machine-conditional decision**: spindle ceiling, axis envelope, work offset naming, post dialect, probe availability. Lathe/lathe + mill programs branch on `kind`; a probing routine is unreachable without probe + spindle-off + work-offset write.
 
+### 4.1 The machine profile — one shape for every machine
+
+The library, the assistant and the built-in catalogue wrote a machine in **three different shapes**, and the kernel read only one of them: a machine the assistant configured was refused by the kernel it was configured for. The **machine profile** (`packages/core/src/cam/kernel/machine-profile.ts`) is the one place that knows the shapes: `profileOfConfig` reads any of them into one `MachineProfile`, and `configOfProfile` writes the canonical one back. The configuration crosses the contract whole (`CamMachineConfig.config` is the record the person wrote) and the kernel's machine carries the profile's figures.
+
+A field that is **absent says the machine does not say**, never a default the kernel would plan against. The profile's groups:
+
+| Group | Fields | What the kernel does with it |
+| --- | --- | --- |
+| identity | `kind`, `controller`, `post` | the kind decides what the machine is; the post is the dialect the control speaks, derived from the controller when it is not named |
+| axes | `axes` (3…6), `axisTable` (each axis: id, kind, min, max, sense, continuous) | the travel of the linear axes bounds the program; the rotary ones are the table's ranges |
+| spindle | `maxRpm`, `minRpm`, `powerKw`, `torqueNm`, `efficiency`, `powerCurve` (kW by speed band) | the ceilings and the rigidity scale the cutting data; the curve is the power at the speed the cut runs at |
+| feed | `max`, `rapid` | the ceiling of the cutting data; the rapid rate is the cycle time |
+| rigidity | `hobby`/`light`/`standard`/`heavy` | scales the depth and the feed the cut may take |
+| envelope | `workVolume`, `travel`, `table` | the work volume is the space the part takes (not a travel bound); the travel bounds the moves; the table is what the spindle must clear |
+| rotary | `layout`, `tilt`, `rotation`, `pivot`, `tcp` | the trunnion table the five-axis planner uses |
+| turning | bar, chuck, `b`, `c`, `continuousC`, `yTravel`, `turret` | what the turning centre holds and turns |
+| offsets | `workOffsets{available, default}` | a program that names an offset the machine does not have is refused: the offset is the datum the part sits in |
+| tooling | `toolChanger{type, capacity, changeSeconds, maxToolDiameter, maxToolLength}` | a program needing more tools than the magazine holds is reported; the change time is the cycle time |
+| coolant | `modes` | a cut asking for a mode the machine does not have is planned with one it has, and the substitution is reported |
+| accuracy | `positioningMm`, `repeatabilityMm`, `runoutMm` | the positioning accuracy is a term of the tolerance budget: the promise includes what the machine itself adds |
+| probing | `cycles`, `stylusRadius`, `feed`, `dialect` | what the control can measure; the kernel does not plan probing yet |
+| reference | `source`, `notes` | where the figures come from and what they assume |
+
+The legacy spellings (`kinematics`, `maxRPM`, `maxFeed`, `postProcessor`, `workOffsets` as a list, the `additionalSettings` bag) are still read, so a configuration written before the profile keeps working; the assistant writes the canonical shape.
+
+
 ## 5. Components — reusable, parametric, versioned
 
 ### 5.1 What a Component is
@@ -217,4 +243,5 @@ The "apply a commit creates the ones that are missing and updates an existing on
 
 ## 10. Change log
 
+- 2026-10-21: §4.1 records the machine profile: the library, the assistant and the built-in catalogue wrote a machine in three shapes and the kernel read one, so a machine the assistant configured was refused by the kernel it was configured for. `profileOfConfig` reads any of them into one `MachineProfile` and `configOfProfile` writes the canonical one back; the configuration crosses the contract whole and the kernel's machine carries the profile's figures. The legacy spellings are still read. The field table above is the agent's view of the machine; the profile is the record the kernel plans against.
 - v1: documents the library as the agent's knowledge; defines what the agent knows, picks and writes; maps existing tools; defers write tools to a v6.x library WP.

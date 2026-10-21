@@ -8,6 +8,10 @@ WP2 derives drilling, contour, pocket, thread and external turning paths from WP
 
 Pure and I/O-free, same rules as WP1.
 
+## Kernel performance and AI responsiveness (2026-10-21, in progress)
+
+Optimize measured hot paths without reducing sampling resolution, changing cutter geometry, tolerances, NC bytes or verification evidence. The drop-cutter may seed its branch-and-bound search with an actual nearby column; every rejection must retain the existing conservative bound. Verify against exhaustive footprint evaluation and complete pre-change manufacturing artifacts. WP8 owns bounded automatic recovery and provider inactivity deadlines; integration may move kernel preparation off the sidecar event loop through the existing scoped worker. Regression gates include the full repository test suite.
+
 ## CAM kernel licensing contract (2026-10-21)
 
 The owner requests proprietary licensing for the CAM kernel, with use and

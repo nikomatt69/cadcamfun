@@ -219,18 +219,11 @@ const toolHandlers = Effect.gen(function*() {
   const decodePrinter = (input: Record<string, unknown>) => Schema.decodeUnknownSync(cam.generator.PrinterExtrasSchema)(input)
 
   const manufacturingJob = (loaded: Awaited<ReturnType<typeof load>>, input: typeof CamManufactureInput.Type):
-    { readonly ok: true; readonly job: cam.kernel.ManufacturingJob; readonly stockNote: string } | { readonly ok: false; readonly error: string } => {
+    { readonly ok: true; readonly job: Parameters<typeof runKernelJob<"cam-manufacture">>[1]; readonly stockNote: string } | { readonly ok: false; readonly error: string } => {
       const elements = loaded.elements.filter((e) => e.type !== "workpiece")
       if (elements.length === 0) return { ok: false, error: "There is no part to machine." }
       // The stored stock is centred in CAD X/Y; its `topZ` is the machine reference, so it stands on the part's bottom here.
-      const meshes = cam.model.partMeshes(elements as never, { tolerance: 0.01 })
-      if (meshes === undefined) return { ok: false, error: "No element of the drawing is a solid the kernel can machine." }
-      const zMin = Math.min(...meshes.meshes.map((m) => cam.model.meshBounds(m).min[2]!))
       const stored = loaded.data["stock"] !== undefined ? Schema.decodeUnknownSync(cam.generator.StockSchema)(loaded.data["stock"]) : undefined
-      const stock = stored === undefined ? undefined : {
-        min: { x: stored.x - stored.width / 2, y: stored.y - stored.height / 2, z: zMin },
-        max: { x: stored.x + stored.width / 2, y: stored.y + stored.height / 2, z: zMin + stored.depth }
-      }
       const machine = input.machineConfig !== undefined
         ? cam.kernel.kernelMachineOfConfig(input.machineConfig)
         : (input.machine !== undefined ? cam.kernel.findMachine(input.machine) : undefined)
@@ -238,11 +231,11 @@ const toolHandlers = Effect.gen(function*() {
         return { ok: false, error: `The machine configuration '${input.machineConfig.name}' is not a machine the kernel can machine: it needs a kind it machines (mill or lathe) and a spindle and a feed ceiling.` }
       }
       if (input.machine !== undefined && machine === undefined) return { ok: false, error: `Unknown machine preset '${input.machine}'. Known: ${cam.kernel.MACHINE_CATALOGUE.map((m) => m.id).join(", ")}` }
-      const job: cam.kernel.ManufacturingJob = {
+      const job: Parameters<typeof runKernelJob<"cam-manufacture">>[1] = {
         schemaVersion: 1, id: `${loaded.id}:${drawingRevision(loaded)}`, name: "CAM kernel job", material: input.material,
         ...(input.setupOrientation !== undefined ? { setupOrientation: input.setupOrientation } : {}),
         ...(input.workOffset !== undefined ? { workOffset: input.workOffset } : {}),
-        part: { kind: "elements", elements: elements as never }, ...(stock !== undefined ? { stock } : {}),
+        part: { kind: "elements", elements: elements as never }, ...(stored !== undefined ? { stockFromPartBottom: { x: stored.x, y: stored.y, width: stored.width, height: stored.height, depth: stored.depth } } : {}),
         ...(machine !== undefined ? { machine } : {}), ...(input.origin !== undefined ? { origin: input.origin } : {}),
         ...(input.operations !== undefined ? { operations: input.operations } : {}), ...(input.tools !== undefined ? { tools: input.tools } : {}),
         ...(input.subprograms === true ? { post: { options: { subprograms: true } } } : {}),
@@ -1176,8 +1169,10 @@ const toolHandlers = Effect.gen(function*() {
     upsertMachineConfig: async (input) => {
       actingCell.assertActive()
       const id = typeof input["id"] === "string" ? input["id"] : undefined
-      const config = { kinematics: input["kinematics"] ?? {}, postProcessor: input["postProcessor"], workOffsets: input["workOffsets"] ?? ["G54", "G55", "G56", "G57", "G58", "G59"],
-        ...(input["probing"] !== undefined ? { probing: input["probing"] } : {}), ...(typeof input["maxRPM"] === "number" ? { maxRPM: input["maxRPM"] } : {}), ...(typeof input["maxFeed"] === "number" ? { maxFeed: input["maxFeed"] } : {}) }
+      // The configuration is written as the machine profile: the fields the model sent, in the canonical shape, plus the
+      // legacy spellings it may still use. The kernel reads it back through the same profile, so what is written is what
+      // the program is planned against.
+      const config = cam.kernel.configOfProfile(cam.kernel.profileOfConfig(input, String(input["kind"])))
       const type = String(input["kind"])
       if (id !== undefined) {
         const existing = await Effect.runPromise(machines.find(acting().id, id))

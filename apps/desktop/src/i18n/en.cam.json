@@ -582,5 +582,9 @@
   "cam.visualizer.stopAtCollision": "Stop at a collision",
   "cam.visualizer.millTurn": "5-axis mill-turn · X Y Z B C",
   "cam.visualizer.previewRotaryTiming": "Assumed rotary speed",
-  "cam.visualizer.millTurnRemoval": "Turning removal shown; local milling removal and full-machine collisions are not simulated."
+  "cam.visualizer.millTurnRemoval": "Turning removal shown; local milling removal and full-machine collisions are not simulated.",
+  "cam.generator.cadElement": "CAD element",
+  "cam.generator.chooseCadElement": "Choose a CAD element…",
+  "cam.generator.selectCadElementHint": "No element selected. Choose a CAD element above or select one in the CAD Editor.",
+  "cam.generator.noCadElements": "No CAD parts in this drawing. Add or open a part in the CAD Editor."
 }

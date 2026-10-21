@@ -23,6 +23,7 @@ import { Modal, formatDate } from "../../toolpaths/components/shared.tsx"
 import { ResourceGeneratorDialog } from "../components/ResourceGeneratorDialog.tsx"
 import { GENERATION_WRITE_ACTIONS, type ResourceKind } from "../lib/resource-generation.ts"
 import { useAiStore } from "../../ai/store/context.tsx"
+import { cam } from "@cadcamfun/core"
 import { actionKey } from "../../ai/lib/editor-sync.ts"
 import { CARD as GLASS_CARD, FIELD, ICON_BUTTON, INPUT, LABEL, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 
@@ -62,24 +63,19 @@ const machineRows = (value: unknown, depth = 0): ReadonlyArray<unknown> => {
 const number = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) ? value : undefined)
 
 /**
- * The travel envelope of a machine, read from both shapes the app stores: the Resources form writes
- * `config.workVolume {x,y,z}` plus `maxSpindleSpeed` / `controller`, while the assistant's `upsert_machine_config`
- * writes the canonical per-axis `config.kinematics {x: {min,max}}` plus `maxRPM` / `postProcessor` (spec 18 §4).
+ * What a machine is, read through the machine profile: the figures the kernel plans against, whichever shape the
+ * configuration was written in (the Resources form, the assistant's record or the canonical profile).
  */
 const machineFacts = (row: Row): ReadonlyArray<Fact> => {
-  const config = asRecord(row["config"])
-  const volume = asRecord(config["workVolume"])
-  const kinematics = asRecord(config["kinematics"])
-  const axisMax = (axis: string): number | undefined => number(volume[axis]) ?? number(asRecord(kinematics[axis])["max"])
-  const x = axisMax("x")
-  const y = axisMax("y")
-  const z = axisMax("z")
-  const envelope = x !== undefined && y !== undefined && z !== undefined ? `${x}×${y}×${z} mm` : ""
-  const controller = str(config["controller"]) || str(config["postProcessor"])
-  const spindle = config["maxSpindleSpeed"] ?? config["maxRPM"]
+  const profile = cam.kernel.profileOfConfig(asRecord(row["config"]), str(row["type"]))
+  const volume = profile.workVolume
+  const envelope = volume !== undefined ? `${volume.x}×${volume.y}×${volume.z} mm` : ""
+  const axes = profile.axisTable?.filter((axis) => axis.kind === "linear").length
   return [
-    { label: "Controller", value: dash(controller) },
-    { label: "Max spindle", value: `${dash(spindle)} rpm` },
+    { label: "Controller", value: dash(profile.controller ?? profile.post) },
+    { label: "Max spindle", value: `${dash(profile.spindle?.maxRpm)} rpm` },
+    { label: "Max feed", value: `${dash(profile.feed?.max)} mm/min` },
+    ...(axes === undefined ? [] : [{ label: "Axes", value: String(axes) }]),
     ...(envelope === "" ? [] : [{ label: "Envelope", value: envelope }])
   ]
 }

@@ -243,6 +243,34 @@ test("catalogue reads share one acquisition and connected-only reads skip host s
   }).pipe(Effect.provide(live)))
 })
 
+test("status polls acquire one bounded history snapshot for both recovery and context", async () => {
+  const reads: unknown[] = []
+  const projectHost = { projectId: "p", directory: "/p", client: {
+    session: {
+      get: async () => ({ id: "s", directory: "/p" }),
+      messages: async (input: unknown) => { reads.push(input); return [
+        { info: { id: "u", role: "user", model: { providerID: "openai", modelID: "test-model" } }, parts: [{ type: "text", text: "Hi" }] },
+        { info: { id: "a", role: "assistant", finish: "stop", tokens: { input: 12, output: 3 } }, parts: [{ type: "text", text: "Hello" }] }
+      ] },
+      goal: async () => null
+    },
+    provider: {
+      list: async () => ({ all: [{ id: "openai", name: "OpenAI", models: { "test-model": { name: "Test", limit: { context: 100, output: 10 }, capabilities: { toolcall: true } } } }] }),
+      auth: async () => ({})
+    },
+    config: { get: async () => ({}) }, brain: { status: async () => ({}) },
+    question: { list: async () => [] }, permission: { list: async () => [] }
+  } }
+  const runtime = { catalogueReady: Promise.resolve("present"), host: () => Effect.succeed(projectHost) } as unknown as NikCliRuntime
+  const base = Layer.mergeAll(AiCredentials.layer, AiConfig.layer({ dataDir: "/unused", forceGateway: false }), Layer.succeed(AiHost, { runtime, scheduler: new BackgroundTaskManager({}) }))
+  const live = AiService.layer.pipe(Layer.provideMerge(DirectModel.layerWith(() => streamModel(["x"])).pipe(Layer.provideMerge(base))))
+  const state = await Effect.runPromise(Effect.gen(function* () {
+    return yield* (yield* AiService).controlSession({ sessionId: "s", projectId: "p", action: "status" })
+  }).pipe(Effect.provide(live)))
+  expect(reads).toEqual([{ sessionID: "s", limit: 40 }])
+  expect(state).toMatchObject({ busy: false, text: "Hello", context: { tokens: 15, provider: "openai", model: "test-model" } })
+})
+
 test("a gateway credential does not advertise unrelated providers as connected", async () => {
   await Effect.runPromise(Effect.gen(function* () {
     const credentials = yield* AiCredentials

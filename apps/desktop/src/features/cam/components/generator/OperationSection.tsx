@@ -1,7 +1,6 @@
 import { For, Match, Show, Switch, type JSX } from "solid-js"
 import { Cpu, Play } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
-import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import { dimensionRows, elementSummary, type CadElement } from "../../lib/job.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { useGeneratorStore, type GeometryType } from "../../store/generatorStore.ts"
@@ -10,6 +9,7 @@ import { PrinterPreview } from "./PrinterPreview.tsx"
 import { PrinterSettings } from "./PrinterSettings.tsx"
 import { INPUT, LABEL, NumberField, Section } from "./ui.tsx"
 import { t } from "../../../../i18n/index.ts"
+import { CadElementPicker } from "./CadElementPicker.tsx"
 import StrategyPalette, {
   paletteToCoreOperation,
   type MachineFamily
@@ -72,7 +72,6 @@ function UseButtons(props: { readonly element: CadElement }): JSX.Element {
 function PrinterElementSelection(): JSX.Element {
   const gen = useGeneratorStore()
   const job = useJob()
-  const store = useElementsStore()
   return (
     <div class="p-4 bg-white rounded-md shadow-sm border border-gray-200">
       <h3 class="text-sm font-medium text-gray-700 mb-3">Element Selection</h3>
@@ -92,8 +91,9 @@ function PrinterElementSelection(): JSX.Element {
         </div>
 
         <Show when={gen.geometryType === "selected"}>
+          <CadElementPicker />
           <div class={`p-3 ${job.element() ? "bg-green-50" : "bg-yellow-50"} rounded-md`}>
-            <Show when={job.element()} fallback={<p class="text-sm text-yellow-700">No element selected. Select an element in the CAD Editor.</p>}>
+            <Show when={job.element()} fallback={<p class="text-sm text-yellow-700">{t("cam.generator.selectCadElementHint")}</p>}>
               {(element) => (
                 <div>
                   <p class="text-sm text-green-700 font-medium mb-1">Selected Element: {String(element()["type"])} (ID: {String(element()["id"]).substring(0, 6)}...)</p>
@@ -104,41 +104,20 @@ function PrinterElementSelection(): JSX.Element {
               )}
             </Show>
           </div>
-          <Show when={job.elements().length > 0}>
-            <div class="mt-2">
-              <h4 class="text-xs font-medium text-gray-600 mb-1">Available Elements:</h4>
-              <div class="max-h-32 overflow-y-auto border border-gray-200 rounded-md">
-                <ul class="divide-y divide-gray-200">
-                  <For each={job.elements()}>
-                    {(element) => (
-                      <li
-                        class={`px-2 py-1 text-xs hover:bg-blue-50 cursor-pointer ${job.element()?.["id"] === element["id"] ? "bg-blue-100" : ""}`}
-                        onClick={() => {
-                          store.selectElement(String(element["id"]))
-                          gen.setGeometryType("selected", element)
-                        }}
-                      >
-                        {String(element["type"])}: {String(element["name"] || String(element["id"]).substring(0, 8))}
-                      </li>
-                    )}
-                  </For>
-                </ul>
-              </div>
-            </div>
-          </Show>
         </Show>
       </div>
     </div>
   )
 }
 
-/** The mill's "Selected Element" panel with its dimension rows. */
-function MillElementPanel(): JSX.Element {
+/** The mill and lathe's selected-element panel with its dimension rows. */
+function SelectedElementPanel(): JSX.Element {
   const gen = useGeneratorStore()
   const job = useJob()
   return (
     <div class={`p-3 ${job.element() ? "bg-green-50" : "bg-yellow-50"} rounded-md`}>
-      <Show when={job.element()} fallback={<p class="text-sm text-yellow-700">No element selected. Select an element in the CAD Editor.</p>}>
+      <CadElementPicker />
+      <Show when={job.element()} fallback={<p class="text-sm text-yellow-700">{t("cam.generator.selectCadElementHint")}</p>}>
         {(element) => {
           const rows = () => dimensionRows(element(), gen.settings.depth)
           return (
@@ -375,6 +354,10 @@ export function OperationSection(): JSX.Element {
         <SurfaceSettings />
       </Show>
 
+      <Show when={gen.settings.machineType === "lathe"}>
+        <SelectedElementPanel />
+      </Show>
+
       <Show when={gen.settings.machineType === "mill"}>
         <div>
           <label class={LABEL}>Geometry Type</label>
@@ -388,7 +371,7 @@ export function OperationSection(): JSX.Element {
         </div>
 
         <Show when={gen.geometryType === "selected"}>
-          <MillElementPanel />
+          <SelectedElementPanel />
         </Show>
 
         <Show when={gen.geometryType === "rectangle"}>

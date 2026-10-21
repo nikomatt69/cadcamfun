@@ -21,7 +21,7 @@ import {
 } from "./models.ts"
 import { automaticModel, flattenCatalog, hostCatalog, type HostModelInfo, type HostProviderInfo } from "./nikcli/catalog.ts"
 import { prepareAttachments, type Attachment } from "./attachments.ts"
-import { abortHostSession, createHostSession, hostChatStream, queueHostMessage, readHostSessionState, sessionExists, taskInfos, type HostSessionState, type PendingDelivery } from "./nikcli/chat.ts"
+import { abortHostSession, createHostSession, hostChatStream, queueHostMessage, readHostSessionSnapshot, readHostSessionState, sessionExists, taskInfos, type HostSessionState, type PendingDelivery } from "./nikcli/chat.ts"
 import type { NikCliRuntime, ProjectHost } from "./nikcli/runtime.ts"
 import { isAssistantMode, SUGGESTED_PROMPTS, type AssistantMode } from "./prompts/modes.ts"
 import { AiModes, modeTable } from "./prompts/contributed-modes.ts"
@@ -436,9 +436,8 @@ export class AiService extends Context.Service<AiService, {
         const sessionId = mapped?.sessionId ?? input.sessionId
         if (!(yield* sessionExists(projectHost, sessionId))) return yield* new AiConfigError({ message: "The conversation no longer exists in the host." })
         const owner = { projectId: projectHost.projectId, parentSessionId: sessionId }
-        const state = yield* readHostSessionState(projectHost, sessionId)
+        const { state, messages } = yield* readHostSessionSnapshot(projectHost, sessionId)
         const catalog = yield* catalogOf(host.value.runtime)
-        const messages = yield* Effect.tryPromise({ try: () => projectHost.client.session.messages({ sessionID: sessionId }), catch: (cause) => new AiProviderError({ message: describeControlError(cause) }) })
         const summaryIndex = messages.findLastIndex((message) => message.info.summary === true)
         const latest = messages.slice(summaryIndex + 1).findLast((message) => message.info.role === "assistant" && message.info.tokens && message.info.summary !== true)
         const lastModel = messages.findLast((message) => message.info.model)?.info.model

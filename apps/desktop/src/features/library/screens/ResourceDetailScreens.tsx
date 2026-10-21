@@ -69,7 +69,12 @@ const payloadOf = (kind: Kind, form: Row): Record<string, unknown> => {
   if (kind === "components") {
     return { name: str(form["name"]).trim(), description: str(form["description"]) || null, type: str(form["type"]) || null, isPublic: form["isPublic"] === true }
   }
-  // Machine configurations are free-form on the server: keep the name, type and the config object as given.
+  // A machine configuration is the machine profile: it is saved in the canonical shape, so what the form shows is what
+  // the kernel reads, whichever shape the row was written in.
+  if (kind === "machines") {
+    const profile = cam.kernel.profileOfConfig(asRecord(form["config"]), str(form["type"]))
+    return { name: str(form["name"]).trim(), type: str(form["type"]) || "mill", description: str(form["description"]) || null, config: cam.kernel.configOfProfile(profile), isPublic: form["isPublic"] === true }
+  }
   return { name: str(form["name"]).trim(), type: str(form["type"]) || "mill", description: str(form["description"]) || null, config: asRecord(form["config"]), isPublic: form["isPublic"] === true }
 }
 
@@ -126,6 +131,8 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const patch = (key: string, value: unknown): void => setForm({ ...form(), [key]: value })
   const patchConfig = (key: string, value: unknown): void => {
     const config = asRecord(form()["config"])
+    // `__config` replaces the whole configuration: the machine's fields are written as one canonical record.
+    if (key === "__config") { setForm({ ...form(), config: asRecord(value) }); return }
     setForm({ ...form(), config: { ...config, [key]: value } })
   }
 
@@ -358,13 +365,7 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
       {input("res-color", "Color", "color")}
     </Show>
     <Show when={props.kind === "machines"}>
-      {input("res-controller", "Controller", "controller")}
-      <div>
-        <label for="res-controller-select" class={LABEL}>Controller type</label>
-        <select id="res-controller-select" class={INPUT} value={str(asRecord(props.form["config"])["controller"])} onChange={(e) => props.onPatchConfig("controller", e.currentTarget.value)}>
-          <option value="grbl">GRBL</option><option value="fanuc">Fanuc</option><option value="gcode">Generic G-code</option>
-        </select>
-      </div>
+      <MachineProfileFields form={props.form} onPatchConfig={props.onPatchConfig} />
     </Show>
     <Show when={props.kind !== "materials"}>
       <div class="md:col-span-2">
@@ -377,6 +378,108 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
       <label for="res-public" class="text-sm text-gray-900 dark:text-gray-300">Make public (visible to all users)</label>
     </div>
   </form>
+}
+
+/**
+ * The machine's own figures, in the canonical machine profile: the kernel reads them, so what the form writes is what the
+ * program is planned against. The fields are read through the profile, so a configuration written in an older shape shows
+ * its figures here and is rewritten in the canonical one when it is saved.
+ */
+function MachineProfileFields(props: { readonly form: Row; readonly onPatchConfig: (key: string, value: unknown) => void }): JSX.Element {
+  const profile = createMemo(() => cam.kernel.profileOfConfig(asRecord(props.form["config"]), str(props.form["type"])))
+  /**
+   * Writes a field of the profile. The configuration is the profile, so the whole config is replaced with the canonical
+   * shape: a configuration written in an older shape keeps its figures and is rewritten in the canonical one.
+   */
+  const patch = (apply: (profile: Record<string, unknown>) => void): void => {
+    const draft: Record<string, unknown> = { ...asRecord(props.form["config"]) }
+    apply(draft)
+    props.onPatchConfig("__config", draft)
+  }
+  const number = (id: string, label: string, value: number | undefined, unit: string, apply: (value: number) => void): JSX.Element => (
+    <div>
+      <label for={id} class={LABEL}>{label}{unit ? ` (${unit})` : ""}</label>
+      <input id={id} class={INPUT} type="number" value={value === undefined ? "" : String(value)} onInput={(e) => {
+        const parsed = Number(e.currentTarget.value)
+        if (Number.isFinite(parsed) && e.currentTarget.value.trim() !== "") apply(parsed)
+      }} />
+    </div>
+  )
+  const profileNumber = (id: string, label: string, group: "spindle" | "feed" | "table" | "accuracy", key: string, unit: string): JSX.Element => {
+    const current = profile()
+    const groupValue = (current[group] ?? {}) as Record<string, unknown>
+    return number(id, label, typeof groupValue[key] === "number" ? groupValue[key] : undefined, unit, (value) =>
+      patch((draft) => {
+        const section = { ...((draft[group] ?? {}) as Record<string, unknown>) }
+        section[key] = value
+        draft[group] = section
+      }))
+  }
+  return <>
+    <div>
+      <label for="res-controller" class={LABEL}>Controller</label>
+      <input id="res-controller" class={INPUT} value={profile().controller ?? ""} onInput={(e) =>
+        patch((draft) => {
+          const value = e.currentTarget.value.trim()
+          if (value === "") delete draft["controller"]
+          else draft["controller"] = value
+        })} />
+    </div>
+    <div>
+      <label for="res-post" class={LABEL}>Post (NC dialect)</label>
+      <select id="res-post" class={INPUT} value={profile().post ?? ""} onChange={(e) =>
+        patch((draft) => {
+          const value = e.currentTarget.value
+          if (value === "") delete draft["post"]
+          else draft["post"] = value
+        })}>
+        <option value="">From the controller</option>
+        <For each={cam.kernel.POST_IDS}>{(id) => <option value={id}>{id}</option>}</For>
+      </select>
+    </div>
+    {profileNumber("res-max-rpm", "Max spindle speed", "spindle", "maxRpm", "rpm")}
+    {profileNumber("res-min-rpm", "Min spindle speed", "spindle", "minRpm", "rpm")}
+    {profileNumber("res-spindle-power", "Spindle power", "spindle", "powerKw", "kW")}
+    {profileNumber("res-spindle-torque", "Spindle torque", "spindle", "torqueNm", "N·m")}
+    {profileNumber("res-max-feed", "Max feed", "feed", "max", "mm/min")}
+    {profileNumber("res-rapid-feed", "Rapid feed", "feed", "rapid", "mm/min")}
+    {profileNumber("res-table-length", "Table length", "table", "length", "mm")}
+    {profileNumber("res-table-width", "Table width", "table", "width", "mm")}
+    {profileNumber("res-table-gap", "Table gap under the stock", "table", "gap", "mm")}
+    {profileNumber("res-positioning", "Positioning accuracy", "accuracy", "positioningMm", "mm")}
+    <div>
+      <label for="res-rigidity" class={LABEL}>Rigidity</label>
+      <select id="res-rigidity" class={INPUT} value={profile().rigidity ?? ""} onChange={(e) =>
+        patch((draft) => {
+          const value = e.currentTarget.value
+          if (value === "") delete draft["rigidity"]
+          else draft["rigidity"] = value
+        })}>
+        <option value="">Not stated</option>
+        <For each={["hobby", "light", "standard", "heavy"] as const}>{(value) => <option value={value}>{value}</option>}</For>
+      </select>
+    </div>
+    <div class="md:col-span-2">
+      <p class={LABEL}>Work volume (mm) — the space the part takes</p>
+      <div class="grid grid-cols-3 gap-3">
+        {(["x", "y", "z"] as const).map((axis) => (
+          <div>
+            <label for={`res-work-${axis}`} class={LABEL}>{axis.toUpperCase()}</label>
+            <input id={`res-work-${axis}`} class={INPUT} type="number" value={profile().workVolume?.[axis] ?? ""} onInput={(e) => {
+              const parsed = Number(e.currentTarget.value)
+              patch((draft) => {
+                const volume = { ...((draft["workVolume"] ?? {}) as Record<string, unknown>) }
+                if (Number.isFinite(parsed) && e.currentTarget.value.trim() !== "") volume[axis] = parsed
+                else delete volume[axis]
+                if (Object.keys(volume).length === 0) delete draft["workVolume"]
+                else draft["workVolume"] = volume
+              })
+            }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  </>
 }
 
 /** The shape fields the tool's type uses (corner / nose radius, angle, pitch, holder, stickout): they shape its 3D model. */

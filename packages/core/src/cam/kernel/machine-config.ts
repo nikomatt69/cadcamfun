@@ -17,7 +17,9 @@
 import type { KernelMachine } from "./contracts.ts"
 import { MACHINE_CATALOGUE } from "./machines.ts"
 import type { PostId } from "../post/types.ts"
-import { configOfProfile, profileOfConfig, type MachineConfigFields, type MachineProfile } from "./machine-profile.ts"
+import { configOfProfile, postOfController, profileOfConfig, type MachineConfigFields, type MachineProfile } from "./machine-profile.ts"
+
+export { postOfController }
 
 /** The stored shape of a machine configuration row (the Resources page and the assistant write it). */
 export interface MachineConfigRow {
@@ -28,25 +30,6 @@ export interface MachineConfigRow {
   readonly description?: string
   /** The machine's parameters, in whichever shape they were written. */
   readonly config: MachineConfigFields
-}
-
-/** The controllers the kernel has a post for, and the control families that speak one of them. */
-const POSTS: Readonly<Record<string, PostId>> = {
-  fanuc: "fanuc", "fanuc 0i": "fanuc", "fanuc 0i-md": "fanuc", mazatrol: "fanuc", smoothai: "fanuc", mazak: "fanuc",
-  haas: "haas", grbl: "grbl", linuxcnc: "generic", generic: "generic", iso: "generic",
-  sinumerik: "siemens", "840d": "siemens", siemens: "siemens",
-  osp: "fanuc", okuma: "fanuc", doosan: "fanuc", dmgmori: "fanuc", dmu: "fanuc",
-  heidenhain: "heidenhain", tnc: "heidenhain", tnc7: "heidenhain", klartext: "heidenhain"
-}
-
-/** The post a controller's name asks for; an unknown control gets the plain ISO post, never a silent mismatch. */
-export const postOfController = (controller: string | undefined): PostId => {
-  const key = (controller ?? "").trim().toLowerCase()
-  if (key === "") return "generic"
-  const direct = POSTS[key]
-  if (direct !== undefined) return direct
-  const partial = Object.entries(POSTS).find(([name]) => name !== "" && key.includes(name))
-  return partial?.[1] ?? "generic"
 }
 
 /**
@@ -68,8 +51,7 @@ export const kernelMachineOfProfile = (profile: MachineProfile, id: string, name
   if (maxFeed === undefined || maxFeed <= 0) return undefined
   const rotary = profile.rotary
   const turning = profile.turning
-  // The travel of the machine: the explicit box, or the linear axes of the axis table when the configuration gives one.
-  const travel = profile.travel ?? travelOfAxisTable(profile)
+  const travel = profile.travel
   const assumptions: string[] = []
   if (profile.workVolume !== undefined) {
     assumptions.push("The work volume is the space the part takes, not the axis travel: the travel check stays off unless the configuration carries one")
@@ -141,21 +123,6 @@ export const kernelMachineOfProfile = (profile: MachineProfile, id: string, name
       }
       : {})
   }
-}
-
-/**
- * The travel of the machine read from the axis table: the linear axes give the box the moves are checked against. A
- * configuration that names its axes but no travel box still bounds the program.
- */
-const travelOfAxisTable = (profile: MachineProfile): { readonly minX: number; readonly maxX: number; readonly minY: number; readonly maxY: number; readonly minZ: number; readonly maxZ: number } | undefined => {
-  const axes = profile.axisTable
-  if (axes === undefined) return undefined
-  const x = axes.find((axis) => axis.id === "X")
-  const y = axes.find((axis) => axis.id === "Y")
-  const z = axes.find((axis) => axis.id === "Z")
-  if (x === undefined || y === undefined || z === undefined) return undefined
-  if (x.kind !== "linear" || y.kind !== "linear" || z.kind !== "linear") return undefined
-  return { minX: x.min, maxX: x.max, minY: y.min, maxY: y.max, minZ: z.min, maxZ: z.max }
 }
 
 /**

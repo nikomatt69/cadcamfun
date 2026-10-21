@@ -36,22 +36,30 @@ const envelopeOf = (value: unknown): { readonly x: number; readonly y: number; r
   return x !== undefined && y !== undefined && z !== undefined ? { x, y, z } : undefined
 }
 
-/** The envelope of a machine, in millimetres: its work volume, else the assistant's `kinematics`. */
-export const machineEnvelopeOf = (machine: MachineConfig): { readonly x: number; readonly y: number; readonly z: number } | undefined =>
-  envelopeOf(machine.config?.workVolume) ?? envelopeOf(machine.config?.kinematics)
+/**
+ * The profile of a machine configuration, read from whichever shape it was written in: the Resources form, the assistant's
+ * record or the canonical profile. Every reader of a machine goes through it, so the panels and the kernel agree.
+ */
+export const machineProfileOf = (machine: MachineConfig): cam.kernel.MachineProfile =>
+  cam.kernel.profileOfConfig(machine.config, machine.type)
 
-export const machineSpindleOf = (machine: MachineConfig): number | undefined =>
-  finite(machine.config?.maxSpindleSpeed) ?? finite(machine.config?.maxRPM)
+/** The envelope of a machine, in millimetres: its work volume, else the travel of its axes. */
+export const machineEnvelopeOf = (machine: MachineConfig): { readonly x: number; readonly y: number; readonly z: number } | undefined => {
+  const profile = machineProfileOf(machine)
+  if (profile.workVolume !== undefined) return profile.workVolume
+  const travel = profile.travel
+  if (travel === undefined) return undefined
+  return { x: travel.maxX - travel.minX, y: travel.maxY - travel.minY, z: travel.maxZ - travel.minZ }
+}
 
-export const machineFeedOf = (machine: MachineConfig): number | undefined =>
-  finite(machine.config?.maxFeedRate) ?? finite(machine.config?.maxFeed)
+export const machineSpindleOf = (machine: MachineConfig): number | undefined => machineProfileOf(machine).spindle?.maxRpm
+
+export const machineFeedOf = (machine: MachineConfig): number | undefined => machineProfileOf(machine).feed?.max
 
 /** The post / controller a machine's programs are written for, if it names one. */
 export const machineControllerOf = (machine: MachineConfig): string | undefined => {
-  const controller = machine.config?.controller
-  if (typeof controller === "string" && controller.trim() !== "") return controller
-  const post = machine.config?.postProcessor
-  return typeof post === "string" && post.trim() !== "" ? post : undefined
+  const profile = machineProfileOf(machine)
+  return profile.controller ?? profile.post
 }
 
 /**

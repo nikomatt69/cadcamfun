@@ -114,8 +114,13 @@ const hiddenSurfaces = (meshes: ReadonlyArray<Mesh64>, bottom: number, tolerance
   return count
 }
 
+export interface PrepareOptions {
+  /** CAD stock dimensions, standing on the unrotated part's bottom. Resolved from the same meshes used to plan the job. */
+  readonly stockFromPartBottom?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly depth: number }
+}
+
 /** Resolves the job: everything the run needs, or the reasons it cannot run. */
-export const prepareJob = (job: ManufacturingJob): CamResult<PreparedJob> => {
+export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}): CamResult<PreparedJob> => {
   const issues: CamIssue[] = []
   if (job.setupOrientation !== undefined && !SETUP_ORIENTATIONS.includes(job.setupOrientation)) return { status: "failed", issues: [issue("InvalidInput", "prepare", "Unknown manual setup orientation")] }
   if (job.schemaVersion !== KERNEL_SCHEMA_VERSION) return { status: "failed", issues: [issue("InvalidInput", "prepare", `Unsupported job schema version ${String(job.schemaVersion)}`)] }
@@ -149,6 +154,15 @@ export const prepareJob = (job: ManufacturingJob): CamResult<PreparedJob> => {
   if (meshes.length === 0) issues.push(issue("InvalidInput", "prepare", "The part has no solid to machine"))
   for (const m of meshes) if (!m.positions.every(Number.isFinite)) { issues.push(issue("InvalidInput", "prepare", "The part mesh has non-finite coordinates")); break }
   if (issues.length > 0 || material === undefined) return { status: "failed", issues }
+
+  if (options.stockFromPartBottom !== undefined) {
+    const dimensions = options.stockFromPartBottom
+    const bottom = boundsOf(meshes).min[2]
+    job = { ...job, stock: {
+      min: { x: dimensions.x - dimensions.width / 2, y: dimensions.y - dimensions.height / 2, z: bottom },
+      max: { x: dimensions.x + dimensions.width / 2, y: dimensions.y + dimensions.height / 2, z: bottom + dimensions.depth }
+    } }
+  }
 
   const transform = setupTransform(job.setupOrientation ?? "+Z")
   if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") meshes = meshes.map((mesh) => {
@@ -372,7 +386,7 @@ export interface KernelProgress {
  * Optional hooks of a run. The kernel is synchronous, so `signal` is read at the checkpoints (before each operation and stage);
  * a host that must stop a job mid-operation runs it in a worker and terminates it (`runKernelJob` in `@cadcamfun/ai`).
  */
-export interface RunOptions {
+export interface RunOptions extends PrepareOptions {
   readonly onProgress?: (progress: KernelProgress) => void
   readonly signal?: { readonly aborted: boolean }
 }
@@ -1047,13 +1061,13 @@ const subprogramNotes = (nc: string): ReadonlyArray<string> => {
 
 /** Prepares and runs a job. */
 export const runJob = (job: ManufacturingJob, options: RunOptions = {}): CamResult<CamArtifact> => {
-  const prepared = prepareJob(job)
+  const prepared = prepareJob(job, options)
   return prepared.status === "ok" ? executeJob(prepared.value, options) : prepared
 }
 
 /** Only the plan: the operations the kernel would run, with their cutters, and what it cannot machine. */
-export const planOnly = (job: ManufacturingJob): CamResult<{ readonly operations: ReadonlyArray<OperationSpec>; readonly notes: ReadonlyArray<string>; readonly unmachined: ReadonlyArray<string> }> => {
-  const prepared = prepareJob(job)
+export const planOnly = (job: ManufacturingJob, options: PrepareOptions = {}): CamResult<{ readonly operations: ReadonlyArray<OperationSpec>; readonly notes: ReadonlyArray<string>; readonly unmachined: ReadonlyArray<string> }> => {
+  const prepared = prepareJob(job, options)
   if (prepared.status === "failed") return prepared
   const p = prepared.value
   const hidden = hiddenSurfaces(p.meshes, p.bounds.min[2], Math.max(1e-6, p.tolerance))

@@ -97,4 +97,16 @@ describe("the CAM kernel as a worker job", () => {
     const plan = await runKernelJob("cam-plan", camJob)
     expect(plan.status).toBe("ok")
   })
+
+  test("stock placed from the part bottom is resolved in the worker with identical NC and evidence", async () => {
+    const stockFromPartBottom = { x: 0, y: 0, width: 34, height: 24, depth: 6 }
+    const explicit = { ...camJob, stock: { min: { x: -17, y: -12, z: -2.5 }, max: { x: 17, y: 12, z: 3.5 } } }
+    for (const setupOrientation of ["+Z", "+X"] as const) {
+      const direct = runKernelJobInline("cam-manufacture", { ...explicit, setupOrientation })
+      const worker = await runKernelJob("cam-manufacture", { ...camJob, setupOrientation, stockFromPartBottom })
+      expect(worker).toEqual(direct)
+      expect(await runKernelJob("cam-plan", { ...camJob, setupOrientation, stockFromPartBottom }))
+        .toEqual(runKernelJobInline("cam-plan", { ...explicit, setupOrientation }))
+    }
+  })
 })

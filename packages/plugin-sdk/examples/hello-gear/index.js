@@ -8275,7 +8275,8 @@ var SURFACE_MODES = ["roughing", "rest", "parallel", "waterline", "steep-shallow
 // packages/core/src/cam/kernel/machines.ts
 var kernMicroHd = (taper) => ({
   id: `kern-micro-hd-${taper}`,
-  name: `KERN Micro HD ${taper === "hsk25" ? "HSK25 (50,000 rpm, 6 kW)" : "HSK40 (42,000 rpm, 15 kW)"} B/C`,
+  name: `KERN Micro HD ${taper === "hsk25" ? "HSK25 (50 000 rpm, 6 kW)" : "HSK40 (42 000 rpm, 15 kW)"} B/C`,
+  kind: "mill",
   post: "heidenhain",
   limits: { maxRpm: taper === "hsk25" ? 50000 : 42000, minRpm: 1000, maxFeed: 60000, powerKw: taper === "hsk25" ? 6 : 15, torqueNm: taper === "hsk25" ? 1.6 : 5.9, rigidity: "standard" },
   fiveAxis: { layout: "table-BC", tilt: [-110, 110], pivot: { x: 0, y: 0, z: -100 } },
@@ -8289,12 +8290,53 @@ var kernMicroHd = (taper) => ({
     assumptions: ["Work origin, rotary pivot and clamping geometry must be calibrated; pivot Z=-100 mm and table envelope are preview assumptions", "The active TNC preset must match the program datum; no TCP/PLANE transformation is emitted", "Minimum spindle speed 1000 rpm is a conservative planning assumption; published stroke is not an absolute work-coordinate bound"]
   }
 });
+var mazakIntegrexI200 = {
+  id: "mazak-integrex-i200",
+  name: "Mazak INTEGREX i-200 class mill-turn (B head, Y axis, C spindle)",
+  kind: "lathe",
+  post: "fanuc",
+  limits: { maxRpm: 12000, minRpm: 50, maxFeed: 40000, powerKw: 18.5, torqueNm: 120, rigidity: "standard" },
+  turning: { maxBarDiameter: 65, maxBarLength: 590, chuckDiameter: 200, b: [-30, 210], c: [-180, 180], continuousC: true, yTravel: 210, turret: "rear" },
+  rapidFeed: 40000,
+  toolChangeSeconds: 4,
+  reference: {
+    controller: "Mazatrol SmoothAi (Fanuc-compatible)",
+    source: "Mazak INTEGREX i-200 series brochure (mmsonline.com mirror)",
+    stroke: { x: 535, y: 210, z: 1020 },
+    assumptions: ["The published travels are axis travels, not work-coordinate limits; the chuck, the turret and the datum must be calibrated", "The turning spindle (5000 rpm / 22 kW) and the milling spindle (12 000 rpm / 18.5 kW) are different spindles: the limit here is the milling spindle", "C is a continuous axis; the B head indexes -30..+210 degrees"]
+  }
+};
+var okumaMultusB300 = {
+  id: "okuma-multus-b300ii",
+  name: "Okuma MULTUS B300II class mill-turn (B head, Y axis, C spindle)",
+  kind: "lathe",
+  post: "fanuc",
+  limits: { maxRpm: 1e4, minRpm: 50, maxFeed: 26000, powerKw: 11, torqueNm: 65.7, rigidity: "standard" },
+  turning: { maxBarDiameter: 65, maxBarLength: 900, chuckDiameter: 200, b: [-30, 195], c: [-180, 180], yTravel: 160, turret: "rear" },
+  rapidFeed: 26000,
+  toolChangeSeconds: 4,
+  reference: {
+    controller: "Okuma OSP-P500 (Fanuc-compatible)",
+    source: "Okuma MULTUS BII series brochure (okuma.com)",
+    stroke: { x: 580, y: 160, z: 935 },
+    assumptions: ["The published travels are axis travels, not work-coordinate limits; the chuck, the turret and the datum must be calibrated", "The milling spindle is 6000 rpm (10 000 rpm as an option); the limit here is the standard spindle", "C indexes 360 degrees (0.001 degrees); B indexes -30..+195 degrees"]
+  }
+};
+var latheStandard = {
+  id: "lathe-standard",
+  name: "CNC lathe, 2 axes (C spindle, X/Z turret)",
+  kind: "lathe",
+  post: "fanuc",
+  limits: { maxRpm: 4000, minRpm: 50, maxFeed: 12000, powerKw: 15, torqueNm: 100, rigidity: "standard" },
+  turning: { maxBarDiameter: 52, maxBarLength: 500, chuckDiameter: 200, c: [-180, 180], turret: "rear" },
+  rapidFeed: 12000,
+  toolChangeSeconds: 4
+};
 var MACHINES = [
-  kernMicroHd("hsk25"),
-  kernMicroHd("hsk40"),
   {
     id: "vmc-standard",
     name: "Vertical machining centre (BT40, 12 000 rpm, 11 kW)",
+    kind: "mill",
     post: "fanuc",
     limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
     table: { length: 1000, width: 500, gap: 30 },
@@ -8304,6 +8346,7 @@ var MACHINES = [
   {
     id: "haas-vf2",
     name: "Haas VF-2 class (8 100 rpm, 22 kW)",
+    kind: "mill",
     post: "haas",
     limits: { maxRpm: 8100, minRpm: 50, maxFeed: 16500, powerKw: 22.4, torqueNm: 122, rigidity: "standard" },
     table: { length: 762, width: 406, gap: 30 },
@@ -8313,6 +8356,7 @@ var MACHINES = [
   {
     id: "siemens-840d-vmc",
     name: "Siemens 840D sl vertical mill (BT40, 12 000 rpm, 13 kW)",
+    kind: "mill",
     post: "siemens",
     limits: { maxRpm: 12000, minRpm: 100, maxFeed: 15000, powerKw: 13, torqueNm: 80, rigidity: "standard" },
     table: { length: 800, width: 500, gap: 30 },
@@ -8322,6 +8366,7 @@ var MACHINES = [
   {
     id: "hsc-mill",
     name: "High-speed mill (HSK-E40, 30 000 rpm, 7 kW)",
+    kind: "mill",
     post: "generic",
     limits: { maxRpm: 30000, minRpm: 3000, maxFeed: 20000, powerKw: 7, torqueNm: 8, rigidity: "standard" },
     table: { length: 600, width: 400, gap: 30 },
@@ -8331,6 +8376,7 @@ var MACHINES = [
   {
     id: "desktop-mill",
     name: "Benchtop mill (10 000 rpm, 0.75 kW)",
+    kind: "mill",
     post: "generic",
     limits: { maxRpm: 1e4, minRpm: 300, maxFeed: 3000, powerKw: 0.75, torqueNm: 3, rigidity: "light" },
     table: { length: 300, width: 200, gap: 15 },
@@ -8340,6 +8386,7 @@ var MACHINES = [
   {
     id: "trunnion-5ax",
     name: "5-axis trunnion (BT40, 12 000 rpm, A/C table, 11 kW)",
+    kind: "mill",
     post: "fanuc",
     limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
     table: { length: 600, width: 400, gap: 30 },
@@ -8350,6 +8397,7 @@ var MACHINES = [
   {
     id: "trunnion-5ax-bc",
     name: "5-axis trunnion B/C (BT40, 12 000 rpm, B/C table, 11 kW)",
+    kind: "mill",
     post: "fanuc",
     limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
     table: { length: 600, width: 400, gap: 30 },
@@ -8360,14 +8408,204 @@ var MACHINES = [
   {
     id: "cnc-router",
     name: "CNC router (24 000 rpm spindle, 2.2 kW)",
+    kind: "mill",
     post: "grbl",
     limits: { maxRpm: 24000, minRpm: 6000, maxFeed: 6000, powerKw: 2.2, torqueNm: 1.2, rigidity: "hobby" },
     table: { length: 1200, width: 900, gap: 20 },
     rapidFeed: 8000,
     toolChangeSeconds: 30
-  }
+  },
+  kernMicroHd("hsk25"),
+  kernMicroHd("hsk40")
 ];
+var LATHES = [latheStandard, mazakIntegrexI200, okumaMultusB300];
+var MACHINE_CATALOGUE = [...MACHINES, ...LATHES];
 var DEFAULT_MACHINE = MACHINES[0];
+// packages/core/src/cam/kernel/machine-profile.ts
+var POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain"];
+var MACHINE_KINDS = ["mill", "lathe", "printer", "laser"];
+var AXIS_IDS = ["X", "Y", "Z", "A", "B", "C", "U", "V", "W"];
+var positive = Finite.check(isGreaterThan2(0));
+var nonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
+var unit = Finite.check(isBetween({ minimum: 0, maximum: 1 }));
+var range = Struct({ min: Finite, max: Finite });
+var MachineAxisSchema = Struct({
+  id: Literals(AXIS_IDS),
+  kind: Literals(["linear", "rotary"]),
+  min: Finite,
+  max: Finite,
+  sense: Literals([1, -1]),
+  continuous: optionalKey2(Boolean3)
+});
+var MachineProfileSchema2 = Struct({
+  kind: Literals(MACHINE_KINDS),
+  controller: optionalKey2(String4),
+  post: optionalKey2(Literals(POST_IDS)),
+  axes: optionalKey2(Literals([3, 4, 5, 6])),
+  axisTable: optionalKey2(ArraySchema(MachineAxisSchema)),
+  spindle: optionalKey2(Struct({
+    maxRpm: positive,
+    minRpm: optionalKey2(positive),
+    powerKw: optionalKey2(nonNegative),
+    torqueNm: optionalKey2(nonNegative),
+    efficiency: optionalKey2(unit),
+    powerCurve: optionalKey2(ArraySchema(Struct({ rpm: positive, kW: positive })))
+  })),
+  feed: optionalKey2(Struct({ max: positive, rapid: optionalKey2(positive) })),
+  rigidity: optionalKey2(Literals(["hobby", "light", "standard", "heavy"])),
+  workVolume: optionalKey2(Struct({ x: positive, y: positive, z: positive })),
+  travel: optionalKey2(Struct({
+    minX: Finite,
+    maxX: Finite,
+    minY: Finite,
+    maxY: Finite,
+    minZ: Finite,
+    maxZ: Finite
+  })),
+  table: optionalKey2(Struct({ length: positive, width: positive, gap: nonNegative })),
+  rotary: optionalKey2(Struct({
+    layout: Literals(["table-AC", "table-BC"]),
+    tilt: optionalKey2(range),
+    rotation: optionalKey2(range),
+    pivot: optionalKey2(Struct({ x: Finite, y: Finite, z: Finite })),
+    tcp: optionalKey2(Literals(["control", "program"]))
+  })),
+  turning: optionalKey2(Struct({
+    maxBarDiameter: optionalKey2(nonNegative),
+    maxBarLength: optionalKey2(nonNegative),
+    chuckDiameter: optionalKey2(nonNegative),
+    b: optionalKey2(range),
+    c: optionalKey2(range),
+    continuousC: optionalKey2(Boolean3),
+    yTravel: optionalKey2(positive),
+    turret: optionalKey2(Literals(["rear", "front"]))
+  })),
+  workOffsets: optionalKey2(Struct({
+    available: ArraySchema(WorkOffsetSchema),
+    default: optionalKey2(WorkOffsetSchema)
+  })),
+  probing: optionalKey2(Struct({
+    cycles: optionalKey2(ArraySchema(String4)),
+    stylusRadius: optionalKey2(positive),
+    feed: optionalKey2(positive),
+    dialect: optionalKey2(Literals(["linuxcnc", "fanuc"]))
+  })),
+  toolChanger: optionalKey2(Struct({
+    type: optionalKey2(Literals(["manual", "carousel", "chain", "umbrella", "rack"])),
+    capacity: optionalKey2(Int.check(isGreaterThan2(0))),
+    changeSeconds: optionalKey2(nonNegative),
+    maxToolDiameter: optionalKey2(positive),
+    maxToolLength: optionalKey2(positive)
+  })),
+  coolant: optionalKey2(Struct({ modes: ArraySchema(CoolantSchema) })),
+  accuracy: optionalKey2(Struct({
+    positioningMm: optionalKey2(nonNegative),
+    repeatabilityMm: optionalKey2(nonNegative),
+    runoutMm: optionalKey2(nonNegative)
+  })),
+  reference: optionalKey2(Struct({
+    source: optionalKey2(String4),
+    notes: optionalKey2(String4)
+  })),
+  extra: optionalKey2(Record(String4, Unknown2))
+});
+var configOfProfile = (profile) => {
+  const config = {
+    kind: profile.kind,
+    ...profile.controller !== undefined ? { controller: profile.controller } : {},
+    ...profile.post !== undefined ? { post: profile.post } : {},
+    ...profile.axes !== undefined ? { axes: profile.axes } : {},
+    ...profile.axisTable !== undefined ? { axisTable: profile.axisTable } : {},
+    ...profile.spindle !== undefined ? { spindle: profile.spindle } : {},
+    ...profile.feed !== undefined ? { feed: profile.feed } : {},
+    ...profile.rigidity !== undefined ? { rigidity: profile.rigidity } : {},
+    ...profile.workVolume !== undefined ? { workVolume: profile.workVolume } : {},
+    ...profile.travel !== undefined ? { travel: profile.travel } : {},
+    ...profile.table !== undefined ? { table: profile.table } : {},
+    ...profile.rotary !== undefined ? { rotary: profile.rotary } : {},
+    ...profile.turning !== undefined ? { turning: profile.turning } : {},
+    ...profile.workOffsets !== undefined ? { workOffsets: profile.workOffsets } : {},
+    ...profile.probing !== undefined ? { probing: profile.probing } : {},
+    ...profile.toolChanger !== undefined ? { toolChanger: profile.toolChanger } : {},
+    ...profile.coolant !== undefined ? { coolant: profile.coolant } : {},
+    ...profile.accuracy !== undefined ? { accuracy: profile.accuracy } : {},
+    ...profile.reference !== undefined ? { reference: profile.reference } : {},
+    ...Object.keys(profile.extra).length > 0 ? { additionalSettings: profile.extra } : {}
+  };
+  return config;
+};
+
+// packages/core/src/cam/kernel/machine-config.ts
+var machineConfigOf = (machine) => {
+  const rotary = machine.fiveAxis;
+  const stroke = machine.reference?.stroke;
+  const profile = {
+    kind: machine.kind === "lathe" ? "lathe" : "mill",
+    ...machine.reference?.controller !== undefined ? { controller: machine.reference.controller } : {},
+    post: machine.post,
+    axes: machine.fiveAxis !== undefined ? 5 : 3,
+    ...machine.travel !== undefined ? {
+      axisTable: [
+        { id: "X", kind: "linear", min: machine.travel.minX, max: machine.travel.maxX, sense: 1 },
+        { id: "Y", kind: "linear", min: machine.travel.minY, max: machine.travel.maxY, sense: 1 },
+        { id: "Z", kind: "linear", min: machine.travel.minZ, max: machine.travel.maxZ, sense: 1 }
+      ]
+    } : {},
+    spindle: {
+      maxRpm: machine.limits.maxRpm,
+      ...machine.limits.minRpm !== undefined ? { minRpm: machine.limits.minRpm } : {},
+      ...machine.limits.powerKw !== undefined ? { powerKw: machine.limits.powerKw } : {},
+      ...machine.limits.powerCurve !== undefined ? { powerCurve: machine.limits.powerCurve } : {},
+      ...machine.limits.torqueNm !== undefined ? { torqueNm: machine.limits.torqueNm } : {},
+      ...machine.limits.efficiency !== undefined ? { efficiency: machine.limits.efficiency } : {},
+      ...machine.limits.rigidity !== undefined ? { rigidity: machine.limits.rigidity } : {}
+    },
+    feed: {
+      max: machine.limits.maxFeed,
+      ...machine.rapidFeed !== undefined ? { rapid: machine.rapidFeed } : {}
+    },
+    ...stroke !== undefined ? { workVolume: stroke } : {},
+    ...machine.table !== undefined ? { table: machine.table } : {},
+    ...machine.workOffsets !== undefined ? { workOffsets: machine.workOffsets } : {},
+    ...machine.coolant !== undefined ? { coolant: machine.coolant } : {},
+    ...machine.accuracy !== undefined ? { accuracy: machine.accuracy } : {},
+    ...machine.toolCapacity !== undefined || machine.toolChangeSeconds !== undefined ? {
+      toolChanger: {
+        ...machine.toolCapacity !== undefined ? { capacity: machine.toolCapacity } : {},
+        ...machine.toolChangeSeconds !== undefined ? { changeSeconds: machine.toolChangeSeconds } : {}
+      }
+    } : {},
+    ...rotary !== undefined ? {
+      rotary: {
+        layout: rotary.layout,
+        tilt: { min: rotary.tilt[0], max: rotary.tilt[1] },
+        ...rotary.rotation !== undefined ? { rotation: { min: rotary.rotation[0], max: rotary.rotation[1] } } : {},
+        ...machine.reference !== undefined && rotary.pivot !== undefined ? { pivot: rotary.pivot } : {}
+      }
+    } : {},
+    ...machine.turning !== undefined ? {
+      turning: {
+        ...machine.turning.maxBarDiameter > 0 ? { maxBarDiameter: machine.turning.maxBarDiameter } : {},
+        ...machine.turning.maxBarLength > 0 ? { maxBarLength: machine.turning.maxBarLength } : {},
+        ...machine.turning.chuckDiameter > 0 ? { chuckDiameter: machine.turning.chuckDiameter } : {},
+        ...machine.turning.b !== undefined ? { b: { min: machine.turning.b[0], max: machine.turning.b[1] } } : {},
+        ...machine.turning.c !== undefined ? { c: { min: machine.turning.c[0], max: machine.turning.c[1] } } : {},
+        ...machine.turning.continuousC === true ? { continuousC: true } : {},
+        ...machine.turning.yTravel !== undefined ? { yTravel: machine.turning.yTravel } : {},
+        ...machine.turning.turret !== undefined ? { turret: machine.turning.turret } : {}
+      }
+    } : {},
+    extra: {}
+  };
+  return {
+    id: machine.id,
+    name: machine.name,
+    type: machine.kind === "lathe" ? "lathe" : "mill",
+    description: machine.reference !== undefined ? `${machine.reference.controller} \u2014 built-in preset` : "Built-in preset",
+    config: configOfProfile(profile)
+  };
+};
+var DEFAULT_MACHINE_CONFIGS = MACHINE_CATALOGUE.map(machineConfigOf);
 // packages/core/src/cam/kernel/head.ts
 var DEG3 = Math.PI / 180;
 
@@ -8375,8 +8613,8 @@ var DEG3 = Math.PI / 180;
 var DEG4 = Math.PI / 180;
 // packages/core/src/cam/kernel/schema.ts
 var SetupOrientationSchema = Literals(SETUP_ORIENTATIONS);
-var positive = Finite.check(isGreaterThan2(0));
-var nonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
+var positive2 = Finite.check(isGreaterThan2(0));
+var nonNegative2 = Finite.check(isGreaterThanOrEqualTo2(0));
 var id = String4.check(isMinLength(1), isMaxLength(80));
 var point = Struct({ x: Finite, y: Finite });
 var ring2 = ArraySchema(point).check(isMinLength(3), isMaxLength(20000));
@@ -8384,51 +8622,51 @@ var CutterSchema = Struct({
   id,
   name: String4.check(isMaxLength(120)),
   kind: Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver", "tap", "reamer"]),
-  diameter: positive,
+  diameter: positive2,
   flutes: Int.check(isBetween({ minimum: 1, maximum: 24 })),
   material: Literals(["hss", "hss-co", "carbide", "pcd"]),
   coating: Literals(["none", "tin", "ticn", "altin", "alcrn", "zrn", "dlc", "diamond"]),
-  cornerRadius: optionalKey2(nonNegative),
+  cornerRadius: optionalKey2(nonNegative2),
   angle: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 180 }))),
-  tipDiameter: optionalKey2(nonNegative),
-  pitch: optionalKey2(positive),
-  fluteLength: positive,
-  shankDiameter: positive,
-  stickout: positive,
-  holder: optionalKey2(Struct({ diameter: positive, length: positive })),
-  maxRpm: optionalKey2(positive),
+  tipDiameter: optionalKey2(nonNegative2),
+  pitch: optionalKey2(positive2),
+  fluteLength: positive2,
+  shankDiameter: positive2,
+  stickout: positive2,
+  holder: optionalKey2(Struct({ diameter: positive2, length: positive2 })),
+  maxRpm: optionalKey2(positive2),
   number: optionalKey2(Int.check(isBetween({ minimum: 1, maximum: 999 })))
 });
 var overrides = {
   id,
   name: optionalKey2(String4.check(isMaxLength(120))),
   tool: id,
-  rpm: optionalKey2(positive),
-  feed: optionalKey2(positive),
-  plungeFeed: optionalKey2(positive),
-  stepdown: optionalKey2(positive),
+  rpm: optionalKey2(positive2),
+  feed: optionalKey2(positive2),
+  plungeFeed: optionalKey2(positive2),
+  stepdown: optionalKey2(positive2),
   stepover: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 100 }))),
   coolant: optionalKey2(CoolantSchema),
-  radialEngagement: optionalKey2(positive)
+  radialEngagement: optionalKey2(positive2)
 };
 var region = Struct({ boundary: ring2, islands: optionalKey2(ArraySchema(ring2).check(isMaxLength(500))) });
 var OperationSpecSchema = Union2([
   Struct({ ...overrides, strategy: Literal2("face"), bottom: Finite }),
-  Struct({ ...overrides, strategy: Literal2("adaptive"), region, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative) }),
-  Struct({ ...overrides, strategy: Literal2("pocket"), region, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative), finish: optionalKey2(Boolean3) }),
-  Struct({ ...overrides, strategy: Literal2("profile"), loop: ring2, side: Literals(["outside", "inside"]), top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative), finish: optionalKey2(Boolean3) }),
-  Struct({ ...overrides, strategy: Literal2("bore"), center: point, diameter: positive, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative) }),
+  Struct({ ...overrides, strategy: Literal2("adaptive"), region, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative2) }),
+  Struct({ ...overrides, strategy: Literal2("pocket"), region, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative2), finish: optionalKey2(Boolean3) }),
+  Struct({ ...overrides, strategy: Literal2("profile"), loop: ring2, side: Literals(["outside", "inside"]), top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative2), finish: optionalKey2(Boolean3) }),
+  Struct({ ...overrides, strategy: Literal2("bore"), center: point, diameter: positive2, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative2) }),
   Struct({ ...overrides, strategy: Literal2("drill"), points: ArraySchema(point).check(isMinLength(1), isMaxLength(5000)), top: Finite, bottom: Finite, cut: optionalKey2(Literals(["drill", "spot", "tap", "ream"])) }),
-  Struct({ ...overrides, strategy: Literal2("thread"), center: point, diameter: positive, pitch: positive, internal: Boolean3, top: Finite, length: positive, rightHand: optionalKey2(Boolean3) }),
-  Struct({ ...overrides, strategy: Literal2("engrave"), paths: ArraySchema(Struct({ points: ArraySchema(point).check(isMinLength(2)), closed: Boolean3 })).check(isMinLength(1), isMaxLength(2000)), top: Finite, depth: positive }),
-  Struct({ ...overrides, strategy: Literal2("chamfer"), loops: ArraySchema(Struct({ points: ring2, side: Literals(["outside", "inside"]) })).check(isMinLength(1), isMaxLength(2000)), top: Finite, width: positive, tipOffset: optionalKey2(nonNegative) }),
+  Struct({ ...overrides, strategy: Literal2("thread"), center: point, diameter: positive2, pitch: positive2, internal: Boolean3, top: Finite, length: positive2, rightHand: optionalKey2(Boolean3) }),
+  Struct({ ...overrides, strategy: Literal2("engrave"), paths: ArraySchema(Struct({ points: ArraySchema(point).check(isMinLength(2)), closed: Boolean3 })).check(isMinLength(1), isMaxLength(2000)), top: Finite, depth: positive2 }),
+  Struct({ ...overrides, strategy: Literal2("chamfer"), loops: ArraySchema(Struct({ points: ring2, side: Literals(["outside", "inside"]) })).check(isMinLength(1), isMaxLength(2000)), top: Finite, width: positive2, tipOffset: optionalKey2(nonNegative2) }),
   Struct({
     ...overrides,
     strategy: Literal2("surface"),
     mode: Literals(SURFACE_MODES),
     slopeAngle: optionalKey2(Finite.check(isBetween({ minimum: 5, maximum: 85 }))),
-    allowance: optionalKey2(nonNegative),
-    scallop: optionalKey2(positive),
+    allowance: optionalKey2(nonNegative2),
+    scallop: optionalKey2(positive2),
     clearing: optionalKey2(Literals(["contour", "adaptive"])),
     angle: optionalKey2(Finite),
     restFrom: optionalKey2(id),
@@ -8438,7 +8676,7 @@ var OperationSpecSchema = Union2([
     ...overrides,
     strategy: Literal2("multiaxis"),
     top: Finite,
-    stepover: positive,
+    stepover: positive2,
     angle: optionalKey2(Finite),
     toolAxis: optionalKey2(Literals(["normal", "lead"])),
     lead: optionalKey2(Finite.check(isBetween({ minimum: -85, maximum: 85 }))),
