@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { z } from "zod"
 import { createCadcamTools, type ToolFactory } from "@nikoemme_/cadcamfun-nikcli-plugin"
+import { Context, Effect, Fiber, Stream } from "effect"
+import { LiveEvents } from "../src/services/live-events.ts"
 import { makeApp, TOKEN } from "./helpers.ts"
 
 /**
@@ -42,6 +44,17 @@ describe("the plugin on the real sidecar", () => {
     const id = added["ids"][0] as string
     const described = await run("cad", { action: "describe" })
     expect(JSON.stringify(described)).toContain(id)
+  })
+
+  test("a terminal write reaches the desktop and phone stream as a live frame", async () => {
+    const frame = await Effect.runPromise(Effect.scoped(Effect.gen(function*() {
+      const bus = Context.get(yield* Effect.promise(() => app.services()), LiveEvents)
+      const stream = yield* bus.subscribe({ projectId })
+      const next = yield* Effect.forkDetach(Stream.runHead(stream.pipe(Stream.filter((event) => event.type === "workspace.changed"))))
+      yield* Effect.promise(() => run("cad_edit", { action: "add", elements: [{ type: "cube", width: 3, height: 3, depth: 3, name: "FromTerminal" }] }))
+      return yield* Fiber.join(next).pipe(Effect.timeout("5 seconds"))
+    })))
+    expect(frame._tag === "Some" && frame.value).toMatchObject({ type: "workspace.changed", projectId })
   })
 
   test("a refusal reaches the agent as a result it can read and recover from", async () => {
