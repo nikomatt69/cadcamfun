@@ -284,6 +284,13 @@ Verification: `bun --no-env-file test packages/core/src/cad/brep`,
   the CAD history and scene suites 104, the AI and sidecar suites 55, the desktop
   CAD and IGES suites 15.
 
+  Provenance: the increment landed in `76256b6`, inside the repository
+  documentation and licensing sweep that the same commit carried, and its last
+  two details (the relief in the shared parametric schema and the AI fixture
+  with `radiusEnd` and `flanges`) in `b70e643`. Neither commit message names
+  the increment — they name the sweep and the machine configurations — so this
+  entry is the record of what those two commits carry on the CAD side.
+
 - 2026-10-21: added proprietary terms for Nicola Mattioli's CAD contributions,
   with explicit third-party exclusions, a scoped NVIDIA USD BRep / SMLib notice
   and the upstream Apache-2.0 license copy. No runtime or geometry changes;
