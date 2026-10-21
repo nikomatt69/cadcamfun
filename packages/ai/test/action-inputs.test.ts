@@ -36,8 +36,9 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
     refuse: [{ name: "x", type: "flat", diameter: 6, material: "carbide", cornerRadius: -1 }, { name: "x", type: "flat", diameter: 6, material: "carbide", stickout: 0 }, { name: "x", type: "flat", diameter: 0, material: "carbide" }, { name: "x", type: "flat", diameter: 6, material: "carbide", numberOfFlutes: 2.5 }, { name: "x", type: "flat", material: "carbide" }]
   },
   "library_edit.upsert_machine_config": {
-    accept: [{ name: "VF2", kind: "mill", postProcessor: "haas" }, { name: "VF2", kind: "mill", postProcessor: "haas", kinematics: { x: { min: 0, max: 762 } }, maxFeed: 25_400 }],
-    refuse: [{ name: "VF2", kind: "laser", postProcessor: "haas" }, { name: "VF2", kind: "mill" }, { name: "VF2", kind: "mill", postProcessor: "haas", maxRPM: 0 }]
+    // The control is optional: the machine's own words decide the post, and a machine without a post is still a machine.
+    accept: [{ name: "VF2", kind: "mill", postProcessor: "haas" }, { name: "VF2", kind: "mill" }, { name: "VF2", kind: "mill", postProcessor: "haas", kinematics: { x: { min: 0, max: 762 } }, maxFeed: 25_400 }],
+    refuse: [{ name: "VF2", kind: "laser", postProcessor: "haas" }, { name: "VF2", kind: "mill", postProcessor: "haas", maxRPM: 0 }]
   },
   "library_edit.upsert_library_item": {
     accept: [{ name: "Vise", category: "setup", type: "fixture", data: { jawWidth: 150 } }],
@@ -103,7 +104,8 @@ describe("Effect-owned action inputs", () => {
     expect(await decode("research.search", { query: "  speeds  " })).toEqual({ query: "speeds", numResults: 5 })
     expect(await decode("agent.start", { description: " Check ", prompt: "p", background: "false" })).toEqual({ description: "Check", prompt: "p", background: false })
     expect(await decode("vcs_edit.open_pull_request", { title: "t" })).toEqual({ title: "t", body: "" })
-    expect(await decode("library_edit.upsert_machine_config", { name: "VF2", kind: "mill", postProcessor: "haas" })).toMatchObject({ kinematics: {}, workOffsets: ["G54", "G55", "G56", "G57", "G58", "G59"], isPublic: false })
+    // The machine configuration carries only what the person wrote, plus the visibility flag.
+    expect(await decode("library_edit.upsert_machine_config", { name: "VF2", kind: "mill", postProcessor: "haas" })).toMatchObject({ name: "VF2", kind: "mill", postProcessor: "haas", isPublic: false })
     expect(await decode("library.lookup_component", {})).toEqual({ query: "" })
   })
 
