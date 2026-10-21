@@ -10,6 +10,7 @@ export {
   fastenScene,
   fastenerOf,
   sceneBom,
+  sceneClearance,
   sceneInterference,
   sceneJoints,
   sceneParts,

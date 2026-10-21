@@ -157,3 +157,12 @@ test("the assembly panel inserts the fasteners in one undo step and reports inte
     useElementsStore.setState({ elements: before, selectedElement: null })
   }
 })
+
+test("clearance lists the closest pairs of parts with their exact gap, nearest first", async () => {
+  const { sceneClearance } = await import("../src/features/cad/lib/component-automation.ts")
+  const cube = (id: string, x: number) => ({ id, type: "cube", name: id, x, y: 0, z: 0, width: 10, height: 10, depth: 10, layerId: "default" })
+  const gaps = sceneClearance([cube("a", 0), cube("b", 12.5), cube("c", 100)] as never)
+  expect(gaps.map((g) => [g.aName, g.bName])).toEqual([["a", "b"]])
+  expect(Math.abs(gaps[0]!.distance - 2.5)).toBeLessThan(1e-9)
+  expect(gaps[0]!.overlap).toBe(false)
+})

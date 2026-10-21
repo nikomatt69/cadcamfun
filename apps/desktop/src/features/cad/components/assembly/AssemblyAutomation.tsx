@@ -8,7 +8,7 @@ import { For, Show, createEffect, createSignal, on, type JSX } from "solid-js"
 import type { BomRow } from "@cadcamfun/core"
 import { t } from "../../../../i18n/index.ts"
 import { useElementsStore } from "../../store/elementsStore.ts"
-import { applyJoints, bomCsv, fastenScene, sceneBom, sceneInterference, sceneJoints, type FastenResult, type JointTarget, type SceneInterference } from "../../lib/component-automation.ts"
+import { applyJoints, bomCsv, fastenScene, sceneBom, sceneClearance, sceneInterference, sceneJoints, type FastenResult, type JointTarget, type SceneInterference } from "../../lib/component-automation.ts"
 import { useAssemblyStore } from "../../store/assemblyStore.ts"
 
 type Skipped = ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>
@@ -19,18 +19,19 @@ const button = "px-2 py-1 text-xs rounded border border-gray-300 dark:border-gra
 
 export default function AssemblyAutomation(): JSX.Element {
   const store = useElementsStore()
-  const [busy, setBusy] = createSignal<"fasten" | "joints" | "interference" | "bom" | undefined>(undefined)
+  const [busy, setBusy] = createSignal<"fasten" | "joints" | "interference" | "clearance" | "bom" | undefined>(undefined)
   const [jointed, setJointed] = createSignal<{ added: number; existing: number; joints: string[]; skipped: Skipped } | undefined>(undefined)
   const [fastened, setFastened] = createSignal<FastenResult | undefined>(undefined)
   const [clashes, setClashes] = createSignal<SceneInterference | undefined>(undefined)
+  const [gaps, setGaps] = createSignal<ReturnType<typeof sceneClearance> | undefined>(undefined)
   const [bom, setBom] = createSignal<{ rows: ReadonlyArray<BomRow>; skipped: Skipped } | undefined>(undefined)
   const [error, setError] = createSignal<string | undefined>(undefined)
   const [washers, setWashers] = createSignal(true)
 
   // A report describes the drawing it was computed on.
-  createEffect(on(() => store.elements, () => { setClashes(undefined); setBom(undefined) }, { defer: true }))
+  createEffect(on(() => store.elements, () => { setClashes(undefined); setGaps(undefined); setBom(undefined) }, { defer: true }))
 
-  const run = (what: "fasten" | "joints" | "interference" | "bom", work: () => void) => {
+  const run = (what: "fasten" | "joints" | "interference" | "clearance" | "bom", work: () => void) => {
     setBusy(what)
     setError(undefined)
     setTimeout(() => {
@@ -48,6 +49,7 @@ export default function AssemblyAutomation(): JSX.Element {
     setJointed({ ...outcome, joints: inferred.joints.map((j) => `${inferred.names.get(j.child) ?? j.child} → ${inferred.names.get(j.parent) ?? j.parent}: ${j.kind}`), skipped: inferred.skipped })
   })
   const interference = () => run("interference", () => setClashes(sceneInterference(store.elements as never)))
+  const clearance = () => run("clearance", () => setGaps(sceneClearance(store.elements as never)))
   const listBom = () => run("bom", () => setBom(sceneBom(store.elements as never)))
   const exportCsv = () => {
     const rows = bom()?.rows
@@ -143,6 +145,21 @@ export default function AssemblyAutomation(): JSX.Element {
               </div>
             )
           }}
+        </Show>
+      </div>
+
+      <div class="space-y-2">
+        <button type="button" class={button} disabled={busy() !== undefined} onClick={clearance}>{busy() === "clearance" ? t("cad.automation.working") : t("cad.automation.clearance")}</button>
+        <Show when={gaps()}>
+          {(g) => (
+            <div class="space-y-1 text-xs text-gray-700 dark:text-gray-300" data-testid="clearance-result">
+              <Show when={g().length > 0} fallback={<p>{t("cad.automation.noNeighbours")}</p>}>
+                <ul>
+                  <For each={g()}>{(c) => <li data-testid="clearance-row">{c.aName} × {c.bName}: {c.overlap ? t("cad.automation.overlap") : `${fmt(c.distance, 3)} mm`}</li>}</For>
+                </ul>
+              </Show>
+            </div>
+          )}
         </Show>
       </div>
 
