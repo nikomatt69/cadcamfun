@@ -3,7 +3,7 @@
  * which only touch, and the parts list with quantities and masses. Every number comes from the B-rep: the overlap is the
  * exact Boolean intersection of two parts, the mass the exact volume times the material's density.
  */
-import { booleanBrep, massProperties, type Brep, type Vec3 } from "./brep/index.ts"
+import { booleanBrep, massProperties, minimumDistance, type Brep, type Vec3 } from "./brep/index.ts"
 import { brepBox } from "./history-brep.ts"
 import { holeStacks } from "./smart-fasteners.ts"
 
@@ -163,4 +163,32 @@ export const billOfMaterials = (parts: ReadonlyArray<AssemblyPart>): ReadonlyArr
     ...(r.density !== undefined ? { mass: (r.volume * r.density) / 1000 } : {}),
     parts: r.parts
   }))
+}
+
+export interface Clearance {
+  readonly a: string
+  readonly b: string
+  /** Smallest gap between the two solids, mm (0 when they overlap). */
+  readonly distance: number
+  readonly pointA: Vec3
+  readonly pointB: Vec3
+  readonly overlap: boolean
+}
+
+/**
+ * The closest pairs of parts: every pair whose gap is below `within` mm (default 5), nearest first. A pair whose boxes are
+ * further apart than `within` is not measured. Overlapping pairs are listed with distance 0 (the interference report says by
+ * how much).
+ */
+export const assemblyClearance = (parts: ReadonlyArray<AssemblyPart>, within = 5): ReadonlyArray<Clearance> => {
+  const boxes = parts.map((p) => brepBox(p.brep))
+  const out: Clearance[] = []
+  for (let i = 0; i < parts.length; i++) {
+    for (let j = i + 1; j < parts.length; j++) {
+      if (!boxesMeet(boxes[i]!, boxes[j]!, within)) continue
+      const m = minimumDistance(parts[i]!.brep, parts[j]!.brep)
+      if (m.distance <= within) out.push({ a: parts[i]!.id, b: parts[j]!.id, distance: m.distance, pointA: m.pointA, pointB: m.pointB, overlap: m.overlap })
+    }
+  }
+  return out.sort((x, y) => x.distance - y.distance)
 }

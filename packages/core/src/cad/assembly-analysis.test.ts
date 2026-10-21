@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { assemblyInterference, billOfMaterials, jointsFromHoles, type AssemblyPart } from "./assembly-analysis.ts"
+import { assemblyClearance, assemblyInterference, billOfMaterials, jointsFromHoles, type AssemblyPart } from "./assembly-analysis.ts"
 import { frame, makeBox, type Brep } from "./brep/index.ts"
 import { rebuildExact } from "./history-brep.ts"
 import { model } from "./script.ts"
@@ -99,5 +99,21 @@ describe("exact interference", () => {
     ])
     // Exact masses: the plate is 60 x 30 x 8 less two 9 mm holes, in aluminium.
     near(bom[1]!.mass!, ((60 * 30 * 8 - 2 * Math.PI * 4.5 ** 2 * 8) * 2.7) / 1000, 1e-6)
+  })
+})
+
+describe("clearance between parts", () => {
+  test("pairs are listed nearest first, with the gap and the closest points; far pairs are not measured", () => {
+    const a = part("a", makeBox(10, 10, 10))
+    const b = part("b", makeBox(10, 10, 10, frame({ x: 12.5, y: 0, z: 0 }, { x: 0, y: 0, z: 1 })))
+    const c = part("c", makeBox(10, 10, 10, frame({ x: 0, y: 0, z: 14 }, { x: 0, y: 0, z: 1 })))
+    const far = part("far", makeBox(10, 10, 10, frame({ x: 100, y: 0, z: 0 }, { x: 0, y: 0, z: 1 })))
+    const r = assemblyClearance([a, b, c, far], 5)
+    expect(r.map((x) => [x.a, x.b])).toEqual([["a", "b"], ["a", "c"], ["b", "c"]])
+    near(r[0]!.distance, 2.5, 1e-9)
+    near(r[1]!.distance, 4, 1e-9)
+    near(r[2]!.distance, Math.hypot(2.5, 4), 1e-9)
+    near(r[0]!.pointA.x, 10, 1e-9)
+    near(r[0]!.pointB.x, 12.5, 1e-9)
   })
 })
