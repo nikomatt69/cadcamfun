@@ -8,14 +8,16 @@
  *   revolute    a turn about the axis through `origin`, degrees
  *   prismatic   a slide along the axis, mm
  *   cylindrical turn and slide along the same axis (two values: `angle`, `slide`)
+ *   ball        three turns about the world x, y and z axes through `origin`, applied in that order (`rx`, `ry`, `rz`, degrees)
+ *   planar      two slides (`u`, `v`) in the plane square to the axis (x and y of the frame the axis defines) and a turn `angle` about it
  *
  * Couplings tie one joint to another: a `gear` pair (the driven revolute turns `ratio` times the driver, a negative ratio for
  * two external gears turning opposite ways) and a `rack` (a revolute and a prismatic: the slide is the arc the pitch radius rolls).
  */
 import { assemblyInterference, type AssemblyPart, type Interference } from "./assembly-analysis.ts"
-import { compose, IDENTITY, normalize3, rotation, transformBrep, translation, applyPoint, type Transform, type Vec3 } from "./brep/index.ts"
+import { compose, frame, IDENTITY, normalize3, rotation, transformBrep, translation, applyPoint, type Transform, type Vec3 } from "./brep/index.ts"
 
-export type JointKind = "fixed" | "revolute" | "prismatic" | "cylindrical"
+export type JointKind = "fixed" | "revolute" | "prismatic" | "cylindrical" | "ball" | "planar"
 
 export interface KJoint {
   readonly id: string
@@ -34,7 +36,7 @@ export type Coupling =
   | { readonly kind: "rack"; readonly pinion: string; readonly rack: string; readonly pitchRadius: number }
 
 /** A joint's value(s): a number for revolute and prismatic, both for cylindrical. */
-export type JointValue = number | { readonly angle?: number; readonly slide?: number }
+export type JointValue = number | { readonly angle?: number; readonly slide?: number; readonly rx?: number; readonly ry?: number; readonly rz?: number; readonly u?: number; readonly v?: number }
 
 export interface KinematicModel {
   readonly ground: string
@@ -44,10 +46,13 @@ export interface KinematicModel {
 
 export interface LimitViolation { readonly joint: string; readonly quantity: "angle" | "slide"; readonly value: number; readonly limit: number }
 
+/** What a joint ended with: the turn and slide of a single-axis joint, the three turns of a ball, the two slides of a plane. */
+export interface JointState { angle: number; slide: number; rx: number; ry: number; rz: number; u: number; v: number }
+
 export interface Pose {
   readonly transforms: ReadonlyMap<string, Transform>
   /** The value each joint ended with, couplings applied. */
-  readonly values: ReadonlyMap<string, { readonly angle: number; readonly slide: number }>
+  readonly values: ReadonlyMap<string, JointState>
   readonly violations: ReadonlyArray<LimitViolation>
 }
 
@@ -59,7 +64,7 @@ export const validateKinematics = (m: KinematicModel): string | undefined => {
   for (const j of m.joints) {
     if (ids.has(j.id)) return `joint '${j.id}' is defined twice`
     ids.add(j.id)
-    if (j.kind !== "fixed" && Math.hypot(j.axis.x, j.axis.y, j.axis.z) < 1e-12) return `joint '${j.id}' has no axis`
+    if (j.kind !== "fixed" && j.kind !== "ball" && Math.hypot(j.axis.x, j.axis.y, j.axis.z) < 1e-12) return `joint '${j.id}' has no axis`
     if (j.limits !== undefined && j.limits.min > j.limits.max) return `joint '${j.id}' has min above max`
   }
   const reached = new Set<string>([m.ground])
@@ -84,17 +89,18 @@ export const validateKinematics = (m: KinematicModel): string | undefined => {
   return undefined
 }
 
-const valueOf = (j: KJoint, v: JointValue | undefined): { angle: number; slide: number } => {
-  if (v === undefined) return { angle: 0, slide: 0 }
-  if (typeof v === "number") return j.kind === "prismatic" ? { angle: 0, slide: v } : { angle: v, slide: 0 }
-  return { angle: v.angle ?? 0, slide: v.slide ?? 0 }
+const valueOf = (j: KJoint, v: JointValue | undefined): JointState => {
+  const zero: JointState = { angle: 0, slide: 0, rx: 0, ry: 0, rz: 0, u: 0, v: 0 }
+  if (v === undefined) return zero
+  if (typeof v === "number") return j.kind === "prismatic" ? { ...zero, slide: v } : { ...zero, angle: v }
+  return { angle: v.angle ?? 0, slide: v.slide ?? 0, rx: v.rx ?? 0, ry: v.ry ?? 0, rz: v.rz ?? 0, u: v.u ?? 0, v: v.v ?? 0 }
 }
 
 /** The pose of every part for the given driver values (joints not named stay at zero). Couplings set their driven joint. */
 export const solvePose = (m: KinematicModel, drivers: Readonly<Record<string, JointValue>> = {}): Pose => {
   const bad = validateKinematics(m)
   if (bad !== undefined) throw new RangeError(bad)
-  const vals = new Map<string, { angle: number; slide: number }>()
+  const vals = new Map<string, JointState>()
   for (const j of m.joints) vals.set(j.id, valueOf(j, drivers[j.id]))
   for (const c of m.couplings ?? []) {
     if (c.kind === "gear") vals.get(c.driven)!.angle = vals.get(c.driver)!.angle * c.ratio
@@ -118,10 +124,18 @@ export const solvePose = (m: KinematicModel, drivers: Readonly<Record<string, Jo
     for (const j of m.joints) {
       if (transforms.has(j.child) || !transforms.has(j.parent)) continue
       const v = vals.get(j.id)!
-      const axis = normalize3(j.axis)
+      const axis = j.kind === "ball" || j.kind === "fixed" ? { x: 0, y: 0, z: 1 } : normalize3(j.axis)
       let motion: Transform = IDENTITY
       if ((j.kind === "revolute" || j.kind === "cylindrical") && v.angle !== 0) motion = rotation(axis, v.angle * RAD, j.origin)
       if ((j.kind === "prismatic" || j.kind === "cylindrical") && v.slide !== 0) motion = compose(motion, translation({ x: axis.x * v.slide, y: axis.y * v.slide, z: axis.z * v.slide }))
+      if (j.kind === "ball") {
+        for (const [a, deg] of [[{ x: 1, y: 0, z: 0 }, v.rx], [{ x: 0, y: 1, z: 0 }, v.ry], [{ x: 0, y: 0, z: 1 }, v.rz]] as const) if (deg !== 0) motion = compose(motion, rotation(a, deg * RAD, j.origin))
+      }
+      if (j.kind === "planar") {
+        const f = frame(j.origin, axis)
+        if (v.angle !== 0) motion = rotation(axis, v.angle * RAD, j.origin)
+        if (v.u !== 0 || v.v !== 0) motion = compose(motion, translation({ x: f.x.x * v.u + f.y.x * v.v, y: f.x.y * v.u + f.y.y * v.v, z: f.x.z * v.u + f.y.z * v.v }))
+      }
       // The motion is defined in the zero pose; the parent then carries the result to where it has moved.
       transforms.set(j.child, compose(motion, transforms.get(j.parent)!))
       again = true

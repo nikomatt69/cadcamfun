@@ -98,3 +98,24 @@ describe("motion study", () => {
     expect(study.firstViolation).toBeUndefined()
   })
 })
+
+describe("ball and planar joints", () => {
+  test("a ball turns about the world axes through its origin, x then y then z", () => {
+    const m: KinematicModel = { ground: "g", joints: [{ id: "b", parent: "g", child: "arm", kind: "ball", origin: { x: 5, y: 0, z: 0 }, axis: O }] }
+    // 90 about x takes +y to +z; then 90 about z takes the +x offset (10, 0, 0) from the ball to +y.
+    const p = solvePose(m, { b: { rx: 90, rz: 90 } })
+    const tip = poseOfPoint(p, "arm", { x: 15, y: 0, z: 0 })
+    near(tip.x, 5); near(tip.y, 10); near(tip.z, 0)
+    const up = poseOfPoint(p, "arm", { x: 5, y: 1, z: 0 })
+    near(up.x, 5); near(up.y, 0); near(up.z, 1)
+    expect(validateKinematics(m)).toBeUndefined()
+  })
+  test("a planar joint slides in the plane square to its axis and turns about it", () => {
+    const m: KinematicModel = { ground: "g", joints: [{ id: "pl", parent: "g", child: "slider", kind: "planar", origin: O, axis: Z }] }
+    const p = solvePose(m, { pl: { u: 3, v: -2, angle: 90 } })
+    // The turn happens first, about the axis through the origin; then the slides in the plane's own axes.
+    const t = poseOfPoint(p, "slider", { x: 10, y: 0, z: 4 })
+    near(t.z, 4)
+    near(t.x, 0 + 3); near(t.y, 10 - 2)
+  })
+})
