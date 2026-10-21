@@ -11,15 +11,18 @@ import { massProperties } from "./mass.ts"
 import { tessellateBrep } from "./tessellate.ts"
 
 /** Signed volume of a coarse watertight tessellation (divergence theorem over its triangles). */
-const coarseVolume = (b: Brep): number => {
+const coarseVolume = (b: Brep): { readonly volume: number; readonly empty: ReadonlyArray<number> } => {
   const t = tessellateBrep(b, { chordTol: 0.05, angleTolDeg: 30 })
+  // A face with a boundary that gives no triangle at all drops its share of the volume without any other sign.
+  const meshed = new Set(t.faces.filter((f) => f.indices.length > 0).map((f) => f.face))
+  const empty = b.faces.map((f, i) => (f.loops.length > 0 && !meshed.has(i) ? i : -1)).filter((i) => i >= 0)
   const p = t.positions, ix = t.indices
   let v = 0
   for (let i = 0; i < ix.length; i += 3) {
     const a = ix[i]! * 3, c = ix[i + 1]! * 3, d = ix[i + 2]! * 3
     v += p[a]! * (p[c + 1]! * p[d + 2]! - p[c + 2]! * p[d + 1]!) - p[a + 1]! * (p[c]! * p[d + 2]! - p[c + 2]! * p[d]!) + p[a + 2]! * (p[c]! * p[d + 1]! - p[c + 1]! * p[d]!)
   }
-  return v / 6
+  return { volume: v / 6, empty }
 }
 
 export interface BrepIssue {
@@ -33,6 +36,7 @@ export interface BrepIssue {
     | "edge-off-surface"
     | "euler"
     | "orientation"
+    | "face-empty"
   readonly message: string
   readonly face?: number
   readonly edge?: number
@@ -142,7 +146,11 @@ export const validateBrep = (b: Brep, options: ValidateOptions = {}): BrepReport
   }
   let volume: number | undefined
   if (manifold && options.skipVolume !== true && issues.length === 0) {
-    volume = options.coarseVolume === true ? coarseVolume(b) : massProperties(b).volume
+    if (options.coarseVolume === true) {
+      const c = coarseVolume(b)
+      volume = c.volume
+      for (const fi of c.empty) issues.push({ kind: "face-empty", face: fi, message: `face ${fi} gives no triangle: its boundary cannot be triangulated, so the solid's volume is incomplete` })
+    } else volume = massProperties(b).volume
     if (!(volume > 0)) issues.push({ kind: "orientation", message: `closed shell encloses a non-positive volume (${volume}); faces point inwards` })
   }
   return { valid: issues.length === 0, issues, manifoldSolid: manifold && issues.length === 0, genus, volume }
