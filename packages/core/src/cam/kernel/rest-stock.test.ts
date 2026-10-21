@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { DEFAULT_CUTTERS, findCutter, runJob, type CamArtifact, type ManufacturingJob, type OperationSpec } from "./index.ts"
+import { DEFAULT_CUTTERS, findCutter, planOnly, runJob, type CamArtifact, type ManufacturingJob, type OperationSpec } from "./index.ts"
 import { findMachine } from "./machines.ts"
 
 setDefaultTimeout(100_000)
@@ -65,5 +65,38 @@ describe("rest machining from the stock the earlier operations left (spec 29 §6
     const roughOnly = run([rough])
     const both = run([rough, rest])
     expect(both.stock.remainingVolume).toBeLessThan(roughOnly.stock.remainingVolume)
+  })
+})
+
+describe("the planner adds rest roughing to freeform parts", () => {
+  test("a dome on a plate is roughed, rested with a smaller flat cutter, then finished", () => {
+    const base = { id: "base", type: "cube", x: 0, y: 0, z: 4, width: 40, height: 40, depth: 8 }
+    const dome = { id: "dome", type: "sphere", x: 0, y: 0, z: 8, radius: 8 }
+    const plan = planOnly({
+      schemaVersion: 1, id: "p", name: "p", material: "6061", part: { kind: "elements", elements: [base, dome] },
+      stock: { min: { x: -22, y: -22, z: 0 }, max: { x: 22, y: 22, z: 17 } }, machine: findMachine("vmc-standard")!, quality: { resolution: 0.4 }
+    })
+    if (plan.status !== "ok") throw new Error(plan.issues.map((i) => i.message).join("; "))
+    const ops = plan.value.operations.map((o) => `${o.strategy === "surface" ? o.mode : o.strategy}`)
+    const rough = ops.indexOf("roughing"), rest = ops.indexOf("rest")
+    console.log(ops.join(","))
+    expect(rough).toBeGreaterThanOrEqual(0)
+    expect(rest).toBeGreaterThan(rough)
+  })
+})
+
+describe("a rest pass with nothing left", () => {
+  test("is skipped with a warning, not failed, so the job still releases", () => {
+    // A plain plate: the roughing leaves nothing the smaller cutter has to take.
+    const r = runJob({
+      schemaVersion: 1, id: "none", name: "Plate", material: "6061", part: { kind: "elements", elements: [{ id: "plate", type: "cube", width: 30, height: 20, depth: 5 }] },
+      tools: [wide, narrow], machine: findMachine("vmc-standard")!, quality: { resolution: 0.3 },
+      operations: [{ id: "rough", strategy: "surface", mode: "roughing", clearing: "contour", tool: wide.id, allowance: 0 }, rest]
+    })
+    if (r.status !== "ok") throw new Error(r.issues.map((i) => i.message).join("; "))
+    const o = r.value.operations.find((x) => x.id === "rest")!
+    expect(o.status).toBe("ok")
+    expect(o.warnings.join(" ")).toMatch(/No material left/)
+    expect(r.value.issues.some((i) => i.tag === "EmptyToolpath")).toBe(false)
   })
 })

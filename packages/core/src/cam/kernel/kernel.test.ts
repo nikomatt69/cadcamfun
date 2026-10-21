@@ -313,15 +313,16 @@ describe("running a job: NC plus evidence about that NC", () => {
       schemaVersion: 1, id: "j", name: "Dome", material: "6061", part: { kind: "elements", elements: [base, dome] },
       stock: { min: { x: -22, y: -22, z: 0 }, max: { x: 22, y: 22, z: 17 } }, quality: { resolution: 0.4, scallop: 0.02 }
     }))
-    // Roughing, the flat ledge of the base round the dome at its exact height with a flat end mill, then one steep-and-shallow
-    // finish (waterline on the walls, raster on the dome) with a ball.
-    expect(a.operations.map((o) => o.strategy)).toEqual(["face", "surface", "surface", "surface"])
+    // Roughing, a smaller flat cutter resting what it left (from the stock), the flat ledge of the base round the dome at its exact
+    // height with a flat end mill, then one steep-and-shallow finish (waterline on the walls, raster on the dome) with a ball.
+    expect(a.operations.map((o) => o.id)).toEqual(["face", "surface-rough", "surface-rest", "surface-flats", "surface-finish"])
     expect(a.operations[1]!.cut).toBe("adaptive")
-    expect(a.operations[2]!.id).toBe("surface-flats")
-    expect(a.operations[2]!.cut).toBe("finish-floor")
-    expect(a.tools.find((t) => t.id === a.operations[2]!.toolId)!.kind).toBe("flat")
-    expect(a.operations[3]!.toolId.startsWith("ball-")).toBe(true)
-    expect(a.operations[3]!.cut).toBe("finish-3d")
+    expect(a.operations[2]!.cut).toBe("adaptive")
+    expect(a.operations[2]!.toolId).not.toBe(a.operations[1]!.toolId)
+    expect(a.operations[3]!.cut).toBe("finish-floor")
+    expect(a.tools.find((t) => t.id === a.operations[3]!.toolId)!.kind).toBe("flat")
+    expect(a.operations[4]!.toolId.startsWith("ball-")).toBe(true)
+    expect(a.operations[4]!.cut).toBe("finish-3d")
     expect(claim(a, "no-gouge")).toBe("passed")
     expect(claim(a, "no-rapid-in-stock")).toBe("passed")
     // Most of the stock above the part is gone; a ball cannot reach the base's sharp inner corner, which the evidence reports.

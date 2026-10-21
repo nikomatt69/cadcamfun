@@ -404,6 +404,10 @@ export const planJob = (input: PlanInput): Plan => {
       ops.push({ id: "surface-rough", name: "3D adaptive roughing", strategy: "surface", mode: "roughing", clearing: "adaptive", tool: rough.id, allowance })
       if (rough.fluteLength < depth) notes.push(`3D roughing: ${rough.name} has ${rough.fluteLength} mm flutes for ${r3(depth)} mm of stock; deep walls rely on the shank clearance check`)
     }
+    // Rest roughing: a flat cutter at most half the size takes what the big one could not reach (inner corners, narrow slots),
+    // from the stock the roughing left (spec 29 §6), so the ball finishes an even layer. Only for cutters of 4 mm and up.
+    const restMill = rough === undefined ? undefined : millers.filter((t) => t.kind === "flat" && t.diameter <= rough.diameter / 2 + 1e-9 && t.diameter >= 4 && t.stickout >= Math.min(depth, 3 * t.diameter) + 2).sort((x, y) => y.diameter - x.diameter)[0]
+    if (restMill !== undefined) ops.push({ id: "surface-rest", name: "3D rest roughing", strategy: "surface", mode: "rest", clearing: "adaptive", tool: restMill.id, allowance })
     // Flat faces (the top only when it is not faced): finished at their exact height by a flat end mill before the ball runs over
     // them, so a floor or ledge is left flat instead of with the ball's cusps.
     const ledges = (input.flats ?? []).filter((f) => f.z > partBottom + 1e-6 && (f.z < partTop - 1e-6 || faceDepth <= 0.005))

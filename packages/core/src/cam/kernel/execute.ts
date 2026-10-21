@@ -545,6 +545,12 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
       return
     }
     const tp = generated.toolpath
+    // A rest pass over stock the earlier operations already cleared is a checked "nothing left", not a failed operation.
+    if (op.strategy === "surface" && op.mode === "rest" && (tp === undefined || !cuts(tp))) {
+      warnings.push("No material left for the rest tool: the operation was skipped", ...generated.warnings)
+      outcomes.push({ id: op.id, name: op.name ?? op.id, strategy: op.strategy, toolId: tool.id, cut, status: "ok", parameters: {}, overridden, warnings, startZ: start, cutLength: 0, timeSeconds: 0, removedVolume: 0 })
+      return
+    }
     if (tp === undefined || !cuts(tp)) { fail("EmptyToolpath", `${op.id}: the strategy produced no cutting move${generated.warnings.length > 0 ? ` (${generated.warnings.join("; ")})` : ""}`, data); return }
     // The marker comment ties every NC block to its operation in the replay.
     const marked: Toolpath = { ...tp, moves: [{ _tag: "Comment", text: `OP${toolpaths.length + 1} ${op.id}` } as Move, ...tp.moves] }
