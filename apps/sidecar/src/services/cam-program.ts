@@ -23,7 +23,10 @@ export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payl
   const result = yield* Effect.tryPromise({
     try: (signal) => runKernelJob("cam-manufacture", job.value, { signal, ...(report !== undefined ? { onProgress: report } : {}) }),
     catch: (error) => new BadRequest({ message: error instanceof KernelJobError && error.reason !== "failed" && error.reason !== "crashed" ? error.message : "The CAM kernel request could not be evaluated" })
-  })
+  }).pipe(
+    // A dropped request interrupts the fiber: say so on the stream, since the code after the run never executes.
+    Effect.onInterrupt(() => Effect.sync(() => report?.("cancelled")))
+  )
   report?.(result.status === "failed" && result.issues.some((i) => i.tag === "Cancelled") ? "cancelled" : "done")
   return yield* Schema.decodeUnknownEffect(CamKernelResult)(result).pipe(Effect.mapError(() => new BadRequest({ message: "The CAM kernel returned an invalid artifact" })))
 })

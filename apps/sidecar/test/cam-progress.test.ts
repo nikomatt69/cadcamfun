@@ -7,6 +7,7 @@ import { Database, schema } from "@cadcamfun/db"
 import { Effect, Fiber, Layer, Stream } from "effect"
 import { frameVisibleTo } from "../src/http/events.ts"
 import { camProgressFrame, camProgressReporter } from "../src/services/cam-progress.ts"
+import { runKernelRequest } from "../src/services/cam-program.ts"
 import { LiveEvents } from "../src/services/live-events.ts"
 import { ProjectRepo } from "../src/repos/project-repo.ts"
 import { makeApp } from "./helpers.ts"
@@ -64,4 +65,19 @@ test("manufacture takes a progress target only for a project the caller can open
   expect(refused.status).toBe(400)
   const plain = await app.call("/api/toolpaths/manufacture", { method: "POST", json: request })
   expect(plain.status).toBe(200)
+})
+
+test("a dropped request ends the worker and announces the run as cancelled", async () => {
+  const seen: Array<string> = []
+  const payload = {
+    schemaVersion: 1 as const, id: "heavy", name: "Dome", material: "6061", resolution: 0.05,
+    elements: [{ id: "base", type: "cube", x: 0, y: 0, z: 4, width: 90, height: 90, depth: 8 }, { id: "dome", type: "sphere", x: 0, y: 0, z: 8, radius: 30 }]
+  }
+  const fiber = Effect.runFork(runKernelRequest(payload as never, (p) => { seen.push(typeof p === "string" ? p : p.stage) }))
+  await Bun.sleep(1200)
+  await Effect.runPromise(Fiber.interrupt(fiber))
+  expect(seen.at(-1)).toBe("cancelled")
+  const frozen = seen.length
+  await Bun.sleep(800)
+  expect(seen.length).toBe(frozen)
 })
