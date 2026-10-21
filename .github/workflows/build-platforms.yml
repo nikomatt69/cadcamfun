@@ -12,7 +12,41 @@ env:
   BUN_VERSION: "1.4.3"
 
 jobs:
+  # Bun fa i Bun: cross-compile every sidecar variant on Linux (no Rust/Tauri).
+  build-sidecars:
+    name: sidecar (bun) ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin }
+          - { target: x86_64-apple-darwin }
+          - { target: x86_64-pc-windows-msvc }
+          - { target: aarch64-pc-windows-msvc }
+          - { target: x86_64-unknown-linux-gnu }
+          - { target: aarch64-unknown-linux-gnu }
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-sidecar-${{ matrix.target }}-${{ hashFiles('bun.lock') }}
+      - name: Cross-compile the sidecar (Bun)
+        run: bun --no-env-file scripts/build.ts --only=install,compile --target=${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sidecar-${{ matrix.target }}
+          path: apps/desktop/src-tauri/binaries/sidecar-${{ matrix.target }}*
+          if-no-files-found: error
+
+  # Tauri fa le sue toolchain: native runners place the prebuilt sidecar and
+  # bundle with Rust + Tauri CLI only (`--skip=check,compile`).
   build:
+    needs: build-sidecars
     strategy:
       fail-fast: false
       matrix:
@@ -46,6 +80,22 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: sidecar-${{ matrix.target }}
+          path: sidecar-incoming
+      - name: Place the prebuilt sidecar (built by Bun, not recompiled here)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ext=""
+          case "${{ matrix.target }}" in *windows*) ext=".exe" ;; esac
+          src="$(find sidecar-incoming -type f -name "sidecar-${{ matrix.target }}${ext}" | head -1)"
+          if [ -z "$src" ]; then echo "sidecar artifact for ${{ matrix.target }} is missing" >&2; exit 1; fi
+          mkdir -p apps/desktop/src-tauri/binaries
+          cp "$src" "apps/desktop/src-tauri/binaries/sidecar-${{ matrix.target }}${ext}"
+          if [ -z "$ext" ]; then chmod +x "apps/desktop/src-tauri/binaries/sidecar-${{ matrix.target }}"; fi
+          ls -l apps/desktop/src-tauri/binaries/
       - uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
@@ -62,11 +112,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 libssl-dev build-essential file rpm
-      - name: Build and index installers
-        run: bun --no-env-file scripts/build.ts --skip=check --no-updater --target=${{ matrix.target }} --bundles=${{ matrix.bundles }} --out-dir=release
+      - name: Build and index installers (Tauri)
+        run: bun --no-env-file scripts/build.ts --skip=check,compile --no-updater --target=${{ matrix.target }} --bundles=${{ matrix.bundles }} --out-dir=release
       - uses: actions/upload-artifact@v4
         with:
           name: cadcamfun-${{ matrix.target }}
           path: release/
           if-no-files-found: error
-

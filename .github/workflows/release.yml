@@ -46,8 +46,53 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: bun --no-env-file scripts/release-ref.ts
 
-  build:
+  # Bun fa i Bun: one Linux runner per variant cross-compiles the sidecar with
+  # `Bun.build --compile` (scripts/compile-sidecar.ts). No Rust, no Tauri, no
+  # signing secrets here — mirroring nikcli `publish.yml`, which cross-builds
+  # every CLI variant on a single Ubuntu runner before any desktop build.
+  build-sidecars:
+    name: sidecar (bun) ${{ matrix.target }}
     needs: trusted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, slug: macos-arm64 }
+          - { target: x86_64-apple-darwin, slug: macos-x64 }
+          - { target: x86_64-pc-windows-msvc, slug: windows-x64 }
+          - { target: aarch64-pc-windows-msvc, slug: windows-arm64 }
+          - { target: x86_64-unknown-linux-gnu, slug: linux-x64 }
+          - { target: aarch64-unknown-linux-gnu, slug: linux-arm64 }
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.trusted.outputs.sha }}
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-sidecar-${{ matrix.target }}-${{ hashFiles('bun.lock') }}
+      # `install,compile` only: install pulls every platform's native deps
+      # (--os=* --cpu=*) so the cross-compile finds them; compile is the Bun step.
+      - name: Cross-compile the sidecar (Bun)
+        run: bun --no-env-file scripts/build.ts --only=install,compile --target=${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sidecar-${{ matrix.target }}
+          path: apps/desktop/src-tauri/binaries/sidecar-${{ matrix.target }}*
+          if-no-files-found: error
+
+  # Tauri fa le sue toolchain: each native runner only places the prebuilt
+  # sidecar and bundles with Rust + Tauri CLI (plus WebKit deps on Linux and
+  # the platform signing certs). It never recompiles the Bun binary — that is
+  # what broke on Windows under nikcli (workspace `bun` bin shim), and why
+  # `build` below skips the `compile` step.
+  build:
+    needs: [trusted, build-sidecars]
     strategy:
       fail-fast: false
       matrix:
@@ -91,6 +136,22 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: sidecar-${{ matrix.target }}
+          path: sidecar-incoming
+      - name: Place the prebuilt sidecar (built by Bun, not recompiled here)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ext=""
+          case "${{ matrix.target }}" in *windows*) ext=".exe" ;; esac
+          src="$(find sidecar-incoming -type f -name "sidecar-${{ matrix.target }}${ext}" | head -1)"
+          if [ -z "$src" ]; then echo "sidecar artifact for ${{ matrix.target }} is missing" >&2; exit 1; fi
+          mkdir -p apps/desktop/src-tauri/binaries
+          cp "$src" "apps/desktop/src-tauri/binaries/sidecar-${{ matrix.target }}${ext}"
+          if [ -z "$ext" ]; then chmod +x "apps/desktop/src-tauri/binaries/sidecar-${{ matrix.target }}"; fi
+          ls -l apps/desktop/src-tauri/binaries/
       - uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
@@ -140,7 +201,9 @@ jobs:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: bun --no-env-file scripts/build.ts --target=${{ matrix.target }} --bundles=${{ matrix.bundles }} --out-dir=release
+        # Tauri bundle only: `compile` is skipped — the sidecar was cross-compiled
+        # by the Bun job above and already placed in src-tauri/binaries/.
+        run: bun --no-env-file scripts/build.ts --skip=compile --target=${{ matrix.target }} --bundles=${{ matrix.bundles }} --out-dir=release
       - name: Build architecture-specific updater manifest
         env:
           RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ needs.trusted.outputs.tag }}-${{ matrix.slug }}
