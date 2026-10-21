@@ -15,10 +15,10 @@
  *
  * A result that does not validate as a closed manifold solid is an error (`BooleanError`), never returned.
  */
-import { add3, cross3, dist3, dot3, length3, normalize3, scale3, sub3, unwrapNear, type Frame, type Vec2, type Vec3 } from "./math.ts"
+import { add3, cross3, dist3, dot3, length3, normalize3, scale3, sub3, translation, unwrapNear, type Frame, type Vec2, type Vec3 } from "./math.ts"
 import { curvePoint, curveProject, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Curve3, type Surface } from "./geom.ts"
 import { interpolateCurve } from "./nurbs.ts"
-import { compactBrep, edgeUses, EMPTY_BREP, type Brep, type Coedge, type Edge, type Face, type Loop } from "./topology.ts"
+import { compactBrep, edgeUses, EMPTY_BREP, transformBrep, type Brep, type Coedge, type Edge, type Face, type Loop } from "./topology.ts"
 import { faceBoundaries, tessellateBrep, type FaceBoundaries, type UvSample } from "./tessellate.ts"
 import { brepLocator, type BrepLocator } from "./classify.ts"
 import { Cdt } from "./cdt.ts"
@@ -74,6 +74,29 @@ export interface BooleanResult {
 }
 
 const TAU = Math.PI * 2
+
+/**
+ * Signed turn between two consecutive samples of a circle, in (−π, π]. Consecutive samples are closer than half a turn, so
+ * the sum telescopes to the exact angle of the last point; a sample slightly out of order (two marks within the tolerance of
+ * one vertex) is a small negative step, not a whole extra turn.
+ */
+const stepAngle = (delta: number): number => {
+  let d = delta % TAU
+  if (d > Math.PI) d -= TAU
+  else if (d <= -Math.PI) d += TAU
+  return d
+}
+
+/** Cumulative angles, kept non-decreasing for use as curve parameters (the true total is `total`). */
+const runningAngles = (angles: ReadonlyArray<number>): { readonly params: number[]; readonly total: number } => {
+  const params: number[] = [0]
+  let acc = 0
+  for (let i = 1; i < angles.length; i++) {
+    acc += stepAngle(angles[i]! - angles[i - 1]!)
+    params.push(Math.max(acc, params[i - 1]!))
+  }
+  return { params, total: acc }
+}
 
 // ================================================================ registries
 
@@ -202,18 +225,8 @@ const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number, conic?
         let fr: Frame = { origin: center, x, y: cross3(z, x), z }
         const ang = (p: Vec3) => Math.atan2(dot3(sub3(p, center), fr.y), dot3(sub3(p, center), fr.x))
         if (ang(pts[1]!) < 0) { const z2 = scale3(z, -1); fr = { origin: center, x, y: cross3(z2, x), z: z2 } }
-        const params: number[] = [0]
-        let acc = 0
-        for (let i = 1; i < n; i++) {
-          let d = ang(pts[i]!) - ang(pts[i - 1]!)
-          while (d < 0) d += TAU
-          while (d >= TAU) d -= TAU
-          acc += d
-          params.push(acc)
-        }
-        let t1 = acc
-        if (closed) t1 = TAU
-        else { let d = ang(Pn) - ang(pts[n - 2]!); while (d < 0) d += TAU; t1 = acc; void d }
+        const { params, total } = runningAngles(pts.map(ang))
+        const t1 = closed ? TAU : total
         return { curve: { kind: "circle", frame: fr, radius: R }, t0: 0, t1, params }
       }
     }
@@ -235,16 +248,8 @@ const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number, conic?
       while (d0 < -Math.PI) d0 += TAU
       const fr: Frame = d0 < 0 ? { origin: conic.frame.origin, x: conic.frame.x, y: scale3(conic.frame.y, -1), z: scale3(conic.frame.z, -1) } : conic.frame
       const t0 = ang(fr, P0)
-      const params: number[] = [t0]
-      let acc = t0
-      for (let i = 1; i < n; i++) {
-        let d = ang(fr, pts[i]!) - ang(fr, pts[i - 1]!)
-        while (d < 0) d += TAU
-        while (d >= TAU) d -= TAU
-        acc += d
-        params.push(acc)
-      }
-      return { curve: { kind: "ellipse", frame: fr, a, b }, t0, t1: closed ? t0 + TAU : acc, params }
+      const { params: rel, total } = runningAngles(pts.map((p) => ang(fr, p)))
+      return { curve: { kind: "ellipse", frame: fr, a, b }, t0, t1: closed ? t0 + TAU : t0 + total, params: rel.map((t) => t0 + t) }
     }
   }
   // Cubic B-spline interpolation (closed curves repeat the first point).
@@ -255,7 +260,7 @@ const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number, conic?
 
 // ================================================================ the Boolean
 
-export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOptions = {}): BooleanResult => {
+export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOptions = {}): BooleanResult => {
   const warnings: string[] = []
   const allBox = boxOf([...A.vertices.map((v) => v.point), ...B.vertices.map((v) => v.point), ...[A, B].flatMap((b) => b.edges.map((e) => curvePoint(e.curve, (e.t0 + e.t1) / 2)))])
   const size = Math.max(1e-3, dist3(allBox.lo, allBox.hi))
@@ -492,7 +497,23 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     let start = 0
     for (let i = 1; i < ring.length; i++) {
       if (ring[i]!.vid === undefined) continue
-      const seg = ring.slice(start, i + 1)
+      const raw = ring.slice(start, i + 1)
+      // Samples crowded next to a neighbour (a refined point beside an inserted vertex) make an interpolating spline hook
+      // back on itself; keep the ends and the samples at least a twentieth of a seed chord apart.
+      const minGap = seedChord * 0.05
+      const seg: Mark[] = [raw[0]!]
+      for (let k = 1; k < raw.length - 1; k++) {
+        const m = raw[k]!
+        if (m.vid === undefined && (dist3(m.q.p, seg[seg.length - 1]!.q.p) < minGap || dist3(m.q.p, raw[raw.length - 1]!.q.p) < minGap)) continue
+        seg.push(m)
+      }
+      if (raw.length > 1) seg.push(raw[raw.length - 1]!)
+      // A refined sample that sits off the curve and makes it turn back on itself is dropped (a spur of the mesh seed); the
+      // spline would otherwise loop there.
+      for (let k = seg.length - 2; k >= 1; k--) {
+        if (seg[k]!.vid !== undefined) continue
+        if (dot3(sub3(seg[k]!.q.p, seg[k - 1]!.q.p), sub3(seg[k + 1]!.q.p, seg[k]!.q.p)) < 0) seg.splice(k, 1)
+      }
       const v0 = seg[0]!.vid!, v1 = seg[seg.length - 1]!.vid!
       const pieceClosed = v0 === v1
       const ptsP = seg.map((m) => m.q)
@@ -520,7 +541,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     ssis: ssis.map((c) => ({ fa: c.fa, fb: c.fb, closed: c.closed, n: c.pts.length, first: c.pts[0]?.p, last: c.pts[c.pts.length - 1]?.p })),
     ssiPieces: ssiPieces.map((p) => ({ key: p.key, v0: p.v0, v1: p.v1, kind: p.curve.kind })),
     vertices: reg.pts,
-    splits: S.map((sd) => sd.splits.map((l) => l.map((x) => x.vid))),
+    splits: S.map((sd) => sd.splits.map((l) => l.map((x) => x.vid + "@" + x.t))),
     onFaces: S.map((sd) => sd.onFaces)
   })
   // ------------------------------------------------ 2a. split edges into pieces
@@ -637,7 +658,16 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
         for (let i = 0; i < n; i++) {
           const a = ring[i]!, b = ring[(i + 1) % n]!
           const isVertex = a.g < sd.brep.vertices.length && (a.edge !== undefined || a.inEdge !== undefined)
-          ex.push({ u: a.u, v: a.v, vid: isVertex ? sd.vid[a.g]! : undefined, out: a.edge, tOut: a.t, tIn: a.inT })
+          // A split vertex that falls exactly on a boundary sample (an equator crossing a sphere's seam at a sampled latitude)
+          // is that sample; the strict "between two samples" test below would never see it.
+          const sampleEdge = a.edge ?? a.inEdge
+          const sampleT = a.edge !== undefined ? a.t : a.inT
+          let sampleVid: number | undefined
+          if (!isVertex && sampleEdge !== undefined && sampleT !== undefined) {
+            const span = sd.brep.edges[sampleEdge]!.t1 - sd.brep.edges[sampleEdge]!.t0
+            sampleVid = edgePieces[s]![sampleEdge]!.slice(0, -1).find((p) => Math.abs(p.t1 - sampleT) <= 1e-9 * span)?.v1
+          }
+          ex.push({ u: a.u, v: a.v, vid: isVertex ? sd.vid[a.g]! : sampleVid, out: a.edge, tOut: a.t, tIn: a.inT })
           if (a.edge !== undefined && b.inEdge === a.edge && a.t !== undefined && b.inT !== undefined) {
             const ta = a.t, tb = b.inT
             const lo = Math.min(ta, tb), hi = Math.max(ta, tb)
@@ -731,12 +761,17 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
       // --- traverse: left faces.
       const out = new Map<number, number[]>()
       hes.forEach((h, i) => { const l = out.get(h.from) ?? []; l.push(i); out.set(h.from, l) })
+      // Direction a half-edge leaves its node: towards the first sample a real distance away. Samples within a few ulps of the
+      // node (a snapped end next to its neighbour) have a direction that is rounding noise.
       const dirAngle = (pts: ReadonlyArray<Vec2>): number => {
         const a = pts[0]!
+        let far = 0
+        for (let k = 1; k < pts.length; k++) far = Math.max(far, Math.hypot((pts[k]!.x - a.x) * su, (pts[k]!.y - a.y) * sv))
+        const min = Math.max(1e-12 * Math.max(1, Math.abs(a.x * su), Math.abs(a.y * sv)), far * 1e-3)
         for (let k = 1; k < pts.length; k++) {
           const b = pts[k]!
           const dx = (b.x - a.x) * su, dy = (b.y - a.y) * sv
-          if (Math.hypot(dx, dy) > 1e-12 * Math.max(1, Math.abs(a.x * su), Math.abs(a.y * sv))) return Math.atan2(dy, dx)
+          if (Math.hypot(dx, dy) > min) return Math.atan2(dy, dx)
         }
         return 0
       }
@@ -871,6 +906,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   let result: Brep = shellsByConnectivity({ vertices, edges, faces, shells: [] })
   result = mergeCoplanarFaces(result)
   result = compactBrep(result)
+  options.debug?.("result", result)
   const report = validateBrep(result, { coarseVolume: true })
   if (!report.valid) throw new BooleanError(`Boolean ${op} produced an invalid solid: ${report.issues.slice(0, 3).map((i) => i.message).join("; ")}`, report.issues)
   return {
@@ -1061,3 +1097,35 @@ const mergeCoplanarFaces = (b: Brep): Brep => {
 }
 
 void refineSurfaceSurface
+
+// ================================================================ degenerate alignments
+
+/**
+ * Boolean with a recovery for degenerate alignments. The first attempt is the plain pipeline. If it does not give a valid
+ * solid, the second operand is nudged by a few parts per
+ * million of the model size, which breaks an exact tangency; that last result is reported in `warnings`.
+ */
+export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOptions = {}): BooleanResult => {
+  try {
+    return booleanStrict(A, B, op, options)
+  } catch (e) {
+    if (!(e instanceof BooleanError)) throw e
+    const first: BooleanError = e
+    const box = boxOf([...A.vertices, ...B.vertices].map((v) => v.point))
+    const extent = dist3(box.lo, box.hi)
+    const dirs: Vec3[] = [{ x: 0.53, y: 0.31, z: 0.79 }, { x: -0.61, y: 0.43, z: -0.66 }]
+    // Growing displacements: an exact tangency needs a few ppm, a near-tangency (two curves 1e-4 apart) needs more.
+    for (const scale of [3e-6, 3e-5, 3e-4]) {
+      const eps = Math.max(1e-6, extent * scale)
+      for (const d of dirs) {
+        try {
+          const r = booleanStrict(A, transformBrep(B, translation(scale3(normalize3(d), eps))), op, options)
+          return { ...r, warnings: [...r.warnings, `degenerate alignment: the second operand was displaced by ${eps.toExponential(1)} mm to break an exact tangency or coincidence`] }
+        } catch (e3) {
+          if (!(e3 instanceof BooleanError)) throw e3
+        }
+      }
+    }
+    throw first
+  }
+}

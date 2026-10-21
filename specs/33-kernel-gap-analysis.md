@@ -135,3 +135,94 @@ resolution; the two assertions disagree with each other) and the AI MCP test hel
   the collaborating session's fix. Fresh reruns of all three files pass 16/16; the surface job takes 1.2 s (30 s gate).
   CAM S1 simulation correctness is recorded separately in spec 32; it does not close M4 stock-aware rest planning.
   The global RM statuses remain unchanged: this is continuation of the owner's concrete kernel work, not an RM acceptance claim.
+
+## 7. Enterprise-grade re-measurement (2026-10-21)
+
+Question: "which gaps can we still close to make the CAD kernel enterprise level". Method: the feature inventory of §1 re-checked
+against `main` (b496f33), plus a stress battery run against the exact B-rep kernel (32 Boolean/blend cases, `booleanBrep` +
+`validateBrep` + `massProperties`, wall-clock timed; probe script not kept, cases listed below so they can become tests).
+
+### 7.1 Measured robustness of the exact kernel
+
+Passing (valid B-rep, analytic volume where one exists): Steinmetz solid (two equal perpendicular cylinders, volume error 1.4e-12,
+1.7 s), box minus sphere through a corner, offset perpendicular cylinders, internally tangent cylinders, coincident cylinder
+faces (7e-14), concentric sphere shell (7e-15), torus minus box, torus ∪ torus, skew cylinders, cone/cylinder coaxial, apex on a
+face, 1e-3 mm hole (3.1 s), fillet of all box edges r=1 and r=4.9, fillet at a box/cylinder junction.
+
+**Failing (Boolean returns an invalid solid, i.e. the replay falls back to the mesh with a reason):**
+
+| # | Case | Failure | Likely cause |
+| --- | --- | --- | --- |
+| R1 | sphere ∪ sphere, centres on a common coordinate axis (r=5, offset 4 along x) | closed shell with volume 0 | intersection circle passes through the poles / seam of both spheres (parametrisation singularity) |
+| R2 | same pair with a tilted frame (offset (2,2.5,1.5), axis (1,1,1)) | edge used 4 times | seam of one sphere crosses the intersection curve at a vertex; seam split not handled |
+| R3 | box ∪ sphere with the sphere centre on a box face | edge used by one face only | equator/seam of the sphere coincides with the planar-face intersection (circle = great circle) |
+| R4 | torus ∪ sphere centred on the tube; torus − cylinder through the tube centre line | zero-volume shell / open edges | torus seam circles meet the cylinder/sphere intersection curve; tangent-ish self-crossing patches |
+| R5 | box − cylinder exactly tangent to a wall | edge used 4 times | tangential contact is not collapsed to a point/line (±0.001 mm either side works, the exact-tangent case does not) |
+
+All five are *degenerate-alignment* failures, not generic ones: a displaced or off-axis variant of every case passes. That is the
+classic enterprise-kernel gap: real parts (centred holes, spheres on a face, tangent bosses) are exactly the aligned cases, so
+the fallback to mesh happens on the shapes users model most. Lessons already recorded (tangential hits, poles, seams) point at
+the same area in `brep/intersect.ts` / `boolean.ts`.
+
+### 7.2 Gaps, ordered for an enterprise kernel
+
+Tier 1 — correctness and robustness (blocks "enterprise" regardless of features)
+
+| # | Gap | Today | Closing it |
+| --- | --- | --- | --- |
+| E1 | Degenerate-alignment Booleans R1–R5 | invalid solid → mesh fallback | seam/pole-aware SSI for sphere/torus, tangent contact collapse; each case becomes a regression test with analytic volume |
+| E2 | Property-based Boolean/blend fuzzing | hand-picked cases only (`fuzz`/`random` appear nowhere in `brep/*.test.ts`) | seeded generator of primitive pairs × placements (aligned + perturbed), invariants: valid, volume = inclusion–exclusion, A∪B − B ⊆ A; run a bounded sample in CI |
+| E3 | Tolerance model | one global `MODEL_TOL=1e-6`, `FIT_TOL=1e-5`; no per-edge/vertex tolerance, no healing on import | per-entity tolerance + sewing/healing pass (gap closing, sliver/short-edge removal, face merging) so foreign STEP bodies open and operate |
+| E4 | Failure reporting | `BooleanError` message strings | structured diagnostics (stage, face/edge ids, suggested nudge) surfaced to history, API and assistant instead of a silent mesh fallback |
+| E5 | Performance gates | 15 s budget on two recipes; a 1 mm hole takes 3 s, Steinmetz 1.7 s | per-operation timing gates, BVH/face-pair culling, incremental tessellation cache across history steps |
+
+Tier 2 — modelling depth (the ranked list of §1.2 that is still open)
+
+| # | Gap | Notes |
+| --- | --- | --- |
+| E6 | **Persistent naming (C6)** | no face/edge identity survives a rebuild; only `names` on `polyhedron`. Needed before direct editing and before drawings/CAM features can reference faces durably. Design: identity from (feature id, generating entity, role) propagated through Booleans via split/merge records |
+| E7 | Fillets: variable radius, setback vertex blends, non-coaxial curved edges, edge chains with tangent propagation, face-face blends (C3) | refused or mitred |
+| E8 | Shell/offset of arbitrary bodies and per-face thickness (C5); offset/delete/replace face on any body (C8) | only extrusions, revolutions, sweeps |
+| E9 | Surfacing (C7): patch, trim, stitch, thicken, offset surface, curvature continuity checks (G1/G2), zebra/curvature analysis | `surface.ts` is an evaluation helper, not a modelling toolset |
+| E10 | Sketch: offset/trim/extend/project, drag solver, over/under-constraint diagnostics (C13) | |
+| E11 | Sheet metal: edge flanges, reliefs, corners, multi-bend unfold of 3D parts (C10) | |
+
+Tier 3 — interoperability and product surface
+
+| # | Gap | Notes |
+| --- | --- | --- |
+| E12 | STEP: assemblies with instancing/product structure, colours/layers (STYLED_ITEM), PMI/GD&T (AP242), AP203/214 variants; STEP *import* of exact bodies into the history (today `import-step.ts` reads 14 entity kinds — polylines/circles/planar faces — while `brep/step.ts` reads the full set) | route imported solids through `readStepBreps` + healing (E3) |
+| E13 | Other exchange: IGES, Parasolid x_t, SAT, 3MF/STL exact-to-mesh options, glTF; DXF 3D | |
+| E14 | Assembly: joint solver with limits, motion study, interference over motion (C11) | |
+| E15 | Analysis: draft/undercut analysis, wall-thickness map, curvature, section properties, clearance/minimum distance between bodies | reuse `massProperties`, `TriBvh` |
+| E16 | Drawings: GD&T symbols, balloons/BOM, assembly drawings, exact silhouettes (C14) | |
+
+### 7.3 Recommended order
+
+1. **E1 + E2 together**: fix the five degenerate cases and land the fuzz harness first, so every later kernel change is measured.
+   Owner: WP1 (`brep/intersect.ts`, `boolean.ts`, tests only).
+2. **E4** (structured diagnostics) because it makes every later failure visible instead of silent.
+3. **E3** healing, then **E12** STEP import of exact bodies — the biggest user-visible interoperability win.
+4. **E6** persistent naming, then E7/E8 on top of stable selections.
+5. E5 performance gates continuously; E9–E11, E13–E16 by product priority.
+
+Nothing in §7 was implemented in this pass; this section is the measured inventory.
+
+### 7.4 E1 and E2 landed (2026-10-21)
+
+`brep/boolean.ts`, tests in `brep/degenerate.test.ts` and `brep/fuzz.test.ts`. The five failures of §7.1 were not one defect:
+
+| Case | Root cause | Fix |
+| --- | --- | --- |
+| R1, R2 (sphere ∪ sphere) | a piece of a fitted circle got a parameter range of 3π: a sample out of order by ~1e-12 rad counted as a whole extra turn, so the edge ended 1e-4 mm from its vertex | `stepAngle` / `runningAngles`: signed telescoping steps, exact end angle |
+| R3 (sphere centred on a face) | a split vertex that falls exactly on a boundary sample of the seam was never inserted (the "strictly between two samples" test missed it), so the equator circle was not connected to the seam | the sample *is* the vertex |
+| R4b (torus − cylinder on the centre line) | a half-edge leaving a node took its direction from a sample a few ulps away (rounding noise), so one of four caps was never closed; plus spline hooks from crowded samples | `dirAngle` uses a sample a real distance away; crowded samples dropped before interpolation |
+| R4a (torus ∪ sphere on the tube) | one out-of-order sample of the mesh seed made the fitted spline loop | samples that make the curve turn back on itself are dropped |
+| R5 (cylinder tangent to a wall) | the contact is a *non-manifold* edge: no valid exact solid exists | `booleanBrep` retries with the second operand displaced by 3e-6 / 3e-5 / 3e-4 of the model extent and says so in `warnings`; `booleanStrict` keeps the no-recovery behaviour |
+
+Fuzzing (`fuzz.test.ts`): seeded random pairs of box / cylinder / sphere / cone / torus, grid-aligned (poles, seams, tangents coincide)
+and generic placements, three operations each; invariants: valid result, `V(A∪B)+V(A∩B)=V(A)+V(B)`, `V(A−B)=V(A)−V(A∩B)` (1e-6, 2e-4 when displaced).
+Measured: aligned 16/16, generic 15/16. **Open (E1b):** generic seed 14, a torus and a sphere whose intersection curve folds back within 1e-4 mm of itself
+(the ring of the torus face self-crosses in (u, v); displacement up to 3e-4 does not separate it). It is pinned in the test as the single allowed failure.
+
+Evidence: core `bun check` clean; brep suites boolean 17, blend 12, loft 4, offset 5, path-sweep 5, face-edit 2, step 7, drawing-edges 7, gates 23, history-brep 31 and the exact-feature suites all pass.
