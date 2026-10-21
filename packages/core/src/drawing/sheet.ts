@@ -19,6 +19,7 @@ import { fmt, planDimensions, type CircleNote, type DimensionPlan, type HoleGrou
 import { edgesOf, projectView, viewFrame, type Edge3, type ProjectedView, type Seg2, type V3, type ViewName } from "./project.ts"
 import { detailView, sectionView, type Axis, type SectionView } from "./section.ts"
 import { drawingToSvg } from "./svg.ts"
+import { drawBalloon, drawDatumFeature, drawFeatureFrame, drawFrameLeader, validateGdt, type GdtSpec, type Pen } from "./gdt.ts"
 
 export type SheetSize = "A4" | "A3" | "A2"
 const SIZES: Readonly<Record<SheetSize, readonly [number, number]>> = { A4: [297, 210], A3: [420, 297], A2: [594, 420] }
@@ -46,6 +47,12 @@ export interface SheetOptions {
   readonly section?: { readonly axis: Axis; readonly at: number; readonly from?: "+" | "-"; readonly letter?: string; readonly parent?: "front" | "top" | "right" }
   readonly detail?: { readonly view?: "front" | "top" | "right"; readonly centre: V3; readonly radius: number; readonly factor: number; readonly letter?: string }
   readonly flatness?: { readonly value: number; readonly view?: "front" | "top" | "right" }
+  /** Feature control frames (ISO 1101): each leads to the world point `at` of the toleranced feature on its view. */
+  readonly gdt?: ReadonlyArray<{ readonly spec: GdtSpec; readonly at: V3; readonly view?: "front" | "top" | "right"; readonly offset?: { readonly x: number; readonly y: number } }>
+  /** Datum feature symbols on the world point `at`, the triangle on the feature, the letter box `side` of it (default below). */
+  readonly datums?: ReadonlyArray<{ readonly letter: string; readonly at: V3; readonly view?: "front" | "top" | "right"; readonly side?: "up" | "down" | "left" | "right" }>
+  /** Balloons (item numbers of the bill of materials) with a leader to the world point `at`. */
+  readonly balloons?: ReadonlyArray<{ readonly text: string; readonly at: V3; readonly view?: "front" | "top" | "right"; readonly offset?: { readonly x: number; readonly y: number } }>
   /** Draw the views from the exact B-rep edges when every body has an exact model (default true); otherwise from the mesh. */
   readonly exact?: boolean
 }
@@ -334,6 +341,37 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
     const target = placedPrincipal.find((p) => p.name === (options.flatness!.view ?? "right")) ?? placedPrincipal[0]
     if (target !== undefined) drawFlatness(cv, target, options.flatness.value, dimensions)
   }
+  // GD&T frames, datum features and balloons, in the sheet's own coordinates, through the principal view they name.
+  const pen: Pen = {
+    line: (a, b, w) => cv.line("dim", a, b, "continuous", w), circle: (c, r) => cv.circle("dim", c, r), arc: (c, r, a0, a1) => cv.arc("dim", c, r, a0, a1),
+    poly: (pts, closed, fill) => cv.poly("dim", pts, closed, fill === true), rect: (x0, y0, x1, y1, w) => cv.rect("dim", x0, y0, x1, y1, w), text: (at, t, size, o) => cv.text(at, t, size, { ...o, track: true })
+  }
+  const target = (name: "front" | "top" | "right" | undefined): Placed | undefined => placedPrincipal.find((q) => q.name === (name ?? "front")) ?? placedPrincipal[0]
+  const DIR = { up: { x: 0, y: 1 }, down: { x: 0, y: -1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } } as const
+  const defined = new Set((options.datums ?? []).map((d) => d.letter))
+  for (const g of options.gdt ?? []) {
+    const t = target(g.view)
+    if (t === undefined) continue
+    const on = place(t, t.view.toView(g.at))
+    const o = g.offset ?? { x: 16, y: 12 }
+    const layout = drawFeatureFrame(pen, { x: on.x + o.x, y: on.y + o.y }, g.spec)
+    drawFrameLeader(pen, { x: on.x + o.x, y: on.y + o.y + layout.height / 2 }, on)
+    dimensions.push({ view: t.name, kind: "callout", text: layout.text, value: g.spec.value })
+    for (const d of g.spec.datums ?? []) if (!defined.has(d)) warnings.push(`GD&T frame '${layout.text}' refers to datum ${d}, which no datum feature on the sheet defines`)
+  }
+  for (const d of options.datums ?? []) {
+    const t = target(d.view)
+    if (t === undefined) continue
+    drawDatumFeature(pen, place(t, t.view.toView(d.at)), DIR[d.side ?? "down"], d.letter)
+    dimensions.push({ view: t.name, kind: "callout", text: `datum ${d.letter}`, value: undefined })
+  }
+  for (const b of options.balloons ?? []) {
+    const t = target(b.view)
+    if (t === undefined) continue
+    const on = place(t, t.view.toView(b.at)), o = b.offset ?? { x: 14, y: 14 }
+    drawBalloon(pen, { x: on.x + o.x, y: on.y + o.y }, on, b.text)
+    dimensions.push({ view: t.name, kind: "callout", text: `item ${b.text}`, value: undefined })
+  }
   // Cutting-plane line and detail circle on the parent views.
   if (options.section !== undefined && arranged.section !== undefined) {
     const parent = placedPrincipal.find((p) => p.name === (options.section!.parent ?? (options.section!.axis === "z" ? "front" : "top")))
@@ -594,6 +632,13 @@ export const validateSheetOptions = (o: SheetOptions): void => {
   if (o.views !== undefined && (o.views.length === 0 || o.views.some((v) => !["front", "top", "right"].includes(v)) || new Set(o.views).size !== o.views.length)) throw new RangeError("Choose unique principal views")
   positive(o.scale, "Scale")
   positive(o.flatness?.value, "Flatness")
+  for (const g of o.gdt ?? []) {
+    const err = validateGdt(g.spec)
+    if (err !== undefined) throw new RangeError(`GD&T ${g.spec.kind}: ${err}`)
+    if (!Object.values(g.at).every(Number.isFinite)) throw new RangeError("Invalid GD&T feature point")
+  }
+  const letters = (o.datums ?? []).map((d) => d.letter)
+  if (letters.some((l) => !/^[A-Z]$/.test(l)) || new Set(letters).size !== letters.length) throw new RangeError("Datum features are single capital letters, each defined once")
   if (o.section !== undefined && (!Number.isFinite(o.section.at) || !["x", "y", "z"].includes(o.section.axis))) throw new RangeError("Invalid section plane")
   if (o.detail !== undefined) {
     positive(o.detail.radius, "Detail radius")

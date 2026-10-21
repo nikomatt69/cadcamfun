@@ -388,7 +388,25 @@ export const ParametricDrawingOptions = Schema.Struct({
     view: optional(principal), centre: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }),
     radius: length.check(Schema.isLessThanOrEqualTo(10000)), factor: length.check(Schema.isLessThanOrEqualTo(20)), letter: optional(Schema.String.check(Schema.isMaxLength(2)))
   })),
-  flatness: optional(Schema.Struct({ value: length, view: optional(principal) }))
+  flatness: optional(Schema.Struct({ value: length, view: optional(principal) })),
+  /** ISO 1101 feature control frames, datum feature symbols and BOM balloons, placed on world points of the model. */
+  gdt: optional(Schema.Array(Schema.Struct({
+    spec: Schema.Struct({
+      kind: Schema.Literals(["straightness", "flatness", "circularity", "cylindricity", "profile-line", "profile-surface", "parallelism", "perpendicularity", "angularity", "position", "concentricity", "symmetry", "runout", "total-runout"]),
+      value: length, diameter: optional(Schema.Boolean), modifier: optional(Schema.Literals(["M", "L"])),
+      datums: optional(Schema.Array(Schema.String.check(Schema.isPattern(/^[A-Z]$/))).check(Schema.isMaxLength(3)))
+    }),
+    at: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }), view: optional(principal),
+    offset: optional(Schema.Struct({ x: Schema.Finite, y: Schema.Finite }))
+  })).check(Schema.isMaxLength(40))),
+  datums: optional(Schema.Array(Schema.Struct({
+    letter: Schema.String.check(Schema.isPattern(/^[A-Z]$/)), at: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }),
+    view: optional(principal), side: optional(Schema.Literals(["up", "down", "left", "right"]))
+  })).check(Schema.isMaxLength(10))),
+  balloons: optional(Schema.Array(Schema.Struct({
+    text: Schema.String.check(Schema.isMaxLength(6)), at: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }), view: optional(principal),
+    offset: optional(Schema.Struct({ x: Schema.Finite, y: Schema.Finite }))
+  })).check(Schema.isMaxLength(60)))
 })
 
 export const PARAMETRIC_ACTION_INPUTS = {

@@ -40,7 +40,13 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad_edit.delete": { accept: [{ ids: ["a"], confirm: true }], refuse: [{ ids: ["a"] }, { ids: ["a"], confirm: false }] },
   "cad_edit.editor": { accept: [{ actions: [{ action: "view_fit" }, { action: "section_on", axis: "x", position: 10 }] }], refuse: [{ actions: [] }, { actions: [{ action: "explode" }] }] },
   "cad_edit.import": { accept: [{ attachment: "part.dxf", depth: 5 }, { format: "svg", content: "<svg/>", depth: 2 }], refuse: [{ format: "iges" }, { content: "" }, { depth: 0 }] },
-  "cad.drawing": { accept: [{}, { elementId: "a" }, { history }], refuse: [{ elementId: "" }, { history: dangling }] },
+  "cad.drawing": {
+    accept: [
+      {}, { elementId: "a" }, { history },
+      { history, options: { gdt: [{ spec: { kind: "position", value: 0.1, diameter: true, modifier: "M", datums: ["A", "B"] }, at: { x: 1, y: 2, z: 3 } }], datums: [{ letter: "A", at: { x: 0, y: 0, z: 0 } }], balloons: [{ text: "1", at: { x: 0, y: 0, z: 0 } }] } }
+    ],
+    refuse: [{ elementId: "" }, { history: dangling }, { history, options: { gdt: [{ spec: { kind: "flatness", value: 0 }, at: { x: 0, y: 0, z: 0 } }] } }, { history, options: { datums: [{ letter: "ab", at: { x: 0, y: 0, z: 0 } }] } }]
+  },
   "cad.parametric_validate": { accept: [{ history }], refuse: [{}, { history: JSON.stringify(history) }, { history: dangling }] },
   "cad.parametric_inspect": { accept: [{ elementId: "a" }], refuse: [{}] },
   "cad.parametric_test": { accept: [{ elementId: "a", cases: [{ name: "wider", parameters: { w: 80 } }] }], refuse: [{ elementId: "a", cases: [] }, { elementId: "a", cases: "[]" }] },
