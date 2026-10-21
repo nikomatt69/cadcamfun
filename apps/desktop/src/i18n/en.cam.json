@@ -405,6 +405,7 @@
   "cam.kernel.qualityHint": "Allowance follows the material preset until edited. A smaller cell size increases replay detail and processing time. Tolerance and work offset are shared with the operation generator.",
   "cam.kernel.generate": "Generate from CAD",
   "cam.kernel.generating": "Planning and verifying…",
+  "cam.kernel.fiveAxisStock": "5-axis moves remove {removedLower}–{removedUpper} mm³; {remainingLower}–{remainingUpper} mm³ may remain (voxel {voxel} mm).",
   "cam.kernel.tolerance.met": "Promised deviation {achieved} mm, within the requested {requested} mm.",
   "cam.kernel.tolerance.notMet": "Promised deviation {achieved} mm (requested {requested} mm): refine the resolution or accept the larger bound.",
   "cam.kernel.progress.operation": "Operation {index} of {count}: {id}",
@@ -577,5 +578,8 @@
   "cam.visualizer.machineAxes": "Machine axes",
   "cam.visualizer.limit": "Limit",
   "cam.visualizer.collision": "Collision",
-  "cam.visualizer.stopAtCollision": "Stop at a collision"
+  "cam.visualizer.stopAtCollision": "Stop at a collision",
+  "cam.visualizer.millTurn": "5-axis mill-turn · X Y Z B C",
+  "cam.visualizer.previewRotaryTiming": "Assumed rotary speed",
+  "cam.visualizer.millTurnRemoval": "Turning removal shown; local milling removal and full-machine collisions are not simulated."
 }

@@ -58271,6 +58271,34 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "finalVolume": {
                                   "type": "number",
                                 },
+                                "fiveAxis": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "remainingLower": {
+                                      "type": "number",
+                                    },
+                                    "remainingUpper": {
+                                      "type": "number",
+                                    },
+                                    "removedLower": {
+                                      "type": "number",
+                                    },
+                                    "removedUpper": {
+                                      "type": "number",
+                                    },
+                                    "voxelMm": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "voxelMm",
+                                    "removedLower",
+                                    "removedUpper",
+                                    "remainingLower",
+                                    "remainingUpper",
+                                  ],
+                                  "type": "object",
+                                },
                                 "initialVolume": {
                                   "type": "number",
                                 },

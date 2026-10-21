@@ -137,7 +137,7 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
         id: m.id, name: m.name, iso: m.iso, family: m.family, hardnessHB: m.hardnessHB, ...(m.hardnessHRC !== undefined ? { hardnessHRC: m.hardnessHRC } : {}),
         kc11: m.kc11, mc: m.mc, vcCarbide: m.vcCarbide, vcHss: m.vcHss ?? null, fz10: m.fz10, coolant: m.coolant, notes: m.notes
       }))
-      return query !== undefined && found === undefined ? { ok: false, error: `No material matches '${query}'`, known: cam.kernel.MATERIALS.map((m) => m.id) } : { ok: true, materials: rows, machines: cam.kernel.MACHINES.map((m) => ({ id: m.id, name: m.name, post: m.post, limits: m.limits })) }
+      return query !== undefined && found === undefined ? { ok: false, error: `No material matches '${query}'`, known: cam.kernel.MATERIALS.map((m) => m.id) } : { ok: true, materials: rows, machines: cam.kernel.MACHINES.map((m) => ({ id: m.id, name: m.name, post: m.post, limits: m.limits, ...(m.fiveAxis !== undefined ? { fiveAxis: m.fiveAxis } : {}) })) }
     }
   }),
   defineWireAction({

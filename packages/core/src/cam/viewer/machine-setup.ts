@@ -19,6 +19,7 @@ import { toolModelFromSettings, type LatheModel, type NozzleModel } from "../too
 import { toolForOperation } from "../operation-tools.ts"
 import { rotaryOfProgram, type RotarySetup } from "./rotary.ts"
 import type { Program } from "../ir.ts"
+import { turnMillAxesOf } from "./turn-mill.ts"
 
 export interface StockBox { readonly min: Vec3; readonly max: Vec3 }
 
@@ -56,6 +57,8 @@ export interface MillSetup {
 
 export interface LatheSetup {
   readonly kind: "lathe"
+  /** A mill-turn centre (X/Y/Z + B head + C spindle): activated by B, Y or positioned C, with an assumed B range. */
+  readonly turnMill?: { readonly b: readonly [number, number] }
   readonly turret: "rear" | "front"
   readonly xMode: "diameter" | "radius"
   readonly zero: "face" | "chuck"
@@ -168,8 +171,17 @@ export const printerSetupOf = (settings: ToolpathSettings): PrinterSetup => ({
 export const setupOf = (kind: MachineSetup["kind"], settings: ToolpathSettings, stock: Stock, table?: { readonly length: number; readonly width: number }): MachineSetup =>
   kind === "lathe" ? latheSetupOf(settings) : kind === "3dprinter" ? printerSetupOf(settings) : millSetupOf(settings, stock, table)
 
+/** Activate the existing lathe's mill-turn scene for B, Y or positioned C; remove it for a turning-only program. */
+export const withTurnMill = (setup: MachineSetup, program: Program): MachineSetup => {
+  if (setup.kind !== "lathe") return setup
+  const used = turnMillAxesOf(program)
+  const { turnMill: _drop, ...base } = setup
+  return used.b || used.y || used.cPositioned ? { ...base, turnMill: { b: [-120, 120] as const } } : base
+}
+
 /** A mill set-up with the rotary table its program uses (none for a 3-axis program). */
 export const withRotary = (setup: MachineSetup, program: Program, gcode = "", pivot?: Vec3): MachineSetup => {
+  if (setup.kind === "lathe") return withTurnMill(setup, program)
   if (setup.kind !== "mill") return setup
   const rotary = rotaryOfProgram(program, gcode, pivot)
   if (rotary === undefined) { const { rotary: _drop, ...rest } = setup; void _drop; return { ...rest, axes: 3 } }

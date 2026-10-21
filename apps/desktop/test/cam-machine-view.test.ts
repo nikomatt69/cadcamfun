@@ -278,6 +278,26 @@ describe("the machine model round a mill (spec 32 P5)", () => {
     expect([...platter.matrix.elements]).toEqual([m[0]!, m[4]!, m[8]!, 0, m[1]!, m[5]!, m[9]!, 0, m[2]!, m[6]!, m[10]!, 0, m[3]!, m[7]!, m[11]!, 1])
     scene.dispose()
   })
+
+  test("a B/C program is drawn on the B/C trunnion: B tilts about Y, C turns, the joints read B and C", () => {
+    const bcProgram = "(TABLE-BC)\nG21 G90 G17\nG0 X0 Y0 Z60 B0 C0\nG1 X20 Y0 Z0 B30 C90 F800\nM30"
+    const bc = cam.generator.analyseGcode(bcProgram)
+    const bcSetup = cam.viewer.withRotary(cam.viewer.setupOf("mill", settings({ axes: 5 }), stock), bc.program, bcProgram)
+    expect(bcSetup.kind === "mill" ? bcSetup.rotary?.layout : undefined).toBe("table-BC")
+    const s = createMachineScene({ setup: bcSetup, program: bc.program, motion: bc.motion, display: { ...DEFAULT_MACHINE_DISPLAY, showMachine: true }, scale: 100, gaugeOf: () => 80 })
+    expect(s.model?.preset).toBe("trunnion-bc")
+    expect(s.model?.rotaryLimits).toEqual({ b: [-120, 120] })
+    for (const link of ["base", "column", "head", "spindle", "table", "cradle", "platter"]) expect(s.root.getObjectByName(`machine-link:${link}`), link).toBeDefined()
+    const rotary = bcSetup.kind === "mill" ? bcSetup.rotary : undefined
+    const pose = cam.viewer.machinePose(s.model!, { x: 20, y: 0, z: 0 }, { b: 30, c: 90 }, rotary, 80, "part")
+    expect(pose.joints).toMatchObject({ b: 30, c: 90 })
+    expect(pose.joints.a).toBeUndefined()
+    // B30 leans the tool axis 30 degrees off vertical in the part frame (C90 turns the lean direction in the plane).
+    expect(Math.hypot(pose.axis.x, pose.axis.y)).toBeCloseTo(0.5, 6)
+    expect(pose.axis.z).toBeCloseTo(Math.cos(Math.PI / 6), 6)
+    expect(s.placeMachine(pose)).toBe(true)
+    s.dispose()
+  })
 })
 
 describe("collisions with the preview's tools (spec 32 P7)", () => {

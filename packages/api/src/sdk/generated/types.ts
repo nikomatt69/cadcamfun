@@ -6169,6 +6169,13 @@ export type ToolpathGeneratorManufactureOutput =
           remainingVolume: number
           maxRemaining: number
           cellSize: number
+          fiveAxis?: {
+            voxelMm: number
+            removedLower: number
+            removedUpper: number
+            remainingLower: number
+            remainingUpper: number
+          }
         }
         cycleTimeSeconds: number
         identity: { job: string; part: string; nc: string; algorithm: string }

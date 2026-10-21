@@ -49375,7 +49375,8 @@
                                     "fanuc",
                                     "grbl",
                                     "linuxcnc",
-                                    "haas"
+                                    "haas",
+                                    "siemens"
                                   ]
                                 }
                               },
@@ -50338,7 +50339,8 @@
                                       "HolderCollision",
                                       "Gouge",
                                       "RemainingStock",
-                                      "ReplayMismatch"
+                                      "ReplayMismatch",
+                                      "Cancelled"
                                     ]
                                   },
                                   "severity": {
@@ -50427,6 +50429,34 @@
                                 },
                                 "cellSize": {
                                   "type": "number"
+                                },
+                                "fiveAxis": {
+                                  "type": "object",
+                                  "properties": {
+                                    "voxelMm": {
+                                      "type": "number"
+                                    },
+                                    "removedLower": {
+                                      "type": "number"
+                                    },
+                                    "removedUpper": {
+                                      "type": "number"
+                                    },
+                                    "remainingLower": {
+                                      "type": "number"
+                                    },
+                                    "remainingUpper": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "voxelMm",
+                                    "removedLower",
+                                    "removedUpper",
+                                    "remainingLower",
+                                    "remainingUpper"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [
@@ -50475,6 +50505,64 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "tolerance": {
+                              "type": "object",
+                              "properties": {
+                                "requested": {
+                                  "type": "number"
+                                },
+                                "terms": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "enum": [
+                                          "source-tessellation",
+                                          "part-model",
+                                          "path",
+                                          "nc-rounding",
+                                          "stock-replay"
+                                        ]
+                                      },
+                                      "mm": {
+                                        "type": "number"
+                                      },
+                                      "basis": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "mm",
+                                      "basis"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "achieved": {
+                                  "type": "number"
+                                },
+                                "unbounded": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "met": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "requested",
+                                "terms",
+                                "achieved",
+                                "unbounded",
+                                "met"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -50534,7 +50622,8 @@
                                   "HolderCollision",
                                   "Gouge",
                                   "RemainingStock",
-                                  "ReplayMismatch"
+                                  "ReplayMismatch",
+                                  "Cancelled"
                                 ]
                               },
                               "severity": {
@@ -51820,6 +51909,7 @@
                               "type": "string",
                               "enum": [
                                 "roughing",
+                                "rest",
                                 "parallel",
                                 "waterline",
                                 "steep-shallow",
@@ -52116,6 +52206,24 @@
                   },
                   "subprograms": {
                     "type": "boolean"
+                  },
+                  "progress": {
+                    "type": "object",
+                    "properties": {
+                      "projectId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "projectId",
+                      "runId"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -56854,6 +56962,43 @@
                                 "additionalProperties": false
                               }
                             ]
+                          },
+                          "faceNames": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "repair": {
+                            "type": "object",
+                            "properties": {
+                              "verticesWelded": {
+                                "type": "integer"
+                              },
+                              "edgesWelded": {
+                                "type": "integer"
+                              },
+                              "collapsedUses": {
+                                "type": "integer"
+                              },
+                              "validAfter": {
+                                "type": "boolean"
+                              },
+                              "issuesAfter": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "verticesWelded",
+                              "edgesWelded",
+                              "collapsedUses",
+                              "validAfter",
+                              "issuesAfter"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -57367,6 +57512,41 @@
                         "checked"
                       ],
                       "additionalProperties": false
+                    },
+                    "clearance": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "a": {
+                            "type": "string"
+                          },
+                          "b": {
+                            "type": "string"
+                          },
+                          "aName": {
+                            "type": "string"
+                          },
+                          "bName": {
+                            "type": "string"
+                          },
+                          "distance": {
+                            "type": "number"
+                          },
+                          "overlap": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "a",
+                          "b",
+                          "aName",
+                          "bName",
+                          "distance",
+                          "overlap"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
                     "bom": {
                       "type": "array",

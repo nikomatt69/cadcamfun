@@ -20,6 +20,9 @@ A real part has many operations. Plan them in this order and do not skip ahead.
 - Horizontal faces at size: `flat` (the kernel plans it on freeform parts with ledges).
 - Deep pockets: `adaptive` then `rest`.
 - Lathe body: `facing`, then `turning_od`, then `parting`; `threading_od` if needed.
+- Five-axis mill: pick the machine by its rotary words. `trunnion-5ax` writes A+C, `trunnion-5ax-bc` writes B+C on the same cutting blocks (simultaneous). `cam.materials` lists each preset's `fiveAxis` layout, pivot and tilt range: choose from that, never guess. A `multiaxis` operation on a machine without `fiveAxis` fails.
+- Reading a five-axis result: `stock.fiveAxis` is the voxel bracket of the turned moves (removed/remaining lower–upper, mm³, `voxelMm`); the height-field volumes do not cover those moves, and `material-removed` stays unresolved. Do not quote a single removed volume for a five-axis program.
+- Lathe in its own mode: turning is X (diameter) and Z with the part turning in the chuck (C spins). A 5-axis lathe is a mill-turn centre: X/Y/Z plus a B milling head (B0 axial, B90 radial) and the C spindle positioned for milling. Turning-only programs carry no B/Y words; do not invent a B axis for them.
 
 ## Picking a tool
 

@@ -315,6 +315,11 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
               {budget().unbounded.length > 0 ? ` ${budget().unbounded.join("; ")}.` : ""}
             </p>
           )}</Show>
+          <Show when={value().stock.fiveAxis}>{(five) => (
+            <p class="text-gray-500" data-testid="kernel-fiveaxis-stock">
+              {t("cam.kernel.fiveAxisStock", { removedLower: five().removedLower.toFixed(0), removedUpper: five().removedUpper.toFixed(0), remainingLower: five().remainingLower.toFixed(0), remainingUpper: five().remainingUpper.toFixed(0), voxel: five().voxelMm })}
+            </p>
+          )}</Show>
           <div class="flex flex-wrap gap-2" data-testid="kernel-tools">
             <For each={value().tools}>
               {(tool) => (

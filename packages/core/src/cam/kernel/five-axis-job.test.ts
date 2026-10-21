@@ -37,7 +37,34 @@ describe("five-axis operations in the kernel", () => {
     expect(bracket).not.toBeNull()
     expect(Number(bracket![1])).toBeGreaterThan(0)
     expect(Number(bracket![1])).toBeLessThanOrEqual(Number(bracket![2]))
+    // The same bracket is structured on the artifact, so API and desktop do not parse the claim text.
+    const five = a.stock.fiveAxis!
+    expect(five).toBeDefined()
+    expect(five.voxelMm).toBe(2)
+    expect(five.removedLower).toBeGreaterThan(0)
+    expect(five.removedLower).toBeLessThanOrEqual(five.removedUpper)
+    expect(five.remainingLower).toBeLessThanOrEqual(five.remainingUpper)
+    expect(five.removedLower + five.remainingUpper).toBeCloseTo(five.removedUpper + five.remainingLower, 0)
+    // The bracket sums to the voxel grid volume (44 x 44 x 18 mm at 2 mm voxels), which covers the stock box.
+    expect(five.removedLower + five.remainingUpper).toBeCloseTo(44 * 44 * 18, 0)
+    expect(Math.round(five.removedLower)).toBe(Number(bracket![1]))
+    expect(Math.round(five.removedUpper)).toBe(Number(bracket![2]))
     expect(a.claims.find((c) => c.id === "machine-clearance")!.status).toBe("unsupported")
+  })
+
+  test("the B/C trunnion writes B and C words together, no A word, and the bracket and replay follow", () => {
+    const r = runJob(job("trunnion-5ax-bc", [multiaxis(ball.id)]))
+    if (r.status !== "ok") throw new Error(r.issues.map((i) => i.message).join("; "))
+    const a = r.value
+    expect(a.nc).toMatch(/\bB-?\d/)
+    expect(a.nc).toMatch(/\bC-?\d/)
+    expect(a.nc).not.toMatch(/\bA-?\d+\.\d/)
+    // B and C move on the same cutting blocks (simultaneous, not indexed apart).
+    expect(a.nc.split("\n").some((l) => /\bB-?\d/.test(l) && /\bC-?\d/.test(l) && /\bX-?\d/.test(l))).toBe(true)
+    expect(a.stock.fiveAxis).toBeDefined()
+    expect(a.stock.fiveAxis!.removedLower).toBeGreaterThan(0)
+    expect(a.claims.find((c) => c.id === "nc-replay")!.status).not.toBe("failed")
+    expect(findMachine("trunnion-5ax-bc")!.fiveAxis).toEqual({ layout: "table-BC", pivot: { x: 0, y: 0, z: -100 }, tilt: [-120, 120] })
   })
 
   test("a five-axis operation on a machine without a rotary table fails that operation with a typed issue", () => {

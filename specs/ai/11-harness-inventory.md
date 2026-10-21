@@ -64,8 +64,8 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cad.parametric_exact` (was `cad_parametric`) | read | — | elementId, history, includeStep, name | handler `parametric` → `apps/sidecar/src/services/ai.ts:553` | yes | declared | action-inputs-cad.test.ts |
 | `cad.exact` | read | — | ids, machining | handler `cadExact` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad.assembly` | read | — | washers | handler `cadAssembly` → `apps/sidecar/src/services/ai.ts:486` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
-| `cad.shell` | read | — | id*, thickness*, open | handler `cadShell` → `apps/sidecar/src/services/ai.ts:493` | yes | declared | action-inputs-cad.test.ts |
-| `cad.distance` | read | — | firstId*, secondId* | handler `cadDistance` → `apps/sidecar/src/services/ai.ts:499` | yes | declared | action-inputs-cad.test.ts |
+| `cad.shell` | read | — | id*, thickness*, open | handler `cadShell` → `apps/sidecar/src/services/ai.ts:493` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
+| `cad.distance` | read | — | firstId*, secondId* | handler `cadDistance` → `apps/sidecar/src/services/ai.ts:499` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad.parametric_fastener` (was `cad_parametric`) | read | — | size, fit, shaftDiameter | local (in-package implementation) — `packages/ai/src/actions/cad.ts` | yes | declared | action-inputs-cad.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
 | `cad.parametric_recipe` (was `cad_parametric`) | read | — | recipe*, params | handler `parametric` → `apps/sidecar/src/services/ai.ts:553` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
 | `cad.parametric_from_element` (was `cad_parametric`) | read | — | elementId*, depth | handler `parametric` → `apps/sidecar/src/services/ai.ts:553` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, ai-fusion-governance.test.ts |
@@ -297,7 +297,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `plugin-authoring` | dev | 1659 | — |
 | `parametric-design` | cad | 6985 | cad, cad_edit, parts, vcs_edit |
 | `fusion-360-modelling` | cad | 8510 | cad, cad_edit, cam |
-| `composed-cam-programs` | cam | 3084 | cam, cam_edit, library, parts |
+| `composed-cam-programs` | cam | 4008 | cam, cam_edit, library, parts |
 | `version-control-cadcam` | vcs | 1671 | vcs, vcs_edit, agent |
 | `workflows-cadcam` | workflows | 1468 | cam, vcs_edit |
 | `machining-cycle-presets` | cam | 1320 | cam, cam_edit, library |

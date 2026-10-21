@@ -213,6 +213,18 @@ export interface StockSummary {
   readonly remainingVolume: number
   readonly maxRemaining: number
   readonly cellSize: number
+  /**
+   * Removal by moves with the table turned, bracketed on the voxel stock (the height field above does not cover them).
+   * `removedLower..removedUpper` and `remainingLower..remainingUpper` are mm³ on the raw stock; the true value lies inside.
+   * Absent when the program has no turned move.
+   */
+  readonly fiveAxis?: {
+    readonly voxelMm: number
+    readonly removedLower: number
+    readonly removedUpper: number
+    readonly remainingLower: number
+    readonly remainingUpper: number
+  }
 }
 
 /** One term of the tolerance budget: what it bounds, in mm, and where the bound comes from. */

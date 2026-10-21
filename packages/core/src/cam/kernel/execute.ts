@@ -57,7 +57,8 @@ import {
   type OperationOutcome,
   type OperationSpec,
   type ReleaseLevel,
-  type StockBox
+  type StockBox,
+  type StockSummary
 } from "./contracts.ts"
 import { DEFAULT_CUTTERS, cutterIssues, legacyTool, verifyTool, type Cutter } from "./cutters.ts"
 import { cuttingData, type CutClass, type CuttingData } from "./cutting-data.ts"
@@ -215,11 +216,18 @@ const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
 
 const shift2 = (p: Vec2, o: Vec3): Vec2 => ({ x: p.x - o.x, y: p.y - o.y })
 
-/** What the five-axis moves removed from the raw stock, as the bracket of the voxel stock; the height field does not cover them. */
-const fiveAxisRemovalText = (vs: VoxelStock): string => {
+/** The five-axis removal bracket on the voxel stock: removed and remaining volumes, each between a lower and an upper bound. */
+const fiveAxisBracket = (vs: VoxelStock): NonNullable<StockSummary["fiveAxis"]> => {
   const raw = vs.nx * vs.ny * vs.nz * vs.voxel ** 3
   const left = remainingVolume(vs)
-  return `Five-axis moves remove between ${(raw - left.upper).toFixed(0)} and ${(raw - left.lower).toFixed(0)} mm³ of the raw stock; the three-axis height field does not cover them`
+  const round = (v: number): number => Math.round(v * 10) / 10
+  return { voxelMm: vs.voxel, removedLower: round(raw - left.upper), removedUpper: round(raw - left.lower), remainingLower: round(left.lower), remainingUpper: round(left.upper) }
+}
+
+/** What the five-axis moves removed from the raw stock, as the bracket of the voxel stock; the height field does not cover them. */
+const fiveAxisRemovalText = (vs: VoxelStock): string => {
+  const b = fiveAxisBracket(vs)
+  return `Five-axis moves remove between ${b.removedLower.toFixed(0)} and ${b.removedUpper.toFixed(0)} mm³ of the raw stock; the three-axis height field does not cover them`
 }
 
 /** Largest table turn between two poses of a move, degrees: the angles are interpolated in steps of at most this. */
@@ -994,7 +1002,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       machine: { id: machine.id, name: machine.name, post: post.id },
       ...(job.setupOrientation !== undefined ? { setupOrientation: job.setupOrientation } : {}),
       origin, stockBounds: prepared.stock, operations: finalOutcomes, program, tools: usedTools, nc, claims, issues, release,
-      stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume()), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000 },
+      stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume()), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000, ...(turnedMoves > 0 && turnedVoxels !== undefined ? { fiveAxis: fiveAxisBracket(turnedVoxels) } : {}) },
       cycleTimeSeconds,
       identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
       notes: [...(prepared.plan?.notes ?? []), ...subprogramNotes(nc)],

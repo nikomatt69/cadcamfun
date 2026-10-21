@@ -73,7 +73,7 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
     status: Schema.Literals(["passed", "failed", "unsupported", "unresolved"]), detail: Schema.String
   })),
   issues: Schema.Array(CamKernelIssue), release: Schema.Literals(["blocked", "preview", "verified-program"]),
-  stock: Schema.Struct({ initialVolume: Schema.Finite, finalVolume: Schema.Finite, partVolume: Schema.Finite, remainingVolume: Schema.Finite, maxRemaining: Schema.Finite, cellSize: Schema.Finite }),
+  stock: Schema.Struct({ initialVolume: Schema.Finite, finalVolume: Schema.Finite, partVolume: Schema.Finite, remainingVolume: Schema.Finite, maxRemaining: Schema.Finite, cellSize: Schema.Finite, fiveAxis: Schema.optionalKey(Schema.Struct({ voxelMm: Schema.Finite, removedLower: Schema.Finite, removedUpper: Schema.Finite, remainingLower: Schema.Finite, remainingUpper: Schema.Finite })) }),
   cycleTimeSeconds: Schema.Finite, identity: Schema.Struct({ job: id, part: id, nc: id, algorithm: id }), notes: strings,
   /** The deviation the program can be promised, term by term; informational, it does not move the release level. */
   tolerance: Schema.optionalKey(Schema.Struct({

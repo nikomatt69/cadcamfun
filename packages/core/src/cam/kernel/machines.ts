@@ -40,6 +40,12 @@ export const MACHINES: ReadonlyArray<KernelMachine> = [
     table: { length: 600, width: 400, gap: 30 }, fiveAxis: { layout: "table-AC", pivot: { x: 0, y: 0, z: -100 }, tilt: [-120, 120] }, rapidFeed: 30000, toolChangeSeconds: 6
   },
   {
+    // Same trunnion class turned about Y instead of X: the program carries B (tilt) and C (rotation) words together.
+    id: "trunnion-5ax-bc", name: "5-axis trunnion B/C (BT40, 12 000 rpm, B/C table, 11 kW)", post: "fanuc",
+    limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
+    table: { length: 600, width: 400, gap: 30 }, fiveAxis: { layout: "table-BC", pivot: { x: 0, y: 0, z: -100 }, tilt: [-120, 120] }, rapidFeed: 30000, toolChangeSeconds: 6
+  },
+  {
     id: "cnc-router", name: "CNC router (24 000 rpm spindle, 2.2 kW)", post: "grbl",
     limits: { maxRpm: 24000, minRpm: 6000, maxFeed: 6000, powerKw: 2.2, torqueNm: 1.2, rigidity: "hobby" },
     table: { length: 1200, width: 900, gap: 20 }, rapidFeed: 8000, toolChangeSeconds: 30
