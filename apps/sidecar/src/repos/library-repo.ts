@@ -4,6 +4,7 @@ import type { Db } from "@cadcamfun/db"
 import { and, desc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { orgIdsOf } from "./access.ts"
+import { LiveEvents } from "../services/live-events.ts"
 
 type Row = typeof schema.libraryItemTable.$inferSelect
 const toRow = (i: Row): LibraryItemRow => ({ ...i, createdAt: i.createdAt.toISOString(), updatedAt: i.updatedAt.toISOString() })
@@ -35,6 +36,9 @@ export class LibraryRepo extends Context.Service<LibraryRepo, {
     Effect.gen(function*() {
       const { query } = yield* Database
       const T = schema.libraryItemTable
+      const events = yield* LiveEvents
+      // Library items are shared catalogue entries: every device re-reads the catalogue, not just the actor's.
+      const catalogueChanged = Effect.suspend(() => events.publish({ type: "catalogue.updated", at: new Date().toISOString() }))
       return LibraryRepo.of({
         list: (userId, f) =>
           query("library.list", async (db) => {
@@ -70,7 +74,7 @@ export class LibraryRepo extends Context.Service<LibraryRepo, {
               organizationId: d.organizationId ?? null, isPublic: d.isPublic || false
             }).returning()
             return toRow(row!)
-          }),
+          }).pipe(Effect.tap(() => catalogueChanged)),
         update: (item, d) =>
           query("library.update", async (db) => {
             const [row] = await db.update(T).set({
@@ -82,8 +86,8 @@ export class LibraryRepo extends Context.Service<LibraryRepo, {
               updatedAt: new Date()
             }).where(eq(T.id, item.id)).returning()
             return toRow(row!)
-          }),
-        remove: (id) => query("library.remove", async (db) => void (await db.delete(T).where(eq(T.id, id)))),
+          }).pipe(Effect.tap(() => catalogueChanged)),
+        remove: (id) => query("library.remove", async (db) => void (await db.delete(T).where(eq(T.id, id)))).pipe(Effect.tap(() => catalogueChanged)),
         catalogue: (userId, kind) =>
           query("library.catalogue", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
@@ -94,5 +98,5 @@ export class LibraryRepo extends Context.Service<LibraryRepo, {
           })
       })
     })
-  )
+  ).pipe(Layer.provide(LiveEvents.layer))
 }

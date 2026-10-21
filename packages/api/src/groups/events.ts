@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi"
 import { Unauthorized, NotFound, InternalError } from "../errors.ts"
+import { NotificationRow } from "./notifications.ts"
 
 /**
  * Live cross-cutting event stream (vcs, pull requests, workflow runs, AI sessions). One channel
@@ -85,13 +86,51 @@ export const WorkspaceChanged = Schema.Struct({
   at: Schema.String,
   projectId: Schema.String
 })
+/**
+ * Notification sync frames: the `Notification` table stays the source of truth and these
+ * frames only announce a committed change, so a desktop, a paired phone and the DB converge
+ * without polling. `created`/`updated` carry the full row; `deleted` and `readAll` carry the
+ * owner id so the stream handler can drop frames addressed to another user.
+ */
+export const NotificationCreated = Schema.Struct({
+  type: Schema.Literal("notification.created"),
+  at: Schema.String,
+  notification: NotificationRow
+})
+export const NotificationUpdated = Schema.Struct({
+  type: Schema.Literal("notification.updated"),
+  at: Schema.String,
+  notification: NotificationRow
+})
+export const NotificationDeleted = Schema.Struct({
+  type: Schema.Literal("notification.deleted"),
+  at: Schema.String,
+  notificationId: Schema.String,
+  userId: Schema.String
+})
+export const NotificationReadAll = Schema.Struct({
+  type: Schema.Literal("notification.readAll"),
+  at: Schema.String,
+  userId: Schema.String,
+  count: Schema.Number
+})
+/** An organization the user belongs to was created, renamed or deleted; receivers reload the synced list/detail. */
+export const OrganizationsChanged = Schema.Struct({
+  type: Schema.Literal("organizations.changed"),
+  at: Schema.String,
+  userId: Schema.String,
+  organizationId: Schema.String
+})
 export const ServerConnected = Schema.Struct({ type: Schema.Literal("server.connected"), at: Schema.String })
-export const ResourcesChanged = Schema.Struct({ type: Schema.Literal("resources.changed"), userId: Schema.String, at: Schema.String })
+/** Keep-alive only (nikcli's `server.heartbeat`): proves the pipe is alive, never means data changed. Receivers must not reload on it. */
+export const ServerHeartbeat = Schema.Struct({ type: Schema.Literal("server.heartbeat"), at: Schema.String })
+export const ResourcesChanged = Schema.Struct({ type: Schema.Literal("resources.changed"), userId: Schema.String, organizationId: Schema.optional(Schema.String), at: Schema.String })
 export const CatalogueUpdated = Schema.Struct({ type: Schema.Literal("catalogue.updated"), at: Schema.String })
 
 export const LiveEvent = Schema.Union([
   PrOpened, PrMerged, PrClosed, PrReviewed, Commit,
-  WorkflowStarted, WorkflowFinished, AiSession, WorkspaceChanged, ServerConnected, ResourcesChanged, CatalogueUpdated
+  WorkflowStarted, WorkflowFinished, AiSession, WorkspaceChanged, ServerConnected, ServerHeartbeat, ResourcesChanged, CatalogueUpdated,
+  NotificationCreated, NotificationUpdated, NotificationDeleted, NotificationReadAll, OrganizationsChanged
 ] as const)
 export type LiveEvent = typeof LiveEvent.Type
 

@@ -108,7 +108,7 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
               isPublic: input.isPublic || false
             }).returning()
             return toRow(row!)
-          }).pipe(Effect.tap((row) => events.resourcesChanged(row.ownerId))),
+          }).pipe(Effect.tap((row) => events.resourcesChanged(row.ownerId, row.organizationId))),
         update: (id, patch) =>
           query("projects.update", async (db) => {
             const [current] = await db.select().from(T).where(eq(T.id, id)).limit(1)
@@ -119,7 +119,7 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
               updatedAt: new Date()
             }).where(eq(T.id, id)).returning()
             return (await hydrate(db, [row!]))[0]!
-          }).pipe(Effect.tap((row) => events.resourcesChanged(row.ownerId))),
+          }).pipe(Effect.tap((row) => events.resourcesChanged(row.ownerId, row.organizationId))),
         remove: (id) =>
           query("projects.remove", async (db) => {
             // Activity and AI-analysis rows point at items by plain id (no foreign key), so cascades miss them.
@@ -129,11 +129,11 @@ export class ProjectRepo extends Context.Service<ProjectRepo, {
               ...(await db.select({ id: schema.componentTable.id }).from(schema.componentTable).where(eq(schema.componentTable.projectId, id))).map((r) => r.id),
               ...(await db.select({ id: schema.toolpathTable.id }).from(schema.toolpathTable).where(eq(schema.toolpathTable.projectId, id))).map((r) => r.id)
             ]
-            const [deleted] = await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId })
+            const [deleted] = await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId })
             await db.delete(schema.activityLogTable).where(inArray(schema.activityLogTable.itemId, ids))
             await db.delete(schema.aIAnalysisLogTable).where(inArray(schema.aIAnalysisLogTable.objectId, ids))
             return deleted
-          }).pipe(Effect.tap((row) => row ? events.resourcesChanged(row.ownerId) : Effect.void), Effect.asVoid)
+          }).pipe(Effect.tap((row) => row ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void), Effect.asVoid)
       })
     })
   ).pipe(Layer.provide(LiveEvents.layer))

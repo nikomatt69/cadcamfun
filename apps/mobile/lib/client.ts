@@ -144,7 +144,30 @@ export interface ChatAttachment {
 /** The project contents the phone can create, rename and delete. */
 export type EntryKind = "drawings" | "components" | "toolpaths"
 export type ResourceKind = "materials" | "tools" | "machine-configs"
-export interface ResourceRow { readonly id: string; readonly name: string; readonly description?: string | null; readonly type?: string | null; readonly isPublic?: boolean; readonly updatedAt?: string }
+export interface ResourceRow {
+  readonly id: string; readonly name: string; readonly description?: string | null; readonly type?: string | null
+  readonly isPublic?: boolean; readonly updatedAt?: string; readonly createdAt?: string
+  readonly diameter?: number; readonly material?: string; readonly numberOfFlutes?: number | null
+  readonly maxRPM?: number | null; readonly properties?: unknown; readonly config?: unknown
+  readonly notes?: string | null; readonly organizationId?: string | null
+}
+
+/** Full resource detail as the desktop detail pages read it (single-row GET, envelope unwrapped). */
+export const resourceRow = (body: unknown): ResourceRow => {
+  const unwrap = (value: unknown): unknown => (value && typeof value === "object" && !Array.isArray(value) && "data" in value ? unwrap((value as { data: unknown }).data) : value)
+  const value = unwrap(body)
+  if (!value || typeof value !== "object" || typeof (value as ResourceRow).id !== "string") throw new CompanionError(502, "The desktop returned an invalid resource")
+  return value as ResourceRow
+}
+
+export interface MaterialInput { readonly name: string; readonly description?: string | null; readonly density: number; readonly hardness?: string; readonly color?: string; readonly isPublic?: boolean }
+export interface ToolInput { readonly name: string; readonly description?: string | null; readonly type: string; readonly diameter: number; readonly material: string; readonly numberOfFlutes?: number | null; readonly maxRPM?: number | null; readonly isPublic?: boolean }
+export interface MachineInput { readonly name: string; readonly description?: string | null; readonly type: string; readonly controller: string; readonly isPublic?: boolean }
+
+export type OrganizationRole = "ADMIN" | "MANAGER" | "MEMBER"
+export interface OrganizationSummary { readonly id: string; readonly name: string; readonly description: string | null; readonly createdAt: string; readonly updatedAt: string; readonly role: OrganizationRole; readonly userCount: number; readonly projectCount: number }
+export interface OrganizationMember { readonly id: string; readonly name: string | null; readonly email: string | null; readonly image: string | null; readonly role: OrganizationRole; readonly joinedAt: string }
+export interface OrganizationDetails { readonly id: string; readonly name: string; readonly description: string | null; readonly createdAt: string; readonly updatedAt: string; readonly members: ReadonlyArray<OrganizationMember>; readonly projectCount: number; readonly userRole: OrganizationRole }
 
 /** Materials and tools answer a bare array; machine configurations answer the legacy `{ data: { data: rows } }` envelope. */
 export const resourceRows = (body: unknown): ResourceRow[] => {
@@ -213,11 +236,36 @@ export class CompanionClient {
 
   resources = (resource: ResourceKind, signal?: AbortSignal) =>
     this.request<unknown>("GET", `/api/${resource}`, undefined, signal).then((body) => resourceRows(body))
-  createMaterial = (name: string, density: number) => this.request<ResourceRow>("POST", "/api/materials", { name, properties: { density } })
-  createTool = (name: string, diameter: number) =>
-    this.request<ResourceRow>("POST", "/api/tools", { name, type: "endmill", diameter, material: "Carbide", numberOfFlutes: 3, maxRPM: 12000 })
+  resource = (resource: ResourceKind, id: string, signal?: AbortSignal) =>
+    this.request<unknown>("GET", `/api/${resource}/${encodeURIComponent(id)}`, undefined, signal).then(resourceRow)
+  createMaterial = (input: MaterialInput | string, density?: number) => {
+    const value: MaterialInput = typeof input === "string" ? { name: input, density: density ?? 0 } : input
+    return this.request<ResourceRow>("POST", "/api/materials", { name: value.name, description: value.description ?? null, isPublic: value.isPublic ?? false, properties: { density: value.density, ...(value.hardness ? { hardness: value.hardness } : {}), ...(value.color ? { color: value.color } : {}) } })
+  }
+  updateMaterial = (id: string, input: MaterialInput) =>
+    this.request<ResourceRow>("PUT", `/api/materials/${encodeURIComponent(id)}`, { name: input.name, description: input.description ?? null, isPublic: input.isPublic ?? false, properties: { density: input.density, ...(input.hardness ? { hardness: input.hardness } : {}), ...(input.color ? { color: input.color } : {}) } })
+  createTool = (input: ToolInput | string, diameter?: number) => {
+    const value: ToolInput = typeof input === "string" ? { name: input, type: "endmill", diameter: diameter ?? 6, material: "Carbide", numberOfFlutes: 3, maxRPM: 12000 } : input
+    return this.request<ResourceRow>("POST", "/api/tools", { name: value.name, notes: value.description ?? null, isPublic: value.isPublic ?? false, type: value.type, diameter: value.diameter, material: value.material, numberOfFlutes: value.numberOfFlutes ?? null, maxRPM: value.maxRPM ?? null })
+  }
+  updateTool = (id: string, input: ToolInput) =>
+    this.request<ResourceRow>("PUT", `/api/tools/${encodeURIComponent(id)}`, { name: input.name, notes: input.description ?? null, isPublic: input.isPublic ?? false, type: input.type, diameter: input.diameter, material: input.material, numberOfFlutes: input.numberOfFlutes ?? null, maxRPM: input.maxRPM ?? null })
+  createMachine = (input: MachineInput) =>
+    this.request<unknown>("POST", "/api/machine-configs", { name: input.name, description: input.description ?? null, isPublic: input.isPublic ?? false, type: input.type, config: { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: input.controller } }).then(resourceRow)
+  updateMachine = (id: string, input: MachineInput, config?: unknown) =>
+    this.request<unknown>("PUT", `/api/machine-configs/${encodeURIComponent(id)}`, { name: input.name, description: input.description ?? null, isPublic: input.isPublic ?? false, type: input.type, config: config ?? { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: input.controller } }).then(resourceRow)
   cloneMachine = (id: string) => this.request<unknown>("POST", `/api/machine-configs/${encodeURIComponent(id)}/clone`, {})
   deleteResource = (resource: ResourceKind, id: string) => this.request<unknown>("DELETE", `/api/${resource}/${encodeURIComponent(id)}`)
+
+  // ── Organizations (same contract and role rules as the desktop) ─────────
+
+  organizations = (signal?: AbortSignal) => this.request<OrganizationSummary[]>("GET", "/api/organizations", undefined, signal)
+  organization = (id: string, signal?: AbortSignal) => this.request<OrganizationDetails>("GET", `/api/organizations/${encodeURIComponent(id)}`, undefined, signal)
+  createOrganization = (name: string, description?: string | null) =>
+    this.request<OrganizationSummary>("POST", "/api/organizations", { name, description: description ?? null })
+  updateOrganization = (id: string, name: string, description?: string | null) =>
+    this.request<OrganizationSummary>("PUT", `/api/organizations/${encodeURIComponent(id)}`, { name, description: description ?? null })
+  deleteOrganization = (id: string) => this.request<{ message: string }>("DELETE", `/api/organizations/${encodeURIComponent(id)}`)
 
   // ── Version control ─────────────────────────────────────────────────────
 

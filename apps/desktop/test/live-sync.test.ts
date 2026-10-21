@@ -25,7 +25,8 @@ test("one desktop host connection coalesces phone changes, reloads on greeting a
     } finally { closed = true }
   })(), (error) => error)
   push = (event) => { queued.push(event); wake?.(); wake = undefined }
-  const app = { cache, runtime, client: { events: { subscribeAll: () => { reads++; return Effect.succeed(stream) } } } } as unknown as AppState
+  const notifications = { handleLiveEvent: () => undefined, refresh: async () => undefined }
+  const app = { cache, runtime, notifications, client: { events: { subscribeAll: () => { reads++; return Effect.succeed(stream) } } } } as unknown as AppState
   const stop = startLiveSync(app)
   const until = async (probe: () => boolean) => {
     const deadline = Date.now() + 2000

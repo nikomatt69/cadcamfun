@@ -11,6 +11,11 @@ export function startLiveSync(app: AppState): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined
   let reconcile = false
   const refresh = (event: LiveEvent) => {
+    // A keep-alive proves the pipe is alive; it never means data changed.
+    if (event.type === "server.heartbeat") return
+    app.notifications.handleLiveEvent(event)
+    if (event.type === "server.connected") void app.notifications.refresh()
+    if (event.type === "organizations.changed") app.cache.invalidate()
     const owner = captureEditorOwner()
     reconcile ||= event.type === "server.connected" || "projectId" in event &&
       (event.projectId === owner.projectId || event.projectId === useCamStore.getState().savedProgram?.projectId)

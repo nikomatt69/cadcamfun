@@ -2,8 +2,8 @@ import { For, Show, createSignal, type JSX } from "solid-js"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { Motion, Presence } from "solid-motionone"
 import {
-  Activity, BarChart2, ChevronDown, ChevronUp, Cpu, CreditCard, Database,
-  DollarSign, FileText, Globe, Home, Package, Puzzle, Server, Settings, SquarePlus, User, Users, Wrench, LayoutGrid
+  Activity, BarChart2, ChevronDown, ChevronUp, Cpu, Database,
+  FileText, Globe, Home, Package, Puzzle, Server, Settings, SquarePlus, User, Users, Wrench, LayoutGrid
 } from "lucide-solid"
 
 interface NavItem { name: string; href: string; icon: JSX.Element; current?: boolean; children?: NavItem[] }
@@ -39,7 +39,6 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
     },
     { name: "Organization", href: "/organizations", icon: <Users size={20} />, current: path().startsWith("/organizations") },
     { name: "Plugins", href: "/plugins", icon: <Puzzle size={20} />, current: path().startsWith("/plugins") },
-    { name: "Pricing", href: "/pricing", icon: <DollarSign size={20} />, current: path().startsWith("/pricing") },
     { name: "Website", href: "https://cadcam.fun", icon: <Globe size={20} />, current: false },
     {
       name: "AI", href: "/ai", icon: <Cpu size={20} />, current: path().startsWith("/ai"),
@@ -56,8 +55,7 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
       name: "Settings", href: "#", icon: <Settings size={20} />, current: path().startsWith("/settings") || path() === "/profile",
       children: [
         { name: "Profile", href: "/profile", icon: <User size={16} />, current: path() === "/profile" },
-        { name: "Preferences", href: "/settings", icon: <Settings size={16} />, current: path() === "/settings" },
-        { name: "Subscription", href: "/settings/subscription", icon: <CreditCard size={16} />, current: path() === "/settings/subscription" }
+        { name: "Preferences", href: "/settings", icon: <Settings size={16} />, current: path() === "/settings" }
       ]
     }
   ]

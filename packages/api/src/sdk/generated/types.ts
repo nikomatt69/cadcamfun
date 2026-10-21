@@ -7041,8 +7041,70 @@ export type EventsSubscribeOutput =
   | { type: "ai.session"; at: string; projectId: string; sessionId: string; phase: "started" | "finished" | "aborted" }
   | { type: "workspace.changed"; at: string; projectId: string }
   | { type: "server.connected"; at: string }
-  | { type: "resources.changed"; userId: string; at: string }
+  | { type: "server.heartbeat"; at: string }
+  | { type: "resources.changed"; userId: string; organizationId?: string | undefined; at: string }
   | { type: "catalogue.updated"; at: string }
+  | {
+      type: "notification.created"
+      at: string
+      notification: {
+        id: string
+        type:
+          | "NEW_MESSAGE"
+          | "PROJECT_CREATED"
+          | "COMPONENT_CREATED"
+          | "MEMBER_JOINED"
+          | "ORGANIZATION_INVITATION"
+          | "PR_OPENED"
+          | "PR_MERGED"
+          | "PR_REVIEWED"
+          | "AI_COMMITTED"
+          | "WORKFLOW_FAILED"
+          | "WORKFLOW_PASSED"
+        title: string
+        content: string
+        isRead: boolean
+        createdAt: string
+        userId: string
+        organizationId: string | null
+        projectId: string | null
+        componentId: string | null
+        messageId: string | null
+        linkUrl: string | null
+      }
+    }
+  | {
+      type: "notification.updated"
+      at: string
+      notification: {
+        id: string
+        type:
+          | "NEW_MESSAGE"
+          | "PROJECT_CREATED"
+          | "COMPONENT_CREATED"
+          | "MEMBER_JOINED"
+          | "ORGANIZATION_INVITATION"
+          | "PR_OPENED"
+          | "PR_MERGED"
+          | "PR_REVIEWED"
+          | "AI_COMMITTED"
+          | "WORKFLOW_FAILED"
+          | "WORKFLOW_PASSED"
+        title: string
+        content: string
+        isRead: boolean
+        createdAt: string
+        userId: string
+        organizationId: string | null
+        projectId: string | null
+        componentId: string | null
+        messageId: string | null
+        linkUrl: string | null
+      }
+    }
+  | { type: "notification.deleted"; at: string; notificationId: string; userId: string }
+  | { type: "notification.readAll"; at: string; userId: string; count: number }
+  | { type: "organizations.changed"; at: string; userId: string; organizationId: string }
 
 export type EventsSubscribeAllOutput =
   | {
@@ -7092,8 +7154,70 @@ export type EventsSubscribeAllOutput =
   | { type: "ai.session"; at: string; projectId: string; sessionId: string; phase: "started" | "finished" | "aborted" }
   | { type: "workspace.changed"; at: string; projectId: string }
   | { type: "server.connected"; at: string }
-  | { type: "resources.changed"; userId: string; at: string }
+  | { type: "server.heartbeat"; at: string }
+  | { type: "resources.changed"; userId: string; organizationId?: string | undefined; at: string }
   | { type: "catalogue.updated"; at: string }
+  | {
+      type: "notification.created"
+      at: string
+      notification: {
+        id: string
+        type:
+          | "NEW_MESSAGE"
+          | "PROJECT_CREATED"
+          | "COMPONENT_CREATED"
+          | "MEMBER_JOINED"
+          | "ORGANIZATION_INVITATION"
+          | "PR_OPENED"
+          | "PR_MERGED"
+          | "PR_REVIEWED"
+          | "AI_COMMITTED"
+          | "WORKFLOW_FAILED"
+          | "WORKFLOW_PASSED"
+        title: string
+        content: string
+        isRead: boolean
+        createdAt: string
+        userId: string
+        organizationId: string | null
+        projectId: string | null
+        componentId: string | null
+        messageId: string | null
+        linkUrl: string | null
+      }
+    }
+  | {
+      type: "notification.updated"
+      at: string
+      notification: {
+        id: string
+        type:
+          | "NEW_MESSAGE"
+          | "PROJECT_CREATED"
+          | "COMPONENT_CREATED"
+          | "MEMBER_JOINED"
+          | "ORGANIZATION_INVITATION"
+          | "PR_OPENED"
+          | "PR_MERGED"
+          | "PR_REVIEWED"
+          | "AI_COMMITTED"
+          | "WORKFLOW_FAILED"
+          | "WORKFLOW_PASSED"
+        title: string
+        content: string
+        isRead: boolean
+        createdAt: string
+        userId: string
+        organizationId: string | null
+        projectId: string | null
+        componentId: string | null
+        messageId: string | null
+        linkUrl: string | null
+      }
+    }
+  | { type: "notification.deleted"; at: string; notificationId: string; userId: string }
+  | { type: "notification.readAll"; at: string; userId: string; count: number }
+  | { type: "organizations.changed"; at: string; userId: string; organizationId: string }
 
 export type CompanionStatusOutput = {
   enabled: boolean

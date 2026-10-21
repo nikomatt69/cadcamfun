@@ -1,7 +1,12 @@
+import { NotificationRow } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import type { NotificationType } from "@cadcamfun/db/schema"
 import { and, eq, ne } from "drizzle-orm"
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Schema } from "effect"
+import { LiveEvents } from "./live-events.ts"
+
+export const toNotificationRow = (value: typeof schema.notificationTable.$inferSelect): NotificationRow =>
+  Schema.decodeUnknownSync(NotificationRow)({ ...value, createdAt: value.createdAt.toISOString() })
 
 export interface NotificationData {
   readonly type: NotificationType
@@ -20,7 +25,8 @@ export interface NotificationData {
  * conversation. Titles and bodies are in English (the legacy strings were Italian).
  */
 export class NotificationService extends Context.Service<NotificationService, {
-  create(data: NotificationData): Effect.Effect<void, DatabaseError>
+  /** Persists the row (DB is the source of truth), then announces it on the live bus. Returns the stored row. */
+  create(data: NotificationData): Effect.Effect<NotificationRow, DatabaseError>
   newMessage(a: { messageId: string; senderId: string; conversationId: string; content: string; senderName: string; organizationId: string }): Effect.Effect<void, DatabaseError>
   newProject(a: { projectId: string; creatorId: string; projectName: string; organizationId: string; creatorName: string }): Effect.Effect<void, DatabaseError>
   newComponent(a: { componentId: string; creatorId: string; componentName: string; organizationId: string; projectId: string; creatorName: string }): Effect.Effect<void, DatabaseError>
@@ -29,14 +35,16 @@ export class NotificationService extends Context.Service<NotificationService, {
     NotificationService,
     Effect.gen(function*() {
       const { query } = yield* Database
+      const events = yield* LiveEvents
       const create = (d: NotificationData) =>
         query("notifications.create", async (db) => {
-          await db.insert(schema.notificationTable).values({
+          const [row] = await db.insert(schema.notificationTable).values({
             type: d.type, title: d.title, content: d.content, userId: d.userId,
             organizationId: d.organizationId ?? null, projectId: d.projectId ?? null,
             componentId: d.componentId ?? null, messageId: d.messageId ?? null, linkUrl: d.linkUrl ?? null
-          })
-        })
+          }).returning()
+          return toNotificationRow(row!)
+        }).pipe(Effect.tap((notification) => events.publish({ type: "notification.created", notification, at: notification.createdAt })))
       const otherMembers = (organizationId: string, except: string) =>
         query("notifications.members", (db) =>
           db.select({ userId: schema.userOrganizationTable.userId }).from(schema.userOrganizationTable)
@@ -71,5 +79,5 @@ export class NotificationService extends Context.Service<NotificationService, {
         })
       })
     })
-  )
+  ).pipe(Layer.provide(LiveEvents.layer))
 }

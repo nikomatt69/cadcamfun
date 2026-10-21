@@ -3,6 +3,7 @@ import { and, count, desc, eq, inArray, sql } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { createHash, randomBytes } from "node:crypto"
 import { orgRef } from "./access.ts"
+import { LiveEvents } from "../services/live-events.ts"
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null)
 
@@ -62,6 +63,7 @@ export class UserRepo extends Context.Service<UserRepo, {
 }>()("cadcamfun/UserRepo") {
   static readonly layer = Layer.effect(UserRepo, Effect.gen(function*() {
     const { query } = yield* Database
+    const events = yield* LiveEvents
     const U = schema.userTable
     const profileCols = {
       id: U.id, name: U.name, email: U.email, image: U.image, bio: U.bio, location: U.location, website: U.website,
@@ -83,7 +85,7 @@ export class UserRepo extends Context.Service<UserRepo, {
           ...(input.image ? { image: input.image } : {})
         }).where(eq(U.id, id)).returning({ ...profileCols, updatedAt: U.updatedAt })
         return { ...row!, updatedAt: row!.updatedAt.toISOString() }
-      }),
+      }).pipe(Effect.tap(() => events.resourcesChanged(id))),
       stats: (id) => query("user.stats", async (db) => {
         const P = schema.projectTable
         const owned = db.select({ id: P.id }).from(P).where(eq(P.ownerId, id))
@@ -153,11 +155,11 @@ export class UserRepo extends Context.Service<UserRepo, {
         const apiKey = `cad_${randomBytes(24).toString("hex")}`
         await db.insert(schema.apiKeyTable).values({ name, keyHash: createHash("sha256").update(apiKey).digest("hex"), userId: id })
         return apiKey
-      }),
+      }).pipe(Effect.tap(() => events.resourcesChanged(id))),
       revokeApiKey: (userId, keyId) => query("user.revokeApiKey", async (db) => {
         const K = schema.apiKeyTable
         return (await db.delete(K).where(and(eq(K.id, keyId), eq(K.userId, userId))).returning({ id: K.id })).length > 0
-      }),
+      }).pipe(Effect.tap((revoked) => revoked ? events.resourcesChanged(userId) : Effect.void)),
       credential: (id) => query("user.credential", async (db) => {
         const [user] = await db.select({ id: U.id }).from(U).where(eq(U.id, id)).limit(1)
         if (!user) return { userExists: false }
@@ -192,5 +194,5 @@ export class UserRepo extends Context.Service<UserRepo, {
         return { _tag: "ok" as const, type }
       })
     })
-  }))
+  })).pipe(Layer.provide(LiveEvents.layer))
 }

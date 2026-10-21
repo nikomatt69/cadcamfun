@@ -12,6 +12,7 @@
  * The schema of these events is mirrored in `packages/api/src/groups/events.ts`; the two must
  * stay in step or the SSE client loses its types.
  */
+import type { NotificationRow } from "@cadcamfun/api"
 import { Context, Effect, Layer, PubSub, Scope, Stream } from "effect"
 
 export type LiveEvent =
@@ -24,8 +25,13 @@ export type LiveEvent =
   | { readonly type: "workflow.finished"; readonly projectId: string; readonly runId: string; readonly workflow: string; readonly status: "success" | "failure" | "cancelled"; readonly at: string }
   | { readonly type: "ai.session"; readonly projectId: string; readonly sessionId: string; readonly phase: "started" | "finished" | "aborted"; readonly at: string }
   | { readonly type: "workspace.changed"; readonly projectId: string; readonly at: string }
-  | { readonly type: "resources.changed"; readonly userId: string; readonly at: string }
+  | { readonly type: "resources.changed"; readonly userId: string; readonly organizationId?: string; readonly at: string }
   | { readonly type: "catalogue.updated"; readonly at: string }
+  | { readonly type: "notification.created"; readonly notification: NotificationRow; readonly at: string }
+  | { readonly type: "notification.updated"; readonly notification: NotificationRow; readonly at: string }
+  | { readonly type: "notification.deleted"; readonly notificationId: string; readonly userId: string; readonly at: string }
+  | { readonly type: "notification.readAll"; readonly userId: string; readonly count: number; readonly at: string }
+  | { readonly type: "organizations.changed"; readonly userId: string; readonly organizationId: string; readonly at: string }
 
 /** How many past events a fresh subscriber is caught up with before it starts receiving live ones. */
 export const LIVE_EVENT_REPLAY = 20
@@ -42,7 +48,8 @@ export const liveEventMatches = (event: LiveEvent, filter: LiveEventFilter): boo
 export class LiveEvents extends Context.Service<LiveEvents, {
   publish(event: LiveEvent): Effect.Effect<void>
   workspaceChanged(projectId: string): Effect.Effect<void>
-  resourcesChanged(userId: string): Effect.Effect<void>
+  /** `organizationId` fans the frame out to every member of that organization, not just the actor. */
+  resourcesChanged(userId: string, organizationId?: string | null): Effect.Effect<void>
   subscribe(filter: LiveEventFilter): Effect.Effect<Stream.Stream<LiveEvent>, never, Scope.Scope>
 }>()("cadcamfun/LiveEvents") {
   static readonly layer: Layer.Layer<LiveEvents> = Layer.effect(
@@ -59,8 +66,32 @@ export class LiveEvents extends Context.Service<LiveEvents, {
           (subscription) => Stream.fromSubscription(subscription).pipe(Stream.filter((e) => liveEventMatches(e, filter))),
         )
       const workspaceChanged = (projectId: string) => publish({ type: "workspace.changed", projectId, at: new Date().toISOString() })
-      const resourcesChanged = (userId: string) => publish({ type: "resources.changed", userId, at: new Date().toISOString() })
+      const resourcesChanged = (userId: string, organizationId?: string | null) =>
+        publish({ type: "resources.changed", userId, ...(organizationId ? { organizationId } : {}), at: new Date().toISOString() })
       return LiveEvents.of({ publish, workspaceChanged, resourcesChanged, subscribe })
     })
   )
+}
+
+/**
+ * Wraps a repo's mutators (first argument = the acting user id) so each success announces
+ * `resources.changed` to that user's devices after the commit. For repos with many writers, so
+ * no mutation can be added later without syncing: list it here or it stays silent on purpose.
+ */
+export const announcingWrites = <S extends object>(
+  events: { readonly resourcesChanged: (userId: string, organizationId?: string | null) => Effect.Effect<void> },
+  service: S,
+  mutators: ReadonlyArray<keyof S>
+): S => {
+  const wrapped = { ...service } as Record<PropertyKey, unknown>
+  for (const name of mutators) {
+    const original = service[name] as unknown as (userId: string, ...rest: ReadonlyArray<unknown>) => Effect.Effect<unknown, unknown, unknown>
+    wrapped[name] = (userId: string, ...rest: ReadonlyArray<unknown>) =>
+      Effect.tap(original(userId, ...rest), (result) => {
+        // A returned row that names an organization fans the frame out to its members.
+        const organizationId = typeof result === "object" && result !== null ? (result as { organizationId?: unknown }).organizationId : undefined
+        return events.resourcesChanged(userId, typeof organizationId === "string" ? organizationId : undefined)
+      })
+  }
+  return wrapped as S
 }

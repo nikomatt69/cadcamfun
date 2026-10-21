@@ -12,7 +12,7 @@
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
-import { Bell, Cpu, Globe, Lock, Shield, Smartphone, Tag, User } from "lucide-solid"
+import { Bell, Cpu, Globe, Lock, Shield, Smartphone, User } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { endSession } from "../../../shared/state/session.ts"
@@ -21,12 +21,11 @@ import { ProfileSettings } from "../components/profile-settings.tsx"
 import { WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 import { SessionManagement } from "../components/session-management.tsx"
 import { PasskeySettings } from "../components/passkey-settings.tsx"
-import { SubscriptionSettings } from "../components/subscription-settings.tsx"
 import { AISettingsPanel } from "../components/ai-settings-panel.tsx"
 import { CompanionPanel } from "../../companion/screens/companion.tsx"
 import { LanguageSelector, SUPPORTED_LANGUAGES } from "../components/language-selector.tsx"
 
-type TabId = "profile" | "account" | "security" | "billing" | "notifications" | "ai" | "devices" | "language"
+type TabId = "profile" | "account" | "security" | "notifications" | "ai" | "devices" | "language"
 
 interface Tab {
   readonly id: TabId
@@ -57,7 +56,6 @@ export function SettingsScreen(): JSX.Element {
     { id: "profile", name: t("settings.tab.profile"), Icon: User },
     { id: "account", name: t("settings.tab.account"), Icon: Shield },
     { id: "security", name: t("settings.tab.security"), Icon: Lock },
-    { id: "billing", name: t("settings.tab.subscription"), Icon: Tag },
     { id: "notifications", name: t("settings.tab.notifications"), Icon: Bell },
     { id: "ai", name: t("settings.tab.ai"), Icon: Cpu },
     { id: "devices", name: t("settings.tab.devices"), Icon: Smartphone },
@@ -254,6 +252,22 @@ export function SettingsScreen(): JSX.Element {
             </fieldset>
           </div>
 
+          {/* Native desktop notifications, synced with the DB feed and the paired phone */}
+          <div class="mt-6">
+            <fieldset>
+              <legend class="text-base font-medium text-slate-900 dark:text-white">Native desktop notifications</legend>
+              <div class="mt-4 flex items-start">
+                <div class="flex items-center h-5">
+                  <input id="native-notifications" name="native-notifications" type="checkbox" checked={app.settings.settings().nativeNotifications} onChange={(event) => app.settings.update({ nativeNotifications: event.currentTarget.checked })} class="h-4 w-4 accent-blue-600" />
+                </div>
+                <div class="ml-3 text-sm">
+                  <label for="native-notifications" class="font-medium text-slate-700 dark:text-slate-300">Show system notifications</label>
+                  <p class="text-slate-500 dark:text-slate-400">For workflow failures, pull requests, reviews and assistant commits. The feed stays synced with your phone either way.</p>
+                </div>
+              </div>
+            </fieldset>
+          </div>
+
           {/* Push notifications */}
           <div class="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
             <fieldset>
@@ -325,24 +339,6 @@ export function SettingsScreen(): JSX.Element {
             <fieldset>
               <div class="mt-4 space-y-4">
                 <AISettingsPanel />
-              </div>
-            </fieldset>
-          </div>
-        </div>
-      </Show>
-
-      <Show when={tab === "billing"}>
-        <div class="space-y-6">
-          <div>
-            <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("settings.billing.title")}</h3>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.billing.subtitle")}</p>
-          </div>
-
-          <div class="mt-6">
-            <fieldset>
-              <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.billing.title")}</legend>
-              <div class="mt-4 space-y-4">
-                <SubscriptionSettings />
               </div>
             </fieldset>
           </div>

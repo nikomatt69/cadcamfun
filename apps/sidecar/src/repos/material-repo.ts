@@ -116,7 +116,7 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
               isPublic: input.isPublic || false
             }).returning()
             return toRow(row!)
-          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void)),
+          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
         update: (id, input) =>
           query("materials.update", async (db) => {
             const [row] = await db.update(T).set({
@@ -127,8 +127,8 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
               updatedAt: new Date()
             }).where(eq(T.id, id)).returning()
             return toRow(row!)
-          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void)),
-        remove: (id) => query("materials.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId }))[0]).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void), Effect.asVoid)
+          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
+        remove: (id) => query("materials.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId }))[0]).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void), Effect.asVoid)
       })
     })
   ).pipe(Layer.provide(LiveEvents.layer))

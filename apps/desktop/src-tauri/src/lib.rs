@@ -109,6 +109,9 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
+        // Native OS notifications: the webview decides when (synced Notification rows of
+        // important types only); the shell only delivers them to the OS.
+        .plugin(tauri_plugin_notification::init())
         // Auto-update: the shell owns the policy, the plugin owns download and
         // signature verification. See updater.rs.
         .plugin(tauri_plugin_updater::Builder::new().build())

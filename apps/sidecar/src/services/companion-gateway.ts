@@ -138,6 +138,10 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["POST"], path: /^\/api\/notifications\/mark-all-read$/ },
   { methods: ["PUT"], path: /^\/api\/notifications\/[^/]+$/ },
   { methods: ["DELETE"], path: /^\/api\/notifications\/[^/]+$/ },
+  // Organizations at desktop parity (same contract the desktop UI uses): list/create/detail/update/delete.
+  // Membership and role checks stay in the sidecar handlers; the gateway only admits the routes.
+  { methods: ["GET", "POST"], path: /^\/api\/organizations$/ },
+  { methods: ["GET", "PUT", "DELETE"], path: /^\/api\/organizations\/[^/]+$/ },
   { methods: ["GET"], path: /^\/api\/ai\/status$/ },
   { methods: ["GET"], path: /^\/api\/ai\/models$/ },
   { methods: ["GET"], path: /^\/api\/ai\/providers$/ },

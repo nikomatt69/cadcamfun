@@ -20,6 +20,8 @@ export interface FakeStore {
   tools: Row[]
   machineConfigs: Row[]
   toolpaths: Row[]
+  notifications: Array<Record<string, unknown> & { id: string }>
+  organizations: Array<Record<string, unknown> & { id: string; name: string }>
 }
 export class FakeApiError extends Error {
   readonly _tag = "FakeApiError"
@@ -94,7 +96,9 @@ export function createFakeApi(options: FakeApiOptions = {}): FakeApi {
     materials: [...(options.seed?.materials ?? [{ ...common(), id: "aluminium", name: "Aluminium 6061", description: null, properties: { density: 2700, costPerUnit: 4.2 } }])],
     tools: [...(options.seed?.tools ?? [{ ...common(), id: "endmill", name: "6 mm end mill", type: "endmill", diameter: 6, material: "carbide", numberOfFlutes: 3, maxRPM: 18000, coolantType: null, cuttingLength: null, totalLength: null, shankDiameter: null, notes: null }])],
     machineConfigs: [...(options.seed?.machineConfigs ?? [{ ...common(), id: "grbl", name: "3018 CNC", type: "mill", description: null, config: { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: "grbl" } }])],
-    toolpaths: [...(options.seed?.toolpaths ?? [])]
+    toolpaths: [...(options.seed?.toolpaths ?? [])],
+    notifications: [],
+    organizations: []
   }
   const failures = new Map<string, string>()
   const kv = new Map<string, { key: string; value: unknown; updatedAt: string }>()
@@ -136,6 +140,37 @@ export function createFakeApi(options: FakeApiOptions = {}): FakeApi {
           return entry === undefined ? json({ _tag: "NotFound", message: "Key not found" }, 404) : json(entry)
         }
       }
+    }
+    if (group === "notifications") {
+      if (method === "POST" && parts[2] === "mark-all-read") {
+        const count = store.notifications.filter((n) => n["isRead"] !== true).length
+        for (const n of store.notifications) n["isRead"] = true
+        return json({ message: "All notifications marked as read", count })
+      }
+      const nid = parts[2]
+      if (method === "GET" && nid === undefined) {
+        const rows = [...store.notifications].sort((a, b) => String(b["createdAt"]).localeCompare(String(a["createdAt"])))
+        return json({ notifications: rows, unreadCount: rows.filter((n) => n["isRead"] !== true).length, nextCursor: null })
+      }
+      const found = store.notifications.find((n) => n.id === nid)
+      if (found === undefined) return json({ message: "Notification not found" }, 404)
+      if (method === "PUT") { found["isRead"] = data["isRead"] === true; return json(found) }
+      if (method === "DELETE") { store.notifications = store.notifications.filter((n) => n.id !== nid); return json({ message: "Notification deleted successfully" }) }
+    }
+    if (group === "organizations") {
+      const oid = parts[2]
+      if (method === "GET" && oid === undefined) return json(store.organizations.map((o) => ({ description: null, createdAt: now(), updatedAt: now(), role: "ADMIN", userCount: 1, projectCount: 0, ...o })))
+      if (method === "POST" && oid === undefined) {
+        if (typeof data["name"] !== "string" || !data["name"].trim()) return json({ message: "Organization name is required" }, 400)
+        const org = { id: `organizations-${++sequence}`, name: data["name"], description: typeof data["description"] === "string" ? data["description"] : null, createdAt: now(), updatedAt: now() }
+        store.organizations.push(org); ids.push(org.id)
+        return json(org, 201)
+      }
+      const org = store.organizations.find((o) => o.id === oid)
+      if (org === undefined) return json({ message: "Organization not found" }, 404)
+      if (method === "GET") return json({ description: null, createdAt: now(), updatedAt: now(), ...org, members: [{ id: "user-local", name: "Local profile", email: null, image: null, role: "ADMIN", joinedAt: now() }], projectCount: 0, userRole: "ADMIN" })
+      if (method === "PUT") { Object.assign(org, { name: typeof data["name"] === "string" ? data["name"] : org.name, description: data["description"] ?? null, updatedAt: now() }); return json(org) }
+      if (method === "DELETE") { store.organizations = store.organizations.filter((o) => o.id !== oid); return json({ message: "Organization deleted successfully" }) }
     }
     if (group === "ai" && parts[2] === "permission" && parts[3] === "reply" && method === "POST") {
       return json({ message: "Permission reply sent" })

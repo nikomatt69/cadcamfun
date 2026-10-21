@@ -16,13 +16,15 @@
   },
   "dependencies": {
     "@cadcamfun/api": "workspace:*",
-    "@cadcamfun/core": "workspace:*",
     "@cadcamfun/buffer": "workspace:*",
+    "@cadcamfun/core": "workspace:*",
+    "@cadcamfun/identity": "workspace:*",
     "@kobalte/core": "^0.13.0",
     "@solidjs/router": "^0.15.0",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-log": "^2.10.0",
+    "@tauri-apps/plugin-notification": "^2",
     "@tauri-apps/plugin-os": "^2.4.0",
     "@tauri-apps/plugin-shell": "^2.0.0",
     "@tauri-apps/plugin-updater": "^2.0.0",
@@ -37,8 +39,7 @@
     "solid-motionone": "^1.0.0",
     "tauri-plugin-liquid-glass-api": "^0.1.6",
     "three": "^0.180.0",
-    "three-csg-ts": "^3.2.0",
-    "@cadcamfun/identity": "workspace:*"
+    "three-csg-ts": "^3.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",

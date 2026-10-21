@@ -114,7 +114,7 @@ export class ToolRepo extends Context.Service<ToolRepo, {
               notes: input.notes ?? null, ownerId: userId, organizationId: input.organizationId || null, isPublic: input.isPublic || false
             }).returning()
             return toRow(row!)
-          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void)),
+          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
         update: (id, i) =>
           query("tools.update", async (db) => {
             // Same truthiness rules as the legacy spread: required text/number fields only when truthy, the rest when defined.
@@ -138,8 +138,8 @@ export class ToolRepo extends Context.Service<ToolRepo, {
               updatedAt: new Date()
             }).where(eq(T.id, id)).returning()
             return toRow(row!)
-          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void)),
-        remove: (id) => query("tools.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId }))[0]).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void), Effect.asVoid)
+          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
+        remove: (id) => query("tools.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId }))[0]).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void), Effect.asVoid)
       })
     })
   ).pipe(Layer.provide(LiveEvents.layer))

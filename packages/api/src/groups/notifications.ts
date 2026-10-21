@@ -19,6 +19,14 @@ export const NotificationPage = Schema.Struct({
   notifications: Schema.Array(NotificationRow), unreadCount: Schema.Number, nextCursor: Schema.NullOr(Schema.String)
 })
 export type NotificationPage = typeof NotificationPage.Type
+/**
+ * Notification types that also raise a native OS popup (desktop via the Tauri notification
+ * plugin, phone via a local Expo notification). Every type stays in the synced feed; only
+ * these interrupt. Single source shared by sidecar tests, desktop and mobile so the three
+ * surfaces can never drift on what counts as important.
+ */
+export const NATIVE_NOTIFICATION_TYPES: ReadonlyArray<NotificationRow["type"]> = ["WORKFLOW_FAILED", "PR_OPENED", "PR_REVIEWED", "AI_COMMITTED", "ORGANIZATION_INVITATION"]
+export const isNativeNotificationType = (type: string): boolean => (NATIVE_NOTIFICATION_TYPES as ReadonlyArray<string>).includes(type)
 /** Largest page; a bigger `limit` is a 400, not silently clamped, so a client never mistakes a short page for the end. */
 export const MAX_NOTIFICATION_PAGE = 100
 const id = { id: Schema.String }

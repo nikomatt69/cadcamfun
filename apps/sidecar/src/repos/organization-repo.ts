@@ -2,6 +2,7 @@ import { Forbidden, OrganizationDetails, OrganizationRow, OrganizationSummary } 
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import { and, count, eq } from "drizzle-orm"
 import { Context, Effect, Layer, Schema } from "effect"
+import { LiveEvents } from "../services/live-events.ts"
 
 type Input = typeof import("@cadcamfun/api").OrganizationBody.Type
 const row = (value: typeof schema.organizationTable.$inferSelect) => Schema.decodeUnknownSync(OrganizationRow)({
@@ -17,6 +18,9 @@ export class OrganizationRepo extends Context.Service<OrganizationRepo, {
 }>()("cadcamfun/OrganizationRepo") {
   static readonly layer = Layer.effect(OrganizationRepo, Effect.gen(function*() {
     const { query } = yield* Database
+    const events = yield* LiveEvents
+    const changed = (userId: string, organizationId: string) =>
+      events.publish({ type: "organizations.changed", userId, organizationId, at: new Date().toISOString() })
     const O = schema.organizationTable
     const M = schema.userOrganizationTable
     const role = Effect.fn("OrganizationRepo.role")(function*(userId: string, id: string) {
@@ -40,11 +44,13 @@ export class OrganizationRepo extends Context.Service<OrganizationRepo, {
         })
       }),
       create: Effect.fn("OrganizationRepo.create")(function*(userId, input) {
-        return yield* query("organizations.create", (db) => db.transaction((tx) => {
+        const created = yield* query("organizations.create", (db) => db.transaction((tx) => {
           const organization = tx.insert(O).values({ name: input.name, description: input.description ?? null }).returning().get()
           tx.insert(M).values({ userId, organizationId: organization.id, role: "ADMIN" }).run()
           return row(organization)
         }))
+        yield* changed(userId, created.id)
+        return created
       }),
       get: Effect.fn("OrganizationRepo.get")(function*(userId, id) {
         const userRole = yield* role(userId, id)
@@ -63,16 +69,19 @@ export class OrganizationRepo extends Context.Service<OrganizationRepo, {
         if ((yield* role(userId, id)) === "MEMBER") {
           return yield* new Forbidden({ message: "You do not have permission to update this organization" })
         }
-        return yield* query("organizations.update", async (db) => {
-          const [updated] = await db.update(O).set({ name: input.name, description: input.description, updatedAt: new Date() })
+        const updated = yield* query("organizations.update", async (db) => {
+          const [found] = await db.update(O).set({ name: input.name, description: input.description, updatedAt: new Date() })
             .where(eq(O.id, id)).returning()
-          return updated ? row(updated) : undefined
+          return found ? row(found) : undefined
         })
+        if (updated) yield* changed(userId, id)
+        return updated
       }),
       remove: Effect.fn("OrganizationRepo.remove")(function*(userId, id) {
         if ((yield* role(userId, id)) !== "ADMIN") return yield* new Forbidden({ message: "Only admins can delete an organization" })
         yield* query("organizations.remove", async (db) => { await db.delete(O).where(eq(O.id, id)) })
+        yield* changed(userId, id)
       })
     })
-  }))
+  })).pipe(Layer.provide(LiveEvents.layer))
 }

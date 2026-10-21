@@ -8,7 +8,6 @@ import Package from "lucide-solid/icons/package"
 import Users from "lucide-solid/icons/users"
 import Puzzle from "lucide-solid/icons/puzzle"
 import Globe from "lucide-solid/icons/globe"
-import DollarSign from "lucide-solid/icons/dollar-sign"
 import Cpu from "lucide-solid/icons/cpu"
 import BarChart from "lucide-solid/icons/chart-no-axes-column"
 import Settings from "lucide-solid/icons/settings"
@@ -17,7 +16,6 @@ import Database from "lucide-solid/icons/database"
 import Server from "lucide-solid/icons/server"
 import PlusSquare from "lucide-solid/icons/square-plus"
 import Activity from "lucide-solid/icons/activity"
-import CreditCard from "lucide-solid/icons/credit-card"
 import ChevronDown from "lucide-solid/icons/chevron-down"
 import ChevronLeft from "lucide-solid/icons/chevron-left"
 import ChevronRight from "lucide-solid/icons/chevron-right"
@@ -60,7 +58,6 @@ const navigation: ReadonlyArray<NavItem> = [
   { key: "shell.organization", href: "/organizations", icon: Users },
   { key: "shell.plugins", href: "/plugins", icon: Puzzle },
   { key: "shell.website", href: "https://cadcam.fun", icon: Globe },
-  { key: "shell.pricing", href: "/pricing", icon: DollarSign },
   { key: "shell.ai", href: "/ai", icon: Cpu },
   { key: "shell.analytics", href: "/analytics", icon: BarChart, children: [
     { key: "shell.dashboard", href: "/analytics", icon: BarChart },
@@ -68,8 +65,7 @@ const navigation: ReadonlyArray<NavItem> = [
   ] },
   { key: "shell.settings", href: "/settings", icon: Settings, children: [
     { key: "shell.profile", href: "/profile", icon: User },
-    { key: "shell.preferences", href: "/settings", icon: Settings },
-    { key: "shell.subscription", href: "/settings/subscription", icon: CreditCard }
+    { key: "shell.preferences", href: "/settings", icon: Settings }
   ] }
 ]
 
@@ -129,8 +125,8 @@ export function ReferenceNavbar(props: { readonly sidebarOpen: boolean; readonly
       <div class="reference-navbar-actions">
         <button type="button" class="reference-icon-button reference-theme-button" aria-label={t("shell.toggleTheme")} onClick={() => app.settings.update({ theme: dark() ? "light" : "dark" })}><Show when={dark()} fallback={<Moon size={24} />}><Sun size={24} /></Show></button>
         <div class="relative">
-          <button ref={notificationButton} type="button" class="reference-icon-button" aria-label={t("shell.notifications")} aria-expanded={popover() === "notifications"} aria-controls="reference-notifications" onClick={() => setPopover(popover() === "notifications" ? undefined : "notifications")}><Bell size={24} /></button>
-          <Show when={popover() === "notifications"}><section id="reference-notifications" class="reference-popover reference-notifications" aria-label={t("shell.notifications")}><h2>{t("shell.notifications")}</h2><p>{t("shell.notificationsUnavailable")}</p></section></Show>
+          <button ref={notificationButton} type="button" class="reference-icon-button" style="position:relative" aria-label={t("shell.notifications")} aria-expanded={popover() === "notifications"} aria-controls="reference-notifications" onClick={() => { const next = popover() === "notifications" ? undefined : "notifications"; setPopover(next); if (next) void app.notifications.refresh() }}><Bell size={24} /><Show when={app.notifications.unreadCount() > 0}><span aria-label={`${app.notifications.unreadCount()} unread`} style="position:absolute;top:2px;right:2px;min-width:16px;height:16px;border-radius:8px;background:#dc2626;color:#fff;font-size:10px;line-height:16px;text-align:center;padding:0 4px">{app.notifications.unreadCount()}</span></Show></button>
+          <Show when={popover() === "notifications"}><section id="reference-notifications" class="reference-popover reference-notifications" aria-label={t("shell.notifications")}><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h2>{t("shell.notifications")}</h2><Show when={app.notifications.unreadCount() > 0}><button type="button" onClick={() => void app.notifications.markAllRead()}>Mark all read</button></Show></div><Show when={app.notifications.rows().length > 0} fallback={<p>No notifications yet. Project, workflow and assistant updates will appear here.</p>}><ul style="list-style:none;margin:0;padding:0;max-height:360px;overflow:auto"><For each={app.notifications.rows().slice(0, 20)}>{(row) => <li><button type="button" style="display:block;width:100%;text-align:left" onClick={() => { close(); if (!row.isRead) void app.notifications.markRead(row); if (row.linkUrl) navigate(row.linkUrl) }}><strong>{row.isRead ? row.title : `• ${row.title}`}</strong><span style="display:block">{row.content}</span><small>{new Date(row.createdAt).toLocaleString()}</small></button></li>}</For></ul></Show></section></Show>
         </div>
         <ReferenceLink href="/settings" class="reference-icon-button reference-navbar-settings" label={t("shell.settings")}><Settings size={24} /></ReferenceLink>
         <div class="relative">

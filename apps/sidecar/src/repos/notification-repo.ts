@@ -2,6 +2,7 @@ import { NotificationRow } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import { and, count, desc, eq, lt, or } from "drizzle-orm"
 import { Context, Effect, Layer, Schema } from "effect"
+import { LiveEvents } from "../services/live-events.ts"
 
 const row = (value: typeof schema.notificationTable.$inferSelect) =>
   Schema.decodeUnknownSync(NotificationRow)({ ...value, createdAt: value.createdAt.toISOString() })
@@ -34,6 +35,7 @@ export class NotificationRepo extends Context.Service<NotificationRepo, {
 }>()("cadcamfun/NotificationRepo") {
   static readonly layer = Layer.effect(NotificationRepo, Effect.gen(function*() {
     const { query } = yield* Database
+    const events = yield* LiveEvents
     const T = schema.notificationTable
     const own = (userId: string, id: string) => and(eq(T.userId, userId), eq(T.id, id))
     return NotificationRepo.of({
@@ -53,19 +55,25 @@ export class NotificationRepo extends Context.Service<NotificationRepo, {
         })
       }),
       update: Effect.fn("NotificationRepo.update")(function*(userId, id, isRead) {
-        return yield* query("notifications.update", async (db) => {
-          const [updated] = await db.update(T).set({ isRead }).where(own(userId, id)).returning()
-          return updated ? row(updated) : undefined
+        const updated = yield* query("notifications.update", async (db) => {
+          const [found] = await db.update(T).set({ isRead }).where(own(userId, id)).returning()
+          return found ? row(found) : undefined
         })
+        if (updated) yield* events.publish({ type: "notification.updated", notification: updated, at: new Date().toISOString() })
+        return updated
       }),
       remove: Effect.fn("NotificationRepo.remove")(function*(userId, id) {
-        return yield* query("notifications.remove", async (db) =>
+        const removed = yield* query("notifications.remove", async (db) =>
           (await db.delete(T).where(own(userId, id)).returning({ id: T.id })).length > 0)
+        if (removed) yield* events.publish({ type: "notification.deleted", notificationId: id, userId, at: new Date().toISOString() })
+        return removed
       }),
       markAllRead: Effect.fn("NotificationRepo.markAllRead")(function*(userId) {
-        return yield* query("notifications.markAllRead", async (db) =>
+        const changed = yield* query("notifications.markAllRead", async (db) =>
           (await db.update(T).set({ isRead: true }).where(and(eq(T.userId, userId), eq(T.isRead, false))).returning({ id: T.id })).length)
+        if (changed > 0) yield* events.publish({ type: "notification.readAll", userId, count: changed, at: new Date().toISOString() })
+        return changed
       })
     })
-  }))
+  })).pipe(Layer.provide(LiveEvents.layer))
 }

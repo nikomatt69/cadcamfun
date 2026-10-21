@@ -66,8 +66,7 @@ describe("detail and settings pages use the workspace chrome", () => {
     { path: "/analytics", title: "Dashboard" },
     { path: "/analytics/history", title: "Activity" },
     { path: "/costs", title: "Costs" },
-    { path: "/settings", title: "Settings" },
-    { path: "/settings/subscription", title: "Subscription" }
+    { path: "/settings", title: "Settings" }
   ] as const
   for (const { path, title } of pages) {
     test(`${path} has the workspace toolbar`, async () => {

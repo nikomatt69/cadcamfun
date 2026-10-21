@@ -17,6 +17,7 @@ import { Context, Effect, Layer } from "effect"
 import type { CostSettings, MaterialCostLike, ToolWearLike } from "../services/costs.ts"
 import { SYSTEM_DEFAULT_SETTINGS } from "../services/costs.ts"
 import { isOrgMember, orgIdsOf, orgRef, userRef } from "./access.ts"
+import { LiveEvents, announcingWrites } from "../services/live-events.ts"
 
 type MaterialCostRow_ = typeof schema.materialCostTable.$inferSelect
 type OperationCostRow_ = typeof schema.operationCostTable.$inferSelect
@@ -144,6 +145,7 @@ export class ProductionCostRepo extends Context.Service<ProductionCostRepo, {
     ProductionCostRepo,
     Effect.gen(function*() {
       const { query } = yield* Database
+      const events = yield* LiveEvents
       const T = schema.productionCostEstimateTable
       const MC = schema.materialCostTable
       const OC = schema.operationCostTable
@@ -231,7 +233,7 @@ export class ProductionCostRepo extends Context.Service<ProductionCostRepo, {
         })
       }
 
-      return ProductionCostRepo.of({
+      return ProductionCostRepo.of(announcingWrites(events, {
         listEstimates: (userId, filter) =>
           query("production-costs.estimates.list", async (db) => {
             const orgIds = await orgIdsOf(db, userId)
@@ -320,7 +322,8 @@ export class ProductionCostRepo extends Context.Service<ProductionCostRepo, {
               throw new Error(`Estimate ${id} is not accessible`)
             }
             await db.delete(T).where(eq(T.id, id))
-          }),
+            return row.organizationId
+          }).pipe(Effect.tap((organizationId) => events.resourcesChanged(userId, organizationId)), Effect.asVoid),
 
         listMaterialCosts: (userId, filter) =>
           query("production-costs.material-costs.list", async (db) => {
@@ -378,7 +381,8 @@ export class ProductionCostRepo extends Context.Service<ProductionCostRepo, {
               throw new Error(`Material cost ${id} is not accessible`)
             }
             await db.delete(MC).where(eq(MC.id, id))
-          }),
+            return row.organizationId
+          }).pipe(Effect.tap((organizationId) => events.resourcesChanged(userId, organizationId)), Effect.asVoid),
 
         listOperationCosts: (userId, filter) =>
           query("production-costs.operation-costs.list", async (db) => {
@@ -434,7 +438,8 @@ export class ProductionCostRepo extends Context.Service<ProductionCostRepo, {
               throw new Error(`Operation cost ${id} is not accessible`)
             }
             await db.delete(OC).where(eq(OC.id, id))
-          }),
+            return row.organizationId
+          }).pipe(Effect.tap((organizationId) => events.resourcesChanged(userId, organizationId)), Effect.asVoid),
 
         listToolWear: (userId, filter) =>
           query("production-costs.tool-wear.list", async (db) => {
@@ -492,7 +497,8 @@ export class ProductionCostRepo extends Context.Service<ProductionCostRepo, {
               throw new Error(`Tool wear cost ${id} is not accessible`)
             }
             await db.delete(TW).where(eq(TW.id, id))
-          }),
+            return row.organizationId
+          }).pipe(Effect.tap((organizationId) => events.resourcesChanged(userId, organizationId)), Effect.asVoid),
 
         settingsFor: (userId, organizationId) =>
           query("production-costs.settings", async (db) => {
@@ -527,7 +533,7 @@ export class ProductionCostRepo extends Context.Service<ProductionCostRepo, {
             if (!row) return null
             return { wearRatePerMeter: row.wearRatePerMeter, replacementCost: row.replacementCost }
           })
-      })
+      }, ["createEstimate", "updateEstimate", "createMaterialCost", "updateMaterialCost", "createOperationCost", "updateOperationCost", "createToolWear", "updateToolWear"]))
     })
-  )
+  ).pipe(Layer.provide(LiveEvents.layer))
 }

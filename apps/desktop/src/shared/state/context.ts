@@ -23,6 +23,7 @@ import {
   type RecentProject
 } from "./recents.ts"
 import type { ActivityId } from "../../app/layout.ts"
+import { createNotificationCenter, type NotificationCenter } from "../../features/notifications/store.ts"
 
 /** Sidecar health as the status bar shows it. */
 export type SidecarStatus = "starting" | "ready" | "fake" | "stopped"
@@ -45,6 +46,8 @@ export interface AppState {
   setActivity(id: ActivityId): void
   readonly cursor: Accessor<{ readonly x: number; readonly y: number } | undefined>
   setCursor(position: { readonly x: number; readonly y: number } | undefined): void
+  /** Synced notification feed + unread count, shared by the bell, badge and native popups. */
+  readonly notifications: NotificationCenter
   readonly sidecar: Accessor<SidecarStatus>
   setSidecar(status: SidecarStatus): void
   readonly drawing: Accessor<Drawing>
@@ -83,6 +86,7 @@ export const createAppState = (options: CreateAppStateOptions): AppState => {
   return {
     client: options.client,
     runtime: options.runtime,
+    notifications: createNotificationCenter({ client: options.client, runtime: options.runtime, nativeEnabled: () => settings.settings().nativeNotifications }),
     cache: options.cache ?? createQueryCache(),
     settings,
     editor,

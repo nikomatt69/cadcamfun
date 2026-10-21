@@ -31,6 +31,8 @@ export interface Settings {
   readonly tolerance: number
   /** Liquid Glass window material (macOS, inside the desktop app); everywhere else it has no effect. */
   readonly glass: boolean
+  /** Native OS popups for important synced notifications (Tauri notification plugin); the feed syncs regardless. */
+  readonly nativeNotifications: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,7 +43,8 @@ export const DEFAULT_SETTINGS: Settings = {
   postProcessor: "grbl",
   snapEnabled: true,
   tolerance: DEFAULT_TOLERANCE,
-  glass: true
+  glass: true,
+  nativeNotifications: true
 }
 
 const STORAGE_KEY = "cadcamfun.settings"
@@ -68,7 +71,8 @@ export const decodeSettings = (raw: unknown): Settings => {
     snapEnabled:
       typeof record["snapEnabled"] === "boolean" ? record["snapEnabled"] : DEFAULT_SETTINGS.snapEnabled,
     tolerance: isTolerance(record["tolerance"]) ? record["tolerance"] : DEFAULT_SETTINGS.tolerance,
-    glass: typeof record["glass"] === "boolean" ? record["glass"] : DEFAULT_SETTINGS.glass
+    glass: typeof record["glass"] === "boolean" ? record["glass"] : DEFAULT_SETTINGS.glass,
+    nativeNotifications: typeof record["nativeNotifications"] === "boolean" ? record["nativeNotifications"] : DEFAULT_SETTINGS.nativeNotifications
   }
 }
 
