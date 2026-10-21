@@ -87,6 +87,7 @@ export const CadAssemblyReport = Schema.Struct({
     undetermined: Schema.Array(Schema.Struct({ a: Schema.String, b: Schema.String, reason: Schema.String })),
     checked: int
   }),
+  clearance: Schema.optionalKey(Schema.Array(Schema.Struct({ a: Schema.String, b: Schema.String, aName: Schema.String, bName: Schema.String, distance: num, overlap: Schema.Boolean }))),
   bom: Schema.Array(Schema.Struct({
     item: int, name: Schema.String, designation: Schema.optionalKey(Schema.String), material: Schema.optionalKey(Schema.String),
     quantity: int, volume: num, mass: Schema.optionalKey(num), parts: Schema.Array(Schema.String)

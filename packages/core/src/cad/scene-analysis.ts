@@ -8,7 +8,7 @@
 import { brepFeatures, type ExactFeatures } from "../cam/brep-part.ts"
 import { massProperties, recognizeHoles, validateBrep, type Brep } from "./brep/index.ts"
 import { brepBox } from "./history-brep.ts"
-import { planSceneFasteners, sceneBom, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
+import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
 import type { BomRow, InferredJoint } from "./assembly-analysis.ts"
 import type { FastenerPlan, UnfastenedStack } from "./smart-fasteners.ts"
 import type { Vec3 } from "./vec.ts"
@@ -124,6 +124,8 @@ export interface AssemblyReport {
     readonly undetermined: ReadonlyArray<{ readonly a: string; readonly b: string; readonly reason: string }>
     readonly checked: number
   }
+  /** The closest pairs of parts (gap below 5 mm, nearest first, at most 20). */
+  readonly clearance: ReadonlyArray<{ readonly a: string; readonly b: string; readonly aName: string; readonly bName: string; readonly distance: number; readonly overlap: boolean }>
   readonly bom: ReadonlyArray<BomRow>
   readonly joints: ReadonlyArray<InferredJoint & { readonly parentName: string; readonly childName: string }>
   readonly fasteners: {
@@ -149,6 +151,7 @@ export const assemblyReport = (elements: ReadonlyArray<Element>, options: { read
       expected: fit.interferences.filter((i) => i.kind === "expected").map((i) => ({ a: i.a, b: i.b, aName: name(i.a), bName: name(i.b), volume: i.volume, note: i.note ?? "declared overlap" })),
       touching: fit.touching, undetermined: fit.undetermined, checked: fit.checked
     },
+    clearance: sceneClearance(elements, 5, scene).slice(0, 20).map((c) => ({ a: c.a, b: c.b, aName: c.aName, bName: c.bName, distance: c.distance, overlap: c.overlap })),
     bom: sceneBom(elements, scene).rows,
     joints: joints.joints.map((j) => ({ ...j, parentName: joints.names.get(j.parent) ?? j.parent, childName: joints.names.get(j.child) ?? j.child })),
     fasteners: {

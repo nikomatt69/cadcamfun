@@ -38,6 +38,7 @@ export const assemblyForModel = (report: cad.AssemblyReport, drawing: Record<str
         clashes: clashes.items, clashesTotal: clashes.total, expected: report.interference.expected.length,
         touching: report.interference.touching.length, undetermined: report.interference.undetermined, checked: report.interference.checked
       },
+      clearance: capped(report.clearance).items, clearanceTotal: report.clearance.length,
       bom: bom.items, bomTotal: bom.total,
       joints: capped(report.joints).items, jointsTotal: report.joints.length,
       fasteners: { plans: plans.items, plansTotal: plans.total, unfastened: report.fasteners.unfastened, existing: report.fasteners.existing },

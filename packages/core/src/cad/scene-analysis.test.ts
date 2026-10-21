@@ -66,3 +66,13 @@ test("two overlapping parts are a clash with the exact overlap volume", () => {
   expect(r.interference.clashes).toHaveLength(1)
   expect(r.interference.clashes[0]!.volume).toBeCloseTo(5 * 10 * 10, 3)
 })
+
+test("the assembly report lists the closest pairs with their exact gap", () => {
+  const cube = (id: string, x: number) => ({ id, type: "cube", name: id, x, y: 0, z: 0, width: 10, height: 10, depth: 10 })
+  const r = assemblyReport([cube("a", 0), cube("b", 13), cube("far", 100)])
+  expect(r.clearance).toHaveLength(1)
+  expect(r.clearance[0]!.aName).toBe("a")
+  expect(r.clearance[0]!.bName).toBe("b")
+  expect(r.clearance[0]!.distance).toBeCloseTo(3, 9)
+  expect(r.clearance[0]!.overlap).toBe(false)
+})

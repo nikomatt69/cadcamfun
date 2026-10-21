@@ -9,7 +9,7 @@
  * check knows a screw's thread belongs in its tapped hole.
  */
 import { findMaterial } from "../cam/kernel/materials.ts"
-import { assemblyInterference, billOfMaterials, jointsFromHoles, type AssemblyPart, type BomRow, type InferredJoint, type InterferenceReport } from "./assembly-analysis.ts"
+import { assemblyClearance, assemblyInterference, billOfMaterials, jointsFromHoles, type AssemblyPart, type BomRow, type InferredJoint, type InterferenceReport } from "./assembly-analysis.ts"
 import * as brep from "./brep/index.ts"
 import { brepBox } from "./history-brep.ts"
 import { elementBrep, gizmoTransform } from "./scene-step.ts"
@@ -209,6 +209,12 @@ export const sceneInterference = (elements: ReadonlyArray<Element>, scene: Scene
     expected: (a, b) => (tapped.get(a) === b || tapped.get(b) === a ? "thread engaged in the tapped hole" : undefined)
   })
   return { ...report, names: new Map(scene.parts.map((p) => [p.id, p.name])), skipped: scene.skipped }
+}
+
+/** Gaps below `within` mm between the scene's solids, nearest first (overlapping pairs have gap 0). */
+export const sceneClearance = (elements: ReadonlyArray<Element>, within = 5, scene: SceneParts = sceneParts(elements)): ReadonlyArray<ReturnType<typeof assemblyClearance>[number] & { readonly aName: string; readonly bName: string }> => {
+  const names = new Map(scene.parts.map((p) => [p.id, p.name]))
+  return assemblyClearance(assemblyParts(scene).filter((p) => scene.parts.find((q) => q.id === p.id)?.fastener === undefined), within).map((c) => ({ ...c, aName: names.get(c.a) ?? c.a, bName: names.get(c.b) ?? c.b }))
 }
 
 /** The bill of materials of the scene's exact solids. */
