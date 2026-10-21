@@ -8,6 +8,8 @@
  * sidebar, the CAD workpiece panel and the resources pages agree on what a machine is.
  */
 import { cam } from "@cadcamfun/core"
+import { CamMachineConfig } from "@cadcamfun/api"
+import { Schema } from "effect"
 import type { MachineConfig } from "../../cad/store/cadStore.ts"
 
 /** Where the CAM sidebar and the other selectors get their machines from. */
@@ -94,3 +96,24 @@ export const sortMachines = (machines: ReadonlyArray<MachineConfig>): ReadonlyAr
 /** The whole answer of `machineConfigs.list`, normalised and sorted. */
 export const machinesFromResponse = (value: unknown): ReadonlyArray<MachineConfig> =>
   sortMachines(machineRowsOf(value).map(machineConfigOf).filter((machine) => machine.id !== ""))
+
+/**
+ * A saved machine configuration as the kernel takes it: the row and the parameters it carries. A configuration the
+ * kernel cannot machine (no spindle ceiling, a kind it does not machine) is left out, never half-applied.
+ */
+export const kernelMachineConfigOf = (machine: MachineConfig): CamMachineConfig | undefined => {
+  try {
+    return Schema.decodeUnknownSync(CamMachineConfig)({
+      id: machine.id, name: machine.name, type: machine.type ?? "mill",
+      ...(typeof machine.description === "string" ? { description: machine.description } : {}),
+      config: machine.config
+    })
+  } catch { return undefined }
+}
+
+/** The saved configurations the kernel can machine, in the order the library lists them. */
+export const kernelMachineConfigsOf = (machines: ReadonlyArray<MachineConfig>): ReadonlyArray<CamMachineConfig> =>
+  machines.flatMap((machine) => {
+    const row = kernelMachineConfigOf(machine)
+    return row === undefined ? [] : [row]
+  })

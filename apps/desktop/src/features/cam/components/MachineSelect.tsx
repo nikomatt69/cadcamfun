@@ -11,11 +11,13 @@ import { For, Show, createEffect, createMemo, createSignal, onMount, type JSX } 
 import { Motion } from "solid-motionone"
 import { A } from "@solidjs/router"
 import { Check, Cpu, ExternalLink, RefreshCw } from "lucide-solid"
+import { cam as coreCam } from "@cadcamfun/core"
 import { Card } from "../../../shared/ui/card.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { useCADStore, type MachineConfig } from "../../cad/store/cadStore.ts"
 import { useCamStore } from "../store/camStore.ts"
+import { useGeneratorStore } from "../store/generatorStore.ts"
 import {
   MACHINES_PATH,
   machineControllerOf,
@@ -24,7 +26,8 @@ import {
   machineResourceKind,
   machineSpindleOf,
   machineTypeLabel,
-  machinesFromResponse
+  machinesFromResponse,
+  kernelMachineConfigOf
 } from "../lib/machines.ts"
 
 const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
@@ -38,6 +41,8 @@ export default function MachineSelect(): JSX.Element {
   const cad = useCADStore()
   const cam = useCamStore()
   const [machines, setMachines] = createSignal<ReadonlyArray<MachineConfig>>([])
+  /** The built-in catalogue of machines: what the kernel plans against when nothing is configured. */
+  const [defaults, setDefaults] = createSignal<ReadonlyArray<MachineConfig>>([])
   const [loading, setLoading] = createSignal(true)
   const [error, setError] = createSignal<string>()
 
@@ -46,6 +51,7 @@ export default function MachineSelect(): JSX.Element {
     setError(undefined)
     try {
       setMachines(machinesFromResponse(await app.runtime.run(app.client.machineConfigs.list({ query: {} }))))
+      setDefaults(machinesFromResponse(await app.runtime.run(app.client.machineConfigs.defaults({}))))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
       setMachines([])
@@ -60,13 +66,24 @@ export default function MachineSelect(): JSX.Element {
   const selected = createMemo(() => {
     const pick = cad.selectedMachine
     if (pick === null) return undefined
-    return machines().find((machine) => machine.id === pick.id) ?? pick
+    return [...defaults(), ...machines()].find((machine) => machine.id === pick.id) ?? pick
   })
 
-  /** Picking a machine is picking the preview's machine and the CAD workpiece's machine at once. */
+  /**
+   * Picking a machine is picking the preview's machine, the CAD workpiece's machine and the kernel's machine at once:
+   * a built-in preset names itself, a configuration of the library travels with the request.
+   */
   const select = (machine: MachineConfig | undefined): void => {
     cad.setSelectedMachine(machine ?? null)
     cam.setMachineOverride(machine === undefined ? undefined : machineResourceKind(machine))
+    if (machine === undefined) return
+    const gen = useGeneratorStore.getState()
+    const builtin = coreCam.kernel.findMachine(machine.id)
+    if (builtin !== undefined) gen.patchKernelSettings({ machine: builtin.id, machineConfig: undefined })
+    else {
+      const row = kernelMachineConfigOf(machine)
+      if (row !== undefined) gen.patchKernelSettings({ machineConfig: row, machine: undefined })
+    }
   }
 
   // The CAD workpiece panel picks from this same list: adopting its machine keeps both panels and
@@ -142,6 +159,29 @@ export default function MachineSelect(): JSX.Element {
                   <span class="block text-xs text-gray-500 dark:text-gray-400">{t("cam.machine.autoHint")}</span>
                 </span>
               </button>
+
+              <Show when={defaults().length > 0}>
+                <p class="px-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{t("cam.machine.builtin")}</p>
+                <For each={defaults()}>{(machine) => (
+                  <button
+                    type="button"
+                    class={`${ROW} ${selected()?.id === machine.id ? ROW_ON : ROW_OFF}`}
+                    role="option"
+                    aria-selected={selected()?.id === machine.id}
+                    data-testid={`cam-machine-option-${machine.id}`}
+                    onClick={() => select(selected()?.id === machine.id ? undefined : machine)}
+                  >
+                    <span class="mt-0.5 h-4 w-4 flex-shrink-0">
+                      <Show when={selected()?.id === machine.id}><Check size={16} class="text-blue-600 dark:text-blue-400" aria-hidden="true" /></Show>
+                    </span>
+                    <span class="min-w-0">
+                      <span class="block truncate text-sm font-medium text-gray-800 dark:text-gray-100">{machine.name}</span>
+                      <span class="mt-0.5 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-300">{machineTypeLabel(machine)}</span>
+                      <For each={facts(machine)}>{(line) => <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{line}</span>}</For>
+                    </span>
+                  </button>
+                )}</For>
+              </Show>
 
               <For each={machines()}>{(machine) => (
                 <button

@@ -237,3 +237,35 @@ test("an assistant turning preview loads the stored lathe settings and identical
   const timeline = cam.viewer.buildTimeline(store.program, undefined, cam.viewer.DEFAULT_RAPID_RATE, cam.viewer.programStart("lathe", store.program))
   expect(cam.viewer.profileRuns(cam.viewer.turnedProfileAt(setup, timeline, timeline.duration), 0.01).some((r) => r.outer < 22)).toBe(true)
 })
+
+test("a machine configuration of the library is a machine the kernel plans against", async () => {
+  const created = await app.sidecar.call("/api/machine-configs", {
+    method: "POST",
+    json: {
+      name: "Shop VMC", type: "mill",
+      config: { workVolume: { x: 800, y: 500, z: 500 }, maxSpindleSpeed: 9000, maxFeedRate: 8000, controller: "fanuc" }
+    }
+  })
+  expect(created.status).toBe(200)
+  const id = (created.body as { data: { id: string } }).data.id
+  useElementsStore.getState().addElements([{ id: "plate", type: "cube", width: 30, height: 20, depth: 5, x: 0, y: 0, z: 0, layerId: "default" }])
+  useElementsStore.setState({ selectedElement: null })
+  const view = app.visit("/cam")
+  try {
+    const select = await app.wait(() => document.querySelector<HTMLSelectElement>("[data-testid='kernel-machine']"), 30_000)
+    // The saved configuration is offered next to the built-in machines.
+    await app.wait(() => [...select.options].some((option) => option.textContent === "Shop VMC") ? true : null, 10_000)
+    select.value = `config:${id}`
+    select.dispatchEvent(new window.Event("change", { bubbles: true }))
+    await app.wait(() => useGeneratorStore.getState().kernelSettings.machineConfig?.id === id ? true : null, 10_000)
+    expect(useGeneratorStore.getState().kernelSettings.machine).toBeUndefined()
+    // The request carries it, and the run is planned against that machine.
+    document.querySelector<HTMLButtonElement>("[data-testid='kernel-generate']")!.click()
+    await app.wait(() => useCamStore.getState().kernelArtifact?.machine.id === `config:${id}` ? true : null, 60_000)
+    expect(useCamStore.getState().kernelRequest?.machineConfig?.id).toBe(id)
+    expect(document.querySelector("[data-testid='kernel-stale']")).toBeNull()
+  } finally {
+    view.dispose()
+    useGeneratorStore.getState().patchKernelSettings({ machine: cam.kernel.DEFAULT_MACHINE.id, machineConfig: undefined })
+  }
+})

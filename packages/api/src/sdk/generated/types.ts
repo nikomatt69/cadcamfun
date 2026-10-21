@@ -1184,6 +1184,33 @@ export type ToolpathGeneratorManufacturePayload = {
   readonly setupOrientation?: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
   readonly material: string
   readonly machine?: string
+  readonly machineConfig?: {
+    readonly id: string
+    readonly name: string
+    readonly type: string
+    readonly description?: string | null
+    readonly config: {
+      readonly workVolume?: { readonly x: number; readonly y: number; readonly z: number } | null
+      readonly maxSpindleSpeed?: number | null
+      readonly maxFeedRate?: number | null
+      readonly controller?: string | null
+      readonly axes?: 3 | 4 | 5 | null
+      readonly rotary?: {
+        readonly layout: "table-AC" | "table-BC"
+        readonly tilt: {
+          readonly min: number | "Infinity" | "-Infinity" | "NaN"
+          readonly max: number | "Infinity" | "-Infinity" | "NaN"
+        }
+        readonly rotation?: {
+          readonly min: number | "Infinity" | "-Infinity" | "NaN"
+          readonly max: number | "Infinity" | "-Infinity" | "NaN"
+        } | null
+        readonly pivot?: { readonly x: number; readonly y: number; readonly z: number } | null
+        readonly tcp?: "control" | "program" | null
+      } | null
+      readonly additionalSettings?: { readonly [x: string]: JsonValue } | null
+    }
+  }
   readonly origin?: "stock-center" | "stock-corner"
   readonly finishAllowance?: number
   readonly scallop?: number
@@ -5352,6 +5379,8 @@ export type MachineConfigsCloneInput = { readonly id: { readonly id: string }["i
 
 export type MachineConfigsCloneOutput = { success: true; data: unknown | null; message?: string | undefined }
 
+export type MachineConfigsDefaultsOutput = { success: true; data: unknown | null; message?: string | undefined }
+
 export type MachineConfigsStorageSaveInput = { readonly id: { readonly id: string }["id"]; readonly payload: unknown }
 
 export type MachineConfigsStorageSaveOutput = { success: true; message: string; data: unknown | null }
@@ -5923,6 +5952,7 @@ export type ToolpathGeneratorManufactureInput = {
   readonly setupOrientation?: ToolpathGeneratorManufacturePayload["setupOrientation"]
   readonly material: ToolpathGeneratorManufacturePayload["material"]
   readonly machine?: ToolpathGeneratorManufacturePayload["machine"]
+  readonly machineConfig?: ToolpathGeneratorManufacturePayload["machineConfig"]
   readonly origin?: ToolpathGeneratorManufacturePayload["origin"]
   readonly finishAllowance?: ToolpathGeneratorManufacturePayload["finishAllowance"]
   readonly scallop?: ToolpathGeneratorManufacturePayload["scallop"]

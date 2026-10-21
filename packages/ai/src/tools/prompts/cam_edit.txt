@@ -6,8 +6,8 @@ Actions and Parameters (mm, mm/min, rpm)
 - generate: operationId (required), maxLines (1-200, default 40); store full NC, return stats and preview.
 - verify: operationId, tool {cuttingLength,shankDiameter,stickout,holderDiameter,holderLength}, fixtures [{id,bounds:{minX,maxX,minY,maxY,minZ,maxZ}}], targetSolids, stock (same bounds), resolution, tolerance, start {x,y,z}. Replay stored NC, never regenerate; persist evidence bound to programHash. Omitted geometry is unmodelled. Default start is X0 Y0 at stock top +10 mm.
 - stock_set: stock {width,height,depth,radius,x,y,topZ,allowance,material?,elementId?}; change stock and invalidate programs.
-- manufacture: material, machine, origin, setupOrientation, finishAllowance, scallop, deburr, operations, tools, subprograms, expectedRevision. Store whole-part kernel NC and evidence; blocked releases refused. Preview via cam manufacture.
-- turn: profile, stock, stepdown, allowance, feedMmRev, rpm, expectedRevision (as cam turn). Store identical native external-turning NC with lathe stock settings. Always preview; ideal point tool, unqualified workholding/controller. Re-run turn after changes, never legacy generate.
+- manufacture: material, machine, machineConfig, origin, setupOrientation, finishAllowance, scallop, deburr, operations, tools, subprograms, expectedRevision. Store whole-part kernel NC and evidence; blocked releases refused. Preview via cam manufacture. machineConfig is the machine configuration of the library (from cam materials): it wins over the preset id.
+- turn: profile, stock, stepdown, allowance, feedMmRev, rpm, machine, machineConfig, expectedRevision (as cam turn). Store identical native external-turning NC with lathe stock settings. Always preview; ideal point tool, unqualified workholding/controller. Re-run turn after changes, never legacy generate.
 
 Result (JSON)
 - ok; create/update: operationId; generate: programHash, lines/previewLines/omittedLines, preview; verify: status, programHash, issues, stats and modelling limits. manufacture/turn: operationId, release, identity; desktop loads the stored original.

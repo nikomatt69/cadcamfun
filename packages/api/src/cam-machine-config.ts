@@ -51,7 +51,7 @@ export const CamMachineConfig = Schema.Struct({
       pivot: Schema.optional(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
       tcp: Schema.optional(Schema.Literals(["control", "program"]))
     })),
-    additionalSettings: Schema.optional(Schema.Record(Schema.String, Schema.Unknown))
+    additionalSettings: Schema.optional(Schema.Record(Schema.String, Schema.Json))
   })
 })
 export type CamMachineConfig = typeof CamMachineConfig.Type

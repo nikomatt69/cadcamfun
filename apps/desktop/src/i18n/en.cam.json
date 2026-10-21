@@ -75,6 +75,7 @@
   "cam.machine.empty": "No machines yet.",
   "cam.machine.createInLibrary": "Create one in the Machines library",
   "cam.machine.library": "Machines library",
+  "cam.machine.builtin": "Built-in machines",
   "cam.machine.refresh": "Refresh machines",
   "cam.machine.retry": "Try again",
   "cam.machine.error": "The machines could not be read.",

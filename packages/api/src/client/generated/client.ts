@@ -2238,6 +2238,9 @@ type Endpoint21_5Input = {
 const Endpoint21_5 = (raw: RawClient["machineConfigs"]) => (input: Endpoint21_5Input) =>
   raw["clone"]({ params: { id: input["id"] }, payload: input["payload"] }).pipe(Effect.mapError(mapClientError))
 
+const Endpoint21_6 = (raw: RawClient["machineConfigs"]) => () =>
+  raw["defaults"]({}).pipe(Effect.mapError(mapClientError))
+
 const adaptGroup21 = (raw: RawClient["machineConfigs"]) => ({
   list: Endpoint21_0(raw),
   create: Endpoint21_1(raw),
@@ -2245,6 +2248,7 @@ const adaptGroup21 = (raw: RawClient["machineConfigs"]) => ({
   update: Endpoint21_3(raw),
   remove: Endpoint21_4(raw),
   clone: Endpoint21_5(raw),
+  defaults: Endpoint21_6(raw),
 })
 
 type Endpoint22_0Request = Parameters<RawClient["machineConfigsStorage"]["save"]>[0]
@@ -2674,6 +2678,7 @@ type Endpoint27_0Input = {
   readonly setupOrientation?: Endpoint27_0Request["payload"]["setupOrientation"]
   readonly material: Endpoint27_0Request["payload"]["material"]
   readonly machine?: Endpoint27_0Request["payload"]["machine"]
+  readonly machineConfig?: Endpoint27_0Request["payload"]["machineConfig"]
   readonly origin?: Endpoint27_0Request["payload"]["origin"]
   readonly finishAllowance?: Endpoint27_0Request["payload"]["finishAllowance"]
   readonly scallop?: Endpoint27_0Request["payload"]["scallop"]
@@ -2697,6 +2702,7 @@ const Endpoint27_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27
       setupOrientation: input["setupOrientation"],
       material: input["material"],
       machine: input["machine"],
+      machineConfig: input["machineConfig"],
       origin: input["origin"],
       finishAllowance: input["finishAllowance"],
       scallop: input["scallop"],

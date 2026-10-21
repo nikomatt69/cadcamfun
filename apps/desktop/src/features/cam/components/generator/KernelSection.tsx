@@ -1,13 +1,14 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { Cpu } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
-import type { CamKernelArtifact, CamKernelResult } from "@cadcamfun/api"
+import type { CamKernelArtifact, CamKernelResult, CamMachineConfig } from "@cadcamfun/api"
 import { useApp } from "../../../../shared/state/context.ts"
 import { t } from "../../../../i18n/index.ts"
 import { captureEditorOwner } from "../../../ai/lib/editor-sync.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { kernelRequestOf } from "../../lib/job.ts"
+import { kernelMachineConfigsOf, machinesFromResponse } from "../../lib/machines.ts"
 import { useCamStore } from "../../store/camStore.ts"
 import { ToolSilhouette } from "../ToolSilhouette.tsx"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
@@ -47,6 +48,13 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
   const [planNotes, setPlanNotes] = createSignal<ReadonlyArray<string>>([])
   const [result, setResult] = createSignal<CamKernelResult>()
   const [error, setError] = createSignal<string>()
+  /** The machine configurations of the library: the machines the person configured, usable by the kernel. */
+  const [savedMachines, setSavedMachines] = createSignal<ReadonlyArray<CamMachineConfig>>([])
+  /** The machine the panel plans against: a saved configuration, else the preset id. */
+  const machineValue = (): string => {
+    const config = settings().machineConfig
+    return config !== undefined ? `config:${config.id}` : (settings().machine ?? cam.kernel.DEFAULT_MACHINE.id)
+  }
   let controller: AbortController | undefined
   let runId = ""
   let disposed = false
@@ -63,15 +71,18 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
   const stale = () => {
     const value = artifact(), current = request()
     if (!value) return false
-    const source = store.kernelRequest, stock = current?.stock
-    const stockChanged = (current?.setupOrientation ?? "+Z") === "+Z" && (stock !== undefined ? (
+    if (!current) return true
+    const source = store.kernelRequest, stock = current.stock
+    const stockChanged = (current.setupOrientation ?? "+Z") === "+Z" && (stock !== undefined ? (
       Math.abs(stock.width - (value.stockBounds.max.x - value.stockBounds.min.x)) > 1e-9 ||
       Math.abs(stock.height - (value.stockBounds.max.y - value.stockBounds.min.y)) > 1e-9 ||
       Math.abs(stock.depth - (value.stockBounds.max.z - value.stockBounds.min.z)) > 1e-9 ||
       Math.abs(stock.x - (value.stockBounds.max.x + value.stockBounds.min.x) / 2) > 1e-9 ||
       Math.abs(stock.y - (value.stockBounds.max.y + value.stockBounds.min.y) / 2) > 1e-9
     ) : source?.stock !== undefined)
-    return !current || value.nc !== store.gcode || value.material.id !== (cam.kernel.findMaterial(current.material)?.id ?? current.material) || value.machine.id !== current.machine ||
+    // The machine the request names: a saved configuration becomes `config:<id>`, a preset keeps its id.
+    const machineId = current.machineConfig !== undefined ? `config:${current.machineConfig.id}` : current.machine
+    return value.nc !== store.gcode || value.material.id !== (cam.kernel.findMaterial(current.material)?.id ?? current.material) || value.machine.id !== machineId ||
       (value.setupOrientation ?? "+Z") !== (current.setupOrientation ?? "+Z") ||
       cam.kernel.canonicalJson(source?.stock ?? null) !== cam.kernel.canonicalJson(current.stock ?? null) ||
       stockChanged || value.program.workOffset !== (current.workOffset ?? "G54") ||
@@ -83,6 +94,12 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
   createEffect(() => {
     requestId()
     controller?.abort()
+  })
+  // The library's machines: what the person configured is what the kernel plans against.
+  onMount(() => {
+    void app.runtime.run(app.client.machineConfigs.list({ query: {} }))
+      .then((value) => setSavedMachines(kernelMachineConfigsOf(machinesFromResponse(value))))
+      .catch(() => setSavedMachines([]))
   })
   onCleanup(() => { disposed = true; controller?.abort(); if (controller) gen.setGenerating(false) })
 
@@ -189,8 +206,25 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
         </select>
       </label>
       <label class={LABEL}>{t("cam.kernel.machine")}
-        <select class={INPUT} value={settings().machine} onChange={(event) => gen.patchKernelSettings({ machine: event.currentTarget.value })} data-testid="kernel-machine">
-          <For each={cam.kernel.MACHINES}>{(item) => <option value={item.id}>{item.name} · {item.post}</option>}</For>
+        <select
+          class={INPUT} value={machineValue()} data-testid="kernel-machine"
+          onChange={(event) => {
+            const value = event.currentTarget.value
+            if (value.startsWith("config:")) {
+              const row = savedMachines().find((machine) => `config:${machine.id}` === value)
+              if (row !== undefined) gen.patchKernelSettings({ machineConfig: row, machine: undefined })
+              return
+            }
+            gen.patchKernelSettings({ machine: value, machineConfig: undefined })
+          }}>
+          <optgroup label="Built-in machines">
+            <For each={cam.kernel.MACHINES}>{(item) => <option value={item.id}>{item.name} · {item.post}</option>}</For>
+          </optgroup>
+          <Show when={savedMachines().length > 0}>
+            <optgroup label="Your machines">
+              <For each={savedMachines()}>{(item) => <option value={`config:${item.id}`}>{item.name}</option>}</For>
+            </optgroup>
+          </Show>
         </select>
       </label>
       <label class={LABEL}>{t("cam.kernel.setupOrientation")}

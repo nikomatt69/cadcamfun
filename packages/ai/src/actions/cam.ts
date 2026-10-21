@@ -132,14 +132,22 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({
     id: "cam.materials", kind: "read",
     parameters: CAM_ACTION_INPUTS["cam.materials"],
-    // Pure: the kernel's material table.
-    run: async ({ query }) => {
+    // Pure: the kernel's material table. The machines are the built-in catalogue plus the configurations of the
+    // library, so the assistant can plan against the machine the person actually configured.
+    run: async ({ query }, { handlers, projectId }) => {
       const found = query !== undefined && query.trim() !== "" ? cam.kernel.findMaterial(query) : undefined
       const rows = (found !== undefined ? [found] : cam.kernel.MATERIALS).map((m) => ({
         id: m.id, name: m.name, iso: m.iso, family: m.family, hardnessHB: m.hardnessHB, ...(m.hardnessHRC !== undefined ? { hardnessHRC: m.hardnessHRC } : {}),
         kc11: m.kc11, mc: m.mc, vcCarbide: m.vcCarbide, vcHss: m.vcHss ?? null, fz10: m.fz10, coolant: m.coolant, notes: m.notes
       }))
-      return query !== undefined && found === undefined ? { ok: false, error: `No material matches '${query}'`, known: cam.kernel.MATERIALS.map((m) => m.id) } : { ok: true, materials: rows, machines: cam.kernel.MACHINES.map((m) => ({ id: m.id, name: m.name, post: m.post, limits: m.limits, ...(m.fiveAxis !== undefined ? { fiveAxis: m.fiveAxis } : {}) })) }
+      const built = cam.kernel.MACHINE_CATALOGUE.map((m) => ({
+        id: m.id, name: m.name, kind: m.kind, post: m.post, limits: m.limits, builtin: true,
+        ...(m.fiveAxis !== undefined ? { fiveAxis: m.fiveAxis } : {}),
+        ...(m.turning !== undefined ? { turning: m.turning } : {})
+      }))
+      const configured = handlers.machines === undefined ? [] : await handlers.machines(projectId)
+      const machines = [...built, ...(Array.isArray(configured) ? configured : [])]
+      return query !== undefined && found === undefined ? { ok: false, error: `No material matches '${query}'`, known: cam.kernel.MATERIALS.map((m) => m.id) } : { ok: true, materials: rows, machines }
     }
   }),
   defineWireAction({
@@ -169,7 +177,26 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cam.turn", kind: "read", parameters: CAM_ACTION_INPUTS["cam.turn"],
     // Pure: the kernel's turning plan (face, stepped roughing on the evolving stock, finish), lathe NC included.
     run: async (input) => {
-      const plan = cam.kernel.planTurning(input)
+      const { machine, machineConfig, ...request } = input
+      const centre = machineConfig !== undefined
+        ? cam.kernel.kernelMachineOfConfig(machineConfig)
+        : (machine !== undefined ? cam.kernel.findMachine(machine) : undefined)
+      if (machineConfig !== undefined && centre === undefined) {
+        return { ok: false, error: `The machine configuration '${machineConfig.name}' is not a turning centre: it needs the kind lathe and a spindle and a feed ceiling.`, issues: [] }
+      }
+      if (machine !== undefined && centre === undefined) {
+        return { ok: false, error: `Unknown machine preset '${machine}'. Known: ${cam.kernel.MACHINE_CATALOGUE.map((m) => m.id).join(", ")}`, issues: [] }
+      }
+      if (centre !== undefined && centre.kind !== "lathe") {
+        return { ok: false, error: `Machine '${centre.name}' is a milling centre: the part does not turn there.`, issues: [] }
+      }
+      const turning = centre?.turning !== undefined
+        ? {
+          id: centre.id, name: centre.name, maxBarDiameter: centre.turning.maxBarDiameter, maxBarLength: centre.turning.maxBarLength,
+          maxRpm: centre.limits.maxRpm, maxFeed: centre.limits.maxFeed
+        }
+        : undefined
+      const plan = cam.kernel.planTurning({ ...request, ...(turning !== undefined ? { machine: turning } : {}) })
       return plan.issues.length > 0
         ? { ok: false, error: plan.issues.join("; "), issues: plan.issues }
         : { ok: true, ...plan }

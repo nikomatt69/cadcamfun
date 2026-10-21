@@ -21,6 +21,16 @@ const history = {
 }
 /** Valid to the JSON schema, refused by the order check: the extrude names a sketch that does not exist. */
 const dangling = { parameters: {}, features: [{ id: "e", type: "extrude", sketch: "nowhere", depth: 5, operation: "new" }] }
+/** A history with the two new feature fields: a fillet whose radius runs along the edge and a sheet with an edge flange and its relief. */
+const tapered = {
+  parameters: {},
+  features: [
+    { id: "s", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: 40, height: 20 }] } },
+    { id: "e", type: "extrude", sketch: "s", depth: 10, operation: "new" },
+    { id: "f", type: "fillet", style: "fillet", radius: 1, radiusEnd: 3, edges: { within: { min: [-1, -1, -1], max: [3, 3, 11] } } },
+    { id: "sh", type: "sheet", sketch: "s", thickness: 2, width: 20, bendRadius: 3, operation: "new", flanges: [{ end: "end", length: 20, angle: 90, relief: { width: 1, depth: 1 } }] }
+  ]
+}
 
 const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readonly refuse: ReadonlyArray<unknown> }> = {
   "cad.describe": { accept: [{}], refuse: [[]] },
@@ -64,7 +74,7 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.parametric_fastener": { accept: [{}, { size: "M6", fit: "medium" }], refuse: [{ fit: "loose" }, { shaftDiameter: 0 }] },
   "cad.parametric_recipe": { accept: [{ recipe: "flange" }, { recipe: "flange", params: { boltCount: 6 } }], refuse: [{ recipe: "teapot" }, {}] },
   "cad.parametric_from_element": { accept: [{ elementId: "a" }, { elementId: "a", depth: 4 }], refuse: [{ elementId: "a", depth: -1 }] },
-  "cad_edit.parametric_create": { accept: [{ history, name: "Plate" }, { history, name: "Plate", x: 5, layer: "L" }], refuse: [{ history }, { history, name: "" }, { history: dangling, name: "P" }] },
+  "cad_edit.parametric_create": { accept: [{ history, name: "Plate" }, { history, name: "Plate", x: 5, layer: "L" }, { history: tapered, name: "Tapered" }], refuse: [{ history }, { history, name: "" }, { history: dangling, name: "P" }] },
   "cad_edit.parametric_update": { accept: [{ elementId: "a", parameters: { w: 60 }, expectedRevision: "r1" }], refuse: [{ elementId: "a", parameters: { "1w": 3 }, expectedRevision: "r1" }, { elementId: "a", parameters: {} }] },
   "cad_edit.parametric_recipe_create": { accept: [{ recipe: "flange" }, { recipe: "flange", name: "F", z: 0 }], refuse: [{ recipe: "flange", name: "" }] },
   "cad_edit.parametric_convert": { accept: [{ elementId: "a" }], refuse: [{ elementId: "" }] }

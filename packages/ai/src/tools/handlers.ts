@@ -36,6 +36,8 @@ export interface ToolHandlersShape {
   /** Stores the native kernel's original multi-tool NC and artifact in the active drawing after write admission. */
   manufactureOperation?(projectId: string, input: typeof CamManufactureOperationInput.Type, signal?: AbortSignal): Promise<unknown>
   turnOperation?(projectId: string, input: typeof CamTurningOperationInput.Type, signal?: AbortSignal): Promise<unknown>
+  /** The user's saved machine configurations, as machines the kernel can plan against (id, name, kind, post, limits). */
+  machines?(projectId: string): Promise<unknown>
   reviewOperation?(projectId: string, operationId: string): Promise<unknown>
   compareSetups?(projectId: string, candidates: ReadonlyArray<SetupCandidate>): Promise<unknown>
   stock?(projectId: string, input: CamStockInput): Promise<unknown>

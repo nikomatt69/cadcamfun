@@ -53,6 +53,34 @@ describe("cam kernel actions", () => {
     expect(wide["error"]).toContain("exceeds the stock diameter")
   })
 
+  test("the turning centre bounds the bar and the spindle, and a milling centre is refused", async () => {
+    const profile = [{ diameter: 40, z: 0 }, { diameter: 25, z: -50 }]
+    const plan = await run("cam.turn", { profile, stock: { diameter: 44, length: 60 }, machine: "mazak-integrex-i200", rpm: 20000 })
+    expect(plan["ok"]).toBe(true)
+    expect(plan["machine"]).toEqual({ id: "mazak-integrex-i200", name: "Mazak INTEGREX i-200 class mill-turn (B head, Y axis, C spindle)" })
+    expect(plan["rpm"]).toBe(12000)
+    expect(plan["nc"]).toContain("M3 S12000")
+    // A bar the chuck cannot take is refused with the reason.
+    const wide = await run("cam.turn", { profile, stock: { diameter: 80, length: 60 }, machine: "mazak-integrex-i200" })
+    expect(wide["ok"]).toBe(false)
+    expect(wide["error"]).toContain("does not fit the chuck")
+    // A milling centre is not a turning centre.
+    const mill = await run("cam.turn", { profile, stock: { diameter: 44, length: 60 }, machine: "vmc-standard" })
+    expect(mill["ok"]).toBe(false)
+    expect(mill["error"]).toContain("milling centre")
+    const unknown = await run("cam.turn", { profile, stock: { diameter: 44, length: 60 }, machine: "nope" })
+    expect(unknown["ok"]).toBe(false)
+    expect(unknown["error"]).toContain("Unknown machine preset")
+  })
+
+  test("the catalogue of machines carries the built-in ones and the configurations of the host", async () => {
+    const answer = await run("cam.materials", {}, { machines: async () => [{ id: "config:row-1", name: "Shop mill", kind: "mill", post: "fanuc", limits: { maxRpm: 9000, maxFeed: 8000 } }] })
+    const machines = answer["machines"] as ReadonlyArray<Record<string, unknown>>
+    expect(machines.some((machine) => machine["id"] === "vmc-standard")).toBe(true)
+    expect(machines.some((machine) => machine["id"] === "mazak-integrex-i200" && machine["kind"] === "lathe")).toBe(true)
+    expect(machines.some((machine) => machine["id"] === "config:row-1")).toBe(true)
+  })
+
   test("manufacture is delegated to the host, and says so when the host has no kernel", async () => {
     const calls: unknown[] = []
     const done = await run("cam.manufacture", { material: "C45", planOnly: true }, { manufacture: async (_p: string, input: unknown) => { calls.push(input); return { ok: true, mutated: false, drawingId: "d", projectId: "p" } } })

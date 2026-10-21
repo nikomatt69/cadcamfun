@@ -231,8 +231,13 @@ const toolHandlers = Effect.gen(function*() {
         min: { x: stored.x - stored.width / 2, y: stored.y - stored.height / 2, z: zMin },
         max: { x: stored.x + stored.width / 2, y: stored.y + stored.height / 2, z: zMin + stored.depth }
       }
-      const machine = input.machine !== undefined ? cam.kernel.findMachine(input.machine) : undefined
-      if (input.machine !== undefined && machine === undefined) return { ok: false, error: `Unknown machine preset '${input.machine}'. Known: ${cam.kernel.MACHINES.map((m) => m.id).join(", ")}` }
+      const machine = input.machineConfig !== undefined
+        ? cam.kernel.kernelMachineOfConfig(input.machineConfig)
+        : (input.machine !== undefined ? cam.kernel.findMachine(input.machine) : undefined)
+      if (input.machineConfig !== undefined && machine === undefined) {
+        return { ok: false, error: `The machine configuration '${input.machineConfig.name}' is not a machine the kernel can machine: it needs a kind it machines (mill or lathe) and a spindle and a feed ceiling.` }
+      }
+      if (input.machine !== undefined && machine === undefined) return { ok: false, error: `Unknown machine preset '${input.machine}'. Known: ${cam.kernel.MACHINE_CATALOGUE.map((m) => m.id).join(", ")}` }
       const job: cam.kernel.ManufacturingJob = {
         schemaVersion: 1, id: `${loaded.id}:${drawingRevision(loaded)}`, name: "CAM kernel job", material: input.material,
         ...(input.setupOrientation !== undefined ? { setupOrientation: input.setupOrientation } : {}),
@@ -256,8 +261,23 @@ const toolHandlers = Effect.gen(function*() {
   const handlers: ToolHandlersShape = {
     turnOperation: async (projectId, input, signal) => {
       signal?.throwIfAborted()
-      const { expectedRevision, ...request } = input
-      const plan = cam.kernel.planTurning(request)
+      const { expectedRevision, machine, machineConfig, ...request } = input
+      // The turning centre the plan runs on: a preset of the catalogue or a configuration of the library.
+      const centre = machineConfig !== undefined
+        ? cam.kernel.kernelMachineOfConfig(machineConfig)
+        : (machine !== undefined ? cam.kernel.findMachine(machine) : undefined)
+      if (machineConfig !== undefined && centre === undefined) {
+        return { ok: false, error: `The machine configuration '${machineConfig.name}' is not a turning centre the kernel can plan on: it needs the kind lathe and a spindle and a feed ceiling.` }
+      }
+      if (machine !== undefined && centre === undefined) return { ok: false, error: `Unknown machine preset '${machine}'. Known: ${cam.kernel.MACHINE_CATALOGUE.map((m) => m.id).join(", ")}` }
+      if (centre !== undefined && centre.kind !== "lathe") return { ok: false, error: `Machine '${centre.name}' is a milling centre: the part does not turn there, so the turning plan does not apply to it.` }
+      const turningMachine = centre?.turning !== undefined
+        ? {
+          id: centre.id, name: centre.name, maxBarDiameter: centre.turning.maxBarDiameter, maxBarLength: centre.turning.maxBarLength,
+          maxRpm: centre.limits.maxRpm, maxFeed: centre.limits.maxFeed
+        }
+        : undefined
+      const plan = cam.kernel.planTurning({ ...request, ...(turningMachine !== undefined ? { machine: turningMachine } : {}) })
       if (plan.issues.length > 0) return { ok: false, error: plan.issues.join("; "), issues: plan.issues }
       const loaded = await load(projectId, true)
       const revision = drawingRevision(loaded)
@@ -1003,6 +1023,19 @@ const toolHandlers = Effect.gen(function*() {
         .map((c) => ({ id: c.id, name: c.name, description: c.description, type: c.type, projectId: c.projectId, projectName: c.project.name, isPublic: c.isPublic, updatedAt: c.updatedAt }))
     },
     lookupMachineConfig: async (query) => (await Effect.runPromise(machines.list(acting().id, { ...(query === "" ? {} : { search: query }), page: 1, limit: 10 }))).rows.slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, type: m.type, config: m.config, isPublic: m.isPublic, isOwner: m.isOwner, usageCount: m.usageCount, updatedAt: m.updatedAt })),
+    // The machines the person configured, as machines the kernel plans against: the configuration becomes a machine.
+    machines: async (projectId) => {
+      const rows = (await Effect.runPromise(machines.list(acting().id, { page: 1, limit: 100 }))).rows
+      return rows.flatMap((row) => {
+        const machine = cam.kernel.kernelMachineOfConfig({ id: row.id, name: row.name, type: row.type, config: row.config as never })
+        if (machine === undefined) return []
+        return [{
+          id: machine.id, name: machine.name, kind: machine.kind, post: machine.post, limits: machine.limits, builtin: false,
+          ...(machine.fiveAxis !== undefined ? { fiveAxis: machine.fiveAxis } : {}),
+          ...(machine.turning !== undefined ? { turning: machine.turning } : {})
+        }]
+      })
+    },
     deleteLibrary: async (input) => {
       const { kind, id } = input
       if (kind === "material" || kind === "tool") {

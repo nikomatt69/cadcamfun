@@ -376,6 +376,7 @@ import type {
   MachineConfigsRemoveOutput,
   MachineConfigsCloneInput,
   MachineConfigsCloneOutput,
+  MachineConfigsDefaultsOutput,
   MachineConfigsStorageSaveInput,
   MachineConfigsStorageSaveOutput,
   MachineConfigsStorageReadInput,
@@ -3368,6 +3369,17 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      defaults: (requestOptions?: RequestOptions) =>
+        request<MachineConfigsDefaultsOutput>(
+          {
+            method: "GET",
+            path: `/api/machine-configs/defaults`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 405, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
     },
     machineConfigsStorage: {
       save: (input: MachineConfigsStorageSaveInput, requestOptions?: RequestOptions) =>
@@ -3814,6 +3826,7 @@ export function make(options: ClientOptions) {
               setupOrientation: input["setupOrientation"],
               material: input["material"],
               machine: input["machine"],
+              machineConfig: input["machineConfig"],
               origin: input["origin"],
               finishAllowance: input["finishAllowance"],
               scallop: input["scallop"],

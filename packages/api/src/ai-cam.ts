@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { cad, cam } from "@cadcamfun/core"
+import { CamMachineConfig } from "./cam-machine-config.ts"
 
 const id = Schema.NonEmptyString
 const revision = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))
@@ -43,6 +44,8 @@ export const CamManufactureInput = Schema.Struct({
   workOffset: Schema.optionalKey(cam.WorkOffsetSchema),
   material: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)),
   machine: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(60))),
+  /** A machine configuration of the library: the machine the person configured, with its ceilings and its controller. */
+  machineConfig: Schema.optionalKey(CamMachineConfig),
   origin: Schema.optionalKey(Schema.Literals(["stock-center", "stock-corner"])),
   finishAllowance: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 5 }))),
   scallop: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(1))), planOnly: Schema.optionalKey(Schema.Boolean),
@@ -69,7 +72,10 @@ export const CamTurningInput = Schema.Struct({
   stepdown: Schema.optionalKey(positive.check(Schema.isBetween({ minimum: 0.001, maximum: 100 }))),
   allowance: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 5 }))),
   feedMmRev: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(10))),
-  rpm: Schema.optionalKey(positive.check(Schema.isBetween({ minimum: 1, maximum: 20000 })))
+  rpm: Schema.optionalKey(positive.check(Schema.isBetween({ minimum: 1, maximum: 20000 }))),
+  /** The turning centre the plan runs on (a preset id or a saved configuration): it bounds the bar and the spindle. */
+  machine: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(60))),
+  machineConfig: Schema.optionalKey(CamMachineConfig)
 })
 export const CamTurningOperationInput = Schema.Struct({ ...CamTurningInput.fields, expectedRevision: Schema.optionalKey(revision) })
 const turnPoint = Schema.Struct({ diameter: Schema.Finite, z: Schema.Finite })
@@ -79,12 +85,17 @@ export const CamTurningPlan = Schema.Struct({
   passes: Schema.Array(Schema.Struct({ kind: Schema.Literals(["face", "rough", "finish"]), diameter: Schema.Finite, points: Schema.Array(turnPoint), removed: Schema.Finite })),
   stockAfter: Schema.Array(Schema.Finite), stockProfiles: Schema.Array(Schema.Array(turnPoint)),
   stockVolume: Schema.Finite, partVolume: Schema.Finite, unmachinedVolume: Schema.Finite, removedVolume: Schema.Finite,
+  /** The spindle speed and the feed the plan runs at (the machine's ceilings when they are lower). */
+  rpm: Schema.Finite, feed: Schema.Finite,
+  /** The turning centre the plan was bounded by, when one was given. */
+  machine: Schema.optionalKey(Schema.Struct({ id: Schema.String, name: Schema.String })),
   nc: Schema.String, issues: Schema.Array(Schema.String)
 })
 export const CamManufactureOperationInput = Schema.Struct({
   setupOrientation: CamManufactureInput.fields.setupOrientation,
   workOffset: CamManufactureInput.fields.workOffset,
   material: CamManufactureInput.fields.material, machine: CamManufactureInput.fields.machine,
+  machineConfig: CamManufactureInput.fields.machineConfig,
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance,
   scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision),
   operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr,

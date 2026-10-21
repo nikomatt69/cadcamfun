@@ -157,7 +157,13 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
     if (kind === "machines") {
       // The envelope is `{ data: { data: rows, pagination } }`; older answers carried `{ data: rows }` or `{ configs }`.
       const list = machineRows(asRecord(await run<unknown>(app.client.machineConfigs.list({ query: {} })))["data"])
-      return list.map(asRecord).filter((row) => typeof row["id"] === "string")
+      const own = list.map(asRecord).filter((row) => typeof row["id"] === "string")
+      // The built-in catalogue of machines: what the kernel plans against when the person configured none.
+      const defaults = machineRows(asRecord(await run<unknown>(app.client.machineConfigs.defaults({})))["data"])
+        .map(asRecord)
+        .filter((row) => typeof row["id"] === "string")
+        .map((row) => ({ ...row, builtin: true }))
+      return [...defaults, ...own]
     }
     // Components belong to a project: gather them across the projects the user can see.
     const list = await run<ReadonlyArray<Project>>(app.client.projects.list())
@@ -445,7 +451,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                           </thead>
                           <tbody class="divide-y divide-slate-200 bg-white dark:divide-slate-700 dark:bg-slate-900">
                             <For each={filtered()}>{(row) => (
-                              <tr class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50" onClick={() => navigate(detailPath(row))}>
+                              <tr class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50" onClick={() => { if (row["builtin"] !== true) navigate(detailPath(row)) }}>
                                 <td class="whitespace-nowrap px-4 py-3">
                                   <div class="flex items-center gap-3">
                                     <div class="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-900"><Icon size={18} class="text-slate-400 dark:text-slate-600" aria-hidden="true" /></div>
@@ -461,8 +467,12 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                                 <td class="whitespace-nowrap px-4 py-3 font-mono text-sm text-slate-500 dark:text-slate-400">{str(row["id"]).substring(0, 8)}...</td>
                                 <td class="whitespace-nowrap px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                                   <div class="flex justify-end gap-1">
-                                    <button type="button" class={ICON_BUTTON} title="Edit" onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
-                                    <button type="button" class={ICON_BUTTON} title="Delete" disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
+                                    <Show when={row["builtin"] === true} fallback={<>
+                                      <button type="button" class={ICON_BUTTON} title="Edit" onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
+                                      <button type="button" class={ICON_BUTTON} title="Delete" disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
+                                    </>}>
+                                      <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Built-in</span>
+                                    </Show>
                                   </div>
                                 </td>
                               </tr>
@@ -474,11 +484,12 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                   >
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                       <For each={filtered()}>{(row) => (
-                        <div class={`${GLASS_CARD} cursor-pointer`} onClick={() => navigate(detailPath(row))} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") navigate(detailPath(row)) }}>
+                        <div class={`${GLASS_CARD} cursor-pointer`} onClick={() => { if (row["builtin"] !== true) navigate(detailPath(row)) }} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" && row["builtin"] !== true) navigate(detailPath(row)) }}>
                           <div class="relative flex h-20 items-center justify-center bg-gradient-to-r from-blue-500/20 to-cyan-500/20 dark:from-blue-600/30 dark:to-cyan-600/30">
                             <div class="rounded-xl bg-white/30 p-2.5 backdrop-blur-sm dark:bg-white/10"><Icon size={28} class="text-blue-600 dark:text-blue-300" aria-hidden="true" /></div>
                             <span class="absolute right-2 top-2 rounded-full bg-blue-100/80 px-2 py-0.5 text-xs font-semibold text-blue-800 backdrop-blur-sm dark:bg-blue-900/50 dark:text-blue-300">{meta.badge(row)}</span>
                             <Show when={row["isPublic"] === true}><span class="absolute left-2 top-2 rounded-full bg-green-100/80 px-2 py-0.5 text-xs font-semibold text-green-800 backdrop-blur-sm dark:bg-green-900/50 dark:text-green-300">Public</span></Show>
+                            <Show when={row["builtin"] === true}><span class="absolute left-2 top-2 rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-semibold text-slate-700 backdrop-blur-sm dark:bg-slate-800/60 dark:text-slate-200">Built-in</span></Show>
                           </div>
                           <div class="flex flex-1 flex-col gap-2 p-4">
                             <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{str(row["name"])}</h3>
@@ -496,8 +507,12 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                           <div class="flex items-center justify-between border-t border-slate-200/50 bg-slate-50/50 px-4 py-2.5 dark:border-slate-700/50 dark:bg-slate-800/30">
                             <span class="text-xs text-slate-500 dark:text-slate-400">Updated {formatDate(str(row["updatedAt"]))}</span>
                             <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
-                              <button type="button" class={ICON_BUTTON} title="Edit" onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
-                              <button type="button" class={ICON_BUTTON} title="Delete" disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
+                              <Show when={row["builtin"] === true} fallback={<>
+                                <button type="button" class={ICON_BUTTON} title="Edit" onClick={() => navigate(detailPath(row))}><Edit size={16} aria-hidden="true" /></button>
+                                <button type="button" class={ICON_BUTTON} title="Delete" disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
+                              </>}>
+                                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Built-in</span>
+                              </Show>
                             </div>
                           </div>
                         </div>

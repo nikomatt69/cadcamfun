@@ -10,6 +10,8 @@ const id = Schema.NonEmptyString
 export const CamKernelRequest = Schema.Struct({
   setupOrientation: CamManufactureInput.fields.setupOrientation,
   material: CamManufactureInput.fields.material, machine: CamManufactureInput.fields.machine,
+  /** A machine configuration the user saved: it wins over the preset id, because it is the machine they configured. */
+  machineConfig: CamManufactureInput.fields.machineConfig,
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance, scallop: CamManufactureInput.fields.scallop,
   schemaVersion: Schema.Literal(1), id, name: id,
   elements: Schema.Array(Schema.Record(Schema.String, Schema.Json)).check(Schema.isMinLength(1), Schema.isMaxLength(2000)),

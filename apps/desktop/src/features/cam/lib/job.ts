@@ -121,7 +121,7 @@ export const geometryOf = (form: GeometryForm, sources: JobSources): cam.generat
 })
 
 /** Snapshot the selected parts and their Boolean operands, or the whole drawing when nothing is selected. */
-export const kernelRequestOf = (sources: JobSources, options: Pick<CamKernelRequest, "setupOrientation" | "material" | "machine" | "origin" | "finishAllowance" | "scallop" | "tolerance" | "workOffset" | "resolution" | "subprograms">): CamKernelRequest => {
+export const kernelRequestOf = (sources: JobSources, options: Pick<CamKernelRequest, "setupOrientation" | "material" | "machine" | "machineConfig" | "origin" | "finishAllowance" | "scallop" | "tolerance" | "workOffset" | "resolution" | "subprograms">): CamKernelRequest => {
   const selected = selectedElements(sources)
   const roots = selected.length > 0 ? selected : sources.elements.filter((element) => !STOCK_TYPES.has(String(element["type"])))
   const byId = new Map(sources.elements.map((element) => [String(element["id"]), element]))
@@ -136,8 +136,10 @@ export const kernelRequestOf = (sources: JobSources, options: Pick<CamKernelRequ
   }
   roots.forEach(include)
   const hasStock = sources.workpiece.configured || sources.workpiece.elementId || sources.workpieceElementId || sources.elements.some((element) => STOCK_TYPES.has(String(element["type"])))
+  // The request schema takes absent keys, never undefined values: a key without a value is left out.
+  const given = Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined))
   const snapshot = {
-    schemaVersion: 1 as const, name: "CAD manufacturing job", ...options,
+    schemaVersion: 1 as const, name: "CAD manufacturing job", ...given,
     elements: [...included].map(toJsonSafeRecord), ...(hasStock ? { stock: stockOf(sources) } : {})
   }
   return Schema.decodeUnknownSync(CamKernelRequest)({ ...snapshot, id: cam.kernel.digestOf("desktop-cam-job", snapshot) })

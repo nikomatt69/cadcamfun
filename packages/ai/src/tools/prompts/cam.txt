@@ -11,10 +11,10 @@ Actions and Parameters (mm, mm/min, rpm)
 - vision: focus; displayed CAM preview.
 - chain_suggest: fromOperationId, materialHint, toolHint.
 - chain_status: operationId.
-- materials: query; grades and machine presets with fiveAxis layout/pivot/limits.
+- materials: query; grades, and the machines: the built-in catalogue (milling centres and turning centres, with kind, post, limits, fiveAxis and turning) plus the machine configurations of the library (id config:<id>). Pick the machine from that list, never invent one.
 - cutting_data: material, cut, tool, machine, depth/ae/ap/scallop; material-based feeds bounded by machine limits.
-- manufacture: material, machine, origin, setupOrientation (+Z|-Z|+X|-X|+Y|-Y), finishAllowance, scallop, deburr, operations, tools, subprograms, planOnly. Exact-B-rep whole-part plan, multi-tool NC and replay claims; planOnly omits NC. Each manual setup has its own workOffset, never invented rotary motion.
-- turn: profile (2-200 of {diameter,z}), stock {diameter,length}, stepdown, allowance, feedMmRev, rpm. Z0 at face, negative towards chuck, X diameter. External rough/finish passes, stock profiles and G18/G94/G97 NC. Volumes: stock = part + unmachined tail + removed. Ideal point-tool preview, no insert/chuck/controller qualification. Save via cam_edit turn. Mill-turn uses a B head and positioned C spindle.
+- manufacture: material, machine, machineConfig, origin, setupOrientation (+Z|-Z|+X|-X|+Y|-Y), finishAllowance, scallop, deburr, operations, tools, subprograms, planOnly. Exact-B-rep whole-part plan, multi-tool NC and replay claims; planOnly omits NC. machineConfig (a row of the library: workVolume, maxSpindleSpeed, maxFeedRate, controller, axes, rotary) is the machine the person configured and wins over the preset id. Each manual setup has its own workOffset, never invented rotary motion.
+- turn: profile (2-200 of {diameter,z}), stock {diameter,length}, stepdown, allowance, feedMmRev, rpm, machine, machineConfig. Z0 at face, negative towards chuck, X diameter. External rough/finish passes, stock profiles and G18/G94/G97 NC. The turning centre (machine preset id or machineConfig) bounds the bar and the spindle: a bar it cannot hold is refused. Volumes: stock = part + unmachined tail + removed. Ideal point-tool preview, no insert/chuck/controller qualification. Save via cam_edit turn. Mill-turn uses a B head and positioned C spindle.
 
 Result (JSON)
 - ok and data/findings. manufacture release/claims concern only modelled NC capabilities; turn always returns release preview. Neither qualifies a machine.

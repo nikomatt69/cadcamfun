@@ -78,7 +78,7 @@ export const MACHINES: ReadonlyArray<KernelMachine> = [
     table: { length: 1000, width: 500, gap: 30 }, rapidFeed: 30000, toolChangeSeconds: 6
   },
   {
-    id: "haas-2", name: "Haas VF-2 class (8 100 rpm, 22 kW)", kind: "mill", post: "haas",
+    id: "haas-vf2", name: "Haas VF-2 class (8 100 rpm, 22 kW)", kind: "mill", post: "haas",
     limits: { maxRpm: 8100, minRpm: 50, maxFeed: 16500, powerKw: 22.4, torqueNm: 122, rigidity: "standard" },
     table: { length: 762, width: 406, gap: 30 }, rapidFeed: 25400, toolChangeSeconds: 4
   },

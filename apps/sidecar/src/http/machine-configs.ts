@@ -1,4 +1,5 @@
 import { Api, CreateMachineConfig, CurrentUser, EnvBadRequest, EnvForbidden, EnvInternal, EnvNotFound, envErr, okAuth } from "@cadcamfun/api"
+import { cam } from "@cadcamfun/core"
 import { Effect, Schema } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { MachineConfigRepo } from "../repos/machine-config-repo.ts"
@@ -27,6 +28,10 @@ export const MachineConfigsHandlers = HttpApiBuilder.group(Api, "machineConfigs"
   })
 
   return handlers
+    .handle("defaults", () =>
+      // The built-in catalogue of machines, in the shape the library stores: what the Resources list shows as the
+      // default machines, and what the kernel plans against when no configuration is chosen.
+      Effect.succeed(okAuth(cam.kernel.DEFAULT_MACHINE_CONFIGS)))
     .handle("list", ({ query }) =>
       Effect.gen(function*() {
         const user = yield* CurrentUser

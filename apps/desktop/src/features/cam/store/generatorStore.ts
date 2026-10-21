@@ -17,7 +17,7 @@ export type ToolpathSettings = cam.generator.ToolpathSettings
 export type GeometryType = cam.generator.GeometryType
 export type PrinterExtras = cam.generator.PrinterExtras
 /** The kernel job the panel builds: presets, quality, and the edited plan / cutter library (absent = the kernel decides). */
-export type KernelSettings = Pick<CamKernelRequest, "setupOrientation" | "material" | "machine" | "origin" | "finishAllowance" | "scallop" | "resolution" | "deburr" | "subprograms" | "operations" | "tools">
+export type KernelSettings = Pick<CamKernelRequest, "setupOrientation" | "material" | "machine" | "machineConfig" | "origin" | "finishAllowance" | "scallop" | "resolution" | "deburr" | "subprograms" | "operations" | "tools">
 const initialKernelSettings = (): KernelSettings => ({ material: "6061", machine: cam.kernel.DEFAULT_MACHINE.id, origin: "stock-center" })
 
 export interface LibraryTool {
@@ -249,11 +249,17 @@ export const restoreKernelSettings = (request: CamKernelRequest): void => {
   // Absent keys, never undefined values (the request schema takes the former): deburr, the edited plan, the cutter library and the subprogram choice come back too.
   const optional: Record<string, unknown> = {
     setupOrientation: request.setupOrientation, finishAllowance: request.finishAllowance, scallop: request.scallop, resolution: request.resolution,
-    deburr: request.deburr, subprograms: request.subprograms, operations: request.operations, tools: request.tools
+    deburr: request.deburr, subprograms: request.subprograms, operations: request.operations, tools: request.tools,
+    ...(request.machineConfig !== undefined ? { machineConfig: request.machineConfig } : {})
   }
   for (const key of Object.keys(optional)) if (optional[key] === undefined) delete optional[key]
   useGeneratorStore.setState({
-    kernelSettings: { material: request.material, machine: request.machine ?? cam.kernel.DEFAULT_MACHINE.id, origin: request.origin ?? "stock-center", ...optional } as KernelSettings,
+    kernelSettings: {
+      material: request.material, origin: request.origin ?? "stock-center",
+      // A saved machine configuration is the machine: the preset id would name another machine.
+      ...(request.machineConfig !== undefined ? { machineConfig: request.machineConfig } : { machine: request.machine ?? cam.kernel.DEFAULT_MACHINE.id }),
+      ...optional
+    } as KernelSettings,
     settings: { ...state.settings, ...(request.setupOrientation !== undefined && request.setupOrientation !== "+Z" ? { workholdingConfigured: false } : {}), tolerance: request.tolerance ?? 0.01, workOffset: request.workOffset ?? "G54" }
   })
 }
