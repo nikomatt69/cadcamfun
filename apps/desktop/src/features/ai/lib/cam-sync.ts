@@ -16,9 +16,10 @@ import { useCamStore } from "../../cam/store/camStore.ts"
 import { restoreKernelSettings, useGeneratorStore, type ToolpathSettings } from "../../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../../cam/store/verifyStore.ts"
 import { captureEditorOwner, type EditorOwner } from "./editor-sync.ts"
+import { restoreCamProgram } from "../../cam/lib/saved-program.ts"
 
-/** The four actions whose result changes what the CAM page shows; the key is `tool.action`. */
-const CAM_ACTIONS = ["create", "update", "generate", "verify", "manufacture"] as const
+/** Actions whose result changes what the CAM page shows; the key is `tool.action`. */
+const CAM_ACTIONS = ["create", "update", "generate", "verify", "manufacture", "turn"] as const
 type CamAction = (typeof CAM_ACTIONS)[number]
 
 /**
@@ -82,6 +83,14 @@ export async function mirrorCamResult(app: AppState, key: string, input: unknown
   try {
     const row = await app.runtime.run(app.client.toolpaths.get({ params: { id } })) as unknown as OperationRow
     if (!owner.current()) return false
+    if (kind === "turn") {
+      if (owner.projectId !== row.projectId || owner.drawingId !== row.drawingId || !row.projectId) return false
+      await restoreCamProgram(app, { id, name: row.name ?? "Native turning preview", gcode: row.gcode, data: row.data,
+        projectId: row.projectId, drawingId: row.drawingId ?? null }, () => owner.current())
+      if (!owner.current()) return false
+      useCamStore.getState().setSelectedOperationId(id)
+      return true
+    }
     if (kind === "manufacture") {
       if (owner.projectId !== row.projectId || owner.drawingId !== row.drawingId) return false
       const data = row.data as Record<string, unknown> | null

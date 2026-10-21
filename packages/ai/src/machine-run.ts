@@ -29,7 +29,7 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
   const analysis = cam.generator.analyseGcode(input.gcode)
   // The same believable start the preview draws (the program does not say where the machine is before its first move).
   const timeline = cam.viewer.buildTimeline(analysis.program, analysis.motion, cam.viewer.DEFAULT_RAPID_RATE, cam.viewer.programStart(input.kind, analysis.program))
-  const toolModel = input.tool !== undefined ? cam.toolModelOf(input.tool, input.kind) : cam.toolForOperation(settings, input.kind)
+  let toolModel = input.tool !== undefined ? cam.toolModelOf(input.tool, input.kind) : cam.toolForOperation(settings, input.kind)
   // The mill stock: given, else a box round the cutting moves (top at the highest cut, at least Z0).
   let stock: cam.generator.Stock
   if (stockParam !== undefined) {
@@ -47,6 +47,14 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
   const setup = cam.viewer.withRotary(base, analysis.program, input.gcode)
   const at = Math.min(timeline.duration, Math.max(0, input.at ?? timeline.duration))
   const pose = cam.viewer.poseAt(timeline, at)
+  const millTurn = setup.kind === "lathe" && setup.turnMill !== undefined
+  const tools = millTurn ? cam.viewer.turnMillToolModels(analysis.program, analysis.motion, input.gcode) : undefined
+  const millingPaths = analysis.program.toolpaths.map((path, i) => {
+    const model = input.tool !== undefined ? toolModel : tools?.get(path.toolId)
+    return millTurn && (model !== undefined ? model.family === "mill" || model.family === "probe" : cam.viewer.turnMillPathIsMilling(analysis.program, i))
+  })
+  const activePath = pose.move?.path ?? 0
+  if (input.tool === undefined) toolModel = tools?.get(analysis.program.toolpaths[activePath]?.toolId ?? "") ?? toolModel
   const sense = pose.state === undefined || pose.state.spindle === "off" ? 0 : cam.viewer.spinSense(input.kind, pose.state.spindle)
   const findings = cam.viewer.checkSetup(setup, timeline, cam.toolEnvelope(toolModel))
   const { axes, rotary } = cam.viewer.displayAxes(setup)
@@ -68,14 +76,26 @@ export const machineRun = (input: MachineRunInput): Record<string, unknown> => {
       program: point(pose.point),
       preview: point(cam.viewer.displayPoint(setup, pose.point, pose.state?.xMode)),
       ...(pose.state !== undefined ? { spindle: pose.state.spindle, rpm: Math.round(pose.state.rpm), plane: `G${pose.state.plane}`, xMode: pose.state.xMode, extrude: round(pose.state.extrude), ...(pose.state.line !== undefined ? { line: pose.state.line } : {}), ...(pose.state.tool !== undefined ? { tool: pose.state.tool } : {}) } : {}),
-      rotation: sense === 0 ? "nothing turns" : cam.viewer.spinSenseText(input.kind, pose.state!.spindle as "cw" | "ccw"),
-      displaySpin: round(cam.viewer.spinAngleAt(timeline, input.kind, cam.viewer.spinTable(timeline, input.kind), at))
+      rotation: millTurn && millingPaths[activePath] ? "C positions the workpiece; the B head carries the milling spindle (spindle mode inferred)"
+        : sense === 0 ? "nothing turns" : cam.viewer.spinSenseText(input.kind, pose.state!.spindle as "cw" | "ccw"),
+      angles: pose.angles,
+      displaySpin: round(millTurn ? cam.viewer.turnMillChuckAngleAt(timeline, millingPaths, cam.viewer.turnMillChuckTrack(timeline, millingPaths, true), at)
+        : cam.viewer.spinAngleAt(timeline, input.kind, cam.viewer.spinTable(timeline, input.kind), at))
     },
     findings: findings.slice(0, 20).map((f) => ({ code: f.code, severity: f.severity, assumed: f.assumed, ...(f.line !== undefined ? { line: f.line } : {}), count: f.count, message: f.message })),
     unsupported: analysis.motion.unsupported.slice(0, 20)
   }
   if (setup.kind === "lathe") {
-    const runs = cam.viewer.profileRuns(cam.viewer.turnedProfileAt(setup, timeline, at), 0.01)
+    const runs = cam.viewer.profileRuns(cam.viewer.turnedProfileAt(setup, timeline, at, millTurn ? new Set(millingPaths.flatMap((yes, i) => yes ? [i] : [])) : undefined), 0.01)
+    if (setup.turnMill !== undefined) {
+      const head = cam.viewer.turnMillDisplayPose(setup, pose.point, pose.angles, "machine", pose.state?.xMode)
+      out["millTurn"] = {
+        axesAt: { X: round(pose.point.x), Y: round(pose.point.y), Z: round(pose.point.z), B: round(pose.angles.b ?? 0), C: round(pose.angles.c ?? 0) },
+        milling: millingPaths[activePath] ?? false, tip: point(head.tip), toolAxis: point(head.axis),
+        chuckAngle: round(head.chuckAngle), limits: cam.viewer.turnMillLimitFindings(setup, timeline),
+        note: "Assumed B-head/C-spindle geometry; positioned-C milling removal and full-machine collision are not certified."
+      }
+    }
     out["turnedPart"] = {
       note: `${setup.noseRadius > 0 ? `insert nose radius ${setup.noseRadius} mm (shoulders rounded by it)` : "point tool (nose radius 0)"}; Z of the program, diameters`,
       sections: runs.slice(0, 60).map((r) => ({ zFrom: round(r.x0), zTo: round(r.x1), diameter: round(2 * r.outer), bore: round(2 * r.inner) })),

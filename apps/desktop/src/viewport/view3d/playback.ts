@@ -25,10 +25,6 @@ const arcChordCount = (from: Vec3, move: cam.ArcMove, tolerance: number): number
   return Math.min(65536, Math.max(2, Math.ceil(sweep / Math.max(step, 1e-6))))
 }
 
-/** How long a move takes, in seconds. */
-const moveDuration = (move: Extract<cam.Move, { readonly _tag: "Rapid" | "Linear" | "Arc" }>, from: Vec3, rapidRate: number): number =>
-  cam.moveLength(move, from) / Math.max(1e-6, move._tag === "Rapid" ? rapidRate : move.feed) * 60
-
 /** The tool ids of a program, in the order the program first uses them. */
 const toolTable = (program: cam.Program): { readonly ids: readonly string[]; readonly index: ReadonlyMap<string, number> } => {
   const ids: string[] = []
@@ -41,6 +37,9 @@ const toolTable = (program: cam.Program): { readonly ids: readonly string[]; rea
   return { ids, index }
 }
 
+/** Rotary trajectories are curved in the part frame even when XYZ is stationary. */
+const rotarySamples = (before: cam.Rotary, after: cam.Rotary): number => Math.min(4096, Math.max(1, Math.ceil(Math.max(...(["a", "b", "c"] as const).map((k) => Math.abs((after[k] ?? 0) - (before[k] ?? 0)))) / 2)))
+
 /**
  * The program's segments, counted.
  *
@@ -51,12 +50,17 @@ const toolTable = (program: cam.Program): { readonly ids: readonly string[]; rea
 const countSegments = (program: cam.Program, tolerance: number, start: Vec3): number => {
   let count = 0
   let from: Vec3 = start
+  let angles: cam.Rotary = {}
   for (const path of program.toolpaths) {
     for (const move of cam.expandMoves(path.moves, from)) {
-      if (move._tag === "Comment" || move._tag === "Orient" || move._tag === "Cycle") continue
+      if (move._tag === "Comment" || move._tag === "Cycle") continue
+      const after = cam.viewer.anglesAfter(move, angles)
+      const samples = rotarySamples(angles, after)
+      angles = after
+      if (move._tag === "Orient") { count += samples; continue }
       if (move._tag === "Dwell") { count++; continue }
       if (move._tag === "Arc") { count += arcChordCount(from, move, tolerance); from = move.to; continue }
-      count++
+      count += samples
       from = move.to
     }
   }
@@ -82,6 +86,7 @@ export const buildPlayback = (
   let index = 0
   let from: Vec3 = start
   let time = 0
+  let angles: cam.Rotary = {}
   const write = (
     segmentFrom: Vec3,
     segmentTo: Vec3,
@@ -90,11 +95,12 @@ export const buildPlayback = (
     path: number,
     move: number,
     tool: number,
+    end?: number,
   ): void => {
     if (index >= segmentCount) throw new RangeError("the playback has more segments than it counted")
     const at = index * 3
     views.starts[index] = time
-    views.durations[index] = duration
+    views.durations[index] = end !== undefined ? end - time : duration
     views.from[at] = segmentFrom.x; views.from[at + 1] = segmentFrom.y; views.from[at + 2] = segmentFrom.z
     views.to[at] = segmentTo.x; views.to[at + 1] = segmentTo.y; views.to[at + 2] = segmentTo.z
     views.pathIndex[index] = path
@@ -102,15 +108,29 @@ export const buildPlayback = (
     views.toolIndex[index] = tool
     views.rapid[index] = rapid ? 1 : 0
     index++
-    time += duration
+    time = end ?? time + duration
   }
   for (const [path, toolpath] of program.toolpaths.entries()) {
     const tool = tools.index.get(toolpath.toolId) ?? 0
     for (const [move, entry] of cam.expandMoves(toolpath.moves, from).entries()) {
-      if (entry._tag === "Comment" || entry._tag === "Orient" || entry._tag === "Cycle") continue
+      if (entry._tag === "Comment" || entry._tag === "Cycle") continue
+      const after = cam.viewer.anglesAfter(entry, angles)
+      const moveStart = time
+      const duration = cam.viewer.previewMoveDuration(entry, from, angles, after, rapidRate)
+      const samples = rotarySamples(angles, after)
+      angles = after
+      if (entry._tag === "Orient") { for (let i = 1; i <= samples; i++) write(from, from, true, duration / samples, path, move, tool, moveStart + duration * (i / samples)); continue }
       if (entry._tag === "Dwell") { write(from, from, false, entry.seconds, path, move, tool); continue }
-      const duration = moveDuration(entry, from, rapidRate)
-      if (entry._tag !== "Arc") { write(from, entry.to, entry._tag === "Rapid", duration, path, move, tool); from = entry.to; continue }
+      if (entry._tag !== "Arc") {
+        const origin = from
+        for (let i = 1; i <= samples; i++) {
+          const f = i / samples
+          const to = i === samples ? entry.to : { x: origin.x + (entry.to.x - origin.x) * f, y: origin.y + (entry.to.y - origin.y) * f, z: origin.z + (entry.to.z - origin.z) * f }
+          write(from, to, entry._tag === "Rapid", duration / samples, path, move, tool, samples > 1 ? moveStart + duration * f : undefined)
+          from = to
+        }
+        continue
+      }
       const origin = from
       const radius = Math.hypot(from.x - entry.center.x, from.y - entry.center.y)
       const sweep = cam.arcSweepBetween(from, entry.to, entry.center, entry.clockwise)
@@ -121,7 +141,7 @@ export const buildPlayback = (
         const to = i === count
           ? entry.to
           : { x: entry.center.x + radius * Math.cos(a), y: entry.center.y + radius * Math.sin(a), z: origin.z + (entry.to.z - origin.z) * t }
-        write(from, to, false, duration / count, path, move, tool)
+        write(from, to, false, duration / count, path, move, tool, moveStart + duration * t)
         from = to
       }
     }

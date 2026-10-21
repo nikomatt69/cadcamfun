@@ -39,6 +39,20 @@ describe("cam kernel actions", () => {
     expect((await run("cam.cutting_data", { material: "6061", cut: "slot", tool: { ...tool, kind: "bull" } }))["ok"]).toBe(false)
   })
 
+  test("turn plans a stepped shaft on the lathe and refuses a profile wider than the bar", async () => {
+    const profile = [{ diameter: 40, z: 0 }, { diameter: 40, z: -20 }, { diameter: 25, z: -20 }, { diameter: 25, z: -50 }]
+    const plan = await run("cam.turn", { profile, stock: { diameter: 44, length: 60 } })
+    expect(plan["ok"]).toBe(true)
+    expect(plan["passes"].map((p: { kind: string }) => p.kind)).toEqual(["face", "rough", "rough", "rough", "rough", "rough", "finish"])
+    expect(plan["release"]).toBe("preview")
+    expect(plan["partVolume"] + plan["unmachinedVolume"] + plan["removedVolume"]).toBeCloseTo(plan["stockVolume"], 6)
+    expect(plan["nc"]).toContain("G18 G21 G90 G40")
+    expect(plan["nc"]).not.toMatch(/\b[BY]-?\d/)
+    const wide = await run("cam.turn", { profile: [{ diameter: 50, z: 0 }, { diameter: 50, z: -10 }], stock: { diameter: 44, length: 60 } })
+    expect(wide["ok"]).toBe(false)
+    expect(wide["error"]).toContain("exceeds the stock diameter")
+  })
+
   test("manufacture is delegated to the host, and says so when the host has no kernel", async () => {
     const calls: unknown[] = []
     const done = await run("cam.manufacture", { material: "C45", planOnly: true }, { manufacture: async (_p: string, input: unknown) => { calls.push(input); return { ok: true, mutated: false, drawingId: "d", projectId: "p" } } })

@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a reproducible defect using safe, synthetic data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities, follow [SECURITY.md](https://github.com/nikomatt69/cadcamfun/blob/HEAD/SECURITY.md).
+        Do not include keys, tokens, pairing links, personal data, local databases or customer drawings.
+        Review [SUPPORT.md](https://github.com/nikomatt69/cadcamfun/blob/HEAD/SUPPORT.md) first.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Identify the build you tested.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Platform and environment
+      description: OS/version, architecture and desktop, sidecar or companion. Include the controller/postprocessor for NC-related bugs.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide minimal steps and synthetic input you are authorized to share.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Optional logs or screenshots. Inspect the contents before submitting; do not attach a real project database.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I removed secrets, personal information and confidential material from this report.
+          required: true

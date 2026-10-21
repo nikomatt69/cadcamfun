@@ -162,8 +162,11 @@ describe("rotary programs and where the machine starts (spec 31 §5.5, §9)", ()
       { _tag: "Linear", to: { x: 10, y: 0, z: 10 }, feed: 60 },
       { _tag: "Linear", to: { x: 20, y: 0, z: 10 }, feed: 60, rotary: { a: 60 } }
     ]))
-    expect(tl.moves.map((m) => m.angles.a ?? 0)).toEqual([0, 30, 60])
-    const second = tl.moves[2]!
+    expect(tl.moves.map((m) => m.angles.a ?? 0)).toEqual([0, 30, 30, 60])
+    const index = tl.moves[1]!
+    expect(index.duration).toBeGreaterThan(0)
+    expect(cam.viewer.poseAt(tl, index.start + index.duration / 2)).toMatchObject({ point: { x: 0, y: 0, z: 10 }, angles: { a: 15 } })
+    const second = tl.moves[3]!
     expect(cam.viewer.poseAt(tl, second.start + second.duration / 2).angles.a).toBeCloseTo(45, 9)
   })
 

@@ -1,0 +1,3 @@
+# Review ownership. Required approvals and branch protection must be configured
+# separately in repository settings; this file alone does not enforce them.
+* @nikomatt69

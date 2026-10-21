@@ -9,7 +9,7 @@ import {
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel, type History } from "@cadcamfun/core"
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
-import { CamKernelArtifact, CamKernelRequest, CamProgramDocument, ToolpathRow, type CamManufactureInput, type SessionUser } from "@cadcamfun/api"
+import { CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, type CamManufactureInput, type SessionUser } from "@cadcamfun/api"
 import { drawingRevision } from "./cam-program.ts"
 import { camProgressReporter } from "./cam-progress.ts"
 import { LiveEvents } from "./live-events.ts"
@@ -247,7 +247,43 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, job, stockNote }
   }
 
+  const storeKernelBody = async (loaded: Awaited<ReturnType<typeof load>>, brep: cad.brep.Brep, name: string) => {
+    if (!loaded.id) return { ok: false, error: "No drawing is open." }
+    const created: Element = { id: crypto.randomUUID(), type: "brep", name, brep, x: 0, y: 0, z: 0, layerId: "default" }
+    await save(loaded, loaded.data, [...loaded.elements, created])
+    return { ok: true, ids: [created.id], elements: [created], ...where(loaded) }
+  }
   const handlers: ToolHandlersShape = {
+    turnOperation: async (projectId, input, signal) => {
+      signal?.throwIfAborted()
+      const { expectedRevision, ...request } = input
+      const plan = cam.kernel.planTurning(request)
+      if (plan.issues.length > 0) return { ok: false, error: plan.issues.join("; "), issues: plan.issues }
+      const loaded = await load(projectId, true)
+      const revision = drawingRevision(loaded)
+      if (expectedRevision !== undefined && expectedRevision !== revision) return { ok: false, status: "stale", error: "The drawing changed. Inspect before storing a turning preview." }
+      const settings = cam.generator.withMachineDefaults(cam.generator.decodeSettings({
+        machineType: "lathe", operationType: "turning", stockDiameter: request.stock.diameter, stockLength: request.stock.length,
+        depth: -request.profile[request.profile.length - 1]!.z, stepdown: request.stepdown ?? 4,
+        rpm: request.rpm ?? 800, feedrate: (request.feedMmRev ?? 0.2) * Math.round(request.rpm ?? 800), noseRadius: 0, latheZero: "face"
+      }))
+      const document = Schema.decodeUnknownSync(CamProgramDocument)({
+        format: "cadcamfun-cam", version: 1, gcode: plan.nc, program: cam.generator.analyseGcode(plan.nc).program,
+        settings, printer: decodePrinter({}),
+        stock: { width: request.stock.diameter, height: request.stock.diameter, depth: request.stock.length }, drawing: loaded.data
+      })
+      const identity = { nc: cam.kernel.sha256(plan.nc) }
+      const current = await load(projectId)
+      if (current.id !== loaded.id || drawingRevision(current) !== revision) return { ok: false, status: "stale", error: "The drawing changed during turning. Plan again." }
+      signal?.throwIfAborted()
+      await assertWrite(loaded.projectId)
+      const row = await Effect.runPromise(toolpaths.create(acting().id, {
+        name: "Native turning preview", description: "Ideal point-tool external turning; unqualified workholding and controller",
+        projectId: loaded.projectId, drawingId: loaded.id, type: "lathe", operationType: "turning", gcode: plan.nc,
+        data: { ...document, turningPlan: Schema.decodeUnknownSync(CamTurningPlan)(plan), turningRequest: request, sourceRevision: revision, identity }
+      }))
+      return { ok: true, operationId: row.id, release: "preview", identity, ...where(loaded) }
+    },
     manufacture: async (projectId, input, signal) => {
       const loaded = await load(projectId)
       const built = manufacturingJob(loaded, input)
@@ -347,6 +383,12 @@ const toolHandlers = Effect.gen(function*() {
       if (!stored || stored.project.id !== loaded.projectId) return { ok: false, error: "Operation not found in the active drawing" }
       const data = record(stored?.row.data)
       if (stored.row.drawingId !== loaded.id && !(stored.row.drawingId === null && data["format"] === "cadcamfun-cam")) return { ok: false, error: "Operation not found in the active drawing" }
+      if (data["turningPlan"] !== undefined) {
+        const plan = Schema.decodeUnknownSync(CamTurningPlan)(data["turningPlan"])
+        const stale = data["sourceRevision"] !== drawingRevision(loaded) || stored.row.gcode !== plan.nc || record(data["identity"])["nc"] !== cam.kernel.sha256(plan.nc)
+        return { ok: false, status: stale ? "stale" : "preview", operationId, release: "preview", identity: data["identity"], stockVolume: plan.stockVolume, partVolume: plan.partVolume, unmachinedVolume: plan.unmachinedVolume, removedVolume: plan.removedVolume,
+          note: "Ideal point-tool geometry only; no insert compensation, chuck clearance or controller qualification. Store again with cam_edit turn after a drawing change." }
+      }
       if (data["kernelArtifact"] !== undefined) {
         const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(data["kernelArtifact"])
         const revision = drawingRevision(loaded)
@@ -493,8 +535,63 @@ const toolHandlers = Effect.gen(function*() {
     cadShell: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
-      try { return { ...cad.sceneShell(loaded.elements, input.id, input.thickness, input.open ?? []), ...where(loaded) } }
+      try { return { ...cad.sceneShell(loaded.elements, input.id, input.thickness, input.open ?? [], input.wallByFace ?? []), ...where(loaded) } }
       catch (error) { return { ok: false, error: `The shell analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    cadStoreBodies: async (projectId, bodies) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      if (bodies.length === 0 || bodies.length > 40) return { ok: false, error: "Store 1..40 bodies per call." }
+      for (const body of bodies) {
+        const report = cad.brep.validateBrep(body.brep)
+        if (!report.valid || (body.kind === "solid" && !report.manifoldSolid) || (body.kind === "surface" && report.manifoldSolid)) return { ok: false, error: `Body '${body.name}' does not validate as a ${body.kind}. Nothing was stored.` }
+      }
+      const loaded = await load(projectId, true)
+      const created: Element[] = bodies.map((body) => ({ id: crypto.randomUUID(), type: "brep", bodyKind: body.kind, name: body.name, brep: body.brep, x: 0, y: 0, z: 0, layerId: "default" }))
+      await save(loaded, loaded.data, [...loaded.elements, ...created])
+      return { ok: true, ids: created.map((e) => e.id), elements: created, ...where(loaded) }
+    },
+    cadExchange: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      if (input.format === "parasolid") return cad.brep.parasolidDiagnostic()
+      const loaded = await load(projectId)
+      try {
+        const scene = cad.sceneParts(cad.selectElements(loaded.elements, input.ids)), ids = input.ids === undefined ? undefined : new Set(input.ids)
+        const parts = scene.parts.filter((p) => ids === undefined || ids.has(p.id))
+        const missing = input.ids?.filter((id) => !parts.some((p) => p.id === id)) ?? []
+        if (parts.length === 0 || missing.length > 0 || scene.skipped.length > 0) return { ok: false, error: "Some requested elements have no exact solid to export.", skipped: scene.skipped, missing }
+        const content = input.format === "iges" ? cad.brep.writeIgesBreps(parts) : cad.brep.writeStepBreps(parts)
+        return { ok: true, format: input.format, content, parts: parts.length, warnings: [], ...where(loaded) }
+      } catch (error) { return { ok: false, error: `Exact export failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    cadOffset: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      try { const r = cad.sceneOffsetBody(loaded.elements, input.id, input.distance); return { ...(r.ok ? r.report : r), ...where(loaded) } }
+      catch (error) { return { ok: false, error: `The offset analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    cadMotion: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      try { return { ...cad.sceneMotion(loaded.elements, input.model, input.sweep), ...where(loaded) } }
+      catch (error) { return { ok: false, error: `The motion study failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    cadBuildShell: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      try {
+        const r = cad.sceneShellBody(loaded.elements, input.id, input.thickness, input.open ?? [], input.wallByFace ?? [])
+        if (!r.ok) return r
+        return storeKernelBody(loaded, r.brep, `${r.report.name} shell`)
+      } catch (error) { return { ok: false, error: `The shell construction failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    cadBuildOffset: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      try {
+        const r = cad.sceneOffsetBody(loaded.elements, input.id, input.distance)
+        if (!r.ok) return r
+        return storeKernelBody(loaded, r.brep, `${r.report.name} offset`)
+      } catch (error) { return { ok: false, error: `The offset construction failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadDistance: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
@@ -801,6 +898,12 @@ const toolHandlers = Effect.gen(function*() {
       const data = record(found.row.data)
       if (found.row.drawingId !== id && !(found.row.drawingId === null && data["format"] === "cadcamfun-cam")) return { ok: false, error: "Operation not found in the active drawing" }
       if (!found.row.gcode) return { ok: false, error: "The operation has no program yet (or its settings changed since): run cam_edit generate first." }
+      if (data["turningPlan"] !== undefined) {
+        const plan = Schema.decodeUnknownSync(CamTurningPlan)(data["turningPlan"])
+        const loaded = await load(drawingId)
+        if (data["sourceRevision"] !== drawingRevision(loaded) || found.row.gcode !== plan.nc || record(data["identity"])["nc"] !== cam.kernel.sha256(plan.nc)) return { ok: false, error: "The turning preview is stale. Run cam_edit turn again." }
+        return { ok: true, operationId, gcode: found.row.gcode, params: record(data["settings"]) }
+      }
       if (data["kernelArtifact"] !== undefined) {
         const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(data["kernelArtifact"])
         const loaded = await load(drawingId)

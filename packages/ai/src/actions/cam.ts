@@ -57,16 +57,18 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
       if (text === undefined && operationId === undefined) return table
       if (text !== undefined && operationId !== undefined) return { ok: false, error: "Send at most one of gcode or operationId." }
       let gcode = text ?? ""
+      let runParams = params ?? {}
       if (operationId !== undefined) {
         if (handlers.operationProgram === undefined) return { ok: false, error: "Stored programs are not available in this host: send the program text as gcode." }
         const program = await handlers.operationProgram(projectId, operationId)
         if (!program.ok) return program
         gcode = program.gcode
+        runParams = { ...program.params, ...runParams }
       }
       // The program on this machine: the same timeline, set-up and checks the preview draws.
       // A tool resource in params.tool (type, diameter, cuttingLength, cornerRadius, tipAngle, threadPitch, holder...) is drawn
       // and checked with the same 3D model the preview uses.
-      const { tool, ...settingsParams } = (params ?? {}) as Record<string, unknown>
+      const { tool, ...settingsParams } = runParams as Record<string, unknown>
       return { ...table, run: machineRun({ kind, gcode, params: settingsParams, ...(tool !== undefined && typeof tool === "object" ? { tool: tool as never } : {}), ...(at !== undefined ? { at } : {}) }) }
     }
   }),
@@ -161,6 +163,16 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
         ...(input.ap !== undefined ? { ap: input.ap } : {}), ...(input.scallop !== undefined ? { scallop: input.scallop } : {})
       })
       return { ok: true, material: { id: material.id, name: material.name, iso: material.iso }, machine, cuttingData: data }
+    }
+  }),
+  defineWireAction({
+    id: "cam.turn", kind: "read", parameters: CAM_ACTION_INPUTS["cam.turn"],
+    // Pure: the kernel's turning plan (face, stepped roughing on the evolving stock, finish), lathe NC included.
+    run: async (input) => {
+      const plan = cam.kernel.planTurning(input)
+      return plan.issues.length > 0
+        ? { ok: false, error: plan.issues.join("; "), issues: plan.issues }
+        : { ok: true, ...plan }
     }
   }),
   defineWireAction({

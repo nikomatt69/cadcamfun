@@ -112,3 +112,17 @@ test("two canvases own separate B-rep resources and origin offsets even when tes
   expect(b.geometry.getAttribute("position").count).toBeGreaterThan(0)
   disposeObject(second)
 })
+
+
+test("open NURBS patches render from both sides and never become CAM volume", async () => {
+  const { createThreeObject } = await import("../src/features/cad/lib/createThreeObject.ts")
+  const patch = brep.surfacePatch({ degreeU: 1, degreeV: 1, knotsU: [0, 0, 1, 1], knotsV: [0, 0, 1, 1], points: [[[0, 0, 0], [0, 10, 0]], [[10, 0, 0], [10, 10, 0]]] })
+  const element = { id: "open-patch", type: "brep", brep: patch.brep, bodyKind: "surface", x: 0, y: 0, z: 0 }
+  const object = createThreeObject(element)!
+  const faces = object.children.filter((child) => child instanceof THREE.Mesh) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[]
+  expect(faces).toHaveLength(1)
+  expect(faces[0]!.material.side).toBe(THREE.DoubleSide)
+  expect(faces[0]!.geometry.index!.count).toBeGreaterThan(0)
+  expect(cam.model.elementMesh(element)).toBeUndefined()
+  expect(cad.sceneParts([element]).skipped[0]?.reason).toContain("open surface")
+})

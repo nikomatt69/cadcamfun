@@ -81,7 +81,7 @@ export const opsFor = (key: string, output: string): ReadonlyArray<SyncOp> => {
   const created = (result as { created?: unknown }).created
   const source: { elements?: unknown; mutation?: unknown } = Array.isArray(result.elements) || typeof created !== "object" || created === null ? result : (created as { elements?: unknown; mutation?: unknown })
   const elements = Array.isArray(source.elements) ? source.elements.filter(isElement) : []
-  if (key === "cad_edit.add" || key === "cad_edit.add_entities" || key === "cad_edit.import") return elements.length > 0 ? [{ kind: "add", elements }] : []
+  if (key === "cad_edit.add" || key === "cad_edit.add_entities" || key === "cad_edit.import" || key === "cad_edit.shell" || key === "cad_edit.offset" || key === "cad_edit.surface") return elements.length > 0 ? [{ kind: "add", elements }] : []
   if (key.startsWith("cad.parametric_validate") || key.startsWith("cad_edit.parametric_")) return elements.length > 0 ? [{ kind: source.mutation === "add" ? "add" : "update", elements }] : []
   if (key === "cad_edit.modify") return elements.length > 0 ? [{ kind: "update", elements }] : []
   if (key === "cad_edit.transform") {

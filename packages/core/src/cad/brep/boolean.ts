@@ -950,7 +950,14 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
   result = mergeCoplanarFaces(result)
   result = compactBrep(result)
   options.debug?.("result", result)
-  const report = validateBrep(result, { coarseVolume: true })
+  let report = validateBrep(result, { coarseVolume: true })
+  // A lens thinner than the coarse chord (seed 114: a 0.07 mm torus/sphere overlap) tessellates with the wrong sign, so a
+  // coarse non-positive volume alone is not proof the faces point inwards: the exact volume decides. Only that one issue is
+  // rechecked exactly; a face that gave no triangle or a broken topology stays a failure on the coarse evidence.
+  if (!report.valid && report.issues.length > 0 && report.issues.every((i) => i.kind === "orientation")) {
+    const exact = validateBrep(result)
+    if (exact.valid) report = exact
+  }
   if (!report.valid) throw new BooleanError(`Boolean ${op} produced an invalid solid: ${report.issues.slice(0, 3).map((i) => i.message).join("; ")}`, report.issues, { stage: "validate", hint: DEGENERATE_HINT, attempts: [] })
   return {
     brep: result,

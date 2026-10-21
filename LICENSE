@@ -1,54 +1,77 @@
-# CAD/CAM FUN - Proprietary Software License
+CADCAMFUN — Repository License and Scope
+Effective date: 21 October 2026
 
-## Copyright Notice
-Copyright © 2025 CAD/CAM FUN (Operated by nikomatt69). All Rights Reserved.
-Website: cadcam.fun
-Primary Code Repository: https://github.com/nikomatt69/cad-cam-app-main-prod
+Copyright © 2025-2026 Nicola Mattioli and the respective contributors.
+Rights in third-party material remain with their respective holders.
 
-## Definitions
-- "Service" refers to the CAD/CAM FUN web application accessible at cadcam.fun.
-- "Software" refers to the underlying source code, object code, algorithms, designs, documentation, and related materials that power the Service.
-- "Author" refers to nikomatt69 and any other designated copyright holders of the Software.
-- "User" refers to any person or entity accessing or using the Service.
-- "Terms of Service" refers to the terms governing the use of the Service, available at [Link to /legal/terms].
+1. Open-source material
 
-## License Terms
+Except for the excluded material identified below and material carrying separate
+license notices, Nicola Mattioli licenses the original code, documentation and
+configuration in this repository that he is entitled to license under the Apache
+License, Version 2.0. The complete, unmodified license terms are in
+LICENSES/Apache-2.0.txt and at https://www.apache.org/licenses/LICENSE-2.0.
 
-1.  **License Grant for Service Use**: 
-    Subject to the User's compliance with the Terms of Service, the Author grants the User a limited, non-exclusive, non-transferable, non-sublicensable, revocable license to access and use the **Service** via its intended web interface at cadcam.fun, solely for the purposes permitted by the Terms of Service.
+This identifies the material made available under Apache-2.0; it does not add
+conditions to, or change, that license. The open-source grant covers permitted
+personal and commercial use, modification and redistribution under its terms.
 
-2.  **No License to Software Code**: 
-    This license applies **only** to the use of the deployed Service. No license or right is granted to the User with respect to the underlying **Software** itself. Accessing or viewing the Software's source code (e.g., via the public repository) does **not** grant the User any right or license to copy, modify, distribute, compile, run, use, or create derivative works of the Software.
+2. Proprietary material excluded from the Apache-2.0 grant
 
-3.  **Restrictions**: 
-    The User shall not, directly or indirectly:
-    a. Reproduce, distribute, modify, translate, adapt, create derivative works of, publicly display, or publicly perform the Software or the Service, except as expressly permitted by the Author or the Terms of Service.
-    b. Use the Software or Service in any commercial product or service without prior written authorization from the Author.
-    c. Reverse engineer, decompile, disassemble, or otherwise attempt to discover the source code, object code, or underlying structure, ideas, or algorithms of the Software or Service.
-    d. Remove, alter, or obscure any copyright notices, trademarks, or other proprietary rights notices contained in or on the Software or Service.
-    e. Sublicense, sell, rent, lease, transfer, assign, or otherwise convey any rights granted hereunder.
-    f. Use the Service in any manner that violates applicable laws or regulations or infringes upon the rights of any third party.
+The following directories are not included in the open-source grant above:
 
-4.  **Contributions** (If Applicable):
-    a. Any contributions (e.g., code suggestions, bug reports) submitted by the User to the Author regarding the Software or Service are voluntary.
-    b. By submitting a contribution, the User grants the Author a perpetual, worldwide, non-exclusive, royalty-free, irrevocable license to use, reproduce, modify, distribute, and otherwise exploit the contribution without restriction or compensation.
+- packages/ai/ — see packages/ai/LICENSE.
+- packages/core/src/cad/ — see packages/core/src/cad/LICENSE.
+- packages/core/src/cam/ — see packages/core/src/cam/LICENSE.
 
-5.  **No Warranty; Limitation of Liability**:
-    a. THE SOFTWARE AND SERVICE ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
-    b. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE, THE SERVICE, OR THE USE OR OTHER DEALINGS IN THE SOFTWARE OR SERVICE.
+The proprietary terms apply only to material in which the relevant licensor
+holds the rights. They also govern copies, modifications and compiled forms of
+that material within the scope of those terms. Public source visibility is not
+permission to reuse proprietary material. Separate written authorization is
+required as stated in each scoped license, subject to mandatory legal rights.
 
-6.  **Reservation of Rights**: 
-    All rights not expressly granted to the User in this license or the Terms of Service are reserved by the Author.
+A file containing or incorporating excluded proprietary material does not become
+Apache-licensed merely by moving, copying, importing or bundling that material.
+Apache-2.0 permission for an open component does not grant permission for a
+proprietary component it uses. Building or redistributing the complete application
+therefore requires the rights applicable to all included components; the complete
+application is not offered as wholly open-source software.
 
-7.  **Termination**: 
-    This license, along with the User's right to access the Service, shall terminate automatically if the User breaches any of these terms or the Terms of Service. Upon termination, the User must cease all use of the Service.
+3. Third-party material
 
-## Ownership Declaration
-This proprietary license and the Author's ownership claim are supported by:
-1.  Control and ownership of the primary code repository: https://github.com/nikomatt69/cad-cam-app-main-prod
-2.  Control and ownership of the primary service domain: cadcam.fun
+Dependencies, vendored material and portions derived from third-party works
+retain their applicable licenses and copyright, patent and attribution notices,
+including within the proprietary directories. This document does not replace or
+restrict rights granted directly by third-party rights holders. See scoped
+notices, including packages/core/src/cad/brep/NOTICE,
+packages/ai/THIRD_PARTY_NOTICES.md and apps/desktop/src-tauri/THIRD_PARTY_NOTICES.md.
+Those notices are scoped attributions, not an exhaustive dependency inventory.
 
-Unauthorized use, reproduction, modification, or distribution of the Software or Service is strictly prohibited and may result in severe civil and criminal penalties, prosecuted to the maximum extent permitted by law.
+No rights in contributions owned by others are granted beyond the authority of
+the person licensing them. Existing valid licenses are not retroactively revoked.
+Material excluded from version control, including .reference/, is not made
+available under this notice.
 
----
-© 2025 CAD/CAM FUN (nikomatt69). All Rights Reserved.
+4. Marks, user content and separate services
+
+Source-code licensing does not grant a general right to present a fork or service
+as an official CADCAMFUN product. Apache-2.0 section 6 and TRADEMARKS.md describe
+the applicable trademark boundary without restricting lawful attribution.
+
+Use of the software does not by itself transfer ownership of user projects,
+prompts, conversations, models, toolpaths, G-code or manufactured parts. Rights in
+third-party inputs, model outputs and copied software remain subject to their
+applicable terms. Hosted services, model providers, support and proprietary
+application distributions may require separate agreements; this source license
+does not promise access to them or change existing agreements.
+
+5. Other repository policies
+
+CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, SUPPORT.md, GOVERNANCE.md,
+PRIVACY.md and TERMS.md explain contribution and operational practices. They do
+not impose additional conditions on the Apache-2.0 grant or override mandatory
+legal rights. Warranties and liability are governed by the applicable component
+license, mandatory law and any separate written agreement.
+
+Licensing inquiries: Nicola Mattioli, https://x.com/nikomatt69.
+Use a private channel; see SUPPORT.md for contact guidance.

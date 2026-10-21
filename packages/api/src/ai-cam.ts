@@ -55,6 +55,32 @@ export const CamManufactureInput = Schema.Struct({
   /** Write toolpaths that repeat translated (hole patterns, copies of a pocket) once as an `M98` subprogram (Fanuc and Haas posts). */
   subprograms: Schema.optionalKey(Schema.Boolean)
 })
+/**
+ * Turning in the kernel (spec 29 A1): a turned profile in the lathe's own coordinates — X is a diameter,
+ * z = 0 is the finished face and negative z runs towards the chuck. The part turns; a mill-turn head is
+ * the separate `turnMill` machine model, never words invented by a turning plan.
+ */
+export const CamTurningInput = Schema.Struct({
+  profile: Schema.Array(Schema.Struct({
+    diameter: positive.check(Schema.isLessThanOrEqualTo(500)),
+    z: Schema.Finite.check(Schema.isBetween({ minimum: -2000, maximum: 0 }))
+  })).check(Schema.isMinLength(2), Schema.isMaxLength(200)),
+  stock: Schema.Struct({ diameter: positive.check(Schema.isLessThanOrEqualTo(500)), length: positive.check(Schema.isLessThanOrEqualTo(2000)) }),
+  stepdown: Schema.optionalKey(positive.check(Schema.isBetween({ minimum: 0.001, maximum: 100 }))),
+  allowance: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 5 }))),
+  feedMmRev: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(10))),
+  rpm: Schema.optionalKey(positive.check(Schema.isBetween({ minimum: 1, maximum: 20000 })))
+})
+export const CamTurningOperationInput = Schema.Struct({ ...CamTurningInput.fields, expectedRevision: Schema.optionalKey(revision) })
+const turnPoint = Schema.Struct({ diameter: Schema.Finite, z: Schema.Finite })
+/** Preview geometry before NC rounding; the bar tail is retained, not parted off. */
+export const CamTurningPlan = Schema.Struct({
+  release: Schema.Literal("preview"),
+  passes: Schema.Array(Schema.Struct({ kind: Schema.Literals(["face", "rough", "finish"]), diameter: Schema.Finite, points: Schema.Array(turnPoint), removed: Schema.Finite })),
+  stockAfter: Schema.Array(Schema.Finite), stockProfiles: Schema.Array(Schema.Array(turnPoint)),
+  stockVolume: Schema.Finite, partVolume: Schema.Finite, unmachinedVolume: Schema.Finite, removedVolume: Schema.Finite,
+  nc: Schema.String, issues: Schema.Array(Schema.String)
+})
 export const CamManufactureOperationInput = Schema.Struct({
   setupOrientation: CamManufactureInput.fields.setupOrientation,
   workOffset: CamManufactureInput.fields.workOffset,
@@ -113,6 +139,8 @@ export const CAM_ACTION_INPUTS = {
   "cam.chain_suggest": Schema.Struct({ fromOperationId: Schema.optionalKey(Schema.String), materialHint: Schema.optionalKey(Schema.String), toolHint: Schema.optionalKey(Schema.String) }),
   "cam.materials": Schema.Struct({ query: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(80))) }),
   "cam.cutting_data": CamCuttingDataInput,
+  "cam.turn": CamTurningInput,
+  "cam_edit.turn": CamTurningOperationInput,
   "cam.manufacture": CamManufactureInput,
   "cam.chain_status": Schema.Struct({ operationId: id }),
   "cam_edit.create": CamCreateInput,

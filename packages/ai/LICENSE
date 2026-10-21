@@ -1,0 +1,85 @@
+CADCAMFUN AI Package — Proprietary License
+Version 1.0 — 21 October 2026
+
+Copyright © 2026 Nicola Mattioli. All rights reserved.
+
+1. Scope and ownership
+
+"Licensor" means Nicola Mattioli. "Software" means the source code, prompts,
+documentation and other original material in packages/ai, and copies, modified
+versions and compiled forms of that material, to the extent the Licensor holds
+the relevant rights. This scope applies recursively, including original source,
+tests, fixtures, configuration, prompt templates, skills and other package assets.
+Third-party material is excluded as described in section 5.
+This notice does not assign or transfer anyone else's rights to the Licensor.
+
+2. Written authorization required
+
+No permission to use, run, compile, copy, modify, adapt, distribute, sublicense,
+sell, rent, host or otherwise make the Software available is granted by this
+document. These activities require prior written authorization from the Licensor,
+except to the extent permitted by applicable law that cannot be excluded by
+agreement. This applies to commercial and noncommercial activities alike.
+
+Public availability of source code, access to a repository, possession of a copy,
+or access to generated output does not by itself grant a license to the Software.
+No patent or trademark license is granted by this document.
+
+3. Separate agreements
+
+Any permission must be stated in a separate written authorization or license
+agreement issued by the Licensor. That agreement determines the permitted use,
+users, term, distribution rights and any fees. An express permission in such an
+agreement takes precedence over this notice for the activities it authorizes.
+Authorization to use a deployed application does not by itself authorize
+redistributing or reusing the AI package source or compiled package separately.
+
+Authorized copies must retain applicable copyright and proprietary notices,
+unless the Licensor expressly authorizes otherwise or mandatory law permits it.
+No rights beyond the written authorization are implied; all other rights are
+reserved. This notice does not revoke permissions previously validly granted.
+
+4. User data and generated output
+
+This license concerns the Software. It does not claim ownership of user prompts,
+conversations, attachments, CAD models, drawings, input data, generated responses,
+geometry, toolpaths, G-code or manufactured parts merely because the Software
+was used to create or process them. It imposes no separate license requirement
+on that output. It does not grant rights in third-party input, model output or
+Software source code copied into an output. Applicable model and provider terms
+remain unaffected.
+
+5. Third-party rights and repository scope
+
+Third-party dependencies and material carrying their own license notices remain
+subject to those licenses. This includes @nikcli-ai/sdk-next, the AI SDK and its
+provider packages, Effect, Zod, and any third-party code, prompts or provider
+catalogue data included in or used by the package. Nothing here replaces,
+restricts or grants rights under their licenses. Applicable third-party licenses,
+attributions and change notices must be preserved as required by those licenses.
+See THIRD_PARTY_NOTICES.md for scoped dependency and bundled-data attributions.
+
+This document specifically addresses the AI package identified in section 1.
+It does not relicense other repository directories or replace the repository root
+LICENSE. It does not enlarge any permission granted by the root LICENSE.
+
+6. Mandatory legal rights
+
+Nothing in this document limits rights or exceptions that applicable law does
+not allow the parties to exclude, including any applicable mandatory software
+interoperability, backup, observation, study or testing rights. Such rights remain
+subject to their statutory conditions. No governing law or exclusive court is
+selected by this document.
+
+7. Warranty and liability
+
+To the fullest extent permitted by applicable law, and unless a separate written
+agreement provides otherwise, the Software is provided "AS IS", without express
+or implied warranties, including merchantability, fitness for a particular
+purpose and noninfringement. To that same extent, the Licensor is not liable for
+loss or damage arising from the Software or its use. These exclusions do not
+exclude any warranty or liability that applicable law does not allow to be
+excluded or limited.
+
+Licensing contact: Nicola Mattioli — https://x.com/nikomatt69.
+Request a private channel before sharing confidential information.

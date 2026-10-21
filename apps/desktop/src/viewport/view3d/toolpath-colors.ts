@@ -34,7 +34,7 @@ export interface PathBufferInput {
   /** Toolpaths not drawn (the operation browser's eye). */
   readonly hidden?: ReadonlySet<number>
   /** Program point -> display point (lathe mapping, rotary part frame). */
-  readonly shown: (p: Vec3, path: number, index: number) => Vec3
+  readonly shown: (p: Vec3, path: number, index: number, seconds?: number) => Vec3
 }
 
 /** The colour of operation `i` (the tool palette, so a one-operation program keeps its colour). */
@@ -96,8 +96,8 @@ export const pathBuffers = (playback: Playback, input: PathBufferInput, palette:
   for (let i = 0; i < segmentCount; i++) {
     if (!shownSegment(i)) continue
     const offset = i * 3, path = v.pathIndex[i]!, move = v.moveIndex[i]!
-    const a = input.shown({ x: v.from[offset]!, y: v.from[offset + 1]!, z: v.from[offset + 2]! }, path, move)
-    const b = input.shown({ x: v.to[offset]!, y: v.to[offset + 1]!, z: v.to[offset + 2]! }, path, move)
+    const a = input.shown({ x: v.from[offset]!, y: v.from[offset + 1]!, z: v.from[offset + 2]! }, path, move, v.starts[i]!)
+    const b = input.shown({ x: v.to[offset]!, y: v.to[offset + 1]!, z: v.to[offset + 2]! }, path, move, v.starts[i]! + v.durations[i]!)
     if (asRapid(i)) {
       rapid[r * 6] = a.x; rapid[r * 6 + 1] = a.y; rapid[r * 6 + 2] = a.z; rapid[r * 6 + 3] = b.x; rapid[r * 6 + 4] = b.y; rapid[r * 6 + 5] = b.z
       rapidStarts[r++] = v.starts[i]!

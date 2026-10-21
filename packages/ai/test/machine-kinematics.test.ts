@@ -113,3 +113,20 @@ describe("machineRun: the simulation player's view (spec 32 P3, P5, P7)", () => 
     expect(r["collisions"].map((c: { code: string; line: number }) => [c.code, c.line])).toEqual([["RAPID_INTO_STOCK", 12]])
   })
 })
+
+test("the assistant reads the same B head and positioned C chuck as the mill-turn viewer", () => {
+  const code = "G18 G90\nM3 S600\nG0 X40 Y6 Z-10 B0 C0\nG1 B90 C90 F90"
+  const result = machineRun({ kind: "lathe", gcode: code, params: { stockDiameter: 50, stockLength: 100, noseRadius: 0 } }) as Record<string, any>
+  expect(result.ok).toBe(true)
+  expect(result.millTurn.axesAt).toEqual({ X: 40, Y: 6, Z: -10, B: 90, C: 90 })
+  expect(result.pose.angles).toMatchObject({ b: 90, c: 90 })
+  expect(result.pose.displaySpin).toBeCloseTo(-Math.PI / 2, 3)
+  expect(result.tool.model.family).toBe("mill")
+  expect(result.millTurn.milling).toBe(true)
+  expect(result.pose.rotation).toContain("C positions the workpiece")
+  expect(result.millTurn.tip).toEqual({ x: -10, y: 6, z: 20 })
+  expect(result.millTurn.toolAxis.z).toBeCloseTo(1, 6)
+  expect(result.turnedPart.sections.every((s: { diameter: number }) => s.diameter === 50)).toBe(true)
+  const outside = machineRun({ kind: "lathe", gcode: "G18\nG0 X40 Z0 B130 C0" }) as Record<string, any>
+  expect(outside.millTurn.limits.some((f: { code: string }) => f.code === "ROTARY_B")).toBe(true)
+})

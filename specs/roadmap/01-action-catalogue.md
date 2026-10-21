@@ -70,6 +70,15 @@ These are future implementation acceptance requirements, not results of this doc
 
 ## Change log
 
+- 2026-10-21: the catalogue grew the exact-kernel capabilities of the spec 33
+  increment (`cad.shell` with a wall per face, `cad.offset`, `cad.motion`,
+  `cad.surface`, `cad.exchange`; the writes `cad_edit.shell`, `cad_edit.offset`,
+  `cad_edit.surface`, and IGES/Parasolid through `cad_edit.import`), each with
+  the shared Effect schema, the prompt, the sidecar handler and the desktop
+  result consumer. The seam rules of this step hold: every action is declared
+  once in the catalogue, a read never changes the document and a write goes
+  through the governed tool. RM-01 is not done; no completion gate is claimed
+  here.
 - 2026-10-15: integration follow-up contract: preserve full structured results through the existing bridge, specialist
   event mapper and desktop wire decoder; share outcome classification with the catalogue and validate committed envelopes
   before success. Owner-requested verification uses existing suites and runtime probes, without adding regression tests.

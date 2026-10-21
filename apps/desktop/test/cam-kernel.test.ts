@@ -208,3 +208,32 @@ test("manual side setup controls clear the old plan, preserve the request and re
     expect(document.querySelector("[data-testid='kernel-stale']")).not.toBeNull()
   } finally { view.dispose() }
 })
+
+test("an assistant turning preview loads the stored lathe settings and identical NC into the desktop", async () => {
+  const { buildTools } = await import("../../../packages/ai/src/tools/registry.ts")
+  const { mirrorCamResult } = await import("../src/features/ai/lib/cam-sync.ts")
+  const { useDocumentStore } = await import("../src/features/cad/store/documentStore.ts")
+  const { previewSetup } = await import("../src/features/cam/lib/machine-view.ts")
+  const { useCADStore } = await import("../src/features/cad/store/cadStore.ts")
+  const projectId = (await app.sidecar.call("/api/projects", { method: "POST", json: { name: "Turning assistant" } })).body.id as string
+  const drawingId = (await app.sidecar.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Shaft", data: { elements: [] } } })).body.id as string
+  useDocumentStore.getState().setDocument({ projectId, drawingId })
+  const input = { profile: [{ diameter: 40, z: 0 }, { diameter: 25, z: -50 }], stock: { diameter: 44, length: 60 } }
+  const tool = buildTools(await app.sidecar.toolHandlers(), projectId).find((spec) => spec.id === "cam_edit")!
+  const output = await tool.execute({ action: "turn", ...input }, { projectId, sessionId: "s", signal: new AbortController().signal })
+  expect(JSON.parse(output)).toMatchObject({ ok: true, release: "preview" })
+  expect(await mirrorCamResult(app.state, "cam_edit.turn", input, output)).toBe(true)
+  const store = useCamStore.getState(), settings = useGeneratorStore.getState().settings
+  expect(store.gcode).toBe(cam.kernel.planTurning(input).nc)
+  expect(settings.machineType).toBe("lathe")
+  expect(settings.stockDiameter).toBe(44)
+  expect(settings.stockLength).toBe(60)
+  expect(store.kernelArtifact).toBeUndefined()
+  expect(store.savedProgram?.id).toBe(JSON.parse(output).operationId)
+  const setup = previewSetup("lathe", settings, Schema.decodeUnknownSync(cam.generator.StockSchema)(useCADStore.getState().workpiece), { program: store.program, gcode: store.gcode })
+  expect(setup.kind).toBe("lathe")
+  if (setup.kind !== "lathe") throw new Error("Expected lathe setup")
+  expect(setup.turnMill).toBeUndefined()
+  const timeline = cam.viewer.buildTimeline(store.program, undefined, cam.viewer.DEFAULT_RAPID_RATE, cam.viewer.programStart("lathe", store.program))
+  expect(cam.viewer.profileRuns(cam.viewer.turnedProfileAt(setup, timeline, timeline.duration), 0.01).some((r) => r.outer < 22)).toBe(true)
+})

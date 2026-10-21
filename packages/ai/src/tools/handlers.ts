@@ -1,5 +1,5 @@
 import type { SetupCandidate, MachiningPlanInput, ManufactureInput } from "../actions/cam.ts"
-import type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadShellInput } from "../actions/cad.ts"
+import type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadShellInput, CadOffsetInput, CadMotionInput } from "../actions/cad.ts"
 import type { CadComponentRelationsInput, CadInspectionInput } from "../actions/cad.ts"
 import type { ParametricHandlerInput } from "../actions/parametric.ts"
 export type { ParametricHandlerInput } from "../actions/parametric.ts"
@@ -8,8 +8,8 @@ import type { VisionCapture } from "../vision.ts"
 import { Context } from "effect"
 import type { cad, cam } from "@cadcamfun/core"
 import type { MachineProfile } from "../gcode-analysis.ts"
-import type { ActionConflict, ActionCommitted, ActionDenied, ActionInvalidInput, ActionInterrupted } from "@cadcamfun/api"
-import type { CamManufactureOperationInput } from "@cadcamfun/api"
+import type { ActionConflict, ActionCommitted, ActionDenied, ActionInvalidInput, ActionInterrupted, CadExchangeInput } from "@cadcamfun/api"
+import type { CamManufactureOperationInput, CamTurningOperationInput } from "@cadcamfun/api"
 
 /** What the stock handlers answer with: the raw piece as it is stored, or the one just configured. */
 export type CamStockInput = { action: "inspect" } | { action: "set"; stock: typeof cam.generator.StockSchema.Type }
@@ -35,6 +35,7 @@ export interface ToolHandlersShape {
   manufacture?(projectId: string, input: ManufactureInput, signal?: AbortSignal): Promise<unknown>
   /** Stores the native kernel's original multi-tool NC and artifact in the active drawing after write admission. */
   manufactureOperation?(projectId: string, input: typeof CamManufactureOperationInput.Type, signal?: AbortSignal): Promise<unknown>
+  turnOperation?(projectId: string, input: typeof CamTurningOperationInput.Type, signal?: AbortSignal): Promise<unknown>
   reviewOperation?(projectId: string, operationId: string): Promise<unknown>
   compareSetups?(projectId: string, candidates: ReadonlyArray<SetupCandidate>): Promise<unknown>
   stock?(projectId: string, input: CamStockInput): Promise<unknown>
@@ -46,6 +47,12 @@ export interface ToolHandlersShape {
   cadAssembly?(projectId: string, input: CadAssemblyInput): Promise<unknown>
   /** What hollowing one solid would give (exact shell, volumes, open faces by name); nothing in the drawing changes. */
   cadShell?(projectId: string, input: CadShellInput): Promise<unknown>
+  cadExchange?(projectId: string, input: CadExchangeInput): Promise<unknown>
+  cadStoreBodies?(projectId: string, bodies: ReadonlyArray<{ readonly brep: cad.brep.Brep; readonly name: string; readonly kind: "solid" | "surface" }>): Promise<unknown>
+  cadOffset?(projectId: string, input: CadOffsetInput): Promise<unknown>
+  cadMotion?(projectId: string, input: CadMotionInput): Promise<unknown>
+  cadBuildShell?(projectId: string, input: CadShellInput): Promise<unknown>
+  cadBuildOffset?(projectId: string, input: CadOffsetInput): Promise<unknown>
   /** The exact smallest gap between two solids, with the closest points. */
   cadDistance?(projectId: string, input: CadDistanceInput): Promise<unknown>
   webSearch?(input: WebSearchInput, signal?: AbortSignal): Promise<unknown>
@@ -70,7 +77,7 @@ export interface ToolHandlersShape {
     { gcode: string; stats?: unknown } | typeof ActionCommitted.Type | ActionConflict | ActionDenied | ActionInvalidInput | ActionInterrupted
   >
   /** The program last generated for an operation, as it is stored (nothing is regenerated); an error when there is none yet. */
-  operationProgram?(projectId: string, operationId: string): Promise<{ ok: true; operationId: string; gcode: string } | { ok: false; error: string }>
+  operationProgram?(projectId: string, operationId: string): Promise<{ ok: true; operationId: string; gcode: string; params?: Readonly<Record<string, unknown>> } | { ok: false; error: string }>
   listOperations(projectId: string): Promise<unknown>
   updateOperation(projectId: string, operationId: string, params: Record<string, unknown>, expectedRevision?: string): Promise<unknown>
   suggestParameters(projectId: string, params: Record<string, unknown>): Promise<unknown>

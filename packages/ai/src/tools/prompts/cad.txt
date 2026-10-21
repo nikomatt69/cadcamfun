@@ -1,52 +1,36 @@
-Read the open drawing. All actions are read-only.
+Read and inspect the open drawing. Every action is read-only.
 
-Actions
-- describe: the drawing: counts, bounds and layers. Start here.
-- check: model checks (sizes, rotations, operands, duplicates, floating parts); fix findings.
-- relations: bounds, placement, distances, parameter dependencies; equal names bind nothing.
-- grep: search ids, names, layers and properties; parametric hits carry a revision.
-- vision: the CAD viewport as an image.
-- inspect_elements: full properties and bounds of elements, paged.
-- inspect_layers: the workspace layers and the active one.
-- inspect_search: elements whose text matches a query, paged.
-- inspect_property: one property of one element by path, paged.
-- inspect_origins: each element's origin, bounds, distance from the CAD zero, children.
-- parametric_validate: rebuild a parametric history and report what it cannot build.
-- parametric_inspect: history, parameters and report of one parametric part.
-- drawing: technical sheet from an elementId or history; SVG with dimensions, callouts, warnings; view options in the schema.
-- parametric_test: run parameter variants; report bodies, volumes and dimensional checks.
-- parametric_dfm: manufacturability findings for a history or part.
-- parametric_exact: exact B-rep per body (volume, area, centroid, holes, faces) or why mesh-only; STEP on request.
-- exact: every solid on the exact kernel: validity, volume, bounds, holes, CAM by features or 3D surface.
-- assembly: exact clashes (volumes), closest pairs of parts, bill of materials with mass, hole joints, missing fasteners.
-- distance: exact gap between two solids, closest points.
-- shell: a solid hollowed on paper: exact volumes, faces left open by name; changes nothing.
-- parametric_fastener: thread, tap drill, clearance and counterbore of a metric size.
-- parametric_recipe: history from `recipe` (mounting_plate, flange, l_bracket, stepped_shaft, pipe_bend, duct_transition, enclosure) and `params`; stored by cad_edit.parametric_recipe_create.
-- parametric_from_element: history with named parameters from a solid, flat shape or component; stored by cad_edit.parametric_convert.
-
-Parameters (mm, radians; ids are read, never invented)
-- describe, check, inspect_layers: none.
-- relations: firstId, secondId - two different existing ids.
-- grep: query (1-200 chars), layerId, parametricOnly, includeParameters, offset, limit (1-50).
-- vision: focus - what to look at.
-- inspect_elements: ids (max 100), layerId, offset (default 0), limit (max 100, default 10).
-- inspect_search: query, layerId, limit (max 100, default 20).
-- inspect_property: elementId, path (1-12 property names), offset (default 0), maxChars (default 10000, max 50000).
-- inspect_origins: as inspect_elements (ids max 100, layerId, offset, limit).
-- parametric_validate: history - the part's history object.
-- parametric_inspect, parametric_test: elementId; test also takes cases (1-12): [{name, parameters, expectedBodies?, minVolumeMm3?, maxVolumeMm3?, checks?}]. checks: {kind, name} plus nominal and tolerance (schema).
-- parametric_dfm, parametric_exact: one of elementId or history. exact: includeStep, name. dfm: process (mill|turn|print), toolDiameter, material (metal|cast|plastic), minWall, envelope {x,y,z}.
-- exact: ids (max 40, default all), machining (default true). assembly: washers (default true).
-- distance: firstId, secondId. shell: id, thickness, open (face names).
-- parametric_fastener: size (M3 ...), fit (fine|medium|coarse), shaftDiameter.
-- parametric_from_element: elementId, depth (mm, only for a flat shape: its extrusion, default 10).
+Actions and Parameters (lengths mm; history and joint angles degrees)
+- describe: counts, bounds, layers; no parameters. Start here.
+- check: sizes, operands, duplicates and floating parts; no parameters.
+- relations: firstId, secondId; bounds, placement and dependencies.
+- grep: query, layerId?, parametricOnly?, includeParameters?, offset?, limit?; search properties and parameters with revisions.
+- vision: focus?; capture the visible CAD viewport.
+- inspect_elements: ids?, layerId?, offset?, limit?; full element properties, paged.
+- inspect_layers: no parameters; layers and active layer.
+- inspect_search: query, layerId?, limit?; matching text.
+- inspect_property: elementId, path (property-name array), offset?, maxChars?; one property, paged.
+- inspect_origins: ids?, layerId?, offset?, limit?; origins, bounds and distance from zero.
+- drawing: elementId or history, options?; dimensioned PDF/SVG. Options include GDT, datums, balloons; see schema.
+- parametric_validate: history; build and validate before storing.
+- parametric_inspect: elementId; parameters and revision.
+- parametric_test: elementId, cases [{name,parameters,expectedBodies?,minVolumeMm3?,maxVolumeMm3?,checks?}]; dimensional checks and variants.
+- parametric_dfm: elementId or history, process (mill|turn|print), toolDiameter?, material?, minWall?, envelope? {x,y,z}.
+- parametric_exact: elementId or history, includeStep?, name?; exact body or reason it is mesh-only.
+- exact: ids?, machining?; exact validity, volume, bounds, faceNames, holes and CAM suitability.
+- assembly: washers?; exact clashes, gaps, BOM, joints, missing fasteners.
+- distance: firstId, secondId; smallest exact gap and closest points.
+- shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]; preview. Get names from exact.
+- offset: id, distance; outward offset preview, rounded convex corners. Unsupported geometry returns a reason.
+- motion: model {ground,joints,couplings?,contacts?}, sweep {joint,from,to,steps,quantity?}; scene part ids, zero-pose world origins/axes. closesLoop constraints solve passive joints. Reports closure, contact gaps and clearance violations per frame; no contact-force simulation.
+- surface: operation patch|stitch|thicken, patches [{data:{degreeU,degreeV,knotsU,knotsV,points,weights?},trim?:{u0,u1,v0,v1}}], thickness?, direction? {x,y,z}, tolerance?, name?. points[u][v]=[x,y,z]. Rectangular isoparametric trim; stitch matching full boundaries. Curved thicken requires explicit axial direction. General curved normal offsets are refused. Open surfaces are not CAM solids.
+- exchange: format step|iges|parasolid, ids?; exact file text. Parasolid is explicitly unsupported.
+- parametric_fastener: size?, fit?, shaftDiameter?; thread, tap, clearance and counterbore.
+- parametric_recipe: recipe, params?; standard-part history. Recipes: mounting_plate, flange, l_bracket, stepped_shaft, pipe_bend, duct_transition, enclosure.
+- parametric_from_element: elementId, depth?; named dimensions from existing geometry.
 
 Result (JSON)
-- ok; describe: elements, counts, bounds; inspect: page, total, nextOffset; origins: per element origin, bounds, distanceFromZeroMm, children; parametric: bodyCount, volumeMm3, problems. Element ids are the edit ids.
+ok, geometry findings or problems; paged inspection gives total/nextOffset. Element ids are edit ids; parameter revisions guard later updates.
 
 Do not use it
-- To change something: cad_edit. To machine: cam and cam_edit.
-
-After it
-- Report ids, positions and bounds; check or verify claims.
+To write use cad_edit; to machine use cam/cam_edit. Store checked shell, offset or surface with cad_edit. Consult fusion-360-modelling for history features and supported domains.

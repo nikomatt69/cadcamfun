@@ -24,7 +24,7 @@ import { booleanMesh, mergeMeshes, rotateMesh } from "./csg.ts"
 import { chamferRefusal, chamferSetbacks } from "./blend-spec.ts"
 import type { Mesh } from "./solid.ts"
 import { meshOf } from "./solid.ts"
-import { sweepSolid, type P3 } from "./sweep-loft.ts"
+import { loftSolid, sweepSolid, type P3 } from "./sweep-loft.ts"
 import type { Vec2 } from "./vec.ts"
 
 const sub = (a: P3, b: P3): P3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z })
@@ -275,6 +275,37 @@ export const blendEdges = (mesh: Mesh, edges: ReadonlyArray<BlendEdge>, radius: 
     vertices = corners.count
   }
   return { mesh: current, blended, vertices, rejected }
+}
+
+/**
+ * Fillets whose radius runs linearly from `radiusA` at each edge's `a` end to `radiusB` at its `b` end: the tool is the loft
+ * of the two end sections (the same conical section the exact `variableFillet` cuts, so the mesh and B-rep bodies agree to
+ * the tessellation). Corners where variable edges meet are not rounded (the exact kernel refuses them too).
+ */
+export const blendEdgesVariable = (mesh: Mesh, edges: ReadonlyArray<BlendEdge>, radiusA: number, radiusB: number): BlendResult => {
+  if (!(radiusA > 0) || !(radiusB > 0) || !Number.isFinite(radiusA + radiusB)) throw new RangeError(`A variable fillet needs finite positive radii at both ends (they are ${radiusA} and ${radiusB})`)
+  let current = mesh
+  let blended = 0
+  const rejected: string[] = []
+  for (const edge of edges) {
+    const name = `edge ${edge.a.x.toFixed(2)},${edge.a.y.toFixed(2)},${edge.a.z.toFixed(2)} to ${edge.b.x.toFixed(2)},${edge.b.y.toFixed(2)},${edge.b.z.toFixed(2)}`
+    const cutA = section(edge, radiusA, "fillet"), cutB = section(edge, radiusB, "fillet")
+    if (typeof cutA === "string") { rejected.push(`${name}: ${cutA}`); continue }
+    if (typeof cutB === "string") { rejected.push(`${name}: ${cutB}`); continue }
+    const e = unit(sub(edge.b, edge.a))
+    const overrun = 0.01
+    try {
+      const tool = loftSolid([
+        { ring: cutA.points.map((q) => add(sub(edge.a, mul(e, overrun)), q)) },
+        { ring: cutB.points.map((q) => add(add(edge.b, mul(e, overrun)), q)) }
+      ], { samples: 64 })
+      current = booleanMesh(current, tool, edge.convex ? "subtract" : "union")
+      blended++
+    } catch (error) {
+      rejected.push(`${name}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  return { mesh: current, blended, vertices: 0, rejected }
 }
 
 /** A prism of the polygon `ring` (in the plane through `origin` perpendicular to `axis`) carried `distance` along `axis`. */

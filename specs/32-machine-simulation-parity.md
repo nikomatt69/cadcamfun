@@ -1,6 +1,8 @@
 # Machine simulation at Fusion 360 / hyperMILL level: every kinematics, every operation, the right tool
 
 Status: **P1, P2, P3 built**, **P5 built (presets, poses, limits)**, **P7 built (stock, reach, machine collisions)**, **P6 S2 voxel stock built** (2026-10-20); P4 S1 removal partially implemented (another session); P6–P9 open.
+
+Five-axis playback increment: **built (2026-10-21)**. The existing mill and lathe previews activate machine-frame playback from rotary toolpaths, including zero angles and stationary indexing. See the change log for scope and limits.
 See §9. Analysis written at `main` @ 9aa648c. It extends
 [31-machine-aware-toolpath-view](31-machine-aware-toolpath-view.md) (machine scene, motion track, frames, set-up checks) and
 [29-native-cam-kernel](29-native-cam-kernel.md) (kinematics, collision, stock); it does not replace them. Owners: WP2
@@ -557,6 +559,18 @@ passes 39 tests. The mounted page checks use a DOM without WebGL; the mesh check
 - Open: deviation colours against the part (shared with P4), a worker for very fine voxels.
 
 ## Change log
+
+### Five-axis playback increment (2026-10-21)
+
+- Owners: WP2 `packages/core/src/cam/viewer`, WP6 `apps/desktop/src/features/cam`, WP7 `apps/desktop/src/viewport`, their tests and English CAM translations. This extends the existing mill and lathe viewers; no new machine kind or API schema is required.
+- A toolpath with rotary words, including explicit zero angles, activates the rotary mill or the lathe mill-turn B/C scene automatically. Existing three-axis, turning and printer programs keep their current mapping and playback.
+- Rotary-only moves and indexed `Orient` moves have a visible duration. Timeline and packed playback share one duration rule: the maximum of linear travel time and rotary travel at an assumed ceiling of 3600 degrees/minute; pure rotary feed uses the lower of its feed and that ceiling. This is preview timing, not controller cycle-time evidence.
+- Mill machine frame animates all model links, workholding, stock and path from the existing kinematic chain. Lathe mill-turn uses XYZ carriage travel, B head tilt and C chuck positioning; C positioning must not also receive free spindle rotation. Milling tools and turning inserts retain their respective motion and geometry. B/C angles use the existing IR degree boundary, with display rotations in radians.
+- The turned-profile approximation applies only to turning cuts. Positioned-C milling must not remove an entire annular band. Mill-turn milling removal and full-machine collision certification remain outside this increment and must be labelled as such.
+- Packed paths sample rotary moves every two degrees (bounded to 4096 samples per move) and map each endpoint at its own time, so changing C at fixed machine XYZ draws a curve in the part frame. Tool visibility, holder visibility, scrubbing, operation tools and the machine preset share the same scene.
+- Imported operations without tooling or spindle-mode metadata remain inferred and labelled assumed; modal B/C alone cannot establish whether a later tool has returned to turning. A declared turning tool retains free spindle motion and turned-profile removal after milling.
+- Verification covers the core CAM suites, desktop viewport and stock regressions, packed-buffer invariants, actual Three.js tool/head/chuck transforms and Solid controls with reactive program changes. The live CAM page and production desktop build are checked separately. Visual browser inspection was unavailable because computer-use approval denied Safari access; no screenshot verification is claimed.
+- Final gates (2026-10-21): 1181 tests across 92 files pass, plus all 9 live CAM page tests; core and desktop `bun check` pass; production desktop build and API-reference `--check` pass. The built CAD/CAM license and NVIDIA notice assets match their source files byte for byte.
 
 - 2026-10-19: analysis written from the code at 9aa648c and the probes of §2.2.
 - 2026-10-19: P1 built (§9).

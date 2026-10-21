@@ -14,6 +14,13 @@ export default defineConfig({
       const dist = dirname(require.resolve("occt-import-js"))
       for (const name of ["license.occt.txt", "license.occt-import-js.txt"]) this.emitFile({ type: "asset", fileName: `licenses/${name}`, source: readFileSync(join(dist, name), "utf8") })
       this.emitFile({ type: "asset", fileName: "licenses/cad-decoder-notice.txt", source: "CAD file decoding uses the unmodified occt-import-js 0.0.23 OpenCascade WebAssembly module, distributed as a separate runtime asset. Source and build instructions: https://github.com/kovacsv/occt-import-js . See license.occt.txt and license.occt-import-js.txt for license terms.\n" })
+      for (const path of ["cad/LICENSE", "cam/LICENSE", "cad/brep/NOTICE", "cad/brep/LICENSE-APACHE-2.0"]) {
+        this.emitFile({
+          type: "asset",
+          fileName: `licenses/${path}`,
+          source: readFileSync(new URL(`../../packages/core/src/${path}`, import.meta.url), "utf8")
+        })
+      }
     }
   }],
   clearScreen: false,

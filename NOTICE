@@ -1,0 +1,16 @@
+CADCAMFUN
+Copyright © 2025-2026 Nicola Mattioli and the respective contributors.
+Project: https://github.com/nikomatt69/cadcamfun
+Maintainer contact: https://x.com/nikomatt69
+
+This repository contains material offered under Apache-2.0 and separate
+proprietary components. The root LICENSE identifies their scope. This NOTICE is
+informational and does not change any license or grant rights in excluded work.
+
+Third-party rights remain with their holders. Scoped attributions include:
+- packages/ai/THIRD_PARTY_NOTICES.md
+- packages/core/src/cad/brep/NOTICE
+- apps/desktop/src-tauri/THIRD_PARTY_NOTICES.md
+
+These references are not a complete dependency inventory. Redistributors must
+preserve the licenses and notices required for the components they distribute.

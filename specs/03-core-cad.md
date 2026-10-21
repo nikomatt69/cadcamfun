@@ -2,7 +2,31 @@
 
 Status: done; targeted solid geometry/document preservation hardening and spec 33 C4 chamfer callouts implemented. Owner dir: `packages/core/src/cad` (+ `packages/core/package.json`, `tsconfig.json`, `src/index.ts` barrel for the `cad` exports).
 
+### Kernel completion increment (2026-10-21, in progress)
+
+The approved spec 33 continuation owns `cad/` and its tests. Cross-WP integration owns only the corresponding schemas in `packages/api/src/ai-{cad,parametric,action-results}.ts`, CAD action bindings/prompts/tests in `packages/ai`, and CAD handlers/tests in `apps/sidecar`, and the existing desktop AI result adapter `apps/desktop/src/features/ai/lib/editor-sync.ts` plus its store test; `features/cad/lib/createThreeObject.ts` and `test/cad-brep.test.ts` only for double-sided rendering of open surfaces; `test/cad-iges.test.ts` independently checks IGES output with the installed OpenCascade reader. Existing CAM and licensing work in the shared tree is independent. Scope: seed 114 and the pole recovery window, per-face shell thickness, outward offset, variable fillets in history, loop/contact kinematics, edge flanges and flat development, open NURBS patch/trim/stitch/thicken, and IGES exchange. Parasolid may return an explicit unsupported-format diagnostic and must never be parsed as STEP. New capability claims require interface tests and AI action coverage. General offsets and freeform offsets remain open wherever exact construction cannot be validated; a refusal does not count as implementing that geometry.
+
 Pure, I/O-free TypeScript. No DOM, no Three.js, no Bun APIs, no database. Must run in Bun, in the webview, and in a Worker.
+
+## CAD kernel licensing contract (2026-10-21)
+
+The owner requests proprietary terms for Nicola Mattioli's own CAD kernel
+contributions. `packages/core/src/cad/LICENSE` applies only to rights held by
+Nicola Mattioli and expressly preserves Apache-2.0 and other third-party rights.
+The TypeScript B-rep implementation is informed by NVIDIA USD BRep / SMLib, as
+already recorded in its source comments. `cad/brep/NOTICE` records that reference,
+the upstream review date and the unresolved original source revision;
+`cad/brep/LICENSE-APACHE-2.0` retains the upstream license and copyright text.
+These documentation files do not assert clean-room independence, resolve
+file-by-file provenance, relicense dependencies or claim ownership of user models
+and outputs. Existing code comments and the repository root license stay intact.
+
+The shared desktop packaging Seam in `apps/desktop/vite.config.ts` is included
+in this licensing scope: its existing license asset plugin must also copy the
+CAD and CAM proprietary licenses plus the B-rep notice and complete Apache-2.0
+text into `dist/licenses/{cad,cam}`. The CAD subdirectory preserves the relative
+`brep/NOTICE`, `brep/LICENSE-APACHE-2.0` and `LICENSE` relationships. Assets are
+read from repository files at build time; OCCT license emission stays unchanged.
 
 Legacy reference (domain knowledge only): `.reference/src/types/cad2d/{geometry,entities,commands,tools}.ts`, `.reference/src/types/cad.ts`, `.reference/src/lib/cad/`, `.reference/src/lib/constraints/`, `.reference/src/lib/canvas/`.
 
@@ -238,6 +262,35 @@ Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 `bun --no-env-file test packages/core`, and `bun --no-env-file check -p packages/core/tsconfig.json`.
 
 ## 8. Change log
+
+- 2026-10-21: spec 33 increment, closed with measurements (spec 33 §7.21–§7.23):
+  the Boolean's orientation check re-checks the exact volume when the coarse one
+  reports only an orientation issue (aligned seed 114's 0.0642 mm³ lens is
+  returned, not refused); `shellBrep` takes a wall per face; `offsetBrep` grows a
+  sphere and a torus analytically and a rectangular box by growing it and
+  blending every new edge (within 1e-3 mm³ of the Minkowski formula), refusing
+  what the dilation cannot sew; the `fillet` feature takes `radiusEnd` and both
+  rebuilds remove the same tapered volume; `kinematics` solves closed loops on
+  passive joints and reports the closure error and the contact clearance
+  violations; the `sheet` feature takes `flanges` (full-width free edges) with
+  optional bend-end `relief` notches; `brep/surface-patch.ts` adds open NURBS
+  patches, exact isoparametric trims, stitching and thickening (a planar normal
+  thickness is exact, a curved one is explicitly axial and a general normal
+  offset is refused); `brep/iges.ts` writes and reads IGES 5.3 with shared
+  topology, checked against the installed OpenCascade reader (a parameter split
+  across two records had moved a vertex, which the internal round trip could not
+  see); Parasolid returns an unsupported-format diagnostic. Every new
+  capability has an AI action and a governed write. Tests: `brep/` 164 pass,
+  the CAD history and scene suites 104, the AI and sidecar suites 55, the desktop
+  CAD and IGES suites 15.
+
+- 2026-10-21: added proprietary terms for Nicola Mattioli's CAD contributions,
+  with explicit third-party exclusions, a scoped NVIDIA USD BRep / SMLib notice
+  and the upstream Apache-2.0 license copy. No runtime or geometry changes;
+  original consulted revision and file-level provenance remain unverified.
+- 2026-10-21: included the desktop Vite packaging Seam in the licensing scope
+  and shipped CAD/CAM licenses and B-rep upstream notices under `dist/licenses`;
+  existing OCCT license assets remain unchanged.
 
 - 2026-10-19: completed spec 33 C4. `fillet` with `style: "chamfer"` accepts `secondDistance` or `angle` in the history,
   including expressions; the mesh and B-rep share setbacks with radians in geometry modules. The first distance belongs to

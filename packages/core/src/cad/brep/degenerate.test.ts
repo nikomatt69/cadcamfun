@@ -52,6 +52,34 @@ describe("degenerate alignments (R1-R5)", () => {
     expect(d.attempts).toEqual([])
   })
 
+  test("seed 114: a torus and a sphere overlapping by 0.07 mm return their lens (the coarse volume had the wrong sign)", () => {
+    // Fuzz seed 114 aligned. Union and difference agreed on a 0.064 mm3 lens, but the intersection's closed shell measured
+    // -2.9e-5 mm3 on the coarse tessellation (thinner than its chord), so the Boolean refused a result whose exact volume is
+    // right. The exact volume now decides an orientation-only failure.
+    const torus = makeTorus(6.5, 2, frame({ x: 1.5, y: 1.5, z: -0.5 }, { x: 0, y: 0, z: 1 }))
+    const sphere = makeSphere(4, frame({ x: 1, y: 0.5, z: -3 }, { x: 1, y: 0, z: 0 }))
+    const i = valid(torus, sphere, "intersect")
+    const u = valid(torus, sphere, "union")
+    const d = valid(torus, sphere, "subtract")
+    expect(Math.abs(i - 0.0642)).toBeLessThan(1e-3)
+    expect(Math.abs(u + i - massProperties(torus).volume - massProperties(sphere).volume)).toBeLessThan(1e-3)
+    expect(Math.abs(d + i - massProperties(torus).volume)).toBeLessThan(1e-3)
+  })
+
+  test("a sphere pole on the torus surface (and across five offsets through 1e-3 mm): the recovery returns balanced volumes, not the strict 0.8 % error", () => {
+    // Spec 33 §7.11/§7.18: with the pole exactly on the other solid the strict pipeline is 0.8 % high; `booleanBrep` routes
+    // a pole within 2e-4 of the model size to the verified recovery. The grid estimate of the intersection is 101.845.
+    for (const dz of [0, 1e-5, 5e-5, 1e-4, 1e-3]) {
+      const torus = makeTorus(4.5, 2.5, frame({ x: -0.5, y: -0.5, z: -1 }, { x: 0, y: 0, z: 1 }))
+      const sphere = transformBrep(makeSphere(4.5, frame({ x: -2, y: -2.5, z: 2 }, { x: 0, y: 0, z: 1 })), translation({ x: 0, y: 0, z: dz }))
+      const u = valid(torus, sphere, "union"), i = valid(torus, sphere, "intersect"), d = valid(torus, sphere, "subtract")
+      const vt = massProperties(torus).volume, vs = massProperties(sphere).volume
+      expect(Math.abs(u + i - vt - vs)).toBeLessThan(1e-3)
+      expect(Math.abs(d + i - vt)).toBeLessThan(1e-3)
+      expect(Math.abs(i - 101.8)).toBeLessThan(0.1)
+    }
+  }, 240_000)
+
   test("a sphere pole a millimetre from a torus: the fragment at the pole tessellates (it was empty), so the volumes balance", () => {
     // The sphere's south pole lies 0.16 mm outside the torus; a vertex of the intersection curve a few microns off the seam near
     // the pole has a u that differs by radians, and the fragment used to come out with no triangles and no warning.

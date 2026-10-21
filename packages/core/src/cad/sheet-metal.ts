@@ -135,6 +135,8 @@ export interface Developed {
   readonly length: number
   /** Straight runs and bends in order along the strip. */
   readonly segments: ReadonlyArray<DevelopedSegment>
+  /** End notches, measured along the developed length and inset equally from both width edges. */
+  readonly reliefs?: ReadonlyArray<{ readonly from: number; readonly to: number; readonly inset: number }>
 }
 
 /**
@@ -172,6 +174,56 @@ export const developedLength = (path: ReadonlyArray<Vec2>, thickness: number, in
     }
   }
   return { straight, bends, length: at, segments }
+}
+
+/** An edge flange on either exposed width edge of an existing sheet profile. Angle is a signed turn in radians. */
+export interface EdgeFlangeSpec {
+  readonly end: "start" | "end"
+  /** Length from the virtual bend corner to the tip, measured on the drawn reference line, mm. */
+  readonly length: number
+  readonly angle: number
+  /** Rectangular bend-end notches: inset from each width edge and depth back past the bend tangent. */
+  readonly relief?: { readonly width: number; readonly depth: number }
+}
+
+/** Build the relief cutting profiles and their developed lengths from the original sheet, before adding the flange. */
+export const edgeFlangeReliefs = (path: ReadonlyArray<Vec2>, thickness: number, width: number, radius: number, side: SheetSide, flanges: ReadonlyArray<EdgeFlangeSpec>): ReadonlyArray<{ readonly outline: ReadonlyArray<Vec2>; readonly inset: number; readonly flatLength: number; readonly end: "start" | "end" }> => {
+  const [a, b] = faceOffsets(thickness, side)
+  return flanges.flatMap((flange) => {
+    if (flange.relief === undefined) return []
+    const { width: inset, depth } = flange.relief
+    if (!(inset > 0 && 2 * inset < width && depth > 0) || !Number.isFinite(inset + depth)) throw new RangeError("A bend relief needs positive finite width/depth and must leave flange width")
+    if (Math.abs(flange.angle) > Math.PI / 2 + 1e-9) throw new RangeError("Bend-end relief currently supports flange turns up to 90 degrees")
+    const oriented = flange.end === "end" ? path : [...path].reverse()
+    const p = oriented[oriented.length - 1]!, q = oriented[oriented.length - 2]!, l = dist(p, q)
+    const d = { x: (p.x - q.x) / l, y: (p.y - q.y) / l }, n = { x: -d.y, y: d.x }
+    const angle = Math.abs(flange.angle), sign = Math.sign(flange.angle) * (flange.end === "end" ? 1 : -1)
+    const setback = (radius + (sign > 0 ? -a : b)) * Math.tan(angle / 2)
+    if (setback + depth >= l || setback >= flange.length) throw new RangeError("Bend relief or radius consumes a straight run")
+    const reach = 2 * (l + flange.length + thickness + radius + depth)
+    const point = (u: number, v: number): Vec2 => ({ x: p.x + u * d.x + v * n.x, y: p.y + u * d.y + v * n.y })
+    return [{ outline: [point(-setback - depth, -reach), point(reach, -reach), point(reach, reach), point(-setback - depth, reach)], inset, end: flange.end,
+      flatLength: flange.length - setback + angle * (radius + 0.44 * thickness) + depth }]
+  })
+}
+
+/** Extend the existing sheet profile at an exposed edge; the same outline and development functions then include the bend. */
+export const withEdgeFlanges = (path: ReadonlyArray<Vec2>, flanges: ReadonlyArray<EdgeFlangeSpec>): Vec2[] => {
+  let pts = dedupe(path)
+  if (pts.length < 2) throw new RangeError("An edge flange needs an existing sheet profile")
+  if (new Set(flanges.map((f) => f.end)).size !== flanges.length) throw new RangeError("Only one edge flange is allowed at each exposed edge")
+  for (const flange of flanges) {
+    if (!(flange.length > 0) || !Number.isFinite(flange.length)) throw new RangeError("An edge flange needs a finite positive length")
+    if (!Number.isFinite(flange.angle) || Math.abs(flange.angle) < 1e-6 || Math.abs(flange.angle) >= Math.PI - 1e-6) throw new RangeError("An edge flange angle must be nonzero and strictly between -pi and pi")
+    const oriented = flange.end === "end" ? pts : [...pts].reverse()
+    const p = oriented[oriented.length - 1]!, q = oriented[oriented.length - 2]!
+    const l = dist(p, q), x = (p.x - q.x) / l, y = (p.y - q.y) / l
+    const c = Math.cos(flange.angle), s = Math.sin(flange.angle)
+    const tip = { x: p.x + flange.length * (c * x - s * y), y: p.y + flange.length * (s * x + c * y) }
+    const extended = [...oriented, tip]
+    pts = flange.end === "end" ? extended : extended.reverse()
+  }
+  return pts
 }
 
 /**
@@ -226,8 +278,17 @@ export const flatPatternDrawing = (developed: Developed, width: number, name = "
     _tag: "Line", id: `line-${++n}`, layerId, visible: true, locked: false, start: { x: x0, y: y0 }, end: { x: x1, y: y1 }
   })
   const L = developed.length
-  const entities = [line("cut", 0, 0, L, 0), line("cut", L, 0, L, width), line("cut", L, width, 0, width), line("cut", 0, width, 0, 0)]
-  for (const s of developed.segments) if (s.kind === "bend") { const m = (s.from + s.to) / 2; entities.push(line("bend", m, 0, m, width)) }
+  const reliefs = developed.reliefs ?? []
+  const breaks = [...new Set([0, L, ...reliefs.flatMap((r) => [r.from, r.to])])].sort((a, b) => a - b)
+  const insetAt = (x: number) => Math.max(0, ...reliefs.filter((r) => x >= r.from && x <= r.to).map((r) => r.inset))
+  const bottom: Vec2[] = []
+  for (let i = 0; i + 1 < breaks.length; i++) {
+    const from = breaks[i]!, to = breaks[i + 1]!, inset = insetAt((from + to) / 2)
+    bottom.push({ x: from, y: inset }, { x: to, y: inset })
+  }
+  const outline = [...bottom, ...[...bottom].reverse().map((p) => ({ x: p.x, y: width - p.y }))]
+  const entities = outline.flatMap((p, i) => { const q = outline[(i + 1) % outline.length]!; return dist(p, q) < 1e-9 ? [] : [line("cut", p.x, p.y, q.x, q.y)] })
+  for (const s of developed.segments) if (s.kind === "bend") { const m = (s.from + s.to) / 2, inset = insetAt(m); entities.push(line("bend", m, inset, m, width - inset)) }
   return { ...base, layers, entities }
 }
 

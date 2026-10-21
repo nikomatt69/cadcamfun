@@ -43,7 +43,17 @@ Every command a designer reaches for in Fusion 360 has a counterpart in the para
 
 ## What is not there
 
-Sheet-metal flanges with hems, flat-pattern DXF export and relief cuts (`sheet` makes the bent strip and reports its flat length), thread cosmetics on a cylinder that is not along Z (a modelled thread runs along Z), joints beyond the face `mate` (rigid, revolute by `spin`, slider by `slide`; no cam, gear or motion study). Say so and use the nearest feature rather than inventing a field.
+Flanges on adjacent sheet edges and their corner treatment, general freeform normal offsets, arbitrary UV trim curves, and Parasolid parsing remain unsupported. Use the structured refusal; never present a smaller feature as equivalent to the requested geometry.
+
+## Exact kernel actions
+
+- `cad.shell` previews a shell; `cad_edit.shell` stores an exact copy. `wallByFace:[{face,thickness}]` overrides named face walls; get face names with `cad.exact`. `open` leaves selected faces open.
+- `cad.offset` / `cad_edit.offset`: outward distance, rounded convex corners; analytic sphere/torus and rounded rectangular boxes are supported, other solids use the checked boundary construction or report a reason.
+- A history `fillet` takes `radiusEnd` for a linearly varying straight-edge radius. Radii are assigned from the lexicographically smaller endpoint. Chamfers refuse `radiusEnd`.
+- A `sheet` accepts `flanges:[{end:"start"|"end",length,angle}]` on its full-width exposed edges. Angles are signed degrees, length is from the virtual bend corner. The existing `bendRadius`, thickness and width apply; flatPatterns includes the new bends. A hem cannot share that edge. Optional `relief:{width,depth}` removes rectangular bend-end notches on turns up to 90 degrees, narrows the flange at both width ends and updates the flat blank.
+- `cad.motion` studies exact scene parts using a model `{ground,joints,couplings?,contacts?}` and sweep `{joint,from,to,steps,quantity?}`. Revolute/prismatic/cylindrical/ball/planar joints, gear/rack couplings, explicit `closesLoop` constraints solved on passive joints, per-frame closure and contact distances/clearance violations. This reports non-penetration violations, not contact forces or cam-following dynamics.
+- `cad.surface` previews; `cad_edit.surface` stores a NURBS patch, stitches matching full edges or thickens a patch. Open surfaces are typed separately and excluded from solid machining. Rectangular trims use exact isoparametric curves. Planar normal thickening is exact; curved patches need an explicit axial direction. Axial thickness does not claim constant normal distance.
+- `cad.exchange` exports exact STEP/IGES text. `cad_edit.import` accepts IGES manifold solids with analytic/rational surfaces and shared topology, or refuses incomplete/unsupported files. Parasolid x_t is text, x_b is binary; neither format is STEP/IGES.
 
 ## Example (it builds: a plate with a slot and three posts)
 

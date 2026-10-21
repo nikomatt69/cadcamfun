@@ -27,8 +27,12 @@ export type WorkOrigin = "stock-center" | "stock-corner"
 export interface KernelMachine {
   readonly id: string
   readonly name: string
+  /** What the machine is: a milling centre (`mill`) or a turning / mill-turn centre (`lathe`). */
+  readonly kind: "mill" | "lathe"
   readonly limits: MachineLimits
   readonly post: PostId
+  /** Published catalogue data and explicit setup assumptions; a stroke is not a work-coordinate limit. */
+  readonly reference?: { readonly controller: string; readonly source: string; readonly stroke?: { readonly x: number; readonly y: number; readonly z: number }; readonly assumptions: ReadonlyArray<string> }
   /** Rapid traverse, mm/min (cycle time). */
   readonly rapidFeed?: number
   /** Seconds a tool change takes (cycle time). */
@@ -50,6 +54,26 @@ export interface KernelMachine {
     readonly pivot: { readonly x: number; readonly y: number; readonly z: number }
     readonly tilt: readonly [number, number]
     readonly rotation?: readonly [number, number]
+  }
+  /**
+   * What a turning centre holds and turns: the bar it takes, the chuck, the B head that tilts the milling spindle and
+   * the C spindle that positions the workpiece. Absent on a plain 2-axis lathe (no B head).
+   */
+  readonly turning?: {
+    /** Largest bar the chuck takes, mm. */
+    readonly maxBarDiameter: number
+    /** Longest bar the machine takes, mm. */
+    readonly maxBarLength: number
+    readonly chuckDiameter: number
+    /** B head range, degrees; absent on a lathe without a tilting head. */
+    readonly b?: readonly [number, number]
+    /** C spindle indexing range, degrees. */
+    readonly c?: readonly [number, number]
+    /** The C spindle turns on without end (a continuous axis, not a 360° index). */
+    readonly continuousC?: boolean
+    /** Y travel of a mill-turn centre, mm. */
+    readonly yTravel?: number
+    readonly turret?: "rear" | "front"
   }
 }
 

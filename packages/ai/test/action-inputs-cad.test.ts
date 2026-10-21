@@ -31,6 +31,13 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.exact": { accept: [{}, { ids: ["a"], machining: false }], refuse: [{ ids: [] }, { machining: "no" }] },
   "cad.assembly": { accept: [{}, { washers: false }], refuse: [{ washers: 1 }] },
   "cad.shell": { accept: [{ id: "a", thickness: 2 }, { id: "a", thickness: 1.5, open: ["plate.top"] }], refuse: [{ id: "a" }, { id: "", thickness: 2 }, { id: "a", thickness: 0 }, { id: "a", thickness: 2, open: [""] }] },
+  "cad.surface": { accept: [{ operation: "patch", patches: [{ data: { degreeU: 1, degreeV: 1, knotsU: [0, 0, 1, 1], knotsV: [0, 0, 1, 1], points: [[[0, 0, 0], [0, 1, 0]], [[1, 0, 0], [1, 1, 0]]] } }] }], refuse: [{ operation: "patch", patches: [] }] },
+  "cad_edit.surface": { accept: [{ operation: "patch", patches: [{ data: { degreeU: 1, degreeV: 1, knotsU: [0, 0, 1, 1], knotsV: [0, 0, 1, 1], points: [[[0, 0, 0], [0, 1, 0]], [[1, 0, 0], [1, 1, 0]]] } }] }], refuse: [{ operation: "not-a-surface", patches: [] }] },
+  "cad.exchange": { accept: [{ format: "iges" }, { format: "parasolid", ids: ["a"] }], refuse: [{ format: "stl" }, { format: "iges", ids: [] }] },
+  "cad.offset": { accept: [{ id: "a", distance: 2 }], refuse: [{ id: "a", distance: 0 }, { id: "a" }] },
+  "cad.motion": { accept: [{ model: { ground: "a", joints: [] }, sweep: { joint: "j", from: 0, to: 10, steps: 2 } }], refuse: [{}, { model: { ground: "a", joints: [] }, sweep: { joint: "j", from: 0, to: 10, steps: 101 } }] },
+  "cad_edit.shell": { accept: [{ id: "a", thickness: 2, wallByFace: [{ face: "top", thickness: 1 }] }], refuse: [{ id: "a", thickness: 2, wallByFace: [{ face: "top", thickness: 0 }] }] },
+  "cad_edit.offset": { accept: [{ id: "a", distance: 2 }], refuse: [{ id: "a", distance: -1 }] },
   "cad.distance": { accept: [{ firstId: "a", secondId: "b" }], refuse: [{ firstId: "a" }, { firstId: "", secondId: "b" }] },
   "cad_edit.add_entities": {
     accept: [{ entities: [{ type: "line", start: { x: 0, y: 0 }, end: { x: 10, y: 0 } }, { type: "circle", center: { x: 0, y: 0 }, radius: 3, layer: "L1" }] }],
@@ -41,7 +48,7 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad_edit.group": { accept: [{ ids: ["a", "b"], name: "G" }], refuse: [{ ids: [] }, { ids: ["a"], name: "" }] },
   "cad_edit.delete": { accept: [{ ids: ["a"], confirm: true }], refuse: [{ ids: ["a"] }, { ids: ["a"], confirm: false }] },
   "cad_edit.editor": { accept: [{ actions: [{ action: "view_fit" }, { action: "section_on", axis: "x", position: 10 }] }], refuse: [{ actions: [] }, { actions: [{ action: "explode" }] }] },
-  "cad_edit.import": { accept: [{ attachment: "part.dxf", depth: 5 }, { format: "svg", content: "<svg/>", depth: 2 }], refuse: [{ format: "iges" }, { content: "" }, { depth: 0 }] },
+  "cad_edit.import": { accept: [{ attachment: "part.dxf", depth: 5 }, { format: "svg", content: "<svg/>", depth: 2 }], refuse: [{ format: "invalid" }, { content: "" }, { depth: 0 }] },
   "cad.drawing": {
     accept: [
       {}, { elementId: "a" }, { history },

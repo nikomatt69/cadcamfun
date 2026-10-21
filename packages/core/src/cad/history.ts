@@ -26,14 +26,14 @@ import { meshBounds, meshOf, meshVolume, type Mesh } from "./solid.ts"
 import { edgedHoleTool, edgedPrism, moveRing, taperedHoleTool, taperedPrism, treatCorners, type EdgeShape, type TreatmentStyle } from "./profile-shape.ts"
 import { loftSolid, roundPath, sweepSolid, type P3 } from "./sweep-loft.ts"
 import { COIL_MAX_TURNS, coilGeometry } from "./helix.ts"
-import { developedLength, sheetOutline, thickenPath, withHems, type Developed } from "./sheet-metal.ts"
+import { developedLength, sheetOutline, thickenPath, withHems, withEdgeFlanges, edgeFlangeReliefs, type Developed } from "./sheet-metal.ts"
 import { threadGroove, threadProblem, threadTool } from "./thread.ts"
 import { textSolid } from "./text-solid.ts"
 import { findPlanarFace, type PlanarFace } from "./face-edit.ts"
 import { findSmoothFace, type SmoothFace } from "./smooth-face.ts"
 import { metricThread } from "./fasteners.ts"
 export { COIL_STEPS_PER_TURN, coilGeometry } from "./helix.ts"
-import { blendEdges, findEdges, selectEdges } from "./edge-blend.ts"
+import { blendEdges, blendEdgesVariable, findEdges, selectEdges } from "./edge-blend.ts"
 import { expandSketch, type SketchShape } from "./sketch-shapes.ts"
 import { elementMesh } from "../cam/model/element-mesh.ts"
 
@@ -223,6 +223,9 @@ export interface FilletFeature {
   readonly type: "fillet"
   /** The radius of a fillet or the setback of a chamfer. */
   readonly radius: Dimension
+  /** A fillet only: the radius at the far end of each edge, so the radius runs linearly from `radius` to `radiusEnd` along
+   * the edge (the start is the edge's lexicographically smaller end, the same rule in the mesh and exact rebuilds). */
+  readonly radiusEnd?: Dimension
   readonly style?: "fillet" | "chamfer"
   /**
    * A chamfer only: the setback on the second face, mm (the callout "2 x 1"). The first setback is `radius`; it goes on the
@@ -321,6 +324,8 @@ export interface SheetFeature {
   /** Which side of the drawn line the material lies on, looking along it (default `centre`). */
   readonly side?: "centre" | "left" | "right"
   /** Hems folded back at the ends of the line: a hem is two 90 degree bends, so with a bend radius `gap` must be at least twice the inside radius. */
+  /** Full-width edge flanges on the existing sheet's exposed start/end width edges; angles in degrees at the history boundary. */
+  readonly flanges?: ReadonlyArray<{ readonly end: "start" | "end"; readonly length: Dimension; readonly angle: Dimension; readonly relief?: { readonly width: Dimension; readonly depth: Dimension } }>
   readonly hems?: ReadonlyArray<{ readonly end: "start" | "end"; readonly length: Dimension; readonly gap?: Dimension; readonly fold?: "left" | "right" }>
   readonly direction?: "up" | "down" | "symmetric"
   readonly operation: Operation
@@ -1075,6 +1080,16 @@ export const rebuild = (history: History): RebuildResult => {
             issues.push({ feature: f.id, severity: "error", message: "A fillet has one radius: a second distance or an angle belongs to a chamfer" })
             break
           }
+          const radiusEnd = f.radiusEnd === undefined ? undefined : dim(f.radiusEnd, f.id)
+          if (f.radiusEnd !== undefined && radiusEnd === undefined) break
+          if (radiusEnd !== undefined && style !== "fillet") {
+            issues.push({ feature: f.id, severity: "error", message: "A variable radius belongs to a fillet, not a chamfer" })
+            break
+          }
+          if (radiusEnd !== undefined && !(radiusEnd > 0)) {
+            issues.push({ feature: f.id, severity: "error", message: `The end radius must be positive (it is ${radiusEnd})` })
+            break
+          }
           if (secondDistance !== undefined && angle !== undefined) {
             issues.push({ feature: f.id, severity: "error", message: "A chamfer takes either two distances or a distance and an angle, not both" })
             break
@@ -1104,10 +1119,23 @@ export const rebuild = (history: History): RebuildResult => {
           for (const b of chosen) {
             const found = findEdges(b.mesh)
             const picked = selectEdges(found.edges, selector)
-            const result = blendEdges(b.mesh, picked, radius, style, chamfer)
-            blended += result.blended
-            for (const why of result.rejected.slice(0, 4)) issues.push({ feature: f.id, severity: "warning", message: `Not blended: ${why}` })
-            bodies[bodies.indexOf(b)] = { ...b, mesh: result.mesh }
+            if (radiusEnd === undefined) {
+              const result = blendEdges(b.mesh, picked, radius, style, chamfer)
+              blended += result.blended
+              for (const why of result.rejected.slice(0, 4)) issues.push({ feature: f.id, severity: "warning", message: `Not blended: ${why}` })
+              bodies[bodies.indexOf(b)] = { ...b, mesh: result.mesh }
+            } else {
+              // One edge at a time, the radius running from the lexicographically smaller end (the exact replay's rule).
+              let mesh = b.mesh
+              for (const edge of picked) {
+                const flip = edge.b.x < edge.a.x || (edge.b.x === edge.a.x && (edge.b.y < edge.a.y || (edge.b.y === edge.a.y && edge.b.z < edge.a.z)))
+                const result = blendEdgesVariable(mesh, [edge], flip ? radiusEnd : radius, flip ? radius : radiusEnd)
+                blended += result.blended
+                for (const why of result.rejected.slice(0, 4)) issues.push({ feature: f.id, severity: "warning", message: `Not blended: ${why}` })
+                mesh = result.mesh
+              }
+              bodies[bodies.indexOf(b)] = { ...b, mesh }
+            }
           }
           if (blended === 0) issues.push({ feature: f.id, severity: "error", message: "No edge matched the selection (edges are found between planar faces that meet at 25 degrees or more)" })
           break
@@ -1357,13 +1385,25 @@ export const rebuild = (history: History): RebuildResult => {
             if (new Set(specs.map((h) => h.end)).size !== specs.length) { issues.push({ feature: f.id, severity: "error", message: "A sheet has at most one hem at each end" }); break }
             line = withHems(cornersOf(line), thickness, specs as never)
           }
+          let reliefs: ReturnType<typeof edgeFlangeReliefs> = []
+          if (f.flanges !== undefined) {
+            if (f.flanges.some((flange) => f.hems?.some((hem) => hem.end === flange.end))) { issues.push({ feature: f.id, severity: "error", message: "An edge cannot carry both a hem and an edge flange" }); break }
+            const flanges = f.flanges.map((flange) => ({ end: flange.end, length: dim(flange.length, f.id), angle: dim(flange.angle, f.id), relief: flange.relief === undefined ? undefined : { width: dim(flange.relief.width, f.id), depth: dim(flange.relief.depth, f.id) } }))
+            if (flanges.some((flange) => flange.length === undefined || flange.angle === undefined)) break
+            if (flanges.some((flange) => flange.relief !== undefined && (flange.relief.width === undefined || flange.relief.depth === undefined))) break
+            const resolved = flanges.map((flange) => ({ end: flange.end, length: flange.length!, angle: flange.angle! * Math.PI / 180, ...(flange.relief !== undefined ? { relief: { width: flange.relief.width!, depth: flange.relief.depth! } } : {}) }))
+            reliefs = edgeFlangeReliefs(cornersOf(line), thickness, width, radius, side, resolved)
+            line = withEdgeFlanges(cornersOf(line), resolved)
+          }
           const outline = sheetOutline(line, thickness, side, radius)
           const dir = f.direction ?? "up"
           const from = dir === "up" ? 0 : dir === "down" ? -width : -width / 2
           const frame = sk.frame
-          const tool = place(prism(outline, from, from + width), frame.u, frame.v, frame.n, frame.origin)
+          let tool = place(prism(outline, from, from + width), frame.u, frame.v, frame.n, frame.origin)
+          for (const relief of reliefs) for (const [z0, z1] of [[from - 1, from + relief.inset], [from + width - relief.inset, from + width + 1]]) tool = booleanMesh(tool, place(prism(relief.outline, z0!, z1!), frame.u, frame.v, frame.n, frame.origin), "subtract")
           // The flat pattern is read off the drawn line with its arcs replaced by their corners: only the corners count.
-          flatPatterns[f.id] = developedLength(cornersOf(line), thickness, radius, side)
+          const developed = developedLength(cornersOf(line), thickness, radius, side)
+          flatPatterns[f.id] = { ...developed, ...(reliefs.length > 0 ? { reliefs: reliefs.map((r) => ({ from: r.end === "start" ? 0 : developed.length - r.flatLength, to: r.end === "start" ? r.flatLength : developed.length, inset: r.inset })) } : {}) }
           tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
           apply(f.id, tool, f.operation, f.targets, f.id)
           break

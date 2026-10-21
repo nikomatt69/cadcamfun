@@ -86,6 +86,8 @@ export default function CamPage(): JSX.Element {
   // An imported program split at its tool changes (T1, T2…): each tool as its header comments describe it.
   const headerModels = createMemo(() => {
     const paths = camStore.program.toolpaths
+    const used = cam.viewer.turnMillAxesOf(camStore.program)
+    if (machineChoice().kind === "lathe" && (used.milling || used.cPositioned)) return cam.viewer.turnMillToolModels(camStore.program, camStore.motion, camStore.gcode)
     // A one-tool program keeps its toolpath `tool`: its tool is the T word the program selects, if the header names it.
     if (paths.length === 1 && paths[0]!.toolId === "tool") {
       const number = camStore.motion?.paths[0]?.runs.find((r) => r.tool !== undefined)?.tool

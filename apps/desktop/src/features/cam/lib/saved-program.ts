@@ -46,7 +46,7 @@ const record = (value: unknown): Record<string, unknown> => value !== null && ty
 /** Keep free-form metadata, but never attach earlier verification to changed program bytes. */
 export const savedProgramData = (previous: unknown, snapshot: SavedCamProgram): Record<string, unknown> => {
   const data = { ...record(previous) }
-  for (const key of ["kernelArtifact", "kernelRequest", "verification", "response", "sourceRevision", "operations"]) delete data[key]
+  for (const key of ["kernelArtifact", "kernelRequest", "turningPlan", "turningRequest", "identity", "verification", "response", "sourceRevision", "operations"]) delete data[key]
   const old = record(previous), oldArtifact = record(old["kernelArtifact"])
   if (snapshot.kernelArtifact && oldArtifact["nc"] === snapshot.gcode && typeof old["sourceRevision"] === "string") data["sourceRevision"] = old["sourceRevision"]
   return { ...data, ...Schema.encodeSync(SavedCamProgram)(snapshot) }

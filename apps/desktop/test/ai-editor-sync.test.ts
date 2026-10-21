@@ -66,3 +66,14 @@ describe("assistant results -> editor", () => {
     }
   })
 })
+
+
+test("kernel body writes appear in the editor and read previews never mutate it", () => {
+  const body = { id: "kernel-body", type: "brep", bodyKind: "surface", brep: { faces: [], edges: [], vertices: [], shells: [] } }
+  for (const action of ["shell", "offset", "surface"]) {
+    const output = JSON.stringify({ ok: true, elements: [body] })
+    expect(opsFor(`cad_edit.${action}`, output)).toEqual([{ kind: "add", elements: [body] }])
+    expect(opsFor(`cad.${action}`, output)).toEqual([])
+    expect(opsFor(`cad_edit.${action}`, JSON.stringify({ ok: false, elements: [body] }))).toEqual([])
+  }
+})

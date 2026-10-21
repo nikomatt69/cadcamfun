@@ -1,0 +1,87 @@
+CADCAMFUN CAD Kernel — Proprietary License for Original Contributions
+Version 1.0 — 21 October 2026
+
+Copyright © 2026 Nicola Mattioli. All rights reserved in his own contributions.
+
+1. Scope and ownership
+
+"Licensor" means Nicola Mattioli. "Proprietary Contributions" means source code,
+documentation and other original contributions in packages/core/src/cad in which
+the Licensor holds the relevant rights, including copies, modified versions and
+compiled forms of those contributions. Third-party code, documentation and other
+material, including any portions derived from NVIDIA USD BRep / SMLib, are not
+made exclusively proprietary by this document.
+
+This notice does not transfer anyone else's rights to the Licensor and does not
+certify that every file or portion of the CAD kernel is independently authored.
+
+2. Written authorization required for Proprietary Contributions
+
+No permission to use, run, compile, copy, modify, adapt, distribute, sublicense,
+sell, rent, host or otherwise make the Proprietary Contributions available is
+granted by this document. These activities require prior written authorization
+from the Licensor, except to the extent permitted by applicable law that cannot
+be excluded by agreement. This applies to commercial and noncommercial activities.
+
+Public availability of source code, access to a repository, possession of a copy
+or access to generated output does not by itself grant a license to Proprietary
+Contributions. No patent or trademark license is granted by this document.
+
+3. Separate agreements and reserved rights
+
+A separate written authorization or license agreement issued by the Licensor
+determines the permitted activities, users, term, distribution rights and fees
+for Proprietary Contributions. Its express permissions take precedence over
+this notice for the activities it authorizes. Authorization to use a deployed
+application does not by itself authorize separate redistribution or reuse of
+the CAD kernel source or compiled kernel.
+
+Authorized copies must retain applicable copyright and proprietary notices,
+unless expressly authorized otherwise or mandatory law permits their removal.
+All other rights in Proprietary Contributions are reserved. This notice does
+not revoke permissions previously validly granted.
+
+4. Apache-2.0 and other third-party rights
+
+NVIDIA USD BRep / SMLib is an upstream reference for the TypeScript B-rep kernel.
+See brep/NOTICE and brep/LICENSE-APACHE-2.0 for the scoped attribution and the
+upstream Apache License, Version 2.0, including NVIDIA's copyright notice.
+
+Any incorporated third-party material retains its applicable license, copyright,
+patent and attribution notices. Nothing in this proprietary notice restricts or
+replaces rights granted directly under Apache-2.0 or another third-party license.
+In case of conflict concerning third-party material, its applicable license
+prevails. No additional authorization from the Licensor is required to exercise
+rights already granted by the relevant third-party rights holder in that material.
+Those rights do not by themselves license separate Proprietary Contributions.
+
+This document does not relicense dependencies, including OpenCascade/OCCT, or
+other repository directories, and does not replace the repository root LICENSE.
+Required third-party licenses, notices and notices of changes must accompany
+distributions as required by the applicable licenses.
+
+5. User data and generated output
+
+This license does not claim ownership of user models, drawings, input data,
+exported geometry, toolpaths, G-code or manufactured parts merely because the
+CAD kernel was used to create or process them. It imposes no separate license
+requirement on that output. It does not grant rights in third-party input or
+in kernel source code copied into an output.
+
+6. Mandatory legal rights
+
+Nothing here limits rights or exceptions that applicable law does not allow
+the parties to exclude, including any applicable mandatory interoperability,
+backup, observation, study or testing rights. Such rights remain subject to
+their statutory conditions. No governing law or exclusive court is selected.
+
+7. Warranty and liability
+
+To the fullest extent permitted by applicable law, and unless a separate written
+agreement provides otherwise, Proprietary Contributions are provided "AS IS",
+without express or implied warranties, including merchantability, fitness for
+a particular purpose and noninfringement. To that same extent, the Licensor is
+not liable for loss or damage arising from those contributions or their use.
+These exclusions do not exclude any warranty or liability that applicable law
+does not allow to be excluded or limited. Third-party material remains subject
+to its own warranty and liability terms.

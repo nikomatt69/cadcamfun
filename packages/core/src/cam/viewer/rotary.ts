@@ -46,9 +46,9 @@ export const rotaryOfProgram = (program: Program, gcode = "", pivot: Vec3 = { x:
     const angles = m._tag === "Orient" ? m : (m._tag === "Rapid" || m._tag === "Linear") ? m.rotary : undefined
     if (m._tag === "Orient") orient = true
     if (angles === undefined) continue
-    if (angles.a !== undefined && angles.a !== 0) used.a = true
-    if (angles.b !== undefined && angles.b !== 0) used.b = true
-    if (angles.c !== undefined && angles.c !== 0) used.c = true
+    if (angles.a !== undefined) used.a = true
+    if (angles.b !== undefined) used.b = true
+    if (angles.c !== undefined) used.c = true
   }
   if (!used.a && !used.b && !used.c && !orient) return undefined
   const header = gcode.slice(0, 4000).toUpperCase()

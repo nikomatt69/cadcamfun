@@ -18,12 +18,13 @@ import { dimensionValue, type Dimension } from "./expr.ts"
 import { ellipseLoopPoints, polygonArea, sketchProfiles, splinePoints, type Sketch } from "./sketch.ts"
 import { add3, cross3, dot3, length3, normalize3, scale3, sub3 } from "./vec.ts"
 import { cornersOf, rebuild, type Feature, type History, type PlaneName, type RebuildResult } from "./history.ts"
-import { sheetOutline, thickenPath, withHems } from "./sheet-metal.ts"
+import { sheetOutline, thickenPath, withHems, withEdgeFlanges, edgeFlangeReliefs } from "./sheet-metal.ts"
 import { textBars } from "./text-solid.ts"
 import { coilGeometry } from "./helix.ts"
 import {
   blendBrep,
   blendCandidates,
+  variableFillet,
   booleanBrep,
   BooleanError,
   uniqueFaceNames,
@@ -972,13 +973,36 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
             ...(sel?.minLength !== undefined ? { minLength: dim(sel.minLength) } : {}), ...(sel?.curved === true ? { curved: true } : {}),
             ...(sel?.within !== undefined ? { within: { min: sel.within.min.map(dim) as [number, number, number], max: sel.within.max.map(dim) as [number, number, number] } } : {})
           }
+          const radiusEnd = f.radiusEnd === undefined ? undefined : dim(f.radiusEnd)
+          if (f.radiusEnd !== undefined && radiusEnd === undefined) break
+          if (radiusEnd !== undefined && style !== "fillet") { unsupported(f, "a variable radius belongs to a fillet, not a chamfer"); break }
           for (const b of bodies.filter((x) => f.targets === undefined || f.targets.includes(x.id))) {
             if (b.exact.brep === undefined) continue
             const picked = selectBlendEdges(blendCandidates(b.exact.brep, 25), selector)
             if (picked.length === 0) continue
-            const res = blendBrep(b.exact.brep, picked, size, style, chamfer === undefined ? {} : { chamfer })
-            for (const why of res.rejected.slice(0, 4)) warnings.push(`${f.id}: not blended: ${why}`)
-            bodies[bodies.indexOf(b)] = { ...b, exact: res.failures.length > 0 ? no(`exact ${style} failed: ${res.failures[0]}`) : ok(res.brep) }
+            if (radiusEnd === undefined) {
+              const res = blendBrep(b.exact.brep, picked, size, style, chamfer === undefined ? {} : { chamfer })
+              for (const why of res.rejected.slice(0, 4)) warnings.push(`${f.id}: not blended: ${why}`)
+              bodies[bodies.indexOf(b)] = { ...b, exact: res.failures.length > 0 ? no(`exact ${style} failed: ${res.failures[0]}`) : ok(res.brep) }
+            } else {
+              // One edge at a time (each cut changes the edge indices), matched again by its end points on the current body;
+              // the radius runs from the lexicographically smaller end, as in the mesh rebuild.
+              let current = b.exact.brep
+              let failed: string | undefined
+              for (const want of picked) {
+                const flip = want.b.x < want.a.x || (want.b.x === want.a.x && (want.b.y < want.a.y || (want.b.y === want.a.y && want.b.z < want.a.z)))
+                const near = (p: { x: number; y: number; z: number }, q: { x: number; y: number; z: number }) => Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) < 1e-6
+                const cand = blendCandidates(current, 25).find((c) => (near(c.a, want.a) && near(c.b, want.b)) || (near(c.a, want.b) && near(c.b, want.a)))
+                if (cand === undefined) { failed = "a variable fillet edge was not found again after the previous cut"; break }
+                const sameWay = near(cand.a, want.a)
+                const rA = (flip !== !sameWay) ? radiusEnd : size
+                const rB = (flip !== !sameWay) ? size : radiusEnd
+                const res = variableFillet(current, cand, rA, rB)
+                if (res.rejected !== undefined) { failed = res.rejected; break }
+                current = res.brep
+              }
+              bodies[bodies.indexOf(b)] = { ...b, exact: failed !== undefined ? no(`exact variable fillet failed: ${failed}`) : ok(current) }
+            }
           }
           break
         }
@@ -1252,10 +1276,22 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
           const F = sk.frame
           const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
           let solid: Brep
+          let reliefs: ReturnType<typeof edgeFlangeReliefs> = []
           try {
+            if (f.flanges !== undefined) {
+              if (f.flanges.some((flange) => f.hems?.some((hem) => hem.end === flange.end))) throw new RangeError("An edge cannot carry both a hem and an edge flange")
+              const resolved = f.flanges.map((flange) => ({ end: flange.end, length: dim(flange.length), angle: dim(flange.angle) * Math.PI / 180, ...(flange.relief !== undefined ? { relief: { width: dim(flange.relief.width), depth: dim(flange.relief.depth) } } : {}) }))
+              reliefs = edgeFlangeReliefs(cornersOf(line), thickness, width, radius, side, resolved)
+              line = withEdgeFlanges(cornersOf(line), resolved)
+            }
             const outline = sheetOutline(line, thickness, side, radius)
             const loop: ProfileLoop = outline.map((a, i) => ({ kind: "line", a, b: outline[(i + 1) % outline.length]! }))
             solid = extrudeProfile({ loops: [loop] }, width, { placement, name: f.id })
+            for (const relief of reliefs) for (const [z0, z1] of [[from - 1, from + relief.inset], [from + width - relief.inset, from + width + 1]]) {
+              const R = frame({ x: F.origin.x + F.n.x * z0!, y: F.origin.y + F.n.y * z0!, z: F.origin.z + F.n.z * z0! }, F.n, F.u)
+              const cut = extrudeProfile({ loops: [relief.outline.map((a, i) => ({ kind: "line" as const, a, b: relief.outline[(i + 1) % relief.outline.length]! }))] }, z1! - z0!, { placement: R })
+              solid = booleanBrep(solid, cut, "subtract").brep
+            }
           } catch (e) {
             unsupported(f, e instanceof Error ? e.message : String(e))
             break

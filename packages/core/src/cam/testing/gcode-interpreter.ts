@@ -28,6 +28,7 @@
 
 import { alongLine, joinOf, offsetElement, type CompElement, type CompLine, type CompSide } from "./cutter-comp.ts"
 import { headerTools } from "./header-tools.ts"
+import { decodeKlartext } from "./heidenhain.ts"
 import { finishCycle, patternCycle, peckCycle, roughCycle, threadCycle, type LatheMove, type ProfilePoint } from "./lathe-cycles.ts"
 
 /** Deepest `M98` nesting the interpreter follows (Fanuc allows four). */
@@ -154,6 +155,14 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   const segments: GSegment[] = []
   const errors: string[] = []
   const unsupported: Array<{ line: number; word: string }> = []
+  if (/\bBEGIN PGM\b/i.test(text)) {
+    const decoded = decodeKlartext(text)
+    text = decoded.text
+    for (const problem of decoded.unsupported) {
+      unsupported.push(problem)
+      errors.push(`Line ${problem.line}: unsupported Klartext block ${problem.word}`)
+    }
+  }
   const mCodes: string[] = []
   const tools: number[] = []
   const states: Array<{ -readonly [K in keyof MotionSample]: MotionSample[K] }> | undefined = options.track ? [] : undefined

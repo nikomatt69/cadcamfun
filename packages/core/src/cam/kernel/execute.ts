@@ -130,6 +130,8 @@ export const prepareJob = (job: ManufacturingJob): CamResult<PreparedJob> => {
   }
   const machine = job.machine ?? DEFAULT_MACHINE
   if (!(machine.limits.maxRpm > 0) || !(machine.limits.maxFeed > 0)) issues.push(issue("InvalidInput", "prepare", `Machine ${machine.id}: spindle speed and feed limits must be positive`))
+  // The milling kernel mills: a turning centre (the part turns there) is refused with its reason, never run as a mill.
+  if (machine.kind === "lathe") issues.push(issue("UnsupportedCapability", "prepare", `Machine ${machine.id} is a turning centre: the part turns there, so the milling kernel cannot machine it. Use the turning plan for it.`))
 
   let meshes: Mesh64[] = []
   let elements: ReadonlyArray<CadElement> | undefined
@@ -715,7 +717,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     const marker = /[(;]\s*OP(\d+)\b/i.exec(raw)
     if (marker) activeOp = Number(marker[1]) - 1
     const code = raw.replace(/\([^)]*\)/g, " ").replace(/;.*$/, "")
-    const t = /\bT(\d+)/i.exec(code)
+    const t = /\bT(\d+)/i.exec(code) ?? /\bTOOL CALL (\d+)/i.exec(code)
     if (t) activeTool = Number(t[1])
     toolAtLine[i + 1] = activeTool
     opAtLine[i + 1] = activeOp

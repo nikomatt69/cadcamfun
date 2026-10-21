@@ -6,11 +6,12 @@
  * the reason.
  */
 import { brepFeatures, type ExactFeatures } from "../cam/brep-part.ts"
-import { healBrep, massProperties, minimumDistance, recognizeHoles, shellBrep, validateBrep, type Brep } from "./brep/index.ts"
+import { healBrep, massProperties, minimumDistance, recognizeHoles, offsetBrep, shellBrep, validateBrep, type Brep } from "./brep/index.ts"
 import { brepBox } from "./history-brep.ts"
 import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
 import type { BomRow, InferredJoint } from "./assembly-analysis.ts"
 import type { FastenerPlan, UnfastenedStack } from "./smart-fasteners.ts"
+import { motionStudy, type KinematicModel } from "./kinematics.ts"
 import type { Vec3 } from "./vec.ts"
 
 type Element = Record<string, unknown> & { id?: string; type?: string; name?: string }
@@ -185,7 +186,14 @@ export type SceneShell =
  * What hollowing a solid of the drawing would give (nothing is changed): its exact shell by dilation of the boundary, with the
  * named faces left open (`<feature>.top`, a face name from `cad.exact`), or the reason it cannot be made.
  */
-export const sceneShell = (elements: ReadonlyArray<Element>, id: string, wall: number, openFaces: ReadonlyArray<string> = []): SceneShell => {
+export const sceneShell = (elements: ReadonlyArray<Element>, id: string, wall: number, openFaces: ReadonlyArray<string> = [], wallByFace: ReadonlyArray<{ readonly face: string; readonly thickness: number }> = []): SceneShell => {
+  const built = sceneShellBody(elements, id, wall, openFaces, wallByFace)
+  if (!built.ok) return built
+  return built.report
+}
+
+/** The same checked construction used by the read preview and the governed write action. */
+export const sceneShellBody = (elements: ReadonlyArray<Element>, id: string, wall: number, openFaces: ReadonlyArray<string> = [], wallByFace: ReadonlyArray<{ readonly face: string; readonly thickness: number }> = []): { readonly ok: true; readonly brep: Brep; readonly report: Extract<SceneShell, { ok: true }> } | { readonly ok: false; readonly error: string } => {
   const scene = sceneParts(elements)
   const part = scene.parts.find((p) => p.id === id)
   if (part === undefined) {
@@ -199,13 +207,22 @@ export const sceneShell = (elements: ReadonlyArray<Element>, id: string, wall: n
     if (hit.length === 0) return { ok: false, error: `'${id}' has no face called '${n}'; its faces are ${[...new Set(named.map((f) => f.name).filter((x) => x !== undefined))].slice(0, 20).join(", ") || "unnamed"}` }
     for (const h of hit) open.push(h.i)
   }
-  const r = shellBrep(part.brep, wall, { open })
+  const overrides = new Map<number, number>()
+  const seenNames = new Set<string>()
+  for (const entry of wallByFace) {
+    if (seenNames.has(entry.face)) return { ok: false, error: `duplicate wall face '${entry.face}'` }
+    seenNames.add(entry.face)
+    const hit = named.filter((f) => f.name === entry.face)
+    if (hit.length === 0) return { ok: false, error: `unknown wall face '${entry.face}'` }
+    for (const h of hit) overrides.set(h.i, entry.thickness)
+  }
+  const r = shellBrep(part.brep, wall, { open, wallByFace: overrides })
   if (typeof r === "string") return { ok: false, error: r }
-  return {
+  return { ok: true, brep: r.brep, report: {
     ok: true, id, name: part.name, wall, open: openFaces,
     volume: massProperties(r.brep).volume, cavityVolume: massProperties(r.cavity).volume, originalVolume: massProperties(part.brep).volume,
     faces: r.brep.faces.length, shells: r.brep.shells.length, pieces: r.pieces, valid: validateBrep(r.brep).valid
-  }
+  } }
 }
 
 export type SceneDistance =
@@ -224,4 +241,28 @@ export const sceneDistance = (elements: ReadonlyArray<Element>, a: string, b: st
     ...(m.faceA !== undefined && pa.brep.faces[m.faceA]?.name !== undefined ? { faceA: pa.brep.faces[m.faceA]!.name! } : {}),
     ...(m.faceB !== undefined && pb.brep.faces[m.faceB]?.name !== undefined ? { faceB: pb.brep.faces[m.faceB]!.name! } : {})
   }
+}
+
+/** Outward offset of a scene part, shared by the preview and the write adapter. */
+export const sceneOffsetBody = (elements: ReadonlyArray<Element>, id: string, distance: number) => {
+  const scene = sceneParts(elements)
+  const part = scene.parts.find((p) => p.id === id)
+  if (part === undefined) return { ok: false as const, error: `no exact solid '${id}' in the drawing` }
+  const r = offsetBrep(part.brep, distance)
+  if (typeof r === "string") return { ok: false as const, error: r }
+  return { ok: true as const, brep: r.brep, report: { ok: true as const, id, name: part.name, distance, originalVolume: massProperties(part.brep).volume, volume: massProperties(r.brep).volume, faces: r.brep.faces.length, valid: validateBrep(r.brep).valid } }
+}
+
+export const sceneMotion = (elements: ReadonlyArray<Element>, model: KinematicModel, sweep: { readonly joint: string; readonly from: number; readonly to: number; readonly steps: number; readonly quantity?: keyof import("./kinematics.ts").JointState }) => {
+  const scene = sceneParts(elements)
+  const ids = new Set(scene.parts.map((p) => p.id))
+  for (const id of new Set([model.ground, ...model.joints.flatMap((j) => [j.parent, j.child])])) {
+    if (!ids.has(id)) return { ok: false as const, error: `motion part '${id}' has no exact solid in the drawing` }
+  }
+  const study = motionStudy(scene.parts, model, sweep)
+  return { ok: true as const, frames: study.frames,
+    ...(study.firstClash !== undefined ? { firstClash: study.firstClash } : {}),
+    ...(study.firstViolation !== undefined ? { firstViolation: study.firstViolation } : {}),
+    ...(study.firstContact !== undefined ? { firstContact: study.firstContact } : {}),
+    ...(study.firstContactViolation !== undefined ? { firstContactViolation: study.firstContactViolation } : {}) }
 }

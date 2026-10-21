@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security reports
+    url: https://github.com/nikomatt69/cadcamfun/blob/HEAD/SECURITY.md
+    about: Follow the private disclosure process; do not post vulnerability details in an issue.
+  - name: Support and licensing
+    url: https://github.com/nikomatt69/cadcamfun/blob/HEAD/SUPPORT.md
+    about: Find support guidance and the maintainer's private contact.

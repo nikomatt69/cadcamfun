@@ -5,7 +5,8 @@
  * read this one list, so what is drawn at time t is what the checks talk about.
  */
 import type { Vec3 } from "../../cad/vec.ts"
-import { expandMoves, moveLength, type Program } from "../ir.ts"
+import { expandMoves, type Program } from "../ir.ts"
+import { anglesAfter, previewMoveDuration } from "./motion-duration.ts"
 import type { MachineKind } from "../machine.ts"
 import { lerpAngles } from "./rotary.ts"
 import { displaySpinRate, spinSense } from "./frames.ts"
@@ -28,6 +29,8 @@ export interface TimedMove {
   /** Rotary angles at the start and the end of the move (empty for a 3-axis program). */
   readonly anglesFrom: RotaryAngles
   readonly angles: RotaryAngles
+  /** The IR move carries rotary words; imported programs may repeat modal angles. */
+  readonly rotaryCommand?: boolean
 }
 
 export interface Timeline {
@@ -50,19 +53,25 @@ export const buildTimeline = (program: Program, track?: MotionTrack, rapidRate =
   let angles: RotaryAngles = {}
   program.toolpaths.forEach((path, p) => {
     expandMoves(path.moves, from).forEach((move, index) => {
-      if (move._tag === "Orient") { angles = { ...angles, ...(move.a !== undefined ? { a: move.a } : {}), ...(move.b !== undefined ? { b: move.b } : {}), ...(move.c !== undefined ? { c: move.c } : {}) }; return }
       if (move._tag === "Comment" || move._tag === "Cycle") return
       const state = stateAt(used, p, index)
       const anglesFrom = angles
-      if ((move._tag === "Rapid" || move._tag === "Linear") && move.rotary !== undefined) angles = { ...angles, ...move.rotary }
+      angles = anglesAfter(move, angles)
+      if (move._tag === "Orient") {
+        const duration = previewMoveDuration(move, from, anglesFrom, angles, rapidRate)
+        moves.push({ path: p, index, kind: "rapid", from, to: from, start: time, duration, state, anglesFrom, angles, rotaryCommand: true })
+        time += duration
+        return
+      }
       if (move._tag === "Dwell") {
         moves.push({ path: p, index, kind: "dwell", from, to: from, start: time, duration: move.seconds, state, anglesFrom, angles })
         time += move.seconds
         return
       }
-      const duration = (moveLength(move, from) / Math.max(1e-6, move._tag === "Rapid" ? rapidRate : move.feed)) * 60
+      const duration = previewMoveDuration(move, from, anglesFrom, angles, rapidRate)
       moves.push({
         path: p, index, kind: move._tag === "Rapid" ? "rapid" : "feed", from, to: move.to, start: time, duration, state, anglesFrom, angles,
+        ...((move._tag === "Rapid" || move._tag === "Linear") && move.rotary !== undefined ? { rotaryCommand: true } : {}),
         ...(move._tag === "Arc" ? { center: move.center, clockwise: move.clockwise } : {})
       })
       time += duration

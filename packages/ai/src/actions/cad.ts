@@ -4,6 +4,7 @@
  * which is what lets the read-only specialists have the whole tool.
  */
 import { CAD_ACTION_INPUTS, EmptyActionInput, CadInspectionElements, CadInspectionLayers, CadInspectionOrigins, CadInspectionProperty, CadInspectionSearch, PARAMETRIC_ACTION_INPUTS } from "@cadcamfun/api"
+import { cad } from "@cadcamfun/core"
 import { Schema } from "effect"
 import { ToolMediaResult } from "../tools/define.ts"
 import { defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
@@ -42,7 +43,7 @@ const withDefaults = (value: Record<string, unknown>): Record<string, unknown> =
   }
 }
 
-export type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadShellInput } from "@cadcamfun/api"
+export type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadShellInput, CadOffsetInput, CadMotionInput } from "@cadcamfun/api"
 
 const inspect = (action: string) => (input: unknown, context: ActionContext) =>
   context.handlers.cadInspect === undefined
@@ -160,6 +161,23 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     run: (input, { handlers, projectId }) =>
       handlers.cadShell === undefined ? { ok: false, error: "Shell analysis is unavailable in this host." } : handlers.cadShell(projectId, input)
   }),
+  defineWireAction({
+    id: "cad.offset", kind: "read", parameters: INPUTS["cad.offset"],
+    run: (input, { handlers, projectId }) => handlers.cadOffset === undefined ? { ok: false, error: "Offset analysis is unavailable in this host." } : handlers.cadOffset(projectId, input)
+  }),
+  defineWireAction({
+    id: "cad.motion", kind: "read", parameters: INPUTS["cad.motion"],
+    run: (input, { handlers, projectId }) => handlers.cadMotion === undefined ? { ok: false, error: "Motion analysis is unavailable in this host." } : handlers.cadMotion(projectId, input)
+  }),
+  defineWireAction({ id: "cad.surface", kind: "read", parameters: INPUTS["cad.surface"],
+    run: (input) => {
+      try {
+        const body = cad.brep.buildSurfaceOperation(input), report = cad.brep.validateBrep(body.brep)
+        return { ok: true, kind: body.kind, valid: report.valid, faces: body.brep.faces.length, boundaryEdges: cad.brep.edgeUses(body.brep).filter((u) => u.length === 1).length }
+      } catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) } }
+    } }),
+  defineWireAction({ id: "cad.exchange", kind: "read", parameters: INPUTS["cad.exchange"],
+    run: (input, { handlers, projectId }) => handlers.cadExchange === undefined ? { ok: false, error: "Exact exchange is unavailable in this host." } : handlers.cadExchange(projectId, input) }),
   defineWireAction({
     id: "cad.distance", kind: "read",
     parameters: INPUTS["cad.distance"],

@@ -1,6 +1,7 @@
 {
   "name": "@cadcamfun/ai",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

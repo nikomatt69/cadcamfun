@@ -105,6 +105,7 @@ export const sceneParts = (elements: ReadonlyArray<Element>): SceneParts => {
       skipped.push({ id, name: nameOf(e), reason: err instanceof Error ? err.message : String(err) }); return []
     }
     if (placed.brep === undefined) { skipped.push({ id, name: nameOf(e), reason: placed.reason }); return [] }
+    if (placed.brep.shells.some((s) => !s.closed)) { skipped.push({ id, name: nameOf(e), reason: "open surface body: thicken or close it before solid analysis or machining" }); return [] }
     const fastener = fastenerOf(e)
     return [{ id, name: nameOf(e), brep: placed.brep, element: e, ...(fastener !== undefined ? { fastener } : {}) }]
   }

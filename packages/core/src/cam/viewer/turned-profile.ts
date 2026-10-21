@@ -30,7 +30,7 @@ export const emptyProfile = (setup: LatheSetup): TurnedProfile => {
   return { x0: back, bin, outer: new Float64Array(n).fill(setup.stock.diameter / 2), inner: new Float64Array(n).fill(setup.stock.bore / 2) }
 }
 
-export const turnedProfileAt = (setup: LatheSetup, timeline: Timeline, seconds: number): TurnedProfile => {
+export const turnedProfileAt = (setup: LatheSetup, timeline: Timeline, seconds: number, milling?: ReadonlySet<number>): TurnedProfile => {
   const profile = emptyProfile(setup)
   const { outer, inner, bin, x0 } = profile
   const n = outer.length
@@ -40,9 +40,12 @@ export const turnedProfileAt = (setup: LatheSetup, timeline: Timeline, seconds: 
     else if (r < outer[b]!) outer[b] = Math.max(inner[b]!, r)
   }
   const rn = Math.max(0, setup.noseRadius)
+  const millingPaths = milling ?? new Set(setup.turnMill !== undefined ? timeline.moves.filter((m) => m.rotaryCommand || m.from.y !== 0 || m.to.y !== 0).map((m) => m.path) : [])
   for (const move of timeline.moves) {
     if (move.start >= seconds) break
     if (move.kind !== "feed" || move.state.spindle === "off" || move.state.probe) continue
+    // A positioned-C or tilted-head cut is local milling, never a complete annular turning cut.
+    if (millingPaths.has(move.path)) continue
     const f = move.duration > 0 ? Math.min(1, (seconds - move.start) / move.duration) : 1
     const radiusOf = (px: number) => Math.max(0, move.state.xMode === "diameter" ? Math.abs(px) / 2 : Math.abs(px))
     const a = move.from, b = pointOn(move, f)

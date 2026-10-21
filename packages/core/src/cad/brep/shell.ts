@@ -24,7 +24,8 @@ import { add3, cross3, dot3, frame, length3, madd3, normalize3, scale3, sub3, ty
 import { curvePoint, surfaceNormal, surfaceProject } from "./geom.ts"
 import { booleanBrep } from "./boolean.ts"
 import { brepLocator } from "./classify.ts"
-import { makeCylinder, makeSphere, makeTorus } from "./primitives.ts"
+import { makeBox, makeCylinder, makeSphere, makeTorus } from "./primitives.ts"
+import { blendBrep, blendCandidates } from "./blend.ts"
 import { extrudeProfile, loopMoments, offsetLoop, revolveProfile, type ProfileLoop, type ProfileSegment } from "./sweep.ts"
 import { faceProfile, type PlanarFacePick } from "./draft.ts"
 import { edgeUses, type Brep } from "./topology.ts"
@@ -35,6 +36,9 @@ const CROSS = 1 + 1e-6
 export interface ShellOptions {
   /** Faces left open (indices into the body's faces): the cavity reaches them. */
   readonly open?: ReadonlyArray<number>
+  /** Per-face wall thickness (face index -> mm), overriding the call's wall where given. Edges and vertices shared by two
+   * faces take the thicker of the two walls, so the cavity never breaks through the thinner side's neighbour. */
+  readonly wallByFace?: ReadonlyMap<number, number>
 }
 
 export interface ShellResult {
@@ -221,10 +225,10 @@ const revolutionPiece = (b: Brep, fi: number, t: number): Brep | string => {
   return revolveProfile({ loops: [loop] }, range.sweep, { origin: s.frame.origin, axis, radial, name: "shell.revolution" })
 }
 
-/** Pieces for an edge: a cylinder along a straight one, a torus along a circular one. */
-const edgePiece = (b: Brep, ei: number, t: number): Brep | string => {
+/** Pieces for an edge: a cylinder along a straight one, a torus along a circular one. `grow` enlarges the piece past `t`. */
+const edgePiece = (b: Brep, ei: number, t: number, grow = CROSS): Brep | string => {
   const e = b.edges[ei]!
-  const tt = t * CROSS
+  const tt = t * grow
   if (e.curve.kind === "line") {
     const p0 = curvePoint(e.curve, e.t0), p1 = curvePoint(e.curve, e.t1)
     const d = sub3(p1, p0), len = length3(d)
@@ -265,6 +269,70 @@ const reflex = (b: Brep, uses: ReturnType<typeof edgeUses>, ei: number, loc: Ret
   return dot3(into, nB) > 1e-9
 }
 
+export interface OffsetResult {
+  readonly brep: Brep
+  /** Number of boundary pieces used by the construction (zero for a direct primitive). */
+  readonly pieces: number
+}
+
+/** The offset by uniting the dilation pieces with the body: works where no piece only touches the body along a curve. */
+const offsetDirect = (b: Brep, distance: number): OffsetResult | string => {
+  const pieces: Brep[] = []
+  for (let fi = 0; fi < b.faces.length; fi++) {
+    const p = facePiece(b, fi, distance, 0)
+    if (typeof p === "string") return `face ${fi}: ${p}`
+    pieces.push(p)
+  }
+  for (let ei = 0; ei < b.edges.length; ei++) {
+    const p = edgePiece(b, ei, distance)
+    if (typeof p === "string") return `edge ${ei}: ${p}`
+    pieces.push(p)
+  }
+  for (const v of b.vertices) pieces.push(makeSphere(distance * CROSS, frame(v.point, { x: 0, y: 0, z: 1 })))
+  let out: Brep = b
+  try {
+    for (const piece of pieces) out = booleanBrep(out, piece, "union").brep
+  } catch (err) {
+    return `exact Boolean failed: ${err instanceof Error ? err.message : String(err)}`
+  }
+  const check = validateBrep(out)
+  if (!check.valid) return `the offset did not validate: ${check.issues[0]?.message ?? "unknown"}`
+  return { brep: out, pieces: pieces.length }
+}
+
+export const offsetBrep = (b: Brep, distance: number): OffsetResult | string => {
+  if (!(distance > 0) || !Number.isFinite(distance)) return "the offset must be positive and finite"
+  const report = validateBrep(b)
+  if (!report.valid || b.shells.length !== 1) return "an offset needs one valid closed solid"
+  if (b.faces.length === 1) {
+    const s = b.faces[0]!.surface
+    if (!b.faces[0]!.reversed && s.kind === "sphere") return { brep: makeSphere(s.radius + distance, s.frame), pieces: 0 }
+    if (!b.faces[0]!.reversed && s.kind === "torus" && s.minor + distance < s.major) return { brep: makeTorus(s.major, s.minor + distance, s.frame), pieces: 0 }
+  }
+  // A rectangular box's dilation is a larger box with every edge rounded by the offset. This construction crosses the
+  // faces during the cuts, avoiding the tangent unions of the boundary bands. Detect the box in its own rotated frame.
+  if (b.faces.length === 6 && b.vertices.length === 8 && b.edges.length === 12 && b.faces.every((f) => f.surface.kind === "plane") && b.edges.every((e) => e.curve.kind === "line")) {
+    const s = b.faces[0]!.surface
+    if (s.kind === "plane") {
+      const axes = [s.frame.x, s.frame.y, s.frame.z]
+      const limits = axes.map((a) => b.vertices.map((v) => dot3(v.point, a)))
+      const lo = limits.map((v) => Math.min(...v)), hi = limits.map((v) => Math.max(...v))
+      const tol = Math.max(...hi.map((v, i) => v - lo[i]!)) * 1e-8
+      const corners = new Set(b.vertices.map((_, i) => limits.map((v, k) => Math.abs(v[i]! - lo[k]!) < tol ? "0" : Math.abs(v[i]! - hi[k]!) < tol ? "1" : "?").join("")))
+      if (corners.size === 8 && [...corners].every((v) => !v.includes("?"))) {
+        const origin = axes.reduce((p, a, i) => add3(p, scale3(a, lo[i]! - distance)), { x: 0, y: 0, z: 0 })
+        const grown = makeBox(hi[0]! - lo[0]! + 2 * distance, hi[1]! - lo[1]! + 2 * distance, hi[2]! - lo[2]! + 2 * distance, frame(origin, axes[2]!, axes[0]!))
+        const rounded = blendBrep(grown, blendCandidates(grown), distance)
+        if (rounded.failures.length > 0 || rounded.rejected.length > 0) return `offset corner blend failed: ${[...rounded.failures, ...rounded.rejected].join("; ")}`
+        const check = validateBrep(rounded.brep)
+        if (!check.valid) return `offset corner blend did not validate: ${check.issues[0]?.message}`
+        return { brep: rounded.brep, pieces: 26 }
+      }
+    }
+  }
+  return offsetDirect(b, distance)
+}
+
 export const shellBrep = (b: Brep, thickness: number, options: ShellOptions = {}): ShellResult | string => {
   if (!(thickness > 0) || !Number.isFinite(thickness)) return "the wall must be positive and finite"
   const report = validateBrep(b)
@@ -280,37 +348,54 @@ export const shellBrep = (b: Brep, thickness: number, options: ShellOptions = {}
   return last
 }
 
-const shellAttempt = (b: Brep, thickness: number, options: ShellOptions, margin: number): ShellResult | string => {
+/** The body eroded by its wall(s): the body minus a dilation piece per face, re-entrant edge and vertex. */
+const erode = (b: Brep, thickness: number, options: ShellOptions, margin: number): { readonly cavity: Brep; readonly pieces: number } | string => {
   const open = new Set(options.open ?? [])
+  const wallOf = (fi: number): number => options.wallByFace?.get(fi) ?? thickness
+  for (const [fi, t] of options.wallByFace ?? []) {
+    if (b.faces[fi] === undefined) return `wallByFace names face ${fi}, which does not exist`
+    if (!(t > 0) || !Number.isFinite(t)) return `the wall of face ${fi} must be positive and finite`
+  }
   const uses = edgeUses(b)
   const loc = brepLocator(b)
   const pieces: Brep[] = []
   for (let fi = 0; fi < b.faces.length; fi++) {
     if (open.has(fi)) continue
-    const p = facePiece(b, fi, thickness, margin)
+    const p = facePiece(b, fi, wallOf(fi), margin)
     if (typeof p === "string") return `face ${fi}: ${p}`
     pieces.push(p)
   }
-  const vertices = new Set<number>()
+  const vertexWall = new Map<number, number>()
   for (let ei = 0; ei < b.edges.length; ei++) {
     if (uses[ei]!.some((u) => open.has(u.face))) continue
     if (!reflex(b, uses, ei, loc)) continue
-    const p = edgePiece(b, ei, thickness)
+    const t = Math.max(...uses[ei]!.map((u) => wallOf(u.face)))
+    const p = edgePiece(b, ei, t)
     if (typeof p === "string") return `edge ${ei}: ${p}`
     pieces.push(p)
     const e = b.edges[ei]!
-    vertices.add(e.v0); vertices.add(e.v1)
+    for (const v of [e.v0, e.v1]) vertexWall.set(v, Math.max(vertexWall.get(v) ?? 0, t))
   }
-  for (const v of vertices) pieces.push(makeSphere(thickness * CROSS, frame(b.vertices[v]!.point, { x: 0, y: 0, z: 1 })))
+  for (const [v, t] of vertexWall) pieces.push(makeSphere(t * CROSS, frame(b.vertices[v]!.point, { x: 0, y: 0, z: 1 })))
   let cavity: Brep = b
   try {
     for (const piece of pieces) {
       cavity = booleanBrep(cavity, piece, "subtract").brep
       if (cavity.faces.length === 0) break
     }
-    if (cavity.faces.length === 0) return "the wall leaves no cavity: it is as thick as half the body"
-    const shell = booleanBrep(b, cavity, "subtract").brep
-    return { brep: shell, cavity, pieces: pieces.length }
+  } catch (err) {
+    return `exact Boolean failed: ${err instanceof Error ? err.message : String(err)}`
+  }
+  return { cavity, pieces: pieces.length }
+}
+
+const shellAttempt = (b: Brep, thickness: number, options: ShellOptions, margin: number): ShellResult | string => {
+  const eroded = erode(b, thickness, options, margin)
+  if (typeof eroded === "string") return eroded
+  if (eroded.cavity.faces.length === 0) return "the wall leaves no cavity: it is as thick as half the body"
+  try {
+    const shell = booleanBrep(b, eroded.cavity, "subtract").brep
+    return { brep: shell, cavity: eroded.cavity, pieces: eroded.pieces }
   } catch (err) {
     return `exact Boolean failed: ${err instanceof Error ? err.message : String(err)}`
   }

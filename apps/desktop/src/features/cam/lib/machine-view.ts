@@ -52,8 +52,12 @@ export const previewSetup = (
     : kind === "lathe" ? cam.viewer.latheSetupOf(settings, options.tool?.family === "lathe" ? options.tool : undefined)
     : kind === "3dprinter" ? { ...cam.viewer.printerSetupOf(settings), ...(options.tool?.family === "nozzle" ? { tool: options.tool, nozzle: options.tool.diameter } : {}) }
     : cam.viewer.setupOf(kind, settings, stock, tableSize)
-  // A rotary program (A/B/C words, indexed Orient moves) gets its trunnion table.
-  return options.program !== undefined ? cam.viewer.withRotary(base, options.program, options.gcode ?? "") : base
+  // A rotary program (A/B/C words, indexed Orient moves) gets its trunnion table; a lathe program that mills gets its B head and C spindle.
+  const setup = options.program !== undefined ? cam.viewer.withRotary(base, options.program, options.gcode ?? "") : base
+  const fiveAxis = options.machineId !== undefined ? cam.kernel.findMachine(options.machineId)?.fiveAxis : undefined
+  return setup.kind === "mill" && setup.rotary !== undefined && fiveAxis !== undefined
+    ? { ...setup, rotary: { ...setup.rotary, layout: fiveAxis.layout, pivot: fiveAxis.pivot, reasons: [...setup.rotary.reasons, "layout and pivot from the selected machine"] } }
+    : setup
 }
 
 /**

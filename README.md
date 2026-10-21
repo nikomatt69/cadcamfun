@@ -74,4 +74,19 @@ Build scripts live in `scripts/` (`bun run build`, `build:sidecar`,
 
 ## License
 
-See [LICENSE](LICENSE).
+CADCAMFUN uses mixed licensing. Original repository material is available under
+[Apache-2.0](LICENSES/Apache-2.0.txt), except for the proprietary
+[AI package](packages/ai/LICENSE), [CAD kernel](packages/core/src/cad/LICENSE)
+and [CAM kernel](packages/core/src/cam/LICENSE). Third-party material retains its
+own licenses. The complete application includes proprietary components; it is
+not offered as wholly open-source software. See [LICENSE](LICENSE) for scope.
+
+## Community and policies
+
+- [Contributing](CONTRIBUTING.md) and [governance](GOVERNANCE.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Security reports](SECURITY.md) and [support/contact](SUPPORT.md)
+- [Privacy and application data practices](PRIVACY.md)
+- [Usage terms](TERMS.md) and [trademark policy](TRADEMARKS.md)
+
+Maintainer: Nicola Mattioli — [@nikomatt69 on X](https://x.com/nikomatt69).

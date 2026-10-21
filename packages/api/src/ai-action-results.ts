@@ -11,6 +11,7 @@
 import { Schema } from "effect"
 import { cam } from "@cadcamfun/core"
 import type { ActionEffect } from "./ai-actions.ts"
+import { CamTurningPlan } from "./ai-cam.ts"
 
 // ---------------------------------------------------------------- shared shapes
 
@@ -153,7 +154,7 @@ const converted = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Lit
 /** A plan check is a verdict: `ok` is false when an operation fails its checks. Validated against `revision`. */
 const planCheck = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed"]), revision: str, mutated: Schema.Literal(false), operations: Schema.Array(record) })
 /** A saved review is a verdict on one operation; `stale` and `unverified` are answers, not refusals. */
-const review = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed", "stale", "unverified"]), operationId: str })
+const review = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed", "stale", "unverified", "preview", "blocked"]), operationId: str })
 const machine = Schema.Struct({ kind: str, title: str, plane: str, axes: Schema.Array(record), xIsDiameter: Schema.Boolean, origins: Schema.Unknown })
 const operations = Schema.Array(Schema.StructWithRest(Schema.Struct({ id: str, name: str, generated: Schema.Boolean }), [record]))
 const compared = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false), candidates: Schema.Array(record), ...drawingRef })
@@ -169,6 +170,8 @@ const chainSuggest = Schema.Struct({
 })
 const materials = Schema.Struct({ ok: Schema.Literal(true), materials: Schema.Array(record), machines: Schema.Array(record) })
 const cuttingData = Schema.Struct({ ok: Schema.Literal(true), material: Schema.Struct({ id: str, name: str, iso: str }), machine: record, cuttingData: record })
+/** A turning plan on the evolving stock: face/rough/finish passes, exact revolved volumes and lathe NC. A refused profile is an `ok: false` answer. */
+const turning = Schema.Struct({ ok: Schema.Literal(true), ...CamTurningPlan.fields })
 /** A read-only kernel run (or plan): nothing is stored. A blocked or failed run is a refusal carrying its issues. */
 const manufactured = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false), ...drawingRef })
 const chainStatus = Schema.Struct({ ok: Schema.Literal(true), operationId: str, restFrom: nullable(str), generated: Schema.Boolean, warnings: strings })
@@ -283,11 +286,18 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.exact": read(exact),
   "cad.assembly": read(assembly),
   "cad.shell": read(shell),
+  "cad.surface": read(Schema.Struct({ ok: Schema.Literal(true), kind: Schema.Literals(["surface", "solid"]), valid: Schema.Boolean, faces: int, boundaryEdges: int })),
+  "cad.exchange": read(Schema.Struct({ ok: Schema.Literal(true), format: Schema.Literals(["step", "iges"]), content: str, parts: int, warnings: strings })),
+  "cad.offset": read(Schema.Struct({ ok: Schema.Literal(true), id: str, name: str, distance: num, originalVolume: num, volume: num, faces: int, valid: Schema.Boolean })),
+  "cad.motion": read(Schema.Struct({ ok: Schema.Literal(true), frames: Schema.Array(record), firstClash: Schema.optionalKey(record), firstViolation: Schema.optionalKey(record), firstContact: Schema.optionalKey(record), firstContactViolation: Schema.optionalKey(record) })),
   "cad.distance": read(distance),
   "cad.parametric_fastener": read(fastener),
   "cad.parametric_recipe": read(recipe),
   "cad.parametric_from_element": read(fromElement),
 
+  "cad_edit.surface": write(["drawing"], added),
+  "cad_edit.shell": write(["drawing"], added),
+  "cad_edit.offset": write(["drawing"], added),
   "cad_edit.add": write(["drawing"], added, "skipped"),
   "cad_edit.add_entities": write(["drawing"], added),
   "cad_edit.modify": write(["drawing"], modified),
@@ -314,10 +324,12 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam.chain_suggest": read(chainSuggest),
   "cam.materials": read(materials),
   "cam.cutting_data": read(cuttingData),
+  "cam.turn": read(turning),
   "cam.manufacture": read(manufactured),
   "cam.chain_status": read(chainStatus),
 
   "cam_edit.manufacture": write(["operation", "program"], programStored),
+  "cam_edit.turn": write(["operation", "program"], programStored),
   "cam_edit.create": write(["operation"], operationCreated),
   "cam_edit.update": write(["operation"], operationUpdated),
   "cam_edit.generate": write(["program"], generated),

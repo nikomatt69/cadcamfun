@@ -64,7 +64,8 @@ export const displayAxes = (setup: MachineSetup): { readonly axes: ReadonlyArray
     return {
       axes: [
         { name: "Z", direction: { x: 1, y: 0, z: 0 }, color: AXIS_COLORS.Z, label: "Z", moves: of("Z").moves, positive: of("Z").positive },
-        { name: "X", direction: { x: 0, y: 0, z: up }, color: AXIS_COLORS.X, label: setup.xMode === "diameter" ? "X Ø" : "X", moves: of("X").moves, positive: of("X").positive }
+        { name: "X", direction: { x: 0, y: 0, z: up }, color: AXIS_COLORS.X, label: setup.xMode === "diameter" ? "X Ø" : "X", moves: of("X").moves, positive: of("X").positive },
+        ...(setup.turnMill !== undefined ? [{ name: "Y" as const, direction: { x: 0, y: up, z: 0 }, color: AXIS_COLORS.Y, label: "Y", moves: "milling head", positive: "off-centre travel" }] : [])
       ],
       rotary: { name: "C", axis: { x: 1, y: 0, z: 0 }, through: { x: 0, y: 0, z: 0 }, turns: "workpiece" }
     }
@@ -74,6 +75,14 @@ export const displayAxes = (setup: MachineSetup): { readonly axes: ReadonlyArray
     label: setup.kind === "3dprinter" && name === "Z" ? "Z build" : name, moves: of(name).moves, positive: of(name).positive
   }))
   return setup.kind === "mill" ? { axes, rotary: { name: "S", axis: { x: 0, y: 0, z: 1 }, through: { x: 0, y: 0, z: 0 }, turns: "tool" } } : { axes }
+}
+
+/** Positive rotary senses in the machine display frame, alongside the existing spindle indicator. */
+export const displayRotaryAxes = (setup: MachineSetup): ReadonlyArray<{ readonly name: "A" | "B" | "C"; readonly axis: Vec3 }> => {
+  if (setup.kind === "lathe") return setup.turnMill === undefined ? [] : [{ name: "B", axis: { x: 0, y: setup.turret === "rear" ? -1 : 1, z: 0 } }, { name: "C", axis: { x: -1, y: 0, z: 0 } }]
+  if (setup.kind !== "mill" || setup.rotary === undefined) return []
+  const b = setup.rotary.layout === "table-BC" || setup.rotary.layout === "head-table-BC"
+  return [{ name: b ? "B" : "A", axis: { x: b ? 0 : 1, y: b ? 1 : 0, z: 0 } }, { name: "C", axis: { x: 0, y: 0, z: 1 } }]
 }
 
 /** Sign of the rotation about the display axis of what turns (mill: the tool about +Z; lathe: the part about +x). */

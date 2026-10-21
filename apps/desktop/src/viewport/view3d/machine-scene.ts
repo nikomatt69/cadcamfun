@@ -10,6 +10,7 @@
 import * as THREE from "three"
 import { cam, type Vec3 } from "@cadcamfun/core"
 import { toolObject } from "./tool-object.ts"
+import { gaugeOfTool } from "./tool-models.ts"
 
 const v = cam.viewer
 
@@ -26,6 +27,8 @@ export interface MachineDisplay {
   readonly frame?: "part" | "machine"
   /** Mills: draw the machine around the part — base, column, head, table, trunnion, fork head (spec 32 P5). */
   readonly showMachine?: boolean
+  readonly showTool?: boolean
+  readonly showHolder?: boolean
 }
 
 export const DEFAULT_MACHINE_DISPLAY: MachineDisplay = { showWorkholding: true, showTriad: true, spin: true, depositMode: "progressive" }
@@ -55,6 +58,7 @@ export interface MachineSceneInput {
 
 export interface MachineScene {
   readonly root: THREE.Group
+  readonly frame?: "part" | "machine"
   readonly timeline: cam.viewer.Timeline
   readonly findings: ReadonlyArray<cam.viewer.SetupFinding>
   readonly layers: ReadonlyArray<number>
@@ -171,6 +175,17 @@ const triad = (setup: cam.viewer.MachineSetup, length: number): THREE.Group => {
     label.position.copy(points[points.length - 1]!.clone().add(w.clone().multiplyScalar(length * 0.1)))
     group.add(label)
   }
+  for (const rotary of v.displayRotaryAxes(setup)) {
+    const axis = new THREE.Vector3(rotary.axis.x, rotary.axis.y, rotary.axis.z)
+    const ref = Math.abs(axis.z) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1)
+    const u = ref.clone().sub(axis.clone().multiplyScalar(ref.dot(axis))).normalize(), w = axis.clone().cross(u)
+    const points = Array.from({ length: 33 }, (_, i) => u.clone().multiplyScalar(length * 0.48 * Math.cos(i / 32 * Math.PI * 1.6)).addScaledVector(w, length * 0.48 * Math.sin(i / 32 * Math.PI * 1.6)))
+    const arc = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: rotary.name === "C" ? 0xfacc15 : 0x2dd4bf }))
+    arc.name = `axis-rotation:${rotary.name}`
+    const label = labelSprite(rotary.name, rotary.name === "C" ? 0xfacc15 : 0x2dd4bf, length * 0.2)
+    label.position.copy(points[32]!)
+    group.add(arc, label)
+  }
   return group
 }
 
@@ -234,18 +249,31 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   let lastProfileWall = 0
   const spin = display.spin ? v.spinTable(timeline, setup.kind) : undefined
   const spinAngle = (seconds: number): number => (spin ? v.spinAngleAt(timeline, setup.kind, spin, seconds) : 0)
+  const millTurn = setup.kind === "lathe" && setup.turnMill !== undefined
+  const inferredTools = millTurn ? v.turnMillToolModels(program, input.motion, "") : undefined
+  const millingPaths = program.toolpaths.map((tp, i) => {
+    const model = input.pathTools?.[i] ?? inferredTools?.get(tp.toolId)
+    return millTurn && (model !== undefined ? model.family === "mill" || model.family === "probe" : v.turnMillPathIsMilling(program, i))
+  })
+  const milling = new Set(millingPaths.flatMap((yes, i) => yes ? [i] : []))
+  const chuckPhases = millTurn ? v.turnMillChuckTrack(timeline, millingPaths, display.spin) : undefined
+  const liveSpin = millTurn && display.spin ? v.spinTable(timeline, "mill") : undefined
+  const turnMillBase = new THREE.Group(); turnMillBase.name = "mill-turn-machine"
+  const turnMillRam = new THREE.Group(); turnMillRam.name = "mill-turn-carriage"
 
   // One drawn tool per distinct model; the one of the playing toolpath is shown.
   const toolObjects = new Map<cam.ToolModel, THREE.Group>()
   const ownFamily = setup.kind === "lathe" ? "lathe" : setup.kind === "3dprinter" ? "nozzle" : undefined
   const modelOfPath = (path: number | undefined): cam.ToolModel | undefined => {
     const own = path !== undefined ? input.pathTools?.[path] : undefined
+    if (millTurn && path !== undefined && millingPaths[path]) return own?.family === "mill" || own?.family === "probe" ? own : inferredTools?.get(program.toolpaths[path]!.toolId)
     return own !== undefined && own.family === ownFamily ? own : setup.kind === "mill" ? undefined : setup.tool
   }
   const toolObjectOf = (model: cam.ToolModel): THREE.Group => {
     let object = toolObjects.get(model)
     if (object === undefined) {
-      object = toolObject(model, setup.kind === "lathe" ? { turret: setup.turret } : {})
+      object = toolObject(model, { ...(setup.kind === "lathe" ? { turret: setup.turret } : {}), assumeHolder: display.showHolder !== false })
+      if (display.showHolder === false) object.traverse((o) => { if (o.name.startsWith("holder")) o.visible = false })
       object.userData.tool = cam.describeTool(model)
       object.visible = false
       toolObjects.set(model, object)
@@ -253,9 +281,21 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     }
     return object
   }
+  let bHead: THREE.Group | undefined
   if (setup.kind === "lathe") {
     tool = toolObjectOf(modelOfPath(timeline.moves[0]?.path)!)
     tool.visible = true
+    if (setup.turnMill !== undefined) {
+      bHead = new THREE.Group(); bHead.name = "turn-mill-b-head"
+      for (const body of v.turnMillMachineBodies(setup)) {
+        const mesh = modelBodyMesh(body, true)
+        if (body.id === "b-head") mesh.name = "b-head-spindle"
+        ;(body.link === "spindle" || body.link === "fork" ? bHead : turnMillBase).add(mesh)
+      }
+      const ram = new THREE.Mesh(new THREE.BoxGeometry(70, 110, 100), material(0x334155, true))
+      ram.position.z = 50; ram.name = "mill-turn-ram"; turnMillRam.add(ram)
+      root.add(bHead, turnMillBase, turnMillRam)
+    }
     const marker = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 3), new THREE.MeshBasicMaterial({ color: 0xfacc15 }))
     const { back } = v.latheStockEnds(setup)
     marker.position.set(back - 2, 0, setup.workholding.chuckDiameter / 2 - 4)
@@ -296,7 +336,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     const now = typeof performance !== "undefined" ? performance.now() : Date.now()
     if (seconds === lastProfileAt || (Number.isFinite(lastProfileAt) && now - lastProfileWall < 60 && seconds > lastProfileAt && seconds < timeline.duration)) return false
     lastProfileAt = seconds; lastProfileWall = now
-    const runs = v.profileRuns(v.turnedProfileAt(setup, timeline, seconds), 1e-6)
+    const runs = v.profileRuns(v.turnedProfileAt(setup, timeline, seconds, millTurn ? milling : undefined), 1e-6)
     if (turned) { spinning.remove(turned); turned.geometry.dispose(); (turned.material as THREE.Material).dispose(); turned = undefined }
     if (runs.length === 0) return true
     // Outline: along the outer radius from the chuck end to the free end, back along the bore.
@@ -325,12 +365,33 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
       if (next !== tool) { next.position.copy(tool.position); tool.visible = false; tool = next; changed = true }
     }
     if (tool) {
-      const d = v.displayPoint(setup, pose.point, pose.state?.xMode)
+      const headPose = millTurn && setup.kind === "lathe" ? v.turnMillDisplayPose(setup, pose.point, pose.angles, display.frame ?? "machine", pose.state?.xMode) : undefined
+      const d = headPose?.tip ?? v.displayPoint(setup, pose.point, pose.state?.xMode)
       if (tool.position.x !== d.x || tool.position.y !== d.y || tool.position.z !== d.z) { tool.position.set(d.x, d.y, d.z); changed = true }
-      tool.visible = timeline.moves.length > 0
+      tool.visible = timeline.moves.length > 0 && display.showTool !== false
+      if (headPose !== undefined) {
+        const axis = new THREE.Vector3(headPose.axis.x, headPose.axis.y, headPose.axis.z)
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis)
+        const milling = model?.family === "mill" || model?.family === "probe"
+        const toolQ = milling ? q.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), liveSpin ? v.spinAngleAt(timeline, "mill", liveSpin, seconds) : 0)) : new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), headPose.machineAngle)
+        if (!tool.quaternion.equals(toolQ)) { tool.quaternion.copy(toolQ); changed = true }
+        if (bHead !== undefined) {
+          const gauge = gaugeOfTool(model, display.showHolder !== false)
+          bHead.position.set(d.x + axis.x * gauge, d.y + axis.y * gauge, d.z + axis.z * gauge)
+          bHead.quaternion.copy(q); bHead.visible = display.showMachine === true && milling
+          turnMillRam.position.copy(bHead.position); turnMillRam.rotation.x = headPose.machineAngle
+          turnMillRam.visible = display.showMachine === true && milling
+        }
+        turnMillBase.rotation.x = headPose.machineAngle
+        turnMillBase.visible = display.showMachine === true
+        statics.rotation.x = headPose.machineAngle
+        changed = true
+      }
     }
     if (setup.kind === "lathe") {
-      const angle = spinAngle(seconds)
+      const indexed = millTurn && millingPaths[pose.move?.path ?? 0]
+      const headPose = millTurn ? v.turnMillDisplayPose(setup, pose.point, pose.angles, display.frame ?? "machine") : undefined
+      const angle = indexed ? headPose!.chuckAngle : chuckPhases ? v.turnMillChuckAngleAt(timeline, millingPaths, chuckPhases, seconds) + (headPose?.machineAngle ?? 0) : spinAngle(seconds)
       if (spinning.rotation.x !== angle) { spinning.rotation.x = angle; changed = true }
     }
     if (beads && deposits && partial) {
@@ -370,7 +431,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     root.add(group)
   }
   const rotary = setup.kind === "mill" ? setup.rotary : undefined
-  const limits = model !== undefined ? cam.viewer.checkLimits(model, timeline, rotary, input.gaugeOf ?? (() => 0)) : []
+  const limits = model !== undefined ? cam.viewer.checkLimits(model, timeline, rotary, input.gaugeOf ?? (() => 0)) : setup.kind === "lathe" ? v.turnMillLimitFindings(setup, timeline) : []
   const placeMachine = (pose: cam.viewer.MachinePose): boolean => {
     let changed = false
     for (const [role, group] of linkGroups) {
@@ -382,7 +443,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   }
 
   return {
-    root, timeline, findings, layers: deposits?.layers ?? [], spinAngle, update, ...(model !== undefined ? { model } : {}), limits, placeMachine,
+    root, frame: display.frame ?? (millTurn ? "machine" : "part"), timeline, findings, layers: deposits?.layers ?? [], spinAngle, update, ...(model !== undefined ? { model } : {}), limits, placeMachine,
     dispose: () => { disposeObject(root); root.clear() }
   }
 }
@@ -445,15 +506,16 @@ export const machineSpatial = (setup: cam.viewer.MachineSetup, machine: MachineS
   const kinematics = cam.KINEMATICS[setup.kind]
   return {
     machine: setup.kind,
+    ...(setup.kind === "lathe" && setup.turnMill !== undefined ? { kinematics: "mill-turn XYZBC", rotary: pose.angles, rotaryAxes: v.displayRotaryAxes(setup), removal: "turned profile only; local milling removal is not simulated" } : {}),
     rotates: kinematics.rotates,
     mapping: setup.kind === "lathe"
-      ? `display x = program Z (chuck on the left), display z = ${setup.turret === "rear" ? "+" : "-"}X/2 (X is a diameter), display y = 0; ${setup.turret} turret`
+      ? `display x = program Z (chuck on the left), display z = ${setup.turret === "rear" ? "+" : "-"}X/2 (X is a diameter), display y = ${setup.turnMill !== undefined ? `${setup.turret === "rear" ? "+" : "-"}program Y` : "0"}; ${setup.turret} turret`
       : "display = program coordinates (Z up)",
     axes: cam.viewer.displayAxes(setup).axes.map((a) => ({ name: a.name, direction: a.direction, positive: a.positive })),
     workholding: setup.kind === "mill" ? setup.workholding : setup.kind === "lathe" ? setup.workholding : { bed: setup.bed },
     assumed: setup.assumed,
     seconds,
-    tool: { program: pose.point, display: cam.viewer.displayPoint(setup, pose.point, pose.state?.xMode), line: pose.state?.line, spindle: pose.state?.spindle, rpm: pose.state?.rpm },
+    tool: { program: pose.point, display: setup.kind === "lathe" && setup.turnMill !== undefined ? v.turnMillDisplayPose(setup, pose.point, pose.angles, machine.frame ?? "machine", pose.state?.xMode).tip : cam.viewer.displayPoint(setup, pose.point, pose.state?.xMode), line: pose.state?.line, spindle: pose.state?.spindle, rpm: pose.state?.rpm },
     findings: machine.findings.map((f) => ({ code: f.code, severity: f.severity, line: f.line, message: f.message }))
   }
 }

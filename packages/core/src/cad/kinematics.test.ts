@@ -99,6 +99,46 @@ describe("motion study", () => {
   })
 })
 
+describe("closed loops and contacts", () => {
+  test("a four-bar: the loop joint's two ends coincide after the free joints are solved", () => {
+    const m: KinematicModel = { ground: "g", joints: [
+      { id: "crank", parent: "g", child: "crank", kind: "revolute", origin: O, axis: Z },
+      { id: "rod", parent: "crank", child: "rod", kind: "revolute", origin: { x: 10, y: 0, z: 0 }, axis: Z },
+      { id: "rocker", parent: "g", child: "rocker", kind: "revolute", origin: { x: 30, y: 0, z: 0 }, axis: Z },
+      { id: "closer", parent: "rod", child: "rocker", kind: "revolute", origin: { x: 40, y: 0, z: 0 }, axis: Z, closesLoop: true }
+    ] }
+    expect(validateKinematics(m)).toBeUndefined()
+    for (const driver of [0, 40, -25]) {
+      const p = solvePose(m, { crank: driver })
+      const a = poseOfPoint(p, "rod", { x: 40, y: 0, z: 0 }), b = poseOfPoint(p, "rocker", { x: 40, y: 0, z: 0 })
+      near(a.x, b.x, 1e-6); near(a.y, b.y, 1e-6); near(a.z, b.z, 1e-6)
+      if (driver !== 0) expect(Math.abs(p.values.get("rocker")!.angle) + Math.abs(p.values.get("rod")!.angle)).toBeGreaterThan(0.1)
+    }
+    // A loop with every joint driven cannot close somewhere else: it is reported, not forced.
+    expect(() => solvePose(m, { crank: 40, rod: 3, rocker: 7 })).toThrow(/loop does not close/)
+    // Without the marker the same shape is still refused as a closed loop.
+    const unmarked: KinematicModel = { ...m, joints: m.joints.map((j) => (j.id === "closer" ? { ...j, closesLoop: undefined } : j)) }
+    expect(validateKinematics(unmarked)).toContain("child of two joints")
+  })
+  test("a declared contact reports its exact distance per frame and the first contact", () => {
+    const part = (id: string, brep: AssemblyPart["brep"]): AssemblyPart => ({ id, name: id, brep })
+    const arm = part("arm", makeBox(30, 4, 4, frame({ x: 0, y: -2, z: 0 }, Z)))
+    const base = part("base", makeCylinder(2, 6, frame({ x: 0, y: 0, z: -1 }, Z)))
+    const post = part("post", makeBox(4, 4, 6, frame({ x: 24, y: 6, z: -1 }, Z)))
+    const m: KinematicModel = { ground: "base", joints: [
+      { id: "pin", parent: "base", child: "arm", kind: "revolute", origin: O, axis: Z },
+      { id: "postFixed", parent: "base", child: "post", kind: "fixed", origin: O, axis: Z }
+    ], contacts: [{ a: "arm", b: "post", clearance: 2 }] }
+    const study = motionStudy([base, arm, post], m, { joint: "pin", from: 0, to: 30, steps: 6 }, { expected: () => true })
+    expect(study.frames[0]!.contacts[0]!.inContact).toBe(false)
+    expect(study.frames[0]!.contacts[0]!.distance).toBeGreaterThan(2)
+    // The arm's tip sweeps toward the post at (24..28, 6..10): the gap closes monotonically over this range.
+    const ds = study.frames.map((f) => f.contacts[0]!.distance)
+    expect(ds[ds.length - 1]).toBeLessThan(ds[0]!)
+    expect(validateKinematics({ ...m, contacts: [{ a: "arm", b: "ghost" }] })).toContain("not in the model")
+  })
+})
+
 describe("ball and planar joints", () => {
   test("a ball turns about the world axes through its origin, x then y then z", () => {
     const m: KinematicModel = { ground: "g", joints: [{ id: "b", parent: "g", child: "arm", kind: "ball", origin: { x: 5, y: 0, z: 0 }, axis: O }] }
@@ -118,4 +158,30 @@ describe("ball and planar joints", () => {
     near(t.z, 4)
     near(t.x, 0 + 3); near(t.y, 10 - 2)
   })
+})
+
+
+test("loop constraints cannot mask unreachable parts or angular misclosure", () => {
+  const disconnected: KinematicModel = { ground: "g", joints: [
+    { id: "tree", parent: "ghost", child: "a", kind: "revolute", origin: O, axis: Z },
+    { id: "loop", parent: "g", child: "a", kind: "ball", origin: O, axis: Z, closesLoop: true }
+  ] }
+  expect(validateKinematics(disconnected)).toContain("ground does not reach")
+  const m: KinematicModel = { ground: "g", joints: [
+    { id: "ball", parent: "g", child: "a", kind: "ball", origin: O, axis: Z },
+    { id: "loop", parent: "g", child: "a", kind: "revolute", origin: O, axis: Z, closesLoop: true }
+  ] }
+  expect(() => solvePose(m, { ball: { rx: 30 } })).toThrow("loop does not close")
+  expect(solvePose(m, { ball: { rz: 30 } }).closure[0]!.angularError).toBeLessThan(1e-7)
+  expect(() => solvePose(m, { ball: NaN })).toThrow("finite")
+  expect(() => solvePose(m, { missing: 0 })).toThrow("tree joint")
+})
+
+test("contacts report clearance violations even when clashes are expected, and missing contact parts are refused", () => {
+  const parts: AssemblyPart[] = [{ id: "g", name: "ground", brep: makeBox(10, 10, 10) }, { id: "a", name: "slider", brep: makeBox(10, 10, 10, frame({ x: 20, y: 0, z: 0 }, Z)) }]
+  const model: KinematicModel = { ground: "g", joints: [{ id: "slide", parent: "g", child: "a", kind: "prismatic", origin: O, axis: { x: -1, y: 0, z: 0 } }], contacts: [{ a: "g", b: "a", clearance: 2 }] }
+  const study = motionStudy(parts, model, { joint: "slide", from: 0, to: 15, steps: 3 }, { expected: () => true })
+  expect(study.firstContactViolation).toBeDefined()
+  expect(study.frames.at(-1)!.contacts[0]!.clearanceViolated).toBe(true)
+  expect(() => motionStudy(parts.slice(0, 1), model, { joint: "slide", from: 0, to: 1, steps: 1 })).toThrow("contact part")
 })

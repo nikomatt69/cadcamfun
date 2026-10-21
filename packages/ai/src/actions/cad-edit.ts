@@ -150,6 +150,17 @@ const runImport = async (a: CadImportInput, { handlers, projectId }: ActionConte
       ? { ...stored, warnings: ["Imported triangles preserve source geometry; no parametric history was recovered. Mesh units use the explicit import scale (default 1 mm per source unit)."], stats: { meshes: elements.length } }
       : stored
   }
+  if (a.format === "parasolid" || /\.x_[tb]$/.test(name)) return cad.brep.parasolidDiagnostic()
+  if (a.format === "iges" || /\.(igs|iges)$/.test(name)) {
+    if (handlers.cadStoreBodies === undefined) return { ok: false, error: "Exact body import is unavailable in this host." }
+    try {
+      const read = cad.brep.readIgesBreps(content)
+      if (read.parts.length === 0 || read.warnings.length > 0) return { ok: false, error: "IGES import is incomplete; nothing was stored.", warnings: read.warnings }
+      const scale = a.scale ?? 1
+      const bodies = read.parts.map((p) => ({ name: a.name ?? p.name, kind: "solid" as const, brep: scale === 1 ? p.brep : cad.brep.transformBrep(p.brep, { m: [scale, 0, 0, 0, scale, 0, 0, 0, scale], t: { x: 0, y: 0, z: 0 } }) }))
+      return handlers.cadStoreBodies(projectId, bodies)
+    } catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) } }
+  }
   const guessed = /\.(step|stp)$/.test(name) || /^\s*ISO-10303-21/.test(content) ? "step" : name.endsWith(".svg") || /<svg[\s>]/i.test(content) ? "svg" : "dxf"
   const format = a.format ?? guessed
   let depth = a.depth
@@ -188,6 +199,18 @@ const NEEDS_LAYER = new Set(["layer_create", "layer_rename", "layer_color", "lay
 const NEEDS_IDS = new Set(["select", "show", "hide", "isolate"])
 
 export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
+  defineWireAction({ id: "cad_edit.surface", kind: "write", parameters: INPUTS["cad_edit.surface"],
+    run: (input, { handlers, projectId }) => {
+      if (handlers.cadStoreBodies === undefined) return { ok: false, error: "Exact body storage is unavailable in this host." }
+      try {
+        const body = cad.brep.buildSurfaceOperation(input)
+        return handlers.cadStoreBodies(projectId, [{ ...body, name: input.name ?? "NURBS surface" }])
+      } catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) } }
+    } }),
+  defineWireAction({ id: "cad_edit.shell", kind: "write", parameters: INPUTS["cad_edit.shell"],
+    run: (input, { handlers, projectId }) => handlers.cadBuildShell === undefined ? { ok: false, error: "Shell construction is unavailable in this host." } : handlers.cadBuildShell(projectId, input) }),
+  defineWireAction({ id: "cad_edit.offset", kind: "write", parameters: INPUTS["cad_edit.offset"],
+    run: (input, { handlers, projectId }) => handlers.cadBuildOffset === undefined ? { ok: false, error: "Offset construction is unavailable in this host." } : handlers.cadBuildOffset(projectId, input) }),
   defineWireAction({ id: "cad_edit.add", kind: "write", replaces: "cad_add_elements", parameters: addElementsParameters, run: runAddElements }),
   defineWireAction({
     id: "cad_edit.add_entities", kind: "write", replaces: "cad_add_entities",

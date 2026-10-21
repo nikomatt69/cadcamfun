@@ -49,7 +49,7 @@ const brepObject = (element: any, offset: { x: number; y: number; z: number }): 
   }
   const t = cached.tessellation;
   const group = new THREE.Group();
-  const material = new THREE.MeshStandardMaterial({ color: element.color || 0x8fa3b8, wireframe: element.wireframe || false, metalness: 0.25, roughness: 0.55, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  const material = new THREE.MeshStandardMaterial({ side: cached.model.shells.some((s) => !s.closed) ? THREE.DoubleSide : THREE.FrontSide, color: element.color || 0x8fa3b8, wireframe: element.wireframe || false, metalness: 0.25, roughness: 0.55, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   for (const face of t.faces) {
     const positions = new Float32Array(face.positions.length);
     for (let i = 0; i < positions.length; i += 3) {

@@ -10,7 +10,8 @@ import type { SetupOrientation } from "../setup.ts"
 import type { WorkOffset } from "../ir.ts"
 import { KERNEL_SCHEMA_VERSION, type CamResult, type ManufacturingJob, type OperationSpec, type WorkOrigin } from "./contracts.ts"
 import type { Cutter } from "./cutters.ts"
-import { findMachine, MACHINES } from "./machines.ts"
+import { findMachine, MACHINE_CATALOGUE } from "./machines.ts"
+import { kernelMachineOfConfig, type MachineConfigRow } from "./machine-config.ts"
 
 export interface KernelSnapshot {
   readonly schemaVersion: typeof KERNEL_SCHEMA_VERSION
@@ -18,6 +19,8 @@ export interface KernelSnapshot {
   readonly name: string
   readonly material: string
   readonly machine?: string
+  /** A machine configuration the user saved: it wins over the preset id, because it is the machine they configured. */
+  readonly machineConfig?: MachineConfigRow
   readonly setupOrientation?: SetupOrientation
   readonly origin?: WorkOrigin
   readonly workOffset?: WorkOffset
@@ -36,10 +39,16 @@ export interface KernelSnapshot {
 }
 
 export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> => {
-  const machine = s.machine !== undefined ? findMachine(s.machine) : undefined
-  if (s.machine !== undefined && machine === undefined) {
-    return { status: "failed", issues: [{ tag: "InvalidInput", severity: "error", stage: "prepare", message: `Unknown machine preset '${s.machine}'. Known: ${MACHINES.map((m) => m.id).join(", ")}` }] }
+  const preset = s.machine !== undefined ? findMachine(s.machine) : undefined
+  if (s.machine !== undefined && preset === undefined) {
+    return { status: "failed", issues: [{ tag: "InvalidInput", severity: "error", stage: "prepare", message: `Unknown machine preset '${s.machine}'. Known: ${MACHINE_CATALOGUE.map((m) => m.id).join(", ")}` }] }
   }
+  // A saved machine configuration is the machine the user configured: it wins over the preset id.
+  const configured = s.machineConfig !== undefined ? kernelMachineOfConfig(s.machineConfig) : undefined
+  if (s.machineConfig !== undefined && configured === undefined) {
+    return { status: "failed", issues: [{ tag: "InvalidInput", severity: "error", stage: "prepare", message: `The machine configuration '${s.machineConfig.name}' is not a machine the kernel can machine: it needs a kind it machines (mill or lathe) and a spindle and feed ceiling.` }] }
+  }
+  const machine = configured ?? preset
   let stock: ManufacturingJob["stock"]
   if (s.stock !== undefined) {
     const meshes = partMeshes(s.elements as never, { tolerance: s.tolerance ?? 0.01 })

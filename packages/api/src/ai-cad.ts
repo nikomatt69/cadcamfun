@@ -49,9 +49,51 @@ export const CadShellInput = Schema.Struct({
   id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)).annotate({ description: "Id of the solid to hollow." }),
   thickness: Schema.Finite.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(1000)).annotate({ description: "Wall thickness, mm." }),
   open: optional(Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))).check(Schema.isMaxLength(20))
-    .annotate({ description: "Names of the faces to leave open (from cad.exact), e.g. [\"plate.top\"]; none = a closed hollow." }))
+    .annotate({ description: "Names of the faces to leave open (from cad.exact), e.g. [\"plate.top\"]; none = a closed hollow." })),
+  wallByFace: optional(Schema.Array(Schema.Struct({ face: nonEmpty, thickness: positive })).check(Schema.isMaxLength(40))
+    .annotate({ description: "Override the default wall on named faces from cad.exact; duplicate or unknown names are refused." }))
 })
 export type CadShellInput = typeof CadShellInput.Type
+
+export const CadOffsetInput = Schema.Struct({ id: nonEmpty, distance: positive.annotate({ description: "Outward offset distance in mm. Convex corners round. Unsupported geometry returns a reason." }) })
+export type CadOffsetInput = typeof CadOffsetInput.Type
+
+const xyz = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
+const limits = Schema.Struct({ min: Schema.Finite, max: Schema.Finite })
+export const CadMotionInput = Schema.Struct({
+  model: Schema.Struct({
+    ground: nonEmpty,
+    joints: Schema.Array(Schema.Struct({
+      id: nonEmpty, parent: nonEmpty, child: nonEmpty, kind: Schema.Literals(["fixed", "revolute", "prismatic", "cylindrical", "ball", "planar"]),
+      origin: xyz, axis: xyz, limits: optional(limits), slideLimits: optional(limits), closesLoop: optional(Schema.Boolean)
+    })).check(Schema.isMaxLength(40)),
+    couplings: optional(Schema.Array(Schema.Union([
+      Schema.Struct({ kind: Schema.Literal("gear"), driver: nonEmpty, driven: nonEmpty, ratio: Schema.Finite }),
+      Schema.Struct({ kind: Schema.Literal("rack"), pinion: nonEmpty, rack: nonEmpty, pitchRadius: positive })
+    ])).check(Schema.isMaxLength(40))),
+    contacts: optional(Schema.Array(Schema.Struct({ a: nonEmpty, b: nonEmpty, clearance: optional(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))) })).check(Schema.isMaxLength(40)))
+  }),
+  sweep: Schema.Struct({ joint: nonEmpty, from: Schema.Finite, to: Schema.Finite, steps: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })), quantity: optional(Schema.Literals(["angle", "slide", "rx", "ry", "rz", "u", "v"])) })
+}).annotate({ description: "Motion study over exact scene part ids. Revolute angles are degrees, slides mm. closesLoop marks a constraint outside the pose tree; passive joints solve closure. Contacts report gaps and penetration; they do not simulate contact forces." })
+export type CadMotionInput = typeof CadMotionInput.Type
+
+const degree = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 8 }))
+const knots = Schema.Array(Schema.Finite).check(Schema.isMinLength(4), Schema.isMaxLength(80))
+const controlRow = Schema.Array(Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])).check(Schema.isMinLength(2), Schema.isMaxLength(64))
+export const CadSurfaceInput = Schema.Struct({
+  operation: Schema.Literals(["patch", "stitch", "thicken"]),
+  patches: Schema.Array(Schema.Struct({
+    data: Schema.Struct({ degreeU: degree, degreeV: degree, knotsU: knots, knotsV: knots,
+      points: Schema.Array(controlRow).check(Schema.isMinLength(2), Schema.isMaxLength(64)),
+      weights: optional(Schema.Array(Schema.Array(positive).check(Schema.isMaxLength(64))).check(Schema.isMaxLength(64))) }),
+    trim: optional(Schema.Struct({ u0: Schema.Finite, u1: Schema.Finite, v0: Schema.Finite, v1: Schema.Finite }))
+  })).check(Schema.isMinLength(1), Schema.isMaxLength(32)),
+  thickness: optional(positive), direction: optional(xyz), tolerance: optional(positive), name: optional(nonEmpty)
+}).annotate({ description: "Open NURBS patch, exact rectangular trim along isoparametric curves, stitch full matching edges, or thicken one patch. Without direction thicken is an exact normal thickness for planar patches only. Curved patches require an explicit axial direction; this is a translated surface, not a general normal offset. Open surfaces remain surface bodies and cannot be machined as solids." })
+export type CadSurfaceInput = typeof CadSurfaceInput.Type
+
+export const CadExchangeInput = Schema.Struct({ format: Schema.Literals(["step", "iges", "parasolid"]), ids: optional(Schema.Array(nonEmpty).check(Schema.isMinLength(1), Schema.isMaxLength(40))) })
+export type CadExchangeInput = typeof CadExchangeInput.Type
 
 /** The exact smallest gap between two solids. */
 export const CadDistanceInput = Schema.Struct({
@@ -94,7 +136,7 @@ export const MAX_IMPORT_CHARS = 2_000_000
 /** DXF/SVG/STEP text to 3D: closed outlines become solids of `depth`, circles and inner loops holes. */
 export const CadImportInput = Schema.Struct({
   /** Defaults to the attachment's extension. */
-  format: optional(Schema.Literals(["dxf", "svg", "step", "mesh"])),
+  format: optional(Schema.Literals(["dxf", "svg", "step", "iges", "parasolid", "mesh"])),
   /** The file text, or ... */
   content: optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_IMPORT_CHARS))),
   /** ... the name of a file the user attached to the chat (preferred: no need to repeat the file). */
@@ -121,6 +163,13 @@ export const CAD_ACTION_INPUTS = {
   "cad.exact": CadExactInput,
   "cad.assembly": CadAssemblyInput,
   "cad.shell": CadShellInput,
+  "cad.offset": CadOffsetInput,
+  "cad.motion": CadMotionInput,
+  "cad.surface": CadSurfaceInput,
+  "cad.exchange": CadExchangeInput,
+  "cad_edit.surface": CadSurfaceInput,
+  "cad_edit.shell": CadShellInput,
+  "cad_edit.offset": CadOffsetInput,
   "cad.distance": CadDistanceInput,
   "cad_edit.add_entities": Schema.Struct({ entities: Schema.Array(CadSketchEntity).check(Schema.isMinLength(1), Schema.isMaxLength(500)) }),
   "cad_edit.modify": Schema.Struct({

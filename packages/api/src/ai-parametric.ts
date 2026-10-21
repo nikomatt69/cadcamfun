@@ -194,6 +194,7 @@ const feature = Schema.Union([
       id, type: Schema.Literal("fillet"), radius: dimension, style: optional(Schema.Literals(["fillet", "chamfer"])), targets,
       secondDistance: optional(described(dimension, "Chamfer only: the setback on the second face, mm (the callout '2 x 1'). The first setback is radius, on the more horizontal of the two faces.")),
       angle: optional(described(dimension, "Chamfer only: the angle between the chamfer face and the first face, degrees (the callout '2 x 30°'). It fixes the setback on the second face.")),
+      radiusEnd: optional(described(dimension, "Fillet only: the radius at the far end of each straight edge; the radius runs linearly from radius (at the edge's lexicographically smaller end) to radiusEnd. Corners where variable edges meet are not rounded.")),
       edges: optional(described(
         Schema.Struct({
           parallel: optional(axis3), kind: optional(Schema.Literals(["convex", "concave", "both"])), minLength: optional(dimension), curved: optional(Schema.Boolean),
@@ -202,7 +203,7 @@ const feature = Schema.Union([
         "Which edges: parallel to an axis, convex/concave (default convex), longer than minLength, wholly inside the box within {min,max}; curved:true also takes rims of curved surfaces (slow, off by default). No selection = every convex edge."
       ))
     }),
-    "Round (fillet radius) or bevel (chamfer setback) the edges between planar faces that meet at 25 degrees or more, on the bodies built so far. A chamfer takes one setback (radius) on both faces, or two distances (radius and secondDistance), or a distance and an angle (radius and angle), never both secondDistance and angle. Distances are positive; angle is strictly between 0 and 90 degrees. Unequal setbacks need a uniquely more horizontal first face. Read the issues: a size wider than the faces is refused."
+    "Round (fillet radius) or bevel (chamfer setback) the edges between planar faces that meet at 25 degrees or more, on the bodies built so far. A chamfer takes one setback (radius) on both faces, or two distances (radius and secondDistance), or a distance and an angle (radius and angle), never both secondDistance and angle. A fillet may run its radius linearly along straight edges with radiusEnd. Distances are positive; angle is strictly between 0 and 90 degrees. Unequal setbacks need a uniquely more horizontal first face. Read the issues: a size wider than the faces is refused."
   ),
   described(
     Schema.Struct({ id, type: Schema.Literal("rib"), sketch: id, thickness: dimension, depth: dimension, direction: optional(direction), operation: optional(operation), targets }),
@@ -211,6 +212,7 @@ const feature = Schema.Union([
   described(
     Schema.Struct({
       id, type: Schema.Literal("sheet"), sketch: id, thickness: dimension, width: dimension, bendRadius: optional(dimension), side: optional(Schema.Literals(["centre", "left", "right"])),
+      flanges: optional(Schema.Array(Schema.Struct({ end: Schema.Literals(["start", "end"]), length: dimension, angle: dimension, relief: optional(Schema.Struct({ width: dimension, depth: dimension })) })).check(Schema.isMaxLength(2))).annotate({ description: "Full-width edge flanges on the exposed width edges of this sheet: end start/end, length from virtual bend corner, signed angle in degrees. Uses bendRadius and thickness of the existing sheet. Cannot share an edge with a hem. Flat development includes the new bend; free ends need no corner relief. Partial-width flanges and adjacent-edge corner relief are not supported." }),
       hems: optional(Schema.Array(Schema.Struct({ end: Schema.Literals(["start", "end"]), length: dimension, gap: optional(dimension), fold: optional(Schema.Literals(["left", "right"])) })).check(Schema.isMaxLength(2))),
       direction: optional(direction), operation, targets
     }),
@@ -295,6 +297,8 @@ const historyIssues = (features: ReadonlyArray<Feature>): Array<Schema.FilterIss
     if (f.type === "fillet" && f.secondDistance !== undefined && f.angle !== undefined) issue(index, "A chamfer takes either two distances or a distance and an angle, not both")
     if (f.type === "fillet" && typeof f.secondDistance === "number" && !(f.secondDistance > 0)) issue(index, "The second chamfer distance must be positive")
     if (f.type === "fillet" && typeof f.angle === "number" && !(f.angle > 0 && f.angle < 90)) issue(index, "The chamfer angle must be between 0 and 90 degrees")
+    if (f.type === "fillet" && f.radiusEnd !== undefined && (f.style ?? "fillet") !== "fillet") issue(index, "A variable radius (radiusEnd) belongs to a fillet, not a chamfer")
+    if (f.type === "fillet" && typeof f.radiusEnd === "number" && !(f.radiusEnd > 0)) issue(index, "The end radius must be positive")
     if ((f.type === "draft" || f.type === "mate") && !hasBody()) issue(index, `A ${f.type} needs a body built before it`)
     if (f.type === "mate" && f.body === f.to.body) issue(index, "A mate needs two different bodies")
     if (f.type === "mate" && (!seen.has(f.body) || !seen.has(f.to.body))) issue(index, "Both bodies of a mate must be earlier features")

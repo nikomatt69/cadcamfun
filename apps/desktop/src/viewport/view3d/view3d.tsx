@@ -299,6 +299,12 @@ export function View3D(props: View3DProps) {
     /** Tip-to-spindle-nose length of a toolpath's tool as it is drawn (its holder, or the assumed one). */
     const gaugeOf = (path: number): number => gaugeOfTool(modelFor(props.program?.toolpaths[path]?.toolId ?? ""), props.toolpathDisplay?.showHolder !== false)
     const rotaryPose = (seconds: number): { readonly at: Vec3; readonly axis: THREE.Vector3; readonly table?: THREE.Matrix4 } | undefined => {
+      const lathe = props.machine
+      if (lathe?.kind === "lathe" && lathe.turnMill !== undefined && machineScene !== undefined) {
+        const at = cam.viewer.poseAt(machineScene.timeline, seconds)
+        const pose = cam.viewer.turnMillDisplayPose(lathe, at.point, at.angles, props.machineDisplay?.frame ?? "machine", at.state?.xMode)
+        return { at: pose.tip, axis: new THREE.Vector3(pose.axis.x, pose.axis.y, pose.axis.z), table: new THREE.Matrix4().makeRotationX(pose.chuckAngle) }
+      }
       if (machineScene?.model !== undefined) {
         // The machine drawn round the part (spec 32 P5): the same pose moves its links, the tool and the table.
         const at = cam.viewer.poseAt(machineScene.timeline, seconds)
@@ -327,7 +333,7 @@ export function View3D(props: View3DProps) {
     /** Turns the part side (path, stock, setter, workholding) as the table does; identity in the part frame. */
     const placeTable = (table: THREE.Matrix4 | undefined): boolean => {
       const target = table ?? new THREE.Matrix4()
-      const bodies = machineScene?.root.getObjectByName("machine-bodies")
+      const bodies = props.machine?.kind === "lathe" ? undefined : machineScene?.root.getObjectByName("machine-bodies")
       let changed = false
       for (const group of [content, bodies]) {
         if (!group) continue
@@ -481,7 +487,7 @@ export function View3D(props: View3DProps) {
         const cutter = props.tools?.get(props.program.toolpaths[0]?.toolId ?? "") ?? props.defaultTool
         const extent = props.stock ? Math.max(props.stock.size.x, props.stock.size.y, props.stock.size.z) : 100
         machineScene = createMachineScene({
-          setup: machine, program: props.program, ...(props.motion !== undefined ? { motion: props.motion } : {}), display: props.machineDisplay ?? DEFAULT_MACHINE_DISPLAY,
+          setup: machine, program: props.program, ...(props.motion !== undefined ? { motion: props.motion } : {}), display: { ...DEFAULT_MACHINE_DISPLAY, ...props.machineDisplay, showTool: props.toolpathDisplay?.showTool ?? props.machineDisplay?.showTool ?? true, showHolder: props.toolpathDisplay?.showHolder ?? props.machineDisplay?.showHolder ?? true },
           ...(start !== undefined ? { start } : {}),
           ...(props.machineOptions !== undefined ? { machineOptions: props.machineOptions } : {}),
           gaugeOf,
@@ -540,10 +546,17 @@ export function View3D(props: View3DProps) {
       // Rotary mills: every point in the part frame (a machine-coordinate program is turned back by its move's angles).
       rotary = machine?.kind === "mill" ? machine.rotary : undefined
       anglesOf.clear()
-      if (rotary && machineScene) for (const m of machineScene.timeline.moves) anglesOf.set(`${m.path}:${m.index}`, m.angles)
-      const shown = (p: Vec3, path: number, index: number): Vec3 => machine?.kind === "lathe"
-        ? cam.viewer.displayPoint(machine, p, track ? cam.viewer.stateAt(track, path, index).xMode : undefined)
-        : rotary ? cam.viewer.partPointOf(p, anglesOf.get(`${path}:${index}`) ?? {}, rotary) : p
+      const timed = new Map<string, cam.viewer.TimedMove>()
+      if (machineScene && (rotary || machine?.kind === "lathe" && machine.turnMill !== undefined)) for (const m of machineScene.timeline.moves) { anglesOf.set(`${m.path}:${m.index}`, m.angles); timed.set(`${m.path}:${m.index}`, m) }
+      const shown = (p: Vec3, path: number, index: number, seconds?: number): Vec3 => {
+        const m = timed.get(`${path}:${index}`)
+        const angles = m !== undefined && seconds !== undefined ? cam.viewer.lerpAngles(m.anglesFrom, m.angles, m.duration > 0 ? Math.max(0, Math.min(1, (seconds - m.start) / m.duration)) : 1) : anglesOf.get(`${path}:${index}`) ?? {}
+        if (machine?.kind === "lathe") {
+          const xMode = track ? cam.viewer.stateAt(track, path, index).xMode : undefined
+          return machine.turnMill !== undefined ? cam.viewer.turnMillDisplayPose(machine, p, angles, "part", xMode).tip : cam.viewer.displayPoint(machine, p, xMode)
+        }
+        return rotary ? cam.viewer.partPointOf(p, angles, rotary) : p
+      }
       // Rapids dashed; cuts one colour per tool, so the operations of a multi-tool program read apart.
       const colors = props.program ? toolColors(props.program) : new Map<string, number>()
       disposeTools()

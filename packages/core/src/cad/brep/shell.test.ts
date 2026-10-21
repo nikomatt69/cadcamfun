@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { booleanBrep, brepLocator, extrudeProfile, frame, makeBox, makeCone, makeCylinder, makeSphere, makeTorus, massProperties, polygonProfileLoop, shellBrep, validateBrep, type Brep } from "./index.ts"
+import { booleanBrep, brepLocator, extrudeProfile, frame, makeBox, makeCone, makeCylinder, makeSphere, makeTorus, massProperties, offsetBrep, polygonProfileLoop, shellBrep, validateBrep, type Brep } from "./index.ts"
 
 setDefaultTimeout(120_000)
 const W = frame({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 })
@@ -81,6 +81,29 @@ describe("exact shell by dilation of the boundary", () => {
     check(dome, 2, { x: 30, y: 30, z: 18 }, ok(shellBrep(dome, 2)).cavity)
     const countersunk = booleanBrep(makeBox(30, 30, 10), makeCone(3, 7, 4, frame({ x: 15, y: 15, z: 6 }, { x: 0, y: 0, z: 1 })), "subtract").brep
     check(countersunk, 1.5, { x: 30, y: 30, z: 10 }, ok(shellBrep(countersunk, 1.5)).cavity)
+  })
+  test("a wall per face: the top of a box is thinner than the rest, the cavity follows each face", () => {
+    const box = makeBox(30, 20, 10)
+    const top = topFace(box, 10)
+    const r = ok(shellBrep(box, 2, { wallByFace: new Map([[top, 1]]) }))
+    // Cavity: 26 x 16 in plan; from z=2 (bottom wall 2) to z=9 (top wall 1).
+    expect(massProperties(r.cavity).volume).toBeCloseTo(26 * 16 * 7, 4)
+    expect(shellBrep(box, 2, { wallByFace: new Map([[99, 1]]) })).toContain("does not exist")
+    expect(shellBrep(box, 2, { wallByFace: new Map([[top, 0]]) })).toContain("positive")
+  })
+  test("an outward offset grows a ball and rounds a box by the requested distance", () => {
+    const ball = offsetBrep(makeSphere(10), 2)
+    if (typeof ball === "string") throw new Error(ball)
+    expect(validateBrep(ball.brep).issues).toEqual([])
+    expect(Math.abs(massProperties(ball.brep).volume - (4 / 3) * Math.PI * 12 ** 3) / ((4 / 3) * Math.PI * 12 ** 3)).toBeLessThan(1e-5)
+    const expected = 6000 + 2200 * 2 + Math.PI * 60 * 4 + (4 / 3) * Math.PI * 8
+    for (const placement of [frame({ x: 0, y: 0, z: 0 }), frame({ x: 17, y: -21, z: 13 }, { x: 1, y: 2, z: 3 }, { x: 2, y: -1, z: 1 })]) {
+      const box = offsetBrep(makeBox(30, 20, 10, placement), 2)
+      if (typeof box === "string") throw new Error(box)
+      expect(validateBrep(box.brep).issues).toEqual([])
+      expect(Math.abs(massProperties(box.brep).volume - expected)).toBeLessThan(1e-3)
+    }
+    expect(offsetBrep(makeBox(10, 10, 10), 0)).toContain("positive")
   })
   test("what the construction cannot do is refused with a reason", () => {
     expect(shellBrep(makeSphere(10), 11)).toContain("thinner than the wall")

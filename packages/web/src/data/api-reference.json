@@ -49376,7 +49376,8 @@
                                     "grbl",
                                     "linuxcnc",
                                     "haas",
-                                    "siemens"
+                                    "siemens",
+                                    "heidenhain"
                                   ]
                                 }
                               },

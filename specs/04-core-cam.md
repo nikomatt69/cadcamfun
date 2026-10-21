@@ -8,6 +8,17 @@ WP2 derives drilling, contour, pocket, thread and external turning paths from WP
 
 Pure and I/O-free, same rules as WP1.
 
+## CAM kernel licensing contract (2026-10-21)
+
+The owner requests proprietary licensing for the CAM kernel, with use and
+distribution permitted only by written authorization from **Nicola Mattioli**.
+`packages/core/src/cam/LICENSE` records those terms for the licensor-owned CAM
+source and its compiled forms; a local `README.md` makes the scope discoverable.
+This change is limited to WP2 documentation: the repository root license,
+third-party licenses, runtime behavior and package-wide metadata remain unchanged.
+The terms preserve mandatory legal exceptions and do not claim ownership of user
+models, generated toolpaths/G-code or machined parts merely through kernel use.
+
 ## Native CAM kernel architecture contract (2026-10-13)
 
 [Spec 29](29-native-cam-kernel.md) defines the owner-requested deep CAM kernel: immutable manufacturing snapshots, authoritative CAD geometry through native B-rep/mesh Adapters, stock lineage shared across operations, separate cutter-location/machine/controller motion, continuous assembly collision checks, independent replay of final NC bytes and capability-specific release evidence. It records the current Implementation's limits and the degree-to-radian compatibility Seam. Status: design only; the existing exports, generation behavior and acceptance results remain as recorded below. Implementation follows the existing owner scopes and ordered-step prerequisites; this contract does not mark a professional kernel as built.
@@ -188,6 +199,10 @@ The `3d_surface` operation no longer follows each element's outline: the selecte
 
 ## 9. Change log
 
+- 2026-10-21: documented the owner-requested proprietary CAM kernel license,
+  naming Nicola Mattioli as licensor; added scoped license and discovery notice
+  under `packages/core/src/cam`. No executable code or root license changes.
+
 - 2026-10-13: added the native CAM kernel contract in [spec 29](29-native-cam-kernel.md): geometry/stock/motion/controller Seams, capability-specific quality and final-NC evidence, legacy conversion Adapters, migration gates and independent acceptance fixtures. Design only; existing runtime behavior and implementation statuses are unchanged.
 
 - 2026-10-13: integrated the parametric-machining worktree with the current named work-plane history contract.
@@ -214,3 +229,15 @@ The `3d_surface` operation no longer follows each element's outline: the selecte
 Status: implemented; verification tracked in [spec 34](34-oriented-cam-setups.md). The native kernel accepts six CAD directions facing the spindle, rotates meshes/stock/exact features together and emits a separate three-axis program. Lateral/bottom workholding and full-part coverage remain unresolved. Downward-facing triangles above the underside prevent height-field replay from certifying hidden surfaces, including explicit-operation jobs. This does not implement rotary helical machining or certify multi-setup stock transfer.
 
 Change log: 2026-10-19 — added manual setup orientation across the existing kernel/snapshot interface and evidence for inaccessible surfaces; global RM statuses unchanged.
+
+### Open CAD surface exclusion (2026-10-21)
+
+The spec 33 CAD increment owns a single guard in `model/element-mesh.ts` and its test: an explicitly open B-rep surface is not a volume part model. Desktop rendering uses its B-rep tessellation independently. This guard prevents a curved patch from becoming a fictitious stock/part volume. CAM implementation and other viewer changes remain outside the increment.
+
+### External turning preview continuation (2026-10-21)
+
+- Owners: WP2 native CAM, WP3 action schemas, WP4 AI handler storage, WP6 CAM result mirroring, WP8 catalogue and machine replay, under spec 29's turning continuation contract.
+- `kernel/turning.ts` exports `planTurning`: face skim, diameter-bounded external roughing, profile finishing, piecewise-linear stock snapshots and analytic volume accounting including the untouched bar tail. Taper intersections are retained, invalid/non-finite profiles and excessive pass counts are refused, and NC returns axially only after radial clearance of the original bar. G94/G97 explicitly select feed/minute and fixed RPM.
+- This is an ideal point-tool preview; insert compensation, workholding, internal turning, grooves, threads, parting and controller qualification are not certified. The analytic volume is before NC rounding, and every successful result remains `preview`.
+- `cam.turn` reads the plan, `cam_edit.turn` stores the same NC and settings in the existing portable CAM document, and the desktop mirrors it into its lathe viewer. `cam.review` reports preview/stale; `cam.machine` uses stored stock settings and the shared B-head/C-spindle poses, tool models, limits and chuck phase. Positioned-C milling does not remove an entire annular band in the assistant's turned profile.
+- Evidence: `kernel/turning.test.ts`, `packages/ai/test/{cam-kernel-actions,cam-wire,machine-kinematics}.test.ts`, `apps/sidecar/test/ai-turning.test.ts`, and the turning persistence/mirroring case in `apps/desktop/test/cam-kernel.test.ts`.

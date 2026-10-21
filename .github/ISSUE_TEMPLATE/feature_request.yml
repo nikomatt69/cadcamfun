@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a concrete improvement with its use case and constraints.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read [CONTRIBUTING.md](https://github.com/nikomatt69/cadcamfun/blob/HEAD/CONTRIBUTING.md).
+        The repository includes proprietary components. A proposal does not grant permission to reuse them.
+        Use synthetic examples and keep customer data and confidential designs out of public reports.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and use case
+      description: Explain who needs this and the task they cannot complete today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the result and any machine, provider, compatibility or accessibility constraints.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: validation
+    attributes:
+      label: How to verify success
+      description: Give a small example or observable acceptance criteria.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for this proposal.
+          required: true
+        - label: This request contains no secrets, personal information or confidential material.
+          required: true

@@ -1,0 +1,37 @@
+CADCAMFUN TypeScript B-rep kernel
+
+Copyright © 2026 Nicola Mattioli, for his own contributions.
+
+Upstream reference: NVIDIA USD BRep / SMLib
+https://github.com/NVIDIA-Omniverse/usd-brep
+
+Upstream copyright notice:
+Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+Upstream license: Apache License, Version 2.0.
+A full copy of the upstream LICENSE, including its copyright notice, accompanies
+this notice as LICENSE-APACHE-2.0.
+
+The CADCAMFUN implementation is written in TypeScript and informed by the
+upstream architecture, as described in index.ts and math.ts. This notice
+distinguishes CADCAMFUN's implementation and contributions from upstream; it
+does not assert a clean-room implementation, that all upstream code was copied,
+or that NVIDIA authored or endorses CADCAMFUN.
+
+Reference checked on 21 October 2026:
+https://raw.githubusercontent.com/NVIDIA-Omniverse/usd-brep/main/LICENSE
+The main-branch license was reviewed on that date. The original upstream revision
+consulted during implementation and the provenance of individual portions have
+not been established by this notice. This date is not a claim that the reviewed
+main revision was the source used to implement this kernel.
+
+Any incorporated or translated upstream material retains the Apache-2.0 rights
+and notices applicable to it. The proprietary terms in ../LICENSE apply only
+to rights held by Nicola Mattioli and do not override those upstream rights.
+This notice does not replace the per-file notices of changes or additional
+attributions required for any particular adapted material.
+
+The upstream project lists separate third-party components. Their presence in
+USD BRep is not evidence that CADCAMFUN incorporates or distributes them; no
+such incorporation is asserted here. Any third-party material actually included
+in a CADCAMFUN distribution must retain its own applicable licenses and notices.

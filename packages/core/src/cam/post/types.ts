@@ -1,7 +1,7 @@
 /** Post-processor contract (spec 04-core-cam.md §4). */
 import type { Program } from "../ir.ts"
 
-export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens"
+export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain"
 
 export type ArcMode = "ijk" | "radius" | "linearize"
 

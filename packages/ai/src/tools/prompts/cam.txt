@@ -1,38 +1,26 @@
-Read machining data. All actions are read-only.
+Read machining data, plans and saved evidence; all actions are read-only.
 
-Actions
-- plan_check: validate proposed operations (drawing, stock, schemas, DFM, machine limits, generation); a pass validates a plan, not a part.
-- review: saved pass/failed/stale/unverified evidence and refinements per drawing/program revision; stale or unverified cannot accept a program.
-- machine: axes, zeros, limits, accepted operations; read first.
-- operations: drawing operations, settings, program availability.
-- suggest: depths, speeds, chip load and warnings from supplied settings.
-- compare_setups: generate and verify candidates on the stock.
-- analyze: static G-code and machine-axis findings, not a safety verdict.
-- stock: configured stock, volume and workpieceMatchesStock.
-- vision: the displayed CAM preview and its evidence.
-- chain_suggest: next operation.
-- chain_status: previous operation, rest tool, warnings.
-- materials, cutting_data, manufacture: the native CAM kernel. Grades; feeds/speeds of a cutter in a material; manufacture previews the whole-part plan read from the exact B-rep (holes, pockets, outlines as features, else a 3D surface job), its NC and its replay and clearance claims. planOnly returns the plan without NC.
-
-Parameters (mm, mm/min, rpm)
-- machine: machineType (mill|lathe|3dprinter).
-- operations, stock: none.
-- plan_check: operations (1-8 of {type, params}), expectedRevision (optional drawing revision). Use the returned revision on create/update.
-- review: operationId.
-- suggest: params (operationType, toolDiameter, depth, stepdown, feedrate, rpm, material, ...).
-- compare_setups: candidates (1-4 of {name, params, toolId?, materialId?}) from libraries.
-- analyze: operationId (full stored program; previews are truncated) or gcode; machineType adds axis checks.
-- vision: focus.
+Actions and Parameters (mm, mm/min, rpm)
+- machine: machineType (mill|lathe|3dprinter), gcode or operationId, params, at (seconds). Shared viewer timeline, tooling, B/C poses and limits.
+- operations, stock: no parameters; saved operations or configured stock.
+- plan_check: operations (1-8 of {type, params}), expectedRevision. A pass checks the plan, not the machined part.
+- review: operationId; pass/failed/stale/unverified/preview evidence for the saved drawing and NC.
+- suggest: params (operationType, toolDiameter, depth, stepdown, feedrate, rpm, material).
+- compare_setups: candidates (1-4 of {name, params, toolId?, materialId?}).
+- analyze: operationId (full stored NC) or gcode; machineType adds axis checks. Empty findings never mean safe.
+- vision: focus; displayed CAM preview.
 - chain_suggest: fromOperationId, materialHint, toolHint.
 - chain_status: operationId.
-- materials: query. cutting_data: material, cut, tool, machine, depth/ae/ap/scallop. manufacture: material, machine, origin, setupOrientation (+Z default|-Z|+X|-X|+Y|-Y: the CAD side facing the spindle after a manual refixture; one program and workOffset per setup), finishAllowance, scallop, deburr, planOnly, operations, tools, subprograms (M98 for repeated toolpaths).
+- materials: query; grades and machine presets with fiveAxis layout/pivot/limits.
+- cutting_data: material, cut, tool, machine, depth/ae/ap/scallop; material-based feeds bounded by machine limits.
+- manufacture: material, machine, origin, setupOrientation (+Z|-Z|+X|-X|+Y|-Y), finishAllowance, scallop, deburr, operations, tools, subprograms, planOnly. Exact-B-rep whole-part plan, multi-tool NC and replay claims; planOnly omits NC. Each manual setup has its own workOffset, never invented rotary motion.
+- turn: profile (2-200 of {diameter,z}), stock {diameter,length}, stepdown, allowance, feedMmRev, rpm. Z0 at face, negative towards chuck, X diameter. External rough/finish passes, stock profiles and G18/G94/G97 NC. Volumes: stock = part + unmachined tail + removed. Ideal point-tool preview, no insert/chuck/controller qualification. Save via cam_edit turn. Mill-turn uses a B head and positioned C spindle.
 
 Result (JSON)
-- ok and data/findings. Empty analyze issues means "no static findings", never "safe".
+- ok and data/findings. manufacture release/claims concern only modelled NC capabilities; turn always returns release preview. Neither qualifies a machine.
 
 Do not use it
-- For writes or stored verification: use cam_edit.
-- For geometry: use cad.
+- For writes or stored verification: use cam_edit. For geometry: use cad.
 
 After it
-- Create/update through cam_edit with the checked revision; generate, analyze the full program, verify and review current evidence.
+- Create/update with the checked revision, then generate, analyze full NC, verify and review evidence. Store turning via cam_edit turn; do not regenerate it with the legacy generator.

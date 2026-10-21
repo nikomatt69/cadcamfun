@@ -6236,6 +6236,37 @@ var parametricCache = new Map;
 var PRIMITIVE_MAY_BE_ZERO = new Set(["holeDiameter", "phiStart"]);
 // packages/core/src/cad/sketch-edit.ts
 var TAU5 = Math.PI * 2;
+// packages/core/src/cad/brep/primitives.ts
+var TAU6 = Math.PI * 2;
+// packages/core/src/cad/brep/sweep.ts
+var TAU7 = Math.PI * 2;
+var CORNER_TURN2 = 10 * Math.PI / 180;
+// packages/core/src/cad/brep/step.ts
+var SOLID_KINDS = new Set(["MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS", "SHELL_BASED_SURFACE_MODEL", "FACETED_BREP"]);
+// packages/core/src/cad/brep/boolean.ts
+var TAU8 = Math.PI * 2;
+var VOLUMES = new WeakMap;
+var SETS = new WeakMap;
+// packages/core/src/cad/brep/features.ts
+var TAU9 = 2 * Math.PI;
+var MAX_GAP = Math.PI / 3;
+// packages/core/src/cad/brep/shell.ts
+var CROSS = 1 + 0.000001;
+// packages/core/src/cad/brep/export-mesh.ts
+var CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0;n < 256; n++) {
+    let c = n;
+    for (let k = 0;k < 8; k++)
+      c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+// packages/core/src/cad/brep/iges.ts
+var TAU10 = Math.PI * 2;
+// packages/core/src/cad/kinematics.ts
+var RAD = Math.PI / 180;
 // packages/core/src/cad/parametric-from-element.ts
 var SOLIDS2 = {
   cube: { numbers: ["width", "height", "depth"] },
@@ -6275,18 +6306,6 @@ var DEG = Math.PI / 180;
 var PRESENTATION = new Set(["layer", "layerId", "name", "description", "visible", "locked", "selected", "color", "opacity", "wireframe", "linewidth", "originalData"]);
 // packages/core/src/cad/dfm.ts
 var GRAZING = Math.cos(65 * Math.PI / 180);
-// packages/core/src/cad/brep/primitives.ts
-var TAU6 = Math.PI * 2;
-// packages/core/src/cad/brep/sweep.ts
-var TAU7 = Math.PI * 2;
-var CORNER_TURN2 = 10 * Math.PI / 180;
-// packages/core/src/cad/brep/step.ts
-var SOLID_KINDS = new Set(["MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS", "SHELL_BASED_SURFACE_MODEL", "FACETED_BREP"]);
-// packages/core/src/cad/brep/boolean.ts
-var TAU8 = Math.PI * 2;
-// packages/core/src/cad/brep/features.ts
-var TAU9 = 2 * Math.PI;
-var MAX_GAP = Math.PI / 3;
 // packages/core/src/cam/kernel/materials.ts
 var m = (x) => x;
 var MATERIALS = [
@@ -7392,7 +7411,7 @@ var encodeStock = encodeEffect(StockSchema);
 var SETUP_ORIENTATIONS = ["+Z", "-Z", "+X", "-X", "+Y", "-Y"];
 // packages/core/src/cam/indexing.ts
 var DEG2 = 180 / Math.PI;
-var RAD = Math.PI / 180;
+var RAD2 = Math.PI / 180;
 // packages/core/src/cam/params.ts
 var NonNegative3 = Finite.check(isGreaterThanOrEqualTo2(0));
 var Positive3 = Finite.check(isGreaterThan2(0));
@@ -7572,7 +7591,32 @@ class MultiaxisParams extends Class3("cam/MultiaxisParams")(Struct({
   flute: withDefault2(Finite.check(isBetween({ minimum: 0.5, maximum: 6 })), 2)
 }).check(heightsOrdered)) {
 }
-var RAD2 = Math.PI / 180;
+var RAD3 = Math.PI / 180;
+// packages/core/src/cam/post/generic.ts
+var genericDialect = {
+  id: "generic",
+  canned: true,
+  rigidTap: {},
+  arcModes: ["ijk", "radius"],
+  dwell: "seconds",
+  uppercaseComments: false,
+  rotary: true,
+  begin: () => [],
+  setup: ["G90", "G17", "G94"],
+  toolChange: (n) => [`T${n} M6`],
+  end: "M30",
+  finish: []
+};
+
+// packages/core/src/cam/post/heidenhain.ts
+var heidenhainDialect = {
+  ...genericDialect,
+  id: "heidenhain",
+  canned: false,
+  rigidTap: undefined,
+  arcModes: ["linearize"],
+  commentStyle: "semicolon"
+};
 // packages/core/src/cam/testing/gcode-interpreter.ts
 var SILENT_STATEMENTS = new Set(["MSG", "TRAORI", "TRAFOOF", "SOFT", "BRISK", "FFWON", "FFWOF", "CFC", "CFTCP", "CFIN", "STOPRE", "WORKPIECE", "DIAMON", "DIAMOF", "DIAM90", "CYCLE832", "COMPCAD", "COMPCURV", "COMPOF", "SUPA", "TOFFON", "TOFFOF", "SETMS", "SPOS", "WAIT", "DEF", "PRINT_START", "PRINT_END", "START_PRINT", "END_PRINT"]);
 // packages/core/src/cam/generator/cycles.ts
@@ -8121,7 +8165,7 @@ var SOLID_TYPES2 = new Set([
 ]);
 
 // packages/core/src/cam/viewer/rotary.ts
-var RAD3 = Math.PI / 180;
+var RAD4 = Math.PI / 180;
 
 // packages/core/src/cam/viewer/machine-setup.ts
 var INTERNAL_TOOLS = new Set(["boring"]);
@@ -8229,7 +8273,25 @@ var VerifyResponseSchema = Struct({
 // packages/core/src/cam/kernel/contracts.ts
 var SURFACE_MODES = ["roughing", "rest", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"];
 // packages/core/src/cam/kernel/machines.ts
+var kernMicroHd = (taper) => ({
+  id: `kern-micro-hd-${taper}`,
+  name: `KERN Micro HD ${taper === "hsk25" ? "HSK25 (50,000 rpm, 6 kW)" : "HSK40 (42,000 rpm, 15 kW)"} B/C`,
+  post: "heidenhain",
+  limits: { maxRpm: taper === "hsk25" ? 50000 : 42000, minRpm: 1000, maxFeed: 60000, powerKw: taper === "hsk25" ? 6 : 15, torqueNm: taper === "hsk25" ? 1.6 : 5.9, rigidity: "standard" },
+  fiveAxis: { layout: "table-BC", tilt: [-110, 110], pivot: { x: 0, y: 0, z: -100 } },
+  table: { length: 350, width: 350, gap: 30 },
+  rapidFeed: 60000,
+  toolChangeSeconds: 3,
+  reference: {
+    controller: "Heidenhain TNC7",
+    source: "https://www.kern-microtechnik.com/en/Products/Machines/Kern-Micro-HD",
+    stroke: { x: 350, y: 220, z: 250 },
+    assumptions: ["Work origin, rotary pivot and clamping geometry must be calibrated; pivot Z=-100 mm and table envelope are preview assumptions", "The active TNC preset must match the program datum; no TCP/PLANE transformation is emitted", "Minimum spindle speed 1000 rpm is a conservative planning assumption; published stroke is not an absolute work-coordinate bound"]
+  }
+});
 var MACHINES = [
+  kernMicroHd("hsk25"),
+  kernMicroHd("hsk40"),
   {
     id: "vmc-standard",
     name: "Vertical machining centre (BT40, 12 000 rpm, 11 kW)",
@@ -8247,6 +8309,15 @@ var MACHINES = [
     table: { length: 762, width: 406, gap: 30 },
     rapidFeed: 25400,
     toolChangeSeconds: 4
+  },
+  {
+    id: "siemens-840d-vmc",
+    name: "Siemens 840D sl vertical mill (BT40, 12 000 rpm, 13 kW)",
+    post: "siemens",
+    limits: { maxRpm: 12000, minRpm: 100, maxFeed: 15000, powerKw: 13, torqueNm: 80, rigidity: "standard" },
+    table: { length: 800, width: 500, gap: 30 },
+    rapidFeed: 30000,
+    toolChangeSeconds: 5
   },
   {
     id: "hsc-mill",
@@ -8273,6 +8344,16 @@ var MACHINES = [
     limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
     table: { length: 600, width: 400, gap: 30 },
     fiveAxis: { layout: "table-AC", pivot: { x: 0, y: 0, z: -100 }, tilt: [-120, 120] },
+    rapidFeed: 30000,
+    toolChangeSeconds: 6
+  },
+  {
+    id: "trunnion-5ax-bc",
+    name: "5-axis trunnion B/C (BT40, 12 000 rpm, B/C table, 11 kW)",
+    post: "fanuc",
+    limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
+    table: { length: 600, width: 400, gap: 30 },
+    fiveAxis: { layout: "table-BC", pivot: { x: 0, y: 0, z: -100 }, tilt: [-120, 120] },
     rapidFeed: 30000,
     toolChangeSeconds: 6
   },

@@ -518,6 +518,10 @@ const bounds = (m: Mesh64): { min: [number, number, number]; max: [number, numbe
  * the chord error of round shapes unless the element carries its own `tolerance` or `segments`.
  */
 export const elementMesh = (e: Element, tolerance = 0.01): Mesh64 | undefined => {
+  if (e["type"] === "brep" && typeof e["brep"] === "object" && e["brep"] !== null) {
+    const body = e["brep"] as Brep
+    if (body.shells?.some((s) => !s.closed)) return undefined
+  }
   const local = localMesh(e, tolerance)
   return local === undefined ? undefined : placeElementMesh(e, local.mesh)
 }

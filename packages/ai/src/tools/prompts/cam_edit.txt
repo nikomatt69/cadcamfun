@@ -1,30 +1,19 @@
-Write operations, programs, verification reports and stock.
+Write machining operations, programs, stock and saved verification reports.
 
-Actions
-- create: add an operation.
-- update: change settings; invalidate NC.
-- generate: store NC; return stats and preview.
-- verify: replay the stored program (never regenerated) and store stock-removal, collision and gouge findings bound to its programHash; generate first if none.
-- stock_set: change stock; invalidate programs.
-- manufacture: kernel route for a whole part: store its multi-tool NC (M98 subprograms) and release evidence. Preview with cam manufacture first; read evidence with cam review.
-
-Parameters (mm, mm/min, rpm, angles in degrees)
-- create: type (contour, pocket, drill, engrave, profile, threading, 3d_surface, probing, multiaxis, facing, turning_od, parting_od, ...), params - the generator settings: toolType, toolDiameter, depth, stepdown, feedrate, rpm, material (aluminum, steel, wood, plastic, brass, titanium, composite, other), offset (inside|outside|center), workOffset (G54..G59), originType, machineType, and printer extras (infillDensity, supportType, shellCount).
-- update: operationId, params (changed fields only).
-- generate: operationId (required; list them with cam operations), maxLines (1-200, default 40).
-- verify: operationId, tool {cuttingLength, shankDiameter, stickout, holderDiameter, holderLength}, fixtures [{id, bounds:{minX,maxX,minY,maxY,minZ,maxZ}}], targetSolids, stock (same bounds), resolution, tolerance. Omitted fields are not modelled.
-- stock_set: stock {width, height, depth, radius, x, y, topZ, allowance, material?, elementId?}.
-- manufacture: as cam manufacture (material, machine, origin, setupOrientation, finishAllowance, scallop, deburr, operations, tools, subprograms) plus expectedRevision. Blocked releases are not saved.
+Actions and Parameters (mm, mm/min, rpm)
+- create: type (contour, pocket, drill, engrave, profile, threading, 3d_surface, probing, multiaxis, facing, turning, parting), params, expectedRevision. params holds generator settings: toolType, toolDiameter, depth, stepdown, feedrate, rpm, material (aluminum|steel|wood|plastic|brass|titanium|composite|other), offset (inside|outside|center), workOffset, originType, machineType; printer extras infillDensity, supportType, shellCount.
+- update: operationId, params, expectedRevision; changed settings invalidate NC.
+- generate: operationId (required), maxLines (1-200, default 40); store full NC, return stats and preview.
+- verify: operationId, tool {cuttingLength,shankDiameter,stickout,holderDiameter,holderLength}, fixtures [{id,bounds:{minX,maxX,minY,maxY,minZ,maxZ}}], targetSolids, stock (same bounds), resolution, tolerance, start {x,y,z}. Replay stored NC, never regenerate; persist evidence bound to programHash. Omitted geometry is unmodelled. Default start is X0 Y0 at stock top +10 mm.
+- stock_set: stock {width,height,depth,radius,x,y,topZ,allowance,material?,elementId?}; change stock and invalidate programs.
+- manufacture: material, machine, origin, setupOrientation, finishAllowance, scallop, deburr, operations, tools, subprograms, expectedRevision. Store whole-part kernel NC and evidence; blocked releases refused. Preview via cam manufacture.
+- turn: profile, stock, stepdown, allowance, feedMmRev, rpm, expectedRevision (as cam turn). Store identical native external-turning NC with lathe stock settings. Always preview; ideal point tool, unqualified workholding/controller. Re-run turn after changes, never legacy generate.
 
 Result (JSON)
-- ok; create: operationId; generate: programHash, lines/returned/omitted, preview head (the stored program is complete); verify: status, programHash, issues, stats, coverage (resolution, omitted issues), modelling limits; stock_set: stock/workpiece, invalidated operations.
-- manufacture: operationId, release, NC identity. Desktop loads the original; cam manufacture previews without writing.
+- ok; create/update: operationId; generate: programHash, lines/previewLines/omittedLines, preview; verify: status, programHash, issues, stats and modelling limits. manufacture/turn: operationId, release, identity; desktop loads the stored original.
 
 Do not use it
-- For machine/operation reads or static analysis: use cam.
-- To claim a program is safe: verify reports only what it modelled.
+- For reads or static analysis: use cam. A simulated pass proves only the supplied model.
 
 After it
-- Send expectedRevision on create/update; stale plans require fresh plan_check.
-- verify: start {x,y,z} is the initial tip; otherwise X0 Y0 at stock top + 10 mm is assumed.
-- Read cam review after verification. At one drawing/stock revision, allow at most three refinements; stop at refinement_limit and report the cause.
+- A stale revision requires fresh inspection and plan_check. Read cam review; at most three refinements per drawing/stock revision, then report refinement_limit.
