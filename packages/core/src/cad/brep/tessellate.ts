@@ -529,7 +529,9 @@ const tessellateFace = (
   // Cylinders and cones are straight along v: any triangle may be long in v, and a Delaunay criterion
   // that sees v compressed joins boundary points at matching u across the face (strips) instead of diagonals across the
   // curvature, which the refinement then broke up into thousands of small triangles. The chord test still decides.
-  if (s.kind === "cylinder" || s.kind === "cone") sv *= 0.02
+  // A long thin cylinder (a 1 mm bore through a 100 mm plate) needs the compression to follow its length: with the fixed
+  // factor the strip stays dozens of times longer than it is wide and the refinement breaks it into 150 000 slivers.
+  if (s.kind === "cylinder" || s.kind === "cone") sv *= Math.min(0.02, (4 * (u1 - u0) * su) / Math.max(1e-300, (v1 - v0) * sv))
   const cdt = new Cdt({ minX: u0 * su, minY: v0 * sv, maxX: u1 * su, maxY: v1 * sv })
   // Local vertex table.
   const localG: number[] = []
