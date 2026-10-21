@@ -7,6 +7,8 @@ import { Stack } from "expo-router"
 import { ThemeProvider as NavigationThemeProvider, DarkTheme, DefaultTheme } from "expo-router/react-navigation"
 import { ThemeProvider, useTheme } from "@/lib/theme"
 import { ServerProvider, useServer } from "@/lib/server"
+import { configureNotificationHandler } from "@/lib/notifications"
+import * as Notifications from "expo-notifications"
 import { setupOfflineDrainOnForeground } from "@/lib/offline-queue"
 import { ToastHost } from "@/components/ui/ToastHost"
 import { AppLockCoordinator } from "@/components/layout/AppLockCoordinator"
@@ -35,6 +37,17 @@ function Gate() {
   return null
 }
 
+/** Tapping a native notification opens the synced Activity feed it came from. */
+function NotificationTap() {
+  const router = useRouter()
+  useEffect(() => {
+    configureNotificationHandler()
+    const sub = Notifications.addNotificationResponseReceivedListener(() => router.push("/(app)/activity" as never))
+    return () => sub.remove()
+  }, [router])
+  return null
+}
+
 function OfflineDrain() {
   const { config } = useServer()
   useEffect(() => setupOfflineDrainOnForeground(() => config), [config])
@@ -49,6 +62,7 @@ function ThemedStack() {
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       <Gate />
+      <NotificationTap />
       <OfflineDrain />
       <Stack
         screenOptions={{

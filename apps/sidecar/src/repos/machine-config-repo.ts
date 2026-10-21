@@ -19,6 +19,12 @@ async function ownerOf(db: Db, ownerId: string) {
 const usageOf = async (db: Db, id: string) =>
   (await db.select({ n: count() }).from(schema.toolpathTable).where(eq(schema.toolpathTable.machineConfigId, id)))[0]?.n ?? 0
 
+/** Organizations whose projects run a toolpath on this machine configuration. */
+const orgsUsing = async (db: Db, id: string): Promise<ReadonlyArray<string>> =>
+  (await db.selectDistinct({ org: schema.projectTable.organizationId }).from(schema.toolpathTable)
+    .innerJoin(schema.projectTable, eq(schema.projectTable.id, schema.toolpathTable.projectId))
+    .where(eq(schema.toolpathTable.machineConfigId, id))).flatMap((r) => r.org ? [r.org] : [])
+
 export type MachineConfigView = ReturnType<typeof serialize> & { owner: ReturnType<typeof owner> | null }
 export interface Permission { hasAccess: boolean; isOwner: boolean; reason?: string }
 
@@ -42,6 +48,8 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
     Effect.gen(function*() {
       const { query } = yield* Database
       const events = yield* LiveEvents
+      const announce = (ownerId: string, orgs: ReadonlyArray<string>) =>
+        Effect.andThen(events.resourcesChanged(ownerId), Effect.forEach(orgs, (org) => events.resourcesChanged(ownerId, org), { discard: true }))
       const T = schema.machineConfigTable
       return MachineConfigRepo.of({
         list: (userId, f) =>
@@ -86,9 +94,13 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
         update: (id, d) =>
           query("machineConfigs.update", async (db) => {
             const [row] = await db.update(T).set({ ...d, updatedAt: new Date() }).where(eq(T.id, id)).returning()
-            return { view: { ...serialize(row!), owner: await ownerOf(db, row!.ownerId) }, usageCount: await usageOf(db, id) }
-          }).pipe(Effect.tap((row) => row.view.ownerId ? events.resourcesChanged(row.view.ownerId) : Effect.void)),
-        remove: (id) => query("machineConfigs.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId }))[0]).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void), Effect.asVoid),
+            return { view: { ...serialize(row!), owner: await ownerOf(db, row!.ownerId) }, usageCount: await usageOf(db, id), orgs: await orgsUsing(db, id) }
+          }).pipe(Effect.tap((row) => row.view.ownerId ? announce(row.view.ownerId, row.orgs) : Effect.void), Effect.map(({ view, usageCount }) => ({ view, usageCount }))),
+        remove: (id) => query("machineConfigs.remove", async (db) => {
+          const orgs = await orgsUsing(db, id)
+          const row = (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId }))[0]
+          return row ? { ownerId: row.ownerId, orgs } : undefined
+        }).pipe(Effect.tap((row) => row?.ownerId ? announce(row.ownerId, row.orgs) : Effect.void), Effect.asVoid),
         usage: (id) => query("machineConfigs.usage", (db) => usageOf(db, id)),
         byId: (id) => query("machineConfigs.byId", async (db) => (await db.select().from(T).where(eq(T.id, id)).limit(1))[0]),
         setConfig: (id, config) => query("machineConfigs.setConfig", async (db) => void (await db.update(T).set({ config, updatedAt: new Date() }).where(eq(T.id, id)))),

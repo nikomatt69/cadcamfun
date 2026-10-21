@@ -9,6 +9,7 @@ import { drainQueueWith, refreshOfflineQueueCount } from "./offline-queue"
 import { uiPreferencesReady, useUIStore } from "./store"
 import { ServerContext, type Connectivity, type DesktopBootstrap, type ServerValue } from "./server-context"
 import { createHostEvents } from "./host-events"
+import { presentNotification, syncNotificationBadge } from "./notifications"
 
 export type { Connectivity, DesktopBootstrap, ServerValue }
 export { useServer } from "./server-context"
@@ -296,6 +297,17 @@ export function ServerProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (connectivity === "online") return hostEvents?.start()
   }, [hostEvents, connectivity])
+  // Paired sync: a new important DB notification pops natively here too, and every
+  // notification frame re-reads the authoritative unread count for tab + OS badges.
+  useEffect(() => hostEvents?.subscribe((event) => {
+    if (event.type === "notification.created") void presentNotification(event.notification)
+    if (event.type.startsWith("notification.")) {
+      void client?.notifications({ limit: 1 }).then((feed) => {
+        useUIStore.getState().setUnreadCount(feed.unreadCount)
+        void syncNotificationBadge(feed.unreadCount)
+      }).catch(() => undefined)
+    }
+  }), [hostEvents, client])
   const value = useMemo<ServerValue>(
     () => ({ hostEvents, config, client, connectivity, connectionError, ai, bootstrap, bootstrapLoading, booting, save, clear, recheck, refreshBootstrap }),
     [hostEvents, config, client, connectivity, connectionError, ai, bootstrap, bootstrapLoading, booting, save, clear, recheck, refreshBootstrap],

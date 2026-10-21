@@ -11,7 +11,7 @@
 import { Api, CurrentUser, InternalError, NotFound, type LiveEvent as LiveEventFrame } from "@cadcamfun/api"
 import { Effect, Stream } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
-import { LiveEvents } from "../services/live-events.ts"
+import { LiveEvents, type LiveEvent } from "../services/live-events.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
 
 /** nikcli's 30s host heartbeat, tighter here so a phone drops a dead radio within a minute. */
@@ -25,6 +25,29 @@ export const framed =<E, R>(live: Stream.Stream<LiveEventFrame, E, R>, heartbeat
     { haltStrategy: "left" }
   )
 
+/**
+ * Who may see a frame. Catalogue frames are global, notification/organization frames belong to one
+ * user, `resources.changed` reaches its owner plus every member of the organization it names, and
+ * everything else follows project access. Rechecked per frame, so revoking access stops delivery.
+ */
+export const frameVisibleTo = (
+  userId: string,
+  event: LiveEvent,
+  projects: { readonly isMember: (userId: string, organizationId: string) => Effect.Effect<boolean, unknown>; readonly find: (userId: string, projectId: string) => Effect.Effect<unknown, unknown> }
+): Effect.Effect<boolean> => {
+  const denied = Effect.catch(() => Effect.succeed(false))
+  switch (event.type) {
+    case "catalogue.updated": return Effect.succeed(true)
+    case "resources.changed":
+      return event.userId === userId ? Effect.succeed(true)
+        : event.organizationId === undefined ? Effect.succeed(false)
+        : projects.isMember(userId, event.organizationId).pipe(denied)
+    case "notification.created": case "notification.updated": return Effect.succeed(event.notification.userId === userId)
+    case "notification.deleted": case "notification.readAll": case "organizations.changed": return Effect.succeed(event.userId === userId)
+    default: return projects.find(userId, event.projectId).pipe(Effect.map((project) => project !== undefined), denied)
+  }
+}
+
 export const EventsHandlers = HttpApiBuilder.group(Api, "events", Effect.fn(function*(handlers) {
   const events = yield* LiveEvents
   const projects = yield* ProjectRepo
@@ -34,21 +57,7 @@ export const EventsHandlers = HttpApiBuilder.group(Api, "events", Effect.fn(func
       const user = yield* CurrentUser
       const source = yield* events.subscribe({})
       // Recheck membership at delivery time: revoking project access also revokes future frames.
-      const visible = source.pipe(
-        Stream.filterEffect((event) => event.type === "catalogue.updated" ? Effect.succeed(true)
-          : event.type === "resources.changed"
-            // Shared (organization) writes reach every member; membership is rechecked per frame.
-            ? event.userId === user.id || event.organizationId === undefined ? Effect.succeed(event.userId === user.id)
-              : projects.isMember(user.id, event.organizationId).pipe(Effect.catchTag("DatabaseError", () => Effect.succeed(false)))
-          // Notification frames are per-user, never per-project: only the owner sees them.
-          : event.type === "notification.created" || event.type === "notification.updated" ? Effect.succeed(event.notification.userId === user.id)
-          : event.type === "notification.deleted" || event.type === "notification.readAll" ? Effect.succeed(event.userId === user.id)
-          : event.type === "organizations.changed" ? Effect.succeed(event.userId === user.id)
-          : projects.find(user.id, event.projectId).pipe(
-          Effect.map((project) => project !== undefined),
-          Effect.catchTag("DatabaseError", () => Effect.succeed(false)),
-        )),
-      )
+      const visible = source.pipe(Stream.filterEffect((event) => frameVisibleTo(user.id, event, projects)))
       return framed(visible, LIVE_HEARTBEAT_MS)
     }))
     .handle("subscribe", ({ params }) =>

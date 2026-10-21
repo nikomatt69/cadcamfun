@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { Context, Effect, Fiber, Stream } from "effect"
 import { makeApp } from "./helpers.ts"
-import { framed } from "../src/http/events.ts"
+import { frameVisibleTo, framed } from "../src/http/events.ts"
 import { LiveEvents, announcingWrites } from "../src/services/live-events.ts"
 import { McpRepo } from "../src/repos/mcp-repo.ts"
 import { UserRepo } from "../src/repos/user-repo.ts"
@@ -59,5 +59,23 @@ describe("sync coverage", () => {
       return yield* Fiber.join(next).pipe(Effect.timeout("5 seconds"))
     })))
     expect(frame._tag === "Some" && frame.value).toMatchObject({ type: "resources.changed", userId, organizationId: "org-1" })
+  })
+
+  test("an organization frame is delivered to members and to nobody else", async () => {
+    const members = new Map([["org-1", new Set(["owner", "colleague"])]])
+    const projects = {
+      isMember: (user: string, org: string) => Effect.succeed(members.get(org)?.has(user) ?? false),
+      find: () => Effect.succeed(undefined)
+    }
+    const frame = { type: "resources.changed", userId: "owner", organizationId: "org-1", at: "now" } as const
+    const seenBy = (user: string) => Effect.runPromise(frameVisibleTo(user, frame, projects))
+    expect(await seenBy("owner")).toBe(true)
+    expect(await seenBy("colleague")).toBe(true)
+    expect(await seenBy("stranger")).toBe(false)
+    // Revoked membership stops delivery on the very next frame.
+    members.get("org-1")!.delete("colleague")
+    expect(await seenBy("colleague")).toBe(false)
+    // A personal write never leaks to an organization.
+    expect(await Effect.runPromise(frameVisibleTo("colleague", { type: "resources.changed", userId: "owner", at: "now" }, projects))).toBe(false)
   })
 })
