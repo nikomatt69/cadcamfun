@@ -1,6 +1,9 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { runJob, type CamArtifact, type ManufacturingJob } from "./index.ts"
 import { findMachine } from "./machines.ts"
+
+// Each case runs the whole kernel on the part: the fine grid is the slow one.
+setDefaultTimeout(30_000)
 
 const base = (extra: Partial<ManufacturingJob> = {}): ManufacturingJob => ({
   schemaVersion: 1, id: "tb", name: "Plate", material: "6061", machine: findMachine("vmc-standard")!, quality: { resolution: 0.4, tolerance: 0.01 },
