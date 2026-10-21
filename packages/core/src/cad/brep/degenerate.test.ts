@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { booleanBrep, booleanStrict, BooleanError, frame, makeBox, makeCylinder, makeSphere, makeTorus, massProperties, validateBrep, type Brep, type BooleanOp } from "./index.ts"
+import { booleanBrep, booleanStrict, BooleanError, frame, transformBrep, translation, makeBox, makeCylinder, makeSphere, makeTorus, massProperties, validateBrep, type Brep, type BooleanOp } from "./index.ts"
 
 setDefaultTimeout(60_000)
 const at = (x: number, y: number, z: number, a = { x: 0, y: 0, z: 1 }) => frame({ x, y, z }, a)
@@ -50,5 +50,17 @@ describe("degenerate alignments (R1-R5)", () => {
     expect(d.stage).toBe("validate")
     expect(d.hint.length).toBeGreaterThan(10)
     expect(d.attempts).toEqual([])
+  })
+
+  test("a sphere pole a millimetre from a torus: the fragment at the pole tessellates (it was empty), so the volumes balance", () => {
+    // The sphere's south pole lies 0.16 mm outside the torus; a vertex of the intersection curve a few microns off the seam near
+    // the pole has a u that differs by radians, and the fragment used to come out with no triangles and no warning.
+    const torus = makeTorus(4.5, 2.5, frame({ x: -0.5, y: -0.5, z: -1 }, { x: 0, y: 0, z: 1 }))
+    const sphere = transformBrep(makeSphere(4.5, frame({ x: -2, y: -2.5, z: 2 }, { x: 0, y: 0, z: 1 })), translation({ x: 5e-4, y: 3e-4, z: 8e-4 }))
+    const u = booleanStrict(torus, sphere, "union").brep, i = booleanStrict(torus, sphere, "intersect").brep
+    const vt = massProperties(torus).volume, vs = massProperties(sphere).volume
+    expect(Math.abs(massProperties(u).volume + massProperties(i).volume - vt - vs)).toBeLessThan(1e-3)
+    // The grid estimate of the intersection (360^3 cells) is 101.8.
+    expect(Math.abs(massProperties(i).volume - 101.78)).toBeLessThan(0.1)
   })
 })

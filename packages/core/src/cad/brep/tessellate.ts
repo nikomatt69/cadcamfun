@@ -172,7 +172,10 @@ const isSingular = (s: Surface, uv: SurfaceParam): { readonly su: boolean; reado
   const d = surfaceDerivs(s, uv.u, uv.v)
   const lu = length3(d.su), lv = length3(d.sv)
   const ref = Math.max(lu, lv, 1e-300)
-  return { su: lu < 1e-9 * ref || lu < 1e-12, sv: lv < 1e-9 * ref || lv < 1e-12 }
+  // A point a few millimetres from a pole has a well defined u in exact arithmetic but not in the data: a vertex a few microns
+  // off the seam (two edges that meet there) differs in u by radians. On a sphere, within 0.5 % of the radius it takes u from its neighbours.
+  const nearPole = s.kind === "sphere" ? 5e-3 : 1e-9
+  return { su: lu < nearPole * ref || lu < 1e-12, sv: lv < 1e-9 * ref || lv < 1e-12 }
 }
 
 interface FaceCtx {
