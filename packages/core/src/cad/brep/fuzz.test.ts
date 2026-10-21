@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { booleanBrep, BooleanError, frame, makeBox, makeCone, makeCylinder, makeSphere, makeTorus, massProperties, validateBrep, type Brep } from "./index.ts"
+import { blendBrep, blendCandidates, booleanBrep, BooleanError, frame, makeBox, makeCone, makeCylinder, makeSphere, makeTorus, massProperties, validateBrep, type Brep } from "./index.ts"
 
 setDefaultTimeout(120_000)
 
@@ -57,4 +57,29 @@ describe("Boolean fuzzing: valid results and inclusion-exclusion", () => {
       expect(failures.length).toBeLessThanOrEqual(aligned ? 0 : 1)
     })
   }
+})
+
+describe("blend fuzzing: boxes with a bore, a boss or a dome, every edge filleted or chamfered", () => {
+  test("12 seeded bodies: valid result, volume between 80 % and 100 % of the original", () => {
+    const failures: string[] = []
+    for (let seed = 1; seed <= 12; seed++) {
+      const r = rng(seed * 977)
+      const w = 8 + r() * 10, h = 8 + r() * 10, d = 6 + r() * 8
+      const at = (x: number, y: number, z: number) => frame({ x, y, z }, { x: 0, y: 0, z: 1 })
+      let b: Brep = makeBox(w, h, d)
+      const k = Math.floor(r() * 4)
+      if (k === 1) b = booleanBrep(b, makeCylinder(1 + r() * 2, d, at(w / 2, h / 2, 0)), "subtract").brep
+      if (k === 2) b = booleanBrep(b, makeCylinder(2 + r() * 2, d, at(w * 0.8, h * 0.5, 0)), "union").brep
+      if (k === 3) b = booleanBrep(b, makeSphere(2 + r() * 2, at(w / 2, h / 2, d)), "union").brep
+      const radius = 0.3 + r() * 1.2
+      try {
+        const out = blendBrep(b, blendCandidates(b), radius, r() < 0.5 ? "fillet" : "chamfer").brep
+        const v0 = volume(b), v1 = volume(out)
+        if (validateBrep(out).issues.length > 0 || !(v1 < v0 && v1 > 0.8 * v0)) failures.push(`seed ${seed}: invalid or implausible volume ${v0.toFixed(1)} -> ${v1.toFixed(1)}`)
+      } catch (e) {
+        failures.push(`seed ${seed}: ${String((e as Error).message).slice(0, 100)}`)
+      }
+    }
+    expect(failures).toEqual([])
+  })
 })
