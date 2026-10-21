@@ -6234,6 +6234,8 @@ var parametricCache = new Map;
 
 // packages/core/src/cad/history.ts
 var PRIMITIVE_MAY_BE_ZERO = new Set(["holeDiameter", "phiStart"]);
+// packages/core/src/cad/sketch-edit.ts
+var TAU5 = Math.PI * 2;
 // packages/core/src/cad/parametric-from-element.ts
 var SOLIDS2 = {
   cube: { numbers: ["width", "height", "depth"] },
@@ -6274,16 +6276,16 @@ var PRESENTATION = new Set(["layer", "layerId", "name", "description", "visible"
 // packages/core/src/cad/dfm.ts
 var GRAZING = Math.cos(65 * Math.PI / 180);
 // packages/core/src/cad/brep/primitives.ts
-var TAU5 = Math.PI * 2;
-// packages/core/src/cad/brep/sweep.ts
 var TAU6 = Math.PI * 2;
+// packages/core/src/cad/brep/sweep.ts
+var TAU7 = Math.PI * 2;
 var CORNER_TURN2 = 10 * Math.PI / 180;
 // packages/core/src/cad/brep/step.ts
 var SOLID_KINDS = new Set(["MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS", "SHELL_BASED_SURFACE_MODEL", "FACETED_BREP"]);
 // packages/core/src/cad/brep/boolean.ts
-var TAU7 = Math.PI * 2;
+var TAU8 = Math.PI * 2;
 // packages/core/src/cad/brep/features.ts
-var TAU8 = 2 * Math.PI;
+var TAU9 = 2 * Math.PI;
 var MAX_GAP = Math.PI / 3;
 // packages/core/src/cam/kernel/materials.ts
 var m = (x) => x;
