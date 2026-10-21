@@ -59,7 +59,11 @@ export const CadExactPart = Schema.Struct({
   volume: num, area: num, centroid: vec3, bounds: Schema.Struct({ min: vec3, max: vec3 }),
   faces: int, edges: int, vertices: int, surfaces: Schema.Record(Schema.String, int),
   throughHoles: Schema.optionalKey(int),
-  holes: Schema.Array(CadExactHole), machining: CadExactMachining
+  holes: Schema.Array(CadExactHole), machining: CadExactMachining,
+  /** Names of the faces (the first 40): the handles `cad.shell` takes for open faces. */
+  faceNames: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** For a solid that does not validate: what healing it would do and whether the healed solid is valid. */
+  repair: Schema.optionalKey(Schema.Struct({ verticesWelded: int, edgesWelded: int, collapsedUses: int, validAfter: Schema.Boolean, issuesAfter: Schema.Array(Schema.String) }))
 })
 
 export const CadExactAnalysis = Schema.Struct({

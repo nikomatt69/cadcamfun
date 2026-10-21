@@ -6,7 +6,7 @@
  * the reason.
  */
 import { brepFeatures, type ExactFeatures } from "../cam/brep-part.ts"
-import { massProperties, minimumDistance, recognizeHoles, shellBrep, validateBrep, type Brep } from "./brep/index.ts"
+import { healBrep, massProperties, minimumDistance, recognizeHoles, shellBrep, validateBrep, type Brep } from "./brep/index.ts"
 import { brepBox } from "./history-brep.ts"
 import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
 import type { BomRow, InferredJoint } from "./assembly-analysis.ts"
@@ -48,6 +48,10 @@ export interface ScenePartAnalysis {
   readonly throughHoles?: number
   readonly holes: ReadonlyArray<SceneHole>
   readonly machining: SceneMachining
+  /** Names of the faces (the first 40), the handles `cad.shell` takes for open faces. */
+  readonly faceNames?: ReadonlyArray<string>
+  /** For a solid that does not validate: what healing it would do and whether the healed solid is valid. */
+  readonly repair?: { readonly verticesWelded: number; readonly edgesWelded: number; readonly collapsedUses: number; readonly validAfter: boolean; readonly issuesAfter: ReadonlyArray<string> }
 }
 
 export interface SceneAnalysis {
@@ -75,7 +79,17 @@ export const analyzeBrep = (id: string, name: string, b: Brep, options: { readon
     entry: h.entry, direction: h.direction, diameter: h.diameter, depth: h.depth, form: h.form, bottom: h.bottom,
     ...(h.headDiameter !== undefined ? { headDiameter: h.headDiameter } : {}), ...(h.headDepth !== undefined ? { headDepth: h.headDepth } : {})
   }))
+  const names = [...new Set(b.faces.map((f) => f.name).filter((n): n is string => n !== undefined))]
+  let repair: ScenePartAnalysis["repair"]
+  if (!report.valid) {
+    try {
+      const h = healBrep(b)
+      repair = { verticesWelded: h.report.verticesWelded, edgesWelded: h.report.edgesWelded, collapsedUses: h.report.degenerateUsesDropped, validAfter: h.report.after.valid, issuesAfter: h.report.after.issues.slice(0, 5).map((i) => i.message) }
+    } catch { /* an unreadable body has nothing to heal */ }
+  }
   return {
+    ...(names.length > 0 ? { faceNames: names.slice(0, 40) } : {}),
+    ...(repair !== undefined ? { repair } : {}),
     id, name, valid: report.valid, issues: report.issues.slice(0, 8).map((i) => i.message),
     volume: mass.volume, area: mass.area, centroid: mass.centroid, bounds: { min: box.lo, max: box.hi },
     faces: b.faces.length, edges: b.edges.length, vertices: b.vertices.length, surfaces,

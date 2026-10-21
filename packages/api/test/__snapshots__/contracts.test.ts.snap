@@ -15617,6 +15617,12 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "edges": {
                             "type": "integer",
                           },
+                          "faceNames": {
+                            "items": {
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
                           "faces": {
                             "type": "integer",
                           },
@@ -15774,6 +15780,37 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           },
                           "name": {
                             "type": "string",
+                          },
+                          "repair": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "collapsedUses": {
+                                "type": "integer",
+                              },
+                              "edgesWelded": {
+                                "type": "integer",
+                              },
+                              "issuesAfter": {
+                                "items": {
+                                  "type": "string",
+                                },
+                                "type": "array",
+                              },
+                              "validAfter": {
+                                "type": "boolean",
+                              },
+                              "verticesWelded": {
+                                "type": "integer",
+                              },
+                            },
+                            "required": [
+                              "verticesWelded",
+                              "edgesWelded",
+                              "collapsedUses",
+                              "validAfter",
+                              "issuesAfter",
+                            ],
+                            "type": "object",
                           },
                           "surfaces": {
                             "additionalProperties": {

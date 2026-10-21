@@ -1,7 +1,8 @@
 import { expect, setDefaultTimeout, test } from "bun:test"
 import type { History } from "./history.ts"
 import { model } from "./script.ts"
-import { analyzeScene, assemblyReport } from "./scene-analysis.ts"
+import { analyzeBrep, analyzeScene, assemblyReport } from "./scene-analysis.ts"
+import { makeBox } from "./brep/index.ts"
 
 setDefaultTimeout(90_000)
 
@@ -101,4 +102,19 @@ test("the exact gap between two solids of the drawing", () => {
   if (d.ok) { expect(d.distance).toBeCloseTo(4.5, 9); expect(d.overlap).toBe(false) }
   expect(sceneDistance([cube("a", 0)], "a", "a").ok).toBe(false)
   expect(sceneDistance([cube("a", 0)], "a", "zz").ok).toBe(false)
+})
+
+test("the exact analysis names the faces and says what healing would do for a solid that does not validate", () => {
+  const params = analyzeScene([{ id: "c", type: "cube", name: "block", x: 0, y: 0, z: 0, width: 10, height: 10, depth: 10 }]).parts[0]!
+  expect(params.valid).toBe(true)
+  expect(params.repair).toBeUndefined()
+  const bad = analyzeBrep("x", "open box", (() => {
+    const box = makeBox(10, 10, 10)
+    // Drop a face: the shell is open and every neighbour's edge is used once.
+    return { ...box, faces: box.faces.slice(0, 5), shells: [{ faces: [0, 1, 2, 3, 4], closed: true }] }
+  })(), { machining: false })
+  expect(bad.valid).toBe(false)
+  expect(bad.repair).toBeDefined()
+  expect(bad.repair!.validAfter).toBe(false)
+  expect(bad.repair!.issuesAfter.length).toBeGreaterThan(0)
 })

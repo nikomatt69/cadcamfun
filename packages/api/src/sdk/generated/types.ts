@@ -6382,6 +6382,14 @@ export type CadExactAnalyzeOutput = {
     machining:
       | { prismatic: true; holes: number; pockets: number; outlines: number; top: number; bottom: number }
       | { prismatic: false; reason: string }
+    faceNames?: Array<string>
+    repair?: {
+      verticesWelded: number
+      edgesWelded: number
+      collapsedUses: number
+      validAfter: boolean
+      issuesAfter: Array<string>
+    }
   }>
   skipped: Array<{ id: string; name: string; reason: string }>
   totals: { parts: number; volume: number; area: number }
