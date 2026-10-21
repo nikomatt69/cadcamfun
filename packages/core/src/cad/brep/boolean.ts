@@ -1203,7 +1203,11 @@ const poleOnOther = (a: Brep, b: Brep): boolean => {
   const ps = poles(a)
   if (ps.length === 0) return false
   const loc = brepLocator(b)
-  return ps.some((p) => loc.closest(p).distance < 1e-6)
+  // On, or so near that the intersection curve passes through the pole's neighbourhood: strict results were seen 0.8 % off for a pole
+  // 1e-5 mm from the surface of a 17 mm model, and sound from 1e-4 mm; the margin is 2e-4 of the model's size.
+  const box = boxOf(ps.concat(b.vertices.map((v) => v.point)))
+  const near = 2e-4 * Math.max(1, dist3(box.lo, box.hi))
+  return ps.some((p) => loc.closest(p).distance < near)
 }
 
 /**
