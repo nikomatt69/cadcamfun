@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { booleanBrep, frame, makeBox, makeCylinder, makeSphere, makeTorus, massProperties, validateBrep, type Brep, type BooleanOp } from "./index.ts"
+import { booleanBrep, booleanStrict, BooleanError, frame, makeBox, makeCylinder, makeSphere, makeTorus, massProperties, validateBrep, type Brep, type BooleanOp } from "./index.ts"
 
 setDefaultTimeout(60_000)
 const at = (x: number, y: number, z: number, a = { x: 0, y: 0, z: 1 }) => frame({ x, y, z }, a)
@@ -40,5 +40,15 @@ describe("degenerate alignments (R1-R5)", () => {
     expect(validateBrep(r.brep).issues).toEqual([])
     expect(r.warnings.some((w) => w.includes("degenerate alignment"))).toBe(true)
     expect(Math.abs(massProperties(r.brep).volume - (1000 - PI * 4 * 10)) / 874).toBeLessThan(1e-5)
+  })
+
+  test("a Boolean that cannot be repaired reports its stage and a remedy; the strict form reports without recovery", () => {
+    let e: unknown
+    try { booleanStrict(makeBox(10, 10, 10), makeCylinder(2, 10, at(2, 5, 0)), "subtract") } catch (x) { e = x }
+    expect(e).toBeInstanceOf(BooleanError)
+    const d = (e as BooleanError).diagnostic!
+    expect(d.stage).toBe("validate")
+    expect(d.hint.length).toBeGreaterThan(10)
+    expect(d.attempts).toEqual([])
   })
 })

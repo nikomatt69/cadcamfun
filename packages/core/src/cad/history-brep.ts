@@ -608,7 +608,7 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
       return ok(booleanBrep(a.brep, b.brep, op).brep)
     } catch (e) {
       if (e instanceof BudgetExceeded) throw e
-      return no(e instanceof BooleanError ? `exact ${op} failed: ${e.message}` : String(e))
+      return no(e instanceof BooleanError ? `exact ${op} failed: ${e.message}${e.diagnostic !== undefined ? ` (${e.diagnostic.stage}: ${e.diagnostic.hint})` : ""}` : String(e))
     }
   }
 

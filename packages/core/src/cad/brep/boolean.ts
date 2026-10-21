@@ -39,11 +39,27 @@ import { validateBrep, type BrepIssue } from "./validate.ts"
 
 export type BooleanOp = "union" | "subtract" | "intersect"
 
+/** Where in the pipeline a Boolean gave up. */
+export type BooleanStage = "prepare" | "arrange" | "validate"
+
+/** Machine-readable account of a failed Boolean: what stage, which operand and face, what to try. */
+export interface BooleanDiagnostic {
+  readonly stage: BooleanStage
+  readonly operand?: "A" | "B"
+  readonly face?: number
+  /** Suggested remedy for the person or the assistant. */
+  readonly hint: string
+  /** Displacements already tried by the recovery (mm), empty when the plain pipeline failed and no recovery ran. */
+  readonly attempts: ReadonlyArray<number>
+}
+
 export class BooleanError extends Error {
-  constructor(message: string, readonly issues: ReadonlyArray<BrepIssue> = []) {
+  constructor(message: string, readonly issues: ReadonlyArray<BrepIssue> = [], readonly diagnostic?: BooleanDiagnostic) {
     super(message)
   }
 }
+
+const DEGENERATE_HINT = "the operands meet in a degenerate way (tangent, coincident or exactly aligned); move one by a small amount, change a radius slightly, or model the contact as an overlap"
 
 export interface BooleanOptions {
   /** Coincidence tolerance, mm (default 1e-8 × model size, at least 1e-7). */
@@ -623,7 +639,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
     const sd = S[s], other = S[1 - s]!
     sd.brep.faces.forEach((face, fi) => {
       checkBudget()
-      if (sd.fb.synthetic[fi]) throw new BooleanError(`face ${fi} of operand ${s === 0 ? "A" : "B"} has a loop wrapping a period without a seam edge (not supported)`)
+      if (sd.fb.synthetic[fi]) throw new BooleanError(`face ${fi} of operand ${s === 0 ? "A" : "B"} has a loop wrapping a period without a seam edge (not supported)`, [], { stage: "prepare", operand: s === 0 ? "A" : "B", face: fi, hint: "split the face with a seam edge (re-create the body from its feature history) before the Boolean", attempts: [] })
       const surf = face.surface
       const per = surfacePeriods(surf)
       const rings = sd.fb.rings[fi] ?? []
@@ -687,7 +703,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
           }
         }
         const cutIdx = ex.map((p, i) => (p.vid !== undefined ? i : -1)).filter((i) => i >= 0)
-        if (cutIdx.length === 0) throw new BooleanError(`face ${fi}: boundary ring without vertices`)
+        if (cutIdx.length === 0) throw new BooleanError(`face ${fi}: boundary ring without vertices`, [], { stage: "arrange", operand: s === 0 ? "A" : "B", face: fi, hint: DEGENERATE_HINT, attempts: [] })
         for (let k = 0; k < cutIdx.length; k++) {
           const i0 = cutIdx[k]!, i1 = cutIdx[(k + 1) % cutIdx.length]!
           const seg: RS[] = []
@@ -698,14 +714,14 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
           // Between two vertices every step runs along one edge, or all along a pole line.
           const ed = a.out
           if (ed === undefined || seg.slice(0, -1).some((p) => p.out !== ed)) {
-            if (seg.slice(0, -1).some((p) => p.out !== undefined)) throw new BooleanError(`face ${fi}: boundary piece mixes edges`)
+            if (seg.slice(0, -1).some((p) => p.out !== undefined)) throw new BooleanError(`face ${fi}: boundary piece mixes edges`, [], { stage: "arrange", operand: s === 0 ? "A" : "B", face: fi, hint: DEGENERATE_HINT, attempts: [] })
             addHe(from, to, uv, undefined, 1)
             continue
           }
           const tA = a.tOut!, tB = b.tIn!
           const mid = (tA + tB) / 2
           const pc = edgePieces[s]![ed]!.find((p) => p.t0 <= mid && mid <= p.t1)
-          if (pc === undefined) throw new BooleanError(`face ${fi}: no piece of edge ${ed} at t=${mid}`)
+          if (pc === undefined) throw new BooleanError(`face ${fi}: no piece of edge ${ed} at t=${mid}`, [], { stage: "arrange", operand: s === 0 ? "A" : "B", face: fi, hint: DEGENERATE_HINT, attempts: [] })
           addHe(from, to, uv, pc.key, tB > tA ? 1 : -1)
         }
       }
@@ -908,7 +924,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
   result = compactBrep(result)
   options.debug?.("result", result)
   const report = validateBrep(result, { coarseVolume: true })
-  if (!report.valid) throw new BooleanError(`Boolean ${op} produced an invalid solid: ${report.issues.slice(0, 3).map((i) => i.message).join("; ")}`, report.issues)
+  if (!report.valid) throw new BooleanError(`Boolean ${op} produced an invalid solid: ${report.issues.slice(0, 3).map((i) => i.message).join("; ")}`, report.issues, { stage: "validate", hint: DEGENERATE_HINT, attempts: [] })
   return {
     brep: result,
     warnings,
@@ -1126,6 +1142,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
         }
       }
     }
-    throw first
+    const tried = [3e-6, 3e-5, 3e-4].map((k) => Math.max(1e-6, extent * k))
+    throw new BooleanError(`${first.message} (also failed with the second operand displaced by up to ${tried[2]!.toExponential(1)} mm)`, first.issues, { ...(first.diagnostic ?? { stage: "validate" as const, hint: DEGENERATE_HINT }), attempts: tried })
   }
 }
