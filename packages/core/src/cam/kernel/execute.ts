@@ -702,7 +702,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const opAtLine: Array<number | undefined> = new Array(lines.length + 2)
   let activeTool: number | undefined, activeOp: number | undefined
   lines.forEach((raw, i) => {
-    const marker = /\(\s*OP(\d+)\b/i.exec(raw)
+    const marker = /[(;]\s*OP(\d+)\b/i.exec(raw)
     if (marker) activeOp = Number(marker[1]) - 1
     const code = raw.replace(/\([^)]*\)/g, " ").replace(/;.*$/, "")
     const t = /\bT(\d+)/i.exec(code)

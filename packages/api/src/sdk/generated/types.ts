@@ -5948,7 +5948,7 @@ export type ToolpathGeneratorManufactureOutput =
         schemaVersion: 1
         jobId: string
         material: { id: string; name: string; iso: string }
-        machine: { id: string; name: string; post: "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" }
+        machine: { id: string; name: string; post: "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" }
         setupOrientation?: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
         origin: { x: number; y: number; z: number }
         stockBounds: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }

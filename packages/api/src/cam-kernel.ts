@@ -57,7 +57,7 @@ const cutter = Schema.Struct({
 export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.Struct({
   schemaVersion: Schema.Literal(1), jobId: id,
   material: Schema.Struct({ id, name: Schema.String, iso: Schema.String }),
-  machine: Schema.Struct({ id, name: Schema.String, post: Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas"]) }),
+  machine: Schema.Struct({ id, name: Schema.String, post: Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens"]) }),
   setupOrientation: Schema.optionalKey(cam.kernel.SetupOrientationSchema),
   origin: cad.Vec3Schema,
   stockBounds: Schema.Struct({ min: cad.Vec3Schema, max: cad.Vec3Schema }),

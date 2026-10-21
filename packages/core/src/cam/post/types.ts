@@ -1,7 +1,7 @@
 /** Post-processor contract (spec 04-core-cam.md §4). */
 import type { Program } from "../ir.ts"
 
-export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas"
+export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens"
 
 export type ArcMode = "ijk" | "radius" | "linearize"
 
@@ -86,6 +86,12 @@ export interface Dialect {
   readonly rigidTap?: { readonly prefix?: (rpm: number) => string }
   /** Upper-case comments (some controls reject lower case). */
   readonly uppercaseComments: boolean
+  /** How a comment line is written: `(text)` (default) or `;text` (Siemens). */
+  readonly commentStyle?: "paren" | "semicolon"
+  /** The modal code that selects the unit, written first in the set-up (default `G21` / `G20`; Siemens `G71` / `G70`). */
+  readonly unitCodes?: { readonly mm: string; readonly inch: string }
+  /** Address of a dwell time (default `P`; Siemens `G4 F<seconds>`). */
+  readonly dwellWord?: string
   /** Lines before everything else, unnumbered (e.g. `%`, `O1000`). */
   readonly begin: (program: Program) => ReadonlyArray<string>
   /** Modal set-up blocks after the unit line. */

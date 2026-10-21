@@ -17,6 +17,12 @@ export const MACHINES: ReadonlyArray<KernelMachine> = [
     table: { length: 762, width: 406, gap: 30 }, rapidFeed: 25400, toolChangeSeconds: 4
   },
   {
+    // Native Sinumerik language (post "siemens"): drilling is written as moves and threads are milled, see post/siemens.ts.
+    id: "siemens-840d-vmc", name: "Siemens 840D sl vertical mill (BT40, 12 000 rpm, 13 kW)", post: "siemens",
+    limits: { maxRpm: 12000, minRpm: 100, maxFeed: 15000, powerKw: 13, torqueNm: 80, rigidity: "standard" },
+    table: { length: 800, width: 500, gap: 30 }, rapidFeed: 30000, toolChangeSeconds: 5
+  },
+  {
     id: "hsc-mill", name: "High-speed mill (HSK-E40, 30 000 rpm, 7 kW)", post: "generic",
     limits: { maxRpm: 30000, minRpm: 3000, maxFeed: 20000, powerKw: 7, torqueNm: 8, rigidity: "standard" },
     table: { length: 600, width: 400, gap: 30 }, rapidFeed: 40000, toolChangeSeconds: 5

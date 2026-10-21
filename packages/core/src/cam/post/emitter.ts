@@ -162,7 +162,7 @@ class Writer {
 
   comment(text: string): void {
     const clean = sanitizeComment(text, this.dialect.uppercaseComments)
-    if (clean.length > 0) this.lines.push(`(${clean})`)
+    if (clean.length > 0) this.lines.push(this.dialect.commentStyle === "semicolon" ? `;${clean}` : `(${clean})`)
   }
 
   block(...words: ReadonlyArray<string | undefined>): void {
@@ -304,7 +304,7 @@ class Writer {
       this.dialect.dwell === "milliseconds"
         ? String(Math.round(seconds * 1000))
         : formatNumber(seconds, this.options.decimals)
-    this.block("G4", `P${p}`)
+    this.block("G4", `${this.dialect.dwellWord ?? "P"}${p}`)
   }
 
   arc(move: ArcMove): void {
@@ -592,7 +592,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     })
     for (const g of plan?.groups ?? []) w.comment(`SUBPROGRAM O${g.number}: ${program.toolpaths[g.leader]!.name} X${g.members.length}`)
   }
-  w.block(program.units === "inch" ? "G20" : "G21", ...dialect.setup)
+  w.block(program.units === "inch" ? (dialect.unitCodes?.inch ?? "G20") : (dialect.unitCodes?.mm ?? "G21"), ...dialect.setup)
   w.block(program.workOffset)
 
   let zMax = -Infinity
