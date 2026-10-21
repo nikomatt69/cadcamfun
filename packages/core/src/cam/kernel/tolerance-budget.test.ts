@@ -6,6 +6,10 @@ const base = (extra: Partial<ManufacturingJob> = {}): ManufacturingJob => ({
   schemaVersion: 1, id: "tb", name: "Plate", material: "6061", machine: findMachine("vmc-standard")!, quality: { resolution: 0.4, tolerance: 0.01 },
   part: { kind: "elements", elements: [{ id: "plate", type: "cube", width: 30, height: 20, depth: 5 }] }, ...extra
 })
+/** A machine that states how accurately it holds a position: the machine's own share of the deviation is then known. */
+const accurate = (): ManufacturingJob["machine"] => ({
+  ...findMachine("vmc-standard")!, accuracy: { positioningMm: 0.005 }
+})
 const run = (job: ManufacturingJob): CamArtifact => {
   const r = runJob(job)
   if (r.status !== "ok") throw new Error(r.issues.map((i) => i.message).join("; "))
@@ -22,7 +26,10 @@ describe("the tolerance budget of an artifact (spec 29 §3)", () => {
     // The grid cell (0.4 mm) is far above 0.01 mm: the program cannot be promised to the requested tolerance.
     expect(b.met).toBe(false)
     expect(b.achieved).toBeGreaterThan(b.requested)
-    expect(b.unbounded).toEqual([])
+    // A machine that states its positioning accuracy leaves no unbounded source.
+    expect(run(base({ machine: accurate() })).tolerance!.unbounded).toEqual([])
+    // A machine that does not says so, rather than promising a deviation it cannot keep.
+    expect(b.unbounded).toEqual(["the machine states no positioning accuracy, so the machine's own share of the deviation is unknown"])
   })
 
   test("the cell terms follow the resolution: a finer grid promises a smaller deviation", () => {
@@ -42,7 +49,7 @@ describe("the tolerance budget of an artifact (spec 29 §3)", () => {
     const mesh = { positions: [0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 10], indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3] }
     const r = runJob(base({ part: { kind: "meshes", meshes: [mesh] }, stock: { min: { x: -2, y: -2, z: -2 }, max: { x: 12, y: 12, z: 12 } } }))
     if (r.status === "ok") {
-      expect(r.value.tolerance!.unbounded).toEqual(["the part is a mesh of unknown accuracy"])
+      expect(r.value.tolerance!.unbounded).toContain("the part is a mesh of unknown accuracy")
       expect(r.value.tolerance!.met).toBe(false)
       expect(r.value.tolerance!.terms.some((t) => t.id === "source-tessellation")).toBe(false)
     }

@@ -1189,27 +1189,7 @@ export type ToolpathGeneratorManufacturePayload = {
     readonly name: string
     readonly type: string
     readonly description?: string | null
-    readonly config: {
-      readonly workVolume?: { readonly x: number; readonly y: number; readonly z: number } | null
-      readonly maxSpindleSpeed?: number | null
-      readonly maxFeedRate?: number | null
-      readonly controller?: string | null
-      readonly axes?: 3 | 4 | 5 | null
-      readonly rotary?: {
-        readonly layout: "table-AC" | "table-BC"
-        readonly tilt: {
-          readonly min: number | "Infinity" | "-Infinity" | "NaN"
-          readonly max: number | "Infinity" | "-Infinity" | "NaN"
-        }
-        readonly rotation?: {
-          readonly min: number | "Infinity" | "-Infinity" | "NaN"
-          readonly max: number | "Infinity" | "-Infinity" | "NaN"
-        } | null
-        readonly pivot?: { readonly x: number; readonly y: number; readonly z: number } | null
-        readonly tcp?: "control" | "program" | null
-      } | null
-      readonly additionalSettings?: { readonly [x: string]: JsonValue } | null
-    }
+    readonly config: { readonly [x: string]: JsonValue }
   }
   readonly origin?: "stock-center" | "stock-corner"
   readonly finishAllowance?: number

@@ -347,7 +347,7 @@ Status 2026-10-20 (each row tested and seen in the running app unless said):
 | Row | Status |
 | --- | --- |
 | A1 machine model | yes, as envelopes of typical classes (P5); no CAD import of a real machine |
-| A2 machine classes | VMC, 4th axis, trunnion AC/BC, head-table BC, fork head AC, gantry router, lathe 2-axis; mill-turn only for G112 paths |
+| A2 machine classes | VMC, 4th axis, trunnion AC/BC, head-table BC, fork head AC, gantry router, lathe 2-axis; mill-turn for B/Y/positioned-C paths, with the machine catalogue of the kernel (milling centres and turning centres, published figures, and the configurations of the library) |
 | A3 limits, DRO | travel and rotary limits, machine-axes DRO; no singularity / unwinding report |
 | A4 TCP, tilted planes | G43.4 / G234 / TRAORI frames, G68 / G68.2 / CYCLE800; tool axis of a tilted plane not in the motion track |
 | B1 every operation | milling cycles incl. tapping / boring, thread milling, probing, lathe G70–G76, grooving, parting; unsupported words listed |

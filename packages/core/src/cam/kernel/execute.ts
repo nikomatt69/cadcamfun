@@ -132,6 +132,10 @@ export const prepareJob = (job: ManufacturingJob): CamResult<PreparedJob> => {
   if (!(machine.limits.maxRpm > 0) || !(machine.limits.maxFeed > 0)) issues.push(issue("InvalidInput", "prepare", `Machine ${machine.id}: spindle speed and feed limits must be positive`))
   // The milling kernel mills: a turning centre (the part turns there) is refused with its reason, never run as a mill.
   if (machine.kind === "lathe") issues.push(issue("UnsupportedCapability", "prepare", `Machine ${machine.id} is a turning centre: the part turns there, so the milling kernel cannot machine it. Use the turning plan for it.`))
+  // The work offset is the datum the part sits in: one the control does not have is a wrong datum, not a default to guess.
+  if (job.workOffset !== undefined && machine.workOffsets !== undefined && !machine.workOffsets.available.includes(job.workOffset)) {
+    issues.push(issue("InvalidInput", "prepare", `Machine ${machine.id} has no ${job.workOffset} work offset (it has ${machine.workOffsets.available.join(", ")})`))
+  }
 
   let meshes: Mesh64[] = []
   let elements: ReadonlyArray<CadElement> | undefined
@@ -470,7 +474,14 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     const plungeFeed = pick("plungeFeed", data.plungeFeed)
     const stepdown = pick("stepdown", data.ap)
     const stepover = pick("stepover", data.stepoverPercent)
-    const coolant = pick("coolant", data.coolant)
+    // The coolant the cut wants, brought to what the machine can deliver: a machine without mist cuts flooded, and the
+    // substitution is reported rather than silently written into the program.
+    const wanted = pick("coolant", data.coolant)
+    const modes = machine.coolant?.modes
+    const coolant = modes === undefined ? wanted : modes.includes(wanted) ? wanted : modes.includes("flood") ? "flood" : modes[0] ?? "off"
+    if (coolant !== wanted && modes !== undefined) {
+      issues.push(issue("MachineLimit", "cutting-data", `${op.id}: the cut asks for ${wanted} coolant and the machine has ${modes.join(", ")}: cutting with ${coolant}`, { operationId: op.id, severity: "warning" }))
+    }
     if (rpm > machine.limits.maxRpm + 1e-9 || (tool.maxRpm !== undefined && rpm > tool.maxRpm + 1e-9)) issues.push(issue("MachineLimit", "cutting-data", `${op.id}: ${rpm} rpm exceeds the spindle or the cutter rating`, { operationId: op.id }))
     if (feed > machine.limits.maxFeed + 1e-9) issues.push(issue("MachineLimit", "cutting-data", `${op.id}: feed ${feed} mm/min exceeds the machine's ${machine.limits.maxFeed}`, { operationId: op.id }))
     const name = op.name ?? op.id
@@ -921,8 +932,12 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     },
     {
       id: "machine-limits",
-      status: exceeded.length > 0 || issues.some((i) => i.tag === "MachineLimit" && i.severity === "error") ? "failed" : machine.limits.powerKw === undefined ? "unsupported" : "passed",
-      detail: exceeded.length > 0 ? exceeded.join("; ") : machine.limits.powerKw === undefined ? "The machine has no spindle power figure: load not checked" : `Spindle speed, feed, power${machine.limits.torqueNm !== undefined ? ", torque" : ""} and cutter deflection within limits`
+      status: exceeded.length > 0 || issues.some((i) => i.tag === "MachineLimit" && i.severity === "error") ? "failed" : machine.limits.powerKw === undefined && machine.limits.powerCurve === undefined ? "unsupported" : "passed",
+      detail: exceeded.length > 0
+        ? exceeded.join("; ")
+        : machine.limits.powerKw === undefined && machine.limits.powerCurve === undefined
+          ? "The machine has no spindle power figure: load not checked"
+          : `Spindle speed, feed, power${machine.limits.torqueNm !== undefined ? ", torque" : ""} and cutter deflection within limits`
     },
     {
       id: "operations-complete",
@@ -979,6 +994,10 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
 
   const usedTools = Object.entries(numbers).map(([id, number]) => ({ ...toolOf(id), number }))
   const toolChanges = usedTools.length
+  // The magazine holds what it holds: a program needing more tools than that cannot be run as it is.
+  if (machine.toolCapacity !== undefined && usedTools.length > machine.toolCapacity) {
+    issues.push(issue("MachineLimit", "post", `The program uses ${usedTools.length} tools and the machine's magazine holds ${machine.toolCapacity}`))
+  }
   const cycleTimeSeconds = Math.round(finalOutcomes.reduce((s, x) => s + x.timeSeconds, 0) + toolChanges * (machine.toolChangeSeconds ?? 8))
   const jobDigest = digestOf("cam-kernel/job@1", {
     ...job,
@@ -986,14 +1005,20 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     resolved: { material: material.id, machine: machine.id, tools: tools.map((t) => t.id) }
   })
   const modelCell = Math.min(0.25, cell)
+  const positioning = machine.accuracy?.positioningMm
   const budgetTerms: ToleranceTerm[] = [
     ...(job.part.kind === "elements" ? [{ id: "source-tessellation" as const, mm: prepared.tolerance, basis: "CAD solids are meshed with a chord error of the tolerance" }] : []),
     { id: "part-model", mm: modelCell, basis: "the part surface is sampled on a grid of this cell; the cutter contact errs by up to one cell" },
     { id: "path", mm: prepared.tolerance, basis: "toolpaths are simplified within the tolerance" },
     { id: "nc-rounding", mm: (Math.sqrt(3) / 2) * Math.pow(10, -decimals), basis: `coordinates are written with ${decimals} decimals` },
-    { id: "stock-replay", mm: Math.max(hf.cellX, hf.cellY) / 2, basis: "the replayed stock is a height field of this cell; a column is read at its centre" }
+    { id: "stock-replay", mm: Math.max(hf.cellX, hf.cellY) / 2, basis: "the replayed stock is a height field of this cell; a column is read at its centre" },
+    // The machine's own accuracy is a term of the promise: a program is only as repeatable as the machine that runs it.
+    ...(positioning !== undefined ? [{ id: "machine-positioning" as const, mm: positioning, basis: `the machine positions within ${positioning} mm` }] : [])
   ]
-  const unbounded = job.part.kind === "meshes" ? ["the part is a mesh of unknown accuracy"] : []
+  const unbounded = [
+    ...(job.part.kind === "meshes" ? ["the part is a mesh of unknown accuracy"] : []),
+    ...(positioning === undefined ? ["the machine states no positioning accuracy, so the machine's own share of the deviation is unknown"] : [])
+  ]
   const achieved = budgetTerms.reduce((s, t) => s + t.mm, 0)
   const tolerance: ToleranceBudget = { requested: prepared.tolerance, terms: budgetTerms.map((t) => ({ ...t, mm: Math.round(t.mm * 1e6) / 1e6 })), achieved: Math.round(achieved * 1e6) / 1e6, unbounded, met: unbounded.length === 0 && achieved <= prepared.tolerance }
   return {

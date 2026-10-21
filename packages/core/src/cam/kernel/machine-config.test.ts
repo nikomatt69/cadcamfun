@@ -61,17 +61,19 @@ describe("the machine library and the kernel are the same machines in two shapes
     expect(DEFAULT_MACHINE_CONFIGS.length).toBe(MACHINE_CATALOGUE.length)
     const kern = DEFAULT_MACHINE_CONFIGS.find((row) => row.id === "kern-micro-hd-hsk25")!
     expect(kern.type).toBe("mill")
-    expect(kern.config.controller).toBe("heidenhain")
-    expect(kern.config.axes).toBe(5)
-    expect(kern.config.rotary?.layout).toBe("table-BC")
+    // The controller is named as the shop names it; the post follows from it.
+    expect(kern.config["controller"]).toBe("Heidenhain TNC7")
+    expect(kernelMachineOfConfig(kern)!.post).toBe("heidenhain")
+    expect(kern.config["axes"]).toBe(5)
+    expect((kern.config["rotary"] as { layout: string }).layout).toBe("table-BC")
     const mazak = DEFAULT_MACHINE_CONFIGS.find((row) => row.id === "mazak-integrex-i200")!
     expect(mazak.type).toBe("lathe")
-    expect(mazak.config.additionalSettings?.["maxBarDiameter"]).toBe(65)
+    expect((mazak.config["turning"] as { maxBarDiameter: number }).maxBarDiameter).toBe(65)
     // The round trip keeps the machine a machine.
     const back = kernelMachineOfConfig(mazak)!
     expect(back.kind).toBe("lathe")
     expect(back.turning?.b).toEqual([-30, 210])
-    expect(machineConfigOf(findMachine("trunnion-5ax")!).config.rotary?.layout).toBe("table-AC")
+    expect((machineConfigOf(findMachine("trunnion-5ax")!).config["rotary"] as { layout: string }).layout).toBe("table-AC")
   })
 })
 

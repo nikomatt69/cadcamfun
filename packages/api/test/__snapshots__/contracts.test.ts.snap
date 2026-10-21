@@ -55936,6 +55936,40 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "minLength": 1,
                     "type": "string",
                   },
+                  "machineConfig": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "config": {
+                        "type": "object",
+                      },
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "id": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "type": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "type",
+                      "config",
+                    ],
+                    "type": "object",
+                  },
                   "material": {
                     "maxLength": 80,
                     "minLength": 1,

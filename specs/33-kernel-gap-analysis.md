@@ -63,7 +63,7 @@ state.
 | --- | --- | --- | --- |
 | M1 | **3D finishing families**: constant scallop, spiral, radial, horizontal | raster/waterline/steep-shallow only; legacy spiral/radial finishing silently fell back to a raster | **closed in this pass** (§5) |
 | M2 | Hole making in the kernel: rigid tapping (G84), reaming (G85), boring cycles, back-boring; tap/reamer/boring-bar cutters | drill and spot only; threads are milled | the interpreter already replays G84/G85 (spec 32 P2) — **closed in this pass** (§5); back-boring (G87) still missing |
-| M3 | Turning in the kernel (facing, OD/ID roughing and finishing, grooving, threading, parting) with stock evolution | legacy generator only, no kernel evidence | mill-turn later |
+| M3 | Turning in the kernel (facing, OD/ID roughing and finishing, grooving, threading, parting) with stock evolution | legacy generator only, no kernel evidence | **external turning closed in this pass** (§8): face skim, diameter-bounded roughing on the evolving stock and profile finishing, with the bar and the spindle bounded by the turning centre; internal turning, grooves, threads and parting still open; mill-turn later |
 | M4 | Stock-aware rest: operation B consumes the stock A left (spec 29 §6) | rest from a previous tool diameter | voxel stock exists for 5-axis only |
 | M5 | 5-axis strategies: swarf, 5x contour, multi-axis roughing, automatic tilting from a 3-axis path (collision avoidance) | parallel/contour lean on a trunnion | head-table and head-head machines in the kernel |
 | M6 | Pencil as a standalone strategy (bi-tangency), morph / flowline / projection finishing | pencil = rest finish after a larger ball | |
@@ -355,3 +355,36 @@ The items above are reachable from the assistant, each with a preview that chang
 An open surface is a typed body: it is excluded from the exact solid analysis and from the CAM volume model (`cam/model/element-mesh.ts`), so a curved patch never becomes a fictitious stock. The desktop mirrors the new writes into the editor (`features/ai/lib/editor-sync.ts`) and draws an open body from both sides.
 
 Still open, and refused rather than approximated: the strict pipeline's pole window (§7.18), an outward offset of a general body whose dilation pieces touch it only along curves, a general normal offset of a freeform surface, partial-width and adjacent-edge sheet flanges, variable fillets meeting other blended edges, IGES trimmed-surface entities (the writer writes analytic and rational surfaces only), Parasolid, and a general cam-following dynamics for contacts (the motion study reports non-penetration, not forces).
+
+## 8. Turning and the machine catalogue (2026-10-21)
+
+- **M3 external turning** is in the kernel (`kernel/turning.ts`, `cam.turn`, `cam_edit.turn`): face skim, diameter-bounded roughing on the evolving stock, profile finish, analytic volumes with the retained bar tail, always `preview`. The turning centre bounds the bar and the spindle; a bar it cannot hold is refused. Still open: internal turning, grooves, threads, parting, insert compensation, chuck clearance, controller qualification.
+- **Machine catalogue**: `MACHINES` (milling) and `LATHES` (turning / mill-turn: Mazak INTEGREX i-200 class, Okuma MULTUS B300II class, 2-axis lathe) plus KERN Micro HD HSK25/HSK40 with a native Heidenhain post. The milling kernel refuses a turning centre with its reason.
+- **Library seam**: a saved Machine Config becomes the machine the kernel plans against (`kernelMachineOfConfig`); the built-in catalogue is shown in Machine Configs (`GET /api/machine-configs/defaults`, read-only "Built-in"); the CAM panel, the kernel panel and the assistant (`cam.materials`, `machineConfig`) see both.
+- Not done: controller mode-switch sequences (turning / positioned C / powered tooling), machine geometry and datum calibration, qualification on real controls. Published strokes are not work-coordinate limits.
+
+## 8. Turning and the machine catalogue (2026-10-21)
+
+Two gaps of §2.2 moved: the external turning of **M3** and the machines themselves (a kernel that only knows classes of machines cannot be the machine the shop owns).
+
+### 8.1 External turning in the kernel
+
+`kernel/turning.ts` (`planTurning`) plans a piecewise-linear profile in the lathe's own coordinates — X is a diameter, z = 0 at the finished face and negative towards the chuck — from bar stock:
+
+- the face is a zero-allowance skim (the stock already starts at z = 0, so no allowance and no removed volume are invented);
+- the roughing passes step the diameter down and each pass follows the profile held out by the finishing allowance, clipped at the pass diameter, so the local cut is bounded by the stepdown and never overcuts a taper (the span is split where the envelope crosses the cap);
+- the finishing pass follows the profile itself; the removed volume of every pass is the exact solid of revolution, and `stockVolume = partVolume + unmachinedVolume + removedVolume` holds with the untouched bar tail written down explicitly (no parting is implied);
+- the NC is lathe NC: `G18 G21 G90 G40 G94 G97`, constant rpm, and the radial retraction happens outside the original bar before the axial return, so the return cannot cross an uncut shoulder.
+
+The plan is a **preview**: an ideal point tool (no insert compensation), no workholding, no internal turning, grooves, threads or parting, and never a verified release.
+
+### 8.2 The machines: a catalogue and the configurations of the library
+
+- `MACHINES` (milling centres) and `LATHES` (turning and mill-turn centres) are separate lists; a machine carries its kind, and the milling kernel refuses a turning centre with the reason instead of running it as a mill.
+- New presets with their published sources: KERN Micro HD HSK25 and HSK40 (B/C table, B -110..+110 degrees, continuous C, 50 000 / 42 000 rpm, Heidenhain TNC7 Klartext post), Mazak INTEGREX i-200 class and Okuma MULTUS B300II class mill-turn centres (B -30..+210 / -30..+195 degrees, Y 210 / 160 mm, C continuous / 360 degrees, Ø65 bar). A published stroke is not a work-coordinate bound; the pivot, the chuck and the datum remain calibration.
+- `kernel/machine-config.ts` is the seam with the library: a saved `MachineConfig` row becomes the machine the kernel plans against (ceilings, the post its controller asks for, its rotary table), a configuration the kernel cannot machine is refused with the reason, and the built-in catalogue is served as machine configurations (`GET /api/machine-configs/defaults`), shown in the Resources list as read-only built-ins.
+- The turning plan is bounded by that machine: a bar its chuck cannot take is refused, and its spindle and feed ceilings cap the plan.
+
+Evidence: `kernel/machine-config.test.ts`, `kernel/turning.test.ts`, `packages/ai/test/cam-kernel-actions.test.ts`, `apps/sidecar/test/machine-config-defaults.test.ts`, the machine case in `apps/desktop/test/cam-kernel.test.ts`.
+
+Still open: internal turning, grooves, threads and parting in the kernel; the controller mode-switch sequences between turning, positioned C and powered tooling on a mill-turn; the machine geometry and the datum calibration of every named machine; the qualification of any of them on a real control.

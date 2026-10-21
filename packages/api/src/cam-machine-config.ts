@@ -28,9 +28,10 @@ export const MachineConfigParams = Schema.Struct({
 })
 
 /**
- * A machine configuration as the kernel takes it: the row and the parameters it carries, tolerant about what the person
- * left out. The kernel refuses a configuration it cannot machine (a kind it does not machine, no spindle ceiling) with
- * the reason, never a default.
+ * A machine configuration as the kernel takes it: the row and the parameters it carries. The parameters are read in
+ * whichever shape they were written — the Resources form, the assistant's record or the canonical machine profile —
+ * so the contract carries them whole and the kernel's machine profile decides what they mean. A configuration the
+ * kernel cannot machine (a kind it does not machine, no spindle ceiling) is refused with the reason, never a default.
  */
 export const CamMachineConfig = Schema.Struct({
   id: Schema.String,
@@ -38,20 +39,6 @@ export const CamMachineConfig = Schema.Struct({
   /** The library's kinds: `mill`, `lathe`, `printer`, `laser`. */
   type: Schema.String,
   description: Schema.optional(Schema.String),
-  config: Schema.Struct({
-    workVolume: Schema.optional(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
-    maxSpindleSpeed: Schema.optional(Schema.Finite),
-    maxFeedRate: Schema.optional(Schema.Finite),
-    controller: Schema.optional(Schema.String),
-    axes: Schema.optional(Schema.Literals([3, 4, 5])),
-    rotary: Schema.optional(Schema.Struct({
-      layout: Schema.Literals(["table-AC", "table-BC"]),
-      tilt: Range,
-      rotation: Schema.optional(Range),
-      pivot: Schema.optional(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
-      tcp: Schema.optional(Schema.Literals(["control", "program"]))
-    })),
-    additionalSettings: Schema.optional(Schema.Record(Schema.String, Schema.Json))
-  })
+  config: Schema.Record(Schema.String, Schema.Json)
 })
 export type CamMachineConfig = typeof CamMachineConfig.Type

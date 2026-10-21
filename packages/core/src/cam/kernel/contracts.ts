@@ -45,6 +45,23 @@ export interface KernelMachine {
    */
   readonly table?: { readonly length: number; readonly width: number; readonly gap: number }
   /**
+   * The work offsets the control has, and the one the machine starts in. A program that names an offset the machine does
+   * not have is refused (`machine-limits`): the offset is where the part sits, and an unknown one is a wrong datum.
+   */
+  readonly workOffsets?: { readonly available: ReadonlyArray<WorkOffset>; readonly default?: WorkOffset }
+  /**
+   * The coolant the machine can deliver. A cut that asks for a mode the machine does not have is planned with the mode it
+   * does have, and the substitution is reported (`machine-limits`).
+   */
+  readonly coolant?: { readonly modes: ReadonlyArray<Coolant> }
+  /**
+   * How accurately the machine holds a position. The positioning accuracy is a term of the tolerance budget: the deviation
+   * the program can be promised includes what the machine itself adds.
+   */
+  readonly accuracy?: { readonly positioningMm?: number; readonly repeatabilityMm?: number; readonly runoutMm?: number }
+  /** The tool magazine: how many tools it holds. A program needing more tools than that is refused. */
+  readonly toolCapacity?: number
+  /**
    * The trunnion table that turns the part for five-axis operations. `pivot` is the centre of rotation of the table in the work
    * frame, mm: a property of the machine's trunnion (its height over the table and its position), so it is given here and not
    * derived from the stock. `layout` is C about Z with tilt A about X or B about Y; `tilt` and `rotation` are the ranges in degrees.
@@ -253,7 +270,7 @@ export interface StockSummary {
 
 /** One term of the tolerance budget: what it bounds, in mm, and where the bound comes from. */
 export interface ToleranceTerm {
-  readonly id: "source-tessellation" | "part-model" | "path" | "nc-rounding" | "stock-replay"
+  readonly id: "source-tessellation" | "part-model" | "path" | "nc-rounding" | "stock-replay" | "machine-positioning"
   readonly mm: number
   readonly basis: string
 }

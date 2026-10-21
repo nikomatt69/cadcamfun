@@ -14,10 +14,10 @@ describe("the default machines of the library", () => {
     expect(rows.length).toBe(cam.kernel.MACHINE_CATALOGUE.length)
     const kern = rows.find((row) => row["id"] === "kern-micro-hd-hsk25")!
     expect(kern["type"]).toBe("mill")
-    expect((kern["config"] as { controller: string }).controller).toBe("heidenhain")
+    expect((kern["config"] as { controller: string }).controller).toBe("Heidenhain TNC7")
     const mazak = rows.find((row) => row["id"] === "mazak-integrex-i200")!
     expect(mazak["type"]).toBe("lathe")
-    expect((mazak["config"] as { additionalSettings: { maxBarDiameter: number } }).additionalSettings.maxBarDiameter).toBe(65)
+    expect((mazak["config"] as { turning: { maxBarDiameter: number } }).turning.maxBarDiameter).toBe(65)
     // Every built-in row is a machine the kernel can plan against.
     for (const row of rows) expect(cam.kernel.kernelMachineOfConfig(row as never), String(row["id"])).toBeDefined()
     // The list of the person's own configurations is untouched by the built-in ones.

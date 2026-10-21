@@ -42,11 +42,33 @@ export interface MachineLimits {
   readonly maxFeed: number
   /** Spindle power, kW; `undefined` = not checked. */
   readonly powerKw?: number
+  /**
+   * The power available by speed band: the spindle holds `kW` up to `rpm`, and the next band takes over above it. A real
+   * spindle is constant-power to its base speed and constant-torque above it, so a single number overstates the high end.
+   * `powerKw` stays the flat ceiling the configuration declares; the curve narrows it where the machine says so.
+   */
+  readonly powerCurve?: ReadonlyArray<{ readonly rpm: number; readonly kW: number }>
   /** Spindle torque, N·m; `undefined` = not checked. */
   readonly torqueNm?: number
   readonly rigidity?: Rigidity
   /** Spindle efficiency between the motor and the cut (default 0.8). */
   readonly efficiency?: number
+}
+
+/**
+ * The power the spindle can deliver at `rpm`, kW: the band of the power curve the speed falls in, else the flat ceiling.
+ * The curve is read as "this power up to this speed": the band with the highest `rpm` at or below the speed wins, and a
+ * speed below the first band takes the first band's power.
+ */
+export const powerLimitAt = (machine: MachineLimits, rpm: number): number | undefined => {
+  const curve = machine.powerCurve
+  if (curve === undefined || curve.length === 0) return machine.powerKw
+  let chosen = curve[0]!
+  for (const band of curve) {
+    if (rpm >= band.rpm) chosen = band
+    else break
+  }
+  return chosen.kW
 }
 
 export interface CuttingRequest {
@@ -330,8 +352,11 @@ const drilling = (req: CuttingRequest, warnings: string[], limitedBy: string[]):
   const kc = mat.kc11 * Math.pow(Math.max(h, 0.001), -mat.mc)
   const torqueNm = (d * d * feedPerRev * kc) / 8000
   const powerKw = (torqueNm * 2 * Math.PI * rpm) / 60_000
+  const powerLimit = powerLimitAt(m, rpm)
   const exceeded: string[] = []
-  if (m.powerKw !== undefined && powerKw / (m.efficiency ?? 0.8) > m.powerKw) exceeded.push(`Drilling needs ${(powerKw / (m.efficiency ?? 0.8)).toFixed(2)} kW, the spindle has ${m.powerKw} kW`)
+  if (powerLimit !== undefined && powerKw / (m.efficiency ?? 0.8) > powerLimit) {
+    exceeded.push(`Drilling needs ${(powerKw / (m.efficiency ?? 0.8)).toFixed(2)} kW, the spindle has ${powerLimit} kW at ${rpm} rpm`)
+  }
   if (m.torqueNm !== undefined && torqueNm > m.torqueNm) exceeded.push(`Drilling needs ${torqueNm.toFixed(1)} N·m, the spindle gives ${m.torqueNm} N·m at low speed`)
   const thrust = 0.5 * kc * (feedPerRev / 2) * d * Math.sin(kappa)
   const { rampAngle, helixPitch } = entryOf(mat, c)
@@ -382,7 +407,10 @@ const holeFinishing = (req: CuttingRequest, warnings: string[], limitedBy: strin
   const torqueNm = tapping ? (kc * pitch * pitch * d) / 8000 : (kc * ae * feedPerRev * d) / 2000
   const powerKw = (torqueNm * 2 * Math.PI * rpm) / 60_000
   const exceeded: string[] = []
-  if (m.powerKw !== undefined && powerKw / (m.efficiency ?? 0.8) > m.powerKw) exceeded.push(`${tapping ? "Tapping" : "Reaming"} needs ${(powerKw / (m.efficiency ?? 0.8)).toFixed(2)} kW, the spindle has ${m.powerKw} kW`)
+  const powerLimit = powerLimitAt(m, rpm)
+  if (powerLimit !== undefined && powerKw / (m.efficiency ?? 0.8) > powerLimit) {
+    exceeded.push(`${tapping ? "Tapping" : "Reaming"} needs ${(powerKw / (m.efficiency ?? 0.8)).toFixed(2)} kW, the spindle has ${powerLimit} kW at ${rpm} rpm`)
+  }
   if (m.torqueNm !== undefined && torqueNm > m.torqueNm) exceeded.push(`${tapping ? "Tapping" : "Reaming"} needs ${torqueNm.toFixed(1)} N·m, the spindle gives ${m.torqueNm} N·m at low speed`)
   if (depth > c.fluteLength + 1e-9) warnings.push(`${tapping ? "Thread" : "Bore"} depth ${r3(depth)} mm exceeds the ${c.fluteLength} mm flutes of ${c.name}`)
   if (tapping && mat.iso === "H") warnings.push(`Tapping ${mat.name} breaks taps: mill the thread instead`)
@@ -467,10 +495,12 @@ export const cuttingData = (req: CuttingRequest): CuttingData => {
   const maxDeflection = req.maxDeflection ?? (finish ? 0.01 : 0.05)
   const eta = m.efficiency ?? 0.8
   const apMin = Math.min(ap, Math.max(0.05, 0.1 * d))
+  // The power the spindle can deliver at this speed: the curve narrows the flat ceiling where the machine says so.
+  const powerLimit = powerLimitAt(m, rpm)
   let load = millingLoad(mat, c, deff, ap, ae, fz, feed, rpm, vc)
   let defl = deflection(c, load.forceN)
   for (let i = 0; i < 24; i++) {
-    const power = m.powerKw !== undefined ? load.powerKw / eta / (0.9 * m.powerKw) : 0
+    const power = powerLimit !== undefined ? load.powerKw / eta / (0.9 * powerLimit) : 0
     const torque = m.torqueNm !== undefined ? load.torqueNm / m.torqueNm : 0
     const bend = defl / maxDeflection
     const ratio = Math.max(power, torque, bend)
@@ -483,7 +513,9 @@ export const cuttingData = (req: CuttingRequest): CuttingData => {
     defl = deflection(c, load.forceN)
   }
   const exceeded: string[] = []
-  if (m.powerKw !== undefined && load.powerKw / eta > m.powerKw + 1e-9) exceeded.push(`The cut needs ${(load.powerKw / eta).toFixed(2)} kW, the spindle has ${m.powerKw} kW`)
+  if (powerLimit !== undefined && load.powerKw / eta > powerLimit + 1e-9) {
+    exceeded.push(`The cut needs ${(load.powerKw / eta).toFixed(2)} kW, the spindle has ${powerLimit} kW at ${rpm} rpm`)
+  }
   if (m.torqueNm !== undefined && load.torqueNm > m.torqueNm * 1.001) exceeded.push(`The cut needs ${load.torqueNm.toFixed(1)} N·m, the spindle gives ${m.torqueNm} N·m`)
   if (defl > maxDeflection * 1.001) exceeded.push(`Tool deflection ${defl.toFixed(3)} mm exceeds ${maxDeflection} mm: shorten the stickout or use a stiffer cutter`)
 
