@@ -8,7 +8,7 @@ WP2 derives drilling, contour, pocket, thread and external turning paths from WP
 
 Pure and I/O-free, same rules as WP1.
 
-## Kernel performance and AI responsiveness (2026-10-21, in progress)
+## Kernel performance and AI responsiveness (2026-10-21, implemented; full-suite verification in progress)
 
 Optimize measured hot paths without reducing sampling resolution, changing cutter geometry, tolerances, NC bytes or verification evidence. The drop-cutter may seed its branch-and-bound search with an actual nearby column; every rejection must retain the existing conservative bound. Verify against exhaustive footprint evaluation and complete pre-change manufacturing artifacts. WP8 owns bounded automatic recovery and provider inactivity deadlines; integration may move kernel preparation off the sidecar event loop through the existing scoped worker. Regression gates include the full repository test suite.
 
@@ -254,3 +254,7 @@ The spec 33 CAD increment owns a single guard in `model/element-mesh.ts` and its
 - `kernel/machine-config.ts` is the seam with the library: `kernelMachineOfConfig` makes a saved `MachineConfig` row the machine the kernel plans against, `machineConfigOf` and `DEFAULT_MACHINE_CONFIGS` make the built-in catalogue visible in the Resources library, and `postOfController` maps a controller name to the post that speaks it. A configuration the kernel cannot machine is refused, never guessed.
 - `kernel/machine-profile.ts` is the one place that knows the shapes a machine configuration may be written in (the Resources form, the assistant's record, the canonical profile): `profileOfConfig` reads any of them into one `MachineProfile`, `configOfProfile` writes the canonical one back, and the profile carries what the kernel can act on (the spindle and its power curve, the feed, the axes and their travel, the rotary table, the turning data, the work offsets, the accuracy). A field that is absent says "the machine does not say", never a default the kernel would plan against.
 - Evidence: `kernel/machine-config.test.ts` (the adapter, the round trip, the refused configurations, the refusal of a turning centre by the milling kernel), `kernel/turning.test.ts` (the bar and the spindle bounds), `packages/ai/test/cam-kernel-actions.test.ts` (the catalogue of machines and the bounded turning plan), `apps/sidecar/test/machine-config-defaults.test.ts` (the built-in rows and the configurations of the library), and the machine case in `apps/desktop/test/cam-kernel.test.ts`.
+
+### Performance change log (2026-10-21)
+
+The drop-cutter seeds its search from an actual column near the tool axis, enabling the existing conservative block rejection immediately. Exhaustive footprint comparisons cover flat/ball/bull/V/drill profiles, allowances, holes, cliffs and non-square cells (1,803 assertions). Block, mounting-plate and dome planning/manufacturing outputs matched the pre-change artifacts byte for byte. `PrepareOptions.stockFromPartBottom` places CAD stock from the unrotated part meshes inside the worker; worker/inline equality covers NC, identity, verification evidence and manual +X setup as well as +Z. Core typecheck passed. Full-suite validation remains in progress.

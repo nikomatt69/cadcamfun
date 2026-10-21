@@ -17,6 +17,7 @@ test("a provider SSE connection that stops sending chunks fails without freezing
   } })
   const scope = Effect.runSync(Scope.make())
   let file: string | undefined, original: string | undefined
+  let stage = "runtime"
   try {
     const runtime = await Effect.runPromise(makeNikCliRuntime({ dataDir: sharedDataDir, providers: [{
       id: "inactivity", name: "Inactivity", protocol: "openai-compatible", baseURL: `http://127.0.0.1:${server.port}/v1`,
@@ -24,6 +25,7 @@ test("a provider SSE connection that stops sending chunks fails without freezing
     }], systemPrompt: "Answer directly.", toolsFor: () => [] }).pipe(Scope.provide(scope)))
     await Effect.runPromise(runtime.setProviderKey("inactivity", "test-key"))
     const host = await Effect.runPromise(runtime.host("provider-inactivity"))
+    stage = "configure transport"
     file = join(runtime.paths.config, "nikcli.json")
     original = await readFile(file, "utf8")
     const config = JSON.parse(original)
@@ -32,14 +34,18 @@ test("a provider SSE connection that stops sending chunks fails without freezing
     config.provider.inactivity.options.chunkTimeout = 1000
     await writeFile(file, JSON.stringify(config))
     await host.client["config-management"].reload()
+    stage = "create session"
     const sessionId = await Effect.runPromise(createHostSession(host, "Inactivity"))
     const started = performance.now()
+    stage = "chat"
     const events = await Effect.runPromise(Stream.runCollect(hostChatStream({ host, sessionId, message: "Hi", model: { providerID: "inactivity", modelID: "inactivity-model" }, continues: 0, autoContinues: 0 })))
     expect(events.some((event) => event.type === "delta" && event.text.includes("Partial answer"))).toBe(true)
     expect(events.at(-1)).toMatchObject({ type: "error" })
     expect(events.filter((event) => event.type === "done")).toHaveLength(0)
     expect(requests).toBe(1)
     expect(performance.now() - started).toBeLessThan(15_000)
+  } catch (cause) {
+    throw new Error(`Provider inactivity test failed during ${stage}: ${cause instanceof Error ? cause.message : String(cause)}; requests=${requests}`, { cause })
   } finally {
     if (file !== undefined && original !== undefined) await writeFile(file, original)
     await Effect.runPromise(Scope.close(scope, Exit.void))

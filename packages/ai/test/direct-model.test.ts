@@ -38,6 +38,26 @@ const withKey = (provider: ProviderId, key = "sk-direct-sentinel-1234") =>
     yield* credentials.set(provider, Redacted.make(key))
   })
 
+test("stateless text and object calls cannot wait forever for a provider", async () => {
+  const factory: LanguageModelFactory = () => new MockLanguageModelV4({ doGenerate: async ({ abortSignal }) =>
+    new Promise<never>((_resolve, reject) => {
+      if (abortSignal?.aborted) reject(abortSignal.reason)
+      else abortSignal?.addEventListener("abort", () => reject(abortSignal.reason), { once: true })
+    })
+  })
+  const live = DirectModel.layerWith(factory, { requestTimeoutMs: 20, retryAttempts: 1 }).pipe(
+    Layer.provideMerge(AiCredentials.layer), Layer.provide(AiConfig.layer({ dataDir: "/unused", forceGateway: false }))
+  )
+  for (const structured of [false, true]) {
+    const result = await Effect.runPromise(Effect.gen(function* () {
+      yield* withKey("openai")
+      const direct = yield* DirectModel
+      return yield* Effect.exit(structured ? direct.generateObject({ prompt: "Hi", schema: Schema.Struct({ text: Schema.String }) }) : direct.generateText({ prompt: "Hi" }))
+    }).pipe(Effect.provide(live)))
+    expect(Exit.isFailure(result)).toBe(true)
+  }
+})
+
 describe("provider resolution matrix", () => {
   const set = (...ids: ProviderId[]) => new Set<ProviderId>(ids)
   const ok = (r: ResolvedModel | AiConfigError): ResolvedModel => {

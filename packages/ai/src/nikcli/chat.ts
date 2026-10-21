@@ -31,7 +31,7 @@ export interface HostChatInput {
   /**
    * How many times the turn is continued on its own when the agent stopped with work left (see `continuationFor`). nikcli's host
    * ends a turn as soon as the model answers without a tool call, so a plan announced in prose, a plan with items left or a
-   * failed call that was not retried would end the work there. Like nikcli's goal loop it runs up to 50 iterations, and it stops
+   * failed call that was not retried would end the work there. It stops
    * earlier whenever recovery stalls (see `MAX_STALLS`). Ordinary chat permits eight continuations; explicit goals retain 50.
    * `0` leaves the host's behaviour.
    */
@@ -353,7 +353,8 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         try {
           for await (const event of host.client.events.subscribe({ signal: controller.signal })) {
             // The in-process SSE body ignores the abort signal once headers are out, so the
-            // loop only notices cancellation when the next bus event (telemetry, heartbeat) arrives.
+            // loop only notices cancellation when the next bus event (telemetry, heartbeat) arrives. Keep this monitor alive
+            // after a UI disconnect: the turn and its hard step budget belong to the host session.
             if (controller.signal.aborted) break
             if (event.type === "server.connected") {
               connected()

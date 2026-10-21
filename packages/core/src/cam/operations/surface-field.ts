@@ -111,7 +111,10 @@ export class Surface {
     if (si <= i1 && sj <= j1) {
       const ox = (si + 0.5 - gx) * cellX, oy = (sj + 0.5 - gy) * cellY
       const d = Math.sqrt(ox * ox + oy * oy) - half
-      if (d <= R) best = this.height[sj * nx + si]! - cutter.profile(d > 0 ? d : 0)
+      if (d <= R) {
+        const candidate = this.height[sj * nx + si]! - cutter.profile(d > 0 ? d : 0)
+        if (candidate > best) best = candidate
+      }
     }
     for (let bj = Math.floor(j0 / BLOCK); bj <= Math.floor(j1 / BLOCK); bj++) {
       // Nearest the block's rows come to the axis along y (distance between cell centres, 0 when the axis is inside).

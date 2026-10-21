@@ -122,6 +122,10 @@ export interface PrepareOptions {
 /** Resolves the job: everything the run needs, or the reasons it cannot run. */
 export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}): CamResult<PreparedJob> => {
   const issues: CamIssue[] = []
+  const dimensions = options.stockFromPartBottom
+  if (dimensions !== undefined && (![dimensions.x, dimensions.y, dimensions.width, dimensions.height, dimensions.depth].every(Number.isFinite) || !(dimensions.width > 0 && dimensions.height > 0 && dimensions.depth > 0))) {
+    return { status: "failed", issues: [issue("InvalidInput", "prepare", "Stock placement needs finite coordinates and positive finite dimensions")] }
+  }
   if (job.setupOrientation !== undefined && !SETUP_ORIENTATIONS.includes(job.setupOrientation)) return { status: "failed", issues: [issue("InvalidInput", "prepare", "Unknown manual setup orientation")] }
   if (job.schemaVersion !== KERNEL_SCHEMA_VERSION) return { status: "failed", issues: [issue("InvalidInput", "prepare", `Unsupported job schema version ${String(job.schemaVersion)}`)] }
   const material = findMaterial(job.material)

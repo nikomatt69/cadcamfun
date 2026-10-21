@@ -45,7 +45,7 @@ describe("host patch report", () => {
     expect(partial.source).toBeUndefined()
     expect(partial.report.find((entry) => entry.name === "cad-environment")?.status).toBe("missing")
     expect(partial.report.filter((entry) => entry.status === "applied")).toHaveLength(HOST_PATCHES.length - 1)
-    expect(applyHostPatches(`${bundle}\n${MEDIA_RULE_MARKER}`).report[0]).toEqual({ name: "media-in-tool-results", status: "ambiguous" })
+    expect(applyHostPatches(`${bundle}\n${MEDIA_RULE_MARKER}`).report.find((entry) => entry.name === "media-in-tool-results")).toEqual({ name: "media-in-tool-results", status: "ambiguous" })
     expect(() => patchHostSource(withoutEnvironment)).toThrow(HostPatchError)
     expect(() => patchHostSource(withoutEnvironment)).toThrow("cad-environment (missing)")
   })

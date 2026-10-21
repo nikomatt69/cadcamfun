@@ -125,6 +125,8 @@ export interface DirectModelSettings {
   readonly retryAttempts?: number
   /** Replaced in tests so a retry does not wait. */
   readonly sleep?: (ms: number, signal: AbortSignal) => Promise<void>
+  /** Deadline for one stateless call; also bounds first-chunk and inter-chunk waits. Default two minutes. */
+  readonly requestTimeoutMs?: number
 }
 
 export class DirectModel extends Context.Service<
@@ -144,6 +146,7 @@ export class DirectModel extends Context.Service<
         const config = yield* AiConfig
         const retryAttempts = settings.retryAttempts ?? RETRY_MAX_ATTEMPTS
         const sleepFor = settings.sleep ?? retrySleep
+        const requestTimeoutMs = settings.requestTimeoutMs ?? 120_000
 
         const prepare = Effect.fn("DirectModel.prepare")(function* (selector: ModelSelector | undefined) {
           const status = yield* credentials.status
@@ -163,6 +166,7 @@ export class DirectModel extends Context.Service<
         })
 
         const toError = (error: unknown, signal: AbortSignal | undefined, provider: ProviderId, secrets: ReadonlyArray<string>, modelId?: string): AiError => {
+          if (!signal?.aborted && error instanceof Error && error.name === "TimeoutError") return new AiProviderError({ message: "The provider timed out. Try again.", provider, retryable: false })
           if (isAbort(error, signal)) return new AiAborted({})
           const failure = failureOf(error)
           const raw = failure.message ?? (error instanceof Error ? error.message : String(error))
@@ -190,7 +194,7 @@ export class DirectModel extends Context.Service<
           return yield* Effect.tryPromise({
             try: (signal): Promise<TextResult> =>
               withRetry(async (abortSignal) => {
-                const result = await generateText({ model, ...callSettings(prepareDirectCall(resolved, input)), abortSignal, maxRetries: 0 })
+                const result = await generateText({ model, ...callSettings(prepareDirectCall(resolved, input)), abortSignal, timeout: requestTimeoutMs, maxRetries: 0 })
                 return { text: result.text, model: resolved.modelId, provider: resolved.provider, usage: usageOf(result.usage) }
               }, signal),
             catch: (error) => toError(error, undefined, resolved.provider, secrets, resolved.modelId)
@@ -208,6 +212,7 @@ export class DirectModel extends Context.Service<
                   model,
                   ...callSettings(prepareDirectCall(resolved, input)),
                   abortSignal: controller.signal,
+                  timeout: { totalMs: requestTimeoutMs * 3, firstChunkMs: requestTimeoutMs, chunkMs: requestTimeoutMs },
                   maxRetries: 1,
                   // Failures arrive as `error` parts below and are reported there; the default handler would also print them.
                   onError: () => undefined
@@ -275,6 +280,7 @@ export class DirectModel extends Context.Service<
                       ...callSettings(prepareDirectCall(resolved, input)),
                       output: Output.object({ schema: aiSchema }),
                       abortSignal,
+                      timeout: requestTimeoutMs,
                       maxRetries: 0
                     })
                     return result.output as unknown
