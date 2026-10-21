@@ -92,7 +92,9 @@ test("a solid of the drawing can be hollowed on paper: volumes, open faces by na
   expect(sceneShell([cube], "missing", 2)).toEqual({ ok: false, error: "no solid 'missing' in the drawing" })
   const bad = sceneShell([cube], "c", 2, ["nothing.top"])
   expect(bad.ok).toBe(false)
-  expect(sceneShell([{ id: "s", type: "sphere", radius: 10, x: 0, y: 0, z: 0 }], "s", 1).ok).toBe(false)
+  expect(sceneShell([{ id: "s", type: "sphere", radius: 10, x: 0, y: 0, z: 0 }], "s", 11).ok).toBe(false)
+  const ball = sceneShell([{ id: "s", type: "sphere", radius: 10, x: 0, y: 0, z: 0 }], "s", 2)
+  expect(ball.ok && Math.abs(ball.cavityVolume - (4 / 3) * Math.PI * 512) < 1e-6).toBe(true)
 })
 
 test("the exact gap between two solids of the drawing", () => {

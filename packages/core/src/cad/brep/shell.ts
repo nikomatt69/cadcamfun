@@ -1,5 +1,5 @@
 /**
- * Exact shell of a solid made of planar and cylindrical faces, by dilation of its boundary.
+ * Exact shell of a solid made of planar and cylindrical faces and faces of revolution (cones, spheres, tori), by dilation of its boundary.
  *
  * The cavity of a shell of wall `t` is the solid eroded by `t`: the points of the body at least `t` from its surface. The
  * points less than `t` from the surface are the union of the pieces the surface is made of, each swept by a ball of radius `t`:
@@ -24,8 +24,8 @@ import { add3, cross3, dot3, frame, length3, madd3, normalize3, scale3, sub3, ty
 import { curvePoint, surfaceNormal, surfaceProject } from "./geom.ts"
 import { booleanBrep } from "./boolean.ts"
 import { brepLocator } from "./classify.ts"
-import { makeCylinder, makeSphere } from "./primitives.ts"
-import { extrudeProfile, revolveProfile, type ProfileLoop } from "./sweep.ts"
+import { makeCylinder, makeSphere, makeTorus } from "./primitives.ts"
+import { extrudeProfile, loopMoments, offsetLoop, revolveProfile, type ProfileLoop, type ProfileSegment } from "./sweep.ts"
 import { faceProfile, type PlanarFacePick } from "./draft.ts"
 import { edgeUses, type Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
@@ -52,15 +52,22 @@ const outward = (b: Brep, fi: number, p: Vec3): Vec3 => {
 }
 
 /** The pieces of one face, or the reason there are none. */
-const facePiece = (b: Brep, fi: number, t: number): Brep | string => {
+const facePiece = (b: Brep, fi: number, t: number, margin: number): Brep | string => {
   const f = b.faces[fi]!
   const s = f.surface
   if (s.kind === "plane") {
     const n = f.reversed ? scale3(s.frame.z, -1) : s.frame.z
     const u = s.frame.x
     const pick: PlanarFacePick = { face: fi, origin: s.frame.origin, normal: n, u, v: cross3(n, u), distance: 0 }
-    const loops = faceProfile(b, pick)
-    if (typeof loops === "string") return loops
+    const raw = faceProfile(b, pick)
+    if (typeof raw === "string") return raw
+    // With a `margin`, a little wider than the face (its outline out, its holes in) so the slab's sides cross whatever stands on
+    // the face's boundary instead of lying tangent to it (a dome whose base meets the face's hole along a cylinder). What it gains
+    // is within the wall of the boundary but for a sliver of margin²/2t, so the shell is tried without it first.
+    const loops = raw.map((l) => {
+      if (margin === 0) return l
+      try { return offsetLoop(l, loopMoments(l).area > 0 ? -margin : margin) } catch { return l }
+    })
     // From t inside the body to a little outside it, so the slab crosses the face instead of lying on it.
     const out = 0.02 * t
     return extrudeProfile({ loops }, t + out, { placement: frame(madd3(s.frame.origin, n, -t), n, u), name: "shell.slab" })
@@ -115,7 +122,103 @@ const facePiece = (b: Brep, fi: number, t: number): Brep | string => {
     const radial = add3(scale3(x, Math.cos(a0)), scale3(cross3(axis, x), Math.sin(a0)))
     return revolveProfile({ loops: [loop] }, sweep, { origin: s.frame.origin, axis, radial, name: "shell.band" })
   }
-  return `a ${s.kind} face has no exact shell yet (planes and cylinders only)`
+  if (s.kind === "sphere" || s.kind === "cone" || s.kind === "torus") return revolutionPiece(b, fi, t)
+  return `a ${s.kind} face has no exact shell yet (planes, cylinders, cones, spheres and tori only)`
+}
+
+/** The smallest arc [start, start + sweep] of the circle that holds all the angles (the largest gap left out). */
+const arcRange = (angles: ReadonlyArray<number>): { readonly start: number; readonly sweep: number } => {
+  const sorted = [...angles].sort((p, q) => p - q)
+  let bestGap = -1, at = 0
+  for (let i = 0; i < sorted.length; i++) {
+    const next = i + 1 < sorted.length ? sorted[i + 1]! : sorted[0]! + 2 * Math.PI
+    if (next - sorted[i]! > bestGap) { bestGap = next - sorted[i]!; at = i }
+  }
+  const sweep = 2 * Math.PI - bestGap
+  return { start: sorted[(at + 1) % sorted.length]!, sweep: sweep > 2 * Math.PI - 1e-6 ? 2 * Math.PI : sweep }
+}
+
+/**
+ * The band of a face of revolution (sphere, cone, torus) swept by the ball: its meridian section, the region within `t` of the
+ * face's meridian arc, revolved over the face's angular extent. The face must be bounded by circles about its own axis and
+ * meridians (a dome, a countersink, a fillet ring); anything else is refused.
+ */
+const revolutionPiece = (b: Brep, fi: number, t: number): Brep | string => {
+  const f = b.faces[fi]!
+  const s = f.surface
+  if (s.kind !== "sphere" && s.kind !== "cone" && s.kind !== "torus") return "not a surface of revolution"
+  const axis = normalize3(s.frame.z), x = s.frame.x, y = cross3(axis, x)
+  const uses = new Map<number, number>()
+  for (const l of f.loops) for (const c of l.coedges) uses.set(c.edge, (uses.get(c.edge) ?? 0) + 1)
+  let seam = false
+  let fullMeridian = false
+  const pts: Array<{ rho: number; h: number; ang: number }> = []
+  for (const l of f.loops) for (const c of l.coedges) {
+    const e = b.edges[c.edge]!
+    if ((uses.get(c.edge) ?? 0) >= 2) seam = true
+    if (e.curve.kind === "circle") {
+      const aligned = Math.abs(Math.abs(dot3(e.curve.frame.z, axis)) - 1) < 1e-6
+      // A meridian lies in a plane through the axis: its normal is square to the axis and the plane passes through the surface's origin.
+      const meridian = Math.abs(dot3(e.curve.frame.z, axis)) < 1e-6 && Math.abs(dot3(sub3(e.curve.frame.origin, s.frame.origin), e.curve.frame.z)) < 1e-6
+      if (!aligned && !meridian) return `a ${s.kind} face bounded by a circle that is neither about its axis nor a meridian`
+      if (meridian && Math.abs(e.t1 - e.t0) > 2 * Math.PI - 1e-6) fullMeridian = true
+    } else if (e.curve.kind !== "line") return `a ${s.kind} face bounded by a ${e.curve.kind}`
+    for (let k = 0; k <= 12; k++) {
+      const d = sub3(curvePoint(e.curve, e.t0 + ((e.t1 - e.t0) * k) / 12), s.frame.origin)
+      pts.push({ rho: Math.hypot(dot3(d, x), dot3(d, y)), h: dot3(d, axis), ang: Math.atan2(dot3(d, y), dot3(d, x)) })
+    }
+  }
+  // Angular extent: the whole turn when the face has a seam or reaches the axis, else the arc its boundary spans.
+  const onAxis = pts.some((p) => p.rho < 1e-7)
+  const around = pts.filter((p) => p.rho > 1e-7).map((p) => p.ang)
+  const range = seam || onAxis || around.length === 0 ? { start: 0, sweep: 2 * Math.PI } : arcRange(around)
+  const radial = add3(scale3(x, Math.cos(range.start)), scale3(y, Math.sin(range.start)))
+  const line = (a: { x: number; y: number }, c: { x: number; y: number }): ProfileSegment => ({ kind: "line", a, b: c })
+  let loop: ProfileLoop
+  if (s.kind === "sphere") {
+    const R = s.radius
+    if (R - t < 1e-6) return `a spherical face of radius ${R} is thinner than the wall ${t}`
+    const lat = pts.map((p) => Math.atan2(p.h, p.rho))
+    const lo = Math.min(...lat), hi = Math.max(...lat)
+    if (!(hi - lo > 1e-9)) return "a spherical face with no extent"
+    const o = R + t, i = R - t
+    loop = [
+      { kind: "arc", center: { x: 0, y: 0 }, radius: o, start: lo, end: hi },
+      line({ x: o * Math.cos(hi), y: o * Math.sin(hi) }, { x: i * Math.cos(hi), y: i * Math.sin(hi) }),
+      { kind: "arc", center: { x: 0, y: 0 }, radius: i, start: hi, end: lo },
+      line({ x: i * Math.cos(lo), y: i * Math.sin(lo) }, { x: o * Math.cos(lo), y: o * Math.sin(lo) })
+    ]
+  } else if (s.kind === "cone") {
+    const al = s.semiAngle, tn = Math.tan(al)
+    const hs = pts.map((p) => p.h)
+    const lo = Math.min(...hs), hi = Math.max(...hs)
+    if (!(hi - lo > 1e-9)) return "a conical face with no extent"
+    const P = (h: number) => ({ x: s.radius + h * tn, y: h })
+    const n = { x: Math.cos(al), y: -Math.sin(al) }
+    const q = (h: number, sign: number) => ({ x: P(h).x + sign * t * n.x, y: P(h).y + sign * t * n.y })
+    const corners = [q(lo, -1), q(lo, 1), q(hi, 1), q(hi, -1)]
+    if (corners.some((c) => c.x < 1e-6)) return `a conical face closer to its apex than the wall ${t}`
+    loop = [line(corners[0]!, corners[1]!), line(corners[1]!, corners[2]!), line(corners[2]!, corners[3]!), line(corners[3]!, corners[0]!)]
+  } else {
+    const R = s.major, r = s.minor
+    if (r - t < 1e-6) return `a toroidal face of tube radius ${r} is thinner than the wall ${t}`
+    if (R - r - t < 1e-6) return "a toroidal face whose offset reaches its axis"
+    const th = pts.map((p) => Math.atan2(p.h, p.rho - R))
+    const a = fullMeridian ? { start: 0, sweep: 2 * Math.PI } : arcRange(th)
+    const o = r + t, i = r - t, a1 = a.start + a.sweep
+    const at = (rad: number, ang: number) => ({ x: R + rad * Math.cos(ang), y: rad * Math.sin(ang) })
+    if (a.sweep >= 2 * Math.PI - 1e-6) {
+      // The whole tube: a torus of tube radius r + t less one of r - t.
+      try { return booleanBrep(makeTorus(R, o, s.frame), makeTorus(R, i, s.frame), "subtract").brep } catch (err) { return `exact Boolean failed: ${err instanceof Error ? err.message : String(err)}` }
+    }
+    loop = [
+          { kind: "arc", center: { x: R, y: 0 }, radius: o, start: a.start, end: a1 },
+          line(at(o, a1), at(i, a1)),
+          { kind: "arc", center: { x: R, y: 0 }, radius: i, start: a1, end: a.start },
+          line(at(i, a.start), at(o, a.start))
+        ]
+  }
+  return revolveProfile({ loops: [loop] }, range.sweep, { origin: s.frame.origin, axis, radial, name: "shell.revolution" })
 }
 
 /** Pieces for an edge: a cylinder along a straight one, a torus along a circular one. */
@@ -166,18 +269,28 @@ export const shellBrep = (b: Brep, thickness: number, options: ShellOptions = {}
   if (!(thickness > 0) || !Number.isFinite(thickness)) return "the wall must be positive and finite"
   const report = validateBrep(b)
   if (!report.valid || b.shells.length !== 1) return "a shell needs one valid closed solid"
+  let last = "no attempt"
+  for (const margin of [0, 1e-2 * thickness]) {
+    const r = shellAttempt(b, thickness, options, margin)
+    if (typeof r !== "string") return r
+    last = r
+    // Only a failed Boolean is worth another try with wider slabs; a refusal for the geometry is final.
+    if (!r.startsWith("exact Boolean failed")) return r
+  }
+  return last
+}
+
+const shellAttempt = (b: Brep, thickness: number, options: ShellOptions, margin: number): ShellResult | string => {
   const open = new Set(options.open ?? [])
   const uses = edgeUses(b)
   const loc = brepLocator(b)
   const pieces: Brep[] = []
-  // Faces.
   for (let fi = 0; fi < b.faces.length; fi++) {
     if (open.has(fi)) continue
-    const p = facePiece(b, fi, thickness)
+    const p = facePiece(b, fi, thickness, margin)
     if (typeof p === "string") return `face ${fi}: ${p}`
     pieces.push(p)
   }
-  // Re-entrant edges not on an open face, and the vertices they end in.
   const vertices = new Set<number>()
   for (let ei = 0; ei < b.edges.length; ei++) {
     if (uses[ei]!.some((u) => open.has(u.face))) continue
@@ -188,10 +301,7 @@ export const shellBrep = (b: Brep, thickness: number, options: ShellOptions = {}
     const e = b.edges[ei]!
     vertices.add(e.v0); vertices.add(e.v1)
   }
-  for (const v of vertices) {
-    pieces.push(makeSphere(thickness * CROSS, frame(b.vertices[v]!.point, { x: 0, y: 0, z: 1 })))
-  }
-  // The cavity: the body minus the pieces, one exact Boolean each.
+  for (const v of vertices) pieces.push(makeSphere(thickness * CROSS, frame(b.vertices[v]!.point, { x: 0, y: 0, z: 1 })))
   let cavity: Brep = b
   try {
     for (const piece of pieces) {
