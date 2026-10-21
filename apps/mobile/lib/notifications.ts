@@ -1,22 +1,15 @@
 import * as Notifications from "expo-notifications"
-import { isNativeNotificationType, type NotificationRow } from "@cadcamfun/api"
+import type { NotificationRow } from "@cadcamfun/api"
+import { markNotificationShown, shouldPresentNotification } from "./notification-policy"
+
+export { markNotificationShown, shouldPresentNotification } from "./notification-policy"
 
 /**
  * Local native notifications for the paired companion: when the host stream announces a
- * new important DB row, the phone shows the same OS popup the desktop shows. Deduped by
- * row id in memory — the stream replays recent frames on reconnect, and a row must never
- * pop twice. No remote push: while unpaired or offline there is no channel, by design.
+ * new important DB row, the phone shows the same OS popup the desktop shows. Dedup and
+ * importance rules live in `notification-policy.ts`. No remote push: while unpaired or
+ * offline there is no channel, by design.
  */
-const shown = new Set<string>()
-const MAX_SHOWN = 500
-
-export const shouldPresentNotification = (row: NotificationRow): boolean =>
-  isNativeNotificationType(row.type) && !row.isRead && !shown.has(row.id)
-
-export const markNotificationShown = (id: string): void => {
-  shown.add(id)
-  if (shown.size > MAX_SHOWN) for (const old of [...shown].slice(0, shown.size - MAX_SHOWN)) shown.delete(old)
-}
 
 let configured = false
 export function configureNotificationHandler(): void {

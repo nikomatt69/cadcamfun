@@ -36,14 +36,14 @@ test("an organization frame reaches a real member, not a stranger, and stops aft
     })
     const memberStream = yield* subscribe(member.id)
     const strangerStream = yield* subscribe(stranger.id)
-    // The frame an organization write publishes; the membership check runs against the real database.
-    yield* events.resourcesChanged(owner.id, org.id)
+    // The real repo write: creating an organization project announces itself with its organization.
+    yield* projects.create(owner.id, { name: "Plate", organizationId: org.id } as never)
     expect((yield* Fiber.join(memberStream)).length).toBe(1)
     expect((yield* Fiber.join(strangerStream)).length).toBe(0)
 
     db.delete(schema.userOrganizationTable).where(eq(schema.userOrganizationTable.userId, member.id)).run()
     const revoked = yield* subscribe(member.id)
-    yield* events.resourcesChanged(owner.id, org.id)
+    yield* projects.create(owner.id, { name: "Bracket", organizationId: org.id } as never)
     expect((yield* Fiber.join(revoked)).length).toBe(0)
   }).pipe(Effect.provide(Live), Effect.provide(LiveEvents.layer))))
 })

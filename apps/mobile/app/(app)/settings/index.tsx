@@ -3,7 +3,7 @@ import { Alert, Platform, Switch, Text, View } from "react-native"
 import Constants from "expo-constants"
 import * as Clipboard from "expo-clipboard"
 import { useRouter } from "expo-router"
-import { Check, ClipboardCopy, EyeOff, Fingerprint, MonitorSmartphone, Palette, Sparkles, Unplug, Vibrate, Lock, Layers3 } from "lucide-react-native"
+import { Building2, Check, ClipboardCopy, EyeOff, Fingerprint, MonitorSmartphone, Palette, Sparkles, Unplug, Vibrate, Lock, Layers3 } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useUIStore } from "@/lib/store"
@@ -132,9 +132,12 @@ export default function SettingsScreen() {
 
     <AccountCard />
 
-    <SettingsGroup title="Library">
+    <SettingsGroup title="Workspace">
+      <ListRow leading={<IconTile size={36}><Building2 size={18} color={palette.accent} /></IconTile>} title="Organizations"
+        subtitle="Your organizations, members and roles — synced with the desktop" onPress={() => router.push("/settings/organizations")} />
+      <Divider inset={16} />
       <ListRow leading={<IconTile size={36}><Layers3 size={18} color={palette.accent} /></IconTile>} title="Materials, tools & machines"
-        subtitle="Create, duplicate and delete your resources" onPress={() => router.push("/settings/resources")} />
+        subtitle="Search, create and edit your resources — synced with the desktop" onPress={() => router.push("/settings/resources")} />
     </SettingsGroup>
 
     <SettingsGroup title="Desktop">

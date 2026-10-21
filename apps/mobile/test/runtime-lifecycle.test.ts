@@ -130,6 +130,8 @@ describe("mobile pairing provider lifecycle", () => {
   let health: () => Promise<{ status: number; body: string }> = async () => ({ status: 200, body: "{}" })
   let clears = 0
   mock.module("react-native", () => ({ AppState: { currentState: "active", addEventListener: () => ({ remove() {} }) }, Platform: { OS: "ios" } }))
+  // Native popups are not under test here; loading expo-notifications would pull in the Expo runtime.
+  mock.module("../lib/notifications", () => ({ presentNotification: async () => undefined, syncNotificationBadge: async () => undefined }))
   mock.module("../lib/native", () => ({
     nativeAvailable: true,
     launchPairLink: async () => null,
