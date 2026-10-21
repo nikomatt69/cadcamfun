@@ -6151,6 +6151,7 @@ export type ToolpathGeneratorManufactureOutput =
             | "Gouge"
             | "RemainingStock"
             | "ReplayMismatch"
+            | "Cancelled"
           severity: "error" | "warning"
           stage: "prepare" | "plan" | "cutting-data" | "generate" | "post" | "replay" | "evidence"
           message: string
@@ -6189,6 +6190,7 @@ export type ToolpathGeneratorManufactureOutput =
           | "Gouge"
           | "RemainingStock"
           | "ReplayMismatch"
+          | "Cancelled"
         severity: "error" | "warning"
         stage: "prepare" | "plan" | "cutting-data" | "generate" | "post" | "replay" | "evidence"
         message: string

@@ -26,7 +26,7 @@ export const CamKernelRequest = Schema.Struct({
 export type CamKernelRequest = typeof CamKernelRequest.Type
 
 export const CamKernelIssue = Schema.Struct({
-  tag: Schema.Literals(["InvalidInput", "UnknownMaterial", "UnknownTool", "NoSuitableTool", "UnsupportedCapability", "GenerationFailed", "EmptyToolpath", "MachineLimit", "RapidInStock", "HolderCollision", "Gouge", "RemainingStock", "ReplayMismatch"]),
+  tag: Schema.Literals(["InvalidInput", "UnknownMaterial", "UnknownTool", "NoSuitableTool", "UnsupportedCapability", "GenerationFailed", "EmptyToolpath", "MachineLimit", "RapidInStock", "HolderCollision", "Gouge", "RemainingStock", "ReplayMismatch", "Cancelled"]),
   severity: Schema.Literals(["error", "warning"]),
   stage: Schema.Literals(["prepare", "plan", "cutting-data", "generate", "post", "replay", "evidence"]),
   message: Schema.String, operationId: Schema.optionalKey(Schema.String), line: Schema.optionalKey(Schema.Int), point: Schema.optionalKey(cad.Vec3Schema)

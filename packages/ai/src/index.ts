@@ -82,7 +82,7 @@ export { definePluginTool, pluginToolId, pluginParameters, MAX_PLUGIN_SCHEMA_CHA
 export { hostPatchesPlugin, patchHostSource, applyHostPatches, HostPatchError, HOST_PATCHES, MEDIA_RULE_MARKER, STEP_INSTRUCTIONS_MARKER, hostPatchesApplied, hostPatchReport } from "./nikcli/host-patches.ts"
 export { acceptPart, type AcceptanceCheck, type AcceptanceReport, type CheckResult } from "./acceptance.ts"
 export { KERNEL_JOB_DEADLINE_MS, KernelJobError, kernelWorkerUrl, runKernelJob, runKernelJobInline } from "./kernel-job.ts"
-export type { KernelJobName, KernelJobs } from "./kernel-jobs.ts"
+export type { KernelJobName, KernelJobProgress, KernelJobs } from "./kernel-jobs.ts"
 
 export { MOD_TOOL_IDS, modToolContributions, modToolIds } from "./nikcli/mod-tools.ts"
 export { modSpecs, readModIndex, saveMod, setModEnabled, removeMod, type ModRecord } from "./nikcli/mods.ts"

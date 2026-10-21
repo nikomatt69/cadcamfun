@@ -4,7 +4,7 @@
  * are pure; whatever persists is written by the caller after the result arrives). `runKernelJobInline` runs the same
  * function on the calling thread, for tests of equivalence and for hosts without workers.
  */
-import { KERNEL_JOBS, type KernelJobName, type KernelJobs } from "./kernel-jobs.ts"
+import { KERNEL_JOBS, type KernelJobName, type KernelJobProgress, type KernelJobs } from "./kernel-jobs.ts"
 
 export class KernelJobError extends Error {
   readonly _tag = "KernelJobError"
@@ -32,7 +32,7 @@ export const runKernelJobInline = <K extends KernelJobName>(name: K, input: Kern
 export const runKernelJob = <K extends KernelJobName>(
   name: K,
   input: KernelJobs[K]["input"],
-  options: { readonly deadlineMs?: number; readonly signal?: AbortSignal } = {}
+  options: { readonly deadlineMs?: number; readonly signal?: AbortSignal; readonly onProgress?: (progress: KernelJobProgress) => void } = {}
 ): Promise<KernelJobs[K]["output"]> => new Promise((resolve, reject) => {
   if (options.signal?.aborted) return reject(new KernelJobError(name, "cancelled", `Kernel job ${name} was cancelled before it started.`))
   const worker = new Worker(kernelWorkerUrl())
@@ -49,8 +49,9 @@ export const runKernelJob = <K extends KernelJobName>(
   const timer = setTimeout(() => finish(() => reject(new KernelJobError(name, "deadline", `Kernel job ${name} passed its ${deadlineMs} ms deadline and was stopped.`))), deadlineMs)
   const onAbort = () => finish(() => reject(new KernelJobError(name, "cancelled", `Kernel job ${name} was cancelled.`)))
   options.signal?.addEventListener("abort", onAbort, { once: true })
-  worker.onmessage = (event: MessageEvent<{ ok: true; value: KernelJobs[K]["output"] } | { ok: false; error: string }>) => {
+  worker.onmessage = (event: MessageEvent<{ progress: KernelJobProgress } | { ok: true; value: KernelJobs[K]["output"] } | { ok: false; error: string }>) => {
     const message = event.data
+    if ("progress" in message) { if (!done) options.onProgress?.(message.progress); return }
     finish(() => message.ok ? resolve(message.value) : reject(new KernelJobError(name, "failed", message.error)))
   }
   worker.onerror = (event) => finish(() => reject(new KernelJobError(name, "crashed", `Kernel job ${name} crashed: ${event.message}`)))

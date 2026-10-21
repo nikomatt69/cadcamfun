@@ -29,7 +29,7 @@ import { ToolRepo } from "../repos/tool-repo.ts"
 import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { KvStore } from "./kv.ts"
 import { kvTaskJournal } from "./ai-task-journal.ts"
-import { normalizeElement, withDefaultTolerance } from "@cadcamfun/ai"
+import { KernelJobError, normalizeElement, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
 import { groupElements, transformElements } from "./ai-transform.ts"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
@@ -237,16 +237,16 @@ const toolHandlers = Effect.gen(function*() {
   }
 
   const handlers: ToolHandlersShape = {
-    manufacture: async (projectId, input) => {
+    manufacture: async (projectId, input, signal) => {
       const loaded = await load(projectId)
       const built = manufacturingJob(loaded, input)
       if (!built.ok) return { ...built, ...where(loaded) }
       const { job, stockNote } = built
       if (input.planOnly === true) {
-        const plan = cam.kernel.planOnly(job)
+        const plan = await runKernelJob("cam-plan", job, signal === undefined ? {} : { signal }).catch(cancelled)
         return plan.status === "ok" ? { ok: true, mutated: false, stockNote, ...plan.value, ...where(loaded) } : { ok: false, error: "The kernel could not plan this job; see issues.", issues: plan.issues, ...where(loaded) }
       }
-      const run = cam.kernel.runJob(job)
+      const run = await runKernelJob("cam-manufacture", job, signal === undefined ? {} : { signal }).catch(cancelled)
       if (run.status === "failed") return { ok: false, error: "The kernel could not machine this job; see issues.", issues: run.issues, ...where(loaded) }
       const a = run.value
       const lines = a.nc.split("\n")
@@ -264,13 +264,13 @@ const toolHandlers = Effect.gen(function*() {
         ...where(loaded)
       }
     },
-    manufactureOperation: async (projectId, input) => {
+    manufactureOperation: async (projectId, input, signal) => {
       const loaded = await load(projectId, true)
       const revision = drawingRevision(loaded)
       if (input.expectedRevision !== undefined && input.expectedRevision !== revision) return { ok: false, status: "stale", error: "The drawing changed. Inspect the current part before manufacturing." }
       const built = manufacturingJob(loaded, input)
       if (!built.ok) return { ...built, ...where(loaded) }
-      const result = cam.kernel.runJob(built.job)
+      const result = await runKernelJob("cam-manufacture", built.job, signal === undefined ? {} : { signal }).catch(cancelled)
       if (result.status === "failed") return { ok: false, error: "The kernel could not machine this job; nothing was stored.", issues: result.issues, ...where(loaded) }
       if (result.value.release === "blocked") return { ok: false, error: "The program is blocked by its own replay claims; nothing was stored.", release: "blocked", issues: result.value.issues, claims: result.value.claims, ...where(loaded) }
       const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(result.value)
@@ -1146,6 +1146,12 @@ const toolHandlers = Effect.gen(function*() {
   }
   return handlers
 })
+
+/** A kernel worker stopped by the assistant's abort or its deadline answers like a failed run, with a typed issue; other faults rethrow. */
+const cancelled = (error: unknown): { readonly status: "failed"; readonly issues: ReadonlyArray<cam.kernel.CamIssue> } => {
+  if (!(error instanceof KernelJobError) || error.reason === "failed" || error.reason === "crashed") throw error
+  return { status: "failed", issues: [{ tag: error.reason === "deadline" ? "GenerationFailed" : "Cancelled", severity: "error", stage: "prepare", message: error.message }] }
+}
 
 export const ToolHandlersLive = Layer.effect(ToolHandlers, toolHandlers.pipe(Effect.map((h) => ToolHandlers.of(h))))
 

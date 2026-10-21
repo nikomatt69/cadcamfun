@@ -10,7 +10,7 @@ import { defineWireAction, type ActionSpec } from "./action.ts"
 export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({
     id: "cam_edit.manufacture", kind: "write", parameters: CAM_ACTION_INPUTS["cam_edit.manufacture"],
-    run: (input, { handlers, projectId }) => handlers.manufactureOperation?.(projectId, input) ?? { ok: false, error: "Native CAM program storage is unavailable in this host." }
+    run: (input, { handlers, projectId, signal }) => handlers.manufactureOperation?.(projectId, input, signal) ?? { ok: false, error: "Native CAM program storage is unavailable in this host." }
   }),
   defineWireAction({
     id: "cam_edit.create", kind: "write", replaces: "cam_create_operation",

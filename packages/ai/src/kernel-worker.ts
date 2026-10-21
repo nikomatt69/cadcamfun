@@ -12,7 +12,7 @@ self.onmessage = (event: MessageEvent<{ readonly name: KernelJobName; readonly i
   try {
     const job = KERNEL_JOBS[name] as ((value: unknown) => unknown) | undefined
     if (job === undefined) throw new Error(`Unknown kernel job '${String(name)}'`)
-    self.postMessage({ ok: true, value: job(input) })
+    self.postMessage({ ok: true, value: (job as (value: unknown, report: (progress: unknown) => void) => unknown)(input, (progress) => self.postMessage({ progress })) })
   } catch (error) {
     self.postMessage({ ok: false, error: error instanceof Error ? error.message : String(error) })
   }

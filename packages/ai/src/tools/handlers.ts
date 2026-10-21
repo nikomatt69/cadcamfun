@@ -32,9 +32,9 @@ export interface VerifyToolOptions {
 export interface ToolHandlersShape {
   validateMachiningPlan?(projectId: string, input: MachiningPlanInput): Promise<unknown>
   /** Runs the CAM kernel on the active drawing: plan from the CAD, cutting data per material, NC and its replay evidence. */
-  manufacture?(projectId: string, input: ManufactureInput): Promise<unknown>
+  manufacture?(projectId: string, input: ManufactureInput, signal?: AbortSignal): Promise<unknown>
   /** Stores the native kernel's original multi-tool NC and artifact in the active drawing after write admission. */
-  manufactureOperation?(projectId: string, input: typeof CamManufactureOperationInput.Type): Promise<unknown>
+  manufactureOperation?(projectId: string, input: typeof CamManufactureOperationInput.Type, signal?: AbortSignal): Promise<unknown>
   reviewOperation?(projectId: string, operationId: string): Promise<unknown>
   compareSetups?(projectId: string, candidates: ReadonlyArray<SetupCandidate>): Promise<unknown>
   stock?(projectId: string, input: CamStockInput): Promise<unknown>

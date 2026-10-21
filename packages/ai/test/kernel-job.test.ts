@@ -1,6 +1,7 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { KernelJobError, kernelWorkerUrl, runKernelJob, runKernelJobInline } from "../src/kernel-job.ts"
 import type { AcceptanceCheck } from "../src/acceptance.ts"
+import { cam } from "@cadcamfun/core"
 
 setDefaultTimeout(120_000)
 
@@ -66,5 +67,34 @@ describe("kernel jobs in a scoped worker (AI-11 Step 10)", () => {
     expect(await runKernelJob("parametric-report", { history: { parameters: {}, features: "nope" } }).catch((cause: KernelJobError) => cause.reason)).toBe("failed")
     expect(kernelWorkerUrl("file:///$bunfs/root/cadcamfun-sidecar")).toBe("file:///$bunfs/root/packages/ai/src/kernel-worker.ts")
     expect(kernelWorkerUrl("file:///home/x/packages/ai/src/kernel-job.ts")).toBe("file:///home/x/packages/ai/src/kernel-worker.ts")
+  })
+})
+
+describe("the CAM kernel as a worker job", () => {
+  const camJob = {
+    schemaVersion: 1 as const, id: "w", name: "Plate", material: "6061", part: { kind: "elements" as const, elements: [{ id: "plate", type: "cube", width: 30, height: 20, depth: 5 }] },
+    machine: cam.kernel.findMachine("vmc-standard")!, quality: { resolution: 0.4 }
+  }
+
+  test("the worker returns the NC the inline run returns, and reports progress on the way", async () => {
+    const seen: string[] = []
+    const inline = runKernelJobInline("cam-manufacture", camJob)
+    const worker = await runKernelJob("cam-manufacture", camJob, { onProgress: (p) => seen.push(p.stage) })
+    if (inline.status !== "ok" || worker.status !== "ok") throw new Error("the job must run")
+    expect(worker.value.nc).toBe(inline.value.nc)
+    expect(seen).toContain("operations")
+    expect(seen.slice(-3)).toEqual(["post", "replay", "evidence"])
+  })
+
+  test("aborting the caller's signal ends the job at once with a cancelled error", async () => {
+    const controller = new AbortController()
+    const run = runKernelJob("cam-manufacture", camJob, { signal: controller.signal })
+    controller.abort()
+    await expect(run).rejects.toMatchObject({ _tag: "KernelJobError", reason: "cancelled" })
+  })
+
+  test("the plan is a job too", async () => {
+    const plan = await runKernelJob("cam-plan", camJob)
+    expect(plan.status).toBe("ok")
   })
 })

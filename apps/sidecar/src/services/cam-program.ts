@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 import { BadRequest, CamKernelResult, CamProgramDocument, combineCamOperations, type CamKernelRequest } from "@cadcamfun/api"
+import { KernelJobError, runKernelJob } from "@cadcamfun/ai"
 import { cam } from "@cadcamfun/core"
 import { Effect, Schema } from "effect"
 import { elementsOf } from "./ai-elements.ts"
@@ -17,7 +18,12 @@ export const drawingRevision = (loaded: { readonly id: string; readonly elements
 export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payload: CamKernelRequest) {
   const job = cam.kernel.jobOfSnapshot(payload)
   if (job.status === "failed") return yield* new BadRequest({ message: job.issues.map((i) => i.message).join("; ") })
-  const result = yield* Effect.try({ try: () => cam.kernel.runJob(job.value), catch: () => new BadRequest({ message: "The CAM kernel request could not be evaluated" }) })
+  // In a scoped worker: the event loop keeps serving while the kernel works, a dropped request interrupts the fiber (its signal
+  // terminates the worker) and a job that runs past its deadline is stopped.
+  const result = yield* Effect.tryPromise({
+    try: (signal) => runKernelJob("cam-manufacture", job.value, { signal }),
+    catch: (error) => new BadRequest({ message: error instanceof KernelJobError && error.reason !== "failed" && error.reason !== "crashed" ? error.message : "The CAM kernel request could not be evaluated" })
+  })
   return yield* Schema.decodeUnknownEffect(CamKernelResult)(result).pipe(Effect.mapError(() => new BadRequest({ message: "The CAM kernel returned an invalid artifact" })))
 })
 

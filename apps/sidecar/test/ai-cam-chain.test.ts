@@ -57,3 +57,22 @@ describe("cam read actions", () => {
     expect(JSON.parse(out)).toMatchObject({ ok: false })
   })
 })
+
+describe("cam.manufacture in the kernel worker", () => {
+  beforeAll(async () => { await handlers.addElements(projectId, [{ type: "cube", width: 30, height: 20, depth: 5, name: "Plate" }]) })
+  test("the assistant's abort stops the run with a typed Cancelled issue instead of an artifact", async () => {
+    const controller = new AbortController()
+    const call = handlers.manufacture!(projectId, { material: "6061" } as never, controller.signal)
+    controller.abort()
+    const result = await call as { ok: boolean; issues?: ReadonlyArray<{ tag: string }> }
+    expect(result.ok).toBe(false)
+    expect(result.issues?.map((i) => i.tag)).toEqual(["Cancelled"])
+  })
+
+  test("without an abort the run completes in the worker and reports its release", async () => {
+    const result = await handlers.manufacture!(projectId, { material: "6061" } as never) as { ok: boolean; release?: string }
+    expect(result.ok).toBe(true)
+    expect(result.release).toBeDefined()
+  })
+})
+

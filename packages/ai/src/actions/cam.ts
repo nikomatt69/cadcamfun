@@ -165,7 +165,7 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
   }),
   defineWireAction({
     id: "cam.manufacture", kind: "read", parameters: CAM_ACTION_INPUTS["cam.manufacture"],
-    run: (input, { handlers, projectId }) => handlers.manufacture?.(projectId, input) ?? Promise.resolve({ ok: false, error: "The CAM kernel is unavailable in this host." })
+    run: (input, { handlers, projectId, signal }) => handlers.manufacture?.(projectId, input, signal) ?? Promise.resolve({ ok: false, error: "The CAM kernel is unavailable in this host." })
   }),
   defineWireAction({
     id: "cam.chain_status", kind: "read", replaces: "cam_chain_status",

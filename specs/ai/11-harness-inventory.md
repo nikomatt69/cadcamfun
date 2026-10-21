@@ -119,31 +119,31 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `library.component_list` (was `cad_component_list`) | read | — | — | contribution `library.component_list` → `apps/sidecar/src/services/ai.ts:1157` | yes | declared | action-inputs.test.ts |
-| `library.lookup_component` (was `lib_lookup_component`) | read | — | query | contribution `library.lookup_component` → `apps/sidecar/src/services/ai.ts:1158` | yes | declared | action-inputs.test.ts |
+| `library.component_list` (was `cad_component_list`) | read | — | — | contribution `library.component_list` → `apps/sidecar/src/services/ai.ts:1163` | yes | declared | action-inputs.test.ts |
+| `library.lookup_component` (was `lib_lookup_component`) | read | — | query | contribution `library.lookup_component` → `apps/sidecar/src/services/ai.ts:1164` | yes | declared | action-inputs.test.ts |
 | `library.lookup_material` (was `lib_lookup_material`) | read | — | query* | handler `lookupMaterial` → `apps/sidecar/src/services/ai.ts:869` | yes | declared | action-inputs.test.ts |
 | `library.lookup_tool` (was `lib_lookup_tool`) | read | — | query* | handler `lookupTool` → `apps/sidecar/src/services/ai.ts:870` | yes | declared | action-inputs.test.ts, action-tool.test.ts |
-| `library.lookup_machine_config` (was `lib_lookup_machine_config`) | read | — | query | contribution `library.lookup_machine_config` → `apps/sidecar/src/services/ai.ts:1159` | yes | declared | action-inputs.test.ts |
+| `library.lookup_machine_config` (was `lib_lookup_machine_config`) | read | — | query | contribution `library.lookup_machine_config` → `apps/sidecar/src/services/ai.ts:1165` | yes | declared | action-inputs.test.ts |
 
 ### `parts`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `parts.save` (was `cad_component_save`) | write | component | ids*, name*, description, type, isPublic | contribution `parts.save` → `apps/sidecar/src/services/ai.ts:1160` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
-| `parts.insert` (was `cad_component_insert`) | write | drawing | componentId*, transform | contribution `parts.insert` → `apps/sidecar/src/services/ai.ts:1168` | yes | declared | action-inputs.test.ts |
-| `parts.delete` (was `cad_component_delete`) | destructive | component | componentId*, confirm* | contribution `parts.delete` → `apps/sidecar/src/services/ai.ts:1173` | yes | declared | action-inputs.test.ts |
+| `parts.save` (was `cad_component_save`) | write | component | ids*, name*, description, type, isPublic | contribution `parts.save` → `apps/sidecar/src/services/ai.ts:1166` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
+| `parts.insert` (was `cad_component_insert`) | write | drawing | componentId*, transform | contribution `parts.insert` → `apps/sidecar/src/services/ai.ts:1174` | yes | declared | action-inputs.test.ts |
+| `parts.delete` (was `cad_component_delete`) | destructive | component | componentId*, confirm* | contribution `parts.delete` → `apps/sidecar/src/services/ai.ts:1179` | yes | declared | action-inputs.test.ts |
 
 ### `library_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `library_edit.upsert_material` (was `lib_upsert_material`) | write | library | id, name*, description, properties, isPublic | contribution `library_edit.upsert_material` → `apps/sidecar/src/services/ai.ts:1174` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
-| `library_edit.upsert_tool` (was `lib_upsert_tool`) | write | library | id, name*, type*, diameter*, material*, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, cornerRadius, tipAngle, threadPitch, holderDiameter, holderLength, stickout, notes, isPublic | contribution `library_edit.upsert_tool` → `apps/sidecar/src/services/ai.ts:1175` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
-| `library_edit.upsert_machine_config` (was `lib_upsert_machine_config`) | write | library | id, name*, kind*, description, kinematics, postProcessor*, workOffsets, probing, maxRPM, maxFeed, isPublic | contribution `library_edit.upsert_machine_config` → `apps/sidecar/src/services/ai.ts:1176` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
-| `library_edit.upsert_library_item` | write | library | id, name*, category*, type*, data*, description, properties, tags, isPublic | contribution `library_edit.upsert_library_item` → `apps/sidecar/src/services/ai.ts:1177` | yes | declared | action-inputs.test.ts |
-| `library_edit.set_cost` | write | library | kind*, id, materialId, toolId, name, costPerUnit, wasteFactor, minimumCharge, wearRatePerMeter, replacementCost, replacementThreshold, machineHourlyRate, operatorHourlyRate, setupTime, currencyCode | contribution `library_edit.set_cost` → `apps/sidecar/src/services/ai.ts:1178` | yes | declared | action-inputs.test.ts |
-| `library_edit.set_default` (was `lib_set_default`) | write | library | materialId, toolId, machineConfigId | contribution `library_edit.set_default` → `apps/sidecar/src/services/ai.ts:1179` | yes | declared | action-inputs.test.ts |
-| `library_edit.delete` (was `lib_delete`) | destructive | library | kind*, id*, confirm* | contribution `library_edit.delete` → `apps/sidecar/src/services/ai.ts:1180` | yes | declared | action-inputs.test.ts |
+| `library_edit.upsert_material` (was `lib_upsert_material`) | write | library | id, name*, description, properties, isPublic | contribution `library_edit.upsert_material` → `apps/sidecar/src/services/ai.ts:1180` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
+| `library_edit.upsert_tool` (was `lib_upsert_tool`) | write | library | id, name*, type*, diameter*, material*, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, cornerRadius, tipAngle, threadPitch, holderDiameter, holderLength, stickout, notes, isPublic | contribution `library_edit.upsert_tool` → `apps/sidecar/src/services/ai.ts:1181` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
+| `library_edit.upsert_machine_config` (was `lib_upsert_machine_config`) | write | library | id, name*, kind*, description, kinematics, postProcessor*, workOffsets, probing, maxRPM, maxFeed, isPublic | contribution `library_edit.upsert_machine_config` → `apps/sidecar/src/services/ai.ts:1182` | yes | declared | action-inputs.test.ts, ai-resource-generator.test.ts, resource-generator.test.ts |
+| `library_edit.upsert_library_item` | write | library | id, name*, category*, type*, data*, description, properties, tags, isPublic | contribution `library_edit.upsert_library_item` → `apps/sidecar/src/services/ai.ts:1183` | yes | declared | action-inputs.test.ts |
+| `library_edit.set_cost` | write | library | kind*, id, materialId, toolId, name, costPerUnit, wasteFactor, minimumCharge, wearRatePerMeter, replacementCost, replacementThreshold, machineHourlyRate, operatorHourlyRate, setupTime, currencyCode | contribution `library_edit.set_cost` → `apps/sidecar/src/services/ai.ts:1184` | yes | declared | action-inputs.test.ts |
+| `library_edit.set_default` (was `lib_set_default`) | write | library | materialId, toolId, machineConfigId | contribution `library_edit.set_default` → `apps/sidecar/src/services/ai.ts:1185` | yes | declared | action-inputs.test.ts |
+| `library_edit.delete` (was `lib_delete`) | destructive | library | kind*, id*, confirm* | contribution `library_edit.delete` → `apps/sidecar/src/services/ai.ts:1186` | yes | declared | action-inputs.test.ts |
 
 ### `memory`
 
