@@ -14,7 +14,7 @@
  * that axis, so a five-axis sweep is bracketed by the same two tests. Units: mm.
  */
 import type { Vec3 } from "../../cad/vec.ts"
-import { assemblyProfile } from "./assembly.ts"
+import { assemblyProfile, type AssemblyPart } from "./assembly.ts"
 import type { Cutter } from "./cutters.ts"
 
 export interface VoxelStock {
@@ -150,4 +150,63 @@ export const remainingVolume = (stock: VoxelStock): { readonly lower: number; re
     if (stock.removedSure[id] !== 1) upper++
   }
   return { lower: lower * v, upper: upper * v }
+}
+
+/** What the tool assembly touches in the stock at one pose: a contact that is certain, or one that cannot be excluded. */
+export interface StockContact {
+  /** Centre of a voxel that certainly remains (not possibly removed) and lies wholly inside the probed part of the tool. */
+  readonly sure?: Vec3
+  /** A voxel that may remain (not surely removed) lies within the probed part's expansion. */
+  readonly possible: boolean
+}
+
+/**
+ * Whether the parts of the assembly given in `parts` (shank and holder while cutting; every part for a rapid) touch material of the
+ * stock at a pose: the tip at `tip`, the tool axis up from it along `axis` (both in the stock's frame). Same two tests as the
+ * removal, in the other direction: material the cutter did not possibly remove is certainly there, and a cube wholly inside the
+ * revolved part is certainly touched; a cube whose centre is within its half diagonal of the part may be. A voxel the cutter
+ * possibly removed is never a certain contact, so a shank following the flutes through their own cut is not a collision.
+ */
+export const stockContact = (stock: VoxelStock, cutter: Cutter, tip: Vec3, axis: Vec3, parts: ReadonlyArray<AssemblyPart>): StockContact => {
+  const p = assemblyProfile(cutter)
+  const segs: Seg[] = []
+  for (let i = 0; i + 1 < p.points.length; i++) if (parts.includes(p.parts[i]!)) segs.push({ a: p.points[i]!, b: p.points[i + 1]! })
+  if (segs.length === 0) return { possible: false }
+  const d = unitOf(axis)
+  const h = stock.voxel, hd = (Math.sqrt(3) / 2) * h
+  const top = Math.max(...segs.map((q) => Math.max(q.a.z, q.b.z)))
+  const bottom = Math.min(...segs.map((q) => Math.min(q.a.z, q.b.z)))
+  const maxR = Math.max(...segs.map((q) => Math.max(q.a.r, q.b.r)))
+  const reach = maxR + hd, axialLo = bottom - hd, axialTop = top + hd
+  // The box that holds the probed part: the tip plus its extent along the axis, widened by the radius in every direction.
+  const x0 = tip.x + Math.min(axialLo * d.x, axialTop * d.x) - reach, x1 = tip.x + Math.max(axialLo * d.x, axialTop * d.x) + reach
+  const y0 = tip.y + Math.min(axialLo * d.y, axialTop * d.y) - reach, y1 = tip.y + Math.max(axialLo * d.y, axialTop * d.y) + reach
+  const z0 = tip.z + Math.min(axialLo * d.z, axialTop * d.z) - reach, z1 = tip.z + Math.max(axialLo * d.z, axialTop * d.z) + reach
+  const i0 = Math.max(0, Math.floor((x0 - stock.origin.x) / h)), i1 = Math.min(stock.nx - 1, Math.floor((x1 - stock.origin.x) / h))
+  const j0 = Math.max(0, Math.floor((y0 - stock.origin.y) / h)), j1 = Math.min(stock.ny - 1, Math.floor((y1 - stock.origin.y) / h))
+  const k0 = Math.max(0, Math.floor((z0 - stock.origin.z) / h)), k1 = Math.min(stock.nz - 1, Math.floor((z1 - stock.origin.z) / h))
+  let possible = false
+  for (let k = k0; k <= k1; k++) {
+    const cz = stock.origin.z + (k + 0.5) * h
+    for (let j = j0; j <= j1; j++) {
+      const cy = stock.origin.y + (j + 0.5) * h
+      for (let i = i0; i <= i1; i++) {
+        const id = index(stock, i, j, k)
+        if (stock.material[id] !== 1 || stock.removedSure[id] === 1) continue
+        const cx = stock.origin.x + (i + 0.5) * h
+        const vx = cx - tip.x, vy = cy - tip.y, vz = cz - tip.z
+        const s = vx * d.x + vy * d.y + vz * d.z
+        if (s < axialLo || s > axialTop) continue
+        const rho = Math.sqrt(Math.max(0, vx * vx + vy * vy + vz * vz - s * s))
+        if (rho > reach) continue
+        const low = radiusAt(segs, Infinity, s - hd), mid = radiusAt(segs, Infinity, s), high = radiusAt(segs, Infinity, s + hd)
+        const rMax = Math.max(low, mid, high)
+        if (rMax < 0 || rho > rMax + hd) continue
+        possible = true
+        const rMin = Math.min(low, mid, high)
+        if (stock.removedPossible[id] !== 1 && rMin >= 0 && rho + hd <= rMin) return { sure: { x: cx, y: cy, z: cz }, possible: true }
+      }
+    }
+  }
+  return { possible }
 }

@@ -29,7 +29,7 @@ import { FaceParams, generateFace } from "../operations/face.ts"
 import { MultiaxisParams, generateMultiaxis } from "../operations/multiaxis.ts"
 import { fiveAxisKinematic } from "../five-axis.ts"
 import { tableRotation, type RotaryAngles, type RotaryLayout } from "../indexing.ts"
-import { remainingVolume, removeTipPath, voxelStock, type VoxelStock } from "./stock.ts"
+import { remainingVolume, removeTipPath, stockContact, voxelStock, type VoxelStock } from "./stock.ts"
 import { TriangleSoup } from "../model/mesh-queries.ts"
 import { PocketParams, generatePocket } from "../operations/pocket.ts"
 import { ProfileParams, generateProfile } from "../operations/profile.ts"
@@ -220,18 +220,31 @@ const fiveAxisRemovalText = (vs: VoxelStock): string => {
   return `Five-axis moves remove between ${(raw - left.upper).toFixed(0)} and ${(raw - left.lower).toFixed(0)} mm³ of the raw stock; the three-axis height field does not cover them`
 }
 
+/** Largest table turn between two poses of a move, degrees: the angles are interpolated in steps of at most this. */
+const TURN_STEP = 3
+
 /**
- * Removes the cutter of a feed move made with the table turned. The NC position is the tip in machine coordinates, so the tip in the
- * part is `Rᵀ (m - pivot) + pivot`, and the tool axis (up from the tip) in the part is `Rᵀ ẑ`. The stock voxels are measured along it.
+ * The poses of a move made with the table turning from `a0` to `a1` (what the controller interpolates linearly in the joints).
+ * The NC position is the tip in machine coordinates, so the tip in the part is `Rᵀ (m - pivot) + pivot` and the tool axis (up from
+ * the tip) in the part is `Rᵀ ẑ`; the angles of each pose come from the interpolation, not only from the end of the move.
  */
-const removeTurnedMove = (vs: VoxelStock, cutter: Cutter, layout: RotaryLayout, pivot: Vec3, from: Vec3, to: Vec3, angles: RotaryAngles): void => {
-  const m = tableRotation(angles, layout)
-  const toPart = (p: Vec3): Vec3 => {
-    const x = p.x - pivot.x, y = p.y - pivot.y, z = p.z - pivot.z
-    return { x: m[0] * x + m[3] * y + m[6] * z + pivot.x, y: m[1] * x + m[4] * y + m[7] * z + pivot.y, z: m[2] * x + m[5] * y + m[8] * z + pivot.z }
+const turnedPoses = (layout: RotaryLayout, pivot: Vec3, from: Vec3, to: Vec3, a0: RotaryAngles, a1: RotaryAngles, spacing: number): ReadonlyArray<{ readonly tip: Vec3; readonly axis: Vec3; readonly machine: Vec3 }> => {
+  const length = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z)
+  const turn = Math.max(Math.abs((a1.a ?? 0) - (a0.a ?? 0)), Math.abs((a1.b ?? 0) - (a0.b ?? 0)), Math.abs((a1.c ?? 0) - (a0.c ?? 0)))
+  const n = Math.min(2000, Math.max(1, Math.ceil(Math.max(length / spacing, turn / TURN_STEP))))
+  const out: Array<{ tip: Vec3; axis: Vec3; machine: Vec3 }> = []
+  for (let k = 0; k <= n; k++) {
+    const f = k / n
+    const m = tableRotation({ a: (a0.a ?? 0) + ((a1.a ?? 0) - (a0.a ?? 0)) * f, b: (a0.b ?? 0) + ((a1.b ?? 0) - (a0.b ?? 0)) * f, c: (a0.c ?? 0) + ((a1.c ?? 0) - (a0.c ?? 0)) * f }, layout)
+    const machine = { x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f, z: from.z + (to.z - from.z) * f }
+    const x = machine.x - pivot.x, y = machine.y - pivot.y, z = machine.z - pivot.z
+    out.push({
+      machine,
+      tip: { x: m[0] * x + m[3] * y + m[6] * z + pivot.x, y: m[1] * x + m[4] * y + m[7] * z + pivot.y, z: m[2] * x + m[5] * y + m[8] * z + pivot.z },
+      axis: { x: m[6], y: m[7], z: m[8] }
+    })
   }
-  const axis: Vec3 = { x: m[6], y: m[7], z: m[8] }
-  removeTipPath(vs, cutter, [toPart(from), toPart(to)], [axis, axis])
+  return out
 }
 
 /** The cone of a chamfer mill / spot drill / engraver. */
@@ -709,6 +722,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   let rapidHits = 0, shankHits = 0, holderHits = 0, noTool = 0
   // Moves with A/B/C words: their XYZ is in the machine frame, not the work frame the height field is in, so they are not carved or checked here.
   let turnedMoves = 0
+  /** What the voxel replay of the turned moves found: certain and possible contacts of the shank, holder and (rapids) flutes with material, and moves it could not check. */
+  const turned = { rapidSure: 0, rapidPossible: 0, holderSure: 0, holderPossible: 0, unchecked: 0 }
   let turnedVoxels: VoxelStock | undefined
   const firstFinding = new Map<string, CamIssue>()
   const finding = (key: string, make: () => CamIssue): void => { if (!firstFinding.has(key)) firstFinding.set(key, make()) }
@@ -738,18 +753,43 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       2
     )
     turnedVoxels = turnedStock
+    let angles: RotaryAngles = { a: 0, b: 0, c: 0 }
     for (const s of interpreted.segments as ReadonlyArray<GSegment>) {
       if (s.kind === "dwell") continue
       if (s.kind !== "arc" && s.rotary !== undefined) {
         turnedMoves++
         const n = toolAtLine[s.line]
         const cutter = n === undefined ? undefined : cutterByNumber.get(n)
-        if (turnedStock !== undefined && five !== undefined && s.kind === "linear" && cutter !== undefined) {
-          const r = s.rotary
-          removeTurnedMove(turnedStock, cutter, five.layout, five.pivot, s.from, s.to, { a: r.a ?? 0, b: r.b ?? 0, c: r.c ?? 0 })
+        const end: RotaryAngles = { a: s.rotary.a ?? 0, b: s.rotary.b ?? 0, c: s.rotary.c ?? 0 }
+        const start = angles
+        angles = end
+        if (turnedStock === undefined || five === undefined || cutter === undefined) { turned.unchecked++; continue }
+        const poses = turnedPoses(five.layout, five.pivot, s.from, s.to, start, end, turnedStock.voxel)
+        const tips = poses.map((q) => q.tip), axes = poses.map((q) => q.axis)
+        const rapid = s.kind === "rapid"
+        // A feed move cuts with the flutes first; the shank and holder then follow through what the flutes removed.
+        if (!rapid) removeTipPath(turnedStock, cutter, tips, axes)
+        const parts = rapid ? (["cutting", "shank", "holder"] as const) : (["shank", "holder"] as const)
+        let sure = false, possible = false
+        for (const q of poses) {
+          const hit = stockContact(turnedStock, cutter, q.tip, q.axis, parts)
+          possible ||= hit.possible
+          if (hit.sure !== undefined) {
+            sure = true
+            const op = opAtLine[s.line]
+            finding(rapid ? "turned-rapid" : "turned-holder", () => issue(rapid ? "RapidInStock" : "HolderCollision", "replay",
+              rapid ? `Rapid move through material at NC line ${s.line} with the table turned (${cutter.name})` : `Shank or holder of ${cutter.name} touches material at NC line ${s.line} with the table turned`,
+              { line: s.line, point: q.machine, ...(op !== undefined ? { operationId: outcomes[opOfToolpath[op]!]?.id } : {}) }))
+            break
+          }
         }
+        if (rapid) { if (sure) turned.rapidSure++; else if (possible) turned.rapidPossible++ }
+        else if (sure) turned.holderSure++
+        else if (possible) turned.holderPossible++
         continue
       }
+      // An arc written while the table is turned is not interpreted in the part's frame: it stays unchecked, not passed.
+      if (s.kind === "arc" && ((angles.a ?? 0) !== 0 || (angles.b ?? 0) !== 0 || (angles.c ?? 0) !== 0)) turned.unchecked++
       const op = opAtLine[s.line]
       if (op !== lastOp) { checkGouges(lastOp); lastOp = op }
       const n = toolAtLine[s.line]
@@ -877,10 +917,21 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       status: failedOps.length > 0 || unmachined.length > 0 ? "failed" : "passed",
       detail: failedOps.length > 0 || unmachined.length > 0 ? [...failedOps.map((x) => `${x.id} failed`), ...unmachined].join("; ") : `${finalOutcomes.length} operations generated; every planned feature has an operation`
     },
-    { id: "no-rapid-in-stock", status: interpreted === undefined ? "unresolved" : rapidHits > 0 ? "failed" : turnedMoves > 0 ? "unresolved" : "passed", detail: rapidHits > 0 ? `${rapidHits} rapid samples inside material` : turnedMoves > 0 ? `${turnedMoves} moves turn the table: their rapids are not checked against the height field` : "No rapid move touches the stock as replayed" },
     {
-      id: "holder-clearance", status: interpreted === undefined ? "unresolved" : shankHits + holderHits > 0 ? "failed" : "passed",
-      detail: shankHits + holderHits > 0 ? `${shankHits} shank and ${holderHits} holder contacts with the stock` : "Shank and holder stay clear of the stock (3-axis height-field replay)"
+      id: "no-rapid-in-stock",
+      status: interpreted === undefined ? "unresolved" : rapidHits > 0 || turned.rapidSure > 0 ? "failed" : turned.unchecked > 0 || turned.rapidPossible > 0 ? "unresolved" : "passed",
+      detail: rapidHits > 0 ? `${rapidHits} rapid samples inside material` : turned.rapidSure > 0 ? `${turned.rapidSure} rapid moves with the table turned pass through material (voxel stock)`
+        : turned.unchecked > 0 ? `${turned.unchecked} moves with the table turned could not be checked against the stock`
+        : turned.rapidPossible > 0 ? `${turned.rapidPossible} rapid moves with the table turned come within a voxel of material that may remain`
+        : turnedMoves > 0 ? `No rapid touches the stock as replayed (${turnedMoves} moves with the table turned on the voxel stock)` : "No rapid move touches the stock as replayed"
+    },
+    {
+      id: "holder-clearance",
+      status: interpreted === undefined ? "unresolved" : shankHits + holderHits > 0 || turned.holderSure > 0 ? "failed" : turned.unchecked > 0 || turned.holderPossible > 0 ? "unresolved" : "passed",
+      detail: shankHits + holderHits > 0 ? `${shankHits} shank and ${holderHits} holder contacts with the stock` : turned.holderSure > 0 ? `${turned.holderSure} moves with the table turned bring the shank or holder into material (voxel stock)`
+        : turned.unchecked > 0 ? `${turned.unchecked} moves with the table turned could not be checked against the stock`
+        : turned.holderPossible > 0 ? `${turned.holderPossible} moves with the table turned bring the shank or holder within a voxel of material that may remain`
+        : turnedMoves > 0 ? `Shank and holder stay clear of the stock (height field for the 3-axis moves, voxel stock for ${turnedMoves} moves with the table turned)` : "Shank and holder stay clear of the stock (3-axis height-field replay)"
     },
     { id: "no-gouge", status: interpreted === undefined ? "unresolved" : gougeColumns > 0 ? "failed" : turnedMoves > 0 ? "unresolved" : "passed", detail: gougeColumns > 0 ? `${gougeColumns} cells cut below the part, up to ${gougeDepth.toFixed(3)} mm` : turnedMoves > 0 ? `${turnedMoves} moves turn the table: their cuts are not checked against the part` : `No cut below the part beyond ${(0.02 + prepared.tolerance).toFixed(3)} mm (one cell of lateral slack)` },
     {
