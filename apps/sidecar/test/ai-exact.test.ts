@@ -33,10 +33,24 @@ test("the assistant reads the exact kernel and the assembly of the open drawing"
   expect(assembly.body.result.interference.clashesTotal).toBe(1)
   expect(assembly.body.result.interference.clashes[0].volume).toBeCloseTo(500, 2)
   expect(assembly.body.result.bomTotal).toBeGreaterThanOrEqual(3)
+
+  // The exact gap between two solids, and a shell on paper.
+  const gap = await invoke({ action: "distance", firstId: "a", secondId: "b" })
+  expect(gap.status).toBe(200)
+  expect(gap.body.result.ok).toBe(true)
+  expect(gap.body.result.overlap).toBe(true)
+  const shell = await invoke({ action: "shell", id: "a", thickness: 2 })
+  expect(shell.status).toBe(200)
+  expect(shell.body.result).toMatchObject({ ok: true, id: "a", wall: 2, valid: true, shells: 2 })
+  expect(shell.body.result.cavityVolume).toBeCloseTo(6 ** 3, 6)
+  const refused = await invoke({ action: "shell", id: "missing", thickness: 2 })
+  expect(refused.body.result).toMatchObject({ ok: false })
 })
 
 test("an unknown project is refused, nothing is provisioned", async () => {
   const handlers = await app.toolHandlers()
   expect(await handlers.cadExact!("missing-project", {})).toMatchObject({ ok: false })
   expect(await handlers.cadAssembly!("missing-project", {})).toMatchObject({ ok: false })
+  expect(await handlers.cadShell!("missing-project", { id: "a", thickness: 2 })).toMatchObject({ ok: false })
+  expect(await handlers.cadDistance!("missing-project", { firstId: "a", secondId: "b" })).toMatchObject({ ok: false })
 })

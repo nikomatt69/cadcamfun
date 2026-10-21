@@ -31,10 +31,20 @@ export interface DistanceOptions {
 
 export const minimumDistance = (A: Brep, B: Brep, options: DistanceOptions = {}): MinimumDistance => {
   const la = brepLocator(A), lb = brepLocator(B)
+  const interior = new Map<Brep, Vec3[]>()
   const samples = (b: Brep): Vec3[] => {
     const t = tessellateBrep(b, { ...(options.chordTol !== undefined ? { chordTol: options.chordTol } : {}), angleTolDeg: 20 })
     const out: Vec3[] = []
     for (let i = 0; i < t.positions.length; i += 3) out.push({ x: t.positions[i]!, y: t.positions[i + 1]!, z: t.positions[i + 2]! })
+    // Centres of the triangles, for the overlap test only: the vertices of a box lie on the other box's faces when the boxes
+    // share a plane, but the middle of a face does not.
+    const mids: Vec3[] = []
+    const stride = Math.max(1, Math.floor(t.indices.length / 3 / 300))
+    for (let k = 0; k + 2 < t.indices.length; k += 3 * stride) {
+      const a = t.indices[k]! * 3, c = t.indices[k + 1]! * 3, d = t.indices[k + 2]! * 3
+      mids.push({ x: (t.positions[a]! + t.positions[c]! + t.positions[d]!) / 3, y: (t.positions[a + 1]! + t.positions[c + 1]! + t.positions[d + 1]!) / 3, z: (t.positions[a + 2]! + t.positions[c + 2]! + t.positions[d + 2]!) / 3 })
+    }
+    interior.set(b, mids)
     return out
   }
   const k = options.candidates ?? 6
@@ -69,7 +79,7 @@ export const minimumDistance = (A: Brep, B: Brep, options: DistanceOptions = {})
       if (d < best.d) best = swap ? { d, a: q, b: p, ...(fq !== undefined ? { fa: fq } : {}), ...(fp !== undefined ? { fb: fp } : {}) } : { d, a: p, b: q, ...(fp !== undefined ? { fa: fp } : {}), ...(fq !== undefined ? { fb: fq } : {}) }
     }
     // One sample inside the other solid means they overlap.
-    if (picked.some((n) => lt.classify(n.p, 1e-7) === "in")) overlap = true
+    if (picked.some((n) => lt.classify(n.p, 1e-7) === "in") || (interior.get(from) ?? []).some((p) => lt.classify(p, 1e-7) === "in")) overlap = true
   }
   run(A, B, la, lb, false)
   run(B, A, lb, la, true)

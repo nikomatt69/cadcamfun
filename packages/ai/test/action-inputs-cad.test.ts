@@ -30,6 +30,8 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.vision": { accept: [{}, { focus: "the pocket" }], refuse: [{ focus: "" }, { focus: "   " }] },
   "cad.exact": { accept: [{}, { ids: ["a"], machining: false }], refuse: [{ ids: [] }, { machining: "no" }] },
   "cad.assembly": { accept: [{}, { washers: false }], refuse: [{ washers: 1 }] },
+  "cad.shell": { accept: [{ id: "a", thickness: 2 }, { id: "a", thickness: 1.5, open: ["plate.top"] }], refuse: [{ id: "a" }, { id: "", thickness: 2 }, { id: "a", thickness: 0 }, { id: "a", thickness: 2, open: [""] }] },
+  "cad.distance": { accept: [{ firstId: "a", secondId: "b" }], refuse: [{ firstId: "a" }, { firstId: "", secondId: "b" }] },
   "cad_edit.add_entities": {
     accept: [{ entities: [{ type: "line", start: { x: 0, y: 0 }, end: { x: 10, y: 0 } }, { type: "circle", center: { x: 0, y: 0 }, radius: 3, layer: "L1" }] }],
     refuse: [{ entities: [] }, { entities: [{ type: "circle", center: { x: 0, y: 0 }, radius: 0 }] }, { entities: [{ type: "spline", points: [] }] }]

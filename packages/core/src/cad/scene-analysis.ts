@@ -6,7 +6,7 @@
  * the reason.
  */
 import { brepFeatures, type ExactFeatures } from "../cam/brep-part.ts"
-import { massProperties, recognizeHoles, validateBrep, type Brep } from "./brep/index.ts"
+import { massProperties, minimumDistance, recognizeHoles, shellBrep, validateBrep, type Brep } from "./brep/index.ts"
 import { brepBox } from "./history-brep.ts"
 import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
 import type { BomRow, InferredJoint } from "./assembly-analysis.ts"
@@ -159,5 +159,55 @@ export const assemblyReport = (elements: ReadonlyArray<Element>, options: { read
       unfastened: fasteners.unfastened, existing: fasteners.existing
     },
     skipped: scene.skipped
+  }
+}
+
+
+export type SceneShell =
+  | { readonly ok: true; readonly id: string; readonly name: string; readonly wall: number; readonly open: ReadonlyArray<string>; readonly volume: number; readonly cavityVolume: number; readonly originalVolume: number; readonly faces: number; readonly shells: number; readonly pieces: number; readonly valid: boolean }
+  | { readonly ok: false; readonly error: string }
+
+/**
+ * What hollowing a solid of the drawing would give (nothing is changed): its exact shell by dilation of the boundary, with the
+ * named faces left open (`<feature>.top`, a face name from `cad.exact`), or the reason it cannot be made.
+ */
+export const sceneShell = (elements: ReadonlyArray<Element>, id: string, wall: number, openFaces: ReadonlyArray<string> = []): SceneShell => {
+  const scene = sceneParts(elements)
+  const part = scene.parts.find((p) => p.id === id)
+  if (part === undefined) {
+    const skipped = scene.skipped.find((s) => s.id === id)
+    return { ok: false, error: skipped !== undefined ? `'${id}' has no exact model: ${skipped.reason}` : `no solid '${id}' in the drawing` }
+  }
+  const named = part.brep.faces.map((f, i) => ({ i, name: f.name }))
+  const open: number[] = []
+  for (const n of openFaces) {
+    const hit = named.filter((f) => f.name === n)
+    if (hit.length === 0) return { ok: false, error: `'${id}' has no face called '${n}'; its faces are ${[...new Set(named.map((f) => f.name).filter((x) => x !== undefined))].slice(0, 20).join(", ") || "unnamed"}` }
+    for (const h of hit) open.push(h.i)
+  }
+  const r = shellBrep(part.brep, wall, { open })
+  if (typeof r === "string") return { ok: false, error: r }
+  return {
+    ok: true, id, name: part.name, wall, open: openFaces,
+    volume: massProperties(r.brep).volume, cavityVolume: massProperties(r.cavity).volume, originalVolume: massProperties(part.brep).volume,
+    faces: r.brep.faces.length, shells: r.brep.shells.length, pieces: r.pieces, valid: validateBrep(r.brep).valid
+  }
+}
+
+export type SceneDistance =
+  | { readonly ok: true; readonly a: string; readonly b: string; readonly distance: number; readonly overlap: boolean; readonly pointA: Vec3; readonly pointB: Vec3; readonly faceA?: string; readonly faceB?: string }
+  | { readonly ok: false; readonly error: string }
+
+/** The smallest gap between two solids of the drawing, exact, with the closest points and the faces they are on. */
+export const sceneDistance = (elements: ReadonlyArray<Element>, a: string, b: string): SceneDistance => {
+  if (a === b) return { ok: false, error: "choose two different solids" }
+  const scene = sceneParts(elements)
+  const pa = scene.parts.find((p) => p.id === a), pb = scene.parts.find((p) => p.id === b)
+  if (pa === undefined || pb === undefined) return { ok: false, error: `no exact solid '${pa === undefined ? a : b}' in the drawing` }
+  const m = minimumDistance(pa.brep, pb.brep)
+  return {
+    ok: true, a, b, distance: m.distance, overlap: m.overlap, pointA: m.pointA, pointB: m.pointB,
+    ...(m.faceA !== undefined && pa.brep.faces[m.faceA]?.name !== undefined ? { faceA: pa.brep.faces[m.faceA]!.name! } : {}),
+    ...(m.faceB !== undefined && pb.brep.faces[m.faceB]?.name !== undefined ? { faceB: pb.brep.faces[m.faceB]!.name! } : {})
   }
 }

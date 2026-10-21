@@ -1,5 +1,5 @@
 import type { SetupCandidate, MachiningPlanInput, ManufactureInput } from "../actions/cam.ts"
-import type { CadAssemblyInput, CadExactInput, CadGrepInput } from "../actions/cad.ts"
+import type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadShellInput } from "../actions/cad.ts"
 import type { CadComponentRelationsInput, CadInspectionInput } from "../actions/cad.ts"
 import type { ParametricHandlerInput } from "../actions/parametric.ts"
 export type { ParametricHandlerInput } from "../actions/parametric.ts"
@@ -44,6 +44,10 @@ export interface ToolHandlersShape {
   cadExact?(projectId: string, input: CadExactInput): Promise<unknown>
   /** Exact interference, bill of materials, joints and the fasteners still missing of the open drawing. */
   cadAssembly?(projectId: string, input: CadAssemblyInput): Promise<unknown>
+  /** What hollowing one solid would give (exact shell, volumes, open faces by name); nothing in the drawing changes. */
+  cadShell?(projectId: string, input: CadShellInput): Promise<unknown>
+  /** The exact smallest gap between two solids, with the closest points. */
+  cadDistance?(projectId: string, input: CadDistanceInput): Promise<unknown>
   webSearch?(input: WebSearchInput, signal?: AbortSignal): Promise<unknown>
   vision?(projectId: string, mode: "cad" | "cam", focus?: string, signal?: AbortSignal): Promise<{ ok: false; error: string } | { ok: true; capture: VisionCapture; evidence: unknown }>
   parametric?(projectId: string, input: ParametricHandlerInput): Promise<unknown>

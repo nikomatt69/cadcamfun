@@ -2,26 +2,28 @@ Read the open drawing. All actions are read-only.
 
 Actions
 - describe: the drawing: counts, bounds and layers. Start here.
-- check: model checks (sizes, rotations, Boolean operands, duplicates, floating parts); fix findings.
-- relations: bounds, placement, distances and parameter dependencies; equal names do not bind parameters.
+- check: model checks (sizes, rotations, operands, duplicates, floating parts); fix findings.
+- relations: bounds, placement, distances, parameter dependencies; equal names bind nothing.
 - grep: search ids, names, layers and properties; parametric hits carry a revision.
-- vision: the CAD viewport and scene evidence as an image.
+- vision: the CAD viewport as an image.
 - inspect_elements: full properties and bounds of elements, paged.
 - inspect_layers: the workspace layers and the active one.
 - inspect_search: elements whose text matches a query, paged.
-- inspect_property: one property of one element by path, paged by characters.
-- inspect_origins: each element's origin and meaning, bounds, distance from the CAD zero, children.
+- inspect_property: one property of one element by path, paged.
+- inspect_origins: each element's origin, bounds, distance from the CAD zero, children.
 - parametric_validate: rebuild a parametric history and report what it cannot build.
 - parametric_inspect: history, parameters and report of one parametric part.
 - drawing: technical sheet from an elementId or history; SVG with dimensions, callouts, warnings; view options in the schema.
 - parametric_test: run parameter variants; report bodies, volumes and dimensional checks.
 - parametric_dfm: manufacturability findings for a history or part.
-- parametric_exact: exact B-rep per body (volume, area, centroid, throughHoles, faces, surfaces) or why mesh-only; STEP on request.
+- parametric_exact: exact B-rep per body (volume, area, centroid, holes, faces) or why mesh-only; STEP on request.
 - exact: every solid on the exact kernel: validity, volume, bounds, holes, CAM by features or 3D surface.
-- assembly: exact interference (clash volumes), bill of materials with mass, hole joints, fasteners still missing.
+- assembly: exact clashes (volumes), closest pairs of parts, bill of materials with mass, hole joints, missing fasteners.
+- distance: exact gap between two solids, closest points.
+- shell: a solid hollowed on paper: exact volumes, faces left open by name; changes nothing.
 - parametric_fastener: thread, tap drill, clearance and counterbore of a metric size.
 - parametric_recipe: history from `recipe` (mounting_plate, flange, l_bracket, stepped_shaft, pipe_bend, duct_transition, enclosure) and `params`; stored by cad_edit.parametric_recipe_create.
-- parametric_from_element: history with named parameters from a solid, flat shape or component; cad_edit.parametric_convert stores it.
+- parametric_from_element: history with named parameters from a solid, flat shape or component; stored by cad_edit.parametric_convert.
 
 Parameters (mm, radians; ids are read, never invented)
 - describe, check, inspect_layers: none.
@@ -33,9 +35,10 @@ Parameters (mm, radians; ids are read, never invented)
 - inspect_property: elementId, path (1-12 property names), offset (default 0), maxChars (default 10000, max 50000).
 - inspect_origins: as inspect_elements (ids max 100, layerId, offset, limit).
 - parametric_validate: history - the part's history object.
-- parametric_inspect, parametric_test: elementId; test also takes cases (1-12): [{name, parameters, expectedBodies?, minVolumeMm3?, maxVolumeMm3?, checks?}]. checks (all must measure inside their limits): {kind, name} plus the kind's nominal and tolerance (schema).
+- parametric_inspect, parametric_test: elementId; test also takes cases (1-12): [{name, parameters, expectedBodies?, minVolumeMm3?, maxVolumeMm3?, checks?}]. checks: {kind, name} plus nominal and tolerance (schema).
 - parametric_dfm, parametric_exact: one of elementId or history. exact: includeStep, name. dfm: process (mill|turn|print), toolDiameter, material (metal|cast|plastic), minWall, envelope {x,y,z}.
 - exact: ids (max 40, default all), machining (default true). assembly: washers (default true).
+- distance: firstId, secondId. shell: id, thickness, open (face names).
 - parametric_fastener: size (M3 ...), fit (fine|medium|coarse), shaftDiameter.
 - parametric_from_element: elementId, depth (mm, only for a flat shape: its extrusion, default 10).
 

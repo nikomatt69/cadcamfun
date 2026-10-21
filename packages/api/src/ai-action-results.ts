@@ -112,6 +112,14 @@ const assembly = Schema.Struct({
   interference: Schema.StructWithRest(Schema.Struct({ clashes: Schema.Array(record), clashesTotal: int, checked: int }), [record]),
   bom: Schema.Array(record), bomTotal: int, jointsTotal: int, fasteners: record, ...drawingRef
 })
+const shell = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), id: str, name: str, wall: num, open: strings, volume: num, cavityVolume: num, originalVolume: num, faces: int, shells: int, pieces: int, valid: Schema.Boolean }),
+  Schema.Struct({ ok: Schema.Literal(false), error: str })
+])
+const distance = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), a: str, b: str, distance: num, overlap: Schema.Boolean, pointA: vec3, pointB: vec3, faceA: Schema.optionalKey(str), faceB: Schema.optionalKey(str) }),
+  Schema.Struct({ ok: Schema.Literal(false), error: str })
+])
 const fastener = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(true), threads: Schema.Array(record) }),
   Schema.Struct({ ok: Schema.Literal(true), thread: record })
@@ -274,6 +282,8 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.parametric_exact": read(parametricExact),
   "cad.exact": read(exact),
   "cad.assembly": read(assembly),
+  "cad.shell": read(shell),
+  "cad.distance": read(distance),
   "cad.parametric_fastener": read(fastener),
   "cad.parametric_recipe": read(recipe),
   "cad.parametric_from_element": read(fromElement),

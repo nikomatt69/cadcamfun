@@ -42,7 +42,7 @@ const withDefaults = (value: Record<string, unknown>): Record<string, unknown> =
   }
 }
 
-export type { CadAssemblyInput, CadExactInput, CadGrepInput } from "@cadcamfun/api"
+export type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadShellInput } from "@cadcamfun/api"
 
 const inspect = (action: string) => (input: unknown, context: ActionContext) =>
   context.handlers.cadInspect === undefined
@@ -153,6 +153,18 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     parameters: INPUTS["cad.assembly"],
     run: (input, { handlers, projectId }) =>
       handlers.cadAssembly === undefined ? { ok: false, error: "Assembly analysis is unavailable in this host." } : handlers.cadAssembly(projectId, input)
+  }),
+  defineWireAction({
+    id: "cad.shell", kind: "read",
+    parameters: INPUTS["cad.shell"],
+    run: (input, { handlers, projectId }) =>
+      handlers.cadShell === undefined ? { ok: false, error: "Shell analysis is unavailable in this host." } : handlers.cadShell(projectId, input)
+  }),
+  defineWireAction({
+    id: "cad.distance", kind: "read",
+    parameters: INPUTS["cad.distance"],
+    run: (input, { handlers, projectId }) =>
+      handlers.cadDistance === undefined ? { ok: false, error: "Distance analysis is unavailable in this host." } : handlers.cadDistance(projectId, input)
   }),
   defineWireAction({
     id: "cad.parametric_fastener", kind: "read", replaces: "cad_parametric",

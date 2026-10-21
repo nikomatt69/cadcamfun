@@ -490,6 +490,18 @@ const toolHandlers = Effect.gen(function*() {
         return assemblyForModel(cad.assemblyReport(loaded.elements, input.washers !== undefined ? { washers: input.washers } : {}), where(loaded))
       } catch (error) { return { ok: false, error: `The assembly analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
+    cadShell: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      try { return { ...cad.sceneShell(loaded.elements, input.id, input.thickness, input.open ?? []), ...where(loaded) } }
+      catch (error) { return { ok: false, error: `The shell analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    cadDistance: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      try { return { ...cad.sceneDistance(loaded.elements, input.firstId, input.secondId), ...where(loaded) } }
+      catch (error) { return { ok: false, error: `The distance analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
     webSearch: async (input, signal) => appConfig.aiOffline ? { ok: false, error: "Web search is disabled in offline mode." } : searchWeb(input, signal),
     vision: async (projectId, mode, focus, signal) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }

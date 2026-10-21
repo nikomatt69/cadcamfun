@@ -76,3 +76,29 @@ test("the assembly report lists the closest pairs with their exact gap", () => {
   expect(r.clearance[0]!.distance).toBeCloseTo(3, 9)
   expect(r.clearance[0]!.overlap).toBe(false)
 })
+
+import { sceneDistance, sceneShell } from "./scene-analysis.ts"
+test("a solid of the drawing can be hollowed on paper: volumes, open faces by name, reasons when it cannot", () => {
+  const cube = { id: "c", type: "cube", name: "block", x: 0, y: 0, z: 0, width: 30, height: 20, depth: 10 }
+  const closed = sceneShell([cube], "c", 2)
+  expect(closed.ok).toBe(true)
+  if (closed.ok) {
+    expect(closed.cavityVolume).toBeCloseTo(26 * 16 * 6, 6)
+    expect(closed.volume).toBeCloseTo(6000 - 26 * 16 * 6, 6)
+    expect(closed.shells).toBe(2)
+    expect(closed.valid).toBe(true)
+  }
+  expect(sceneShell([cube], "missing", 2)).toEqual({ ok: false, error: "no solid 'missing' in the drawing" })
+  const bad = sceneShell([cube], "c", 2, ["nothing.top"])
+  expect(bad.ok).toBe(false)
+  expect(sceneShell([{ id: "s", type: "sphere", radius: 10, x: 0, y: 0, z: 0 }], "s", 1).ok).toBe(false)
+})
+
+test("the exact gap between two solids of the drawing", () => {
+  const cube = (id: string, x: number) => ({ id, type: "cube", name: id, x, y: 0, z: 0, width: 10, height: 10, depth: 10 })
+  const d = sceneDistance([cube("a", 0), cube("b", 14.5)], "a", "b")
+  expect(d.ok).toBe(true)
+  if (d.ok) { expect(d.distance).toBeCloseTo(4.5, 9); expect(d.overlap).toBe(false) }
+  expect(sceneDistance([cube("a", 0)], "a", "a").ok).toBe(false)
+  expect(sceneDistance([cube("a", 0)], "a", "zz").ok).toBe(false)
+})

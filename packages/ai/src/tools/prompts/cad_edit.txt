@@ -37,4 +37,4 @@ Do not use it
 - To move or change something: transform or modify, never delete and rebuild.
 
 After it
-- cad.check the result, or cad.describe it, before telling the user it is done. For several parts also cad.exact (validity, how CAM will machine each solid) and cad.assembly (clashes, missing fasteners).
+- cad.check the result, or cad.describe it, before telling the user it is done. For several parts also cad.exact (validity, how CAM will machine each solid) and cad.assembly (clashes, missing fasteners, the closest pairs of parts). cad.distance gives the exact gap between two solids; cad.shell shows, without changing anything, what hollowing a solid with a wall (and chosen open faces) would give.

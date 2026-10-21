@@ -44,6 +44,22 @@ export const CadAssemblyInput = Schema.Struct({
 })
 export type CadAssemblyInput = typeof CadAssemblyInput.Type
 
+/** What hollowing a solid would give, on paper: nothing in the drawing changes. */
+export const CadShellInput = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)).annotate({ description: "Id of the solid to hollow." }),
+  thickness: Schema.Finite.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(1000)).annotate({ description: "Wall thickness, mm." }),
+  open: optional(Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))).check(Schema.isMaxLength(20))
+    .annotate({ description: "Names of the faces to leave open (from cad.exact), e.g. [\"plate.top\"]; none = a closed hollow." }))
+})
+export type CadShellInput = typeof CadShellInput.Type
+
+/** The exact smallest gap between two solids. */
+export const CadDistanceInput = Schema.Struct({
+  firstId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+  secondId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))
+})
+export type CadDistanceInput = typeof CadDistanceInput.Type
+
 // ---------------------------------------------------------------- `cad_edit`
 
 const point = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: optional(Schema.Finite) })
@@ -104,6 +120,8 @@ export const CAD_ACTION_INPUTS = {
   "cad.vision": VisionInput,
   "cad.exact": CadExactInput,
   "cad.assembly": CadAssemblyInput,
+  "cad.shell": CadShellInput,
+  "cad.distance": CadDistanceInput,
   "cad_edit.add_entities": Schema.Struct({ entities: Schema.Array(CadSketchEntity).check(Schema.isMinLength(1), Schema.isMaxLength(500)) }),
   "cad_edit.modify": Schema.Struct({
     changes: Schema.Array(Schema.Struct({ id: nonEmpty, changes: Schema.Record(Schema.String, Schema.Unknown) })).check(Schema.isMinLength(1))

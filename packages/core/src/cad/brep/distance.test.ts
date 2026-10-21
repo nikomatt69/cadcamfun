@@ -33,3 +33,11 @@ describe("minimum distance between solids", () => {
     expect(t.distance).toBeLessThan(1e-9)
   })
 })
+
+describe("overlap of boxes that share planes", () => {
+  test("boxes of one size offset along x overlap although every vertex of one lies on a face of the other", () => {
+    const r = minimumDistance(makeBox(10, 10, 10), makeBox(10, 10, 10, at(5, 0, 0)))
+    expect(r.overlap).toBe(true)
+    expect(r.distance).toBe(0)
+  })
+})
