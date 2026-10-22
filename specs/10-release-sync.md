@@ -27,7 +27,7 @@ One reproducible script `scripts/build.ts` (Bun, not shell) run locally and in C
 2. Regenerate the API reference, then `bun run typecheck`. Tests run in CI validation, outside the build script.
 3. Compile the sidecar for the host target triple into `apps/desktop/src-tauri/binaries/sidecar-<triple>` (`bun build --compile`; see `05-api-sidecar.md` §3).
 4. Copy `packages/db/drizzle/` into `apps/desktop/src-tauri/resources/migrations/`.
-5. `bun run --filter @cadcamfun/desktop build` (Vite) then `bunx tauri build`.
+5. `bun run --filter @cadcamfun/desktop build` (Vite) then `bunx tauri build`. When the Linux bundles include an AppImage, the compiled sidecar is moved to `/usr/share/cadcamfun/sidecar` for that invocation and `binaries/sidecar-<triple>` is a shell wrapper. linuxdeploy's `ldd`/patchelf pass only rewrites ELF files in `usr/bin`, and that pass aborts on the Bun standalone. The wrapper is removed and the compiled sidecar restored before the script exits. Dev builds and Linux bundles without an AppImage keep the standalone as the external binary.
 6. Emit SHA-256 checksums and a release-notes file from commit messages since the last tag.
 
 Explicit target triples are passed to both Bun and Tauri. Rust `x86_64` maps to Bun `x64`; Rust `aarch64` maps to Bun `arm64`. Bundles are collected only from `<cargo-target-dir>/<triple>/release/bundle`, with the default Cargo directory under `src-tauri`. The output directory must be empty and outside the bundle tree. Installers and signatures are copied with deterministic flat names `<triple>--<original-basename>`; checksums use these exact copied names. Migration resources map `resources/migrations/` to runtime `migrations/`.
@@ -232,6 +232,7 @@ Earlier checkpoints:
 ## 7. Change log
 
 - v1: initial spec.
+- 2026-10-22: Linux AppImage bundling shelters the Bun sidecar. linuxdeploy on the ARM runner aborted with `Failed to run ldd` while scanning `usr/bin/sidecar`; the standalone now ships at `/usr/share/cadcamfun/sidecar` and the external binary is a wrapper for that `tauri build` only.
 - 2026-10-22: fixed the failed actionlint installation in CI and publish. The Rust installer does not support actionlint and falls back to looking for a nonexistent crate; both workflows now use a shared action invoking actionlint's official version-pinned binary installer.
 - 2026-10-22: updated the repository toolchain to Bun 1.4.4, including the runtime minimum, CI/iOS setup, release-version expectations and current documentation. CI and iOS derive the Bun version from `package.json` to keep every build aligned.
 - 2026-10-22: removed tests from the local/release build script; its check step only regenerates the API reference and typechecks. Added nikcli-style `ci-pipeline.yml`: validate once, then automatically publish a patch release with all six desktop variants on main pushes. Reused the existing CI and publish workflows, with repository/event gates and release-commit loop prevention; PRs remain validation-only.
