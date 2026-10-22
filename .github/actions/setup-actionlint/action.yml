@@ -1,0 +1,16 @@
+name: Setup actionlint
+description: Install the pinned actionlint binary using its upstream download script
+runs:
+  using: composite
+  steps:
+    - name: Install actionlint 1.7.12
+      shell: bash
+      run: |
+        set -euo pipefail
+        install_dir="$RUNNER_TEMP/actionlint-bin"
+        mkdir -p "$install_dir"
+        curl --fail --silent --show-error --location --retry 3 \
+          https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash \
+          --output "$RUNNER_TEMP/download-actionlint.bash"
+        bash "$RUNNER_TEMP/download-actionlint.bash" 1.7.12 "$install_dir"
+        echo "$install_dir" >> "$GITHUB_PATH"

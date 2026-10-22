@@ -88,9 +88,8 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: actionlint@1.7.12
+      - name: Setup actionlint
+        uses: ./.github/actions/setup-actionlint
 
       - name: Validate release workflows
         run: bun --no-env-file scripts/lint-workflows.ts

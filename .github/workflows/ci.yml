@@ -87,9 +87,8 @@ jobs:
           bun --no-env-file packages/web/script/generate-api-reference.mjs
           bun --no-env-file run typecheck
 
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: actionlint@1.7.12
+      - name: Setup actionlint
+        uses: ./.github/actions/setup-actionlint
 
       - name: Validate workflows
         run: bun --no-env-file scripts/lint-workflows.ts
