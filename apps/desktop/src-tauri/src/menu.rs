@@ -2,9 +2,9 @@
 //! stable item id (for example `file.new`); the UI maps ids to commands.
 
 use tauri::menu::{Menu, MenuItemBuilder, SubmenuBuilder};
-use tauri::{AppHandle, Emitter, Runtime};
 #[cfg(debug_assertions)]
 use tauri::Manager;
+use tauri::{AppHandle, Emitter, Runtime};
 
 /// Event name the webview listens to for menu activations.
 pub const MENU_EVENT: &str = "menu";
