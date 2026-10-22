@@ -349,7 +349,13 @@ async function stepBundle(): Promise<void> {
   if (adHoc) for (const name of APPLE_SIGNING_ENV) delete signingEnv[name];
   if (adHoc) say("   no Apple certificate configured — the bundle is ad-hoc signed and not notarised");
   // linuxdeploy is an AppImage. GitHub's Linux runners have no FUSE, so it has to extract and run.
-  if (platform === "linux") signingEnv.APPIMAGE_EXTRACT_AND_RUN = "1";
+  // Its bundled patchelf rewrites the aarch64 Bun sidecar into a binary the dynamic
+  // linker cannot load, and the GTK plugin then aborts the AppImage. The wrapper
+  // keeps that rewrite only when the file still loads.
+  if (platform === "linux") {
+    signingEnv.APPIMAGE_EXTRACT_AND_RUN = "1";
+    signingEnv.PATCHELF = join(ROOT, "scripts/linuxdeploy-patchelf.sh");
+  }
   const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({
     build: { beforeBuildCommand: "" },
     bundle: {
