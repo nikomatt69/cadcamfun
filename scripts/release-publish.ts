@@ -258,17 +258,7 @@ async function phaseStart(options: { bump?: string | undefined; version?: string
   }
 
   await pushBranch(section);
-
-  const existingTag = await captureCommand(["git", "rev-parse", "--verify", `refs/tags/${tag}`], { cwd: ROOT });
-  if (existingTag.code === 0) {
-    const head = (await captureCommand(["git", "rev-parse", "HEAD"], { cwd: ROOT })).stdout.trim();
-    if (existingTag.stdout.trim() !== head) throw new Error(`The tag ${tag} already exists and points at another commit`);
-    say(`the tag ${tag} already exists at this commit`);
-  } else {
-    await $`git tag ${tag}`.cwd(ROOT);
-    await $`git push origin ${tag}`.cwd(ROOT);
-    say(`pushed the tag ${tag}`);
-  }
+  await pushReleaseTag(tag);
 
   const directory = await mkdtemp(join(tmpdir(), "cadcam-release-"));
   try {
@@ -353,6 +343,36 @@ async function resolveReleaseConflicts(section: string): Promise<boolean> {
 }
 
 /**
+ * The origin URL that carries the push token.
+ *
+ * The publish job removes the checkout credential, so git has no username unless the
+ * token is on the remote for the duration of the push.
+ */
+export function authenticatedOrigin(repositoryName: string, token: string): string {
+  return `https://x-access-token:${token}@github.com/${repositoryName}`;
+}
+
+/**
+ * Point origin at the push token, run `action`, then put the public URL back.
+ *
+ * The token is removed again when `action` returns, including when it throws, so a
+ * later command cannot print it. A push that runs after this helper has no username:
+ * the branch push and the tag push both have to happen inside it.
+ */
+async function withAuthenticatedOrigin(action: () => Promise<void>): Promise<void> {
+  const token = env("GH_PUSH_TOKEN") ?? env("GITHUB_TOKEN");
+  const original = (await captureCommand(["git", "remote", "get-url", "origin"], { cwd: ROOT })).stdout.trim();
+  if (token !== undefined) {
+    await $`git remote set-url origin ${authenticatedOrigin(repository(), token)}`.cwd(ROOT);
+  }
+  try {
+    await action();
+  } finally {
+    if (token !== undefined && original !== "") await $`git remote set-url origin ${original}`.cwd(ROOT);
+  }
+}
+
+/**
  * Push the release commit to the branch it was made on.
  *
  * The branch may have moved while the release was being prepared, so the commit is
@@ -361,13 +381,7 @@ async function resolveReleaseConflicts(section: string): Promise<boolean> {
 async function pushBranch(section: string): Promise<void> {
   const branch = (await captureCommand(["git", "branch", "--show-current"], { cwd: ROOT })).stdout.trim();
   if (branch === "") throw new Error("Unable to determine the branch to push the release to");
-  const token = env("GH_PUSH_TOKEN") ?? env("GITHUB_TOKEN");
-  const repo = repository();
-  const original = (await captureCommand(["git", "remote", "get-url", "origin"], { cwd: ROOT })).stdout.trim();
-  if (token !== undefined) {
-    await $`git remote set-url origin ${`https://x-access-token:${token}@github.com/${repo}`}`.cwd(ROOT);
-  }
-  try {
+  await withAuthenticatedOrigin(async () => {
     for (let attempt = 0; attempt < 3; attempt++) {
       await $`git fetch origin ${branch}`.cwd(ROOT);
       const rebase = await $`git rebase ${`origin/${branch}`}`.nothrow().cwd(ROOT);
@@ -385,9 +399,29 @@ async function pushBranch(section: string): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, 2_000));
     }
     throw new Error(`Cannot push the release commit to ${branch}`);
-  } finally {
-    if (token !== undefined && original !== "") await $`git remote set-url origin ${original}`.cwd(ROOT);
+  });
+}
+
+/**
+ * Push the release tag.
+ *
+ * The tag is created locally first. The push uses the same authenticated origin as the
+ * release commit: restoring the public URL before this push asks git for a username and
+ * the job fails with "could not read Username for 'https://github.com'".
+ */
+async function pushReleaseTag(tag: string): Promise<void> {
+  const existingTag = await captureCommand(["git", "rev-parse", "--verify", `refs/tags/${tag}`], { cwd: ROOT });
+  if (existingTag.code === 0) {
+    const head = (await captureCommand(["git", "rev-parse", "HEAD"], { cwd: ROOT })).stdout.trim();
+    if (existingTag.stdout.trim() !== head) throw new Error(`The tag ${tag} already exists and points at another commit`);
+    say(`the tag ${tag} already exists at this commit`);
+    return;
   }
+  await $`git tag ${tag}`.cwd(ROOT);
+  await withAuthenticatedOrigin(async () => {
+    await $`git push origin ${tag}`.cwd(ROOT);
+  });
+  say(`pushed the tag ${tag}`);
 }
 
 // ───────────────────────────── phase: complete ─────────────────────────────

@@ -20,6 +20,9 @@ runs:
         git config --global user.email "${{ inputs.email }}"
       shell: bash
 
+    # The checkout action stores its credential in this header. The release script
+    # authenticates origin itself for every push, including the tag: a push that runs
+    # after the header is gone and the public URL is restored asks git for a username.
     - name: Clear checkout auth
       run: |
         git config --local --unset-all http.https://github.com/.extraheader || true

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { classifyPublishLog } from "./release-publish.ts";
+import { authenticatedOrigin, classifyPublishLog } from "./release-publish.ts";
 import { assertBunVersion, expectedBunVersion, RELEASE_REPOSITORY, RELEASE_UPDATER_ENDPOINT } from "./release-helpers.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -43,6 +43,21 @@ test("the release refuses a Bun the workspace does not support", async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("the release tag is pushed while origin still carries the push token", async () => {
+  expect(authenticatedOrigin("nikomatt69/cadcamfun", "push-token")).toBe(
+    "https://x-access-token:push-token@github.com/nikomatt69/cadcamfun",
+  );
+  const source = await readFile(join(ROOT, "scripts/release-publish.ts"), "utf8");
+  const tagPush = source.slice(source.indexOf("async function pushReleaseTag"), source.indexOf("async function phaseComplete"));
+  const pushAt = tagPush.indexOf("git push origin ${tag}");
+  expect(pushAt).toBeGreaterThan(-1);
+  // The publish job clears the checkout credential, and the branch push puts the public
+  // URL back before the tag is pushed. The tag push has to run inside the same helper
+  // or git asks for a username and the job exits 128.
+  expect(tagPush.lastIndexOf("withAuthenticatedOrigin", pushAt)).toBeGreaterThan(-1);
+  expect(tagPush.indexOf("git push origin ${tag}", tagPush.indexOf("withAuthenticatedOrigin"))).toBe(pushAt);
 });
 
 test("npm's answer about a publish is read as an outcome", () => {
