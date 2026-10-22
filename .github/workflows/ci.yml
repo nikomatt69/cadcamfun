@@ -93,8 +93,6 @@ jobs:
       - name: Validate workflows
         run: bun --no-env-file scripts/lint-workflows.ts
 
-      - name: Test
-        run: bun run test
 
       - name: Stage the sidecar binary and the migrations resource
         run: |

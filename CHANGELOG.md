@@ -3,7 +3,7 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
-## v6.0.1 (October 2026)
+## v0.1.0 (October 2026)
 
 ## Core
 

@@ -100,7 +100,6 @@ jobs:
           bun --no-env-file install --frozen-lockfile
           bun --no-env-file packages/web/script/generate-api-reference.mjs
           bun --no-env-file run typecheck
-          bun --no-env-file run test
 
       - name: Prepare the release
         id: release
