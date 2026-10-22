@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.2 (October 2026)
+
+## Build and release
+
+- Accept the release tag the publish pipeline passes in.
+
 ## v0.1.1 (October 2026)
 
 ## Build and release
