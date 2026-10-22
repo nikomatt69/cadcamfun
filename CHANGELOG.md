@@ -1,10 +1,17 @@
 # Changelog
 
 <!-- UNRELEASED:START -->
-## Unreleased (October 22, 2026)
+<!-- UNRELEASED:END -->
+
+## v6.0.1 (October 2026)
 
 ## Core
 
+- Fix the two tests that fail the validate job on main.
+- Fix optional chaining in stock test to prevent runtime errors when accessing requested tolerance. Update test assertion to ensure robustness in handling undefined values.
+- Update README and enhance CAD/CAM functionality with new tests and features. Refactor push/pull and draft operations to support named face references, ensuring better error handling for stale references. Introduce warnings in parametric reports and improve STEP file handling in tests. Add tests for multiaxis mode preservation in HTTP requests and refine ellipse handling in CAD operations.
+- Finalize release automation and document the CADCAMFUN platform
+- Enhance CAM functionality by introducing a program sheet as a visual capture for the assistant's vision tool. This allows the CAM page to display the G-code and toolpaths even when the 3D preview is not visible. Update related components to ensure the program sheet is registered and rendered correctly, improving the assistant's ability to provide context while editing. Additionally, update the changelog and documentation to reflect these changes.
 - Enhance DirectModel with request timeout feature to prevent indefinite waits during stateless calls. Introduce requestTimeoutMs setting for controlling call duration and update related error handling for timeout scenarios. Add tests to ensure proper functionality and failure handling for provider inactivity.
 - Refactor machine configuration handling to unify the profile reading process across various shapes. Update the machine profile to ensure it accurately reflects the configuration written by users, including optional fields for controller and axes. Enhance the UI components for selecting CAD elements and improve messaging for element selection in the generator. This change streamlines the interaction between the library, assistant, and kernel, ensuring consistency in machine data representation.
 - CAM kernel: the tolerance budget's cases run the whole kernel, so they need more than the default timeout
@@ -180,6 +187,7 @@
 
 ## Desktop
 
+- Add default on-demand CAD/CAM and CNC manuals catalogue
 - Remove flutes rendering from mill tools in the 3D viewport and update related tests to reflect this change. The flute strips are no longer drawn, ensuring a cleaner representation of mill types in the Resources page and machine scene.
 - Closest parts (exact clearance) in the assembly automations
 - Desktop tests: reset the kernel panel's settings between files
@@ -340,8 +348,6 @@
 
 ## Build and release
 
-- Align the repository toolchain, CI, release checks and current documentation with Bun 1.4.4.
-- Run tests in CI validation instead of the build script; publish all six desktop releases after successful main-branch validation through the new CI pipeline.
 - Implement cross-compilation for sidecar binaries in GitHub workflows. Add build-sidecars job to handle multiple target platforms using Bun, and update build job to utilize prebuilt sidecar artifacts. Ensure proper artifact handling and streamline the build process for Tauri integration.
 - Remove obsolete codex session file and update build script to skip tests during the build process. The build steps now only include typechecking, enhancing clarity and efficiency in the build pipeline.
 - Npm publish: fall back to @cadcamfun/cadcamfun when the @nikoemme_ scope is missing or not writable
@@ -368,4 +374,4 @@
 - Record the verified simulator-to-desktop round trip
 - The iOS app launches and stays alive in the iOS simulator on macOS CI
 - Record the billing decision: Stripe
-<!-- UNRELEASED:END -->
+

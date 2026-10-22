@@ -2,7 +2,7 @@
   "expo": {
     "name": "CADCAMFUN",
     "slug": "cadcamfun-mobile",
-    "version": "6.0.0",
+    "version": "6.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -16,7 +16,9 @@
         "CADisableMinimumFrameDurationOnPhone": true,
         "NSCameraUsageDescription": "CADCAMFUN uses the camera to scan the pairing QR code shown on your Mac.",
         "NSLocalNetworkUsageDescription": "CADCAMFUN connects to your Mac on the local network or Personal Hotspot to work with your projects.",
-        "NSBonjourServices": ["_cadcamfun._tcp"],
+        "NSBonjourServices": [
+          "_cadcamfun._tcp"
+        ],
         "NSFaceIDUsageDescription": "CADCAMFUN uses Face ID to unlock the app and confirm sensitive actions.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
@@ -30,7 +32,14 @@
     },
     "plugins": [
       "expo-router",
-      ["expo-build-properties", { "ios": { "enableSceneSupport": true } }],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ],
       [
         "expo-camera",
         {
