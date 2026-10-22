@@ -166,7 +166,12 @@ describe("the chamfer's callout", () => {
     expect(massProperties(explicit.brep).volume).toBeCloseTo(massProperties(plain.brep).volume, 6)
     const meshed = blendEdges(mesh, findEdges(mesh).edges, 1, "chamfer", { secondDistance: 1 })
     expect(meshed.rejected).toEqual([])
-    expect(meshVolume(meshed.mesh)).toBeCloseTo(massProperties(plain.brep).volume, 3)
+    expect(meshed.blended).toBe(12)
+    // The mesh is the exact chamfered box: 40×25×6 minus 136 mm³ (edge prisms of leg 1, corners included).
+    // Twelve exact Booleans leave sub-micron slivers, so the B-rep sits a few hundredths of a mm³ off that
+    // polyhedron. A vertical edge left uncut would move the volume by several mm³.
+    expect(meshVolume(meshed.mesh)).toBeCloseTo(40 * 25 * 6 - 136, 3)
+    expect(Math.abs(meshVolume(meshed.mesh) - massProperties(plain.brep).volume)).toBeLessThan(0.1)
   })
 
   test("a 60-degree callout on a 60-degree wedge has finite equal setbacks", () => {

@@ -15,7 +15,9 @@ const fingerprint = (text: string): string => {
 /** Recorded on main @ 7f38b6b, before spec 31 touched the interpreter. */
 const RECORDED: Readonly<Record<string, string>> = {
   contour: "3b5f028df03cf521",
-  arcsIJ: "6644f6a67263277e",
+  // Re-recorded for the spec 31 I/J full-circle helix: identical XY endpoints are one turn, and the cut length
+  // includes hypot(2πr, Δz). The geometry is asserted below. The other milling fixtures kept their original hashes.
+  arcsIJ: "e8baea19179192af",
   arcsR: "a49c61ce3e6f443d",
   incremental: "feef60165b723e1e",
   cycles: "60ef3e6e0f8ae59d",
@@ -45,6 +47,18 @@ describe("spec 32 P2 changed only the warnings of the milling fixtures", () => {
     expect(Bun.hash(JSON.stringify([r.segments, r.end, r.cutLength, r.rapidLength, r.minZ, r.mCodes, r.tools, r.ended])).toString(16)).toBe("32aab60a1bdb424")
     expect(r.errors).toEqual(["line 6: G41 needs the tool radius (D1 is not set by G10 L12, the host or a T/D header comment): drawn on the programmed path"])
     expect(r.unsupported).toEqual([{ line: 6, word: "G41" }])
+  })
+})
+
+describe("spec 31: an I/J block that returns to its own XY is one full turn", () => {
+  test("arcsIJ: two semicircles and a helical turn of radius 10", () => {
+    const r = interpretGcode(MILL_PROGRAMS.arcsIJ!)
+    expect(r.errors).toEqual([])
+    const arcs = r.segments.filter((s) => s.kind === "arc")
+    expect(arcs).toHaveLength(3)
+    expect(arcs[2]).toMatchObject({ from: { x: 10, y: 0, z: -1 }, to: { x: 10, y: 0, z: -2 }, center: { x: 0, y: 0 }, clockwise: false, radiusStart: 10, radiusEnd: 10 })
+    // Plunge of 3 mm, two semicircles, and one helical revolution.
+    expect(r.cutLength).toBeCloseTo(3 + 20 * Math.PI + Math.hypot(20 * Math.PI, 1), 9)
   })
 })
 
