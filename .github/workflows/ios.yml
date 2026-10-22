@@ -76,15 +76,72 @@ jobs:
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
           UDID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for rt in sorted(d, reverse=True) if "iOS" in rt for x in d[rt] if "iPhone" in x["name"]))')
           echo "simulator: $UDID, bundle: $BUNDLE_ID"
+          # iOS 26 shows "Open in CADCAMFUN?" for simctl openurl until LaunchServices has approved the
+          # scheme. It reads that plist only at boot, so the approval has to be on disk while the device
+          # is shut down. A never-booted simulator has no Preferences directory until the first boot.
+          device_state() {
+            xcrun simctl list devices -j | UDID="$UDID" python3 -c 'import json,os,sys; u=os.environ["UDID"]; devices=json.load(sys.stdin)["devices"]; print(next(x["state"] for group in devices.values() for x in group if x.get("udid")==u))'
+          }
+          ensure_shutdown() {
+            for _ in $(seq 1 90); do
+              STATE=$(device_state)
+              echo "simulator state: $STATE"
+              case "$STATE" in
+                Shutdown) return 0 ;;
+                Booted) xcrun simctl shutdown "$UDID" || true ;;
+              esac
+              sleep 2
+            done
+            echo "simulator did not shut down" >&2
+            return 1
+          }
+          PREFS="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Preferences"
+          if [ ! -d "$PREFS" ]; then
+            echo "booting once so the simulator data directory exists"
+            xcrun simctl boot "$UDID"
+            xcrun simctl bootstatus "$UDID" -b
+            ensure_shutdown
+          else
+            ensure_shutdown
+          fi
+          UDID="$UDID" BUNDLE_ID="$BUNDLE_ID" python3 - <<'PY'
+          import os, plistlib, sys
+          udid = os.environ["UDID"]
+          bundle = os.environ["BUNDLE_ID"]
+          device = os.path.expanduser(f"~/Library/Developer/CoreSimulator/Devices/{udid}")
+          if not os.path.isdir(device):
+              sys.exit(f"simulator device directory missing: {device}")
+          path = os.path.join(device, "data/Library/Preferences/com.apple.launchservices.schemeapproval.plist")
+          os.makedirs(os.path.dirname(path), exist_ok=True)
+          data = {}
+          if os.path.exists(path):
+              with open(path, "rb") as handle:
+                  data = plistlib.load(handle)
+          data["com.apple.CoreSimulator.CoreSimulatorBridge-->cadcamfun"] = bundle
+          with open(path, "wb") as handle:
+              plistlib.dump(data, handle, fmt=plistlib.FMT_BINARY)
+          print(f"approved cadcamfun -> {bundle}")
+          PY
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
+          # Best effort: the service name is absent on older simctl builds.
+          xcrun simctl privacy "$UDID" grant local-network "$BUNDLE_ID" || true
           xcrun simctl install "$UDID" "$APP"
           xcrun simctl launch "$UDID" "$BUNDLE_ID"
+          # The native process starts before the release bundle subscribes to linking events.
+          for _ in $(seq 1 30); do
+            READY=$(xcrun simctl spawn "$UDID" launchctl list | grep "UIKitApplication:$BUNDLE_ID" | awk '{print $1; exit}' || true)
+            [ -n "${READY:-}" ] && [ "$READY" != "-" ] && break
+            sleep 1
+          done
+          sleep 8
           xcrun simctl openurl "$UDID" "$LINK"
 
           # The desktop's view: the device token was accepted (lastSeen is set only after a pinned-TLS request authenticated).
           SEEN=""
-          for _ in $(seq 1 45); do
+          for attempt in $(seq 1 45); do
+            # A link opened before the router is listening is dropped. Send it again, still without tapping a dialog.
+            if [ "$attempt" = "10" ] || [ "$attempt" = "25" ]; then xcrun simctl openurl "$UDID" "$LINK" || true; fi
             SEEN=$(api "http://127.0.0.1:$PORT/api/companion" | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print((d[0]["lastSeen"] or "") if d else "")')
             [ -n "$SEEN" ] && break
             sleep 2
