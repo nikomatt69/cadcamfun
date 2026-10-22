@@ -162,11 +162,19 @@ export function releaseVersion(raw: string): string {
  * Three ways in, all of them naming the tag explicitly: a tag push, a manual dispatch
  * and the `workflow_call` the publish pipeline makes (the release of one version is
  * built by the workflow that owns the release).
+ *
+ * A nested reusable workflow keeps the caller's `GITHUB_EVENT_NAME` and `GITHUB_REF`.
+ * The publish pipeline therefore arrives as `push` on `refs/heads/main`, with the
+ * release tag in the explicit input. That input is the tag. A branch push with no
+ * input is still rejected, and an explicit tag that disagrees with a tag ref is rejected too.
  */
 export function selectReleaseRef(event: string, ref: string, input: string | undefined, configuredVersion: string): { tag: string; version: string } {
   if (event !== "push" && event !== "workflow_dispatch" && event !== "workflow_call") throw new Error("Release requires a tag push, a manual dispatch or the publish pipeline");
-  if (event === "push" && !ref.startsWith("refs/tags/")) throw new Error("Release push must reference a tag");
-  const tag = event === "push" ? ref.slice("refs/tags/".length) : input;
+  const explicit = input || undefined;
+  const pushed = event === "push" && ref.startsWith("refs/tags/") ? ref.slice("refs/tags/".length) : undefined;
+  if (explicit && pushed && explicit !== pushed) throw new Error("Release tag and push ref disagree");
+  if (event === "push" && !explicit && !pushed) throw new Error("Release push must reference a tag");
+  const tag = explicit ?? pushed;
   if (!tag || !tag.startsWith("v")) throw new Error("Release ref must be an existing v-prefixed version tag");
   const version = releaseVersion(tag);
   if (version !== releaseVersion(configuredVersion)) throw new Error("Release tag and application version disagree");

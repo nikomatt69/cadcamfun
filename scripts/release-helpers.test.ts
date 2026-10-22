@@ -33,10 +33,14 @@ describe("release gate", () => {
   test("accepts only matching tag pushes and explicit dispatch tags", () => {
     expect(selectReleaseRef("push", "refs/tags/v6.0.0", undefined, "6.0.0")).toEqual({ tag: "v6.0.0", version: "6.0.0" });
     expect(selectReleaseRef("workflow_dispatch", "refs/heads/main", "v6.0.0", "6.0.0").tag).toBe("v6.0.0");
-    for (const [event, ref, input] of [["push", "refs/heads/v6.0.0", undefined], ["pull_request", "refs/tags/v6.0.0", undefined], ["workflow_dispatch", "refs/heads/main", undefined]]) {
+    expect(selectReleaseRef("workflow_call", "refs/heads/main", "v6.0.0", "6.0.0")).toEqual({ tag: "v6.0.0", version: "6.0.0" });
+    expect(selectReleaseRef("push", "refs/heads/main", "v6.0.0", "6.0.0")).toEqual({ tag: "v6.0.0", version: "6.0.0" });
+    for (const [event, ref, input] of [["push", "refs/heads/v6.0.0", undefined], ["push", "refs/heads/main", ""], ["pull_request", "refs/tags/v6.0.0", undefined], ["workflow_dispatch", "refs/heads/main", undefined]]) {
       expect(() => selectReleaseRef(event ?? "", ref ?? "", input, "6.0.0")).toThrow();
     }
     expect(() => selectReleaseRef("push", "refs/tags/v6.1.0", undefined, "6.0.0")).toThrow("disagree");
+    expect(() => selectReleaseRef("push", "refs/tags/v6.0.0", "v6.1.0", "6.0.0")).toThrow("push ref disagree");
+    expect(() => selectReleaseRef("push", "refs/heads/main", "v6.1.0", "6.0.0")).toThrow("disagree");
   });
   test("version and notes tag selection", () => {
     expect(releaseVersion("v6.0.0-beta.1")).toBe("6.0.0-beta.1");
