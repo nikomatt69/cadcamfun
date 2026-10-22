@@ -179,15 +179,20 @@ async function requirePath(path: string, what: string): Promise<void> {
 async function stepInstall(): Promise<void> {
   announce(1, "install workspace dependencies");
   // The sidecar cross-compile needs every platform's optional native packages, so an Apple
-  // Silicon runner can compile the Intel sidecar. A native bundle does not: installing the
-  // whole workspace pulls wrangler, and workerd's postinstall rejects Windows ARM
-  // (`Unsupported platform: win32 arm64`).
+  // Silicon runner can compile the Intel sidecar.
   if (selectedSteps.includes("compile")) {
     await run(["bun", "install", "--frozen-lockfile", "--os=*", "--cpu=*"]);
     return;
   }
-  say("   desktop bundle only — wrangler is not installed");
-  await run(["bun", "install", "--frozen-lockfile", "--filter", "@cadcamfun/desktop"]);
+  // workerd's postinstall throws on Windows ARM (`Unsupported platform: win32 arm64`).
+  // `@astrojs/cloudflare` pulls it in, and `bun install --filter` still installs the whole
+  // lockfile, so a filtered install does not avoid it. The desktop bundle never runs workerd.
+  if (process.platform === "win32" && process.arch === "arm64") {
+    say("   Windows ARM — skipping lifecycle scripts (workerd has no win32 arm64 binary)");
+    await run(["bun", "install", "--frozen-lockfile", "--ignore-scripts"]);
+    return;
+  }
+  await run(["bun", "install", "--frozen-lockfile", "--os=*", "--cpu=*"]);
 }
 
 async function stepCheck(): Promise<void> {

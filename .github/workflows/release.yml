@@ -140,8 +140,8 @@ jobs:
           df -h /
       - uses: ./.github/actions/setup-bun
         with:
-          # The build script installs the workspace itself, with the native dependencies
-          # of every platform (`--os=* --cpu=*`).
+          # The build script installs the workspace itself. Windows ARM skips lifecycle
+          # scripts: workerd's postinstall rejects win32 arm64.
           install: "false"
       - uses: actions/download-artifact@v4
         with:
