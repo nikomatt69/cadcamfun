@@ -621,11 +621,20 @@ const toolHandlers = Effect.gen(function*() {
         delete: (key) => Effect.runPromise(kv.delete(key))
       }, { projectId, mode, ...(focus !== undefined ? { focus } : {}), ...(signal !== undefined ? { signal } : {}) }, async (capture) => {
         const loaded = await load(projectId)
-        const camContext = capture.context["cam"] as { selectedOperationId?: unknown } | undefined
+        const camContext = capture.context["cam"] as { selectedOperationId?: unknown; toolpaths?: unknown } | undefined
         const selected = mode === "cam" && typeof camContext?.selectedOperationId === "string" ? await Effect.runPromise(toolpaths.find(acting().id, camContext.selectedOperationId)) : undefined
         const programError = camContext?.selectedOperationId && mode === "cam" && (!selected || selected.row.drawingId !== loaded.id || !selected.row.gcode) ? "The selected CAM operation has no saved program in the active drawing." : undefined
         const programRevision = selected?.row.gcode && selected.row.drawingId === loaded.id ? createHash("sha256").update(cam.programGeometryText(cam.generator.analyseGcode(selected.row.gcode).program)).digest("hex") : undefined
-        return { elements: loaded.elements, drawing: { ...describeElements(loaded.elements, 100, elementBounds), ...where(loaded) }, operations: mode === "cam" ? await handlers.listOperations(projectId) : null, ...(programRevision ? { programRevision } : {}), ...(programError ? { programError } : {}) }
+        // The toolpaths of the program on screen: what the capture draws, in the model's words.
+        const shownToolpaths = mode === "cam" && Array.isArray(camContext?.toolpaths) ? camContext.toolpaths : undefined
+        return {
+          elements: loaded.elements,
+          drawing: { ...describeElements(loaded.elements, 100, elementBounds), ...where(loaded) },
+          operations: mode === "cam" ? await handlers.listOperations(projectId) : null,
+          ...(shownToolpaths !== undefined ? { toolpaths: shownToolpaths } : {}),
+          ...(programRevision ? { programRevision } : {}),
+          ...(programError ? { programError } : {})
+        }
       })
     },
     grep: async (projectId, input) => {

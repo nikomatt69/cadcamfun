@@ -28,6 +28,8 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { assertSigningConfig, bundleRoot, indexArtifacts, previousReleaseTag, releaseVersion, targetInfo } from "./release-helpers.ts";
 
+import { gitCommits, renderNotes as renderChangelogNotes } from "./changelog.ts";
+
 import { signingEnvironment } from "./signing-config.ts";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -341,10 +343,15 @@ async function lastTag(): Promise<string | null> {
   return previousReleaseTag(tags, current);
 }
 
-async function commits(range: readonly string[]): Promise<string[]> {
-  const stdout =
-    (await probeGit(["log", ...range, "--no-merges", "--pretty=format:%h %s"]))?.stdout ?? "";
-  return stdout.split("\n").filter((line) => line.trim() !== "");
+/**
+ * The release notes of the commits since the previous release.
+ *
+ * The notes come from the shared changelog module, so the text in `RELEASE_NOTES.md` is
+ * the same text that ends up in `CHANGELOG.md` and in the body of the GitHub release.
+ */
+async function commits(previousTag: string | null): Promise<string[]> {
+  const collected = await gitCommits(previousTag, "HEAD");
+  return renderChangelogNotes(collected);
 }
 
 /**
@@ -398,8 +405,7 @@ async function collectNotes(): Promise<Notes> {
   const raw = await readFile(join(SRC_TAURI, "tauri.conf.json"), "utf8");
   const version = releaseVersion((JSON.parse(raw) as { version: string }).version);
   const previousTag = await lastTag();
-  const range = previousTag !== null ? [`${previousTag}..HEAD`] : ["--all"];
-  const lines = await commits(range);
+  const lines = await commits(previousTag);
 
   // Downgrade safety (specs/10-release-sync.md §3): only a range that leaves the
   // previous tag can carry migrations. With no tag at all we cannot know.

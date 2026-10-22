@@ -1,5 +1,42 @@
 import { basename, join } from "node:path";
 
+/**
+ * Run a command and capture its output.
+ *
+ * Bun's shell prints what a command writes even when the output is captured, which puts
+ * the raw `git log` of a release into the middle of the release notes. This spawns the
+ * process quietly instead and hands back what it wrote.
+ */
+export async function captureCommand(
+  command: readonly string[],
+  options: { cwd?: string } = {},
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  const child = Bun.spawn([...command], {
+    cwd: options.cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+    stdin: "ignore",
+  });
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(child.stdout as ReadableStream).text(),
+    new Response(child.stderr as ReadableStream).text(),
+    child.exited,
+  ]);
+  return { stdout, stderr, code };
+}
+
+/**
+ * The repository the releases are published to.
+ *
+ * The index release, the six platform releases and the updater feed all live here, so
+ * the name is written once and checked against the publish workflow and the Tauri
+ * configuration: a feed that points at another repository resolves to nothing.
+ */
+export const RELEASE_REPOSITORY = "nikomatt69/cadcamfun";
+
+/** The updater feed: the `latest.json` of the release GitHub marks as the latest one. */
+export const RELEASE_UPDATER_ENDPOINT = `https://github.com/${RELEASE_REPOSITORY}/releases/latest/download/latest.json`;
+
 export const RELEASE_PLATFORM_TRIPLES: Readonly<Record<string, string>> = {
   "darwin-aarch64": "aarch64-apple-darwin",
   "darwin-x86_64": "x86_64-apple-darwin",

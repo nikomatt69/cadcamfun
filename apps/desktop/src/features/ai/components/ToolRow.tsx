@@ -409,7 +409,7 @@ export function ToolRow(props: ToolRowProps): JSX.Element {
     >
       <div class="assistant-tool-call-inner">
         <Header />
-        <For each={props.call?.images ?? []}>{(url) => <figure class="assistant-tool-figure"><a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={`${toolTitle(props.tool, actionOf(props.call?.input))} captured viewport for review`} class="max-h-80 rounded border object-contain" loading="lazy" /></a><figcaption>Captured viewport · {agent() ?? "CAD/CAM assistant"}</figcaption></figure>}</For>
+        <For each={props.call?.images ?? []}>{(url) => <figure class="assistant-tool-figure"><a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={`${toolTitle(props.tool, actionOf(props.call?.input))} captured view for review`} class="max-h-80 rounded border object-contain" loading="lazy" /></a><figcaption>Captured CAD/CAM view · {agent() ?? "CAD/CAM assistant"}</figcaption></figure>}</For>
         <Show when={failure()}>
           {(message) => <p class="assistant-tool-error" data-testid="tool-error">{message().slice(0, 600)}</p>}
         </Show>

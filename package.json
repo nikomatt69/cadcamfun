@@ -23,6 +23,9 @@
     "generate:check": "bun run --filter @cadcamfun/api generate:check",
     "db:generate": "bun run --filter @cadcamfun/db generate",
     "db:migrate": "bun run --filter @cadcamfun/db migrate",
+    "release": "./scripts/release",
+    "release:version": "bun --no-env-file scripts/release-version.ts",
+    "changelog": "bun --no-env-file scripts/changelog.ts",
     "turbo": "turbo"
   },
   "devDependencies": {

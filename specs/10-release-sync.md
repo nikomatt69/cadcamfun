@@ -27,13 +27,87 @@ Scripts must fail fast, print each step, and never read `.env*`.
 ## 2. CI (GitHub Actions)
 
 - `ci.yml` on PR/push: ubuntu runs install + typecheck + tests (including `cargo clippy`, `cargo test` for `src-tauri`); caches Bun and Cargo.
-- `release.yml` on tag `v*`: six-target matrix for macOS, Windows and Linux on arm64 + x64 → build, sign, notarise, upload to a draft GitHub Release, generate the updater manifest. It follows nikcli's native-runner approach: both macOS targets use `macos-14` (Intel is cross-compiled), Windows ARM uses `windows-11-arm`, and Linux ARM uses `ubuntu-22.04-arm`.
+- `publish.yml` is the release entry point, in the shape of nikcli's `publish.yml`: it resolves the version, stamps it across the workspace, writes the changelog, publishes npm, commits and pushes the release, tags it and creates the **draft** index release; it then calls `release.yml` for the six platform releases and, in a last job, attaches the updater manifest, publishes the Homebrew cask and only then makes the release public.
+- `release.yml` is called by `publish.yml` with the resolved tag (and can be dispatched by hand to rebuild an existing tag): six-target matrix for macOS, Windows and Linux on arm64 + x64 → build, sign, notarise, upload to a draft GitHub Release, generate the updater manifest. It follows nikcli's native-runner approach: both macOS targets use `macos-14` (Intel is cross-compiled), Windows ARM uses `windows-11-arm`, and Linux ARM uses `ubuntu-22.04-arm`.
 - `build-platforms.yml` on a `build/**` branch or manual dispatch uses the same six native targets to produce downloadable installer artifacts without requiring release/updater signing credentials. Like nikcli's desktop scripts, the sidecar is prepared for the explicit Rust target before Tauri bundles on the matching native runner.
 - Linux packages `.deb`, `.rpm`, `.AppImage`; macOS builds separate `.app` + `.dmg` artifacts per architecture so Tauri also emits the updater `.app.tar.gz`; Windows packages `.msi` + NSIS `.exe`.
 - macOS uses separate arm64 and x64 installers, not a universal binary. Modern Tauri updater assets are `.app.tar.gz`, `.AppImage`, and NSIS `.exe`, with sibling `.sig` files.
 - Manual releases require an existing `v`-prefixed tag input. The gate checks out that tag, installs Bun, verifies the checked-out commit and configured app version, and outputs immutable SHA/version/date metadata. Secret-bearing builds depend on this gate; branch pushes and fork release workflows are excluded. Windows imports the owner-provided certificate, passes its thumbprint to Tauri signing configuration, then removes it even on failure. No secret appears in an `if` expression.
 - `updater-manifest.ts` validates object shapes and consistent version/date/notes, rejects duplicate platforms, and requires all six platform keys when merging. `stage-release.ts` checks each downloaded target's checksums, rejects unexpected/duplicate files, compares notes and signatures, verifies exact release URLs against copied assets, and stages one flat draft asset set with a combined `SHA256SUMS`. Published releases are not modified by a rerun. The release remains a draft until the owner verifies and publishes it; draft assets are not an active updater feed.
 - Required secrets (names only, set by the owner in GitHub): `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`, `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD`. Workflows must not echo them and must not run on forks' PRs with secrets.
+
+## 2.1 Release pipeline (nikcli parity, 2026-10-22)
+
+The release is driven the way nikcli drives its own: **one command starts it, and the
+version, the changelog and the publishing are the pipeline's job**, not the owner's.
+
+```bash
+./scripts/release patch     # 6.0.0 -> 6.0.1
+./scripts/release minor     # 6.0.0 -> 6.1.0
+./scripts/release major     # 6.0.0 -> 7.0.0
+./scripts/release 6.2.0     # an explicit version
+```
+
+`scripts/release` triggers the `publish` workflow, which runs in three jobs:
+
+1. **`publish`** — resolve the version, stamp it across the workspace, write the
+   changelog, publish npm, commit and push the release, tag it, create the **draft**
+   index release.
+2. **`desktop`** — call `release.yml`, which builds, signs and publishes the six platform
+   releases and merges the updater manifest.
+3. **`publish-release`** — attach the updater manifest to the index release, publish the
+   Homebrew cask, and only then make the release public.
+
+The index release stays a **draft** until the last job, so a release that fails halfway is
+never visible to a user and the updater feed never points at a missing installer. This is
+nikcli's split between `publish-start.ts` and `publish-complete.ts`, with the same
+consequence: the release is published last or not at all.
+
+### The version is one version
+
+A release has exactly one version. It lives in `apps/desktop/src-tauri/tauri.conf.json`
+and every other holder mirrors it: the workspace `package.json` files that carry a
+version, `apps/desktop/src-tauri/Cargo.toml` and `apps/mobile/app.json`.
+`scripts/release-version.ts` is the only place that decides the version and writes it
+everywhere; a release version must be strictly newer than the newest tag, so a version
+that was already published is never reused.
+
+### The changelog comes from the commits
+
+`scripts/changelog.ts` groups the commits since the previous release by the area they
+touched (Core, Desktop, Sidecar, Mobile, Database, API, AI, Web, Version control,
+Workflows, Identity, Buffer, Integrations, Build and release, Documentation), drops the
+housekeeping commits, and writes the notes into `CHANGELOG.md` under a marker-delimited
+"Unreleased" block. The same notes are the body of the GitHub release and the
+`RELEASE_NOTES.md` of the build, so the three can never drift apart. No model and no
+network are involved: the notes are produced from the commit messages alone, exactly as
+nikcli's `--raw` mode does in CI.
+
+### What the pipeline publishes
+
+- **npm** — the workspace packages that are not private (the nikcli plugin). A version
+  that is already on the registry is skipped, so a re-run is harmless; a prerelease goes
+  to the `next` tag, a release to `latest`.
+- **GitHub releases** — the six platform releases (`v6.0.1-macos-arm64`, …) and the index
+  release (`v6.0.1`) that carries `latest.json` for the in-app updater.
+- **Homebrew** — a cask for the two macOS builds, generated from the checksums the
+  release build already verified, and pushed to the tap repository.
+
+### Secrets and variables
+
+| Name | Kind | Needed for | Without it |
+| --- | --- | --- | --- |
+| `NPM_TOKEN` | secret | publishing the npm package | the release warns and continues |
+| `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | secret | signing the updater bundles | the bundle fails |
+| `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | secret | signing and notarising the macOS builds | the bundle fails |
+| `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD` | secret | signing the Windows builds | the bundle fails |
+| `HOMEBREW_TAP_REPOSITORY` | variable (`owner/name`) | the Homebrew cask | the cask is skipped, the release completes |
+| `HOMEBREW_TAP_BRANCH` | variable | the branch of the tap (default `main`) | `main` is used |
+| `HOMEBREW_TAP_TOKEN` | secret | pushing the cask to the tap | the cask is skipped |
+| `GITHUB_TOKEN` | built-in | pushing the release commit and the tag, creating and publishing the release | — (the workflow asks for `contents: write`) |
+
+The built-in `GITHUB_TOKEN` can only write to *this* repository, so the Homebrew tap —
+another repository — needs its own token.
 
 ## 3. Auto-update
 

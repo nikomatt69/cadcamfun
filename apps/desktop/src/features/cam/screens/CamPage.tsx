@@ -41,12 +41,16 @@ import { restoreCamProgram, SavedCamProgram } from "../lib/saved-program.ts"
 import { Schema } from "effect"
 import { cam } from "@cadcamfun/core"
 import { captureEditorOwner } from "../../ai/lib/editor-sync.ts"
+import { registerProgramSheet } from "../../ai/lib/viewport-capture.ts"
+import { renderProgramSheet, programSheetPaths } from "../lib/program-sheet.ts"
 import { useVerifyStore } from "../store/verifyStore.ts"
 import { mountCamHistory, useCamHistoryStore } from "../store/camHistoryStore.ts"
 import CamHistoryModal from "../components/CamHistoryModal.tsx"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
 const PARSE_DELAY_MS = 400
+/** The rapid rate the CAM store's own estimates use (mm/min). */
+const RAPID_RATE_MM_PER_MIN = 5000
 
 const RIGHT_TAB_ON = "text-[#007ACC] bg-blue-50/80 dark:bg-blue-900/30 border-b-2 border-[#007ACC] shadow-md"
 const RIGHT_TAB_OFF = "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/40 dark:hover:bg-gray-700/40"
@@ -105,6 +109,20 @@ export default function CamPage(): JSX.Element {
     program: camStore.program, gcode: camStore.gcode, tool: toolModel()
   }))
   const previewDefaultTool = createMemo(() => machineChoice().kind === "mill" ? cam.kernel.settingsCutter(gen.settings) : undefined)
+  /** What the program sheet says about the program: the machine, its toolpaths and their moves. */
+  const sheetSummary = createMemo(() => {
+    const paths = camStore.program.toolpaths
+    const machine = machineChoice().kind
+    return {
+      machine,
+      name: camStore.program.name,
+      toolpaths: paths.map((path) => ({ id: path.id, name: path.name, toolId: path.toolId, moves: path.moves.length })),
+      moves: paths.reduce((sum, path) => sum + path.moves.length, 0),
+      durationSeconds: paths.reduce((sum, path) => sum + cam.estimateTime(path, RAPID_RATE_MM_PER_MIN), 0),
+      // The toolpath the sheet draws: the cutting plane of the machine the program is for.
+      paths: programSheetPaths(camStore.program, machine)
+    }
+  })
   const generator = makeToolpathGenerator(app.client)
   const [search, setSearch] = useSearchParams()
 
@@ -128,6 +146,14 @@ export default function CamPage(): JSX.Element {
 
   // The raw piece follows the CAD (legacy `syncWorkpieceFromCAD` on mount).
   onMount(() => { syncDocumentSettings(app); camStore.syncWorkpieceFromCAD() })
+
+  // The CAM's visual capture: the program sheet is always on offer, so the assistant sees the G-code
+  // and the toolpaths even while the editor hides the 3D preview. The preview's own capture (the
+  // rendered toolpath) wins while it is on screen.
+  onMount(() => {
+    const stop = registerProgramSheet("cam", () => ({ canvas: renderProgramSheet(camStore.gcode, sheetSummary()) }))
+    onCleanup(stop)
+  })
   onMount(() => {
     const stopHistory = mountCamHistory()
     const key = (event: KeyboardEvent): void => {

@@ -1,8 +1,19 @@
 name: Release
 
+# The six platform releases of one version. It is called by `publish.yml`, which owns the
+# index release (`v6.0.1`) and the updater manifest that points at these releases; it can
+# also be dispatched by hand to rebuild an existing tag.
 on:
-  push:
-    tags: ["v*"]
+  workflow_call:
+    inputs:
+      tag:
+        description: The v-prefixed version tag to build, e.g. v6.0.1
+        required: true
+        type: string
+      version:
+        description: The released version the tag carries
+        required: false
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -23,9 +34,8 @@ env:
 jobs:
   trusted:
     if: >-
-      github.event.repository.fork == false &&
-      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-       (github.event_name == 'workflow_dispatch' && startsWith(inputs.tag, 'v')))
+      github.event.repository.fork != true &&
+      (startsWith(inputs.tag, 'v') || startsWith(github.ref_name, 'v'))
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.ref.outputs.tag }}
@@ -303,101 +313,14 @@ jobs:
           name: CADCAM FUN ${{ needs.trusted.outputs.tag }} for ${{ matrix.label }}
           draft: false
           prerelease: ${{ contains(needs.trusted.outputs.version, '-') }}
-          # Only the index release below may be "latest": the updater reads latest.json from it.
+          # Only the index release may be "latest": the updater reads latest.json from it.
           make_latest: "false"
           body_path: dist/RELEASE_NOTES.md
           files: dist/*
           fail_on_unmatched_files: true
 
-  # Published last, and only when all six platform releases are out: the updater manifest it carries then never points at a
-  # missing installer.
-  publish-index:
-    needs: [trusted, manifest, publish-platform]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.trusted.outputs.sha }}
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: latest-json
-          path: manifest
-      - name: Verify the manifest points into the six platform releases; stage the index release
-        env:
-          DOWNLOAD_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download
-          RELEASE_TAG: ${{ needs.trusted.outputs.tag }}
-        run: bun --no-env-file scripts/stage-release.ts --mode=index --manifest=manifest/latest.json --out=dist --download-url="$DOWNLOAD_URL" --tag="$RELEASE_TAG"
-      - name: Refuse to modify an already published release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.trusted.outputs.tag }}
-        run: |
-          if gh release view "$RELEASE_TAG" --json isDraft > existing-release.json 2> /dev/null; then
-            jq -e '.isDraft == true' existing-release.json > /dev/null || { echo "Release $RELEASE_TAG is already published" >&2; exit 1; }
-          fi
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.trusted.outputs.tag }}
-          target_commitish: ${{ needs.trusted.outputs.sha }}
-          name: CADCAM FUN ${{ needs.trusted.outputs.tag }}
-          draft: false
-          prerelease: ${{ contains(needs.trusted.outputs.version, '-') }}
-          make_latest: ${{ contains(needs.trusted.outputs.version, '-') && 'false' || 'true' }}
-          body_path: dist/RELEASE_NOTES.md
-          files: dist/*
-          fail_on_unmatched_files: true
+  # The index release (`v6.0.1`) and the npm package are published by `publish.yml`, which
+  # owns the release as a whole: it creates the index release as a draft, calls this
+  # workflow for the six platform releases, and only makes the index release public once
+  # the updater manifest is attached to it.
 
-  # Needs the repository secret NPM_TOKEN (an npm automation token that can publish under the @nikoemme_ scope). Without it
-  # the job warns and stays green; a version already on the registry is skipped, so re-running a release is safe.
-  publish-npm:
-    needs: trusted
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.trusted.outputs.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-      - name: Publish the nikcli plugin (@nikoemme_ scope, else @cadcamfun/cadcamfun)
-        working-directory: packages/nikcli-plugin
-        shell: bash
-        env:
-          FALLBACK_NAME: "@cadcamfun/cadcamfun"
-        run: |
-          set -uo pipefail
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::warning::NPM_TOKEN is not set; skipping the npm publish"
-            exit 0
-          fi
-          primary=$(node -p "require('./package.json').name")
-          version=$(node -p "require('./package.json').version")
-          for candidate in "$primary" "$FALLBACK_NAME"; do
-            if npm view "$candidate@$version" version > /dev/null 2>&1; then
-              echo "$candidate@$version is already on npm; nothing to publish"
-              exit 0
-            fi
-          done
-          case "$version" in *-*) channel=next ;; *) channel=latest ;; esac
-          if npm publish --access public --tag "$channel" 2>&1 | tee publish.log; then
-            echo "Published $primary@$version"
-            exit 0
-          fi
-          # Fall back only when the scope itself is the problem; any other failure (network, expired token) must stay red.
-          if ! grep -qE "Scope not found|E404|E403|403 Forbidden|You do not have permission" publish.log; then
-            echo "::error::npm publish failed for $primary" >&2
-            exit 1
-          fi
-          echo "::warning::$primary could not be published (scope missing or not writable); publishing as $FALLBACK_NAME"
-          npm pkg set name="$FALLBACK_NAME"
-          npm publish --access public --tag "$channel"

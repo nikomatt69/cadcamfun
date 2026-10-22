@@ -8,7 +8,7 @@ Actions and Parameters (mm, mm/min, rpm)
 - suggest: params (operationType, toolDiameter, depth, stepdown, feedrate, rpm, material).
 - compare_setups: candidates (1-4 of {name, params, toolId?, materialId?}).
 - analyze: operationId (full stored NC) or gcode; machineType adds axis checks. Empty findings never mean safe.
-- vision: focus; displayed CAM preview.
+- vision: focus; the CAM as it is on screen: the viewport image with the rendered toolpath, and the program sheet (the G-code with its line numbers and the toolpaths it holds). The sheet is what arrives while the editor shows the G-code instead of the preview; the program's text is in the result.
 - chain_suggest: fromOperationId, materialHint, toolHint.
 - chain_status: operationId.
 - materials: query; grades, and the machines: the built-in catalogue (milling centres and turning centres, with kind, post, limits, fiveAxis and turning) plus the machine configurations of the library (id config:<id>). Pick the machine from that list, never invent one.

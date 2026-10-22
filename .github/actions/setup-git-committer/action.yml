@@ -1,0 +1,26 @@
+name: "Setup Git Committer"
+description: "Configure the git identity the release commit is made with"
+inputs:
+  name:
+    description: "The author name of the release commit"
+    required: false
+    default: "cadcamfun-release[bot]"
+  email:
+    description: "The author email of the release commit"
+    required: false
+    default: "cadcamfun-release[bot]@users.noreply.github.com"
+runs:
+  using: "composite"
+  steps:
+    # A release commit without an identity is refused by git, and the runner image has
+    # none: the name and the email have to be written before the commit is made.
+    - name: Configure git user
+      run: |
+        git config --global user.name "${{ inputs.name }}"
+        git config --global user.email "${{ inputs.email }}"
+      shell: bash
+
+    - name: Clear checkout auth
+      run: |
+        git config --local --unset-all http.https://github.com/.extraheader || true
+      shell: bash

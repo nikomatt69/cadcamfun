@@ -1,0 +1,149 @@
+name: publish
+run-name: "${{ format('release {0}', inputs.version || inputs.bump) }}"
+
+# The release pipeline, in the same shape as nikcli's `publish.yml`:
+#
+#   publish          resolve the version, stamp it across the workspace, write the
+#                    changelog, publish npm, commit and push the release, tag it and
+#                    create the *draft* GitHub release.
+#   desktop          build, sign and publish the six platform releases.
+#   publish-release  attach the updater manifest, publish the Homebrew cask, and only
+#                    then make the release public.
+#
+# The release stays a draft until the last job, so a release that fails halfway is never
+# visible to a user and the updater feed never points at a missing installer.
+
+on:
+  workflow_call:
+    inputs:
+      bump:
+        description: "Bump type: major, minor or patch"
+        required: false
+        type: string
+      version:
+        description: "An explicit version, which wins over the bump"
+        required: false
+        type: string
+      prevalidated:
+        description: "The caller already ran the workspace validation"
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      tag:
+        description: "The release tag, e.g. v6.0.1"
+        value: ${{ jobs.publish.outputs.tag }}
+      version:
+        description: "The released version, e.g. 6.0.1"
+        value: ${{ jobs.publish.outputs.version }}
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Bump type"
+        required: false
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+      version:
+        description: "An explicit version (optional, wins over the bump)"
+        required: false
+        type: string
+
+concurrency:
+  group: publish-${{ github.ref }}-${{ inputs.version || inputs.bump || 'manual' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  publish:
+    name: prepare the release
+    runs-on: ubuntu-latest
+    if: github.repository == 'nikomatt69/cadcamfun'
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - run: git fetch --force --tags
+
+      # The release commit needs an author: the runner image has no git identity.
+      - uses: ./.github/actions/setup-git-committer
+
+      - uses: ./.github/actions/setup-bun
+        with:
+          # The validation step below installs the workspace with the frozen lockfile.
+          install: "false"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Validate the workspace
+        if: ${{ !inputs.prevalidated }}
+        run: |
+          bun install --frozen-lockfile
+          bun run typecheck
+          bun run test
+
+      - name: Prepare the release
+        id: release
+        run: bun --no-env-file scripts/release-publish.ts --phase=start --bump="$CADCAM_BUMP" --version="$CADCAM_VERSION"
+        env:
+          CADCAM_BUMP: ${{ inputs.bump }}
+          CADCAM_VERSION: ${{ inputs.version }}
+          GH_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_FALLBACK_NAME: "@cadcamfun/cadcamfun"
+          # The npm provenance attestation needs an OIDC identity the release token
+          # does not carry; the release is published without it, as in nikcli.
+          NPM_CONFIG_PROVENANCE: "false"
+
+  desktop:
+    name: build and publish the platform releases
+    needs: publish
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.publish.outputs.tag }}
+      version: ${{ needs.publish.outputs.version }}
+    secrets: inherit
+
+  publish-release:
+    name: publish the release
+    needs: [publish, desktop]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-bun
+        with:
+          install: "false"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: latest-json
+          path: manifest
+
+      - name: Attach the updater manifest, publish the cask and make the release public
+        run: bun --no-env-file scripts/release-publish.ts --phase=complete --tag="$RELEASE_TAG" --manifest=manifest/latest.json
+        env:
+          RELEASE_TAG: ${{ needs.publish.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_REPOSITORY: ${{ vars.HOMEBREW_TAP_REPOSITORY }}
+          HOMEBREW_TAP_BRANCH: ${{ vars.HOMEBREW_TAP_BRANCH }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

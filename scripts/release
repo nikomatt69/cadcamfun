@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Release CADCAM FUN.
+#
+#   ./scripts/release patch     # 6.0.0 -> 6.0.1
+#   ./scripts/release minor     # 6.0.0 -> 6.1.0
+#   ./scripts/release major     # 6.0.0 -> 7.0.0
+#   ./scripts/release 6.2.0     # an explicit version
+#
+# It only triggers the `publish` workflow; the workflow does the rest: it stamps the
+# version across the workspace, writes the changelog, publishes npm, builds and signs the
+# six platform releases, attaches the updater manifest and publishes the Homebrew cask.
+set -euo pipefail
+
+BUMP="${1:-patch}"
+VERSION=""
+
+case "$BUMP" in
+  major | minor | patch) ;;
+  v[0-9]* | [0-9]*)
+    VERSION="${BUMP#v}"
+    BUMP=""
+    ;;
+  *)
+    echo "usage: $0 [major|minor|patch|<version>]" >&2
+    exit 2
+    ;;
+esac
+
+args=(-f "bump=$BUMP")
+if [ -n "$VERSION" ]; then
+  args+=(-f "version=$VERSION")
+fi
+
+gh workflow run publish.yml "${args[@]}"
+
+echo "triggered publish.yml (${BUMP:-version $VERSION})"

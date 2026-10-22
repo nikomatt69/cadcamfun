@@ -6,6 +6,7 @@
 import { CAD_ACTION_INPUTS, EmptyActionInput, CadInspectionElements, CadInspectionLayers, CadInspectionOrigins, CadInspectionProperty, CadInspectionSearch, PARAMETRIC_ACTION_INPUTS } from "@cadcamfun/api"
 import { cad } from "@cadcamfun/core"
 import { Schema } from "effect"
+import type { FilePart } from "../attachments.ts"
 import { ToolMediaResult } from "../tools/define.ts"
 import { defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
 import type { CadInspectionInput as CadInspectionInputWire, VisionInput } from "@cadcamfun/api"
@@ -51,11 +52,23 @@ const inspect = (action: string) => (input: unknown, context: ActionContext) =>
     : context.handlers.cadInspect(context.projectId, withDefaults({ ...(input as Record<string, unknown>), action }) as never)
 
 /** A capture of the viewport the user sees, with its evidence; shared by `cad.vision` and `cam.vision`. */
-export const vision = (mode: "cad" | "cam", filename: string) => async (input: typeof VisionInput.Type, context: ActionContext) => {
+export const vision = (mode: "cad" | "cam", filename: string, sheetName = filename.replace(/-viewport\.png$/, "-program.png")) => async (input: typeof VisionInput.Type, context: ActionContext) => {
   if (context.handlers.vision === undefined) return { ok: false, error: "Viewport capture is unavailable in this host." }
   const result = await context.handlers.vision(context.projectId, mode, input.focus, context.signal)
   if (!result.ok) return result
-  return new ToolMediaResult(result.evidence, [{ type: "file", mime: result.capture.mime, filename, url: `data:${result.capture.mime};base64,${result.capture.data}` }])
+  const capture = result.capture
+  // The image the user sees: the viewport, or the program sheet that stands in for it.
+  const files: FilePart[] = [{
+    type: "file",
+    mime: capture.mime,
+    filename: capture.kind === "sheet" ? sheetName : filename,
+    url: `data:${capture.mime};base64,${capture.data}`
+  }]
+  // The program sheet, when the capture is the viewport: the G-code and the toolpaths as a picture.
+  if (capture.sheet !== undefined) {
+    files.push({ type: "file", mime: capture.sheet.mime, filename: sheetName, url: `data:${capture.sheet.mime};base64,${capture.sheet.data}` })
+  }
+  return new ToolMediaResult(result.evidence, files)
 }
 
 export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
