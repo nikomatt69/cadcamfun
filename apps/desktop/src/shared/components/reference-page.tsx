@@ -4,7 +4,7 @@ import { t, type Key } from "../../i18n/index.ts"
 import { ReferenceLink } from "./reference-navigation.tsx"
 
 const labels: Readonly<Record<string, Key>> = {
-  projects: "shell.projects", cad: "shell.cad", cam: "shell.cam", library: "shell.resources",
+  projects: "shell.projects", cad: "shell.cad", cam: "shell.cam", library: "shell.resources", manuals: "shell.manuals",
   toolpaths: "shell.toolpaths", components: "shell.components", materials: "shell.materials",
   machine: "shell.configurations", tools: "shell.tools", organizations: "shell.organizations",
   plugins: "shell.plugins", pricing: "shell.pricing",

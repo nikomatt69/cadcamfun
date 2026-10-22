@@ -9,6 +9,7 @@ import { For, Show, type JSX } from "solid-js"
 import Cpu from "lucide-solid/icons/cpu"
 import FolderOpen from "lucide-solid/icons/folder-open"
 import Library from "lucide-solid/icons/library"
+import BookOpen from "lucide-solid/icons/book-open"
 import Plug from "lucide-solid/icons/plug"
 import Ruler from "lucide-solid/icons/ruler"
 import SettingsIcon from "lucide-solid/icons/settings"
@@ -24,6 +25,7 @@ const ICONS = {
   cad: Ruler,
   cam: Cpu,
   library: Library,
+  manuals: BookOpen,
   costs: Wallet,
   ai: Sparkles,
   plugins: Plug,

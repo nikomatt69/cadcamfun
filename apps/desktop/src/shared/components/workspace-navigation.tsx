@@ -1,9 +1,10 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { Motion, Presence } from "solid-motionone"
+import { t } from "../../i18n/index.ts"
 import {
   Activity, BarChart2, ChevronDown, ChevronUp, Cpu, Database,
-  FileText, Globe, Home, Package, Puzzle, Server, Settings, SquarePlus, User, Users, Wrench, LayoutGrid
+  FileText, Globe, Home, Package, Puzzle, Server, Settings, SquarePlus, User, Users, Wrench, LayoutGrid, BookOpen
 } from "lucide-solid"
 
 interface NavItem { name: string; href: string; icon: JSX.Element; current?: boolean; children?: NavItem[] }
@@ -26,6 +27,7 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
     },
     { name: "CAD Editor", href: "/cad", icon: <LayoutGrid size={20} />, current: path() === "/cad" },
     { name: "CAM Editor", href: "/cam", icon: <Wrench size={20} />, current: path() === "/cam" },
+    { name: t("shell.manuals"), href: "/manuals", icon: <BookOpen size={20} />, current: path() === "/manuals" },
     {
       name: "Resources", href: "#", icon: <Package size={20} />,
       current: ["/components", "/materials", "/machine", "/tools", "/drawing-instruments", "/library"].some((prefix) => path().startsWith(prefix)),

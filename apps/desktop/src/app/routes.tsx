@@ -32,6 +32,7 @@ export const routes: AppRoute[] = [
   { path: "/legal/terms", component: lazy(() => import("../pages/legal/terms.tsx")) },
   { path: "/legal/third-party-licenses", component: lazy(() => import("../pages/legal/third-party-licenses.tsx")) },
   { path: "/library", component: lazy(() => import("../pages/library/index.tsx")) },
+  { path: "/manuals", component: lazy(() => import("../pages/manuals.tsx")) },
   { path: "/machine/:id", component: lazy(() => import("../pages/machine/_id_.tsx")) },
   { path: "/machine", component: lazy(() => import("../pages/machine/index.tsx")) },
   { path: "/materials/:id", component: lazy(() => import("../pages/materials/_id_.tsx")) },

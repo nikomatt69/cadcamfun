@@ -1,0 +1,39 @@
+/* Shared workspace components own surfaces and controls; these rules only arrange the catalogue. */
+.manuals-screen { color: var(--shell-text); --manual-muted: var(--shell-muted); --manual-line: var(--page-border); --manual-accent: var(--page-accent); }
+.manuals-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; color: var(--manual-muted); }
+.manuals-stats small { font-size: 11px; }
+.manuals-subtitle { margin: 0 0 14px; color: var(--manual-muted); font-size: 13px; line-height: 1.65; }
+.manuals-access-note { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 18px; padding: 12px; background: var(--page-tab); border: 1px solid var(--manual-line); border-radius: var(--page-radius); font-size: 12px; }
+.manuals-access-note > svg { flex: none; margin-top: 2px; color: var(--manual-accent); }
+.manuals-access-note strong { font-weight: 600; }
+.manuals-access-note p { margin: 4px 0 0; line-height: 1.6; color: var(--manual-muted); }
+.manuals-manufacturers { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.manuals-filters nav { display: grid; gap: 3px; margin-bottom: 20px; }
+.manuals-filters nav button { display: flex; justify-content: space-between; gap: 8px; padding: 9px 8px; text-align: left; font-size: 12px; }
+.manuals-filters nav button > span:last-child { color: var(--manual-muted); font-variant-numeric: tabular-nums; font-size: 11px; }
+.manuals-content { min-width: 0; }
+.manuals-search-row { display: flex; align-items: center; gap: 12px; }
+.manuals-search { position: relative; flex: 1; min-width: 0; }
+.manuals-search > svg { position: absolute; top: 50%; left: 10px; transform: translateY(-50%); color: var(--manual-muted); pointer-events: none; }
+.manuals-search input { padding-left: 34px; padding-right: 30px; }
+.manuals-search input::-webkit-search-cancel-button { display: none; }
+.manuals-search button { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); padding: 2px; color: var(--manual-muted); }
+.manuals-result-count { margin: 12px 0; color: var(--manual-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.manuals-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.manual-card { display: flex; flex-direction: column; min-width: 0; }
+.manual-card:focus-within { border-color: var(--manual-accent); }
+.manual-card-top { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-bottom: 16px; }
+.manual-kind { color: var(--manual-muted); border: 1px solid var(--manual-line); border-radius: var(--ui-radius-sm); padding: 2px 6px; font-size: 10px; font-weight: 500; }
+.manual-account { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--manual-muted); }
+.manual-publisher { margin: 0 0 5px; color: var(--manual-accent); font-size: 11px; font-weight: 600; }
+.manual-card h2 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -.015em; line-height: 1.5; overflow-wrap: anywhere; }
+.manual-card h2 a { text-decoration: none; color: inherit; }
+.manual-collection { margin: 8px 0 20px; color: var(--manual-muted); font-size: 12px; line-height: 1.6; }
+.manual-card-bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--manual-line); }
+.manual-language { display: inline-flex; gap: 5px; align-items: center; color: var(--manual-muted); font-size: 11px; }
+.manual-open { display: inline-flex; gap: 5px; align-items: center; color: var(--manual-accent); font-size: 12px; font-weight: 500; text-decoration: none; }
+.manual-source { color: var(--manual-muted); font-size: 10px; margin-top: 10px; overflow-wrap: anywhere; }
+.manuals-pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 24px 0 12px; font-size: 12px; color: var(--manual-muted); }
+@media (hover: hover) { .manual-card h2 a:hover { color: var(--manual-accent); } .manual-open:hover { text-decoration: underline; } }
+@media (min-width: 1500px) { .manuals-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1000px) { .manuals-grid { grid-template-columns: minmax(0, 1fr); } }

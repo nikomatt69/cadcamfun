@@ -1,6 +1,7 @@
 import { A, useLocation, useNavigate } from "@solidjs/router"
 import { For, Show, createEffect, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import Home from "lucide-solid/icons/house"
+import BookOpen from "lucide-solid/icons/book-open"
 import FileText from "lucide-solid/icons/file-text"
 import Grid from "lucide-solid/icons/grid-2x2"
 import Tool from "lucide-solid/icons/wrench"
@@ -48,6 +49,7 @@ const navigation: ReadonlyArray<NavItem> = [
   ] },
   { key: "shell.cad", href: "/cad", icon: Grid },
   { key: "shell.cam", href: "/cam", icon: Tool },
+  { key: "shell.manuals", href: "/manuals", icon: BookOpen },
   { key: "shell.resources", href: "/library", icon: Package, children: [
     { key: "shell.toolpaths", href: "/toolpaths", icon: Tool },
     { key: "shell.components", href: "/components", icon: Package },

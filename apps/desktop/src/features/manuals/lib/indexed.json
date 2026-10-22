@@ -1,0 +1,5426 @@
+{
+  "indexedAt": "2026-10-22T14:57:42.329Z",
+  "documents": [
+    {
+      "id": "blender-curves-ac7a1e435eac",
+      "title": "Active Spline",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/properties/active_spline.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-798952d0e847",
+      "title": "Control Points",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/editing/control_points.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-0c10e61899d1",
+      "title": "Curve",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/editing/curve.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-6b4b4ef8fc44",
+      "title": "Curve Display",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/curve_display.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-f7b443765f73",
+      "title": "Curve Pen",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/tools/pen.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-0dc27ff0164e",
+      "title": "Draw",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/tools/draw.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-26a7fc22beac",
+      "title": "Editing",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/editing/index.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-4fbad4f639af",
+      "title": "Geometry",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/properties/geometry.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-5a2c854d357b",
+      "title": "Introduction",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/introduction.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-9a27637ec103",
+      "title": "Other",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/editing/other.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-74f7a84c50b4",
+      "title": "Path Animation",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/properties/path_animation.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-caad51b6df88",
+      "title": "Primitives",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/primitives.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-a399ee49d201",
+      "title": "Properties",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/properties/index.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-df5e1c643c33",
+      "title": "Segments",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/editing/segments.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-87040c2d05fe",
+      "title": "Selecting",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/selecting.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-70e86d247c53",
+      "title": "Shape",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/properties/shape.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-d9ae2c40568e",
+      "title": "Structure",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/structure.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-7bfa34f7e8d0",
+      "title": "Toolbar",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/tools/toolbar.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-fd4627ff0df2",
+      "title": "Tools",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/tools/index.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-curves-fd4c33f1e971",
+      "title": "Transform Panel",
+      "collection": "Blender curves and surfaces manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/curves/editing/transform_panel.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "curves",
+        "nurbs",
+        "bezier"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-6f485254e46a",
+      "title": "Bend",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/bend.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-07b6a5f9e418",
+      "title": "By Attribute",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/by_attribute.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-d01dcb275558",
+      "title": "Checker Deselect",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/checker_deselect.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-8f6f4d6b2e7e",
+      "title": "Duplicate",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/duplicate.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-61d39d752e47",
+      "title": "Editing",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/index.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-7f2e1f5062f0",
+      "title": "Extrude",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/extrude.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-62e459b959f0",
+      "title": "Extrude Manifold",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/tools/extrude_manifold.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-cbe656373aa6",
+      "title": "Extrude Region",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/tools/extrude_region.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-3aa463e1db10",
+      "title": "Extrude to Cursor",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/tools/extrude_cursor.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-808be5396554",
+      "title": "Flatten",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/flatten.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-6f521a085d79",
+      "title": "Introduction",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/introduction.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-178905333039",
+      "title": "Introduction",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/introduction.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-71fc9ac7a694",
+      "title": "Introduction",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/introduction.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-6b7ba9b5fbe1",
+      "title": "Loop Cut",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/tools/loop.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-264e7e85c8b9",
+      "title": "Merge",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/merge.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-aa48352c96f5",
+      "title": "Mesh Operators",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/index.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-87646ca4cd83",
+      "title": "Mesh Plane",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/import_images_as_planes.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-0b724b0d2a40",
+      "title": "Mirror",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/mirror.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-0d7e4ffed086",
+      "title": "Move, Rotate, Scale",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/basic.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-e4d33a2cd188",
+      "title": "Poly Build",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/tools/poly_build.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-9bfa77beb35f",
+      "title": "Primitives",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/primitives.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-5e07b64706c1",
+      "title": "Push/Pull",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/push_pull.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-5d42ed1fede9",
+      "title": "Randomize",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/randomize.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-9309c7c8cd8a",
+      "title": "Select All by Trait",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/all_by_trait.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-8dfd24d5dda1",
+      "title": "Select Linked",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/linked.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-a11ed610e5eb",
+      "title": "Select Loops",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/loops.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-4b90a921d6dc",
+      "title": "Select Mirror",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/mirror.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-387efc710949",
+      "title": "Select More/Less",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/more_less.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-6cdc683ce758",
+      "title": "Select Random",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/random.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-b41820d3b627",
+      "title": "Select Sharp Edges",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/sharp_edges.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-6380df4f5352",
+      "title": "Select Similar",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/similar.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-d0cc6006d0b0",
+      "title": "Selecting",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/index.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-6715a0084f8c",
+      "title": "Separate",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/separate.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-84131f9786ef",
+      "title": "Shear",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/shear.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-7cd6403125a7",
+      "title": "Shrink/Fatten",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/shrink-fatten.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-8ebfa5fc9b32",
+      "title": "Side of Active",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/selecting/side_of_active.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-a9abf2600b45",
+      "title": "Skin Resize",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/skin_resize.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-26ac3f909cac",
+      "title": "Space Edge Loops Evenly",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/space_edge_loops_evenly.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-4f5c30bad7d4",
+      "title": "Spin",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/tools/spin.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-6a6a5950bf06",
+      "title": "Split",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/split.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-161272603040",
+      "title": "Structure",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/structure.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-bf479990fe8d",
+      "title": "To Circle",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/to_circle.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-1cf9efd54227",
+      "title": "To Sphere",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/to_sphere.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-0b4b22a7b33a",
+      "title": "Tool Settings",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/tools/tool_settings.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-855d1833d138",
+      "title": "Toolbar",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/tools/toolbar.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-61d477a12c3f",
+      "title": "Tools",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/tools/index.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-de0494d4b0ae",
+      "title": "Transformation",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/index.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-mesh-1a650c64b2bf",
+      "title": "Warp",
+      "collection": "Blender mesh modeling manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/transform/warp.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "mesh",
+        "extrude",
+        "bevel",
+        "topology"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-0e25e5df9286",
+      "title": "Armature Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/deform/armature.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-c46b1f989ed5",
+      "title": "Array (Legacy) Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/array_legacy.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-8201f5f0be1f",
+      "title": "Array Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/array.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-87197e385c95",
+      "title": "Bevel Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/bevel.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-d65bc46b00fd",
+      "title": "Boolean Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/booleans.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-bc7daf607fd3",
+      "title": "Build Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/build.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-403b6828fb82",
+      "title": "Cast Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/deform/cast.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-8e8ad2d0b39b",
+      "title": "Common Modifier Options",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/common_options.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-e44b07de646e",
+      "title": "Curve to Tube Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/curve_to_tube.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-8d388a445e12",
+      "title": "Data Transfer Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/modify/data_transfer.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-1315d632b565",
+      "title": "Decimate Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/decimate.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-29baa862de7e",
+      "title": "Deform",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/deform/index.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-4f2b29ed44e4",
+      "title": "Edge Split Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/edge_split.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-43bdbf09252e",
+      "title": "Generate",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/index.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-f7d92cea0047",
+      "title": "Introduction",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/introduction.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-0755fc590d9b",
+      "title": "Mask Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/mask.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-5f75a45068b2",
+      "title": "Mesh Cache Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/modify/mesh_cache.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-874f0bf283d5",
+      "title": "Mesh Sequence Cache Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/modify/mesh_sequence_cache.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-03b7ec55a8d1",
+      "title": "Mesh to Volume Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/mesh_to_volume.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-84002fcd6c5a",
+      "title": "Mirror Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/mirror.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-57354dfd1ebd",
+      "title": "Multiresolution Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/multiresolution.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-64c47650309c",
+      "title": "Remesh Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/remesh.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-3a85773e29a1",
+      "title": "Scatter on Surface Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/scatter_on_surface.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-6d12f4db420c",
+      "title": "Screw Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/screw.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-411617ba04f6",
+      "title": "Skin Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/skin.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-af228ef9e10e",
+      "title": "Solidify Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/solidify.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-c26acfe80cfb",
+      "title": "Subdivision Surface Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/subdivision_surface.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-017196b95b6c",
+      "title": "Triangulate Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/triangulate.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-ce86423971c5",
+      "title": "UV Project Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/modify/uv_project.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-c90d19540b72",
+      "title": "UV Warp Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/modify/uv_warp.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-6fb306384f6e",
+      "title": "Vertex Weight Mix Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/modify/weight_mix.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-c47ac8fb2964",
+      "title": "Vertex Weight Proximity Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/modify/weight_proximity.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-e782ee7c137c",
+      "title": "Volume to Mesh Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/volume_to_mesh.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-213a72bf0515",
+      "title": "Weld Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/weld.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "blender-modifiers-9c7c5a19e36e",
+      "title": "Wireframe Modifier",
+      "collection": "Blender modeling modifiers manual",
+      "publisher": "Blender Foundation",
+      "category": "modeling",
+      "url": "https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/wireframe.html",
+      "topics": [
+        "blender",
+        "3d modeling",
+        "modifiers",
+        "boolean",
+        "solidify",
+        "mirror"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-8990229b19f5",
+      "title": "Assemblies",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/assemblies.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-f7115a9bfa36",
+      "title": "Builders",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/builders.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-07e4563d1e1b",
+      "title": "Import/Export",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/import_export.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-6c316a948a92",
+      "title": "Installation",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/installation.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-db7a765b02e6",
+      "title": "Introduction",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/introduction.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-87202ee19406",
+      "title": "Introductory Examples",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/introductory_examples.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-b379dd3417aa",
+      "title": "Joints",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/joints.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-55c1f9366a1e",
+      "title": "Key Concepts",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/key_concepts.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-dee55662cf4c",
+      "title": "Key Concepts (algebra mode)",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/key_concepts_algebra.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-40a3e6586fa6",
+      "title": "Key Concepts (builder mode)",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/key_concepts_builder.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-e2c506c92386",
+      "title": "Moving Objects",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/moving_objects.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-35cf4859da1c",
+      "title": "Objects",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/objects.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-c70fd33bd9df",
+      "title": "Operations",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/operations.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-2b4887c142ee",
+      "title": "Sheet Metal",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/sheet_metal/index.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-71c937270790",
+      "title": "Tips, Best Practices and FAQ",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/tips.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-58a17d764595",
+      "title": "Topology Selection and Exploration",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/topology_selection.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-4bbc22a91c64",
+      "title": "Transitioning from OpenSCAD",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/OpenSCAD.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "build123d-480f58eb0280",
+      "title": "Tutorials",
+      "collection": "build123d solid modeling manual",
+      "publisher": "build123d Project",
+      "category": "modeling",
+      "url": "https://build123d.readthedocs.io/en/latest/tutorials.html",
+      "topics": [
+        "build123d",
+        "solid",
+        "sketch",
+        "parametric",
+        "assembly"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-5a221f6ea536",
+      "title": "API Reference",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/apireference.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-d6237e2b0ddc",
+      "title": "Assemblies",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/assy.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-9380f2247cda",
+      "title": "CadQuery Class Summary",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/classreference.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-6b971933f55f",
+      "title": "CadQuery Scripts and Object Output",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/fileformat.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-2d94f41203ef",
+      "title": "Concepts",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/primer.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-3071f70fbc04",
+      "title": "Design Principles",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/designprinciples.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-6a93aee912a8",
+      "title": "Examples",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/examples.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-02c8f15690c7",
+      "title": "Extending CadQuery",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/extending.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-7fdeea3d4c98",
+      "title": "Free function API",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/free-func.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-6af6cd7f3007",
+      "title": "Importing and Exporting Files",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/importexport.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-78eae8c316c7",
+      "title": "Installing CadQuery",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/installation.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-1422d343ca98",
+      "title": "Introduction",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/intro.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-9f0d82ae3b83",
+      "title": "QuickStart",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/quickstart.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-2d525e40072f",
+      "title": "Selectors Reference",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/selectors.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-5493962c9a97",
+      "title": "Sketch",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/sketch.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-9c9cbea19445",
+      "title": "The CadQuery Gateway Interface",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/cqgi.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-55494b8445a1",
+      "title": "Visualization",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/vis.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "cadquery-4bc3ab1204ef",
+      "title": "Workplane",
+      "collection": "CadQuery parametric modeling manual",
+      "publisher": "CadQuery Project",
+      "category": "modeling",
+      "url": "https://cadquery.readthedocs.io/en/latest/workplane.html",
+      "topics": [
+        "cadquery",
+        "parametric",
+        "solid",
+        "sketch",
+        "assembly",
+        "step"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-d0e5b9b9360d",
+      "title": "Compiling Grbl",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Compiling-Grbl",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-cc644b9977b6",
+      "title": "Connecting Grbl",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Connecting-Grbl",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-4750fe074aba",
+      "title": "Flashing Grbl to an Arduino",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Flashing-Grbl-to-an-Arduino",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-b4ce569e5ad5",
+      "title": "Frequently Asked Questions",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Frequently-Asked-Questions",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-cecd0edef6b9",
+      "title": "Grbl v1.1 Commands",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Grbl-v1.1-Commands",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-0aeb55cf93cf",
+      "title": "Grbl v1.1 Configuration",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Grbl-v1.1-Configuration",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-597ae7e6dc99",
+      "title": "Grbl v1.1 Interface",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Grbl-v1.1-Interface",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-709f294dbbba",
+      "title": "Grbl v1.1 Jogging",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Grbl-v1.1-Jogging",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-9983cc18bee0",
+      "title": "Known Issues",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Known-Issues",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-0f6284bc8a1d",
+      "title": "Laser Mode",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Grbl-v1.1-Laser-Mode",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-354341ddc1da",
+      "title": "Set up the Homing Cycle",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Set-up-the-Homing-Cycle",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grbl-e92d9129f929",
+      "title": "Two Axis System Considerations",
+      "collection": "Grbl CNC controller documentation",
+      "publisher": "Grbl",
+      "category": "controllers",
+      "url": "https://github.com/gnea/grbl/wiki/Two-Axis-System-Considerations",
+      "topics": [
+        "grbl",
+        "router",
+        "laser",
+        "gcode",
+        "homing",
+        "settings"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-520dd9a6b6a5",
+      "title": "Additional G and M codes",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/Additional-G--and-M-codes",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-1a751650abd0",
+      "title": "Additional or extended settings",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/Additional-or-extended-settings",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-19a580cc64da",
+      "title": "Compatibility level",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/Compatibility-level",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-64bd53392ca1",
+      "title": "Compiling grblHAL",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/Compiling-grblHAL",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-40718c444b00",
+      "title": "Expressions and flow control",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/Expressions-and-flow-control",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-1cdd3bc5d2d4",
+      "title": "First Run Grbl Settings",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/First-Run-Grbl-Settings",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-f22beaf3400e",
+      "title": "For sender developers",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/For-sender-developers",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-d88590fc3e53",
+      "title": "Hardware Abstraction Layer (HAL) developer reference",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/Hardware-Abstraction-Layer-(HAL)----developer-reference",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-de7258f4b9c5",
+      "title": "Jerk acceleration",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/Jerk-acceleration",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-6cf84881abb5",
+      "title": "Manual tool change protocol",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/Manual-tool-change-protocol",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-7eab66d5888b",
+      "title": "Manual, semi automatic and automatic tool change",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/Manual,-semi-automatic-and-automatic-tool-change",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "grblhal-e38903966270",
+      "title": "MPG and DRO interfaces",
+      "collection": "grblHAL CNC controller documentation",
+      "publisher": "grblHAL",
+      "category": "controllers",
+      "url": "https://github.com/grblHAL/core/wiki/MPG-and-DRO-interfaces",
+      "topics": [
+        "grbl",
+        "grblhal",
+        "router",
+        "cnc",
+        "probing"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-27154c41f96f",
+      "title": "Axis Twist Compensation",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Axis_Twist_Compensation.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-37d6ea1e4ab1",
+      "title": "Bed leveling",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Bed_Level.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-881540b1adf3",
+      "title": "Bed Mesh",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Bed_Mesh.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-9a7f8d1e3adc",
+      "title": "BL-Touch",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/BLTouch.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-9087dc23bead",
+      "title": "Commands templates",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Command_Templates.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-52b4f3bf889d",
+      "title": "Configuration checks",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Config_checks.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-7e7edfa1f29a",
+      "title": "Configuration reference",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Config_Reference.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-5b0d20f74f4a",
+      "title": "Contact",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Contact.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-1fd94dba8bc5",
+      "title": "Delta calibration",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Delta_Calibrate.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-44e26405ba20",
+      "title": "Endstop phase",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Endstop_Phase.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-05ab8a48cb7e",
+      "title": "Exclude Objects",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Exclude_Object.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-85e069ebdfbb",
+      "title": "Features",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Features.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-fc8218da0824",
+      "title": "Frequently Asked Questions",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/FAQ.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-bc47a2f0cc04",
+      "title": "Installation",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Installation.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-2bb6093e9a84",
+      "title": "Manual leveling",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Manual_Level.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-fae579c6ad93",
+      "title": "Measuring Resonances",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Measuring_Resonances.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-5ef30892331e",
+      "title": "Multiple Micro-controller Homing and Probing",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Multi_MCU_Homing.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-3204d60810f7",
+      "title": "OctoPrint for Klipper",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/OctoPrint.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-cf0bccbf9ff6",
+      "title": "Overview",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Overview.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-431b3f1e0438",
+      "title": "Pressure advance",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Pressure_Advance.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-1c240290f4ca",
+      "title": "Probe calibration",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Probe_Calibrate.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-06f164e5ef6d",
+      "title": "Resonance Compensation",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Resonance_Compensation.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-07ae13e2df8b",
+      "title": "Rotation distance",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Rotation_Distance.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-cccbe45f5112",
+      "title": "Skew correction",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Skew_Correction.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-c867afb2cbc8",
+      "title": "Slicers",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Slicers.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-983f6af0c603",
+      "title": "Status reference",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Status_Reference.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-664c8c65466a",
+      "title": "TMC drivers",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/TMC_Drivers.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "klipper-5bdf9b9f9a65",
+      "title": "Using PWM tools",
+      "collection": "Klipper setup and calibration guides",
+      "publisher": "Klipper",
+      "category": "printing",
+      "url": "https://www.klipper3d.org/Using_PWM_Tools.html",
+      "topics": [
+        "klipper",
+        "3d printer",
+        "calibration",
+        "bed leveling",
+        "pressure advance"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-c83bf70a59b9",
+      "title": "About LinuxCNC",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/getting-started/about-linuxcnc.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-db7ac8236dca",
+      "title": "AX5214H Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/ax5214h.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-8b0c207a944d",
+      "title": "Canonical Device Interfaces",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/canonical-devices.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-e2b34f5e4ef3",
+      "title": "ClassicLadder Examples",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/ladder/ladder-examples.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-434f1490616d",
+      "title": "ClassicLadder Introduction",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/ladder/ladder-intro.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-75a4a9d0d0f2",
+      "title": "ClassicLadder Programming",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/ladder/classic-ladder.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-6b1a5ce09de4",
+      "title": "CNC Machine Overview",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/gcode/machining-center.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-b24bdf6a7011",
+      "title": "Creating Non-Realtime Python Components",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/halmodule.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-76b26dea7001",
+      "title": "Deutsch",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/de/",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-28b6758458c7",
+      "title": "DH Parameters",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/motion/dh-parameters.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-da8a657a71d1",
+      "title": "Filter Programs",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/gui/filter-programs.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-cb36fa28b180",
+      "title": "G-Code Quick Reference",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/gcode.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-d014f60c8492",
+      "title": "General Mechatronics GM6-PCI Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/gm.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-4cdc170234b0",
+      "title": "Generic GPIO Driver using libgpiod",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/hal_gpio.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-6b90026e6706",
+      "title": "Getting LinuxCNC",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/getting-started/getting-linuxcnc.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-ef3a598cf094",
+      "title": "GS2 Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/gs2.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-01ccd72bcaea",
+      "title": "GS2 Example",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/examples/gs2-example.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-57acdcb50939",
+      "title": "HAL Basics",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/basic-hal.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-e754ec74b4c8",
+      "title": "HAL Component Descriptions",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/rtcomps.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-9d38a123ecd4",
+      "title": "HAL Component Generator",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/comp.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-8c048689bc79",
+      "title": "HAL Component List",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/components.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-afb330dc2fb8",
+      "title": "HAL Core Components",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/core-components.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-c1b448650a55",
+      "title": "HAL Examples",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/hal-examples.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-ea419c431f5a",
+      "title": "HAL Introduction",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/intro.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-39993da24031",
+      "title": "HAL TCL Files",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/haltcl.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-68fe5d8af75f",
+      "title": "HAL Tools",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/tools.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-912f62ac2b08",
+      "title": "HAL Tutorial",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/tutorial.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-e31c774b9843",
+      "title": "HAL Twopass",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/twopass.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-2d9e1507ea84",
+      "title": "HALUI Examples",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/halui-examples.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-80aaa0e0149e",
+      "title": "HALUI, Hardware Abstract Layer User Interface",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/gui/halui.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-41281b3f8d0e",
+      "title": "Homing Configuration",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/ini-homing.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-85e717caacef",
+      "title": "I/O Control V2",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/iov2.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-09e33546cac5",
+      "title": "Important User Concepts",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/user/user-concepts.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-22717461d416",
+      "title": "INI Configuration",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/ini-config.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-264ec025119c",
+      "title": "Integrator Concepts",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/integrator-concepts.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-aefdff9ca785",
+      "title": "Kinematics",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/motion/kinematics.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-f6906b2c8b65",
+      "title": "Latency Test",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/install/latency-test.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-4fdbc5f37799",
+      "title": "Lathe Configuration",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/lathe-config.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-eba4c8ef56cd",
+      "title": "Lathe User Information",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/lathe/lathe-user.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-8c561c4dbff9",
+      "title": "Linux FAQ",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/common/linux-faq.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-1338ba92c141",
+      "title": "LinuxCNC User Introduction",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/user/user-intro.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-93a1d90bb8a2",
+      "title": "Mesa HostMot2 Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/hostmot2.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-3b41e53457be",
+      "title": "Mitsubishi VFD Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/mitsub-vfd.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-05c63be83ed4",
+      "title": "Modbus framework for Mesa cards (superseded)",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/mesa_modbus.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-2078c81f3ace",
+      "title": "Modbus to HAL Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/mb2hal.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-f31ba7b6ebe2",
+      "title": "Motenc Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/motenc.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-15e52a85eca4",
+      "title": "MPG Example",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/examples/mpg.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-ea2b07a8c549",
+      "title": "Opto22 Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/opto22.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-74a9a8a3d515",
+      "title": "Parallel Port Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/hal/parallel-port.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-43565bdf876b",
+      "title": "PCI Parallel Port Example",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/examples/pci-parallel-port.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-2607fa45bf58",
+      "title": "Pico Drivers",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/pico-ppmc.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-6c13fc9b63bb",
+      "title": "Plasma CNC Primer",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/plasma/plasma-cnc-primer.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-19b2adee8f46",
+      "title": "Pluto P Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/pluto-p.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-a3c7417dc625",
+      "title": "PnCconf, Mesa Hardware Configurator",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/pncconf.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-1e68067d8941",
+      "title": "Powermax Modbus Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/pmx485.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-1c78e2b45874",
+      "title": "Raspberry Pi GPIO Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/hal_pi_gpio.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-d45a215b8628",
+      "title": "Running LinuxCNC",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/getting-started/running-linuxcnc.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-e6aaa900eb0b",
+      "title": "Servo To Go Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/servo-to-go.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-2229372d8316",
+      "title": "ShuttleXpress and ShuttlePRO Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/shuttle.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-2729f7bf78e1",
+      "title": "Spindle Control Example",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/examples/spindle.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-6da32e104745",
+      "title": "Starting LinuxCNC",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/user/starting-linuxcnc.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-d17769ba423b",
+      "title": "StepConf, Parallel Port Stepper Configurator",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/stepconf.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-73530693585f",
+      "title": "Stepper Configuration",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/stepper.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-b9f793e56a10",
+      "title": "Stepper Diagnostics",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/stepper-diagnostics.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-d9e196de22e3",
+      "title": "Stepper Quick Start",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/config/stepper-quickstart.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-386d65338ed4",
+      "title": "Stepper Tuning",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/motion/tweaking-steppers.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-a3da5132fb42",
+      "title": "System Requirements",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/getting-started/system-requirements.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-fa487eb8e03e",
+      "title": "Updating LinuxCNC",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/getting-started/updating-linuxcnc.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-2dd376bd261b",
+      "title": "User Foreword",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/user/user-foreword.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "linuxcnc-0b529cbf0ea6",
+      "title": "VFS11 Driver",
+      "collection": "LinuxCNC 2.9 documentation",
+      "publisher": "LinuxCNC",
+      "category": "controllers",
+      "url": "https://linuxcnc.org/docs/2.9/html/drivers/vfs11.html",
+      "topics": [
+        "linuxcnc",
+        "generic",
+        "cnc",
+        "milling",
+        "turning",
+        "configuration"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-8aafff2854cd",
+      "title": "G-code Commands",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-b988fb2394bd",
+      "title": "G0-G1: Linear Move",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G000-G001.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-73d024d87d8e",
+      "title": "G10: Retract",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G010.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-cc03e727bc31",
+      "title": "G11: Recover",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G011.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-f263ea36be33",
+      "title": "G12: Clean the Nozzle",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G012.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-3d0e43d0fd1d",
+      "title": "G17-G19: CNC Workspace Planes",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G017-G019.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-38539d5b2fda",
+      "title": "G2-G3: Arc or Circle Move",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G002-G003.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-9c556907efbf",
+      "title": "G20: Inch Units",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G020.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-d9bd8bffc8d5",
+      "title": "G21: Millimeter Units",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G021.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-1feaa86956e6",
+      "title": "G26: Mesh Validation Pattern",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G026.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-f5574f22ed3a",
+      "title": "G27: Park toolhead",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G027.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-be8f496a2fa6",
+      "title": "G28: Auto Home",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G028.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-c7444c2c707c",
+      "title": "G29: Bed Leveling",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G029.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-45fe093e8718",
+      "title": "G29: Bed Leveling (3-Point)",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G029-abl-3point.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-9c32ec4f766d",
+      "title": "G29: Bed Leveling (Bilinear)",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G029-abl-bilinear.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-132b683f41e7",
+      "title": "G29: Bed Leveling (Linear)",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G029-abl-linear.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-1a4df22e8c3f",
+      "title": "G29: Bed Leveling (Manual)",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G029-mbl.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-79acc75f2498",
+      "title": "G29: Bed Leveling (Unified)",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G029-ubl.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-21b979942757",
+      "title": "G30: Single Z-Probe",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G030.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-d290aafa442c",
+      "title": "G31: Dock Sled",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G031.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-a60336392d26",
+      "title": "G32: Undock Sled",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G032.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-42da45bf45b9",
+      "title": "G33: Delta Auto Calibration",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G033.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-46f495fe5203",
+      "title": "G34: Mechanical Gantry Calibration",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G034-mgc.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-7972a43bfa73",
+      "title": "G34: Z Steppers Auto-Alignment",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G034-zsaa.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-cf41f4fef5f4",
+      "title": "G35: Tramming Assistant",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G035.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-98fd009de708",
+      "title": "G38.2-G38.5: Probe target",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G038.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-0b7402d9f98a",
+      "title": "G4: Dwell",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G004.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-9d9f70e876cd",
+      "title": "G42: Move to mesh coordinate",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G042.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-b7ca777e9bb7",
+      "title": "G425: Backlash and Toolhead Offset Calibration",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G425.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    },
+    {
+      "id": "marlin-d40f8f72d3ef",
+      "title": "G53: Move in Machine Coordinates",
+      "collection": "Marlin G-code reference",
+      "publisher": "Marlin Firmware",
+      "category": "programming",
+      "url": "https://marlinfw.org/docs/gcode/G053.html",
+      "topics": [
+        "marlin",
+        "gcode",
+        "mcode",
+        "3d printer",
+        "additive"
+      ],
+      "kind": "chapter",
+      "access": "public",
+      "language": "en"
+    }
+  ]
+}

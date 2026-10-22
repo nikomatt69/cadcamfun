@@ -65,7 +65,7 @@ export function Shell(props: ShellProps): JSX.Element {
     if (route !== undefined) go(route)
   }
 
-  // The palette lists the shortcuts plus the eight destinations, so `Cmd/Ctrl+K` is a
+  // The palette lists shortcuts and destinations, so `Cmd/Ctrl+K` is a
   // complete keyboard interface on its own.
   const commands = (): ReadonlyArray<PaletteCommand> => {
     const context = {
@@ -92,6 +92,7 @@ export function Shell(props: ShellProps): JSX.Element {
       "cad",
       "cam",
       "library",
+      "manuals",
       "costs",
       "settings",
       "plugins"

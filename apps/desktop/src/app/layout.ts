@@ -8,8 +8,8 @@
 import type { JSX } from "solid-js"
 import type { Component } from "solid-js"
 
-/** The eight destinations in the activity bar, in the order the spec lists them. */
-export type ActivityId = "projects" | "cad" | "cam" | "library" | "costs" | "ai" | "plugins" | "settings"
+/** Destinations available from the shell and command palette. */
+export type ActivityId = "projects" | "cad" | "cam" | "library" | "manuals" | "costs" | "ai" | "plugins" | "settings"
 
 export interface Activity {
   readonly id: ActivityId
@@ -26,6 +26,7 @@ export const ACTIVITIES: ReadonlyArray<Activity> = [
   { id: "cad", route: "/cad", labelKey: "activity.cad", shortcut: "Cmd/Ctrl+1" },
   { id: "cam", route: "/cam", labelKey: "activity.cam", shortcut: "Cmd/Ctrl+2" },
   { id: "library", route: "/library", labelKey: "activity.library", shortcut: undefined },
+  { id: "manuals", route: "/manuals", labelKey: "activity.manuals", shortcut: undefined },
   { id: "costs", route: "/costs", labelKey: "activity.costs", shortcut: undefined },
   { id: "ai", route: "/ai", labelKey: "activity.ai", shortcut: "Cmd/Ctrl+J" },
   { id: "plugins", route: "/plugins", labelKey: "activity.plugins", shortcut: undefined },

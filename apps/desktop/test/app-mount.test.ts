@@ -21,8 +21,8 @@ const concrete = (pattern: string) => pattern.replace(/:\w+/g, "sample-id")
 
 describe("route table", () => {
   // 61 legacy pages plus `/settings/companion` and `/projects/:id/history` (spec 13), which have no legacy counterpart.
-  // Pricing and subscription are hidden while there are no paid plans.
-  test("covers every legacy page", () => { expect(table.length).toBe(61) })
+  // Pricing and subscription are hidden while there are no paid plans. The default manuals catalogue adds one route.
+  test("covers every legacy page and the manuals catalogue", () => { expect(table.length).toBe(62) })
 
   for (const route of table.filter((r) => r.path !== "*")) {
     test(`${route.path} mounts`, async () => {

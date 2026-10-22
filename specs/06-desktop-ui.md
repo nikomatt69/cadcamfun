@@ -1,5 +1,15 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Default manuals catalogue (2026-10-22)
+
+Status: implemented and verified. Owner request: ship a `/manuals` section already populated with many official CNC machine/control manuals, CNC programming references, CAD/CAM and 3D modeling guides. Include FANUC, HEIDENHAIN, Siemens, Haas, Mazak, Okuma, Grbl and LinuxCNC; cover milling, turning, multi-axis machining, tooling, probing, additive manufacturing and supported geometry formats. Generic coding documentation is excluded. Latest owner clarification: documents are consulted on demand from their official sources, not downloaded or bundled in advance. The catalogue itself is included by default and requires no account, project or sidecar call. Opening a document explicitly launches its official URL in the system browser (Tauri) or a new browser tab. Never iframe third-party sites or bypass publisher authentication. Identify complete manuals, chapters, references and portals separately, with account requirements where known.
+
+WP6 owns `features/manuals`, route/page, shell and CAD/CAM quick navigation, command palette, i18n, tests and a metadata-only catalogue refresh script. Refresh reads official documentation indexes, keeps title/URL/publisher/category metadata, and stores no manual bodies, PDFs or offline reader. Existing API/database contracts remain unchanged. Verify broad domain coverage, all exposed controller families, searching/filtering/pagination, explicit source opening, zero document requests on mount, and desktop build. This concrete owner request does not advance unrelated RM steps.
+
+Owner-requested UI consistency: reuse `WorkspacePage`, its toolbar and filter rail, `PANEL`, `FIELD`, `TOOLBAR_BUTTON` and `StageEmpty` from the existing library screens. Feature CSS only arranges document metadata and consumes shell/page tokens; shared components own surfaces, controls, typography, theme behavior and entry motion.
+
+Verification: 343 default entries from 24 publishers in eight categories. The desktop suite passes (852 tests); seven targeted manuals/workstation tests pass after the final shared-UI alignment. Desktop typecheck and Vite production build pass; the generated API reference remains fresh. DOM flows exercise default availability without a sidecar or document fetch, official-link activation, combined filters, pagination, empty states, deep links and shared workspace components. No manual bodies or PDFs are shipped. Refresh with `bun --no-env-file apps/desktop/scripts/refresh-manual-catalogue.ts` to rebuild the metadata index; publisher access restrictions do not remove the curated access points.
+
 ## Subscription provider connections (2026-10-16)
 
 Owner clarification: also provide OpenCode Zen (`opencode`) and Go (`opencode-go`) account-key connections. Their documented account/subscription access uses API keys, not an invented OAuth grant. WP8 owns explicit provider fallbacks and native session headers; WP6 owns console links and key guidance. Preserve models.dev per-model protocol routing. Reference: https://opencode.ai/v2/docs/console/go/ and https://opencode.ai/v2/docs/console/models/.
@@ -88,6 +98,8 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 - Keyboard-only workflow for create project → draw → generate → export works.
 
 ## 5. Change log
+
+- 2026-10-22: shipped the default on-demand CAD/CAM and CNC manuals catalogue (343 entries, 24 publishers), official publisher access labels, metadata-only refresh tooling, search/filter/pagination, and shell/workstation/palette navigation. Reused library workspace components and theme tokens; verified desktop tests, final targeted UI flows, typecheck and production build.
 
 - 2026-10-22: the CAM page registers a program sheet as its visual capture, so the assistant's vision tool sees the CAM in every tab and not only while the 3D preview is on screen. The sheet draws the toolpath (in the machine's own cutting plane), the G-code with its line numbers, the machine and the toolpaths; the preview's capture wins while it is mounted and the sheet travels with it. The layout is pure and the drawing is a canvas pass over it (`features/cam/lib/program-sheet.ts`). Evidence: `apps/desktop/test/cam-vision.test.ts` (8 pass) and desktop typecheck clean.
 
