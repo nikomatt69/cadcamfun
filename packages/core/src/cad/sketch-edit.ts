@@ -105,6 +105,16 @@ export const trimEntity = (sketch: Sketch, id: string, pick: Vec2): Sketch | str
   if (e === undefined) return `'${id}' is not in the sketch`
   const g = geometry(sketch, e)
   if (g === undefined || e.kind === "point") return `'${id}' cannot be trimmed`
+  if (sketch.nominalCurves?.some((curve) => curve.replaces.includes(id))) return `'${id}' is a construction edge of a nominal curve; trim the curve instead`
+  // Construction chords cannot establish where the nominal curve bounds the stretch to remove.
+  const bounds = "seg" in g
+    ? [Math.min(g.seg.a.x, g.seg.b.x), Math.min(g.seg.a.y, g.seg.b.y), Math.max(g.seg.a.x, g.seg.b.x), Math.max(g.seg.a.y, g.seg.b.y)]
+    : [g.round.c.x - g.round.r, g.round.c.y - g.round.r, g.round.c.x + g.round.r, g.round.c.y + g.round.r]
+  for (const curve of sketch.nominalCurves ?? []) {
+    const points = curve.segments.flatMap((segment) => segment.points)
+    const xs = points.map((point) => point[0]!), ys = points.map((point) => point[1]!)
+    if (Math.max(...xs) >= bounds[0]! - EPS && Math.min(...xs) <= bounds[2]! + EPS && Math.max(...ys) >= bounds[1]! - EPS && Math.min(...ys) <= bounds[3]! + EPS) return `trimming '${id}' near a nominal curve needs curve intersections; construction chords cannot be used`
+  }
   const others = sketch.entities.filter((x) => x.id !== id && x.kind !== "point")
   const hits = others.flatMap((o) => cross(g, geometry(sketch, o), true))
   const removed = new Set<string>([id])
@@ -117,7 +127,7 @@ export const trimEntity = (sketch: Sketch, id: string, pick: Vec2): Sketch | str
     const ts = [...new Set(hits.map((p) => Math.round(tOf(p) * 1e9) / 1e9))].filter((t) => t > 1e-7 && t < 1 - 1e-7).sort((a, b) => a - b)
     const tp = Math.max(0, Math.min(1, tOf(pick)))
     const lo = [...ts].reverse().find((t) => t <= tp), hi = ts.find((t) => t >= tp)
-    if (lo === undefined && hi === undefined) return { entities: kept, constraints: withoutIds(sketch.constraints, removed) }
+    if (lo === undefined && hi === undefined) return { ...sketch, entities: kept, constraints: withoutIds(sketch.constraints, removed) }
     const newPts: SketchPoint[] = []
     const pointAt = (t: number): string => {
       const pid = uid({ entities: [...kept, ...newPts], constraints: [] }, "pt")
@@ -132,13 +142,13 @@ export const trimEntity = (sketch: Sketch, id: string, pick: Vec2): Sketch | str
     const used = new Set<string>([...kept, ...pieces].flatMap((x) => (x.kind === "line" ? [x.p1, x.p2] : x.kind === "circle" || x.kind === "arc" ? [x.center] : [])))
     const dropEnds = [l.p1, l.p2].filter((p) => !used.has(p))
     const entities = [...kept.filter((x) => !(x.kind === "point" && dropEnds.includes(x.id))), ...newPts, ...pieces]
-    return { entities, constraints: withoutIds(sketch.constraints, new Set([...removed, ...dropEnds])) }
+    return { ...sketch, entities, constraints: withoutIds(sketch.constraints, new Set([...removed, ...dropEnds])) }
   }
   const r = g.round
   const rel = (p: Vec2) => norm(angleOf(r.c, p) - r.a0)
   const cuts = [...new Set(hits.map((p) => Math.round(rel(p) * 1e9) / 1e9))].filter((t) => e.kind === "circle" || (t > 1e-7 && t < r.span - 1e-7)).sort((a, b) => a - b)
   if (cuts.length === 0 || (e.kind === "circle" && cuts.length < 2)) {
-    return e.kind === "circle" && cuts.length === 1 ? "a circle needs two crossings to trim" : { entities: kept, constraints: withoutIds(sketch.constraints, removed) }
+    return e.kind === "circle" && cuts.length === 1 ? "a circle needs two crossings to trim" : { ...sketch, entities: kept, constraints: withoutIds(sketch.constraints, removed) }
   }
   const tp = rel(pick)
   const centreId = e.kind === "circle" ? e.center : (e as SketchArc).center
@@ -163,7 +173,7 @@ export const trimEntity = (sketch: Sketch, id: string, pick: Vec2): Sketch | str
     if (lo !== undefined) arc(a.start, add(lo))
     if (hi !== undefined) arc(add(hi), a.end)
   }
-  return { entities: [...kept, ...newPts, ...arcs], constraints: withoutIds(sketch.constraints, removed) }
+  return { ...sketch, entities: [...kept, ...newPts, ...arcs], constraints: withoutIds(sketch.constraints, removed) }
 }
 
 /**
@@ -175,6 +185,9 @@ export const extendLine = (sketch: Sketch, id: string, end: "p1" | "p2", target:
   if (e === undefined || e.kind !== "line") return `'${id}' is not a line of the sketch`
   const t = sketch.entities.find((x) => x.id === target)
   if (t === undefined || t.kind === "point") return `'${target}' is not an entity to extend to`
+  const pid = end === "p1" ? e.p1 : e.p2
+  const replaced = new Set(sketch.nominalCurves?.flatMap((curve) => curve.replaces))
+  if (replaced.has(id) || replaced.has(target) || sketch.entities.some((entity) => entity.kind === "line" && replaced.has(entity.id) && (entity.p1 === pid || entity.p2 === pid))) return `extending '${id}' would use or modify nominal-curve construction geometry`
   const a = at(sketch, e.p1), b = at(sketch, e.p2)
   const moving = end === "p1" ? a : b, fixed = end === "p1" ? b : a
   const dir = { x: moving.x - fixed.x, y: moving.y - fixed.y }
@@ -190,6 +203,5 @@ export const extendLine = (sketch: Sketch, id: string, end: "p1" | "p2", target:
     .sort((x, y) => x.s - y.s)
   if (hits.length === 0) return `line '${id}' does not reach '${target}' when extended`
   const to = hits[0]!.p
-  const pid = end === "p1" ? e.p1 : e.p2
-  return { entities: sketch.entities.map((x) => (x.kind === "point" && x.id === pid ? { ...x, x: to.x, y: to.y } : x)), constraints: sketch.constraints }
+  return { ...sketch, entities: sketch.entities.map((x) => (x.kind === "point" && x.id === pid ? { ...x, x: to.x, y: to.y } : x)) }
 }

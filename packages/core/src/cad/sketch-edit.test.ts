@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { entityIntersections, extendLine, trimEntity } from "./sketch-edit.ts"
 import type { Sketch, SketchEntity } from "./sketch.ts"
+import { ellipseCurves } from "./sketch-curves.ts"
+import { expandSketch } from "./sketch-shapes.ts"
 
 const pt = (id: string, x: number, y: number): SketchEntity => ({ id, kind: "point", x, y })
 const line = (id: string, p1: string, p2: string): SketchEntity => ({ id, kind: "line", p1, p2 })
@@ -74,5 +76,30 @@ describe("extend", () => {
     const r2 = extendLine(s, "h", "p2", "k") as Sketch
     near(pos(r2, "b").x, 10)
     expect(extendLine(s, "h", "p1", "v")).toBe("line 'h' does not reach 'v' when extended")
+  })
+})
+
+describe("editing beside nominal curves", () => {
+  const nominal: Sketch = {
+    ...cross,
+    nominalCurves: [{ id: "ellipse", replaces: [], segments: ellipseCurves({ x: 100, y: 100 }, 3, 1), closed: true, start: "e0", end: "e0" }]
+  }
+
+  test("trimming and extending unrelated geometry retain the nominal curve", () => {
+    const trimmed = trimEntity(nominal, "h", { x: 1, y: 0 }) as Sketch
+    expect(trimmed.nominalCurves).toBe(nominal.nominalCurves)
+    const extended = extendLine({ ...nominal, entities: [...nominal.entities, pt("g", 20, -5), pt("i", 20, 5), line("v3", "g", "i")] }, "h", "p2", "v3") as Sketch
+    expect(extended.nominalCurves).toBe(nominal.nominalCurves)
+    near(pos(extended, "b").x, 20)
+  })
+
+  test("nominal construction chords and endpoints cannot be edited as independent lines", () => {
+    const expanded = expandSketch({ entities: [], constraints: [], shapes: [{ id: "e", kind: "ellipse", at: [0, 0], radiusX: 3, radiusY: 1, segments: 8 }] }, (value) => Number(value))
+    const sketch: Sketch = { ...expanded, constraints: [], entities: [...expanded.entities, pt("x", 20, -5), pt("y", 20, 5), line("target", "x", "y"), pt("a", -5, 0), pt("b", 5, 0), line("crossing", "a", "b"), line("attached", "a", "e.v0")] }
+    expect(trimEntity(sketch, "e.l0", { x: 2.9, y: 0.1 })).toContain("construction edge")
+    expect(trimEntity(sketch, "crossing", { x: 0, y: 0 })).toContain("curve intersections")
+    expect(extendLine(sketch, "e.l0", "p1", "target")).toContain("construction geometry")
+    expect(extendLine(sketch, "attached", "p2", "target")).toContain("construction geometry")
+    expect(extendLine(sketch, "crossing", "p2", "e.l0")).toContain("construction geometry")
   })
 })

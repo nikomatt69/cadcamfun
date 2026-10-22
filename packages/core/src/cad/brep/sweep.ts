@@ -31,6 +31,25 @@ export interface Profile {
 export const segmentStart = (s: ProfileSegment): Vec2 => segmentPoint(s, 0)
 export const segmentEnd = (s: ProfileSegment): Vec2 => segmentPoint(s, 1)
 
+/** Rigid planar placement, including reflections. NURBS keep their knots and weights under the affine map. */
+export const mapProfileLoop = (loop: ProfileLoop, m: readonly [number, number, number, number], shift: Vec2): ProfileLoop => {
+  if (![...m, shift.x, shift.y].every(Number.isFinite) || Math.abs(m[0] ** 2 + m[1] ** 2 - 1) > 1e-9 || Math.abs(m[2] ** 2 + m[3] ** 2 - 1) > 1e-9 || Math.abs(m[0] * m[2] + m[1] * m[3]) > 1e-9) throw new RangeError("profile placement needs a finite rigid planar map")
+  const f = (p: Vec2): Vec2 => ({ x: shift.x + m[0] * p.x + m[1] * p.y, y: shift.y + m[2] * p.x + m[3] * p.y })
+  const det = m[0] * m[3] - m[1] * m[2]
+  return loop.map((s): ProfileSegment => {
+    if (s.kind === "line") return { kind: "line", a: f(s.a), b: f(s.b) }
+    if (s.kind === "arc") {
+      const center = f(s.center), startPoint = f(segmentStart(s))
+      const start = Math.atan2(startPoint.y - center.y, startPoint.x - center.x)
+      return { ...s, center, start, end: start + (s.end - s.start) * Math.sign(det) }
+    }
+    return { kind: "nurbs", data: { ...s.data, points: s.data.points.map((point) => {
+      const p = f({ x: point[0]!, y: point[1]! })
+      return [p.x, p.y]
+    }) } }
+  })
+}
+
 /** Point at fraction `f` of the segment. */
 export const segmentPoint = (s: ProfileSegment, f: number): Vec2 => {
   switch (s.kind) {

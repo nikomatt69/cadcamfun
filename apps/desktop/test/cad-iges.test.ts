@@ -1,11 +1,14 @@
 /** External reader oracle: an internal writer/reader round-trip can share a wire-format mistake. */
 import { expect, test, setDefaultTimeout } from "bun:test"
 import { createRequire } from "node:module"
-import { brep } from "@cadcamfun/core"
+import { brep, model, rebuildExact, type History } from "@cadcamfun/core"
 setDefaultTimeout(120_000)
 interface ImportedMesh { attributes: { position: { array: number[] } }; index: { array: number[] } }
 interface Imported { success: boolean; meshes: ImportedMesh[] }
-interface Occt { ReadIgesFile(content: Uint8Array, parameters: Record<string, unknown>): Imported }
+interface Occt {
+  ReadIgesFile(content: Uint8Array, parameters: Record<string, unknown>): Imported
+  ReadStepFile(content: Uint8Array, parameters: Record<string, unknown>): Imported
+}
 const volume = (meshes: ImportedMesh[]): number => {
   let v = 0
   for (const mesh of meshes) {
@@ -32,5 +35,28 @@ test("OpenCascade reads IGES primitive and drilled-part geometry at the expected
     expect(imported.meshes.length).toBeGreaterThan(0)
     const expected = brep.massProperties(shape).volume
     expect(Math.abs(volume(imported.meshes) - expected) / expected).toBeLessThan(0.002)
+  }
+})
+
+test("OpenCascade reads nominal ellipse and Bezier STEP exports at their analytic volumes", async () => {
+  const factory = createRequire(import.meta.url)("occt-import-js") as () => Promise<Occt>
+  const occt = await factory()
+  const ellipse = model(), slender = model(), bezier = model(), revolve = model(), sweep = model()
+  ellipse.extrude(ellipse.sketch("XY").ellipse([0, 0], 12, 6, { segments: 8 }), { depth: 4 })
+  slender.extrude(slender.sketch("XY").ellipse([3, -2], 80, 2), { depth: 3 })
+  bezier.extrude(bezier.sketch("XY").curve("bezier", [[0, 0], [4, 8], [8, 8], [12, 0]], { chord: true, divisions: 4 }), { depth: 2 })
+  revolve.revolve(revolve.sketch("XY").ellipse([3, 10], 2, 1), { axis: "x" })
+  sweep.sweep(sweep.sketch("XY").ellipse([0, 0], 3, 1), sweep.sketch("YZ").path([[0, 0], [0, 10]]))
+  const cases: ReadonlyArray<readonly [History, number]> = [
+    [ellipse.build(), Math.PI * 12 * 6 * 4], [slender.build(), Math.PI * 80 * 2 * 3], [bezier.build(), 96],
+    [revolve.build(), 40 * Math.PI ** 2], [sweep.build(), Math.PI * 3 * 10]
+  ]
+  for (const [history, expected] of cases) {
+    const shape = rebuildExact(history).bodies[0]!.brep!
+    const text = brep.writeStepBreps([{ name: "Nominal curves", brep: shape }])
+    const imported = occt.ReadStepFile(new TextEncoder().encode(text), { linearUnit: "millimeter", linearDeflectionType: "absolute_value", linearDeflection: 0.001, angularDeflection: 0.05 })
+    expect(imported.success).toBe(true)
+    expect(imported.meshes.length).toBeGreaterThan(0)
+    expect(Math.abs(volume(imported.meshes) - expected) / expected).toBeLessThan(0.001)
   }
 })

@@ -22,6 +22,9 @@ const centre = (b: Brep, fi: number): Vec3 => {
   return n === 0 ? { x: 0, y: 0, z: 0 } : { x: x / n, y: y / n, z: z / n }
 }
 
+/** The centre of a face: the mean of its edge midpoints (a point on the face, for a selection or a report). */
+export const faceCentre = (b: Brep, fi: number): Vec3 => centre(b, fi)
+
 export const uniqueFaceNames = (b: Brep): Brep => {
   const groups = new Map<string, number[]>()
   b.faces.forEach((f, i) => { if (f.name !== undefined) groups.set(f.name, [...(groups.get(f.name) ?? []), i]) })

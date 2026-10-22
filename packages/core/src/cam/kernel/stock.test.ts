@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { remainingVolume, removeTipPath, voxelStock, type Cutter } from "./index.ts"
+import { carryHeightField, remainingVolume, removeTipPath, voxelStock, type Cutter } from "./index.ts"
+import { HeightField } from "../verify/heightfield.ts"
 
 const flat: Cutter = { id: "t", name: "t", kind: "flat", diameter: 10, flutes: 3, material: "carbide", coating: "altin", fluteLength: 22, shankDiameter: 10, stickout: 40 }
 
@@ -90,5 +91,54 @@ describe("volumetric stock", () => {
     expect(sure).toBeGreaterThan(0)
     expect(missedPossible).toBe(0)
     expect(missedSure).toBe(0)
+  })
+})
+
+describe("carrying a 3-axis predecessor's removal onto the voxel stock (K5)", () => {
+  /** A height field over [0,10]x[0,10] with 1 mm cells, its columns lowered to `top`. */
+  const field = (top: number): HeightField => {
+    const hf = new HeightField(10, 10, 0, 0, 10, 10, 0, 20)
+    hf.top.fill(top)
+    return hf
+  }
+
+  test("material the predecessor cut away is gone; material it left is untouched", () => {
+    // A 20 x 20 x 20 grid of 2 mm voxels, the columns cut down to z = 8 by the 3-axis predecessor.
+    const voxels = voxelStock({ x: 0, y: 0, z: 0 }, { x: 20, y: 20, z: 20 }, 2)
+    carryHeightField(voxels, field(8))
+    const remaining = remainingVolume(voxels)
+    // Definitely left: z in [0, 8] over 20 x 20 mm = 3200 mm³. Possibly left: the 6..8 band straddles the cut, so +2 voxels layers.
+    expect(remaining.lower).toBeCloseTo(20 * 20 * 8, 6)
+    expect(remaining.upper).toBeCloseTo(20 * 20 * 10, 6)
+    // Every surely-removed voxel is also possibly removed, and nothing under the cut was touched.
+    for (let k = 0; k < voxels.nz; k++) for (let j = 0; j < voxels.ny; j++) for (let i = 0; i < voxels.nx; i++) {
+      const id = (k * voxels.ny + j) * voxels.nx + i
+      if (voxels.removedSure[id] === 1) expect(voxels.removedPossible[id]).toBe(1)
+      // Voxel centres below z = 8 lie under the remaining material and must stay stock in both tests.
+      if (voxels.origin.z + (k + 0.5) * 2 <= 8) expect(voxels.removedSure[id]).toBe(0)
+    }
+  })
+
+  test("the carry only tightens the bracket downwards and never loosens an existing removal", () => {
+    const voxels = voxelStock({ x: 0, y: 0, z: 0 }, { x: 20, y: 20, z: 20 }, 2)
+    // A rotary cut already removed a layer; carrying a height field must not hand that material back.
+    removeTipPath(voxels, flat, [{ x: 10, y: 10, z: 18 }, { x: 10, y: 10, z: 12 }])
+    const beforeSure = Uint8Array.from(voxels.removedSure), beforePossible = Uint8Array.from(voxels.removedPossible)
+    carryHeightField(voxels, field(14))
+    for (let id = 0; id < voxels.material.length; id++) {
+      if (beforeSure[id] === 1) expect(voxels.removedSure[id]).toBe(1)
+      if (beforePossible[id] === 1) expect(voxels.removedPossible[id]).toBe(1)
+    }
+    // And the carry never claims more than the height field proved: a voxel that is not sure above every column stays possible-only.
+    const remaining = remainingVolume(voxels)
+    expect(remaining.lower).toBeLessThanOrEqual(20 * 20 * 14)
+    expect(remaining.upper).toBeGreaterThanOrEqual(remaining.lower)
+  })
+
+  test("an untouched height field (no 3-axis predecessor) leaves the voxel stock at the raw box", () => {
+    // The top of a fresh height field is its ceiling; carrying it marks nothing, so five-axis-only jobs keep their prior bracket.
+    const voxels = voxelStock({ x: 0, y: 0, z: 0 }, { x: 20, y: 20, z: 20 }, 2)
+    carryHeightField(voxels, field(20))
+    expect(remainingVolume(voxels)).toEqual({ lower: 20 * 20 * 20, upper: 20 * 20 * 20 })
   })
 })

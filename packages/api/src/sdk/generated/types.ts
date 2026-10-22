@@ -1424,6 +1424,7 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly coolant?: "off" | "flood" | "mist"
         readonly radialEngagement?: number
         readonly strategy: "multiaxis"
+        readonly mode?: "parallel" | "contour"
         readonly top: number
         readonly angle?: number
         readonly toolAxis?: "normal" | "lead"

@@ -61,7 +61,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cad.parametric_inspect` (was `cad_parametric`) | read | — | elementId* | handler `parametric` → `apps/sidecar/src/services/ai.ts:672` | yes | declared | action-inputs-cad.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-drawing.test.ts |
 | `cad.parametric_test` (was `cad_parametric`) | read | — | elementId*, cases* | handler `parametric` → `apps/sidecar/src/services/ai.ts:672` | yes | declared | action-inputs-cad.test.ts, assistant-controls.test.ts, fusion-modelling.test.ts, ai-parametric-acceptance.test.ts |
 | `cad.parametric_dfm` (was `cad_parametric`) | read | — | elementId, history, process, toolDiameter, material, minWall, envelope | handler `parametric` → `apps/sidecar/src/services/ai.ts:672` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
-| `cad.parametric_exact` (was `cad_parametric`) | read | — | elementId, history, includeStep, name | handler `parametric` → `apps/sidecar/src/services/ai.ts:672` | yes | declared | action-inputs-cad.test.ts |
+| `cad.parametric_exact` (was `cad_parametric`) | read | — | elementId, history, includeStep, name | handler `parametric` → `apps/sidecar/src/services/ai.ts:672` | yes | declared | action-inputs-cad.test.ts, parametric-exact.test.ts |
 | `cad.exact` | read | — | ids, machining | handler `cadExact` → `apps/sidecar/src/services/ai.ts:534` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad.assembly` | read | — | washers | handler `cadAssembly` → `apps/sidecar/src/services/ai.ts:541` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad.shell` | read | — | id*, thickness*, open, wallByFace | handler `cadShell` → `apps/sidecar/src/services/ai.ts:548` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
@@ -305,7 +305,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `drawings-and-images` | cad | 2381 | cad, cad_edit, parts |
 | `plugin-authoring` | dev | 1659 | — |
 | `parametric-design` | cad | 6985 | cad, cad_edit, parts, vcs_edit |
-| `fusion-360-modelling` | cad | 10501 | cad, cad_edit, cam, parts |
+| `fusion-360-modelling` | cad | 10749 | cad, cad_edit, cam, parts |
 | `composed-cam-programs` | cam | 5740 | cam, cam_edit, library, parts |
 | `version-control-cadcam` | vcs | 1671 | vcs, vcs_edit, agent |
 | `workflows-cadcam` | workflows | 1468 | cam, vcs_edit |

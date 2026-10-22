@@ -56,12 +56,16 @@ describe("the machine's coolant", () => {
 })
 
 describe("the machine's magazine", () => {
-  test("a program needing more tools than the magazine holds is reported", () => {
+  test("a program needing more tools than the magazine holds is blocked and fails its machine claim", () => {
     const machine = withMachine({ toolCapacity: 1 })
     const run = runJob(job(machine))
     expect(run.status).toBe("ok")
     if (run.status !== "ok") throw new Error("the run must finish")
     expect(run.value.issues.some((issue) => issue.message.includes("magazine"))).toBe(true)
+    expect(run.value.tools.length).toBeGreaterThan(machine.toolCapacity!)
+    expect(run.value.release).toBe("blocked")
+    expect(run.value.claims.find((claim) => claim.id === "machine-limits")?.status).toBe("failed")
+    expect(run.value.claims.find((claim) => claim.id === "machine-limits")?.detail).toContain("magazine")
   })
 
   test("a magazine big enough for the program is not reported", () => {
@@ -70,6 +74,8 @@ describe("the machine's magazine", () => {
     expect(run.status).toBe("ok")
     if (run.status !== "ok") throw new Error("the run must finish")
     expect(run.value.issues.some((issue) => issue.message.includes("magazine"))).toBe(false)
+    expect(run.value.release).toBe("verified-program")
+    expect(run.value.claims.find((claim) => claim.id === "machine-limits")?.status).toBe("passed")
   })
 })
 

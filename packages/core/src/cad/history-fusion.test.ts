@@ -39,8 +39,9 @@ describe("parametric sketch shapes", () => {
     expect(area(slab([{ id: "p", kind: "polygon", at: [0, 0], sides: 6, radius: R }]))).toBeCloseTo((3 * Math.sqrt(3) / 2) * R * R, 2)
     // `flats` measures to the middle of a side: the apothem of an octagon of apothem 10 gives n r^2 tan(pi / n).
     expect(area(slab([{ id: "p", kind: "polygon", at: [0, 0], sides: 8, radius: 10, flats: true }]))).toBeCloseTo(8 * 100 * Math.tan(Math.PI / 8), 2)
-    const a = 20, b = 8, n = 48
-    expect(area(slab([{ id: "e", kind: "ellipse", at: [0, 0], radiusX: a, radiusY: b }]))).toBeCloseTo(0.5 * n * a * b * Math.sin((2 * Math.PI) / n), 2)
+    const a = 20, b = 8
+    // Display geometry follows the nominal ellipse within its 0.01 mm chord budget, rather than a fixed 48-gon.
+    expect(Math.abs(area(slab([{ id: "e", kind: "ellipse", at: [0, 0], radiusX: a, radiusY: b }])) - Math.PI * a * b)).toBeLessThan(2 * Math.PI * a * 0.01)
   })
 
   test("a polygon's rotation turns it and its radius can be an expression", () => {

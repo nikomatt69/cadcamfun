@@ -29,8 +29,14 @@ export const EXACT_ACTION_BUDGET_MS = 60_000
  */
 export const exactReport = (history: History, result: ReturnType<typeof rebuild>, budgetMs = REPORT_EXACT_BUDGET_MS) => {
   const round = (x: number, d = 4) => Math.round(x * 10 ** d) / 10 ** d
+  let warnings: ReadonlyArray<string> = []
   try {
-    return brep.withBudget(budgetMs, () => exactSummary(rebuildExact(history, result))).map((b) =>
+    const exact = brep.withBudget(budgetMs, () => {
+      const replay = rebuildExact(history, result)
+      warnings = replay.warnings
+      return exactSummary(replay)
+    })
+    const bodies = exact.map((b) =>
       b.exact
         ? {
             id: b.id, exact: true, valid: b.valid, volumeMm3: round(b.volume!), areaMm2: round(b.area!),
@@ -39,8 +45,9 @@ export const exactReport = (history: History, result: ReturnType<typeof rebuild>
           }
         : { id: b.id, exact: false, reason: b.reason }
     )
+    return { bodies, warnings }
   } catch (error) {
-    return result.bodies.map((b) => ({ id: b.id, exact: false, reason: `exact model failed: ${error instanceof Error ? error.message : String(error)}` }))
+    return { bodies: result.bodies.map((b) => ({ id: b.id, exact: false, reason: `exact model failed: ${error instanceof Error ? error.message : String(error)}` })), warnings }
   }
 }
 
@@ -56,8 +63,10 @@ const computeParametricReport = (history: History) => {
     }
   }
   const finite = Number.isFinite(volume) && (result.bodies.length === 0 || Object.values({ ...min, maxX: max.x, maxY: max.y, maxZ: max.z }).every(Number.isFinite))
+  const exact = exactReport(history, result)
   return {
-    exact: exactReport(history, result),
+    exact: exact.bodies,
+    warnings: exact.warnings,
     ok: finite && result.bodies.length > 0 && volume > 0 && !result.issues.some((i) => i.severity === "error"),
     parameters: result.parameters, bodyCount: result.bodies.length, volumeMm3: finite ? volume : null,
     bounds: result.bodies.length > 0 && finite ? { min, max } : null,

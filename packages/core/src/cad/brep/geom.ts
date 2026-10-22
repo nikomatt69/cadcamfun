@@ -129,9 +129,16 @@ const newtonCurve = (c: Curve3, p: Vec3, t0: number, a: number, b: number, perio
     const r = sub3(C, p)
     const f = dot3(r, d1)
     const df = dot3(d1, d1) + dot3(r, d2)
-    if (df <= 0) break
-    let next = t - f / df
-    next = periodic ? wrap(next, a, b - a) : clamp(next, a, b)
+    // A coarse seed at a flat ellipse's end can have negative curvature of squared distance while the minimum lies
+    // inside the interval. Use a descent step there; even a Newton step must reduce distance before it is accepted.
+    const step = df > 0 ? -f / df : -Math.sign(f) * (b - a) / 32
+    const distance2 = dot3(r, r)
+    let next = t
+    for (let scale = 1; scale >= 1 / 65536; scale /= 2) {
+      const candidate = periodic ? wrap(t + step * scale, a, b - a) : clamp(t + step * scale, a, b)
+      const delta = sub3(curvePoint(c, candidate), p)
+      if (dot3(delta, delta) <= distance2) { next = candidate; break }
+    }
     if (Math.abs(next - t) < 1e-14 * Math.max(1, Math.abs(t))) { t = next; break }
     t = next
   }

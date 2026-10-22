@@ -57118,6 +57118,13 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "minimum": -85,
                               "type": "number",
                             },
+                            "mode": {
+                              "enum": [
+                                "parallel",
+                                "contour",
+                              ],
+                              "type": "string",
+                            },
                             "name": {
                               "maxLength": 120,
                               "type": "string",

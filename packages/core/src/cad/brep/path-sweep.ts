@@ -9,8 +9,8 @@ import { add3, cross3, dot3, length3, normalize3, scale3, sub3 } from "../vec.ts
 import { convexCell } from "./blend.ts"
 import { booleanBrep } from "./boolean.ts"
 import { sewSolids } from "./sew.ts"
-import { applyPoint, frame, rotation, type Vec2, type Vec3 } from "./math.ts"
-import { extrudeProfile, normalizeProfile, revolveProfile, segmentPoint, type Profile, type ProfileLoop, type ProfileSegment } from "./sweep.ts"
+import { applyPoint, frame, rotation, type Vec3 } from "./math.ts"
+import { extrudeProfile, mapProfileLoop, normalizeProfile, revolveProfile, segmentPoint, type Profile } from "./sweep.ts"
 import type { Brep } from "./topology.ts"
 
 export type PathPiece =
@@ -46,21 +46,6 @@ export interface PathSweepOptions {
   /** The path closes on itself (its last point is its first); every joint, the closing one included, is mitred. */
   readonly closed?: boolean
   readonly name?: string
-}
-
-/** Maps profile coordinates (along x, y) through a 2x2 linear map that is a rotation or a reflection. */
-const mapLoop = (loop: ProfileLoop, m: readonly [number, number, number, number], shift: Vec2): ProfileLoop => {
-  const f = (p: Vec2): Vec2 => ({ x: shift.x + m[0] * p.x + m[1] * p.y, y: shift.y + m[2] * p.x + m[3] * p.y })
-  const det = m[0] * m[3] - m[1] * m[2]
-  return loop.map((s): ProfileSegment => {
-    if (s.kind === "line") return { kind: "line", a: f(s.a), b: f(s.b) }
-    if (s.kind === "arc") {
-      const c = f(s.center), a = f(segmentPoint(s, 0))
-      const start = Math.atan2(a.y - c.y, a.x - c.x)
-      return { kind: "arc", center: c, radius: s.radius, start, end: start + (s.end - s.start) * Math.sign(det) }
-    }
-    throw new RangeError("A spline in the profile has no exact sweep yet")
-  })
 }
 
 /**
@@ -116,7 +101,7 @@ export const sweepPath = (profile: Profile, start: PathFrame, path: ReadonlyArra
       const L = pieceLength(p)
       // Profile x along the frame's x; y along y when (x, y, tangent) is right-handed, mirrored otherwise.
       const hand = dot3(cross3(t, F.x), F.y) >= 0 ? 1 : -1
-      const placed = { loops: loops.map((l) => mapLoop(l, [1, 0, 0, hand], { x: 0, y: 0 })) }
+      const placed = { loops: loops.map((l) => mapProfileLoop(l, [1, 0, 0, hand], { x: 0, y: 0 })) }
       let solid = extrudeProfile(placed, L + e0 + e1, { placement: frame(sub3(p.a, scale3(t, e0)), t, F.x), name: `${options.name ?? "sweep"}.${i}` })
       if (before !== undefined || after !== undefined) {
         const big = L + e0 + e1 + 2 * reach + 10
@@ -141,7 +126,7 @@ export const sweepPath = (profile: Profile, start: PathFrame, path: ReadonlyArra
     const radial = normalize3(sub3(p.from, p.center))
     const r = length3(sub3(p.from, p.center))
     const m: [number, number, number, number] = [dot3(F.x, radial), dot3(F.y, radial), dot3(F.x, p.axis), dot3(F.y, p.axis)]
-    const placed = { loops: loops.map((l) => mapLoop(l, m, { x: r, y: 0 })) }
+    const placed = { loops: loops.map((l) => mapProfileLoop(l, m, { x: r, y: 0 })) }
     for (const l of placed.loops) for (const s of l) for (let k = 0; k <= 8; k++) if (segmentPoint(s, k / 8).x <= 1e-9) throw new RangeError("A bend of the sweep path is tighter than the profile")
     pieces.push(revolveProfile(placed, p.angle, { origin: p.center, axis: p.axis, radial, name: `${options.name ?? "sweep"}.${i}` }))
   })

@@ -85,7 +85,7 @@ const shape = Schema.Union([
     Schema.Struct({ id, kind: Schema.Literal("polygon"), at: pair, sides: intBetween(3, 64), radius: dimension, flats: optional(Schema.Boolean), rotation: optional(dimension) }),
     "Regular polygon: radius to the corners (to the sides when flats), rotation in degrees."
   ),
-  described(Schema.Struct({ id, kind: Schema.Literal("ellipse"), at: pair, radiusX: dimension, radiusY: dimension, segments: optional(intBetween(8, 200)) }), "Ellipse drawn as straight chords (default 48)."),
+  described(Schema.Struct({ id, kind: Schema.Literal("ellipse"), at: pair, radiusX: dimension, radiusY: dimension, segments: optional(intBetween(8, 200)) }), "Nominal ellipse with exact rational profile curves. segments (default 48) controls legacy construction vertices/edges for constraints; display sampling follows its chord tolerance."),
   described(Schema.Struct({ id, kind: Schema.Literal("slot"), at: pair, length: dimension, width: dimension, angle: optional(dimension) }), "Slot: at = middle, length end to end (must exceed width), angle in degrees."),
   described(Schema.Struct({ id, kind: Schema.Literal("polyline"), points: between(Schema.Array(pair), 3, 200) }), "Any closed outline: points [x, y] in order; every coordinate may be an expression."),
   described(
@@ -233,12 +233,12 @@ const feature = Schema.Union([
     "Solid text (capitals, digits, punctuation of a single-stroke font). Emboss: operation union, plane at the face (offset), direction up. Engrave: operation subtract, direction down. at = lower-left corner, or the centre with align centre. height = cap height."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("pushpull"), near: triple, normal: optional(triple), distance: dimension, body: optional(id) }),
-    "Press Pull: move the planar face of a body nearest the point near along its outward normal by distance (positive grows the body, negative cuts into it). normal restricts to faces facing that way (use it to choose between the top and bottom face at the same point). A face with holes keeps them. A curved face (a boss side, a hole wall, a fillet with the faces tangent to it) is offset along its normals: a cylinder changes radius by distance; pulling a hole wall further than its radius is refused."
+    Schema.Struct({ id, type: Schema.Literal("pushpull"), near: triple, name: optional(id), normal: optional(triple), distance: dimension, body: optional(id) }),
+    "Press Pull: move one planar face along its outward normal by distance (positive grows the body, negative cuts into it). name is the exact face name (e.g. plate.top): that face is moved, and near is only a hint that may be stale after an edit. A name that no longer exists is an error, never a nearby face. Without name, the planar face nearest near is taken. normal restricts to faces facing that way (use it to choose between the top and bottom face at the same point). A face with holes keeps them. A curved face (a boss side, a hole wall, a fillet with the faces tangent to it) is offset along its normals: a cylinder changes radius by distance; pulling a hole wall further than its radius is refused."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("draft"), near: triple, normal: optional(triple), angle: dimension, pull: optional(triple), neutral: optional(dimension), body: optional(id) }),
-    "Draft of ONE planar face of any body (Fusion Draft): the face nearest the point near is tilted by angle degrees (-45..45) about its hinge, where it meets the neutral plane (pull . p = neutral; pull defaults to [0,0,1], neutral to 0). Positive angle: above the neutral plane the wall leans inward (material removed), below it outward (added). One feature per face; faces square to the pull direction are refused. A curved face (a boss, a hole wall) is drafted too, one way only: put neutral at its base or top (a cylinder becomes a cone). Use extrude.taper when the whole extrusion is drafted."
+    Schema.Struct({ id, type: Schema.Literal("draft"), near: triple, name: optional(id), normal: optional(triple), angle: dimension, pull: optional(triple), neutral: optional(dimension), body: optional(id) }),
+    "Draft of ONE planar face of any body (Fusion Draft): name is the exact face (e.g. plate.side0.0) and near is then only a hint; a name that no longer exists is an error, never a nearby face. Without name, the face nearest the point near is tilted by angle degrees (-45..45) about its hinge, where it meets the neutral plane (pull . p = neutral; pull defaults to [0,0,1], neutral to 0). Positive angle: above the neutral plane the wall leans inward (material removed), below it outward (added). One feature per face; faces square to the pull direction are refused. A curved face (a boss, a hole wall) is drafted too, one way only: put neutral at its base or top (a cylinder becomes a cone). Use extrude.taper when the whole extrusion is drafted."
   ),
   described(
     Schema.Struct({

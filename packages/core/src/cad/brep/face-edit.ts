@@ -63,20 +63,45 @@ export const planarFaceFrame = (b: Brep, pick: PlanarFacePick): FaceFrame | stri
 export interface PushPullOptions extends FaceQuery {
   /** Out of the body (positive) or into it (negative), along the face's normal. */
   readonly distance: number
+  /**
+   * The face to push or pull, when the caller already knows it (a named reference): the face is then the named one, never
+   * the nearest one to `near`, whose point may be stale after an edit.
+   */
+  readonly face?: number
+}
+
+/** The pick of a face the caller knows: its plane, its outward normal and its in-plane axes. */
+const pickOfFace = (b: Brep, fi: number): PlanarFacePick | undefined => {
+  const f = b.faces[fi]
+  if (f === undefined || f.surface.kind !== "plane") return undefined
+  const F = f.surface.frame
+  const n = f.reversed ? scale3(F.z, -1) : F.z
+  return { face: fi, origin: F.origin, normal: n, u: F.x, v: cross3(n, F.x), distance: 0 }
 }
 
 /** The body with one planar face pushed out or pulled in, or why it cannot be. */
 export const pushPullFace = (b: Brep, o: PushPullOptions): Brep | string => {
   if (o.distance === 0) return b
-  const found = nearestFace(b, o)
-  if (found === undefined) return "no planar face near the given point"
-  if (!("pick" in found)) return "a push/pull of a curved face has no exact model yet"
-  const { pick } = found
+  let pick: PlanarFacePick | undefined
+  if (o.face !== undefined) {
+    pick = pickOfFace(b, o.face)
+    if (pick === undefined) return "the named face is not a planar face of this body"
+  } else {
+    const found = nearestFace(b, o)
+    if (found === undefined) return "no planar face near the given point"
+    if (!("pick" in found)) return "a push/pull of a curved face has no exact model yet"
+    pick = found.pick
+  }
   const profile = faceProfile(b, pick)
   if (typeof profile === "string") return profile
   const n = pick.normal
-  const prism = (from: number, to: number): Brep =>
-    extrudeProfile({ loops: profile }, to - from, { placement: frame(add3(pick.origin, scale3(n, from)), n, pick.u), name: "pushpull" })
+  // The moved face keeps its name: a later feature can still refer to it (the pushed face is the prism's far end).
+  const original = b.faces[pick.face]!.name
+  const prism = (from: number, to: number): Brep => {
+    const solid = extrudeProfile({ loops: profile }, to - from, { placement: frame(add3(pick.origin, scale3(n, from)), n, pick.u), name: "pushpull" })
+    if (original === undefined) return solid
+    return { ...solid, faces: solid.faces.map((face) => face.name === "pushpull.top" ? { ...face, name: original } : face) }
+  }
   // The overlap the mesh rebuild gives its tool, so the Boolean meets a volume and not a face.
   const margin = 0.01
   try {

@@ -15,7 +15,8 @@
  * caller's back.
  */
 import { dimensionValue, type Dimension } from "./expr.ts"
-import { ellipseLoopPoints, polygonArea, sketchProfiles, splinePoints, type Sketch } from "./sketch.ts"
+import { polygonArea, sketchProfiles, type Sketch } from "./sketch.ts"
+import { catmullRomCurves, ellipseCurves } from "./sketch-curves.ts"
 import { add3, cross3, dot3, length3, normalize3, scale3, sub3 } from "./vec.ts"
 import { cornersOf, rebuild, type Feature, type History, type PlaneName, type RebuildResult } from "./history.ts"
 import { sheetOutline, thickenPath, withHems, withEdgeFlanges, edgeFlangeReliefs } from "./sheet-metal.ts"
@@ -28,6 +29,8 @@ import {
   booleanBrep,
   BooleanError,
   uniqueFaceNames,
+  faceByName,
+  faceCentre,
   brepLocator,
   compose,
   edgePointAt,
@@ -44,6 +47,7 @@ import {
   loftBrep,
   loftSection,
   loopArea,
+  mapProfileLoop,
   type LoftSegment,
   mateTransform,
   nearestFace,
@@ -62,6 +66,7 @@ import {
   segmentEnd,
   segmentPoint,
   segmentStart,
+  reverseSegment,
   selectBlendEdges,
   treatLoopCorners,
   tessellateBrep,
@@ -112,36 +117,39 @@ export const exactSketchLoops = (sketch: Sketch): { readonly loops: ProfileLoop[
     if (p === undefined) throw new RangeError(`'${id}' is not a point of the sketch`)
     return p
   }
-  interface Piece { readonly a: string; readonly b: string; readonly seg: ProfileSegment }
+  interface Piece { readonly a: string; readonly b: string; readonly segments: ReadonlyArray<ProfileSegment> }
   const pieces: Piece[] = []
   const loops: ProfileLoop[] = []
+  const replaced = new Set(sketch.nominalCurves?.flatMap((curve) => curve.replaces))
+  for (const curve of sketch.nominalCurves ?? []) {
+    const segments = curve.segments.map((data): ProfileSegment => ({ kind: "nurbs", data }))
+    if (curve.closed) loops.push(segments)
+    else pieces.push({ a: curve.start, b: curve.end, segments })
+  }
   for (const e of sketch.entities) {
-    if (e.kind === "line") pieces.push({ a: e.p1, b: e.p2, seg: { kind: "line", a: at(e.p1), b: at(e.p2) } })
+    if (replaced.has(e.id)) continue
+    if (e.kind === "line") pieces.push({ a: e.p1, b: e.p2, segments: [{ kind: "line", a: at(e.p1), b: at(e.p2) }] })
     else if (e.kind === "arc") {
       const c = at(e.center), s = at(e.start), t = at(e.end)
       const a0 = Math.atan2(s.y - c.y, s.x - c.x)
       let sweep = Math.atan2(t.y - c.y, t.x - c.x) - a0
       while (sweep <= 1e-12) sweep += 2 * Math.PI
-      pieces.push({ a: e.start, b: e.end, seg: { kind: "arc", center: c, radius: Math.hypot(s.x - c.x, s.y - c.y), start: a0, end: a0 + sweep } })
+      pieces.push({ a: e.start, b: e.end, segments: [{ kind: "arc", center: c, radius: Math.hypot(s.x - c.x, s.y - c.y), start: a0, end: a0 + sweep }] })
     } else if (e.kind === "circle") loops.push([{ kind: "arc", center: at(e.center), radius: e.radius, start: 0, end: 2 * Math.PI }])
-    // Ellipses and closed splines have no analytic profile segment in this kernel: the exact loop carries the same
-    // sampled chords the mesh is cut from, so the two views agree by construction.
     else if (e.kind === "ellipse") {
-      const ring = ellipseLoopPoints(at(e.center), e.radiusX, e.radiusY, e.rotation ?? 0)
-      loops.push(ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! })))
-    } else if (e.kind === "spline" && e.closed === true) {
-      const ring = splinePoints(e.points.map(at), true)
-      if (ring.length > 1 && Math.hypot(ring[0]!.x - ring[ring.length - 1]!.x, ring[0]!.y - ring[ring.length - 1]!.y) < 1e-9) ring.pop()
-      loops.push(ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! })))
+      loops.push(ellipseCurves(at(e.center), e.radiusX, e.radiusY, e.rotation ?? 0).map((data) => ({ kind: "nurbs", data })))
+    } else if (e.kind === "spline") {
+      const segments = catmullRomCurves(e.points.map(at), e.closed === true).map((data): ProfileSegment => ({ kind: "nurbs", data }))
+      if (e.closed === true) loops.push(segments)
+      else pieces.push({ a: e.points[0]!, b: e.points[e.points.length - 1]!, segments })
     }
   }
-  const reverse = (s: ProfileSegment): ProfileSegment => (s.kind === "line" ? { kind: "line", a: s.b, b: s.a } : s.kind === "arc" ? { ...s, start: s.end, end: s.start } : s)
   const used = new Set<number>()
   let open = 0
   for (let i = 0; i < pieces.length; i++) {
     if (used.has(i)) continue
     used.add(i)
-    const chain: ProfileSegment[] = [pieces[i]!.seg]
+    const chain: ProfileSegment[] = [...pieces[i]!.segments]
     const start = pieces[i]!.a
     let head = pieces[i]!.b
     while (head !== start) {
@@ -150,7 +158,7 @@ export const exactSketchLoops = (sketch: Sketch): { readonly loops: ProfileLoop[
       used.add(next)
       const p = pieces[next]!
       const forward = p.a === head
-      chain.push(forward ? p.seg : reverse(p.seg))
+      chain.push(...(forward ? p.segments : [...p.segments].reverse().map(reverseSegment)))
       head = forward ? p.b : p.a
     }
     if (head === start) loops.push(chain)
@@ -214,8 +222,6 @@ type Exact = { readonly brep: Brep; readonly reason?: undefined } | { readonly b
 const ok = (brep: Brep): Exact => ({ brep })
 const no = (reason: string): Exact => ({ reason })
 
-const unionAll = (parts: ReadonlyArray<Brep>): Brep => parts.slice(1).reduce((acc, b) => booleanBrep(acc, b, "union").brep, parts[0]!)
-
 type SketchFrame = { readonly origin: Vec3; readonly u: Vec3; readonly v: Vec3; readonly n: Vec3 }
 const onFrame = (F: SketchFrame, p: Vec2): Vec3 => ({ x: F.origin.x + F.u.x * p.x + F.v.x * p.y, y: F.origin.y + F.u.y * p.x + F.v.y * p.y, z: F.origin.z + F.u.z * p.x + F.v.z * p.y })
 
@@ -225,6 +231,7 @@ const onFrame = (F: SketchFrame, p: Vec2): Vec3 => ({ x: F.origin.x + F.u.x * p.
  * anything else (several chains, a spline) is the reason.
  */
 export const exactSketchPath = (sketch: Sketch, F: SketchFrame): { readonly pieces: PathPiece[]; readonly closed: boolean } | string => {
+  if ((sketch.nominalCurves?.length ?? 0) > 0 || sketch.entities.some((entity) => entity.kind === "spline" || entity.kind === "ellipse")) return "an exact sweep path currently supports lines and circular arcs; nominal spline and ellipse paths need a general curve sweep"
   const pts = new Map<string, Vec2>()
   for (const e of sketch.entities) if (e.kind === "point") pts.set(e.id, { x: e.x, y: e.y })
   const at = (id: string): Vec2 => pts.get(id)!
@@ -579,6 +586,13 @@ export const rebuildExact = (history: History, given?: RebuildResult, options: {
 const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
   const result = given ?? rebuild(history)
   const warnings: string[] = []
+  let featureId = "history"
+  const combine = (a: Brep, b: Brep, operation: "union" | "subtract" | "intersect"): Brep => {
+    const combined = booleanBrep(a, b, operation)
+    warnings.push(...combined.warnings.map((warning) => `${featureId}: ${warning}`))
+    return combined.brep
+  }
+  const unionAll = (parts: ReadonlyArray<Brep>): Brep => parts.slice(1).reduce((acc, b) => combine(acc, b, "union"), parts[0]!)
   // Why the replay stopped early (its time budget ran out), for the bodies it never reached.
   let stopped: string | undefined
   const values = result.parameters
@@ -607,7 +621,7 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
     if (a.brep === undefined) return a
     if (b.brep === undefined) return b
     try {
-      return ok(booleanBrep(a.brep, b.brep, op).brep)
+      return ok(combine(a.brep, b.brep, op))
     } catch (e) {
       if (e instanceof BudgetExceeded) throw e
       return no(e instanceof BooleanError ? `exact ${op} failed: ${e.message}${e.diagnostic !== undefined ? ` (${e.diagnostic.stage}: ${e.diagnostic.hint})` : ""}` : String(e))
@@ -647,6 +661,7 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
 
   for (const f of history.features) {
     if (failed.has(f.id)) continue
+    featureId = f.id
     try {
       checkBudget()
       switch (f.type) {
@@ -719,18 +734,8 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
           const samples = loop0.flatMap((s) => [segmentPoint(s, 0), segmentPoint(s, 0.5)])
           if (samples.every((p) => side(dirA, p) <= 1e-6)) dirA = { x: -dirA.x, y: -dirA.y }
           const n2 = { x: -dirA.y, y: dirA.x }
-          const map = (p: Vec2): Vec2 => ({ x: Math.max(0, (p.x - a0.x) * n2.x + (p.y - a0.y) * n2.y), y: (p.x - a0.x) * dirA.x + (p.y - a0.y) * dirA.y })
           // (radial, axial) coordinates are a reflection of the sketch's: arcs change their sense.
-          const mapped: ProfileLoop = loop0.map((s): ProfileSegment => {
-            if (s.kind === "line") return { kind: "line", a: map(s.a), b: map(s.b) }
-            if (s.kind === "arc") {
-              const c = map(s.center)
-              const ps = map(segmentPoint(s, 0))
-              const a1 = Math.atan2(ps.y - c.y, ps.x - c.x)
-              return { kind: "arc", center: c, radius: s.radius, start: a1, end: a1 - (s.end - s.start) }
-            }
-            return s
-          })
+          const mapped = mapProfileLoop(loop0, [n2.x, n2.y, dirA.x, dirA.y], { x: -a0.x * n2.x - a0.y * n2.y, y: -a0.x * dirA.x - a0.y * dirA.y })
           const P = sk.frame
           const w = (p: Vec2): Vec3 => ({ x: P.origin.x + P.u.x * p.x + P.v.x * p.y, y: P.origin.y + P.u.y * p.x + P.v.y * p.y, z: P.origin.z + P.u.z * p.x + P.v.z * p.y })
           const o3 = w(a0)
@@ -1061,7 +1066,7 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
             const pieces = profilesOfLoops(ex.loops).map((p) => {
               const [outer, ...holes] = p.loops
               let piece = extrudeProfile({ loops: [offsetLoop(outer!, t)] }, z1 - z0, { placement: at(z0), name: `${f.id}.cavity` })
-              for (const h of holes) piece = booleanBrep(piece, extrudeProfile({ loops: [offsetLoop(h, -t)] }, z1 - z0 + 2, { placement: at(z0 - 1), name: `${f.id}.wall` }), "subtract").brep
+              for (const h of holes) piece = combine(piece, extrudeProfile({ loops: [offsetLoop(h, -t)] }, z1 - z0 + 2, { placement: at(z0 - 1), name: `${f.id}.wall` }), "subtract")
               return piece
             })
             cavity = unionAll(pieces)
@@ -1075,13 +1080,29 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
         }
         case "draft": {
           // The face nearest `near` among the candidate bodies (the mesh rebuild's choice); a curved one leans by moving its
-          // vertices in the mesh rebuild, which has no exact counterpart yet.
-          const near = { x: dim(f.near[0]), y: dim(f.near[1]), z: dim(f.near[2]) }
-          const hint = f.normal === undefined ? undefined : { x: dim(f.normal[0]), y: dim(f.normal[1]), z: dim(f.normal[2]) }
+          // vertices in the mesh rebuild, which has no exact counterpart yet. A named face is that face, and `near` is only a hint.
+          let near = { x: dim(f.near[0]), y: dim(f.near[1]), z: dim(f.near[2]) }
+          let hint = f.normal === undefined ? undefined : { x: dim(f.normal[0]), y: dim(f.normal[1]), z: dim(f.normal[2]) }
           const raw = f.pull === undefined ? { x: 0, y: 0, z: 1 } : { x: dim(f.pull[0]), y: dim(f.pull[1]), z: dim(f.pull[2]) }
           const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
+          let pool = candidates
+          if (f.name !== undefined) {
+            let named: { body: (typeof bodies)[number]; face: number } | undefined
+            for (const b of candidates) {
+              if (b.exact.brep === undefined) continue
+              const face = faceByName(b.exact.brep, f.name)
+              if (face !== undefined) { named = { body: b, face }; break }
+            }
+            if (named === undefined) {
+              for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no(`the face '${f.name}' does not exist any more`) }
+              break
+            }
+            near = faceCentre(named.body.exact.brep!, named.face)
+            hint = undefined
+            pool = [named.body]
+          }
           let chosen: { body: (typeof bodies)[number]; distance: number; planar: boolean } | undefined
-          for (const b of candidates) {
+          for (const b of pool) {
             if (b.exact.brep === undefined) continue
             const closest = brepLocator(b.exact.brep).closest(near)
             const planar = closest.face !== undefined && b.exact.brep.faces[closest.face]!.surface.kind === "plane"
@@ -1290,7 +1311,7 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
             for (const relief of reliefs) for (const [z0, z1] of [[from - 1, from + relief.inset], [from + width - relief.inset, from + width + 1]]) {
               const R = frame({ x: F.origin.x + F.n.x * z0!, y: F.origin.y + F.n.y * z0!, z: F.origin.z + F.n.z * z0! }, F.n, F.u)
               const cut = extrudeProfile({ loops: [relief.outline.map((a, i) => ({ kind: "line" as const, a, b: relief.outline[(i + 1) % relief.outline.length]! }))] }, z1! - z0!, { placement: R })
-              solid = booleanBrep(solid, cut, "subtract").brep
+              solid = combine(solid, cut, "subtract")
             }
           } catch (e) {
             unsupported(f, e instanceof Error ? e.message : String(e))
@@ -1333,7 +1354,7 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
               return extrudeProfile({ loops: [loop] }, depth, { placement, name: f.id })
             })
             solid = pieces.slice(1).reduce((acc, p) => {
-              try { return booleanBrep(acc, p, "union").brep } catch { return mergeBreps([acc, p]) }
+              try { return combine(acc, p, "union") } catch { return mergeBreps([acc, p]) }
             }, pieces[0]!)
           } catch (e) {
             unsupported(f, e instanceof Error ? e.message : String(e))
@@ -1379,6 +1400,23 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
           const hint = f.normal === undefined ? undefined : { x: dim(f.normal[0]), y: dim(f.normal[1]), z: dim(f.normal[2]) }
           const query = { near, ...(hint !== undefined ? { normal: hint } : {}) }
           const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
+          // A named face is the one that is moved: the point it was authored with may be stale after an edit, and a name
+          // that no longer exists is reported rather than replaced by a nearby face.
+          if (f.name !== undefined) {
+            let target: { body: (typeof bodies)[number]; face: number } | undefined
+            for (const b of candidates) {
+              if (b.exact.brep === undefined) continue
+              const face = faceByName(b.exact.brep, f.name)
+              if (face !== undefined) { target = { body: b, face }; break }
+            }
+            if (target === undefined) {
+              for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no(`the face '${f.name}' does not exist any more`) }
+              break
+            }
+            const pushed = pushPullFace(target.body.exact.brep!, { ...query, distance, face: target.face })
+            bodies[bodies.indexOf(target.body)] = { ...target.body, exact: typeof pushed === "string" ? no(pushed) : ok(pushed) }
+            break
+          }
           // The body whose face is nearest (the mesh rebuild's choice); a body without an exact model could have been it.
           if (candidates.length > 1 && candidates.some((b) => b.exact.brep === undefined)) {
             for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no("the pushed face may lie on a body without an exact model") }
@@ -1503,6 +1541,8 @@ export interface HistoryStep {
   readonly step?: string
   readonly exported: ReadonlyArray<string>
   readonly skipped: ReadonlyArray<{ readonly id: string; readonly reason: string }>
+  /** Recovery and approximation diagnostics from the exact replay, including any operand displacement. */
+  readonly warnings: ReadonlyArray<string>
 }
 
 /** The exact bodies of a history as a STEP file, one product per body (`name` alone for a single body). */
@@ -1510,5 +1550,5 @@ export const historyToStep = (history: History, name = "part", options: StepWrit
   const ex = rebuildExact(history)
   const parts = ex.bodies.filter((b) => b.brep !== undefined).map((b) => ({ name: ex.bodies.length === 1 ? name : `${name}-${b.id}`, brep: b.brep! }))
   const skipped = ex.bodies.filter((b) => b.brep === undefined).map((b) => ({ id: b.id, reason: b.reason ?? "no exact model" }))
-  return parts.length === 0 ? { exported: [], skipped } : { step: writeStepBreps(parts, options), exported: parts.map((p) => p.name), skipped }
+  return parts.length === 0 ? { exported: [], skipped, warnings: ex.warnings } : { step: writeStepBreps(parts, options), exported: parts.map((p) => p.name), skipped, warnings: ex.warnings }
 }

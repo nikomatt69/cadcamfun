@@ -5,7 +5,7 @@ import { meshVolume } from "./solid.ts"
 import { buildRecipe } from "./recipes.ts"
 import { rebuildExact } from "./history-brep.ts"
 import { model } from "./script.ts"
-import { massProperties, validateBrep } from "./brep/index.ts"
+import { faceCentre, massProperties, validateBrep } from "./brep/index.ts"
 
 setDefaultTimeout(60_000)
 
@@ -212,6 +212,37 @@ describe("exact replay of a parametric history", () => {
     expect(rel(exactVolume(bored([pp([5, 5, 6], 3)])), (1000 - 16 * PI) * 9)).toBeLessThan(1e-9)
     // The bore's wall is curved: said, not approximated.
     expect(rebuildExact(bored([pp([24, 12.5, 3], 1)])).bodies[0]!.reason).toContain("curved face")
+  })
+
+  test("a named push/pull moves that face when the point is stale, and a missing name is an error", () => {
+    // The point sits on the +X side. The name still moves the top, which a nearest-face pick would not.
+    const named: Feature = { id: "pp", type: "pushpull", name: "plate.top", near: [40, 12.5, 3], distance: 4 }
+    const grown = rebuildExact(plate([named]))
+    expect(grown.result.issues.filter((i) => i.severity === "error")).toEqual([])
+    expect(rel(massProperties(grown.bodies[0]!.brep!).volume, 40 * 25 * 10)).toBeLessThan(1e-9)
+    expect(rel(meshVolume(grown.result.bodies[0]!.mesh), 40 * 25 * 10)).toBeLessThan(1e-6)
+    // The same point, unnamed, grows the side it actually lies on.
+    const side: Feature = { id: "pp", type: "pushpull", near: [40, 12.5, 3], distance: 4 }
+    expect(rel(exactVolume(plate([side])), 44 * 25 * 6)).toBeLessThan(1e-9)
+    const missing = rebuildExact(plate([{ id: "pp", type: "pushpull", name: "plate.missing", near: [20, 12.5, 6], distance: 4 }]))
+    expect(missing.bodies[0]!.reason).toBeUndefined()
+    expect(rel(massProperties(missing.bodies[0]!.brep!).volume, 6000)).toBeLessThan(1e-9)
+    expect(missing.result.issues.some((i) => i.feature === "pp" && i.severity === "error" && i.message.includes("does not exist"))).toBe(true)
+    expect(rel(meshVolume(missing.result.bodies[0]!.mesh), 6000)).toBeLessThan(1e-6)
+  })
+
+  test("a named draft tilts that face when the point lies on another, and a missing name leaves the plate", () => {
+    const plain = rebuildExact(plate()).bodies[0]!.brep!
+    const plusX = plain.faces.findIndex((f, i) => f.name?.startsWith("plate.side") === true && faceCentre(plain, i).x > 39)
+    const sideName = plain.faces[plusX]!.name!
+    const k = Math.tan((5 * PI) / 180)
+    const named: Feature = { id: "lean", type: "draft", name: sideName, near: [20, 12.5, 6], angle: 5, neutral: 0 }
+    const drafted = rebuildExact(plate([named]))
+    expect(drafted.result.issues.filter((i) => i.severity === "error")).toEqual([])
+    expect(rel(massProperties(drafted.bodies[0]!.brep!).volume, 6000 - 25 * (36 * k) / 2)).toBeLessThan(1e-9)
+    const missing = rebuildExact(plate([{ id: "lean", type: "draft", name: "plate.missing", near: [40, 12.5, 3], normal: [1, 0, 0], angle: 5, neutral: 0 }]))
+    expect(missing.result.issues.some((i) => i.feature === "lean" && i.message.includes("does not exist"))).toBe(true)
+    expect(rel(massProperties(missing.bodies[0]!.brep!).volume, 6000)).toBeLessThan(1e-9)
   })
 
   test("a mate lays one body's face on another's exactly: opposed normals, centres of area together, offset, slide and spin", () => {

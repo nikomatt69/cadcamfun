@@ -6092,6 +6092,25 @@ var RADIAN_LOOKALIKES = [Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, 3 *
 // packages/core/src/cad/expr.ts
 var UNITS = { mm: 1, cm: 10, m: 1000, in: 25.4, deg: Math.PI / 180, rad: 1 };
 var CONSTANTS = { pi: Math.PI, e: Math.E, tau: 2 * Math.PI };
+// packages/core/src/cad/brep/math.ts
+var glCache = new Map;
+var TRIANGLE_RULE = (() => {
+  const out = [];
+  const push3 = (a, w) => {
+    const b = (1 - a) / 2;
+    out.push([a, b, b, w], [b, a, b, w], [b, b, a, w]);
+  };
+  const push6 = (a, b, w) => {
+    const c = 1 - a - b;
+    out.push([a, b, c, w], [a, c, b, w], [b, a, c, w], [b, c, a, w], [c, a, b, w], [c, b, a, w]);
+  };
+  out.push([1 / 3, 1 / 3, 1 / 3, 0.144315607677787]);
+  push3(0.081414823414554, 0.095091634267285);
+  push3(0.65886138449648, 0.103217370534718);
+  push3(0.898905543365938, 0.032458497623198);
+  push6(0.008394777409958, 0.263112829634638, 0.027230314174435);
+  return out;
+})();
 // packages/core/src/cad/csg.ts
 var EMPTY = { positions: new Float32Array(0), indices: new Uint32Array(0) };
 // packages/core/src/cad/profile-shape.ts
@@ -6193,26 +6212,6 @@ var METRIC_THREADS = [
   t(24, 3, 21, 25, 26, 28, 36, 24, 40, 25.5, 43),
   t(30, 3.5, 26.5, 31, 33, 35, 45, 30, 50, 32, 54)
 ];
-// packages/core/src/cad/brep/math.ts
-var glCache = new Map;
-var TRIANGLE_RULE = (() => {
-  const out = [];
-  const push3 = (a, w) => {
-    const b = (1 - a) / 2;
-    out.push([a, b, b, w], [b, a, b, w], [b, b, a, w]);
-  };
-  const push6 = (a, b, w) => {
-    const c = 1 - a - b;
-    out.push([a, b, c, w], [a, c, b, w], [b, a, c, w], [b, c, a, w], [c, a, b, w], [c, b, a, w]);
-  };
-  out.push([1 / 3, 1 / 3, 1 / 3, 0.144315607677787]);
-  push3(0.081414823414554, 0.095091634267285);
-  push3(0.65886138449648, 0.103217370534718);
-  push3(0.898905543365938, 0.032458497623198);
-  push6(0.008394777409958, 0.263112829634638, 0.027230314174435);
-  return out;
-})();
-
 // packages/core/src/cad/brep/geom.ts
 var TAU2 = Math.PI * 2;
 var gridCache = new WeakMap;
@@ -6231,24 +6230,19 @@ var faceMeshes = new WeakMap;
 var TAU4 = 2 * Math.PI;
 var brepMeshCache = new WeakMap;
 var parametricCache = new Map;
-
-// packages/core/src/cad/history.ts
-var PRIMITIVE_MAY_BE_ZERO = new Set(["holeDiameter", "phiStart"]);
-// packages/core/src/cad/sketch-edit.ts
-var TAU5 = Math.PI * 2;
 // packages/core/src/cad/brep/primitives.ts
-var TAU6 = Math.PI * 2;
+var TAU5 = Math.PI * 2;
 // packages/core/src/cad/brep/sweep.ts
-var TAU7 = Math.PI * 2;
+var TAU6 = Math.PI * 2;
 var CORNER_TURN2 = 10 * Math.PI / 180;
 // packages/core/src/cad/brep/step.ts
 var SOLID_KINDS = new Set(["MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS", "SHELL_BASED_SURFACE_MODEL", "FACETED_BREP"]);
 // packages/core/src/cad/brep/boolean.ts
-var TAU8 = Math.PI * 2;
+var TAU7 = Math.PI * 2;
 var VOLUMES = new WeakMap;
 var SETS = new WeakMap;
 // packages/core/src/cad/brep/features.ts
-var TAU9 = 2 * Math.PI;
+var TAU8 = 2 * Math.PI;
 var MAX_GAP = Math.PI / 3;
 // packages/core/src/cad/brep/shell.ts
 var CROSS = 1 + 0.000001;
@@ -6264,6 +6258,10 @@ var CRC_TABLE = (() => {
   return t;
 })();
 // packages/core/src/cad/brep/iges.ts
+var TAU9 = Math.PI * 2;
+// packages/core/src/cad/history.ts
+var PRIMITIVE_MAY_BE_ZERO = new Set(["holeDiameter", "phiStart"]);
+// packages/core/src/cad/sketch-edit.ts
 var TAU10 = Math.PI * 2;
 // packages/core/src/cad/kinematics.ts
 var RAD = Math.PI / 180;
@@ -8675,6 +8673,7 @@ var OperationSpecSchema = Union2([
   Struct({
     ...overrides,
     strategy: Literal2("multiaxis"),
+    mode: optionalKey2(MultiaxisStrategySchema),
     top: Finite,
     stepover: positive2,
     angle: optionalKey2(Finite),

@@ -1,5 +1,128 @@
 # 33 — CAD and CAM kernel gap analysis (Fusion 360 / hyperMILL reference)
 
+## Owner-authorized completion increment (2026-10-22)
+
+The owner accepted the current-source reclassification and requests implementation of the actual gaps, with regression
+protection. This section preserves that request across sessions. It is a concrete continuation of this kernel scope, not a
+claim that an RM step or commercial parity is complete. Historical inventories below are evidence of past states, not a
+current missing-feature list. Read the source and this ledger before resuming.
+
+Verified starting point: clean HEAD `9dbbb5c`; 2,416 core tests passed. A subsequent focused remeasurement passed 20 tests
+and reproduced the issues below. Existing STEP/healing, IGES, 3-axis carried-stock rest, adaptive stay-down links, scallop,
+variable straight-edge fillets, assembly loops and GD&T must remain functional. The tolerance budget is informational in
+the current public contract; its value is not measured physical error. A refusal is evidence of an unsupported capability,
+not implementation of that capability.
+
+### Scope and acceptance ledger
+
+- **K0 — correctness fixes (closed).** The magazine-capacity error is now collected before the claims and the release
+  assessment, so a 3-tool job on a 1-tool magazine returns `release: "blocked"` and a failed `machine-limits` claim naming
+  the magazine. A tangent-hole Boolean recovery keeps its provenance: the parametric rebuild reports
+  `bore: degenerate alignment: the second operand was displaced by 5.2e-5 mm …`, `historyToStep` carries the same warnings
+  beside an exported valid body, and the assistant's `cad.parametric_exact` contract has an optional `warnings` field (older
+  results without it stay decodable). Evidence: `packages/core/src/cad/history-recovery.test.ts`,
+  `packages/core/src/cam/kernel/machine-claims.test.ts`, `packages/ai/test/parametric-exact.test.ts`.
+- **K1 — nominal curves (closed for the named families).** Shape expansion keeps the historical construction entity ids and
+  constraints and attaches runtime-only nominal curve provenance to the solved sketch; the display sampler and the exact
+  profile adapter consume the same geometry. An ellipse is four rational quadratic Bézier spans (an exact conic), a Bezier
+  or NURBS keeps its knots, a spline keeps the sketcher's uniform Catmull-Rom law as cubic spans. Measured: the builder's
+  12 x 6 mm ellipse extrudes to 6 exact faces (4 extrusion + 2 planes) with the analytic volume to 1e-7 mm³, its display
+  profile stays within the 0.01 mm chord budget, a parameter edit keeps the nominal curve (0.25, 12 and 80 mm radii), a cubic
+  Bezier profile has its analytic area, a revolution and a straight sweep keep the nominal profile, and the independent
+  OpenCascade reader reads the STEP of an ellipse, a slender ellipse, a Bezier, a revolution and a sweep at their analytic
+  volumes (within 0.1 %). Refusals replace approximations: a nominal curve used as a sweep path is refused with an explicit
+  reason instead of silently using the construction chords, and trim/extend refuse to edit construction geometry while
+  keeping the nominal curve of unrelated geometry. Fixed on the way: the Newton projection of a curve now takes a descent
+  step where the squared distance has negative curvature, which had dropped faces of a slender ellipse from the
+  triangulation. Evidence: `packages/core/src/cad/sketch-curves.test.ts`,
+  `packages/core/src/cad/history-nominal-curves.test.ts`, `packages/core/src/cad/sketch-edit.test.ts`,
+  `apps/desktop/test/cad-iges.test.ts`.
+- **K2 — general blends (first family closed).** The concave circular rim between an outward spherical cap and a plane is now
+  a blend candidate and is blended with an exact rolling-circle construction: the section is the meridian of the rolling
+  circle and of the remaining sphere, revolved, so both contact circles are exact and no tangent Boolean is needed. Measured:
+  the fillet surface is a torus, the two contact circles have matching normals to 1e-9, the volume equals the analytic
+  sectional volume (the plane, the rolling circle and the sphere) for cap depths above and below the equator and under an
+  arbitrary rigid placement, the shell is valid, and STEP reads it back with the same volume. Refusals stay explicit: a rim
+  that reaches another boundary of the support, a chamfer of this family, a trimmed cap and an interacting blend are refused
+  with their reason and leave the body unchanged. The parametric history uses this native result for the derived mesh (the
+  exact prefix plus a checked tessellation), so viewport and CAM no longer keep the old sharp rim; other selections keep
+  the previous mesh blend path. Evidence: `packages/core/src/cad/brep/blend-sphere-plane.test.ts`,
+  `packages/core/src/cad/history-curved-fillet.test.ts`. The coaxial cone/plane foot is the same kind of result: the revolved
+  rolling ball is an exact torus, the added volume matches the analytic section, a fillet wider than the cone face is refused,
+  and the parametric history derives the mesh from that solid (`packages/core/src/cad/brep/blend-cone-plane.test.ts`). Still
+  open in K2: a rim between two curved faces, tangent chains, blend junctions and the general rolling-ball law (the existing
+  variable fillet keeps its circular cross-section law).
+- **K3 — surface modeling (pending).** General trimming curves and normal-offset/thickening of curved patches, with a
+  controlled geometric error, self-intersection handling and checked topology. Existing rectangular/isoparametric trim,
+  planar normal thickening and explicit curved axial thickening stay supported. General normal offsets need not be
+  rational NURBS exactly; approximation must meet a declared tolerance rather than silently change the requested geometry.
+- **K4 — general multiaxis execution (first increment closed).** The multiaxis operation now carries an explicit
+  `mode: "parallel" | "contour"` from the shared operation schema through the HTTP and assistant contracts into the kernel:
+  omitting it keeps the previous parallel generation and the same NC bytes, the two modes produce distinct NC, and an
+  unknown mode fails decoding. The contour strategy no longer joins reachable contact samples across an unreachable
+  interval: it retracts and starts a new section, so the path never cuts through a gap. Required contact samples that were
+  unreachable or never cleared the part are counted and make `part-coverage` unresolved with that count, so a program with
+  uncovered regions cannot read as complete coverage. Evidence: `packages/core/src/cam/kernel/five-axis-job.test.ts`,
+  `packages/core/test/cam/five-axis.test.ts`, `apps/sidecar/test/cam-kernel.test.ts`. Still open in K4: contact generation
+  over regions hidden from the vertical-ray search, path-level orientation corridors and collision planning wired into
+  generation, head/table and head/head machines, bounded intermediate motion, singularities and safe rewinds.
+- **K5 — stock and quality evidence (pending; first seed landed).** A rotary replay on a five-axis machine seeds its voxel
+  stock from the height field the three-axis operations carved (`carryHeightField` in `kernel/execute.ts`). Five-axis moves
+  are not written into that field, so the seed is the predecessor stock. The carry is one-sided: a voxel wholly above every
+  overlapping column is certainly gone, a voxel whose top rises above the lowest column in its footprint is only possibly
+  gone, and nothing is ever put back. An untouched field leaves the raw box. A three-axis-only job still has no voxel
+  bracket. The bracket stays a bracket: `material-removed` is not passed, `no-gouge` stays unresolved for turned moves, and
+  the tolerance budget stays informational. Evidence: `packages/core/src/cam/kernel/stock.test.ts`,
+  `packages/core/src/cam/kernel/rest-stock.test.ts`, `packages/core/src/cam/kernel/five-axis-job.test.ts`. Still open:
+  gouge and residual proof of the final NC, machine clearance under explicit controller assumptions, declared rigid setup
+  transfers, numerical error budgets, and any change to the public tolerance contract. Unknown or excessive bounds cannot
+  establish requested-quality verification.
+- **K6 — turning/mill-turn (pending; boring preview landed).** `planBoring` in `kernel/turning.ts` bores a declared pilot out
+  to a finished internal profile. The bar is the same solid cylinder the external plan uses; the cavity grows inward from
+  the pilot; every removed volume is analytic and the worked stock partitions as removed + remaining + unmachined. A
+  finished diameter below the pilot, a bore that breaks out of the bar, an unordered profile, and a bar the chuck cannot
+  hold are refused and emit no NC. The external NC bytes of the reference fixture are unchanged. Release stays `preview`:
+  an ideal point tool. This planner is not a manufacturing-job operation and is not `cam.turn`. Evidence:
+  `packages/core/src/cam/kernel/turning.test.ts`. Still open: grooves, threading, parting, insert compensation, chuck
+  clearance beyond the bar-diameter refusal, live tools, the C axis, stock transfer, and qualification on a real machine.
+  The external-turning preview and the legacy turning generator stay as they were.
+- **K7 — persistent references (first increment).** A push/pull or a draft may name the face (`name`, for example `plate.top`).
+  The named face is the one that moves or tilts, on the exact replay and on the mesh rebuild, even when `near` is stale. A name
+  that no longer exists is an error and the body is left unchanged; it is never replaced by a nearby face. The assistant
+  history schema accepts the optional field on both features. The moved face keeps its own name (the push/pull's tool does not
+  rename it to `pushpull.top`), so a later feature can still refer to the face that was moved. Evidence:
+  `packages/core/src/cad/history-brep.test.ts`, `packages/core/src/cad/history-face-reference.test.ts`,
+  `packages/ai/test/modeling-features.test.ts`. Still open: lineage through faces that a later feature splits, deletes or
+  modifies, and selection by name in drawings and CAM. A nearest-face heuristic must never silently resolve an ambiguous
+  design reference.
+
+Specialist barrel/swarf/impeller/tube packages remain explicit future product choices, not prerequisites silently added to
+the six accepted functional gaps. Do not claim missing features from stale sections, derive parity from passing tests or
+strategy names, or promise that all possible regressions have been excluded.
+
+### Ownership and verification
+
+The named kernel continuation owns WP1 `packages/core/src/cad`, WP2 `packages/core/src/cam` and their tests plus the
+corresponding design specs. Cross-WP contracts must be amended in the owning design spec before touching API/sidecar/AI/
+desktop adapters; changes must propagate through existing interfaces instead of introducing duplicate implementations.
+This exception is the owner's concrete kernel request under roadmap `00-how-to-follow.md` section 1; unrelated RM work
+and global RM statuses are unchanged.
+
+Deepen the existing geometry, stock, motion and evidence modules. Their interface is the test surface; record supported
+geometry, error bounds and refusal semantics. Reuse existing adapters at each real seam for locality and leverage. Write
+regression tests that fail on the pre-change behavior, keep independent analytic/external-reader checks, run relevant
+package tests and typechecks, regenerate the web API reference before workspace checking, and broaden to downstream and
+repository-wide gates when the changed contracts justify it. Do not regenerate goldens to conceal a semantic change.
+
+Implementation log: K0, K1, K2 (first family, including the coaxial cone/plane foot), K4 (first increment) and K7 (named push/pull and draft) are implemented with the evidence named in their
+entries. Gates run on this tree: `bun check -p packages/core/tsconfig.json` clean over 417 files; the core suite passes
+(2,427 tests over 164 files at the K0/K1 baseline, and 193 tests over the four CAD history and blend suites after the K2
+mesh wiring); the workspace typecheck passes all 15 package tasks; the repository suite's failures are sandbox limits (a
+local server cannot bind a port, Metal cannot write its cache), and the 66 tests re-run outside the sandbox pass. K5's
+rotary voxel seed and K6's internal boring preview then landed: `kernel/stock.test.ts`, `kernel/rest-stock.test.ts`,
+`kernel/turning.test.ts` and `kernel/five-axis-job.test.ts` pass (36 tests). K3 and the rest of K2, K4, K5, K6 and K7
+have not run an acceptance gate and stay open.
+
 Status: analysis measured on 2026-10-19 against `main` (`ed73e6c` → `8b3a3712`), followed by the fixes listed in
 §5. Owner request: "analizza i gap mancanti nel core del cad e del cam kernel e il loro utilizzo nel sidecar, httpapi e desktop …
 li aggiorniamo con il mancante". This spec is the inventory the follow-up work is ordered from. It does not claim parity: the gates
@@ -63,8 +186,8 @@ state.
 | --- | --- | --- | --- |
 | M1 | **3D finishing families**: constant scallop, spiral, radial, horizontal | raster/waterline/steep-shallow only; legacy spiral/radial finishing silently fell back to a raster | **closed in this pass** (§5) |
 | M2 | Hole making in the kernel: rigid tapping (G84), reaming (G85), boring cycles, back-boring; tap/reamer/boring-bar cutters | drill and spot only; threads are milled | the interpreter already replays G84/G85 (spec 32 P2) — **closed in this pass** (§5); back-boring (G87) still missing |
-| M3 | Turning in the kernel (facing, OD/ID roughing and finishing, grooving, threading, parting) with stock evolution | legacy generator only, no kernel evidence | **external turning closed in this pass** (§8): face skim, diameter-bounded roughing on the evolving stock and profile finishing, with the bar and the spindle bounded by the turning centre; internal turning, grooves, threads and parting still open; mill-turn later |
-| M4 | Stock-aware rest: operation B consumes the stock A left (spec 29 §6) | rest from a previous tool diameter | voxel stock exists for 5-axis only |
+| M3 | Turning in the kernel (facing, OD/ID roughing and finishing, grooving, threading, parting) with stock evolution | legacy generator only, no kernel evidence | **external turning closed in this pass** (§8): face skim, diameter-bounded roughing on the evolving stock and profile finishing, with the bar and the spindle bounded by the turning centre; internal boring is a preview planner (`planBoring`, §8.1), not a job operation; grooves, threads and parting still open; mill-turn later |
+| M4 | Stock-aware rest: operation B consumes the stock A left (spec 29 §6) | rest from a previous tool diameter | 3-axis rest reads the carried height field; a rotary replay seeds its voxel stock from that field (K5 first seed). Setup transfers and gouge proof of the final NC stay open |
 | M5 | 5-axis strategies: swarf, 5x contour, multi-axis roughing, automatic tilting from a 3-axis path (collision avoidance) | parallel/contour lean on a trunnion | head-table and head-head machines in the kernel |
 | M6 | Pencil as a standalone strategy (bi-tangency), morph / flowline / projection finishing | pencil = rest finish after a larger ball | |
 | M7 | Toolpath linking optimisation (2-opt/TSP over rapids, stay-down links in 2.5D) | 2-opt over nearest neighbour for point ordering (`optimizedOrder`, used by drill); stay-down links in 2.5D still open | cycle time |
@@ -358,7 +481,7 @@ Still open, and refused rather than approximated: the strict pipeline's pole win
 
 ## 8. Turning and the machine catalogue (2026-10-21)
 
-- **M3 external turning** is in the kernel (`kernel/turning.ts`, `cam.turn`, `cam_edit.turn`): face skim, diameter-bounded roughing on the evolving stock, profile finish, analytic volumes with the retained bar tail, always `preview`. The turning centre bounds the bar and the spindle; a bar it cannot hold is refused. Still open: internal turning, grooves, threads, parting, insert compensation, chuck clearance, controller qualification.
+- **M3 external turning** is in the kernel (`kernel/turning.ts`, `cam.turn`, `cam_edit.turn`): face skim, diameter-bounded roughing on the evolving stock, profile finish, analytic volumes with the retained bar tail, always `preview`. The turning centre bounds the bar and the spindle; a bar it cannot hold is refused. Internal boring is the separate preview planner in §8.1 (`planBoring`): analytic volumes from a declared pilot, release stays `preview`, and it is not a job operation. Still open: grooves, threads, parting, insert compensation, chuck clearance, controller qualification.
 - **Machine catalogue**: `MACHINES` (milling) and `LATHES` (turning / mill-turn: Mazak INTEGREX i-200 class, Okuma MULTUS B300II class, 2-axis lathe) plus KERN Micro HD HSK25/HSK40 with a native Heidenhain post. The milling kernel refuses a turning centre with its reason.
 - **Library seam**: a saved Machine Config becomes the machine the kernel plans against (`kernelMachineOfConfig`); the built-in catalogue is shown in Machine Configs (`GET /api/machine-configs/defaults`, read-only "Built-in"); the CAM panel, the kernel panel and the assistant (`cam.materials`, `machineConfig`) see both.
 - Not done: controller mode-switch sequences (turning / positioned C / powered tooling), machine geometry and datum calibration, qualification on real controls. Published strokes are not work-coordinate limits.
@@ -376,7 +499,9 @@ Two gaps of §2.2 moved: the external turning of **M3** and the machines themsel
 - the finishing pass follows the profile itself; the removed volume of every pass is the exact solid of revolution, and `stockVolume = partVolume + unmachinedVolume + removedVolume` holds with the untouched bar tail written down explicitly (no parting is implied);
 - the NC is lathe NC: `G18 G21 G90 G40 G94 G97`, constant rpm, and the radial retraction happens outside the original bar before the axial return, so the return cannot cross an uncut shoulder.
 
-The plan is a **preview**: an ideal point tool (no insert compensation), no workholding, no internal turning, grooves, threads or parting, and never a verified release.
+The plan is a **preview**: an ideal point tool (no insert compensation), no workholding, no grooves, threads or parting, and never a verified release.
+
+`planBoring` is the internal counterpart on the same bar. The caller declares the pilot hole; the cavity grows inward from that pilot to the finished profile; each removed volume is the solid of revolution of the pass, and the worked stock partitions as removed + remaining + unmachined (the pilot volume is already void, so the finished bore is the pilot plus what the passes remove). The NC plunges through the open pilot and retracts axially out of the face. A finished diameter below the pilot, a bore that reaches the outer wall, a profile that does not run from the face towards the chuck, and a bar the chuck cannot hold are refused and emit no NC. The external fixture's NC bytes are unchanged. Release stays `preview`. `planBoring` is not wired into a manufacturing job and is not `cam.turn`.
 
 ### 8.2 The machines: a catalogue and the configurations of the library
 
@@ -387,4 +512,151 @@ The plan is a **preview**: an ideal point tool (no insert compensation), no work
 
 Evidence: `kernel/machine-config.test.ts`, `kernel/turning.test.ts`, `packages/ai/test/cam-kernel-actions.test.ts`, `apps/sidecar/test/machine-config-defaults.test.ts`, the machine case in `apps/desktop/test/cam-kernel.test.ts`.
 
-Still open: internal turning, grooves, threads and parting in the kernel; the controller mode-switch sequences between turning, positioned C and powered tooling on a mill-turn; the machine geometry and the datum calibration of every named machine; the qualification of any of them on a real control.
+Still open: grooves, threads and parting in the kernel (internal boring is the preview above, not a job operation); the controller mode-switch sequences between turning, positioned C and powered tooling on a mill-turn; the machine geometry and the datum calibration of every named machine; the qualification of any of them on a real control.
+
+## 9. 3D printing parity with mill and lathe (analysis, 2026-10-22)
+
+### 9.1 The question and how it was measured
+
+Owner request: *"analizza ... se nel cam il kernel della stampa 3d il generatore e tutto cio che riguarda la stampa 3d sia al livello di mill e lathe su tutti i fronti — analizza cosa manca nei kernels nel cam page nel visualizer ecc."*
+
+Method: read the printer path end to end in the core (`packages/core/src/cam/{machine,tool-model,operation-tools,generator,viewer,verify,sim,kernel}`), the contracts (`packages/api/src`), the sidecar (`apps/sidecar/src`), the assistant (`packages/ai/src`) and the desktop CAM page and viewport (`apps/desktop/src/features/cam`, `apps/desktop/src/viewport/view3d`); counted which entry points each layer calls for a mill, a lathe and a printer; and **executed** the printer path to measure what it actually emits rather than what it claims to. Every claim cites `file.ts:line`; the measurements and their commands are in §9.8.
+
+A parallel audit of the same subject was produced in the same working tree (untracked, at `specs/audits/printing-parity/README.md`): it characterises the HTTP surface and the end-to-end paths, this section maps the parity of each layer and holds the ledger the follow-up work is ordered from. Every defect listed in §9.5 was reproduced here independently rather than taken on trust.
+
+**Parity criterion adopted** (so "at the level of mill and lathe" is testable, not an opinion): on a surface, a printer is at parity when it can do what a mill does through the same interface with the same evidence, and where it cannot, it **refuses with a reason** instead of degrading silently.
+
+### 9.2 The parity matrix
+
+| Surface | Mill | Lathe | Printer | Parity |
+| --- | --- | --- | --- | --- |
+| Machine knowledge (`cam/machine.ts`) | axes X Y Z, G17, spindle, checks | axes X Z, G18, diameter, checks | axes X Y Z E, additive, plate origin, 4 printer checks | **at parity** (ahead: `PRINTER_COLD_EXTRUSION`, `PRINTER_LAYER_DOWN`, `PRINTER_NOT_HOMED` have no mill/lathe analogue) |
+| Tool model (`cam/tool-model.ts`) | shapes | inserts | nozzles (brass/hardened/ruby/standard), `:146` | at parity |
+| Operation → tool (`cam/operation-tools.ts`) | 12 keys `:33-44` | 8 keys `:45-52` | **1 key** for 6 operations `:53`, `:64` | partial |
+| Program checks (`cam/machine.ts:165-244`) | mill checks | lathe checks | 4 printer checks `:220-233`, `:242` | at parity |
+| Operation catalogue | 9 (`settings.ts:37`) | 7 (`:39`) | 6 declared (`:41`) | declared only |
+| **Generation** — the operation does what its name says | yes | yes | **no**: all six produce byte-identical G-code | **missing** |
+| **Part geometry** | mesh / B-rep | revolved profile | primitives only; anything else → **bounding box** | **missing** |
+| **Stock / volume model** | subtractive (height field + voxel) | bar stock, analytic volumes | none | **missing** |
+| **Verification evidence** | height-field replay, gouge, clearance | turning preview | none (every check `not-run`) | **missing** |
+| **Native kernel** (plan → NC → replay → claims → release) | yes | partial (`kernel/turning.ts`) | **absent** | **missing** |
+| Machine catalogue | 10 presets | 3 presets | 0 | **missing** |
+| Contracts (HTTP / AI) | yes | yes | legacy generator route only | partial |
+| Assistant (`packages/ai`) | yes | yes | `cam.machine` and `machine-run` know a printer; `cam.manufacture` (the kernel) does not | partial |
+| Mobile companion (`apps/mobile`) | yes | yes | build volume, nozzle glyph, no spindle | at parity |
+| Desktop CAM page | yes | yes | legacy generator branch only | partial |
+| Visualizer / 3D viewport | yes | yes | **at parity** | at parity |
+
+The headline: **3D printing is at parity in the layers that describe a machine and draw one, and absent in the layers that make one.** The viewer, the machine table, the tool model, the program checks and the CAD manufacturability analysis all know a printer; the native kernel, the verification replay and the additive stock model do not.
+
+### 9.3 Gap ledger — the native CAM kernel (`packages/core/src/cam/kernel`)
+
+| # | Gap | Today | Evidence |
+| --- | --- | --- | --- |
+| P0 | **The kernel cannot name a printer** | `KernelMachine.kind` is `"mill" \| "lathe"`. The only kind refusal at runtime is the lathe one; the printer's refusal is a **doc comment** (`machine-config.ts:37`: *"the library's kinds the kernel does not machine (`printer`, `laser`) … are refused"*) and not a message a caller ever sees | `kernel/contracts.ts:32`, `kernel/execute.ts:143`, `kernel/machine-config.ts:37` |
+| P1 | **No print strategy** | the 11 kernel strategies are all subtractive; `OperationSpec`/`OperationSpecSchema` have no print variant | `kernel/contracts.ts:125-148`, `kernel/schema.ts:43-65` |
+| P2 | **The stock model is removal-only** | `VoxelStock` carries `removedSure`/`removedPossible`; `removeTipPath`/`remainingVolume` subtract. There is no deposition and no "as printed" volume | `kernel/stock.ts:20-35` |
+| P3 | **The IR has no E axis** | `MoveSchema` is `Rapid \| Linear \| Arc \| Dwell \| Comment \| Cycle \| Orient` — a print program cannot be represented, so the kernel can neither replay nor draw one | `cam/ir.ts:104-112` |
+| P4 | **No deposition data for materials** | the material table has ISO-N plastics (POM-C, PMMA, PA6) but every row carries *subtractive* data (`vcCarbide`, `fz10`, `drillFeed10`); there is no extrusion, flow or thermal model | `kernel/materials.ts:278-299` |
+| P5 | **No printer in the machine catalogue** | `MACHINES` = 10 mill, `LATHES` = 3 lathe, `MACHINE_CATALOGUE` = 13 entries, none a printer. No bed, build height, kinematics (cartesian/corexy/bed-slinger/delta), nozzle or print-speed ceiling | `kernel/machines.ts:74-127` (measured: 10 / 3 / 13) |
+| P6 | **A printer configuration is refused without a reason** | the profile layer knows `printer` (and aliases `3dprinter`/`3-d-printer`/`fff`/`additive`), but `kernelMachineOfProfile` maps it to `undefined` and `kernelMachineOfConfig` returns `undefined` — no issue, no message. The mill and the lathe refusals carry their reason | `kernel/machine-profile.ts:45`, `:367`; `kernel/machine-config.ts:39-47` |
+| P7 | **The planner and the claims are subtractive-only** | `planJob` plans 2.5D/3D features from the part; the 12 claim ids are all subtractive (no-gouge, holder-clearance, material-removed…). A print job needs additive claims: layer coverage, wall count, infill, overhang/support, bed fit, filament | `kernel/planner.ts:138`, `kernel/contracts.ts:222` |
+| P8 | **The kernel's verification replay is subtractive** | the replay runs the NC with the cutter active and reports *removed* volume; for a printer the removal is the deposition | `kernel/execute.ts` (replay stage), `kernel/contracts.ts:250-270` |
+
+### 9.4 Gap ledger — the generator (`packages/core/src/cam/generator`)
+
+| # | Gap | Today | Evidence |
+| --- | --- | --- | --- |
+| P9 | **The six printer operation types are inert aliases** | `PrinterOperationSchema` declares `standard \| vase \| support \| infill \| raft \| brim`, but the printer generator never reads `operationType`. **Measured: all six produce byte-identical G-code** (3104 chars each). | `generator/schema.ts:23`, `generator/settings.ts:40-41`, `generator/index.ts:124-128`, `generator/printer.ts:218-230` |
+| P10 | **The default infill pattern is not implemented** | `DEFAULT_PRINTER_EXTRAS.infillPattern = "grid"`, but only `"lines"` is implemented; `grid`, `triangles` and `honeycomb` write a warning comment and **extrude nothing**. **Measured: the default path prints zero infill** (34 extruding moves with `grid`, 74 with `lines`). | `generator/schema.ts:244`, `generator/printer-composite.ts:227-258` |
+| P11 | **The warning is silently dropped** | the generator emits `"; WARNING: …"` but `warningsIn` collects only `"; Warning:"`. **Measured: the response's `warnings` array is empty while the G-code carries the warning** — the user is never told. | `generator/index.ts:101-102` vs `generator/printer-composite.ts:255`, `generator/printer.ts:185` |
+| P12 | **Only the first selected element is printed** | the printer branch takes `geometry.selectedElements[0]`; the mill path machines **every** selected element. **Measured: the second cube of a two-cube selection is absent from the program.** | `generator/index.ts:125-127` vs `generator/dispatch.ts:112` |
+| P13 | **A real CAD part cannot be sliced** | `elementBody` handles cube/cylinder/sphere/cone/torus/text; every other type falls back to the **bounding box**. **Measured: a mesh element prints its bbox with a warning**, so the printer cannot print the parts the app actually makes. | `generator/printer.ts:172-189`, `:185-186` |
+| P14 | **Supports, raft and brim are placeholders** | `support()` writes `"; TODO: Implement overhang detection logic"`; `raftLayers` and `brimWidth` travel in `PrinterSettings` and are never read. | `generator/printer-composite.ts:261-266`, `generator/printer-base.ts:19-20` |
+| P15 | **No per-layer process** | no top/bottom layers, no per-layer speed/flow/temperature, no retraction on travel, no fan control, no purge/prime/wipe beyond the fixed start block. | `generator/printer-base.ts:38-64`, `generator/printer.ts:63-64`, `:101-102`, `:120-121`, `:155-156` |
+| P16 | **A printed program has no evidence** | for any non-mill machine every replay check is `not-run`: *"The stock replay covers 3-axis milling, not the 3dprinter"*. The mill has 6 checks; the printer has 0. | `generator/evidence.ts:130`, `:165-167` |
+| P17 | **The verification layer refuses the printer explicitly** | `verifyToolOf` returns `undefined` for anything that is not a mill and `verifyRequestFor` answers *"Verification supports milling operations only"* — a lathe and a printer are both refused with a reason; the workholding fixtures are mill-only too. A test pins the refusal. | `cam/verify/request.ts:38-43`, `:71-74`, `:65-70`, `cam/verify/verify.test.ts:224-227` |
+
+### 9.5 Reproduced defects — a printed program that is wrong, not merely missing
+
+These are measured, not read: each was reproduced by running the printer path and reading the output. They come first because a wrong program is worse than an absent one.
+
+| # | Defect | Reproduced | Evidence |
+| --- | --- | --- | --- |
+| P26 | **The final retraction asks for the wrong amount of filament** | the start block selects absolute extrusion (`M82`) and the end block emits `G1 E-2` with no E reset and no switch to relative. After a cube whose last E is 26.07595, that targets E = −2 and **retracts 28.076 mm instead of 2** | `generator/printer-base.ts:40`, `:57` |
+| P27 | **A composite declares a placement its children never receive** | the note says *"bottom at Z0"* while the first extruding move is at **Z 5.200**: `placeOnBed` shifts the composite root, `shiftElement` does not recurse into its members, and the slicer reads the members directly | `generator/printer.ts:196-215`, `generator/elements.ts:503`, `generator/printer-composite.ts:131` |
+| P28 | **A program can claim success while it is wrong** | a 200 × 200 mm cube on a 100 × 100 mm bed returns `warnings=[]` and `evidence.result="passed"`; of the eight evidence checks only `generated` is `passed` and the other seven are `not-run`. The bed-fit warning exists in the G-code but never reaches the response (P11) | `generator/evidence.ts:165-167`, `:198`; `generator/printer.ts:214` |
+| P29 | **The common post-passes destroy extrusion** | `optimizePath` drops 2 of the 42 extruding moves (42 → 40) because the optimizer compares X/Y/Z/feed and not E; `useArcFitting` emits G2/G3 blocks that carry **no E word**, so those spans are not extruded | `generator/index.ts:144-145`, `generator/postpass.ts:12` |
+| P30 | **The part's orientation and scale are ignored** | a cube with `rotationY: 90, scaleX: 2, scaleY: 3, scaleZ: 4` produces **byte-identical** G-code to the plain cube | `generator/printer.ts:39-67`, `generator/printer-composite.ts:85-128` |
+
+### 9.6 Gap ledger — contracts, API, assistant and desktop
+
+| # | Gap | Today | Evidence |
+| --- | --- | --- | --- |
+| P18 | **The kernel route cannot take a printer** | `POST /api/toolpaths/manufacture` resolves the machine through `findMachine` / `kernelMachineOfConfig`; a printer preset is unknown and a printer configuration is refused with *"it needs a kind it machines (mill or lathe)"*. The generator route does take a printer. | `apps/sidecar/src/services/ai.ts:228-233`, `packages/api/src/groups/toolpath-generator.ts:16-31` |
+| P19 | **The kernel panel has no printer** | the kernel section's built-in machine list is `cam.kernel.MACHINES` only. | `apps/desktop/src/features/cam/components/generator/KernelSection.tsx:221` |
+| P20 | **The CAM page's capability list does not mention printing** | the groups are cad / mill / drill / lathe / probe / verify / workflow. | `apps/desktop/src/features/cam/components/CapabilitiesOverview.tsx:69-118` |
+| P21 | **The CAM page shows no operation picker for a printer** | the palette category for printers exists (standard, vase, support, infill, raft and brim) but the CAM page renders `StrategyPalette` only for `mill \|\| lathe`; a printer gets the element picker, a 2-D preview and the settings instead. The `family={… === "3dprinter" ? "mill" : …}` expression is dead code. So the user sees **no** operation cell at all — and the six the core declares would be inert anyway (P9). | `apps/desktop/src/features/cam/components/generator/OperationSection.tsx:318-337`; `apps/desktop/src/features/cam/components/generator/StrategyPalette.data.ts:116-130` |
+| P22 | **The copy promises more than the core does** | *"Standard slicer settings — wall, infill, top / bottom, supports."* There are no top/bottom layers and no supports (P14). The saved-toolpath labels repeat the six inert operation names. | `apps/desktop/src/i18n/en.cam.json:328`, `apps/desktop/src/features/toolpaths/components/shared.tsx:11`, `:24` |
+| P23 | **Five machine-kind vocabularies** | `mill\|lathe\|3dprinter` (generator), `mill\|lathe` (kernel machine), `mill\|lathe\|printer\|laser` (machine profile), `mill\|lathe\|printer\|laser` (library API), `mill\|lathe\|3Dprinter` (assistant input). The normalisation lives in one desktop adapter, not in a shared seam. | `generator/schema.ts:20`, `kernel/contracts.ts:32`, `kernel/machine-profile.ts:45`, `packages/api/src/groups/machine-configs.ts:11`, `packages/api/src/ai-action-inputs.ts:91`, `apps/desktop/src/features/cam/lib/machines.ts:73` |
+| P24 | **The saved machine catalogue cannot reach the printer** | `GET /api/machine-configs/defaults` serves `MACHINE_CATALOGUE` (mill + lathe); a saved printer configuration exists in the library but the kernel refuses it silently (P6). | `apps/sidecar/test/machine-config-defaults.test.ts:14`, `kernel/machine-config.ts:39-42` |
+| P25 | **The assistant can describe a printer but cannot plan one** | `cam.machine` returns the printer's bed, plate origin, build height and kinematics and `machine-run` reports its layers, beads and filament; `cam.manufacture` is the kernel and therefore has no printer (P18). | `packages/ai/src/actions/cam.ts:51`, `:54`; `packages/ai/src/machine-run.ts:105-117`; `packages/ai/src/tools/prompts/cam.txt:4` |
+| P31 | **The ribbon can assign an operation type that does not exist** | the ribbon's machining groups are the mill, 5-axis and lathe cells and are **not filtered by machine**. For a printer, `paletteToCoreOperation` falls through to `return paletteId`, so clicking "Contour" writes `operationType: "strategy-contour"`. **Measured: the core schema then refuses it** (`Expected "contour" \| "pocket" \| …`), so the request fails to decode. | `apps/desktop/src/features/cam/components/CamRibbon.tsx:113-116`; `apps/desktop/src/features/cam/components/CamRibbon.data.ts:70-113`; `apps/desktop/src/features/cam/components/generator/StrategyPalette.data.ts:196-201` |
+| P32 | **There is no additive simulation** | the stock simulation is refused for every machine that is not a mill (*"a lathe/printer has its own stock representation; displaying a vertical sweep here would invent material removal"*), so the viewport has no solid build-up for a printer — only beads. | `apps/desktop/src/viewport/view3d/stock-simulation.ts:53-58`, `apps/desktop/src/viewport/view3d/view3d.tsx:527`; `packages/core/src/cam/sim/stock-sim.ts:7-8` |
+| P33 | **The machine bodies are mill-only** | the 3-D machine model (table, spindle, holder, links) is built only for a mill; a printer gets the bed, the build volume, the nozzle, the beads and the travels — and no body to check a clash against. | `apps/desktop/src/viewport/view3d/machine-scene.ts:422` |
+
+### 9.7 What the printer already has that mill and lathe do not (do not regress it)
+
+This is not a gap list; it is the part of the printer that is already ahead and that any kernel work must carry over.
+
+- **Print-time and material estimates** — `calculateOptimal3DPrintSettings`, `estimatePrintTime` (minutes), `estimateMaterialUsage` (grams). The mill and the lathe have no equivalent estimator. `generator/estimates.ts:41`, `:56`, `:72`.
+- **The bed-fit check** — a part larger than the plate is reported, not printed in the air. `generator/printer.ts:212-214`.
+- **An extrusion-aware emitter** — `calculateExtrusion` from the filament area, `polygonLayer` with travel moves separated from extruding moves. `generator/printer-base.ts:67-93`.
+- **Printer-specific program checks** — a cold extrusion, a layer that goes down, a spindle word on a printer, a program that never homed. `cam/machine.ts:220-233`, `:242`.
+- **A bead/layer model with progressive deposit** — `printerDeposits` / `depositedAt`. `cam/viewer/printer-layers.ts:29-58`.
+- **The CAD manufacturability analysis for the print process** — `DfmProcess = "mill" \| "turn" \| "print"` with print-specific rules (minimum printable hole, overhang area and overhang share). `cad/dfm.ts:23`, `:479`, `:538`, `:554`. This is why the desktop's DFM panel already understands a printer (`apps/sidecar/src/services/ai.ts:371`).
+- **A visualizer and a 3D viewport at mill/lathe parity** — the machine override, "E" instead of the spindle, the deposit mode (as printed so far / whole print), the layer slider, the layer-coloured beads and the travel lines. `apps/desktop/src/features/cam/components/ToolpathVisualizer.tsx:376`, `:410`, `:604`; `apps/desktop/src/viewport/view3d/machine-scene.ts:304-330`; `packages/core/src/cam/viewer/printer-layers.ts`.
+
+Two caveats on that parity: it is reached only through the **legacy generator's** G-code (the kernel builds no printer timeline — P3), and the viewport **disables the playback** for a printer (`apps/desktop/src/viewport/view3d/view3d.tsx:577`).
+
+### 9.8 What was measured, and how
+
+| Measurement | Command | Result |
+| --- | --- | --- |
+| The six printer operations are inert | `bun run .tmp-probe/printer-probe.ts` (generator, one cube) | `op=standard … op=brim` → **3104 chars each**, identical |
+| The default infill pattern prints nothing | `bun run .tmp-probe/printer-probe2.ts` (composite, four patterns) | `grid` → 34 extruding moves + `"; WARNING: Infill pattern 'grid' not fully implemented"`; `lines` → 74; `triangles`/`honeycomb` → 34 |
+| The warning is dropped | same probe, `response.warnings` | `warnings=[]` while the G-code carries `"; WARNING:"` |
+| A mesh part prints as its bounding box | `bun run .tmp-probe/printer-probe3.ts` | `"; WARNING: Unsupported element type 'mesh' for direct 3D printing."` |
+| Only the first selected element is printed | same probe | two cubes → the second is absent; the mill path prints `Element 1` and `Element 2` |
+| The kernel refuses a printer configuration | `bun run .tmp-probe/kernel-printer-probe.ts` | `kernelMachineOfConfig(printer)` → `undefined`; `profileOfConfig(...).kind` → `"printer"` (the profile knows it, the kernel machine does not) |
+| The catalogue has no printer | same probe | `MACHINES: 10`, `LATHES: 3`, `MACHINE_CATALOGUE: 13`, no printer |
+| The final retraction over-retracts | `bun run .tmp-probe/defects2.ts` | `M82` present, last E `26.07595`, retract line `G1 E-2 F3600` → an absolute target of E −2, i.e. **28.07595 mm** of retraction for an asked 2 mm |
+| A composite ignores its own placement | `bun run .tmp-probe/defects3.ts` | the note says `bottom at Z0`; the first extruding move is at **Z 5.200** |
+| The post-passes destroy extrusion | same probe | E-bearing moves: baseline 42, `optimizePath` **40**; `useArcFitting` emits 2 G2/G3 blocks that carry **no E** |
+| Orientation and scale are ignored | `bun run .tmp-probe/defects.ts` | the rotated+scaled cube's NC is **byte-identical** to the plain cube |
+| A wrong print reports success | same probe | a 200 × 200 mm cube on a 100 × 100 mm bed → `warnings=[]`, `evidence.result=passed`, checks `generated:passed` + seven `not-run` |
+| The ribbon assigns an operation type that does not exist | `bun run .tmp-probe/ribbon.ts` | `paletteToCoreOperation("3dprinter", "strategy-contour")` → `"strategy-contour"`, not a printer operation |
+| …and the core schema refuses it | `bun run .tmp-probe/ribbon2.ts` | `DECODE FAILS -> Expected "contour" \| "pocket" \| "drill" \| …` |
+| The CAM core suite is green | `bun test packages/core/test/cam packages/core/src/cam` | **1109 pass, 0 fail**, 82 files, 873 602 assertions |
+| The API reference is current | `bun --no-env-file packages/web/script/generate-api-reference.mjs --check` | exit 0 — *"API reference: 303 operations, 213 paths, 35 groups, 56 schemas"* |
+
+The probe scripts live in the git-ignored `.tmp-probe/` directory; each measurement above names the script that produced it, so any of them can be re-created and re-run.
+
+### 9.9 Ordered remediation (owner directories, per WP)
+
+The order is the one the project's rules impose: **the owning design spec first**, then the core, then the adapters. Nothing below is implemented by this section.
+
+1. **Spec (no code).** Amend this spec and `04-core-cam.md` with the additive-printing contract: what a print job is, which claims exist, and what a refusal says. Amend `05-api-sidecar.md`, `06-desktop-ui.md` and `08-ai.md` only when their contracts actually change.
+2. **WP2 — stop the wrong programs first (P26, P27, P29, P30, P11, P28).** A printer that emits a wrong program is worse than a printer that refuses. Fix the retraction's E semantics, resolve the placement of the whole scene before slicing, keep the post-passes away from extruding input (or make them E-aware with filament conservation), honour the part's transform, make every warning travel, and stop the evidence from reporting "passed" for a program it did not check. Each of these needs a regression test that fails on the pre-change behaviour.
+3. **WP2 — make the printer a first-class kernel citizen (P0, P1, P5, P6).** Add `3dprinter` to `KernelMachine.kind`, a print strategy to `OperationSpec`/`OperationSpecSchema`, printer presets to the catalogue (bed, build height, kinematics, nozzle, print speed), and turn the silent `undefined` of P6 into a **reasoned refusal** for everything the kernel still cannot do. Until the rest lands, the kernel must say "a printer is not machined by this kernel" rather than accept a printer it cannot run.
+4. **WP2 — make the generator honest (P9, P10, P12, P13, P14).** Either implement the six operations or refuse the five that are not real, with the reason; implement the default infill pattern or change the default to the one that works; print every selected element; slice the **actual** part (mesh or B-rep), never its bounding box; and either implement supports/raft/brim or remove them from the schema.
+5. **WP2 — additive evidence (P2, P3, P16, P7, P17).** An E axis in the IR, a deposition volume model, and the additive claims (layer coverage, walls, infill, overhang/support, bed fit, filament) with a replay that measures what was laid down.
+6. **WP3/WP4 — expose it (P18, P23, P24).** The kernel route accepts a printer; one machine-kind vocabulary with one normalisation seam, shared by the generator schema, the kernel machine, the machine profile, the library and the assistant.
+7. **WP6/WP8 — show it (P19, P20, P21, P22, P31, P32, P33).** The kernel panel lists the printer machines; the capability overview has a printing group; the CAM page offers a printer operation picker that the core can honour; the ribbon cannot assign an operation a printer does not have; the copy matches the behaviour; and the viewport says plainly that there is no additive solid simulation rather than showing a mill's removal.
+8. **WP1/WP8 (only after the core).** The CAD DFM already knows the print process; the assistant can expose a print manufacturability read once a print job exists to read.
+
+### 9.10 Status
+
+**Analysis only.** No implementation, no acceptance gate, no roadmap status change. The ledger above is the inventory the follow-up work is ordered from; the same rule as §1 applies: a refusal is evidence of an unsupported capability, not an implementation of it. The RM rows are untouched — this is a continuation of the owner's kernel request, not an RM acceptance claim.
+
+Measured against the working tree of 2026-10-22 (which carries uncommitted CAM/CAD work from a parallel session; the findings here are about the printer and are independent of it).

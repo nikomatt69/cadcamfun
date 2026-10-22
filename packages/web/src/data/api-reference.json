@@ -52179,6 +52179,13 @@
                                 "multiaxis"
                               ]
                             },
+                            "mode": {
+                              "type": "string",
+                              "enum": [
+                                "parallel",
+                                "contour"
+                              ]
+                            },
                             "top": {
                               "type": "number"
                             },

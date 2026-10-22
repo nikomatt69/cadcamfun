@@ -1,5 +1,23 @@
 # WP3 + WP4 — Shared API contract and sidecar server
 
+## Exact-replay diagnostic preservation (2026-10-22)
+
+Spec 33 K0 authorizes WP3 `packages/api/src/ai-action-results.ts` and its tests to add optional string-array warnings to
+the existing parametric validation/exact result contracts, plus the existing exact-export fields already returned by WP8.
+WP8 forwards core recovery warnings through these contracts; historical results lacking warnings remain decodable. No new
+route, storage schema or handler ownership is introduced. Regenerate the web API reference before checks and completion.
+
+K1 additionally owns the descriptions in `packages/api/src/ai-parametric.ts`: an ellipse/curve shape preserves nominal
+geometry; its legacy `segments`/`divisions` fields control construction references rather than the exact profile boundary.
+No input schema fields or generated client signatures change.
+
+K7 additionally owns an optional `name` on the `pushpull` and `draft` features in `packages/api/src/ai-parametric.ts`. It is
+the exact face name. Older histories without it stay decodable. No new route. Regenerate the web API reference.
+
+K4 additionally owns `apps/sidecar/test/cam-kernel.test.ts` for the shared optional multiaxis `mode` field consumed from
+WP2's operation schema by both manufacturing request schemas. Verify validation and the resolved mode/actual NC across
+HTTP; retain existing routes and handlers. The generated web API reference must include the additive field.
+
 ## Subscription provider connections (2026-10-16)
 
 Owner clarification: also provide OpenCode Zen (`opencode`) and Go (`opencode-go`) account-key connections. Their documented account/subscription access uses API keys, not an invented OAuth grant. WP8 owns explicit provider fallbacks and native session headers; WP6 owns console links and key guidance. Preserve models.dev per-model protocol routing. Reference: https://opencode.ai/v2/docs/console/go/ and https://opencode.ai/v2/docs/console/models/.

@@ -8,6 +8,38 @@ The approved spec 33 continuation owns `cad/` and its tests. Cross-WP integratio
 
 Pure, I/O-free TypeScript. No DOM, no Three.js, no Bun APIs, no database. Must run in Bun, in the webview, and in a Worker.
 
+### Current-source kernel completion (2026-10-22)
+
+The owner accepted the concrete gap remeasurement in spec 33's **Owner-authorized completion increment**. WP1 owns K0
+Boolean warning propagation, K1 nominal sketch curves, K2 general blends, K3 surface operations and K7 durable references
+in `cad/` and its tests. Preserve all existing supported constructions and serialized histories. Exact output must retain
+nominal curves or report a controlled approximation; a recovered Boolean must retain its displacement warning through
+rebuild and export. Track actual acceptance evidence and remaining work in that spec's ledger. No global RM completion or
+machine qualification is implied. Cross-WP exposure follows a contract amendment before adapter edits.
+
+K1 implementation detail: shape expansion keeps historical construction entity ids and constraints while attaching
+runtime-only nominal curve provenance to the solved sketch. Display profiles and exact profiles consume that same
+geometry through distinct adapters. `segments`/`divisions` retain construction-reference density; they do not redefine an
+ellipse or spline as a polygon. Stored history shape fields remain unchanged. Rational Bezier control-hull subdivision
+bounds display chord error and fails explicitly on work exhaustion. Exact profile conversion must also preserve open
+curves joined to lines; unsupported exact path sweeps must report their limitations rather than silently use stale chords.
+
+The K1 exchange gate also owns `apps/desktop/test/cad-iges.test.ts` to independently read nominal-curve STEP exports with
+the already installed OpenCascade reader. It adds no desktop UI behavior or dependencies.
+
+K2's first curved-surface family is an isolated concave circular rim between an outward spherical cap and a plane. Solve
+the rolling circle tangent to the plane and the sphere in a meridian section, and revolve that section. Replace the cap
+and its rim in the existing shell, preserving unaffected faces and names; do not substitute a straight tangent section.
+Require clearance from the plane's other boundaries and reject trimmed/joined caps or interacting blends without an
+implemented junction law. Test sphere/plane and torus tangency, analytic sectional volume, arbitrary rigid placement,
+topology and STEP. Other curved blends, tangent chains and junctions remain K2 acceptance work.
+
+The history's display adapter may obtain the exact prefix for an explicitly requested curved fillet by passing its
+already-built result to `rebuildExact`; it must never recursively rebuild that prefix. If the selected set includes this
+sphere/plane family, use the native blend and its checked tessellation for the derived mesh, so CAD and CAM do not keep
+the old sharp rim. Failures remain explicit and preserve the previous body. Other selections keep the existing mesh
+blend path. Exact-prefix work and derived tessellation are bounded by the existing kernel budget.
+
 ## CAD kernel licensing contract (2026-10-21)
 
 The owner requests proprietary terms for Nicola Mattioli's own CAD kernel
@@ -252,16 +284,47 @@ inserted as `brep` elements in one undo step and are not inserted twice; the BOM
 pulls it in (subtracted); `mateTransform` is the mesh rebuild's mate motion (normals opposed, centres of area
 together, offset, slide along the target face's u/v, spin), built from `planarFaceFrame`, whose centre of area
 is exact (`loopMoments`: Green's theorem over lines and arcs). `nearestFace` selects as the mesh rebuild does
-(60-degree normal hint; a nearer curved face is reported, not approximated).
+(60-degree normal hint; a nearer curved face is reported, not approximated). A push/pull or a draft may name the
+face (`name`, for example `plate.top`): that face is moved or tilted even when `near` is stale, and a name that no
+longer exists is an error on the rebuild and the previous exact body stays valid, never a silent nearest-face pick.
 
 Fillets of non-coaxial curved edges (variable radius, setbacks), loft and coil, drafts and push-pulls of curved
-faces, persistent naming and 2D drafting remain pending, so the professional kernel acceptance gate is not
+faces and 2D drafting remain pending. Face names are stable for the faces a feature creates; lineage through
+a split, and selection by name in drawings and CAM, remain open, so the professional kernel acceptance gate is not
 claimed complete.
 
 Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 `bun --no-env-file test packages/core`, and `bun --no-env-file check -p packages/core/tsconfig.json`.
 
 ## 8. Change log
+
+- 2026-10-22: a push/pull may name its face (`name`). The named face moves on the mesh rebuild and the exact
+  replay even when `near` is stale; a missing name is an error and the body stays unchanged. The moved face
+  keeps its own name (the push/pull's tool no longer renames it to `pushpull.top`), so a later feature can
+  still refer to the face that was moved. Lineage through a split, and selection by name in drawings and CAM,
+  stay open. Evidence: `packages/core/src/cad/history-face-reference.test.ts`,
+  `packages/core/src/cad/history-brep.test.ts`.
+- 2026-10-22: spec 33's owner-authorized completion increment, K0, K1 and the first family of K2
+  (the evidence is recorded in spec 33's ledger). K0: a Boolean that recovers from a degenerate
+  alignment by displacing an operand keeps that warning through the parametric rebuild
+  (`rebuildExact(...).warnings`), through the STEP export (`historyToStep(...).warnings`) and through
+  the assistant's `cad.parametric_exact` contract, so a displaced solid is never presented as
+  the nominal one. K1: sketch shapes keep their nominal geometry — an ellipse is four rational
+  quadratic Bézier spans, a Bezier or NURBS keeps its knots, a spline keeps the sketcher's
+  Catmull-Rom law — and the exact profile adapter extrudes, revolves and sweeps them as exact
+  curves; the display sampler follows the same curves within its chord budget, the construction
+  entity ids and constraints are unchanged, and a nominal curve used where only lines and arcs
+  are supported (a sweep path) is refused with the reason instead of silently using the
+  construction chords. K2: the concave rim between an outward spherical cap and a plane is now a
+  blend candidate and is blended with an exact rolling-circle construction (the meridian of the
+  rolling circle and of the remaining sphere, revolved), so the fillet surface is a torus with
+  exact tangent contact circles; the parametric history derives its mesh from that native result
+  for this family and keeps the previous mesh blend path for every other selection. Fixed on the
+  way: the Newton projection of a curve takes a descent step where the squared distance has
+  negative curvature (a slender ellipse had lost faces from the triangulation).
+  Verification: `packages/core/src/cad/{sketch-curves,history-nominal-curves,history-recovery,history-curved-fillet}.test.ts`,
+  `packages/core/src/cad/brep/blend-sphere-plane.test.ts`, `apps/desktop/test/cad-iges.test.ts` (independent
+  OpenCascade reader), the core suite and the workspace typecheck.
 
 - 2026-10-21: spec 33 increment, closed with measurements (spec 33 §7.21–§7.23):
   the Boolean's orientation check re-checks the exact volume when the coarse one

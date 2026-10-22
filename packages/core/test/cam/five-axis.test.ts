@@ -289,6 +289,28 @@ describe("simultaneous 5-axis operation", () => {
     expect(issues.filter((i) => i._tag === "RotaryLimit")).toEqual([])
   })
 
+  test("a contour retracts across an obstructed interval instead of joining the reachable points through it", () => {
+    class ObstructedSoup extends TriangleSoup {
+      override isClear(p: { readonly x: number; readonly y: number; readonly z: number }, clearance: number): boolean {
+        return Math.abs(p.x) > 1 && super.isClear(p, clearance)
+      }
+    }
+    const soup = new ObstructedSoup([elementMesh({ type: "sphere", x: 0, y: 0, z: 0, radius: 8 }, 0.02)!], 0.5)
+    const k = fiveAxisKinematic({ layout: "table-BC", limits: { tilt: [-180, 180] }, tcp: "control" })
+    const result = generateMultiaxis(params({ strategy: "contour", toolAxis: "normal", gouge: false, totalDepth: 4, stepdown: 4, maxRotaryStep: 180 }), soup, { ...ballnose, diameter: 1 }, k)
+    expect(result.stats.skipped).toBeGreaterThan(0)
+    expect(result.stats.sections).toBeGreaterThan(1)
+    let previous: { readonly x: number } | undefined
+    const sides = new Set<number>()
+    for (const move of result.toolpath.moves) {
+      if (move._tag !== "Linear") { previous = undefined; continue }
+      sides.add(Math.sign(move.to.x))
+      if (previous !== undefined) expect(previous.x * move.to.x).toBeGreaterThan(0)
+      previous = move.to
+    }
+    expect([...sides].sort()).toEqual([-1, 1])
+  })
+
   test("drills are refused for a 5-axis surface", () => {
     const drill = Schema.decodeUnknownSync(ToolSchema)({ id: "d", name: "drill", kind: "drill", diameter: 5, flutes: 2, maxRpm: 5000 }) as Tool
     const result = generateMultiaxis(params(), plate, drill, umc)

@@ -2,6 +2,8 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { buildRecipe } from "../../cad/recipes.ts"
 import { DEFAULT_CUTTERS, findCutter, runJob, type CamArtifact, type ManufacturingJob, type OperationSpec } from "./index.ts"
 import { findMachine } from "./machines.ts"
+import { Schema } from "effect"
+import { OperationSpecSchema } from "./schema.ts"
 
 setDefaultTimeout(100_000)
 
@@ -15,7 +17,7 @@ const job = (machine: string, operations: ReadonlyArray<OperationSpec>): Manufac
   schemaVersion: 1, id: "five", name: "Five-axis dome", material: "6061", part: { kind: "elements", elements: [base, dome] },
   stock, tools: [ball], operations, machine: findMachine(machine)!, quality: { resolution: 0.4 }
 })
-const multiaxis = (tool: string): OperationSpec => ({ id: "five-finish", strategy: "multiaxis", tool, top: 17, stepover: 20, toolAxis: "normal" })
+const multiaxis = (tool: string): Extract<OperationSpec, { strategy: "multiaxis" }> => ({ id: "five-finish", strategy: "multiaxis", tool, top: 17, stepover: 20, toolAxis: "normal" })
 
 describe("five-axis operations in the kernel", () => {
   test("a five-axis finish on the trunnion writes simultaneous A/C words and the run completes", () => {
@@ -24,6 +26,11 @@ describe("five-axis operations in the kernel", () => {
     const a: CamArtifact = r.value
     expect(a.operations.map((o) => o.strategy)).toEqual(["multiaxis"])
     expect(a.operations[0]!.cut).toBe("finish-3d")
+    expect(a.operations[0]!.parameters["mode"]).toBe("parallel")
+    const skipped = a.operations[0]!.parameters["skippedSamples"] as number
+    expect(skipped).toBeGreaterThan(0)
+    expect(a.claims.filter((c) => c.id === "part-coverage")).toHaveLength(1)
+    expect(a.claims.find((c) => c.id === "part-coverage")).toMatchObject({ status: "unresolved", detail: expect.stringContaining(`${skipped} required multiaxis contact samples`) })
     // The table turns while the axes move: the NC has rotary words on the cutting blocks.
     expect(a.nc).toMatch(/\bA-?\d/)
     expect(a.nc).toMatch(/\bC-?\d/)
@@ -81,9 +88,23 @@ describe("five-axis operations in the kernel", () => {
 
   test("the same job on the same machine gives byte-identical NC", () => {
     const a = runJob(job("trunnion-5ax", [multiaxis(ball.id)]))
-    const b = runJob(job("trunnion-5ax", [multiaxis(ball.id)]))
+    const b = runJob(job("trunnion-5ax", [{ ...multiaxis(ball.id), mode: "parallel" }]))
     if (a.status !== "ok" || b.status !== "ok") throw new Error("the five-axis job must run")
     expect(a.value.nc).toBe(b.value.nc)
+  })
+
+  test("the shared operation schema preserves contour mode and execution generates its distinct NC", () => {
+    const decoded = Schema.decodeUnknownSync(OperationSpecSchema)({ ...multiaxis(ball.id), mode: "contour", stepdown: 4 })
+    expect(decoded).toMatchObject({ mode: "contour" })
+    expect(() => Schema.decodeUnknownSync(OperationSpecSchema)({ ...decoded, mode: "unsupported" })).toThrow()
+    const contour = runJob(job("trunnion-5ax", [decoded]))
+    const parallel = runJob(job("trunnion-5ax", [{ ...multiaxis(ball.id), stepdown: 4 }]))
+    if (contour.status !== "ok" || parallel.status !== "ok") throw new Error("Both modes must run")
+    expect(contour.value.operations[0]!.status).toBe("ok")
+    expect(contour.value.operations[0]!.parameters["mode"]).toBe("contour")
+    expect(contour.value.nc).not.toBe(parallel.value.nc)
+    expect(contour.value.nc).toMatch(/\bA-?\d/)
+    expect(contour.value.claims.find((c) => c.id === "nc-replay")!.status).toBe("passed")
   })
 })
 

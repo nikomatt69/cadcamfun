@@ -1,5 +1,7 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { brep } from "@cadcamfun/core"
+import { brep, model } from "@cadcamfun/core"
+import { ACTION_CONTRACTS } from "@cadcamfun/api"
+import { Schema } from "effect"
 import { parametricReport } from "../src/parametric.ts"
 import { runParametricExact } from "../src/actions/parametric.ts"
 import type { ActionContext } from "../src/actions/action.ts"
@@ -19,6 +21,20 @@ const plate = {
 const context = { handlers: {}, projectId: "p" } as unknown as ActionContext
 
 describe("the assistant's view of the exact model", () => {
+  test("recovery warnings survive validation and the exact-action wire contract, with and without STEP", async () => {
+    const m = model()
+    m.extrude(m.sketch("XY").rectangle([0, 0], 10, 10), { depth: 10 })
+    m.hole({ id: "bore", plane: "XY", offset: 10, at: [2, 5], diameter: 4, depth: 10 })
+    const history = m.build()
+    expect(parametricReport(history).warnings.some((warning) => warning.includes("bore:") && warning.includes("displaced"))).toBe(true)
+    for (const includeStep of [false, true]) {
+      const result = await runParametricExact({ history, includeStep } as never, context)
+      const decoded = Schema.decodeUnknownSync(ACTION_CONTRACTS["cad.parametric_exact"]!.result! as Schema.Decoder<unknown>)(result) as { warnings: string[]; step?: string }
+      expect(decoded.warnings.some((warning) => warning.includes("bore:") && warning.includes("displaced"))).toBe(true)
+      expect(new Set(decoded.warnings).size).toBe(decoded.warnings.length)
+      if (includeStep) expect(decoded.step).toStartWith("ISO-10303-21;")
+    }
+  })
   test("every validation report carries the exact volume and topology of each body", () => {
     const report = parametricReport(plate) as unknown as { ok: boolean; exact: Array<Record<string, unknown>> }
     expect(report.ok).toBe(true)

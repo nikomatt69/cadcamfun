@@ -21,6 +21,7 @@ import type { Dimension } from "./expr.ts"
 import type { DimConstraint } from "./history.ts"
 import type { SketchEntity } from "./sketch.ts"
 import { sampleSpline } from "./spline.ts"
+import { controlledCurves, ellipseCurves, type NominalSketchCurve } from "./sketch-curves.ts"
 import type { Vec2 } from "./vec.ts"
 
 type Pair = readonly [Dimension, Dimension]
@@ -37,6 +38,7 @@ export type SketchShape =
 export interface ExpandedShape {
   readonly entities: ReadonlyArray<SketchEntity>
   readonly constraints: ReadonlyArray<DimConstraint>
+  readonly nominalCurves?: ReadonlyArray<NominalSketchCurve>
 }
 
 /** Turns a dimension into a number (the history's parameters are known to the caller). */
@@ -166,7 +168,12 @@ export const expandShape = (shape: SketchShape, evaluate: Evaluate, lenient = fa
       const segments = shape.segments ?? 48
       if (!Number.isInteger(segments) || segments < 8 || segments > 200) refuse(`Ellipse '${id}' needs from 8 to 200 segments (it has ${segments})`)
       if (!(evaluate(shape.radiusX) > GUARD && evaluate(shape.radiusY) > GUARD)) refuse(`Ellipse '${id}' needs positive radii`)
-      return roundVertices(id, shape.at, segments, shape.radiusX, shape.radiusY, 0, evaluate)
+      const expanded = roundVertices(id, shape.at, segments, shape.radiusX, shape.radiusY, 0, evaluate)
+      return { ...expanded, nominalCurves: [{
+        id, replaces: Array.from({ length: segments }, (_, i) => `${id}.l${i}`), closed: true,
+        start: `${id}.v0`, end: `${id}.v0`,
+        segments: ellipseCurves({ x: evaluate(shape.at[0]), y: evaluate(shape.at[1]) }, evaluate(shape.radiusX), evaluate(shape.radiusY))
+      }] }
     }
     case "slot": {
       const length = evaluate(shape.length), width = evaluate(shape.width)
@@ -228,7 +235,11 @@ export const expandShape = (shape: SketchShape, evaluate: Evaluate, lenient = fa
       })
       const joins = closed || shape.chord === true ? sampled.length : sampled.length - 1
       for (let k = 0; k < joins; k++) acc.entities.push({ id: `${id}.l${k}`, kind: "line", p1: `${id}.p${k}`, p2: `${id}.p${(k + 1) % sampled.length}` })
-      return acc
+      return { ...acc, nominalCurves: [{
+        id, replaces: Array.from({ length: closed ? joins : sampled.length - 1 }, (_, i) => `${id}.l${i}`),
+        segments: controlledCurves(shape.curve, shape.points.map(([x, y]) => ({ x: evaluate(x), y: evaluate(y) })), closed, degree),
+        closed, start: `${id}.p0`, end: `${id}.p${closed ? 0 : sampled.length - 1}`
+      }] }
     }
     case "polyline": {
       if (shape.points.length < 3) refuse(`Polyline '${id}' needs at least three points (it has ${shape.points.length})`)
@@ -247,6 +258,7 @@ export const expandSketch = (
 ): ExpandedShape => {
   const entities: SketchEntity[] = [...sketch.entities]
   const constraints: DimConstraint[] = [...sketch.constraints]
+  const nominalCurves: NominalSketchCurve[] = []
   const seen = new Set(entities.map((e) => e.id))
   for (const shape of sketch.shapes ?? []) {
     const expanded = expandShape(shape, evaluate)
@@ -256,6 +268,7 @@ export const expandSketch = (
       entities.push(e)
     }
     constraints.push(...expanded.constraints)
+    nominalCurves.push(...expanded.nominalCurves ?? [])
   }
-  return { entities, constraints }
+  return { entities, constraints, ...(nominalCurves.length === 0 ? {} : { nominalCurves }) }
 }

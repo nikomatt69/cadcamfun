@@ -93,6 +93,21 @@ describe("rib, sheet metal, thread, text and press/pull reach the assistant", ()
     expect(historyVolume(built)).toBeCloseTo(40 * 30 * 10 + 3 * 5 * 2 * 4, 3)
   })
 
+  test("a named press/pull moves that face when the point is stale, and a missing name is refused", () => {
+    const named = parse([...base, { id: "pp", type: "pushpull", name: "e.top", near: [0, 0, 0], distance: 5 }])
+    expect(named.success).toBe(true)
+    if (!named.success) return
+    const built = rebuild(named.data as History)
+    expect(built.issues.filter((i) => i.severity === "error")).toEqual([])
+    expect(Math.abs(historyVolume(built) - 40 * 30 * 15) / (40 * 30 * 15)).toBeLessThan(1e-4)
+    const missing = parse([...base, { id: "pp", type: "pushpull", name: "e.missing", near: [20, 15, 10], distance: 5 }])
+    expect(missing.success).toBe(true)
+    if (!missing.success) return
+    const refused = rebuild(missing.data as History)
+    expect(refused.issues.some((i) => i.severity === "error" && i.message.includes("does not exist"))).toBe(true)
+    expect(Math.abs(historyVolume(refused) - 40 * 30 * 10) / (40 * 30 * 10)).toBeLessThan(1e-4)
+  })
+
   test("references are checked: a rib needs an earlier sketch, a push/pull needs a body", () => {
     expect(parse([...base, { id: "rib", type: "rib", sketch: "nope", thickness: 2, depth: 4 }]).success).toBe(false)
     expect(parse([plate, { id: "pp", type: "pushpull", near: [0, 0, 0], distance: 1 }]).success).toBe(false)
@@ -117,6 +132,12 @@ describe("rib, sheet metal, thread, text and press/pull reach the assistant", ()
     expect(built.issues).toEqual([])
     expect(built.bodies).toHaveLength(2)
     expect(parse([plate, { id: "d", type: "draft", near: [0, 0, 0], angle: 3 }]).success).toBe(false)
+    const named = parse([...base, { id: "d", type: "draft", name: "e.top", near: [0, 0, 0], angle: 5 }])
+    expect(named.success).toBe(true)
+    if (named.success) {
+      const feature = named.data.features.at(-1)
+      expect(feature !== undefined && "name" in feature ? feature.name : undefined).toBe("e.top")
+    }
     expect(parse([...base, ...second, { id: "j", type: "mate", body: "e", face: { near: [0, 0, 0] }, to: { body: "e", near: [0, 0, 0] } }]).success).toBe(false)
     expect(parse([...base, ...second, { id: "j", type: "mate", body: "e2", face: { near: [0, 0, 0] }, to: { body: "ghost", near: [0, 0, 0] } }]).success).toBe(false)
   })

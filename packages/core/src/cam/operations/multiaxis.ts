@@ -246,12 +246,15 @@ export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, t
       const loops = contour(height, level, rect, step, false, nodes).map((l) => simplify(l, params.tolerance, true)).filter((l) => l.length >= 3)
       stats.lines += loops.length
       for (const loop of loops) {
-        const run: Sample[] = []
-        for (const xy of loop) {
+        let run: Sample[] = []
+        // Revisit the first point to cut the closing leg, but never bridge an unreachable interval.
+        for (const xy of [...loop, loop[0]!]) {
           const hit = soup.down(xy.x, xy.y, topZ + 1)
-          if (hit === undefined) continue
-          const sample = take(sampleAt(hit, travelOf(loop, xy), params, tool, soup, k))
-          if (sample !== undefined) run.push(sample)
+          const sample = take(hit === undefined ? undefined : sampleAt(hit, travelOf(loop, xy), params, tool, soup, k))
+          if (sample === undefined) {
+            if (run.length > 0) sections.push(run)
+            run = []
+          } else run.push(sample)
         }
         if (run.length > 0) sections.push(run)
       }

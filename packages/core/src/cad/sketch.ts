@@ -25,6 +25,7 @@
  * Dimensions are numbers; the parametric history (`history.ts`) resolves its expressions to numbers before it calls the solver.
  */
 import type { Vec2 } from "./vec.ts"
+import { catmullRomCurves, sampleNominalCurves, type NominalSketchCurve } from "./sketch-curves.ts"
 
 export type PointId = string
 
@@ -77,6 +78,8 @@ export type Constraint = (
 export interface Sketch {
   readonly entities: ReadonlyArray<SketchEntity>
   readonly constraints: ReadonlyArray<Constraint>
+  /** Runtime provenance generated from authored shapes; sampled construction edges keep their constraint ids. */
+  readonly nominalCurves?: ReadonlyArray<NominalSketchCurve>
 }
 
 export type SolveStatus = "fully-constrained" | "under-constrained" | "over-constrained" | "conflicting" | "failed"
@@ -474,7 +477,7 @@ export const solveSketch = (sketch: Sketch, options: SolveOptions = {}): SolveRe
     return e
   }
   return {
-    sketch: { entities: sketch.entities.map(moved), constraints: sketch.constraints },
+    sketch: { ...sketch, entities: sketch.entities.map(moved) },
     status, dof, iterations, residual,
     free: [...freePoints].filter((id) => sketch.entities.some((e) => e.id === id && (e.kind === "point" || e.kind === "circle" || e.kind === "ellipse"))).sort(),
     conflicts: solved ? [] : conflicts,
@@ -551,7 +554,14 @@ export const sketchProfiles = (sketch: Sketch, tolerance = 0.01): { readonly loo
   const edges: Edge[] = []
   const loops: Vec2[][] = []
   const open: Vec2[][] = []
+  const replaced = new Set(sketch.nominalCurves?.flatMap((curve) => curve.replaces))
+  for (const curve of sketch.nominalCurves ?? []) {
+    const sampled = sampleNominalCurves(curve.segments, tolerance)
+    if (curve.closed) { sampled.pop(); loops.push(sampled) }
+    else edges.push({ a: curve.start, b: curve.end, points: (forward) => forward ? sampled : [...sampled].reverse() })
+  }
   for (const e of sketch.entities) {
+    if (replaced.has(e.id)) continue
     if (e.kind === "line") edges.push({ a: e.p1, b: e.p2, points: (f) => (f ? [at(e.p1), at(e.p2)] : [at(e.p2), at(e.p1)]) })
     else if (e.kind === "arc") edges.push({ a: e.start, b: e.end, points: (f) => { const p = arcPoints(at(e.center), at(e.start), at(e.end), tolerance); return f ? p : [...p].reverse() } })
     else if (e.kind === "circle") {
@@ -562,9 +572,9 @@ export const sketchProfiles = (sketch: Sketch, tolerance = 0.01): { readonly loo
     }
     else if (e.kind === "ellipse") loops.push(ellipseLoopPoints(at(e.center), e.radiusX, e.radiusY, e.rotation ?? 0, tolerance))
     else if (e.kind === "spline") {
-      const sampled = splinePoints(e.points.map(at), e.closed === true, tolerance)
+      const sampled = sampleNominalCurves(catmullRomCurves(e.points.map(at), e.closed === true), tolerance)
       if (e.closed === true) { if (sampled.length > 1 && Math.hypot(sampled[0]!.x - sampled[sampled.length - 1]!.x, sampled[0]!.y - sampled[sampled.length - 1]!.y) < 1e-9) sampled.pop(); loops.push(sampled) }
-      else open.push(sampled)
+      else edges.push({ a: e.points[0]!, b: e.points[e.points.length - 1]!, points: (forward) => forward ? sampled : [...sampled].reverse() })
     }
   }
   const used = new Set<number>()

@@ -36,6 +36,9 @@ export { COIL_STEPS_PER_TURN, coilGeometry } from "./helix.ts"
 import { blendEdges, blendEdgesVariable, findEdges, selectEdges } from "./edge-blend.ts"
 import { expandSketch, type SketchShape } from "./sketch-shapes.ts"
 import { elementMesh } from "../cam/model/element-mesh.ts"
+import { rebuildExact } from "./history-brep.ts"
+import { blendBrep, blendCandidates, faceByName, faceCentre, isConePlaneRim, meshEdgeDefects, selectBlendEdges, tessellateBrep, withBudget } from "./brep/index.ts"
+import { isSpherePlaneRim } from "./brep/blend-sphere-plane.ts"
 
 export type PlaneName = "XY" | "YZ" | "ZX"
 /** A plane a sketch, hole or text lies on: one of the three base planes, or the id of an earlier `plane` feature. */
@@ -389,6 +392,11 @@ export interface PushPullFeature {
   readonly type: "pushpull"
   /** A point on, or near, the face: the face nearest it is taken. */
   readonly near: readonly [Dimension, Dimension, Dimension]
+  /**
+   * The exact name of the face to push or pull (e.g. `plate.top`): the named face is then the one that is moved, and the
+   * point above is only a hint. A name that no longer exists is reported, never replaced by a nearby face.
+   */
+  readonly name?: string
   /** Only faces whose outward normal points this way (within 60 degrees) are considered. */
   readonly normal?: readonly [Dimension, Dimension, Dimension]
   readonly distance: Dimension
@@ -404,6 +412,11 @@ export interface DraftFeature {
   readonly id: string
   readonly type: "draft"
   readonly near: readonly [Dimension, Dimension, Dimension]
+  /**
+   * The exact name of the face to draft (e.g. `plate.side0.0`): that face is tilted, and `near` is only a hint. A name that
+   * no longer exists is reported, never replaced by a nearby face.
+   */
+  readonly name?: string
   readonly normal?: readonly [Dimension, Dimension, Dimension]
   readonly angle: Dimension
   /** Pull direction (default +Z). */
@@ -869,7 +882,29 @@ export const rebuild = (history: History): RebuildResult => {
     apply(feature, mergeMeshes(copies.map((c) => c.mesh)), operation, targets, `${feature}#all`)
   }
 
-  for (const f of history.features) {
+  /**
+   * The point of a face named by a reference (`plate.top`). The name is resolved on the exact model of the features before
+   * the one that names it, because a named reference must survive an edit that moves the face: the point it was authored
+   * with may be stale by then. A name that does not exist any more is reported, never replaced by a nearby face.
+   */
+  const namedFacePoint = (index: number, bodyId: string | undefined, name: string): { readonly point: V3 } | { readonly error: string } => {
+    if (index <= 0) return { error: `the face '${name}' cannot be resolved: no feature builds a body before it` }
+    let exact: ReturnType<typeof rebuildExact> | undefined
+    try {
+      exact = rebuildExact({ ...history, features: history.features.slice(0, index) }, { bodies: [...bodies], parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues: [...issues] }, { budgetMs: 10_000 })
+    } catch {
+      return { error: `the face '${name}' cannot be resolved: the exact model of the earlier features did not build` }
+    }
+    for (const body of exact.bodies) {
+      if (bodyId !== undefined && body.id !== bodyId) continue
+      if (body.brep === undefined) continue
+      const face = faceByName(body.brep, name)
+      if (face !== undefined) return { point: faceCentre(body.brep, face) }
+    }
+    return { error: `the face '${name}' does not exist any more` }
+  }
+
+  for (const [featureIndex, f] of history.features.entries()) {
     try {
       switch (f.type) {
         case "sketch": {
@@ -908,7 +943,7 @@ export const rebuild = (history: History): RebuildResult => {
             } else constraints.push(c as Constraint)
           }
           if (!ok) break
-          const solve = solveSketch({ entities: expanded.entities, constraints })
+          const solve = solveSketch({ entities: expanded.entities, constraints, ...(expanded.nominalCurves === undefined ? {} : { nominalCurves: expanded.nominalCurves }) })
           const planeFrame = frameFor(f.plane, offset)
           if (planeFrame === undefined) { issues.push({ feature: f.id, severity: "error", message: `Plane '${f.plane}' is not XY, YZ, ZX or an earlier plane feature` }); break }
           sketches[f.id] = { plane: f.plane, offset, frame: planeFrame, solve }
@@ -1116,7 +1151,37 @@ export const rebuild = (history: History): RebuildResult => {
           const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
           if (chosen.length === 0) { issues.push({ feature: f.id, severity: "error", message: "There is no body for this operation to act on" }); break }
           let blended = 0
+          let nativeAttempts = 0
+          // The prefix already has its solved sketches and mesh bodies. Giving it to the exact adapter avoids re-entering
+          // this rebuild. A selection made only of sphere/plane or cone/plane rims uses that exact solid for the mesh.
+          const exactBefore = f.edges?.curved === true && style === "fillet" && radiusEnd === undefined
+            ? rebuildExact({ ...history, features: history.features.slice(0, history.features.indexOf(f)) }, { bodies: [...bodies], parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues: [...issues] }, { budgetMs: 10_000 })
+            : undefined
           for (const b of chosen) {
+            const exact = exactBefore?.bodies.find((body) => body.id === b.id)?.brep
+            const nativeEdges = exact === undefined ? [] : selectBlendEdges(blendCandidates(exact, 25), selector)
+            if (exact !== undefined && nativeEdges.length > 0 && nativeEdges.every((edge) => isSpherePlaneRim(exact, edge) || isConePlaneRim(exact, edge))) {
+              nativeAttempts++
+              try {
+                const result = withBudget(10_000, () => {
+                  const native = blendBrep(exact, nativeEdges, radius)
+                  if (native.blended !== nativeEdges.length || native.rejected.length > 0 || native.failures.length > 0) return { reasons: [...native.rejected, ...native.failures] }
+                  const tessellation = tessellateBrep(native.brep, { chordTol: 0.01 })
+                  const defects = meshEdgeDefects(tessellation.indices)
+                  if (tessellation.warnings.length > 0 || defects.open + defects.nonManifold + defects.misoriented > 0) return { reasons: [...tessellation.warnings, "the derived native-blend mesh is not a checked closed shell"] }
+                  return { mesh: { positions: Float32Array.from(tessellation.positions), indices: tessellation.indices }, count: native.blended }
+                })
+                if (result.mesh === undefined) issues.push({ feature: f.id, severity: "error", message: `Native curved fillet refused: ${result.reasons.join("; ")}` })
+                else {
+                  bodies[bodies.indexOf(b)] = { ...b, mesh: result.mesh }
+                  blended += result.count
+                  for (const warning of exactBefore?.warnings ?? []) if (!issues.some((issue) => issue.feature === f.id && issue.message === warning)) issues.push({ feature: f.id, severity: "warning", message: warning })
+                }
+              } catch (error) {
+                issues.push({ feature: f.id, severity: "error", message: `Native curved fillet failed: ${error instanceof Error ? error.message : String(error)}` })
+              }
+              continue
+            }
             const found = findEdges(b.mesh)
             const picked = selectEdges(found.edges, selector)
             if (radiusEnd === undefined) {
@@ -1137,7 +1202,7 @@ export const rebuild = (history: History): RebuildResult => {
               bodies[bodies.indexOf(b)] = { ...b, mesh }
             }
           }
-          if (blended === 0) issues.push({ feature: f.id, severity: "error", message: "No edge matched the selection (edges are found between planar faces that meet at 25 degrees or more)" })
+          if (blended === 0 && nativeAttempts === 0) issues.push({ feature: f.id, severity: "error", message: "No edge matched the selection (edges are found between planar faces that meet at 25 degrees or more)" })
           break
         }
         case "shell": {
@@ -1512,8 +1577,14 @@ export const rebuild = (history: History): RebuildResult => {
           const w: V3 = { x: pullRaw[0]! / pl, y: pullRaw[1]! / pl, z: pullRaw[2]! / pl }
           const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
           if (candidates.length === 0) { issues.push({ feature: f.id, severity: "error", message: f.body === undefined ? "There is no body to draft" : `Body '${f.body}' does not exist at this point of the history` }); break }
-          const draftNear = { x: near[0]!, y: near[1]!, z: near[2]! }
-          const draftHint = wanted === undefined ? undefined : { x: wanted[0]!, y: wanted[1]!, z: wanted[2]! }
+          let draftNear = { x: near[0]!, y: near[1]!, z: near[2]! }
+          let draftHint = wanted === undefined ? undefined : { x: wanted[0]!, y: wanted[1]!, z: wanted[2]! }
+          if (f.name !== undefined) {
+            const resolved = namedFacePoint(featureIndex, f.body, f.name)
+            if ("error" in resolved) { issues.push({ feature: f.id, severity: "error", message: resolved.error }); break }
+            draftNear = resolved.point
+            draftHint = undefined
+          }
           // A curved face (the side of a boss, a hole wall) leans by moving each vertex square to the pull, by its height above the
           // neutral plane times tan(angle): a cylinder becomes a cone. One-sided only: the neutral plane must not cross the face.
           let curvedDraft: { readonly body: Body; readonly face: SmoothFace } | undefined
@@ -1607,11 +1678,18 @@ export const rebuild = (history: History): RebuildResult => {
           if (candidates.length === 0) { issues.push({ feature: f.id, severity: "error", message: f.body === undefined ? "There is no body to push or pull" : `Body '${f.body}' does not exist at this point of the history` }); break }
           const nearPoint = { x: near[0]!, y: near[1]!, z: near[2]! }
           const normalHint = wantedNormal === undefined ? undefined : { x: wantedNormal[0]!, y: wantedNormal[1]!, z: wantedNormal[2]! }
+          // A named face is the one that is moved: the point it was authored with may be stale after an edit.
+          let selected = nearPoint
+          if (f.name !== undefined) {
+            const resolved = namedFacePoint(featureIndex, f.body, f.name)
+            if ("error" in resolved) { issues.push({ feature: f.id, severity: "error", message: resolved.error }); break }
+            selected = resolved.point
+          }
           const margin = 0.01
           // A curved face (the side of a boss, the wall of a hole, a fillet) is offset along its vertex normals; a flat one by its outline.
           let curved: { readonly body: Body; readonly face: SmoothFace } | undefined
           for (const b of candidates) {
-            const found = findSmoothFace(b.mesh, { near: nearPoint, ...(normalHint !== undefined ? { normal: normalHint } : {}) })
+            const found = findSmoothFace(b.mesh, { near: selected, ...(normalHint !== undefined ? { normal: normalHint } : {}) })
             if ("error" in found) continue
             if (curved === undefined || found.face.distance < curved.face.distance) curved = { body: b, face: found.face }
           }
@@ -1620,7 +1698,7 @@ export const rebuild = (history: History): RebuildResult => {
             apply(f.id, tool, distance > 0 ? "union" : "subtract", [curved.body.id], f.id)
             break
           }
-          const pick = pickFace(candidates, nearPoint, normalHint)
+          const pick = pickFace(candidates, selected, normalHint)
           if ("error" in pick) { issues.push({ feature: f.id, severity: "error", message: pick.error }); break }
           const { face, body } = pick
           const local = distance > 0 ? profileSolid(face.loops, -margin, distance) : profileSolid(face.loops, distance, margin)

@@ -8,6 +8,7 @@ import { Schema } from "effect"
 import { CoolantSchema } from "../ir.ts"
 import type { Cutter } from "./cutters.ts"
 import { SURFACE_MODES, type OperationSpec } from "./contracts.ts"
+import { MultiaxisStrategySchema } from "../operations/multiaxis.ts"
 
 export const SetupOrientationSchema = Schema.Literals(SETUP_ORIENTATIONS)
 
@@ -56,7 +57,7 @@ export const OperationSpecSchema = Schema.Union([
     angle: Schema.optionalKey(Schema.Finite), restFrom: Schema.optionalKey(id), center: Schema.optionalKey(point)
   }),
   Schema.Struct({
-    ...overrides, strategy: Schema.Literal("multiaxis"), top: Schema.Finite, stepover: positive,
+    ...overrides, strategy: Schema.Literal("multiaxis"), mode: Schema.optionalKey(MultiaxisStrategySchema), top: Schema.Finite, stepover: positive,
     angle: Schema.optionalKey(Schema.Finite), toolAxis: Schema.optionalKey(Schema.Literals(["normal", "lead"])),
     lead: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 }))),
     tilt: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 })))

@@ -2,7 +2,7 @@
 
 **A native CAD/CAM workspace for designing parts, planning machining and reviewing the result.**
 
-CADCAMFUN v6 brings parametric modelling, toolpath generation, G-code, engineering libraries and an AI assistant into a desktop application. Project data lives in a local SQLite database. A Tauri shell runs the interface and manages a compiled Bun sidecar that owns the application's services, CAD/CAM operations and integrations.
+CADCAMFUN brings parametric modelling, toolpath generation, G-code, engineering libraries and an AI assistant into a desktop application. Project data lives in a local SQLite database. A Tauri shell runs the interface and manages a compiled Bun sidecar that owns the application's services, CAD/CAM operations and integrations.
 
 [Getting started](#getting-started) · [Capabilities](#capabilities) · [Architecture](#architecture) · [Development](#development) · [Releases](#releases-and-distribution) · [Security](#security-privacy-and-data-ownership) · [Licensing](#licensing-and-commercial-use)
 

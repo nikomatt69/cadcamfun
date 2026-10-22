@@ -6,6 +6,8 @@ import {
   arcControl,
   basisFuns,
   circleProfileLoop,
+  curvePoint,
+  curveProject,
   dersBasisFuns,
   extrudeProfile,
   findSpan,
@@ -112,6 +114,15 @@ describe("nurbs", () => {
       for (let k = 0; k < 3; k++) expect(Math.abs(a[k]! - b[k]!)).toBeLessThan(1e-12)
     }
   })
+})
+
+test("projection of a slender rational ellipse leaves a coarse endpoint seed with negative distance curvature", () => {
+  const curve = { kind: "nurbs" as const, data: { degree: 2, knots: [0, 0, 0, 1, 1, 1], points: [[80, 0, 0], [80, 2, 0], [0, 2, 0]], weights: [1, Math.SQRT1_2, 1] } }
+  for (let i = 0; i <= 100; i++) {
+    const t = i / 100, p = curvePoint(curve, t)
+    const actual = curveProject(curve, p)
+    expect(actual).toBeCloseTo(t, 10)
+  }
 })
 
 describe("surfaces", () => {

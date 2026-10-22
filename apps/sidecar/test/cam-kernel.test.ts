@@ -61,6 +61,20 @@ test("configured stock and Haas presets survive the wire contract", async () => 
   }
 })
 
+test("HTTP preserves the selected multiaxis mode and refuses unknown modes", async () => {
+  const operation = { id: "finish", strategy: "multiaxis", mode: "contour", tool: "ball-10", top: 9, stepover: 40, stepdown: 4 }
+  const request = { ...input, machine: "trunnion-5ax", elements: [{ id: "dome", type: "sphere", x: 0, y: 0, z: 0, radius: 8 }], operations: [operation], resolution: 0.5 }
+  expect((await post({ ...request, operations: [{ ...operation, mode: "unsupported" }] })).status).toBe(400)
+  const response = await post(request)
+  expect(response.status).toBe(200)
+  const result = Schema.decodeUnknownSync(CamKernelResult)(response.body)
+  if (result.status !== "ok") throw new Error(JSON.stringify(result.issues))
+  expect(result.value.operations[0]).toMatchObject({ status: "ok", parameters: { mode: "contour" } })
+  expect(result.value.nc).toMatch(/\bA-?\d/)
+  expect(result.value.identity.nc).toBe(cam.kernel.sha256(result.value.nc))
+  expect(result.value.claims.find((claim) => claim.id === "nc-replay")?.status).toBe("passed")
+})
+
 test("assistant native manufacture stores the original artifact only through a write-scoped action", async () => {
   const project = (await app.call("/api/projects", { method: "POST", json: { name: "Assistant kernel" } })).body.id
   const drawing = (await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Plate", data: { elements: input.elements } } })).body.id

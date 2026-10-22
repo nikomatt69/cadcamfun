@@ -90,6 +90,7 @@ const sheet = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(
 /** The rebuild report every parametric read returns: the rebuild succeeded (`ok`), its bodies, volume and problems. */
 const parametricReport = {
   ok: Schema.Boolean,
+  warnings: Schema.optionalKey(strings),
   bodyCount: int,
   volumeMm3: nullable(num),
   bounds: nullable(Schema.Struct({ min: vec3, max: vec3 })),
@@ -100,7 +101,11 @@ const parametricValidate = Schema.Struct(parametricReport)
 const parametricInspect = Schema.Struct({ ...parametricReport, elementId: str, revision: str, history: record, ...drawingRef })
 const parametricTest = Schema.Struct({ ok: Schema.Boolean, revision: str, mutated: Schema.Literal(false), cases: Schema.Array(record), elementId: str, ...drawingRef })
 const parametricDfm = Schema.Struct({ ok: Schema.Boolean, process: str, toolDiameter: num, issues: Schema.Array(record), metrics: Schema.Struct({ bodies: int, volumeMm3: num }) })
-const parametricExact = Schema.Struct({ ok: Schema.Boolean, bodies: Schema.Array(record), issues: Schema.Array(record) })
+const parametricExact = Schema.Struct({
+  ok: Schema.Boolean, bodies: Schema.Array(record), issues: Schema.Array(record), warnings: Schema.optionalKey(strings),
+  exported: Schema.optionalKey(strings), skipped: Schema.optionalKey(Schema.Array(Schema.Struct({ id: str, reason: str }))),
+  step: Schema.optionalKey(str), stepBytes: Schema.optionalKey(int), stepNote: Schema.optionalKey(str)
+})
 const exact = Schema.Struct({
   ok: Schema.Literal(true),
   totals: Schema.Struct({ parts: int, volume: num, area: num }),

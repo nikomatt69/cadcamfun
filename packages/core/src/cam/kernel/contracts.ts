@@ -9,6 +9,7 @@ import type { Coolant, Program, Toolpath, WorkOffset } from "../ir.ts"
 import type { PostId, PostOptions } from "../post/types.ts"
 import type { Cutter } from "./cutters.ts"
 import type { CutClass, CuttingData, MachineLimits } from "./cutting-data.ts"
+import type { MultiaxisStrategy } from "../operations/multiaxis.ts"
 
 export const KERNEL_SCHEMA_VERSION = 1
 
@@ -144,7 +145,7 @@ export type OperationSpec =
    * Simultaneous five-axis finishing on a trunnion table: the tool leans off the surface normal (`lead` towards the travel, `tilt`
    * sideways) and the table turns with the linear axes. The moves carry A/B/C words; `top` is the highest the tool may be.
    */
-  | (OperationBase & { readonly strategy: "multiaxis"; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead"; readonly lead?: number; readonly tilt?: number })
+  | (OperationBase & { readonly strategy: "multiaxis"; readonly mode?: MultiaxisStrategy; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead"; readonly lead?: number; readonly tilt?: number })
 
 export type Strategy = OperationSpec["strategy"]
 
@@ -256,7 +257,9 @@ export interface StockSummary {
   readonly cellSize: number
   /**
    * Removal by moves with the table turned, bracketed on the voxel stock (the height field above does not cover them).
-   * `removedLower..removedUpper` and `remainingLower..remainingUpper` are mm³ on the raw stock; the true value lies inside.
+   * The voxel stock is seeded with the removal the three-axis operations left, so these volumes are against the stock the
+   * rotary operation actually ran on (the raw box less the predecessor's removal), not against the raw box.
+   * `removedLower..removedUpper` and `remainingLower..remainingUpper` are mm³ on that stock; the true value lies inside.
    * Absent when the program has no turned move.
    */
   readonly fiveAxis?: {

@@ -32,6 +32,7 @@ import { edgeUses, mergeBreps, type Brep } from "./topology.ts"
 import { chamferRefusal, chamferSetbacks } from "../blend-spec.ts"
 import { loftBrep, loftSection } from "./loft.ts"
 import { BudgetExceeded } from "./budget.ts"
+import { blendSpherePlaneRim, isSpherePlaneRim } from "./blend-sphere-plane.ts"
 
 interface Box { readonly lo: Vec3; readonly hi: Vec3 }
 
@@ -133,6 +134,21 @@ export const blendCandidates = (b: Brep, minAngleDegrees = 0.5): BlendCandidate[
       return
     }
     if (e.curve.kind === "circle" && e.v0 === e.v1) {
+      const planeUse = u.find((use) => b.faces[use.face]!.surface.kind === "plane")
+      const sphereUse = u.find((use) => b.faces[use.face]!.surface.kind === "sphere")
+      if (planeUse !== undefined && sphereUse !== undefined) {
+        const p0 = b.vertices[e.v0]!.point
+        const nA = outwardNormal(b, planeUse.face, p0), nB = outwardNormal(b, sphereUse.face, p0)
+        const sphere = b.faces[sphereUse.face]!.surface
+        if (sphere.kind !== "sphere" || Math.abs(e.t1 - e.t0 - 2 * Math.PI) > 1e-9 || Math.abs(Math.abs(dot3(e.curve.frame.z, nA)) - 1) > 1e-9 || length3(cross3(sub3(sphere.frame.origin, e.curve.frame.origin), nA)) > MODEL_TOL || length3(cross3(nA, nB)) < Math.max(1e-9, minSin)) return
+        const intoA = cross3(nA, coedgeTangent(b, ei, e.t0, planeUse.reversed))
+        const reach = (fi: number) => faceBoundaryPoints(b, fi).reduce((m, p) => Math.max(m, length3(sub3(p, p0))), 0)
+        out.push({ edge: ei, curve: "circle", a: p0, b: p0, nA, nB, faceA: planeUse.face, faceB: sphereUse.face,
+          convex: dot3(intoA, nB) < 0, length: 2 * Math.PI * e.curve.radius,
+          reachA: reach(planeUse.face), reachB: reach(sphereUse.face), curved: true,
+          axis: { origin: e.curve.frame.origin, dir: nA, radius: e.curve.radius } })
+        return
+      }
       // A rim between two faces whose sections through the axis are straight: a plane square to the axis, a cylinder or a
       // cone about it (a hole's mouth, a boss's foot, a turned shoulder, a cone meeting a cylinder or another cone). The
       // rolling ball's section is then the same 2D corner as for a straight edge, revolved: an exact torus.
@@ -261,6 +277,10 @@ export interface BlendResult {
   /** Edges or corners whose exact Boolean failed: the exact solid then differs from the mesh blend. */
   readonly failures: ReadonlyArray<string>
 }
+
+/** A full circular rim between a plane and a cone. The revolved rolling-ball tool is an exact torus. */
+export const isConePlaneRim = (b: Brep, e: BlendCandidate): boolean =>
+  e.curve === "circle" && b.faces[e.faceA]?.surface.kind === "plane" && b.faces[e.faceB]?.surface.kind === "cone"
 
 export const describeBlendEdge = (e: BlendCandidate): string =>
   e.curve === "circle"
@@ -483,6 +503,16 @@ export const blendBrep = (b: Brep, edges: ReadonlyArray<BlendCandidate>, size: n
   const built: Array<{ readonly edge: BlendCandidate; readonly tool: Brep; readonly box: Box }> = []
   for (const e of edges) {
     try {
+      if (isSpherePlaneRim(b, e)) {
+        if (style !== "fillet") { rejected.push(`${describeBlendEdge(e)}: a sphere/plane chamfer needs a curved setback construction`); continue }
+        if (edges.some((other) => other.edge !== e.edge && [other.faceA, other.faceB].some((fi) => fi === e.faceA || fi === e.faceB))) { rejected.push(`${describeBlendEdge(e)}: interacting sphere/plane blends need a junction law`); continue }
+        const matches = current === b ? [e] : blendCandidates(current).filter((candidate) => isSpherePlaneRim(current, candidate) && candidate.axis !== undefined && e.axis !== undefined && Math.abs(candidate.axis.radius - e.axis.radius) < MODEL_TOL && length3(sub3(candidate.axis.origin, e.axis.origin)) < MODEL_TOL)
+        if (matches.length !== 1) { rejected.push(`${describeBlendEdge(e)}: the original rim no longer has a unique correspondence`); continue }
+        const result = blendSpherePlaneRim(current, matches[0]!, size)
+        if (typeof result === "string") rejected.push(`${describeBlendEdge(e)}: ${result}`)
+        else { current = result; blended++; done.push(e) }
+        continue
+      }
       const tool = edgeTool(b, uses, e, size, style, g, endCuts(b, e, edges, size, style), options.chamfer)
       if (typeof tool === "string") { rejected.push(`${describeBlendEdge(e)}: ${tool}`); continue }
       built.push({ edge: e, tool, box: toolBox(tool, g) })

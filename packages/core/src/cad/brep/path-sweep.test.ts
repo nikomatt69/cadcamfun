@@ -1,5 +1,6 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { booleanBrep, circleProfileLoop, frame, makeBox, massProperties, rectangleProfileLoop, sewSolids, sweepPath, validateBrep, type Brep, type PathPiece } from "./index.ts"
+import { booleanBrep, circleProfileLoop, frame, makeBox, mapProfileLoop, massProperties, rectangleProfileLoop, sewSolids, sweepPath, validateBrep, type Brep, type PathPiece, type ProfileLoop } from "./index.ts"
+import { ellipseCurves } from "../sketch-curves.ts"
 
 setDefaultTimeout(60_000)
 
@@ -44,6 +45,19 @@ describe("exact sweep along a path of lines and arcs", () => {
     expect(rel(solid(sweepPath({ loops: [rectangleProfileLoop(-2, -1, 2, 1)] }, { x: v(0, 1, 0), y: v(0, 0, 1) }, square, { closed: true })), (44 * 44 - 36 * 36) * 2)).toBeLessThan(1e-12)
     const ring: PathPiece[] = [{ kind: "arc", center: v(0, 0, 0), axis: v(0, 0, 1), from: v(10, 0, 0), angle: 2 * PI }]
     expect(rel(solid(sweepPath({ loops: [circleProfileLoop({ x: 0, y: 0 }, 2)] }, { x: v(1, 0, 0), y: v(0, 0, 1) }, ring, { closed: true })), 2 * PI * PI * 10 * 4)).toBeLessThan(1e-12)
+  })
+
+  test("an elliptical NURBS section retains its area through straight runs and a circular bend", () => {
+    const spans = ellipseCurves({ x: 0, y: 0 }, 2, 1)
+    const loop: ProfileLoop = spans.map((data) => ({ kind: "nurbs", data }))
+    const pipe = sweepPath({ loops: [loop] }, start, bent)
+    expect(rel(solid(pipe), PI * 2 * (40 + 5 * PI))).toBeLessThan(1e-8)
+    const mirrored = mapProfileLoop(loop, [1, 0, 0, -1], { x: 10, y: 3 })
+    expect(mirrored[0]!.kind).toBe("nurbs")
+    if (mirrored[0]!.kind === "nurbs") {
+      expect(mirrored[0]!.data.weights).toBe(spans[0]!.weights)
+    }
+    expect(() => mapProfileLoop(loop, [2, 0, 0, 1], { x: 0, y: 0 })).toThrow("rigid")
   })
 
   test("a bend tighter than the section, or a path that turns back, is refused", () => {

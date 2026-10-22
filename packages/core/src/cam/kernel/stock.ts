@@ -16,6 +16,7 @@
 import type { Vec3 } from "../../cad/vec.ts"
 import { assemblyProfile, type AssemblyPart } from "./assembly.ts"
 import type { Cutter } from "./cutters.ts"
+import type { HeightField } from "../verify/heightfield.ts"
 
 export interface VoxelStock {
   /** Minimum corner of the grid, mm. */
@@ -150,6 +151,57 @@ export const remainingVolume = (stock: VoxelStock): { readonly lower: number; re
     if (stock.removedSure[id] !== 1) upper++
   }
   return { lower: lower * v, upper: upper * v }
+}
+
+/**
+ * Carry the 3-axis removal recorded on `hf` (the height field the operations carved) onto a voxel grid, so a later rotary /
+ * four-axis operation is measured against the material the 3-axis predecessor actually left instead of the original stock box.
+ *
+ * The carry is one-sided and conservative, so it can only tighten the bracket downwards to what the predecessor proved:
+ *
+ *   - a voxel lying wholly above the remaining top of EVERY height-field column it overlaps is certainly gone
+ *     (`removedSure`, and therefore also `removedPossible`);
+ *   - a voxel whose top rises above the lowest remaining top in its footprint may have been cut (`removedPossible` only);
+ *   - a voxel that still straddles or lies under the deepest remaining material is left as stock.
+ *
+ * A voxel is only ever added to the removal sets, never taken out of them, so carrying a height field can never turn a
+ * possibly-removed voxel back into material. The height field reads each column at its centre and quantises walls to half a
+ * cell, which is why the straddling band is only "possible": the carry never asserts more removal than the predecessor proved.
+ */
+export const carryHeightField = (voxels: VoxelStock, hf: HeightField): void => {
+  const h = voxels.voxel, hd = h / 2
+  const topsOf = (x: number, y: number): { min: number; max: number } => {
+    // Columns whose extent overlaps this voxel's XY footprint. The voxel centre is clamped into the field first, so an edge
+    // voxel resolves to its nearest columns instead of an empty range; the grid and the field share the stock's XY extent, so
+    // this clamp only bites at the boundary.
+    const cx = Math.min(hf.minX + (hf.nx - 0.5) * hf.cellX, Math.max(hf.minX + 0.5 * hf.cellX, x))
+    const cy = Math.min(hf.minY + (hf.ny - 0.5) * hf.cellY, Math.max(hf.minY + 0.5 * hf.cellY, y))
+    const i0 = Math.max(0, Math.floor((cx - hd - hf.minX) / hf.cellX)), i1 = Math.min(hf.nx - 1, Math.floor((cx + hd - hf.minX) / hf.cellX))
+    const j0 = Math.max(0, Math.floor((cy - hd - hf.minY) / hf.cellY)), j1 = Math.min(hf.ny - 1, Math.floor((cy + hd - hf.minY) / hf.cellY))
+    let min = Infinity, max = -Infinity
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const top = hf.top[j * hf.nx + i]!
+      if (top < min) min = top
+      if (top > max) max = top
+    }
+    return { min, max }
+  }
+  for (let k = 0; k < voxels.nz; k++) {
+    const cz = voxels.origin.z + (k + 0.5) * h
+    for (let j = 0; j < voxels.ny; j++) {
+      const cy = voxels.origin.y + (j + 0.5) * h
+      for (let i = 0; i < voxels.nx; i++) {
+        const id = index(voxels, i, j, k)
+        if (voxels.material[id] !== 1 || voxels.removedSure[id] === 1) continue
+        const { min, max } = topsOf(voxels.origin.x + (i + 0.5) * h, cy)
+        if (!Number.isFinite(min)) continue
+        // Above the deepest remaining column in the footprint: at least some of this voxel was cut away.
+        if (cz + hd > min) voxels.removedPossible[id] = 1
+        // Above the highest remaining column: the whole voxel is gone, in this footprint and everywhere under it.
+        if (cz - hd > max) voxels.removedSure[id] = 1
+      }
+    }
+  }
 }
 
 /** What the tool assembly touches in the stock at one pose: a contact that is certain, or one that cannot be excluded. */

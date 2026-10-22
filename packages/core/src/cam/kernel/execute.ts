@@ -29,7 +29,7 @@ import { FaceParams, generateFace } from "../operations/face.ts"
 import { MultiaxisParams, generateMultiaxis } from "../operations/multiaxis.ts"
 import { fiveAxisKinematic } from "../five-axis.ts"
 import { tableRotation, type RotaryAngles, type RotaryLayout } from "../indexing.ts"
-import { remainingVolume, removeTipPath, stockContact, voxelStock, type VoxelStock } from "./stock.ts"
+import { carryHeightField, remainingVolume, removeTipPath, stockContact, voxelStock, type VoxelStock } from "./stock.ts"
 import { TriangleSoup } from "../model/mesh-queries.ts"
 import { PocketParams, generatePocket } from "../operations/pocket.ts"
 import { ProfileParams, generateProfile } from "../operations/profile.ts"
@@ -248,10 +248,10 @@ const fiveAxisBracket = (vs: VoxelStock): NonNullable<StockSummary["fiveAxis"]> 
   return { voxelMm: vs.voxel, removedLower: round(raw - left.upper), removedUpper: round(raw - left.lower), remainingLower: round(left.lower), remainingUpper: round(left.upper) }
 }
 
-/** What the five-axis moves removed from the raw stock, as the bracket of the voxel stock; the height field does not cover them. */
+/** What the five-axis moves removed, as the bracket of the voxel stock; the height field does not cover them. */
 const fiveAxisRemovalText = (vs: VoxelStock): string => {
   const b = fiveAxisBracket(vs)
-  return `Five-axis moves remove between ${b.removedLower.toFixed(0)} and ${b.removedUpper.toFixed(0)} mm³ of the raw stock; the three-axis height field does not cover them`
+  return `Five-axis moves remove between ${b.removedLower.toFixed(0)} and ${b.removedUpper.toFixed(0)} mm³ of the voxel stock they ran on (the raw box less what the three-axis operations left); the three-axis height field does not cover them`
 }
 
 /** Largest table turn between two poses of a move, degrees: the angles are interpolated in steps of at most this. */
@@ -377,6 +377,7 @@ const carve = (hf: HeightField, segments: ReadonlyArray<PathSegment>, model: Too
 interface Generated {
   readonly toolpath: Toolpath | undefined
   readonly warnings: ReadonlyArray<string>
+  readonly skippedSamples?: number
 }
 
 /** Where a running job is, reported before each operation and each stage after them. */
@@ -596,7 +597,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           if (five === undefined) { fail("InvalidInput", `${op.id}: the machine has no rotary table: choose a 5-axis machine`, data); return }
           const soup = new TriangleSoup(workMeshes, Math.max(0.5, cell))
           const params = decode(MultiaxisParams, {
-            ...common, strategy: "parallel", stepover: Math.max(1, Math.min(100, op.stepover)), angle: op.angle ?? 0,
+            ...common, strategy: op.mode ?? "parallel", stepover: Math.max(1, Math.min(100, op.stepover)), angle: op.angle ?? 0,
             toolAxis: op.toolAxis ?? "normal", lead: op.lead ?? 10, tilt: op.tilt ?? 0, tolerance: prepared.tolerance
           })
           const kin = fiveAxisKinematic({
@@ -604,7 +605,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
             pivot: five.pivot, tcp: "program"
           })
           const r = generateMultiaxis(params, soup, legacyTool(tool), kin)
-          generated = { toolpath: r.toolpath, warnings: [...r.warnings, ...(r.stats.skipped > 0 ? [`${op.id}: ${r.stats.skipped} points skipped (no lean clears the part, or the table cannot reach it)`] : [])] }
+          generated = { toolpath: r.toolpath, skippedSamples: r.stats.skipped, warnings: [...r.warnings, ...(r.stats.skipped > 0 ? [`${op.id}: ${r.stats.skipped} points skipped (no lean clears the part, or the table cannot reach it)`] : [])] }
           break
         }
         case "surface": {
@@ -651,7 +652,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     warnings.push(...generated.warnings, ...data.warnings)
     outcomes.push({
       id: op.id, name, strategy: op.strategy, toolId: tool.id, cut, status: "ok", cutting: data,
-      parameters: { ...common, stepover, ...(allowance !== undefined ? { allowance } : {}) }, overridden, warnings, startZ: start,
+      parameters: { ...common, stepover, ...(allowance !== undefined ? { allowance } : {}), ...(op.strategy === "multiaxis" ? { mode: op.mode ?? "parallel", skippedSamples: generated.skippedSamples ?? 0 } : {}) }, overridden, warnings, startZ: start,
       cutLength: 0, timeSeconds: estimateTime(marked, machine.rapidFeed ?? 10000), removedVolume: 0
     })
   })
@@ -786,13 +787,17 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   if (interpreted !== undefined) {
     let lastOp: number | undefined
     const cellSize = Math.min(hf.cellX, hf.cellY)
-    // The five-axis removal is tracked on its own voxel stock from the raw stock; the height field keeps the three-axis removal.
+    // The five-axis removal is tracked on its own voxel stock; the height field keeps the three-axis removal.
     const five = machine.fiveAxis
     const turnedStock: VoxelStock | undefined = five === undefined ? undefined : voxelStock(
       { x: stock.min.x - origin.x, y: stock.min.y - origin.y, z: stock.min.z - origin.z },
       { x: stock.max.x - origin.x, y: stock.max.y - origin.y, z: stock.max.z - origin.z },
       2
     )
+    // A rotary operation after a three-axis one consumes the stock that predecessor left, not the raw box: the voxel grid is
+    // seeded with the removal the carried height field recorded, so its contact tests and its remaining-volume bracket start
+    // from the material that is really there. The seed only tightens the bracket downwards, never loosens it.
+    if (turnedStock !== undefined) carryHeightField(turnedStock, provisional)
     turnedVoxels = turnedStock
     let angles: RotaryAngles = { a: 0, b: 0, c: 0 }
     for (const s of interpreted.segments as ReadonlyArray<GSegment>) {
@@ -942,6 +947,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   for (const m of unmachined) issues.push(issue("UnsupportedCapability", "plan", m, { severity: "warning" }))
   const exceeded = finalOutcomes.flatMap((x) => x.cutting?.exceeded ?? [])
   const rubbing = finalOutcomes.filter((x) => x.cutting?.warnings.some((w) => /below the .* needs to cut|not suitable|unsuitable|wears in minutes/.test(w)))
+  const usedTools = Object.entries(numbers).map(([id, number]) => ({ ...toolOf(id), number }))
+  if (machine.toolCapacity !== undefined && usedTools.length > machine.toolCapacity) {
+    issues.push(issue("MachineLimit", "post", `The program uses ${usedTools.length} tools and the machine's magazine holds ${machine.toolCapacity}`))
+  }
+  const machineFailures = issues.filter((i) => i.tag === "MachineLimit" && i.severity === "error").map((i) => i.message)
   const claims: Claim[] = [
     {
       id: "cutting-data",
@@ -950,9 +960,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     },
     {
       id: "machine-limits",
-      status: exceeded.length > 0 || issues.some((i) => i.tag === "MachineLimit" && i.severity === "error") ? "failed" : machine.limits.powerKw === undefined && machine.limits.powerCurve === undefined ? "unsupported" : "passed",
-      detail: exceeded.length > 0
-        ? exceeded.join("; ")
+      status: exceeded.length > 0 || machineFailures.length > 0 ? "failed" : machine.limits.powerKw === undefined && machine.limits.powerCurve === undefined ? "unsupported" : "passed",
+      detail: exceeded.length > 0 || machineFailures.length > 0
+        ? [...exceeded, ...machineFailures].join("; ")
         : machine.limits.powerKw === undefined && machine.limits.powerCurve === undefined
           ? "The machine has no spindle power figure: load not checked"
           : `Spindle speed, feed, power${machine.limits.torqueNm !== undefined ? ", torque" : ""} and cutter deflection within limits`
@@ -998,24 +1008,23 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     }
   ]
   const hidden = hiddenSurfaces(prepared.meshes, prepared.bounds.min[2], Math.max(1e-6, prepared.tolerance))
-  if (hidden > 0) {
-    const detail = `${hidden} downward-facing mesh triangles above the underside are hidden from this setup; prepare another manual setup or a supported rotary process. Height-field replay does not verify these surfaces`
+  const skippedSamples = finalOutcomes.reduce((sum, outcome) => sum + (typeof outcome.parameters["skippedSamples"] === "number" ? outcome.parameters["skippedSamples"] : 0), 0)
+  if (hidden > 0 || skippedSamples > 0) {
+    const detail = [
+      ...(hidden > 0 ? [`${hidden} downward-facing mesh triangles above the underside are hidden from this setup; prepare another manual setup or a supported rotary process. Height-field replay does not verify these surfaces`] : []),
+      ...(skippedSamples > 0 ? [`${skippedSamples} required multiaxis contact samples were unreachable or did not clear the part; the generated paths leave these regions uncovered`] : [])
+    ].join("; ")
     claims.push({ id: "part-coverage", status: "unresolved", detail })
     issues.push(issue("UnsupportedCapability", "evidence", detail, { severity: "warning" }))
   }
   if (job.setupOrientation !== undefined && job.setupOrientation !== "+Z") claims.push(
     { id: "setup-workholding", status: "unresolved", detail: "Manual refixture requires independently configured and checked workholding; no fixture is assumed by this program" },
-    ...(hidden === 0 ? [{ id: "part-coverage" as const, status: "unresolved" as const, detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" }] : [])
+    ...(hidden === 0 && skippedSamples === 0 ? [{ id: "part-coverage" as const, status: "unresolved" as const, detail: "This separate setup checks the visible height field only; hidden surfaces and coverage across setups are not certified" }] : [])
   )
   const hardFailure = issues.some((i) => i.severity === "error")
   const release: ReleaseLevel = hardFailure || nc === "" ? "blocked" : claims.every((c) => c.status === "passed" || (c.status === "unsupported" && c.id === "machine-travel")) ? "verified-program" : "preview"
 
-  const usedTools = Object.entries(numbers).map(([id, number]) => ({ ...toolOf(id), number }))
   const toolChanges = usedTools.length
-  // The magazine holds what it holds: a program needing more tools than that cannot be run as it is.
-  if (machine.toolCapacity !== undefined && usedTools.length > machine.toolCapacity) {
-    issues.push(issue("MachineLimit", "post", `The program uses ${usedTools.length} tools and the machine's magazine holds ${machine.toolCapacity}`))
-  }
   const cycleTimeSeconds = Math.round(finalOutcomes.reduce((s, x) => s + x.timeSeconds, 0) + toolChanges * (machine.toolChangeSeconds ?? 8))
   const jobDigest = digestOf("cam-kernel/job@1", {
     ...job,

@@ -8,6 +8,22 @@ WP2 derives drilling, contour, pocket, thread and external turning paths from WP
 
 Pure and I/O-free, same rules as WP1.
 
+## Current-source kernel completion (2026-10-22)
+
+The owner accepted spec 33's **Owner-authorized completion increment**. WP2 owns K0 final release consistency and K4–K6
+multiaxis execution, shared stock/quality evidence and turning/mill-turn in `cam/` and its tests. Collect machine-capacity
+errors before claims/release; a hard error cannot yield a verified artifact. Preserve existing NC behavior unless an
+explicitly tested correction requires changing it. The current tolerance budget remains informational until K5's contract
+is amended across its consumers; blocking all existing jobs is not completion of precision verification. Track verified
+progress and open deliverables in spec 33. This concrete kernel continuation does not change global RM statuses.
+
+K4's first execution increment adds optional `mode: "parallel" | "contour"` to the existing multiaxis operation. Omission
+retains parallel generation and existing NC. The operation schema, manufacturing HTTP request and assistant request reuse
+the same strategy schema; invalid modes fail decoding. Artifact operation parameters record the resolved mode. Contours
+must retract across missing/unreachable contact samples instead of joining their neighbours through an unchecked gap.
+Skipped required samples remain visible as unresolved part coverage. General 3D contact, path-level collision planning,
+head machines and shared volumetric evidence remain separate open acceptance gates in K4/K5.
+
 ## Kernel performance and AI responsiveness (2026-10-21, implemented; full-suite verification in progress)
 
 Optimize measured hot paths without reducing sampling resolution, changing cutter geometry, tolerances, NC bytes or verification evidence. The drop-cutter may seed its branch-and-bound search with an actual nearby column; every rejection must retain the existing conservative bound. Verify against exhaustive footprint evaluation and complete pre-change manufacturing artifacts. WP8 owns bounded automatic recovery and provider inactivity deadlines; integration may move kernel preparation off the sidecar event loop through the existing scoped worker. Regression gates include the full repository test suite.
@@ -203,6 +219,30 @@ The `3d_surface` operation no longer follows each element's outline: the selecte
 
 ## 9. Change log
 
+- 2026-10-22: K5 first seed and K6 boring preview (the evidence is recorded in spec 33's ledger). A rotary replay seeds its voxel stock from the three-axis height field; the carry only tightens the bracket and a three-axis-only job still has no voxel bracket. `planBoring` opens a declared pilot to a finished internal profile with analytic volumes and stays `preview`; it is not a job operation. Verification: `packages/core/src/cam/kernel/{stock,rest-stock,turning,five-axis-job}.test.ts` (36 tests).
+
+- 2026-10-22: spec 33's owner-authorized completion increment, K0 and the first increment of K4
+  (the evidence is recorded in spec 33's ledger). K0: the magazine-capacity error is collected
+  before the claims and the release assessment, so a program that needs more tools than the
+  machine's magazine holds returns `release: "blocked"` and a failed `machine-limits` claim
+  naming the magazine; a hard error can no longer coexist with a verified artifact. K4: the
+  multiaxis operation takes an explicit `mode: "parallel" | "contour"` from the shared operation
+  schema through the HTTP and assistant contracts into the kernel — omitting it keeps the
+  previous parallel generation and the same NC bytes, the two modes produce distinct NC, and an
+  unknown mode fails decoding; the contour strategy retracts across an unreachable interval
+  instead of joining the reachable samples through it, and required contact samples that were
+  unreachable or never cleared the part are counted and make `part-coverage` unresolved, so a
+  program with uncovered regions cannot read as complete coverage. Verification:
+  `packages/core/src/cam/kernel/{five-axis-job,machine-claims}.test.ts`,
+  `packages/core/test/cam/five-axis.test.ts`, `apps/sidecar/test/cam-kernel.test.ts`, the core
+  suite and the workspace typecheck.
+
+- 2026-10-22: added the 3D-printing parity analysis to [spec 33](33-kernel-gap-analysis.md) §9: the printer is
+  at parity in the layers that describe a machine and draw one (machine table, tool model, program checks,
+  viewer, 3D viewport, CAD manufacturability) and absent in the layers that make one (native kernel,
+  additive stock, verification replay). The ledger (P0–P24) is the inventory the follow-up work is ordered
+  from. Analysis only: no code, contract, runtime or roadmap change.
+
 - 2026-10-21: documented the owner-requested proprietary CAM kernel license,
   naming Nicola Mattioli as licensor; added scoped license and discovery notice
   under `packages/core/src/cam`. No executable code or root license changes.
@@ -242,9 +282,15 @@ The spec 33 CAD increment owns a single guard in `model/element-mesh.ts` and its
 
 - Owners: WP2 native CAM, WP3 action schemas, WP4 AI handler storage, WP6 CAM result mirroring, WP8 catalogue and machine replay, under spec 29's turning continuation contract.
 - `kernel/turning.ts` exports `planTurning`: face skim, diameter-bounded external roughing, profile finishing, piecewise-linear stock snapshots and analytic volume accounting including the untouched bar tail. Taper intersections are retained, invalid/non-finite profiles and excessive pass counts are refused, and NC returns axially only after radial clearance of the original bar. G94/G97 explicitly select feed/minute and fixed RPM.
-- This is an ideal point-tool preview; insert compensation, workholding, internal turning, grooves, threads, parting and controller qualification are not certified. The analytic volume is before NC rounding, and every successful result remains `preview`.
-- `cam.turn` reads the plan, `cam_edit.turn` stores the same NC and settings in the existing portable CAM document, and the desktop mirrors it into its lathe viewer. `cam.review` reports preview/stale; `cam.machine` uses stored stock settings and the shared B-head/C-spindle poses, tool models, limits and chuck phase. Positioned-C milling does not remove an entire annular band in the assistant's turned profile.
+- This is an ideal point-tool preview; insert compensation, workholding, grooves, threads, parting and controller qualification are not certified. Internal boring is the separate preview below. The analytic volume is before NC rounding, and every successful result remains `preview`.
+- `cam.turn` reads the external plan, `cam_edit.turn` stores the same NC and settings in the existing portable CAM document, and the desktop mirrors it into its lathe viewer. `cam.review` reports preview/stale; `cam.machine` uses stored stock settings and the shared B-head/C-spindle poses, tool models, limits and chuck phase. Positioned-C milling does not remove an entire annular band in the assistant's turned profile.
 - Evidence: `kernel/turning.test.ts`, `packages/ai/test/{cam-kernel-actions,cam-wire,machine-kinematics}.test.ts`, `apps/sidecar/test/ai-turning.test.ts`, and the turning persistence/mirroring case in `apps/desktop/test/cam-kernel.test.ts`.
+
+### Internal boring preview and rotary stock seed (2026-10-22)
+
+- `kernel/turning.ts` exports `planBoring`: a declared pilot is opened out to a finished internal profile. The cavity grows inward, every removed volume is the solid of revolution of the pass, and the worked stock partitions as removed + remaining + unmachined. A finished diameter below the pilot, a bore that breaks out of the bar, an unordered profile, and a bar the chuck cannot hold are refused and emit no NC. The external fixture's NC bytes are unchanged. Release stays `preview`. `planBoring` is not a manufacturing-job operation and is not `cam.turn`. Grooves, threading, parting, insert compensation, live tools and machine qualification stay out of scope.
+- A rotary replay on a five-axis machine seeds its voxel stock from the height field the three-axis operations carved (`carryHeightField`). Five-axis moves are not written into that field. The carry only removes: a voxel wholly above every overlapping column is certainly gone, a voxel that only rises above the lowest column in its footprint is possibly gone, and an untouched field leaves the raw box. A three-axis-only job has no voxel bracket. The bracket stays a bracket; turned moves are not gouge-checked, and the tolerance budget stays informational.
+- Evidence: `packages/core/src/cam/kernel/turning.test.ts`, `packages/core/src/cam/kernel/stock.test.ts`, `packages/core/src/cam/kernel/rest-stock.test.ts`, `packages/core/src/cam/kernel/five-axis-job.test.ts`.
 
 ### Machine catalogue and machine configurations (2026-10-21)
 
@@ -258,3 +304,15 @@ The spec 33 CAD increment owns a single guard in `model/element-mesh.ts` and its
 ### Performance change log (2026-10-21)
 
 The drop-cutter seeds its search from an actual column near the tool axis, enabling the existing conservative block rejection immediately. Exhaustive footprint comparisons cover flat/ball/bull/V/drill profiles, allowances, holes, cliffs and non-square cells (1,803 assertions). Block, mounting-plate and dome planning/manufacturing outputs matched the pre-change artifacts byte for byte. `PrepareOptions.stockFromPartBottom` places CAD stock from the unrotated part meshes inside the worker; worker/inline equality covers NC, identity, verification evidence and manual +X setup as well as +Z. Core typecheck passed. Full-suite validation remains in progress.
+
+### 3D printing parity with mill and lathe (2026-10-22, analysis)
+
+[Spec 33](33-kernel-gap-analysis.md) §9 holds the measured inventory. The summary for WP2 (`packages/core/src/cam`):
+
+- **At parity today**: the machine table (`cam/machine.ts`: axes X Y Z E, additive process, plate origin, and the printer-only checks `PRINTER_SPINDLE` / `PRINTER_COLD_EXTRUSION` / `PRINTER_LAYER_DOWN` / `PRINTER_NOT_HOMED`), the tool model (the nozzle family), the viewer and the 3D viewport (beads, layers, progressive deposit), the CAD print-process manufacturability rules, the print-time and material estimates and the bed-fit check.
+- **Missing in the native kernel**: the machine kind (`kernel/contracts.ts:32` is `"mill" | "lathe"`), a print strategy, an E axis in the IR (`cam/ir.ts:104-112`), a deposition stock model (`kernel/stock.ts:20-35` is removal-only), deposition material data, printer presets in the catalogue, and a reasoned refusal where the kernel still cannot run a printer (`kernel/machine-config.ts:39-47` returns `undefined` with no message).
+- **Missing in the generator**: the six declared printer operations are inert (all six produce byte-identical G-code), the default infill pattern (`grid`) extrudes nothing, the generator's warnings are dropped (`"; WARNING:"` vs the collected `"; Warning:"`), only the first selected element is printed, and a real CAD part falls back to its bounding box.
+- **Missing in verification**: `verifyToolOf` is mill-only and every replay check is `not-run` for a printer.
+- **Reproduced defects (measured, not read)**: the final retraction asks for E −2 in absolute mode and retracts 28.076 mm instead of 2; a composite declares a placement its children never receive and prints 5 mm above the bed; a part that does not fit the bed still reports `evidence.result = "passed"`; the common optimizer and arc fitter drop extrusion; and the part's rotation and scale are ignored.
+
+No executable change is made by this entry; the remediation order and the owner directories per WP are in spec 33 §9.9.
