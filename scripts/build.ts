@@ -30,6 +30,7 @@ import { APPLE_SIGNING_ENV, assertSigningConfig, bundleRoot, indexArtifacts, pre
 
 import { gitCommits, renderNotes as renderChangelogNotes } from "./changelog.ts";
 
+import { aarch64LinuxdeployEnv, includesAppImage } from "./linuxdeploy-aarch64.ts";
 import { signingEnvironment } from "./signing-config.ts";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -350,6 +351,17 @@ async function stepBundle(): Promise<void> {
   if (adHoc) say("   no Apple certificate configured — the bundle is ad-hoc signed and not notarised");
   // linuxdeploy is an AppImage. GitHub's Linux runners have no FUSE, so it has to extract and run.
   if (platform === "linux") signingEnv.APPIMAGE_EXTRACT_AND_RUN = "1";
+  // aarch64 `ldd` can print a full library trace and still exit non-zero. linuxdeploy
+  // aborts on that status, and Tauri reports only "failed to run linuxdeploy".
+  // The same job also dies if the bundled strip rejects one library.
+  const armAppImage = platform === "linux" && targetInfo(triple).arch === "aarch64" && includesAppImage(bundles);
+  if (armAppImage) {
+    if (dryRun) say("   [dry-run] would wrap ldd and skip strip for the aarch64 AppImage");
+    else {
+      say("   preparing the aarch64 AppImage bundler");
+      Object.assign(signingEnv, await aarch64LinuxdeployEnv(signingEnv.PATH));
+    }
+  }
   const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({
     build: { beforeBuildCommand: "" },
     bundle: {
@@ -359,6 +371,9 @@ async function stepBundle(): Promise<void> {
     },
   })];
   if (bundles !== undefined) tauri.push("--bundles", bundles);
+  // Show linuxdeploy's own log. Without this, a remaining aarch64 failure is only
+  // the generic "failed to run linuxdeploy" line.
+  if (armAppImage) tauri.push("--verbose");
   await run(tauri, { cwd: DESKTOP, env: signingEnv });
 }
 
