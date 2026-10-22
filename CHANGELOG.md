@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.3 (October 2026)
+
+## Build and release
+
+- Install the Linux ARM tools AppImage bundling needs.
+
 ## v0.1.2 (October 2026)
 
 ## Build and release
