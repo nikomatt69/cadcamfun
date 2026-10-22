@@ -258,17 +258,7 @@ async function phaseStart(options: { bump?: string | undefined; version?: string
   }
 
   await pushBranch(section);
-
-  const existingTag = await captureCommand(["git", "rev-parse", "--verify", `refs/tags/${tag}`], { cwd: ROOT });
-  if (existingTag.code === 0) {
-    const head = (await captureCommand(["git", "rev-parse", "HEAD"], { cwd: ROOT })).stdout.trim();
-    if (existingTag.stdout.trim() !== head) throw new Error(`The tag ${tag} already exists and points at another commit`);
-    say(`the tag ${tag} already exists at this commit`);
-  } else {
-    await $`git tag ${tag}`.cwd(ROOT);
-    await $`git push origin ${tag}`.cwd(ROOT);
-    say(`pushed the tag ${tag}`);
-  }
+  await pushReleaseTag(tag);
 
   const directory = await mkdtemp(join(tmpdir(), "cadcam-release-"));
   try {
@@ -353,6 +343,53 @@ async function resolveReleaseConflicts(section: string): Promise<boolean> {
 }
 
 /**
+ * Point origin at GitHub with the push token, then put the previous URL back.
+ *
+ * The checkout step removes the Actions credential header, so a later `git push`
+ * has no username and fails with "could not read Username". The release commit
+ * and the release tag are both writes to origin, and each one has to carry the
+ * token for the whole push: restoring the plain URL after the commit is what
+ * dropped the tag on the publish job.
+ */
+export async function withAuthenticatedOrigin(action: () => Promise<void>, cwd: string = ROOT): Promise<void> {
+  const token = env("GH_PUSH_TOKEN") ?? env("GITHUB_TOKEN");
+  // The stored URL, not the one a global insteadOf rewrite would display. Restoring
+  // the rewritten form would write a credential into the remote.
+  const stored = await captureCommand(["git", "config", "--local", "--get", "remote.origin.url"], { cwd });
+  const original = stored.code === 0 ? stored.stdout.trim() : "";
+  if (token !== undefined) {
+    const repo = repository();
+    await $`git remote set-url origin ${`https://x-access-token:${token}@github.com/${repo}`}`.cwd(cwd);
+  }
+  try {
+    await action();
+  } finally {
+    if (token !== undefined && original !== "") await $`git remote set-url origin ${original}`.cwd(cwd);
+  }
+}
+
+/**
+ * Create the release tag and push it.
+ *
+ * A tag that already points at this commit is left alone. A tag that points
+ * somewhere else is a different release and is refused.
+ */
+async function pushReleaseTag(tag: string): Promise<void> {
+  const existingTag = await captureCommand(["git", "rev-parse", "--verify", `refs/tags/${tag}`], { cwd: ROOT });
+  if (existingTag.code === 0) {
+    const head = (await captureCommand(["git", "rev-parse", "HEAD"], { cwd: ROOT })).stdout.trim();
+    if (existingTag.stdout.trim() !== head) throw new Error(`The tag ${tag} already exists and points at another commit`);
+    say(`the tag ${tag} already exists at this commit`);
+    return;
+  }
+  await $`git tag ${tag}`.cwd(ROOT);
+  await withAuthenticatedOrigin(async () => {
+    await $`git push origin ${tag}`.cwd(ROOT);
+  });
+  say(`pushed the tag ${tag}`);
+}
+
+/**
  * Push the release commit to the branch it was made on.
  *
  * The branch may have moved while the release was being prepared, so the commit is
@@ -361,13 +398,7 @@ async function resolveReleaseConflicts(section: string): Promise<boolean> {
 async function pushBranch(section: string): Promise<void> {
   const branch = (await captureCommand(["git", "branch", "--show-current"], { cwd: ROOT })).stdout.trim();
   if (branch === "") throw new Error("Unable to determine the branch to push the release to");
-  const token = env("GH_PUSH_TOKEN") ?? env("GITHUB_TOKEN");
-  const repo = repository();
-  const original = (await captureCommand(["git", "remote", "get-url", "origin"], { cwd: ROOT })).stdout.trim();
-  if (token !== undefined) {
-    await $`git remote set-url origin ${`https://x-access-token:${token}@github.com/${repo}`}`.cwd(ROOT);
-  }
-  try {
+  await withAuthenticatedOrigin(async () => {
     for (let attempt = 0; attempt < 3; attempt++) {
       await $`git fetch origin ${branch}`.cwd(ROOT);
       const rebase = await $`git rebase ${`origin/${branch}`}`.nothrow().cwd(ROOT);
@@ -385,9 +416,7 @@ async function pushBranch(section: string): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, 2_000));
     }
     throw new Error(`Cannot push the release commit to ${branch}`);
-  } finally {
-    if (token !== undefined && original !== "") await $`git remote set-url origin ${original}`.cwd(ROOT);
-  }
+  });
 }
 
 // ───────────────────────────── phase: complete ─────────────────────────────
