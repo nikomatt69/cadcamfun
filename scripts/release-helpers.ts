@@ -159,14 +159,16 @@ export function releaseVersion(raw: string): string {
 /**
  * The release gate: the tag the release is made from.
  *
- * Three ways in, all of them naming the tag explicitly: a tag push, a manual dispatch
- * and the `workflow_call` the publish pipeline makes (the release of one version is
- * built by the workflow that owns the release).
+ * A tag push names the tag in the ref. A manual dispatch names it with an input.
+ * The publish pipeline does too, but a reusable workflow keeps the caller's
+ * event: that pipeline is a push to `main`, and the tag arrives in the input.
  */
 export function selectReleaseRef(event: string, ref: string, input: string | undefined, configuredVersion: string): { tag: string; version: string } {
   if (event !== "push" && event !== "workflow_dispatch" && event !== "workflow_call") throw new Error("Release requires a tag push, a manual dispatch or the publish pipeline");
-  if (event === "push" && !ref.startsWith("refs/tags/")) throw new Error("Release push must reference a tag");
-  const tag = event === "push" ? ref.slice("refs/tags/".length) : input;
+  const tagFromPush = event === "push" && ref.startsWith("refs/tags/") ? ref.slice("refs/tags/".length) : undefined;
+  const explicit = input && input.length > 0 ? input : undefined;
+  if (event === "push" && !tagFromPush && !explicit) throw new Error("Release push must reference a tag");
+  const tag = tagFromPush ?? explicit;
   if (!tag || !tag.startsWith("v")) throw new Error("Release ref must be an existing v-prefixed version tag");
   const version = releaseVersion(tag);
   if (version !== releaseVersion(configuredVersion)) throw new Error("Release tag and application version disagree");
