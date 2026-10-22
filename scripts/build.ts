@@ -323,6 +323,21 @@ async function stepResources(): Promise<void> {
   for (const name of staged) say(`     ${name}`);
 }
 
+/**
+ * Environment the Linux bundler needs. linuxdeploy rewrites every ELF rpath to
+ * `$ORIGIN/../lib`. On aarch64 that rewrite makes the Bun sidecar's dynamic linker
+ * abort, and the GTK plugin's second `ldd` then kills the AppImage. `PATCHELF`
+ * points at a wrapper that keeps the rewrite only when `ldd` still succeeds.
+ */
+export function linuxBundleEnv(env: Record<string, string | undefined>, root = ROOT): Record<string, string | undefined> {
+  return {
+    ...env,
+    APPIMAGE_EXTRACT_AND_RUN: "1",
+    NO_STRIP: "1",
+    PATCHELF: join(root, "scripts", "linuxdeploy-patchelf.sh"),
+  };
+}
+
 async function stepBundle(): Promise<void> {
   const triple = await resolveTarget();
   const config = JSON.parse(await readFile(join(SRC_TAURI, "tauri.conf.json"), "utf8"));
@@ -351,10 +366,7 @@ async function stepBundle(): Promise<void> {
   // linuxdeploy is an AppImage. It extracts instead of mounting, and it does not strip
   // bundled libraries: aarch64 WebKit ships RELR relocations that strip rejects, and
   // `tauri build --ci` hides that stderr behind "failed to run linuxdeploy".
-  if (platform === "linux") {
-    signingEnv.APPIMAGE_EXTRACT_AND_RUN = "1";
-    signingEnv.NO_STRIP = "1";
-  }
+  if (platform === "linux") Object.assign(signingEnv, linuxBundleEnv(signingEnv));
   const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({
     build: { beforeBuildCommand: "" },
     bundle: {
