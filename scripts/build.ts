@@ -30,6 +30,7 @@ import { APPLE_SIGNING_ENV, assertSigningConfig, bundleRoot, indexArtifacts, pre
 
 import { gitCommits, renderNotes as renderChangelogNotes } from "./changelog.ts";
 
+import { appImageNeedsSidecarShelter, linuxSidecarBundleConfig, LINUX_SIDECAR_PAYLOAD, shelterCompiledSidecar } from "./linux-sidecar.ts";
 import { signingEnvironment } from "./signing-config.ts";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -355,19 +356,38 @@ async function stepBundle(): Promise<void> {
     signingEnv.APPIMAGE_EXTRACT_AND_RUN = "1";
     signingEnv.NO_STRIP = "1";
   }
+  // AppImage bundling runs linuxdeploy, which ldd/patchelf's every ELF in usr/bin.
+  // The Bun standalone fails that pass, so it is installed under usr/share and the
+  // externalBin slot holds a wrapper until tauri build returns.
+  const shelter = platform === "linux" && appImageNeedsSidecarShelter(bundles);
+  const bundleConfig: Record<string, unknown> = {
+    createUpdaterArtifacts: updaterArtifacts,
+    ...(thumbprint && platform === "windows" ? { windows: { certificateThumbprint: thumbprint, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" } } : {}),
+    ...(adHoc ? { macOS: { signingIdentity: "-" } } : {}),
+    ...(shelter ? linuxSidecarBundleConfig(bundles) : {}),
+  };
   const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({
     build: { beforeBuildCommand: "" },
-    bundle: {
-      createUpdaterArtifacts: updaterArtifacts,
-      ...(thumbprint && platform === "windows" ? { windows: { certificateThumbprint: thumbprint, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" } } : {}),
-      ...(adHoc ? { macOS: { signingIdentity: "-" } } : {}),
-    },
+    bundle: bundleConfig,
   })];
   if (bundles !== undefined) tauri.push("--bundles", bundles);
   // `--ci` sets the bundler log to error and drops linuxdeploy's stderr. On ARM that
   // was the whole failure message, so this build keeps the tool's output.
   if (platform === "linux" && triple.startsWith("aarch64")) tauri.push("--verbose");
-  await run(tauri, { cwd: DESKTOP, env: signingEnv });
+  let restoreSidecar: (() => Promise<void>) | undefined;
+  if (shelter && !dryRun) {
+    try {
+      restoreSidecar = await shelterCompiledSidecar(sidecarOutfile(triple), join(SRC_TAURI, LINUX_SIDECAR_PAYLOAD));
+    } catch (error) {
+      throw new BuildError(error instanceof Error ? error.message : String(error));
+    }
+    say("   AppImage: Bun sidecar installed at /usr/share/cadcamfun/sidecar (linuxdeploy does not rewrite it)");
+  }
+  try {
+    await run(tauri, { cwd: DESKTOP, env: signingEnv });
+  } finally {
+    if (restoreSidecar) await restoreSidecar();
+  }
 }
 
 // ──────────────────────────────── step 6 ──────────────────────────────────

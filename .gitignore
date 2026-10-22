@@ -93,6 +93,7 @@ src-tauri/target/*
 apps/desktop/dist/
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/binaries/sidecar-*
+apps/desktop/src-tauri/linux-share/
 apps/desktop/src-tauri/resources/migrations/
 release/
 data/
