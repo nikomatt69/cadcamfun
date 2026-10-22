@@ -90,6 +90,8 @@ let dryRun = false;
 let target: string | undefined;
 let bundles: string | undefined;
 let updaterArtifacts = true;
+/** Steps selected for this run. The install narrows when the sidecar is not being compiled. */
+let selectedSteps: readonly StepName[] = [];
 let outDir = DEFAULT_OUT_DIR;
 /** How the bundle of this build was signed; the release notes state it. */
 let signing: SigningPlan = { apple: "ad-hoc", windows: "unsigned" };
@@ -176,9 +178,16 @@ async function requirePath(path: string, what: string): Promise<void> {
 
 async function stepInstall(): Promise<void> {
   announce(1, "install workspace dependencies");
-  // Match nikcli's cross-platform builder: keep every optional native dependency available so an
-  // Apple Silicon runner can compile the Intel sidecar and each native runner gets its FFI binary.
-  await run(["bun", "install", "--frozen-lockfile", "--os=*", "--cpu=*"]);
+  // The sidecar cross-compile needs every platform's optional native packages, so an Apple
+  // Silicon runner can compile the Intel sidecar. A native bundle does not: installing the
+  // whole workspace pulls wrangler, and workerd's postinstall rejects Windows ARM
+  // (`Unsupported platform: win32 arm64`).
+  if (selectedSteps.includes("compile")) {
+    await run(["bun", "install", "--frozen-lockfile", "--os=*", "--cpu=*"]);
+    return;
+  }
+  say("   desktop bundle only — wrangler is not installed");
+  await run(["bun", "install", "--frozen-lockfile", "--filter", "@cadcamfun/desktop"]);
 }
 
 async function stepCheck(): Promise<void> {
@@ -334,6 +343,8 @@ async function stepBundle(): Promise<void> {
   // variable as a request to import a real certificate, even when it is empty.
   if (adHoc) for (const name of APPLE_SIGNING_ENV) delete signingEnv[name];
   if (adHoc) say("   no Apple certificate configured — the bundle is ad-hoc signed and not notarised");
+  // linuxdeploy is an AppImage. GitHub's Linux runners have no FUSE, so it has to extract and run.
+  if (platform === "linux") signingEnv.APPIMAGE_EXTRACT_AND_RUN = "1";
   const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({
     build: { beforeBuildCommand: "" },
     bundle: {
@@ -685,6 +696,7 @@ async function main(): Promise<void> {
   dryRun = options.dryRun;
   target = options.target;
   bundles = options.bundles;
+  selectedSteps = options.steps;
   outDir = options.outDir;
   updaterArtifacts = options.updaterArtifacts;
 
