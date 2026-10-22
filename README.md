@@ -61,7 +61,7 @@ Open [GitHub Releases](https://github.com/nikomatt69/cadcamfun/releases) and cho
 
 - **macOS:** Apple Silicon or Intel, with `.dmg` installers and updater archives.
 - **Windows:** x64 or ARM64, with MSI and NSIS installers.
-- **Linux:** x64 or ARM64, with Debian, RPM and AppImage packages.
+- **Linux:** x64 or ARM64, with Debian and RPM packages.
 
 The [latest-release link](https://github.com/nikomatt69/cadcamfun/releases/latest) resolves once a public release is marked latest. Installer availability is determined by the assets actually attached to that release.
 
@@ -294,7 +294,7 @@ The pipeline:
 1. Validates the workspace and workflows, resolves a new version, stamps version holders and refreshes the lockfile.
 2. Builds the changelog from commits, publishes the public npm package, commits the release metadata and creates a draft index release.
 3. Cross-compiles the six sidecar variants with Bun, then bundles the desktop on the corresponding native runners.
-4. Verifies installer checksums, signatures and updater URLs; publishes the platform releases and merges all six updater entries.
+4. Verifies installer checksums. macOS and Windows also check updater signatures and URLs. Linux publishes Debian and RPM packages. The updater manifest covers macOS and Windows.
 5. Attaches the updater manifest, publishes the index release and then updates the optional Homebrew cask.
 
 The index stays a draft until the desktop jobs succeed. A failed optional Homebrew publication is reported separately. Prereleases do not advance the stable cask or become the latest stable updater release.

@@ -92,6 +92,12 @@ export const RELEASE_PLATFORM_TRIPLES: Readonly<Record<string, string>> = {
 
 export const RELEASE_PLATFORM_KEYS = Object.freeze(Object.keys(RELEASE_PLATFORM_TRIPLES));
 
+/**
+ * Platforms whose installers Tauri can sign for the in-app updater.
+ * Linux ships `.deb` and `.rpm` only — the same set as nikcli's desktop — so it has no updater artifact.
+ */
+export const UPDATER_PLATFORM_KEYS = Object.freeze(RELEASE_PLATFORM_KEYS.filter((key) => !key.startsWith("linux-")));
+
 /** Suffix of a platform's own GitHub release: `v6.0.0` is shipped as `v6.0.0-macos-arm64`, `v6.0.0-windows-x64`, ... */
 export const RELEASE_PLATFORM_SLUGS: Readonly<Record<string, string>> = {
   "aarch64-apple-darwin": "macos-arm64",

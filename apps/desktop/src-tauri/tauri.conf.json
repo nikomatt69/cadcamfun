@@ -43,7 +43,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["deb", "rpm", "app", "dmg", "nsis", "msi"],
     "category": "DeveloperTool",
     "macOS": {
       "infoPlist": "Info.plist"

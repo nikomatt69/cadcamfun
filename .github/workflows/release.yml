@@ -122,11 +122,11 @@ jobs:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             slug: linux-x64
-            bundles: deb,rpm,appimage
+            bundles: deb,rpm
           - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             slug: linux-arm64
-            bundles: deb,rpm,appimage
+            bundles: deb,rpm
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -173,7 +173,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 libssl-dev build-essential file rpm xdg-utils desktop-file-utils
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev build-essential file rpm
       - name: Import Windows signing certificate
         if: runner.os == 'Windows'
         shell: pwsh
@@ -214,7 +214,10 @@ jobs:
         # Tauri bundle only: `compile` is skipped — the sidecar was cross-compiled
         # by the Bun job above and already placed in src-tauri/binaries/.
         run: bun --no-env-file scripts/build.ts --skip=check,compile --target=${{ matrix.target }} --bundles=${{ matrix.bundles }} --out-dir=release
+      # Tauri's in-app updater consumes an AppImage on Linux. This pipeline matches
+      # nikcli and does not build one, so Linux publishes deb and rpm only.
       - name: Build architecture-specific updater manifest
+        if: ${{ !contains(matrix.target, 'linux') }}
         env:
           RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ needs.trusted.outputs.tag }}-${{ matrix.slug }}
           RELEASE_VERSION: ${{ needs.trusted.outputs.version }}
@@ -223,6 +226,7 @@ jobs:
         shell: bash
         run: bun --no-env-file scripts/updater-manifest.ts --collect-dir=release --arch="$RELEASE_TARGET" --version="$RELEASE_VERSION" --release-url="$RELEASE_URL" --pub-date="$RELEASE_DATE" --out=manifest/latest.json
       - uses: actions/upload-artifact@v4
+        if: ${{ !contains(matrix.target, 'linux') }}
         with:
           name: manifest-${{ matrix.target }}
           path: manifest/latest.json
@@ -252,10 +256,10 @@ jobs:
         with:
           pattern: manifest-*
           path: manifests
-      - name: Validate and merge all six updater platforms
+      - name: Validate and merge updater platforms
         env:
           RELEASE_VERSION: ${{ needs.trusted.outputs.version }}
-        run: bun --no-env-file scripts/updater-manifest.ts --merge=manifests --out=latest.json --version="$RELEASE_VERSION" --expected-platforms=darwin-aarch64,darwin-x86_64,windows-aarch64,windows-x86_64,linux-aarch64,linux-x86_64
+        run: bun --no-env-file scripts/updater-manifest.ts --merge=manifests --out=latest.json --version="$RELEASE_VERSION" --expected-platforms=darwin-aarch64,darwin-x86_64,windows-aarch64,windows-x86_64
       - uses: actions/upload-artifact@v4
         with:
           name: latest-json
@@ -292,13 +296,20 @@ jobs:
           name: installers-${{ matrix.target }}
           path: installers
       - uses: actions/download-artifact@v4
+        if: ${{ !contains(matrix.target, 'linux') }}
         with:
           name: manifest-${{ matrix.target }}
           path: manifest
       - name: Verify checksums, signatures and manifest links; stage this platform's release
         env:
           RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ needs.trusted.outputs.tag }}-${{ matrix.slug }}
-        run: bun --no-env-file scripts/stage-release.ts --mode=platform --installers=installers --manifest=manifest/latest.json --out=dist --release-url="$RELEASE_URL"
+        shell: bash
+        run: |
+          if [ -f manifest/latest.json ]; then
+            bun --no-env-file scripts/stage-release.ts --mode=platform --installers=installers --manifest=manifest/latest.json --out=dist --release-url="$RELEASE_URL"
+          else
+            bun --no-env-file scripts/stage-release.ts --mode=installers --installers=installers --out=dist
+          fi
       - name: Refuse to modify an already published release
         env:
           GH_TOKEN: ${{ github.token }}

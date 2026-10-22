@@ -58,10 +58,10 @@ jobs:
             bundles: msi,nsis
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            bundles: deb,rpm,appimage
+            bundles: deb,rpm
           - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
-            bundles: deb,rpm,appimage
+            bundles: deb,rpm
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -100,7 +100,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 libssl-dev build-essential file rpm xdg-utils desktop-file-utils
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev build-essential file rpm
       - name: Build and index installers (Tauri)
         run: bun --no-env-file scripts/build.ts --skip=check,compile --no-updater --target=${{ matrix.target }} --bundles=${{ matrix.bundles }} --out-dir=release
       - uses: actions/upload-artifact@v4

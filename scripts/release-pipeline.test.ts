@@ -4,13 +4,13 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { platformReleaseTag, previousReleaseTag, RELEASE_PLATFORM_SLUGS, RELEASE_PLATFORM_TRIPLES } from "./release-helpers.ts";
+import { platformReleaseTag, previousReleaseTag, RELEASE_PLATFORM_SLUGS, RELEASE_PLATFORM_TRIPLES, UPDATER_PLATFORM_KEYS } from "./release-helpers.ts";
 import { buildManifest, mergeManifests } from "./updater-manifest.ts";
-import { stageIndexRelease, stagePlatformRelease } from "./stage-release.ts";
+import { stageIndexRelease, stagePlatformInstallers, stagePlatformRelease } from "./stage-release.ts";
 
 const TAG = "v6.0.0";
 const DOWNLOAD = "https://github.com/example/app/releases/download";
-const SUFFIX: Record<string, string> = { darwin: ".app.tar.gz", windows: ".exe", linux: ".AppImage" };
+const SUFFIX: Record<string, string> = { darwin: ".app.tar.gz", windows: ".exe" };
 
 test("every platform gets its own verified release and the index only carries the merged manifest", async () => {
   const root = await mkdtemp(join(tmpdir(), "cadcam-release-"));
@@ -21,8 +21,24 @@ test("every platform gets its own verified release and the index only carries th
       const dir = join(root, "installers", `installers-${triple}`);
       const manifestDir = join(manifests, triple);
       await mkdir(dir, { recursive: true });
+      const out = join(root, "dist", RELEASE_PLATFORM_SLUGS[triple] ?? "");
+      const os = key.split("-")[0] ?? "";
+      if (os === "linux") {
+        const packages = [`${triple}--app.deb`, `${triple}--app.rpm`];
+        const checksums: string[] = [];
+        for (const file of packages) {
+          const content = `installer:${file}`;
+          await writeFile(join(dir, file), content);
+          checksums.push(`${createHash("sha256").update(content).digest("hex")}  ${file}`);
+        }
+        await writeFile(join(dir, "SHA256SUMS"), `${checksums.join("\n")}\n`);
+        await writeFile(join(dir, "RELEASE_NOTES.md"), "Release notes\n");
+        await stagePlatformInstallers(dir, out);
+        expect((await readdir(out)).sort()).toEqual(["RELEASE_NOTES.md", "SHA256SUMS", ...packages].sort());
+        continue;
+      }
       await mkdir(manifestDir, { recursive: true });
-      const name = `${triple}--App 6.0.0${SUFFIX[key.split("-")[0] ?? ""]}`;
+      const name = `${triple}--App 6.0.0${SUFFIX[os]}`;
       const checksums: string[] = [];
       for (const [file, content] of [[name, `installer:${triple}`], [`${name}.sig`, `signature:${triple}\n`]] as const) {
         await writeFile(join(dir, file), content);
@@ -36,19 +52,19 @@ test("every platform gets its own verified release and the index only carries th
       const manifestPath = join(manifestDir, "latest.json");
       await writeFile(manifestPath, JSON.stringify(manifest));
 
-      const out = join(root, "dist", RELEASE_PLATFORM_SLUGS[triple] ?? "");
       await stagePlatformRelease(dir, manifestPath, out, releaseUrl);
       expect((await readdir(out)).sort()).toEqual(["RELEASE_NOTES.md", "SHA256SUMS", name, `${name}.sig`].sort());
       staged[triple] = dir;
     }
 
-    const merged = await mergeManifests(manifests, "6.0.0", Object.keys(RELEASE_PLATFORM_TRIPLES));
+    const merged = await mergeManifests(manifests, "6.0.0", UPDATER_PLATFORM_KEYS);
     const mergedPath = join(root, "latest.json");
     await writeFile(mergedPath, JSON.stringify(merged));
     const index = join(root, "index");
     await stageIndexRelease(mergedPath, index, DOWNLOAD, TAG);
     expect((await readdir(index)).sort()).toEqual(["RELEASE_NOTES.md", "latest.json"]);
     expect(JSON.parse(await readFile(join(index, "latest.json"), "utf8"))).toEqual(merged);
+    expect(Object.keys(merged.platforms).some((key) => key.startsWith("linux-"))).toBe(false);
     const notes = await readFile(join(index, "RELEASE_NOTES.md"), "utf8");
     for (const slug of Object.values(RELEASE_PLATFORM_SLUGS)) expect(notes).toContain(`v6.0.0-${slug}`);
     await expect(stageIndexRelease(mergedPath, index, DOWNLOAD, TAG)).rejects.toThrow("empty");
