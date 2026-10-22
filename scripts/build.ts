@@ -348,8 +348,13 @@ async function stepBundle(): Promise<void> {
   // variable as a request to import a real certificate, even when it is empty.
   if (adHoc) for (const name of APPLE_SIGNING_ENV) delete signingEnv[name];
   if (adHoc) say("   no Apple certificate configured — the bundle is ad-hoc signed and not notarised");
-  // linuxdeploy is an AppImage. GitHub's Linux runners have no FUSE, so it has to extract and run.
-  if (platform === "linux") signingEnv.APPIMAGE_EXTRACT_AND_RUN = "1";
+  // linuxdeploy is an AppImage. It extracts instead of mounting, and it does not strip
+  // bundled libraries: aarch64 WebKit ships RELR relocations that strip rejects, and
+  // `tauri build --ci` hides that stderr behind "failed to run linuxdeploy".
+  if (platform === "linux") {
+    signingEnv.APPIMAGE_EXTRACT_AND_RUN = "1";
+    signingEnv.NO_STRIP = "1";
+  }
   const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({
     build: { beforeBuildCommand: "" },
     bundle: {
@@ -359,6 +364,9 @@ async function stepBundle(): Promise<void> {
     },
   })];
   if (bundles !== undefined) tauri.push("--bundles", bundles);
+  // `--ci` sets the bundler log to error and drops linuxdeploy's stderr. On ARM that
+  // was the whole failure message, so this build keeps the tool's output.
+  if (platform === "linux" && triple.startsWith("aarch64")) tauri.push("--verbose");
   await run(tauri, { cwd: DESKTOP, env: signingEnv });
 }
 

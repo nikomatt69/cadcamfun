@@ -173,7 +173,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 libssl-dev build-essential file rpm
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 libssl-dev build-essential file rpm xdg-utils desktop-file-utils
       - name: Import Windows signing certificate
         if: runner.os == 'Windows'
         shell: pwsh

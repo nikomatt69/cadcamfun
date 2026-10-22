@@ -100,7 +100,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 libssl-dev build-essential file rpm
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 libssl-dev build-essential file rpm xdg-utils desktop-file-utils
       - name: Build and index installers (Tauri)
         run: bun --no-env-file scripts/build.ts --skip=check,compile --no-updater --target=${{ matrix.target }} --bundles=${{ matrix.bundles }} --out-dir=release
       - uses: actions/upload-artifact@v4
