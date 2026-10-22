@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.1 (October 2026)
+
+## Build and release
+
+- Fix the Windows ARM desktop install.
+
 ## v0.1.0 (October 2026)
 
 ## Core
