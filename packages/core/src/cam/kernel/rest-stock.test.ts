@@ -135,7 +135,7 @@ describe("a rotary operation consumes the stock its 3-axis predecessor left (K5)
     // Turned moves are still never claimed as gouge-checked.
     expect(preceded.claims.find((c) => c.id === "no-gouge")!.status).toBe("unresolved")
     // The tolerance budget stays informational: it is not a verification of requested quality, and it is not asserted here.
-    expect(preceded.tolerance.requested).toBeGreaterThan(0)
+    expect(preceded.tolerance?.requested).toBeGreaterThan(0)
   })
 })
 
