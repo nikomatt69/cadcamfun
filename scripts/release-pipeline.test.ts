@@ -91,6 +91,9 @@ test("the build planner completes for all six release targets without installing
     expect(code).toBe(0);
     expect(stdout).toContain(`sidecar-${triple}${triple.includes("windows") ? ".exe" : ""}`);
     expect(stdout).toContain(`--target ${triple}`);
+    expect(stdout).toContain("bun packages/web/script/generate-api-reference.mjs");
+    expect(stdout).toContain("bun run typecheck");
+    expect(stdout).not.toMatch(/\bbun (?:--no-env-file )?(?:run )?test\b/);
     expect(stdout).toContain('"beforeBuildCommand":""');
     expect(stdout).toContain("nothing was changed");
   }));

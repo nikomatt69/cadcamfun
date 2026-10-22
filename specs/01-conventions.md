@@ -6,7 +6,7 @@ Reference for Effect v4 (pinned to `4.0.0-rc.112`): `packages/db/node_modules/ef
 
 - English only: identifiers, comments, docs, commit messages, UI strings (UI strings go through the i18n table, default locale `en`).
 - TypeScript strict. No `any` in exported signatures; prefer `unknown` + Schema decoding at boundaries.
-- Type checking is Bun's built-in checker: `bun check -p <package>/tsconfig.json` (Bun 1.4.3). It reads the workspace `tsconfig.json` and reports the same diagnostics as `tsc`; do not add `tsc`/`tsgo` back as a project checker. A workspace script must not be named `check`, or `bun check` would run that script instead of the checker.
+- Type checking is Bun's built-in checker: `bun check -p <package>/tsconfig.json` (Bun 1.4.4). It reads the workspace `tsconfig.json` and reports the same diagnostics as `tsc`; do not add `tsc`/`tsgo` back as a project checker. A workspace script must not be named `check`, or `bun check` would run that script instead of the checker.
 - ES modules, relative imports include the `.ts` extension (`allowImportingTsExtensions` is on).
 - Files `kebab-case.ts`; one concept per file; tests next to source as `*.test.ts` using `bun:test`.
 - Comments explain *why*, not *what*. Keep modules small and pure where possible.

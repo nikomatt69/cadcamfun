@@ -49,8 +49,6 @@ const STEP_ALIASES: Readonly<Record<string, StepName>> = {
   deps: "install",
   check: "check",
   checks: "check",
-  test: "check",
-  tests: "check",
   compile: "compile",
   sidecar: "compile",
   resources: "resources",
@@ -187,7 +185,6 @@ async function stepCheck(): Promise<void> {
   announce(2, "typecheck the workspace");
   await run(["bun", "packages/web/script/generate-api-reference.mjs"]);
   await run(["bun", "run", "typecheck"]);
-  await run(["bun", "run", "test"]);
 }
 
 async function resolveTarget(): Promise<string> {
@@ -597,7 +594,7 @@ Steps, in order:
   6. artifacts   SHA-256 checksums and RELEASE_NOTES.md since the last git tag
 
 Step aliases accepted by --only/--skip:
-  install (deps) · check (checks, test, tests) · compile (sidecar)
+  install (deps) · check (checks) · compile (sidecar)
   resources (resource, migrations) · bundle · artifacts (notes, checksums, release)
 
 Options:

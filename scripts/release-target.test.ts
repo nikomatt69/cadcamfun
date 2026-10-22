@@ -38,7 +38,7 @@ test("the release refuses a Bun the workspace does not support", async () => {
     expect(expectedBunVersion(root)).toBe(">=9.9.9");
     expect(() => assertBunVersion(root)).toThrow("needs bun@>=9.9.9");
     // The workspace itself declares a version the running Bun satisfies.
-    expect(expectedBunVersion(ROOT)).toBe(">=1.4.3");
+    expect(expectedBunVersion(ROOT)).toBe(">=1.4.4");
     expect(() => assertBunVersion(ROOT)).not.toThrow();
   } finally {
     await rm(root, { recursive: true, force: true });

@@ -1,0 +1,41 @@
+name: ci-pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-pipeline-${{ github.ref }}
+  # A release can already be publishing installers when the next push arrives.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  validate:
+    name: validate
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: publish all desktop releases
+    needs: validate
+    if: >-
+      needs.validate.result == 'success' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      github.repository == 'nikomatt69/cadcamfun' &&
+      !startsWith(github.event.head_commit.message, 'release: v') &&
+      !startsWith(github.event.head_commit.message, 'chore: generate') &&
+      !startsWith(github.event.head_commit.message, 'chore: update')
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/publish.yml
+    with:
+      bump: patch
+      prevalidated: true
+    secrets: inherit

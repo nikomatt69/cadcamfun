@@ -77,7 +77,7 @@ Updater signatures are required by the release pipeline. Apple Developer signing
 
 Install these prerequisites first:
 
-- **Bun 1.4.3**, the toolchain version pinned by the root `packageManager` field.
+- **Bun 1.4.4**, the toolchain version pinned by the root `packageManager` field.
 - **Rust and Cargo**, using a toolchain compatible with the checked-in Tauri dependencies.
 - **Git** and the native build prerequisites for your operating system.
 - On **macOS**, Xcode Command Line Tools for desktop development; full Xcode for iOS work.
@@ -278,7 +278,9 @@ Configure the plugin with the running application's URL, a scoped bridge token a
 
 ## Releases and distribution
 
-The release entry point is one command:
+Pushes to `main` run the CI pipeline and, after validation succeeds, publish a patch release for all six desktop targets: macOS, Windows and Linux on ARM64 and x64. Release commits and generated/update housekeeping commits do not trigger another publication. Pull requests only run validation.
+
+To start a release manually:
 
 ```bash
 ./scripts/release patch --dry-run
@@ -301,7 +303,8 @@ Release credentials belong in GitHub Actions secrets: `NPM_TOKEN`, the Tauri upd
 
 CI definitions:
 
-- [ci.yml](.github/workflows/ci.yml): workspace validation, Rust checks and companion validation.
+- [ci-pipeline.yml](.github/workflows/ci-pipeline.yml): validation followed by automatic release publication on `main` pushes.
+- [ci.yml](.github/workflows/ci.yml): reusable workspace validation, Rust checks and companion validation; also runs on other branch pushes.
 - [build-platforms.yml](.github/workflows/build-platforms.yml): downloadable platform build artifacts without requiring release signing credentials.
 - [publish.yml](.github/workflows/publish.yml): versioning, npm publication and final release orchestration.
 - [release.yml](.github/workflows/release.yml): sidecar compilation, native bundles, platform releases and updater manifest validation.

@@ -340,6 +340,8 @@
 
 ## Build and release
 
+- Align the repository toolchain, CI, release checks and current documentation with Bun 1.4.4.
+- Run tests in CI validation instead of the build script; publish all six desktop releases after successful main-branch validation through the new CI pipeline.
 - Implement cross-compilation for sidecar binaries in GitHub workflows. Add build-sidecars job to handle multiple target platforms using Bun, and update build job to utilize prebuilt sidecar artifacts. Ensure proper artifact handling and streamline the build process for Tauri integration.
 - Remove obsolete codex session file and update build script to skip tests during the build process. The build steps now only include typechecking, enhancing clarity and efficiency in the build pipeline.
 - Npm publish: fall back to @cadcamfun/cadcamfun when the @nikoemme_ scope is missing or not writable

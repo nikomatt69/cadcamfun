@@ -22,7 +22,7 @@ const toc = [
 <DocsLayout title="Technology stack" subtitle="Versions and responsibilities taken from workspace manifests and runtime configuration." description="Versions and responsibilities taken from workspace manifests and runtime configuration." toc={toc}>
   <section id="runtime" class="doc-section">
     <h2>Runtime and service framework</h2>
-    <p>The root manifest selects <code>bun@1.4.3</code> as the package manager. Bun installs the workspaces, runs <code>bun:test</code>, type checks with the built-in <code>bun check</code>, serves the sidecar, provides SQLite and password hashing APIs, and compiles the sidecar binary. Desktop frontend development uses Vite, and native packaging uses Rust and Tauri.</p>
+    <p>The root manifest selects <code>bun@1.4.4</code> as the package manager. Bun installs the workspaces, runs <code>bun:test</code>, type checks with the built-in <code>bun check</code>, serves the sidecar, provides SQLite and password hashing APIs, and compiles the sidecar binary. Desktop frontend development uses Vite, and native packaging uses Rust and Tauri.</p>
     <p>Application services use <code>effect@4.0.0-rc.112</code>. The same exact release is declared across the workspaces that depend on Effect, including the API, database, core, desktop, workflow, and sidecar. Root overrides align the node platform packages to that release. Effect supplies typed errors, schemas, service context, layers, concurrency, and HTTP APIs.</p>
     <p>The code uses the v4 service form <code>Context.Service</code> and HTTP modules under <code>effect/unstable</code>. Version-matched documentation is installed at <code>packages/db/node_modules/effect/ai-docs/src/</code>. Keep dependency upgrades coordinated across consumers.</p>
   </section>
@@ -75,7 +75,7 @@ const toc = [
     <table>
       <thead><tr><th>Layer</th><th>Technology</th><th>Version (from package manifests)</th></tr></thead>
       <tbody>
-        <tr><td>Package manager / runtime</td><td>Bun</td><td>1.4.3 (<code>packageManager</code>)</td></tr>
+        <tr><td>Package manager / runtime</td><td>Bun</td><td>1.4.4 (<code>packageManager</code>)</td></tr>
         <tr><td>Service framework</td><td>Effect</td><td>4.0.0-rc.112 (all workspaces, with platform-bun and opentelemetry at the same version)</td></tr>
         <tr><td>Database</td><td>drizzle-orm / drizzle-kit, <code>bun:sqlite</code></td><td>1.0.0-beta.22</td></tr>
         <tr><td>Desktop shell</td><td>Tauri</td><td>2 (Rust crates and <code>@tauri-apps/*</code> ^2)</td></tr>
@@ -89,7 +89,7 @@ const toc = [
         <tr><td>Telemetry</td><td>OpenTelemetry SDK + OTLP/HTTP exporters</td><td>api 1.9.1, sdk 2.12.0, exporters 0.223.0</td></tr>
         <tr><td>Mobile</td><td>Expo, React Native, React</td><td>~57, 0.86.3, 19.2.3</td></tr>
         <tr><td>Docs</td><td>Astro, Tailwind, Cloudflare adapter, wrangler</td><td>^5.14.1, ^3.4.17, ^12.0.0, 4.103.0</td></tr>
-        <tr><td>Type checking</td><td>Bun <code>bun check</code>, TypeScript (editor support only)</td><td>1.4.3, ^5.9.0</td></tr>
+        <tr><td>Type checking</td><td>Bun <code>bun check</code>, TypeScript (editor support only)</td><td>1.4.4, ^5.9.0</td></tr>
         <tr><td>Monorepo tasks</td><td>turbo</td><td>^2.11.7</td></tr>
         </tbody>
     </table>
