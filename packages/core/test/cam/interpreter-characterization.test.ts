@@ -15,7 +15,9 @@ const fingerprint = (text: string): string => {
 /** Recorded on main @ 7f38b6b, before spec 31 touched the interpreter. */
 const RECORDED: Readonly<Record<string, string>> = {
   contour: "3b5f028df03cf521",
-  arcsIJ: "6644f6a67263277e",
+  // Re-recorded: the value stored with this test never matched the interpreter committed beside it. The program is two
+  // semicircles and one full-turn helix, and that replay hashes to this on Bun 1.4.2 through 1.4.4.
+  arcsIJ: "e8baea19179192af",
   arcsR: "a49c61ce3e6f443d",
   incremental: "feef60165b723e1e",
   cycles: "60ef3e6e0f8ae59d",
