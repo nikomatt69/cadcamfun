@@ -5,32 +5,66 @@
 #   ./scripts/release minor     # 6.0.0 -> 6.1.0
 #   ./scripts/release major     # 6.0.0 -> 7.0.0
 #   ./scripts/release 6.2.0     # an explicit version
+#   ./scripts/release --dry-run # what a release would do, without starting one
 #
 # It only triggers the `publish` workflow; the workflow does the rest: it stamps the
 # version across the workspace, writes the changelog, publishes npm, builds and signs the
 # six platform releases, attaches the updater manifest and publishes the Homebrew cask.
 set -euo pipefail
 
-BUMP="${1:-patch}"
+BUMP="patch"
 VERSION=""
+DRY_RUN="false"
 
-case "$BUMP" in
-  major | minor | patch) ;;
-  v[0-9]* | [0-9]*)
-    VERSION="${BUMP#v}"
-    BUMP=""
-    ;;
-  *)
-    echo "usage: $0 [major|minor|patch|<version>]" >&2
-    exit 2
-    ;;
-esac
+for argument in "$@"; do
+  case "$argument" in
+    --dry-run) DRY_RUN="true" ;;
+    major | minor | patch) BUMP="$argument" ;;
+    v[0-9]* | [0-9]*)
+      VERSION="${argument#v}"
+      BUMP=""
+      ;;
+    *)
+      echo "usage: $0 [major|minor|patch|<version>] [--dry-run]" >&2
+      exit 2
+      ;;
+  esac
+done
+
+# The release is a GitHub Actions run, so the `gh` CLI has to be there and it has to be
+# authenticated: without them the dispatch fails with a message that says nothing about
+# what is missing.
+if ! command -v gh > /dev/null 2>&1; then
+  echo "gh is required to start a release (brew install gh)" >&2
+  exit 1
+fi
+if ! gh auth status > /dev/null 2>&1; then
+  echo "gh is not authenticated; run 'gh auth login' first" >&2
+  exit 1
+fi
 
 args=(-f "bump=$BUMP")
 if [ -n "$VERSION" ]; then
   args+=(-f "version=$VERSION")
 fi
 
+# The workflow is read from the default branch, so a workflow that is not pushed yet
+# cannot be dispatched. The check says so plainly instead of failing with a 404.
+repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+if ! gh api "repos/${repo}/contents/.github/workflows/publish.yml" > /dev/null 2>&1; then
+  echo "publish.yml is not on the default branch of ${repo} yet; push it before releasing" >&2
+  exit 1
+fi
+
+# The version the release would take is resolved from the tree and the newest tag, so
+# a dry run says which version is about to be published.
+version="$(bun --no-env-file scripts/release-version.ts ${VERSION:+--version=$VERSION} ${BUMP:+--bump=$BUMP})"
+
+if [ "$DRY_RUN" = "true" ]; then
+  echo "would release ${repo} v${version} (${BUMP:-explicit version})"
+  exit 0
+fi
+
 gh workflow run publish.yml "${args[@]}"
 
-echo "triggered publish.yml (${BUMP:-version $VERSION})"
+echo "triggered publish.yml (${BUMP:-version $VERSION}) → v${version}"

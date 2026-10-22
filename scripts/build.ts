@@ -24,9 +24,9 @@
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { assertSigningConfig, bundleRoot, indexArtifacts, previousReleaseTag, releaseVersion, targetInfo } from "./release-helpers.ts";
+import { APPLE_SIGNING_ENV, assertSigningConfig, bundleRoot, indexArtifacts, previousReleaseTag, releaseVersion, signingStatement, targetInfo, type SigningPlan } from "./release-helpers.ts";
 
 import { gitCommits, renderNotes as renderChangelogNotes } from "./changelog.ts";
 
@@ -91,8 +91,10 @@ function childEnv(): Record<string, string | undefined> {
 let dryRun = false;
 let target: string | undefined;
 let bundles: string | undefined;
-let outDir = DEFAULT_OUT_DIR;
 let updaterArtifacts = true;
+let outDir = DEFAULT_OUT_DIR;
+/** How the bundle of this build was signed; the release notes state it. */
+let signing: SigningPlan = { apple: "ad-hoc", windows: "unsigned" };
 
 function say(message: string): void {
   process.stdout.write(`${message}\n`);
@@ -104,7 +106,7 @@ function announce(step: number, title: string): void {
 }
 
 function rel(path: string): string {
-  const printed = relative(ROOT, path);
+  const printed = relative(ROOT, path).split(sep).join("/");
   return printed.startsWith("..") ? path : printed;
 }
 
@@ -124,8 +126,8 @@ async function run(
   }
   say(`   $ ${command.map(quote).join(" ")}`);
   const executable = command[0];
-  const argv = executable === "bun" || executable === "bunx"
-    ? [executable, "--no-env-file", ...command.slice(1)] : [...command];
+  const argv = executable === "bun" ? [process.execPath, "--no-env-file", ...command.slice(1)]
+    : executable === "bunx" ? [process.execPath, "--no-env-file", "x", ...command.slice(1)] : [...command];
   const child = Bun.spawn(argv, {
     cwd,
     stdin: "inherit",
@@ -183,7 +185,9 @@ async function stepInstall(): Promise<void> {
 
 async function stepCheck(): Promise<void> {
   announce(2, "typecheck the workspace");
+  await run(["bun", "packages/web/script/generate-api-reference.mjs"]);
   await run(["bun", "run", "typecheck"]);
+  await run(["bun", "run", "test"]);
 }
 
 async function resolveTarget(): Promise<string> {
@@ -241,13 +245,9 @@ async function sameTree(left: string, right: string): Promise<boolean> {
   // path relative to each root; otherwise the two sides are never comparable.
   const names = async (dir: string) => {
     const root = resolve(dir);
-    const prefix = `${root}/`;
     return (await readdir(dir, { recursive: true, withFileTypes: true }))
       .filter((e) => e.isFile() && !e.name.startsWith("."))
-      .map((e) => {
-        const parent = resolve(e.parentPath);
-        return parent === root ? e.name : `${parent.slice(prefix.length)}/${e.name}`;
-      })
+      .map((e) => relative(root, join(e.parentPath, e.name)))
       .sort();
   };
   const [a, b] = await Promise.all([names(left), names(right)]);
@@ -263,7 +263,7 @@ async function stepCompile(): Promise<void> {
   await requirePath(SIDECAR_ENTRY, "sidecar entrypoint (WP4: apps/sidecar/src/main.ts)");
   // Compile beside the real binary and swap it in only when the result differs, so an unchanged build
   // leaves `src-tauri/binaries/` untouched and `tauri dev` keeps the window it already has open.
-  const candidate = `${outfile}.candidate`;
+  const candidate = outfile.endsWith(".exe") ? `${outfile.slice(0, -4)}.candidate.exe` : `${outfile}.candidate`;
   if (!dryRun) {
     await mkdir(dirname(outfile), { recursive: true });
     await rm(candidate, { force: true });
@@ -317,18 +317,32 @@ async function stepBundle(): Promise<void> {
   const config = JSON.parse(await readFile(join(SRC_TAURI, "tauri.conf.json"), "utf8"));
   // Only the bundler receives local signing credentials; checks and sidecar builds do not.
   const signingEnv = dryRun || !updaterArtifacts ? childEnv() : signingEnvironment(ROOT, process.env, config.plugins?.updater?.pubkey);
-  if (!dryRun && updaterArtifacts) assertSigningConfig(config, signingEnv, targetInfo(triple).platform, process.env.CADCAM_RELEASE === "1");
+  const platform = targetInfo(triple).platform;
+  const release = process.env.CADCAM_RELEASE === "1";
+  if (!dryRun && updaterArtifacts) {
+    signing = assertSigningConfig(config, signingEnv, platform, release);
+  }
   announce(5, "build the desktop frontend and bundle the app");
   await run(["bun", "run", "--filter", "@cadcamfun/desktop", "build"]);
   // Match nikcli's release scripts: prepare the frontend once above, then prevent Tauri from
   // invoking beforeBuildCommand again. This also avoids Windows resolving a workspace bin shim.
   const thumbprint = process.env.TAURI_WINDOWS_CERTIFICATE_THUMBPRINT;
-  if (!dryRun && process.env.CADCAM_RELEASE === "1" && targetInfo(triple).platform === "windows" && !thumbprint) throw new BuildError("Imported Windows signing certificate is required");
+  if (!dryRun && release && platform === "windows" && signing.windows === "certificate" && !thumbprint) {
+    throw new BuildError("The Windows signing certificate is configured but was not imported");
+  }
+  // Without an Apple Developer certificate the bundle is ad-hoc signed, exactly like
+  // nikcli's desktop builds: the app runs, but Gatekeeper asks the user to confirm it.
+  const adHoc = platform === "darwin" && signing.apple === "ad-hoc";
+  // GitHub supplies absent secrets as empty strings. Tauri treats a present Apple
+  // variable as a request to import a real certificate, even when it is empty.
+  if (adHoc) for (const name of APPLE_SIGNING_ENV) delete signingEnv[name];
+  if (adHoc) say("   no Apple certificate configured — the bundle is ad-hoc signed and not notarised");
   const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({
     build: { beforeBuildCommand: "" },
     bundle: {
       createUpdaterArtifacts: updaterArtifacts,
-      ...(thumbprint && targetInfo(triple).platform === "windows" ? { windows: { certificateThumbprint: thumbprint, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" } } : {}),
+      ...(thumbprint && platform === "windows" ? { windows: { certificateThumbprint: thumbprint, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" } } : {}),
+      ...(adHoc ? { macOS: { signingIdentity: "-" } } : {}),
     },
   })];
   if (bundles !== undefined) tauri.push("--bundles", bundles);
@@ -339,7 +353,7 @@ async function stepBundle(): Promise<void> {
 
 async function lastTag(): Promise<string | null> {
   const tags = (await probeGit(["tag", "--merged", "HEAD", "--sort=-version:refname"]))?.stdout.trim().split("\n") ?? [];
-  const current = (await probeGit(["describe", "--tags", "--exact-match", "HEAD"]))?.stdout.trim() ?? null;
+  const current = process.env.RELEASE_TAG || (await probeGit(["describe", "--tags", "--exact-match", "HEAD"]))?.stdout.trim() || null;
   return previousReleaseTag(tags, current);
 }
 
@@ -386,6 +400,7 @@ interface Notes {
   rangeLabel: string;
   lines: string[];
   migrationsState: "changed" | "unchanged" | "unknown";
+  signing: string;
 }
 
 async function repositoryUrl(): Promise<string> {
@@ -425,9 +440,16 @@ async function collectNotes(): Promise<Notes> {
     rangeLabel: previousTag !== null ? `${previousTag}..HEAD` : "the whole history (no tags yet)",
     lines,
     migrationsState,
+    signing: updaterArtifacts ? signingStatement(signing) : "Installers built without updater signatures or platform certificates.",
   };
 }
 
+/**
+ * How this build is signed, in one sentence for the release notes.
+ *
+ * A build that is not signed with a platform certificate has to say so: the user has to
+ * confirm the app the first time they open it.
+ */
 async function migrationsFingerprintAt(revision: string): Promise<string | null> {
   const listing = await probeGit([
     "-c",
@@ -490,7 +512,8 @@ function renderNotes(notes: Notes): string {
       "release can be compared. Treat a downgrade as unsafe until verified by hand.",
     ];
   }
-  return [...head, ...body, ...rollback, ...downgrade, ""].join("\n");
+  const signing = ["", "## Signing", "", notes.signing];
+  return [...head, ...body, ...rollback, ...downgrade, ...signing, ""].join("\n");
 }
 
 async function collectArtefacts(root: string): Promise<string[]> {
@@ -590,7 +613,7 @@ Options:
   -h, --help          show this help
 
 Local updater signing uses ignored tauri-signing.json when no environment key is set.
-Platform certificates are still required for CADCAM_RELEASE=1.
+Platform certificates are optional; incomplete signing credentials fail CADCAM_RELEASE=1.
 
 Examples:
   bun scripts/build.ts                              full release build

@@ -13,7 +13,8 @@
  */
 
 import { readdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type Bump = "major" | "minor" | "patch";
 
@@ -34,7 +35,7 @@ export function parseVersion(raw: string): ParsedVersion {
   const match = SEMVER.exec(value);
   if (!match) throw new Error(`Invalid version: ${raw}`);
   const [, major, minor, patch, prerelease, build] = match;
-  if (prerelease !== undefined && prerelease.split(".").some((part) => part === "")) {
+  if (prerelease !== undefined && prerelease.split(".").some((part) => part === "" || (/^\d+$/.test(part) && part.length > 1 && part.startsWith("0")))) {
     throw new Error(`Invalid version: ${raw}`);
   }
   if (build !== undefined && build.split(".").some((part) => part === "")) {
@@ -104,10 +105,10 @@ export interface ReleaseVersionInput {
 /**
  * Decide the version of the release that is about to be made.
  *
- * An explicit version wins. Otherwise the bump is applied to the version already in the
- * tree — the tree is the source of truth, so a release always moves forward from what
- * the application currently claims to be. The result must be strictly newer than the
- * newest tag, otherwise the release would reuse a version that was already published.
+ * An explicit version wins. Otherwise the bump is applied to the version the release
+ * moves forward from — the newer of the version in the tree and the newest release tag —
+ * so a release never reuses a version that was already published, even when the tree
+ * lags behind it.
  */
 export function resolveReleaseVersion(input: ReleaseVersionInput): string {
   if (input.override !== undefined && input.override.trim() !== "") {
@@ -119,9 +120,23 @@ export function resolveReleaseVersion(input: ReleaseVersionInput): string {
   if (bump !== "major" && bump !== "minor" && bump !== "patch") {
     throw new Error(`A release needs a bump (major, minor, patch) or an explicit version, got: ${input.bump ?? "(none)"}`);
   }
-  const version = bumpVersion(parseVersion(input.current).raw, bump);
+  const version = bumpVersion(releaseBase(input.current, input.latestTag), bump);
   assertNewerThanLatest(version, input.latestTag ?? null);
   return version;
+}
+
+/**
+ * The version the bump is applied to.
+ *
+ * The release moves forward from what was published: the newer of the version in the
+ * tree and the newest release tag. A tree that lags behind a published release — a
+ * reverted branch, a release made from another one — still moves forward.
+ */
+export function releaseBase(current: string, latestTag: string | null | undefined): string {
+  const tree = parseVersion(current).raw;
+  if (latestTag === null || latestTag === undefined || latestTag.trim() === "") return tree;
+  const tag = latestTag.trim().replace(/^v/, "");
+  return compareVersions(tree, tag) >= 0 ? tree : tag;
 }
 
 function assertNewerThanLatest(version: string, latestTag: string | null): void {
@@ -132,9 +147,46 @@ function assertNewerThanLatest(version: string, latestTag: string | null): void 
   }
 }
 
+// ──────────────────────────────── release tags ────────────────────────────────
+
+/**
+ * The newest release tag.
+ *
+ * The per-platform tags (`v6.0.0-macos-arm64`) are releases of one platform, not
+ * versions of the application, so they are not version numbers and are skipped.
+ */
+export function latestReleaseTag(tags: readonly string[]): string | null {
+  const candidates = tags.filter((tag) => {
+    if (!tag.startsWith("v") || /-(?:macos|windows|linux)-(?:arm64|x64)$/.test(tag)) return false;
+    try { parseVersion(tag); return true; } catch { return false; }
+  });
+  let newest: string | null = null;
+  for (const tag of candidates) {
+    if (newest === null || compareVersions(tag, newest) > 0) newest = tag;
+  }
+  return newest;
+}
+
+/** The tags of the repository. */
+export function repositoryTags(root?: string): string[] {
+  const child = Bun.spawnSync(["git", "tag", "--list"], {
+    cwd: root,
+    stdout: "pipe",
+    stderr: "pipe",
+    stdin: "ignore",
+  });
+  if (child.exitCode !== 0) return [];
+  return child.stdout.toString().split("\n").map((tag) => tag.trim()).filter((tag) => tag !== "");
+}
+
+/** The newest release tag in the repository, or `null` when it has never been released. */
+export async function lastReleaseTag(root?: string): Promise<string | null> {
+  return latestReleaseTag(repositoryTags(root));
+}
+
 // ───────────────────────────── version holders ─────────────────────────────
 
-export type HolderKind = "package-json" | "tauri-config" | "cargo-toml" | "expo-config";
+export type HolderKind = "package-json" | "tauri-config" | "cargo-toml" | "cargo-lock" | "expo-config";
 
 export interface VersionHolder {
   /** Path relative to the repository root. */
@@ -146,6 +198,7 @@ export interface VersionHolder {
 export const FIXED_VERSION_HOLDERS: readonly VersionHolder[] = [
   { path: "apps/desktop/src-tauri/tauri.conf.json", kind: "tauri-config" },
   { path: "apps/desktop/src-tauri/Cargo.toml", kind: "cargo-toml" },
+  { path: "apps/desktop/src-tauri/Cargo.lock", kind: "cargo-lock" },
   { path: "apps/mobile/app.json", kind: "expo-config" },
 ];
 
@@ -178,7 +231,7 @@ export async function discoverVersionHolders(root: string): Promise<VersionHolde
     if (typeof parsed !== "object" || parsed === null) continue;
     const version = (parsed as { version?: unknown }).version;
     if (typeof version !== "string") continue;
-    holders.push({ path: relative(root, manifest), kind: "package-json" });
+    holders.push({ path: relative(root, manifest).split(sep).join("/"), kind: "package-json" });
   }
   for (const holder of FIXED_VERSION_HOLDERS) {
     try {
@@ -215,6 +268,11 @@ export async function readHolderVersion(root: string, holder: VersionHolder): Pr
     case "cargo-toml": {
       const match = /^version\s*=\s*"([^"]*)"/m.exec(text);
       if (!match?.[1]) throw new Error(`${holder.path} has no [package] version`);
+      return match[1];
+    }
+    case "cargo-lock": {
+      const match = /\[\[package\]\]\r?\nname = "cadcamfun-desktop"\r?\nversion = "([^"]+)"/.exec(text);
+      if (!match?.[1]) throw new Error(`${holder.path} has no cadcamfun-desktop package version`);
       return match[1];
     }
   }
@@ -316,6 +374,11 @@ export async function stampVersions(root: string, version: string): Promise<stri
         await writeFile(path, updated, "utf8");
         break;
       }
+      case "cargo-lock": {
+        const updated = original.replace(/(\[\[package\]\]\r?\nname = "cadcamfun-desktop"\r?\nversion = )"[^"]*"/, `$1"${parsed}"`);
+        await writeFile(path, updated, "utf8");
+        break;
+      }
     }
     changed.push(holder.path);
   }
@@ -325,7 +388,7 @@ export async function stampVersions(root: string, version: string): Promise<stri
 // ─────────────────────────────────── cli ───────────────────────────────────
 
 if (import.meta.main) {
-  const root = new URL("..", import.meta.url).pathname;
+  const root = fileURLToPath(new URL("..", import.meta.url));
   const options = new Map<string, string>();
   for (const arg of process.argv.slice(2)) {
     const match = /^--([a-z-]+)(?:=(.*))?$/.exec(arg);
@@ -335,14 +398,22 @@ if (import.meta.main) {
   const bump = options.get("bump");
   const override = options.get("version");
   const versions = await readWorkspaceVersions(root);
-  assertVersionsAgree(versions);
-  const current = versions["apps/desktop/src-tauri/tauri.conf.json"] ?? Object.values(versions)[0];
-  if (current === undefined) throw new Error("No application version found");
-  if (options.has("stamp")) {
+  const current = versions[APPLICATION_VERSION_PATH];
+  if (current === undefined) throw new Error(`The application version is missing from ${APPLICATION_VERSION_PATH}`);
+  // The tag the release moves forward from: the newest one in the repository, unless
+  // the caller names one.
+  const latestTag = options.get("latest-tag") ?? (await lastReleaseTag(root));
+
+  if (options.has("check")) {
+    // The holders must agree: a release that ships two versions is broken.
+    assertVersionsAgree(versions);
+    process.stdout.write(`the workspace carries one version: ${current}\n`);
+  } else if (options.has("stamp")) {
+    // Stamping is what makes the holders agree, so it may not require it.
     const changed = await stampVersions(root, override ?? current);
     process.stdout.write(`stamped ${changed.length} file(s): ${changed.join(", ") || "(none)"}\n`);
   } else {
-    const resolved = resolveReleaseVersion({ bump, override, current, latestTag: options.get("latest-tag") ?? null });
+    const resolved = resolveReleaseVersion({ bump, override, current, latestTag });
     process.stdout.write(`${resolved}\n`);
   }
 }

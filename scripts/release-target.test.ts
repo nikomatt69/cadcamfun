@@ -1,0 +1,53 @@
+import { expect, test } from "bun:test";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { classifyPublishLog } from "./release-publish.ts";
+import { assertBunVersion, expectedBunVersion, RELEASE_REPOSITORY, RELEASE_UPDATER_ENDPOINT } from "./release-helpers.ts";
+
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
+
+test("the updater feed points at the repository the releases are published to", async () => {
+  const config = JSON.parse(await readFile(join(ROOT, "apps/desktop/src-tauri/tauri.conf.json"), "utf8")) as {
+    plugins: { updater: { endpoints: string[] } };
+  };
+  expect(config.plugins.updater.endpoints).toContain(RELEASE_UPDATER_ENDPOINT);
+  // The endpoint is the feed of the *latest* release: the index release carries the
+  // merged manifest and is the one GitHub marks as the latest.
+  expect(RELEASE_UPDATER_ENDPOINT).toBe(`https://github.com/${RELEASE_REPOSITORY}/releases/latest/download/latest.json`);
+});
+
+test("the publish workflow releases the same repository the feed reads", async () => {
+  const workflow = await readFile(join(ROOT, ".github/workflows/publish.yml"), "utf8");
+  expect(workflow).toContain(`github.repository == '${RELEASE_REPOSITORY}'`);
+});
+
+test("the published plugin points at the same repository", async () => {
+  const manifest = JSON.parse(await readFile(join(ROOT, "packages/nikcli-plugin/package.json"), "utf8")) as {
+    repository: { url: string };
+  };
+  expect(manifest.repository.url).toContain(`github.com/${RELEASE_REPOSITORY}.git`);
+  expect(manifest.repository.url).not.toContain("cadcamfun-tauri");
+});
+
+test("the release refuses a Bun the workspace does not support", async () => {
+  const root = await mkdtemp(join(tmpdir(), "cadcam-bun-"));
+  try {
+    await writeFile(join(root, "package.json"), `${JSON.stringify({ name: "x", engines: { bun: ">=9.9.9" } })}\n`);
+    expect(expectedBunVersion(root)).toBe(">=9.9.9");
+    expect(() => assertBunVersion(root)).toThrow("needs bun@>=9.9.9");
+    // The workspace itself declares a version the running Bun satisfies.
+    expect(expectedBunVersion(ROOT)).toBe(">=1.4.3");
+    expect(() => assertBunVersion(ROOT)).not.toThrow();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("npm's answer about a publish is read as an outcome", () => {
+  expect(classifyPublishLog("npm notice Publishing to https://registry.npmjs.org/")).toBe("failed");
+  expect(classifyPublishLog("npm error code E409\nnpm error You cannot publish over the previously published versions: 6.0.0.")).toBe("already-published");
+  expect(classifyPublishLog("npm error code E429\nnpm error Too Many Requests - retry later")).toBe("rate-limited");
+  expect(classifyPublishLog("npm error code E403\nnpm error 403 Forbidden - PUT https://registry.npmjs.org/@nikoemme_%2Fcadcamfun-nikcli-plugin")).toBe("failed");
+});

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { renderCask, selectDmg } from "./homebrew-cask.ts";
+import { caskPath, renderCask, selectDmg } from "./homebrew-cask.ts";
 
 const ENTRIES = [
   {
@@ -18,8 +18,10 @@ test("the cask carries both macOS architectures and the digests of the release",
   const cask = renderCask({ version: "6.0.1", repository: "nikomatt69/cadcamfun", entries: ENTRIES });
   expect(cask).toContain('cask "cadcamfun" do');
   expect(cask).toContain('version "6.0.1"');
-  expect(cask).toContain("on_arch_conditional do");
-  expect(cask).toContain("Hardware::CPU.arm?");
+  expect(cask).toContain("on_arm do");
+  expect(cask).toContain("on_intel do");
+  expect(cask).not.toContain("if null");
+  expect(caskPath()).toBe("Casks/cadcamfun.rb");
   expect(cask).toContain(ENTRIES[0]?.url ?? "");
   expect(cask).toContain(ENTRIES[1]?.url ?? "");
   expect(cask).toContain(`sha256 "${"a".repeat(64)}"`);

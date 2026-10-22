@@ -1,0 +1,14 @@
+# Configuration file for actionlint (https://github.com/rhysd/actionlint).
+#
+# The workflows are linted with `bun run lint:workflows`; the same check runs in the
+# release verification, so a workflow that cannot run is caught before it is published.
+
+# The repository runs on GitHub-hosted runners only: no self-hosted labels are expected.
+self-hosted-runner:
+  labels: []
+
+# The repository variables the workflows read. Every other `vars.*` reference is an
+# error: a variable that does not exist is a workflow that reads an empty string.
+config-variables:
+  - HOMEBREW_TAP_REPOSITORY
+  - HOMEBREW_TAP_BRANCH

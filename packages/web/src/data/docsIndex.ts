@@ -155,7 +155,7 @@ const pageCopy: Record<string, DocsIndexCopy> = {
   },
   "/docs/packages": {
     summary: "All workspace libraries and apps, public exports, dependency roles, HTTP client generation, documentation assistant and Markdown routes, and local Studio operation.",
-    keywords: ["packages", "workspace", "@cadcamfun/db", "@cadcamfun/core", "@cadcamfun/api", "@cadcamfun/httpapi-codegen", "packages/nikcli-plugin", "@nikoemme_/cadcamfun-nikcli-plugin", "web", "studio", "llm", "docs assistant"],
+    keywords: ["packages", "workspace", "@cadcamfun/db", "@cadcamfun/core", "@cadcamfun/api", "@cadcamfun/httpapi-codegen", "packages/nikcli-plugin", "@cadcamfunv2/cadcamfun-nikcli-plugin", "web", "studio", "llm", "docs assistant"],
   },
   "/docs/source-map": {
     summary: "Implementation entry points for geometry, CAM posts, API groups, SQLite, sidecar layers, desktop viewport, native shell, mobile transport, AI, plugins, history, workflows, and documentation delivery.",

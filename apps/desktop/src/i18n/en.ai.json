@@ -450,7 +450,7 @@
   "ai.cmd.model.unknown": "That model is not in the catalogue.",
   "ai.cmd.model.unconfigured": "That model has no API key yet.",
   "ai.bridge.title": "Standalone nikcli",
-  "ai.bridge.hint": "Let a nikcli outside this app (a terminal, another machine, CI) work on the open project through @nikoemme_/cadcamfun-nikcli-plugin. A token is for one project, read-only or read-write, opens nothing else and can be revoked here. Deleting or replacing work always stays in this window.",
+  "ai.bridge.hint": "Let a nikcli outside this app (a terminal, another machine, CI) work on the open project through @cadcamfunv2/cadcamfun-nikcli-plugin. A token is for one project, read-only or read-write, opens nothing else and can be revoked here. Deleting or replacing work always stays in this window.",
   "ai.bridge.name": "Name (e.g. my laptop)",
   "ai.bridge.write": "Read and write",
   "ai.bridge.read": "Read only",

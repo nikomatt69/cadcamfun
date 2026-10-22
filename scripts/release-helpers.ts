@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
+import { compareVersions, parseVersion } from "./release-version.ts";
 
 /**
  * Run a command and capture its output.
@@ -36,6 +38,48 @@ export const RELEASE_REPOSITORY = "nikomatt69/cadcamfun";
 
 /** The updater feed: the `latest.json` of the release GitHub marks as the latest one. */
 export const RELEASE_UPDATER_ENDPOINT = `https://github.com/${RELEASE_REPOSITORY}/releases/latest/download/latest.json`;
+
+/**
+ * The Bun version the workspace expects.
+ *
+ * It is read from the `engines` field of the root manifest, so the version lives in
+ * one place: the release scripts write the lockfile and compile the sidecar, and a
+ * different Bun writes a different lockfile.
+ */
+export function expectedBunVersion(root: string): string | null {
+  const manifest = join(root, "package.json");
+  let parsed: { engines?: { bun?: unknown } };
+  try {
+    parsed = JSON.parse(readFileSync(manifest, "utf8")) as { engines?: { bun?: unknown } };
+  } catch {
+    return null;
+  }
+  const range = parsed.engines?.bun;
+  return typeof range === "string" ? range : null;
+}
+
+/**
+ * Refuse to publish with the wrong Bun.
+ *
+ * The range is the `>=` form the workspace declares; a narrower range is accepted as
+ * long as the running version satisfies it.
+ */
+export function assertBunVersion(root: string): void {
+  const range = expectedBunVersion(root);
+  if (range === null) return;
+  const minimum = />=\s*(\d+)\.(\d+)\.(\d+)/.exec(range);
+  if (!minimum) return;
+  const [, major, minor, patch] = minimum;
+  const actual = Bun.version.split(".").map((part) => Number(part) || 0);
+  const expected = [Number(major), Number(minor), Number(patch)];
+  for (let index = 0; index < 3; index++) {
+    const difference = (actual[index] ?? 0) - (expected[index] ?? 0);
+    if (difference > 0) return;
+    if (difference < 0) {
+      throw new Error(`The release needs bun@${range}, but it runs on bun@${Bun.version}`);
+    }
+  }
+}
 
 export const RELEASE_PLATFORM_TRIPLES: Readonly<Record<string, string>> = {
   "darwin-aarch64": "aarch64-apple-darwin",
@@ -112,30 +156,99 @@ export function releaseVersion(raw: string): string {
   return version;
 }
 
+/**
+ * The release gate: the tag the release is made from.
+ *
+ * Three ways in, all of them naming the tag explicitly: a tag push, a manual dispatch
+ * and the `workflow_call` the publish pipeline makes (the release of one version is
+ * built by the workflow that owns the release).
+ */
 export function selectReleaseRef(event: string, ref: string, input: string | undefined, configuredVersion: string): { tag: string; version: string } {
-  if (event !== "push" && event !== "workflow_dispatch") throw new Error("Release requires a tag push or manual dispatch");
+  if (event !== "push" && event !== "workflow_dispatch" && event !== "workflow_call") throw new Error("Release requires a tag push, a manual dispatch or the publish pipeline");
   if (event === "push" && !ref.startsWith("refs/tags/")) throw new Error("Release push must reference a tag");
-  const tag = event === "workflow_dispatch" ? input : ref.slice("refs/tags/".length);
+  const tag = event === "push" ? ref.slice("refs/tags/".length) : input;
   if (!tag || !tag.startsWith("v")) throw new Error("Release ref must be an existing v-prefixed version tag");
   const version = releaseVersion(tag);
   if (version !== releaseVersion(configuredVersion)) throw new Error("Release tag and application version disagree");
   return { tag, version };
 }
 
+/**
+ * The release before the current one.
+ *
+ * The newest tag wins, not the first one in the list: `git tag --list` sorts
+ * lexicographically, and `v9.0.0` sorts before `v10.0.0`.
+ */
 export function previousReleaseTag(tags: readonly string[], currentTag: string | null): string | null {
-  return tags.find((tag) => tag !== currentTag && /^v\d+\.\d+\.\d+/.test(tag) && !PLATFORM_TAG.test(tag)) ?? null;
+  const candidates = tags.filter((tag) => {
+    if (tag === currentTag || !tag.startsWith("v") || PLATFORM_TAG.test(tag)) return false;
+    try { parseVersion(tag); } catch { return false; }
+    return currentTag === null || compareVersions(tag, currentTag) < 0;
+  });
+  let newest: string | null = null;
+  for (const tag of candidates) {
+    if (newest === null || compareVersions(tag, newest) > 0) newest = tag;
+  }
+  return newest;
 }
 
-export function assertSigningConfig(config: unknown, env: Readonly<Record<string, string | undefined>>, platform: string, release: boolean): void {
+/** The environment that signs and notarises a macOS build. */
+export const APPLE_SIGNING_ENV = ["APPLE_CERTIFICATE", "APPLE_CERTIFICATE_PASSWORD", "APPLE_ID", "APPLE_PASSWORD", "APPLE_TEAM_ID"] as const;
+
+/** The environment that signs a Windows build. */
+export const WINDOWS_SIGNING_ENV = ["WINDOWS_CERTIFICATE", "WINDOWS_CERTIFICATE_PASSWORD"] as const;
+
+/** How a platform build is signed. */
+export interface SigningPlan {
+  /** `certificate` when the Apple environment is complete, `ad-hoc` otherwise. */
+  apple: "certificate" | "ad-hoc";
+  /** `certificate` when the Windows environment is complete, `unsigned` otherwise. */
+  windows: "certificate" | "unsigned";
+}
+
+/** Same text on every builder: updater fragments must agree on their release notes. */
+export function signingStatement(plan: SigningPlan): string {
+  return [
+    plan.apple === "certificate"
+      ? "macOS: signed with an Apple Developer certificate and notarised."
+      : "macOS: ad-hoc signed and **not notarised**; confirm the app on first launch.",
+    plan.windows === "certificate"
+      ? "Windows: signed with a code-signing certificate."
+      : "Windows: **not signed**; SmartScreen may require confirmation on first launch.",
+    "Linux: packages are not code-signed.",
+    "Updater bundles on every platform have a verified Tauri signature.",
+  ].join("\n\n");
+}
+
+function hasAll(env: Readonly<Record<string, string | undefined>>, names: readonly string[]): boolean {
+  return names.every((name) => (env[name] ?? "").trim() !== "");
+}
+
+/**
+ * Check the signing configuration and say how the build will be signed.
+ *
+ * The updater key is required: without it the release cannot be verified by the
+ * application that downloads it. The platform certificates are not: like nikcli, a build
+ * without them is ad-hoc signed on macOS and unsigned on Windows, and the release notes
+ * say so. A certificate that is *partly* configured is still an error, because that is a
+ * mistake rather than a choice.
+ */
+export function assertSigningConfig(config: unknown, env: Readonly<Record<string, string | undefined>>, platform: string, release: boolean): SigningPlan {
   if (!isRecord(config) || !isRecord(config.plugins) || !isRecord(config.plugins.updater)) throw new Error("Missing updater configuration");
   const key = config.plugins.updater.pubkey;
   if (typeof key !== "string" || key.trim() === "" || /REPLACE|PLACEHOLDER/i.test(key)) throw new Error("Configure a real Tauri updater public key before bundling");
   if (!env.TAURI_SIGNING_PRIVATE_KEY?.trim()) throw new Error("TAURI_SIGNING_PRIVATE_KEY is required before bundling");
-  if (!release) return;
-  const required = platform === "darwin"
-    ? ["APPLE_CERTIFICATE", "APPLE_CERTIFICATE_PASSWORD", "APPLE_ID", "APPLE_PASSWORD", "APPLE_TEAM_ID"]
-    : platform === "windows" ? ["WINDOWS_CERTIFICATE", "WINDOWS_CERTIFICATE_PASSWORD"] : [];
-  for (const name of required) if (!env[name]?.trim()) throw new Error(`${name} is required for a signed release`);
+
+  const apple = hasAll(env, APPLE_SIGNING_ENV) ? "certificate" : "ad-hoc";
+  const windows = hasAll(env, WINDOWS_SIGNING_ENV) ? "certificate" : "unsigned";
+  if (release) {
+    const partly = (names: readonly string[]) => names.some((name) => (env[name] ?? "").trim() !== "") && !hasAll(env, names);
+    const appleRequested = APPLE_SIGNING_ENV.some((name) => name !== "APPLE_TEAM_ID" && (env[name] ?? "").trim() !== "");
+    if (appleRequested && apple === "ad-hoc") throw new Error("APPLE_CERTIFICATE and the Apple signing environment must be configured together");
+    if (partly(WINDOWS_SIGNING_ENV)) throw new Error("WINDOWS_CERTIFICATE and WINDOWS_CERTIFICATE_PASSWORD must be configured together");
+  }
+  void platform;
+  return { apple, windows };
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

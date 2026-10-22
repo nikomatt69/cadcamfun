@@ -1,4 +1,4 @@
-# @nikoemme_/cadcamfun-nikcli-plugin
+# @cadcamfunv2/cadcamfun-nikcli-plugin
 
 A standalone [nikcli](https://github.com/) (terminal, another machine, CI) driving a **running CADCAMFUN**: the application's CAD/CAM
 action catalogue as nikcli tools. Same tool ids and descriptions as the in-app assistant (`cad`, `cad_edit`, `cam`, `cam_edit`,

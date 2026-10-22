@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { assertManifestAssets, assertSigningConfig, bundleRoot, indexArtifacts, mergeManifestValues, parseChecksums, previousReleaseTag, releaseVersion, selectReleaseRef, targetInfo, validateManifest } from "./release-helpers.ts";
+import { APPLE_SIGNING_ENV, assertManifestAssets, assertSigningConfig, bundleRoot, indexArtifacts, mergeManifestValues, parseChecksums, previousReleaseTag, releaseVersion, selectReleaseRef, signingStatement, targetInfo, validateManifest } from "./release-helpers.ts";
 
 const date = "2026-10-05T12:00:00Z";
 const url = "https://github.com/example/app/releases/download/v6.0.0";
@@ -44,11 +44,24 @@ describe("release gate", () => {
     for (const version of ["6.0.0-beta..1", "6.0.0-01", "6.0.0+build..1"]) expect(() => releaseVersion(version)).toThrow();
     expect(previousReleaseTag(["v6.0.0", "v5.0.0"], "v6.0.0")).toBe("v5.0.0");
   });
-  test("never invents signing keys and requires release certificates", () => {
+  test("requires updater keys and accepts absent platform certificates", () => {
     expect(() => assertSigningConfig({ plugins: { updater: { pubkey: "REPLACE_WITH_KEY" } } }, {}, "linux", false)).toThrow("public key");
     const config = { plugins: { updater: { pubkey: "owner-supplied-key" } } };
     expect(() => assertSigningConfig(config, {}, "linux", false)).toThrow("PRIVATE_KEY");
-    expect(() => assertSigningConfig(config, { TAURI_SIGNING_PRIVATE_KEY: "secret" }, "darwin", true)).toThrow("APPLE_CERTIFICATE");
+    expect(assertSigningConfig(config, { TAURI_SIGNING_PRIVATE_KEY: "secret", APPLE_TEAM_ID: "team" }, "darwin", true)).toEqual({ apple: "ad-hoc", windows: "unsigned" });
+    expect(() => assertSigningConfig(config, { TAURI_SIGNING_PRIVATE_KEY: "secret", APPLE_CERTIFICATE: "certificate" }, "darwin", true)).toThrow("APPLE_CERTIFICATE");
+    expect(() => assertSigningConfig(config, { TAURI_SIGNING_PRIVATE_KEY: "secret", WINDOWS_CERTIFICATE: "certificate" }, "windows", true)).toThrow("WINDOWS_CERTIFICATE");
+  });
+  test("all builders describe the same signing configuration", () => {
+    const config = { plugins: { updater: { pubkey: "owner-supplied-key" } } };
+    const env = { TAURI_SIGNING_PRIVATE_KEY: "secret", ...Object.fromEntries(APPLE_SIGNING_ENV.map((name) => [name, "configured"])) };
+    const notes = ["darwin", "windows", "linux"].map((platform) => signingStatement(assertSigningConfig(config, env, platform, true)));
+    expect(new Set(notes).size).toBe(1);
+    expect(notes[0]).toContain("notarised");
+    expect(notes[0]).toContain("SmartScreen");
+  });
+  test("the previous release excludes newer tags and orders prereleases numerically", () => {
+    expect(previousReleaseTag(["v7.0.0", "v6.0.0-rc.2", "v6.0.0-rc.10", "v6.0.0-invalid!"], "v6.0.0")).toBe("v6.0.0-rc.10");
   });
 });
 

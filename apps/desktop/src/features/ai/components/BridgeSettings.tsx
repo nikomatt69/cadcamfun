@@ -1,6 +1,6 @@
 /**
  * Standalone nikcli (Settings → AI, RM-11): scoped, revocable tokens that let a nikcli outside the application — a terminal, another
- * machine, CI — drive one project through `@nikoemme_/cadcamfun-nikcli-plugin`. A token is for the open project, read-only or read-write, and
+ * machine, CI — drive one project through `@cadcamfunv2/cadcamfun-nikcli-plugin`. A token is for the open project, read-only or read-write, and
  * opens only the action bridge; it is shown once, here, and can be revoked at any time. Deleting or replacing work is never
  * reachable from outside: the application asks a person first, and only it can.
  */

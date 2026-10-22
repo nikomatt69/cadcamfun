@@ -8,11 +8,8 @@ on:
 permissions:
   contents: read
 
-env:
-  BUN_VERSION: "1.4.3"
-
 jobs:
-  # Bun fa i Bun: cross-compile every sidecar variant on Linux (no Rust/Tauri).
+  # Cross-compile every sidecar variant on Linux (no Rust/Tauri).
   build-sidecars:
     name: sidecar (bun) ${{ matrix.target }}
     strategy:
@@ -28,13 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: ./.github/actions/setup-bun
         with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: bun-sidecar-${{ matrix.target }}-${{ hashFiles('bun.lock') }}
+          install: "false"
       - name: Cross-compile the sidecar (Bun)
         run: bun --no-env-file scripts/build.ts --only=install,compile --target=${{ matrix.target }}
       - uses: actions/upload-artifact@v4
@@ -43,7 +36,7 @@ jobs:
           path: apps/desktop/src-tauri/binaries/sidecar-${{ matrix.target }}*
           if-no-files-found: error
 
-  # Tauri fa le sue toolchain: native runners place the prebuilt sidecar and
+  # Native runners place the prebuilt sidecar and
   # bundle with Rust + Tauri CLI only (`--skip=check,compile`).
   build:
     needs: build-sidecars
@@ -77,9 +70,9 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup || true
           df -h /
-      - uses: oven-sh/setup-bun@v2
+      - uses: ./.github/actions/setup-bun
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          install: "false"
       - uses: actions/download-artifact@v4
         with:
           name: sidecar-${{ matrix.target }}
@@ -96,10 +89,6 @@ jobs:
           cp "$src" "apps/desktop/src-tauri/binaries/sidecar-${{ matrix.target }}${ext}"
           if [ -z "$ext" ]; then chmod +x "apps/desktop/src-tauri/binaries/sidecar-${{ matrix.target }}"; fi
           ls -l apps/desktop/src-tauri/binaries/
-      - uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}

@@ -7,8 +7,8 @@ run-name: "${{ format('release {0}', inputs.version || inputs.bump) }}"
 #                    changelog, publish npm, commit and push the release, tag it and
 #                    create the *draft* GitHub release.
 #   desktop          build, sign and publish the six platform releases.
-#   publish-release  attach the updater manifest, publish the Homebrew cask, and only
-#                    then make the release public.
+#   publish-release  attach the updater manifest, make the release public and publish
+#                    the optional Homebrew cask.
 #
 # The release stays a draft until the last job, so a release that fails halfway is never
 # visible to a user and the updater feed never points at a missing installer.
@@ -52,7 +52,7 @@ on:
         type: string
 
 concurrency:
-  group: publish-${{ github.ref }}-${{ inputs.version || inputs.bump || 'manual' }}
+  group: cadcamfun-publish
   cancel-in-progress: false
 
 permissions:
@@ -88,12 +88,20 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: actionlint@1.7.12
+
+      - name: Validate release workflows
+        run: bun --no-env-file scripts/lint-workflows.ts
+
       - name: Validate the workspace
         if: ${{ !inputs.prevalidated }}
         run: |
-          bun install --frozen-lockfile
-          bun run typecheck
-          bun run test
+          bun --no-env-file install --frozen-lockfile
+          bun --no-env-file packages/web/script/generate-api-reference.mjs
+          bun --no-env-file run typecheck
+          bun --no-env-file run test
 
       - name: Prepare the release
         id: release
@@ -105,7 +113,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_FALLBACK_NAME: "@cadcamfun/cadcamfun"
           # The npm provenance attestation needs an OIDC identity the release token
           # does not carry; the release is published without it, as in nikcli.
           NPM_CONFIG_PROVENANCE: "false"
@@ -129,6 +136,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.publish.outputs.tag }}
 
       - uses: ./.github/actions/setup-bun
         with:
@@ -139,7 +147,7 @@ jobs:
           name: latest-json
           path: manifest
 
-      - name: Attach the updater manifest, publish the cask and make the release public
+      - name: Attach the updater manifest, make the release public and publish the cask
         run: bun --no-env-file scripts/release-publish.ts --phase=complete --tag="$RELEASE_TAG" --manifest=manifest/latest.json
         env:
           RELEASE_TAG: ${{ needs.publish.outputs.tag }}

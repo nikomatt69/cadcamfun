@@ -13,9 +13,9 @@
  */
 
 import { $ } from "bun";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { parseChecksums, captureCommand } from "./release-helpers.ts";
 
 export interface CaskEntry {
@@ -39,10 +39,21 @@ export interface CaskInput {
 }
 
 /**
+ * The path of the cask inside the tap repository.
+ *
+ * Homebrew looks for a cask in `Casks/<name>.rb` and a formula in `Formula/<name>.rb`;
+ * a file at the root of the tap is the tap's own default package and is not what
+ * `brew install --cask owner/tap/cadcamfun` resolves to.
+ */
+export function caskPath(token = "cadcamfun"): string {
+  return `Casks/${token}.rb`;
+}
+
+/**
  * Render the cask.
  *
  * The two macOS architectures are published as separate platform releases, so the cask
- * picks the right one per machine with `on_arch_conditional`.
+ * picks the right one per machine with Homebrew's architecture blocks.
  */
 export function renderCask(input: CaskInput): string {
   if (input.entries.length === 0) throw new Error("The cask needs at least one macOS build");
@@ -53,25 +64,15 @@ export function renderCask(input: CaskInput): string {
   const arm = entries.find((entry) => entry.arch === "arm64");
   const intel = entries.find((entry) => entry.arch === "x64");
 
-  const block = (entry: CaskEntry | undefined, condition: string | null): string[] => {
-    if (entry === undefined) return [];
-    const lines = [`    if ${condition}`, `      url "${entry.url}"`, `      sha256 "${entry.sha256}"`];
-    if (condition !== null) lines.push("    end");
-    return lines;
-  };
-
   const arch: string[] = [];
   if (arm !== undefined && intel !== undefined) {
-    arch.push("  on_arch_conditional do");
-    arch.push(...block(arm, "Hardware::CPU.arm?"));
-    arch.push("    else");
-    arch.push(...block(intel, null));
-    arch.push("    end");
-    arch.push("  end");
+    for (const [condition, entry] of [["on_arm", arm], ["on_intel", intel]] as const) {
+      arch.push(`  ${condition} do`, `    url "${entry.url}"`, `    sha256 "${entry.sha256}"`, "  end");
+    }
   } else {
     const only = entries[0];
     if (only === undefined) throw new Error("The cask needs at least one macOS build");
-    arch.push(...block(only, null).map((line) => `  ${line.trimStart()}`));
+    arch.push(`  url "${only.url}"`, `  sha256 "${only.sha256}"`);
   }
 
   return [
@@ -87,6 +88,14 @@ export function renderCask(input: CaskInput): string {
     `  name "${appName}"`,
     `  desc "CAD/CAM desktop application"`,
     `  homepage "https://github.com/${input.repository}"`,
+    "",
+    // The tap follows the releases of the repository, so `brew upgrade` finds the
+    // version that is out.
+    "  livecheck do",
+    "    url :stable",
+    "    strategy :github_latest",
+    "    regex(/v?(\\d+(?:\\.\\d+)+)/i)",
+    "  end",
     "",
     `  app "${appName}.app"`,
     "",
@@ -167,14 +176,16 @@ export async function publishCask(options: PublishCaskOptions): Promise<string> 
   const cask = renderCask({ version: options.version, repository: options.repository, entries: options.entries });
   const directory = options.workdir ?? (await mkdtemp(join(tmpdir(), "cadcam-tap-")));
   const owns = options.workdir === undefined;
+  const relative = caskPath();
   try {
     await $`rm -rf ${directory}`.nothrow();
     const clone = await captureCommand(["git", "clone", "--depth", "1", "--branch", options.branch ?? "main", `https://x-access-token:${options.token}@github.com/${options.tap}.git`, directory]);
     if (clone.code !== 0) throw new Error(`Cannot clone the tap ${options.tap}: ${clone.stderr.trim()}`);
-    const file = join(directory, "cadcamfun.rb");
+    const file = join(directory, relative);
+    await mkdir(dirname(file), { recursive: true });
     await writeFile(file, cask, "utf8");
-    await $`git -c user.name=release-bot -c user.email=release-bot@users.noreply.github.com add cadcamfun.rb`.cwd(directory);
-    const commit = await $`git -c user.name=release-bot -c user.email=release-bot@users.noreply.github.com commit -m "CADCAM FUN ${options.version}"`.nothrow().cwd(directory);
+    await $`git -c user.name=release-bot -c user.email=release-bot@users.noreply.github.com add ${relative}`.cwd(directory);
+    const commit = await $`git -c user.name=release-bot -c user.email=release-bot@users.noreply.github.com commit -m ${`CADCAM FUN ${options.version}`}`.nothrow().cwd(directory);
     // An unchanged cask means the tap is already up to date; that is not a failure.
     if (commit.exitCode !== 0) {
       const message = commit.stderr.toString() + commit.stdout.toString();

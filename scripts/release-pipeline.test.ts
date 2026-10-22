@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { platformReleaseTag, previousReleaseTag, RELEASE_PLATFORM_SLUGS, RELEASE_PLATFORM_TRIPLES } from "./release-helpers.ts";
 import { buildManifest, mergeManifests } from "./updater-manifest.ts";
 import { stageIndexRelease, stagePlatformRelease } from "./stage-release.ts";
@@ -78,3 +79,19 @@ test("platform release tags are never taken for the previous version tag", () =>
   expect(previousReleaseTag(["v6.0.1-linux-x64", "v6.0.1", "v6.0.0-windows-arm64", "v6.0.0"], "v6.0.2")).toBe("v6.0.1");
   expect(previousReleaseTag(["v6.0.1-linux-x64", "v6.0.0-rc.1"], "v6.0.2")).toBe("v6.0.0-rc.1");
 });
+
+test("the build planner completes for all six release targets without installing or writing", async () => {
+  const cwd = fileURLToPath(new URL("..", import.meta.url));
+  await Promise.all(Object.values(RELEASE_PLATFORM_TRIPLES).map(async (triple) => {
+    const child = Bun.spawn([process.execPath, "--no-env-file", "scripts/build.ts", "--dry-run", `--target=${triple}`], {
+      cwd, stdout: "pipe", stderr: "pipe", stdin: "ignore",
+    });
+    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+    expect(stderr).toBe("");
+    expect(code).toBe(0);
+    expect(stdout).toContain(`sidecar-${triple}${triple.includes("windows") ? ".exe" : ""}`);
+    expect(stdout).toContain(`--target ${triple}`);
+    expect(stdout).toContain('"beforeBuildCommand":""');
+    expect(stdout).toContain("nothing was changed");
+  }));
+}, 20_000);

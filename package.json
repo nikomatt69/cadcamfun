@@ -26,6 +26,7 @@
     "release": "./scripts/release",
     "release:version": "bun --no-env-file scripts/release-version.ts",
     "changelog": "bun --no-env-file scripts/changelog.ts",
+    "lint:workflows": "bun --no-env-file scripts/lint-workflows.ts",
     "turbo": "turbo"
   },
   "devDependencies": {

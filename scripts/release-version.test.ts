@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { join } from "node:path";import {
   assertVersionsAgree,
   bumpVersion,
@@ -38,12 +39,18 @@ test("the release version comes from the bump, or from an explicit version", () 
   expect(resolveReleaseVersion({ override: "6.2.0", current: "6.0.0", latestTag: "v6.1.0" })).toBe("6.2.0");
   // An explicit version wins over the bump.
   expect(resolveReleaseVersion({ bump: "patch", override: "6.2.0", current: "6.0.0" })).toBe("6.2.0");
-  // A release never reuses a version that was already published.
-  expect(() => resolveReleaseVersion({ bump: "patch", current: "6.0.0", latestTag: "v6.0.1" })).toThrow("not newer");
+  // A stale branch still bumps from the newest published version.
+  expect(resolveReleaseVersion({ bump: "patch", current: "6.0.0", latestTag: "v6.0.1" })).toBe("6.0.2");
   expect(() => resolveReleaseVersion({ override: "6.0.0", current: "6.0.0", latestTag: "v6.0.0" })).toThrow("not newer");
   // Without a bump and without a version there is nothing to release.
   expect(() => resolveReleaseVersion({ current: "6.0.0" })).toThrow("needs a bump");
   expect(() => resolveReleaseVersion({ bump: "nonsense", current: "6.0.0" })).toThrow("needs a bump");
+});
+
+test("semantic versions reject invalid numeric prereleases and compare releases above prereleases", () => {
+  expect(() => parseVersion("6.0.1-01")).toThrow("Invalid version");
+  expect(compareVersions("6.0.1-rc.10", "6.0.1-rc.2")).toBeGreaterThan(0);
+  expect(compareVersions("6.0.1", "6.0.1-rc.10")).toBeGreaterThan(0);
 });
 
 /** A checkout with the version holders a release touches. */
@@ -120,7 +127,7 @@ test("a package without a version is left alone", async () => {
 });
 
 test("the workspace of this repository carries one version", async () => {
-  const root = new URL("..", import.meta.url).pathname;
+  const root = fileURLToPath(new URL("..", import.meta.url));
   const versions = await readWorkspaceVersions(root);
   expect(versions["apps/desktop/src-tauri/tauri.conf.json"]).toBeDefined();
   expect(versions["package.json"]).toBe(versions["apps/desktop/src-tauri/tauri.conf.json"]);
@@ -136,4 +143,17 @@ test("a holder without a version is an error, not a silent skip", async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("the Rust lockfile is stamped without changing dependency versions", async () => {
+  const root = await fixture();
+  try {
+    const lockfile = join(root, "apps/desktop/src-tauri/Cargo.lock");
+    await writeFile(lockfile, 'version = 4\n\n[[package]]\nname = "cadcamfun-desktop"\nversion = "6.0.0"\n\n[[package]]\nname = "dependency"\nversion = "6.0.0"\n');
+    expect(await stampVersions(root, "6.0.1")).toContain("apps/desktop/src-tauri/Cargo.lock");
+    const content = await readFile(lockfile, "utf8");
+    expect(content).toContain('name = "cadcamfun-desktop"\nversion = "6.0.1"');
+    expect(content).toContain('name = "dependency"\nversion = "6.0.0"');
+    assertVersionsAgree(await readWorkspaceVersions(root));
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -101,7 +101,7 @@ const toc = [
 
   <section id="nikcli-plugin" class="doc-section">
     <h2>Standalone nikcli access</h2>
-<p><code>@nikoemme_/cadcamfun-nikcli-plugin</code> connects a standalone nikcli to a running application. Configure its <code>url</code>, <code>token</code>, and default <code>projectId</code>, or use <code>CADCAMFUN_URL</code>, <code>CADCAMFUN_TOKEN</code>, and <code>CADCAMFUN_PROJECT</code>. Supply a scoped bridge token issued by the application for outside access.</p>
+<p><code>@cadcamfunv2/cadcamfun-nikcli-plugin</code> connects a standalone nikcli to a running application. Configure its <code>url</code>, <code>token</code>, and default <code>projectId</code>, or use <code>CADCAMFUN_URL</code>, <code>CADCAMFUN_TOKEN</code>, and <code>CADCAMFUN_PROJECT</code>. Supply a scoped bridge token issued by the application for outside access.</p>
     <p>Bridge tokens are restricted to one project and read-only or read/write actions. They default to 30 days, allow 1–365 days, can be listed and revoked, and reveal their secret only when issued. They admit only the two action bridge routes. Policy can narrow the visible tools and actions further.</p>
     <p>The plugin fetches the catalogue from the application and converts its schemas into nikcli tool arguments. Destructive actions are refused even with a confirmation flag, and the in-process <code>agent</code> delegation tool is excluded. Write-capable plugin extension tools are not exposed through this outside bridge. HTTP 401 reports a rejected token; action refusals return readable failure results.</p>
   </section>

@@ -1,7 +1,7 @@
 /**
  * Workspace map for the homepage and the architecture docs.
  *
- * packages/nikcli-plugin publishes as @nikoemme_/cadcamfun-nikcli-plugin.
+ * packages/nikcli-plugin publishes as @cadcamfunv2/cadcamfun-nikcli-plugin.
  * It is outside the @cadcamfun scope.
  */
 
@@ -94,7 +94,7 @@ export const packages: readonly WorkspaceUnit[] = [
     owns: "Generates clients from the HttpApi contract into packages/api/src/sdk and packages/api/src/client.",
   },
   {
-    name: "@nikoemme_/cadcamfun-nikcli-plugin",
+    name: "@cadcamfunv2/cadcamfun-nikcli-plugin",
     path: "packages/nikcli-plugin",
     role: "Bridge",
     owns: "Exposes the running app’s CAD/CAM action catalogue to a standalone nikcli. The list is read from the app; the plugin does not keep a second copy.",

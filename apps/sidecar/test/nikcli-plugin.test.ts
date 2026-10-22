@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { z } from "zod"
-import { createCadcamTools, type ToolFactory } from "@nikoemme_/cadcamfun-nikcli-plugin"
+import { createCadcamTools, type ToolFactory } from "@cadcamfunv2/cadcamfun-nikcli-plugin"
 import { Context, Effect, Fiber, Stream } from "effect"
 import { LiveEvents } from "../src/services/live-events.ts"
 import { makeApp, TOKEN } from "./helpers.ts"
 
 /**
- * RM-11, both faces end to end: a standalone nikcli's plugin (`@nikoemme_/cadcamfun-nikcli-plugin`) building its tools from the running
+ * RM-11, both faces end to end: a standalone nikcli's plugin (`@cadcamfunv2/cadcamfun-nikcli-plugin`) building its tools from the running
  * application's catalogue and calling them over HTTP, against the real sidecar routes. nikcli's own `tool()` is injected: it is
  * the identity function with zod attached.
  */

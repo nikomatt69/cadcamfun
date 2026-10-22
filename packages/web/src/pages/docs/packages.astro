@@ -45,7 +45,7 @@ const toc = [
     <h2>Extension packages</h2>
     <h3><code>@cadcamfun/plugin-sdk</code></h3>
     <p>The SDK's <code>src/index.ts</code> is the public application plugin entry point. It defines manifest and capability contracts and plugin authoring helpers. The runtime host lives in <code>apps/sidecar/src/plugins</code>; the SDK itself is not the host process.</p>
-    <h3><code>@nikoemme_/cadcamfun-nikcli-plugin</code></h3>
+    <h3><code>@cadcamfunv2/cadcamfun-nikcli-plugin</code></h3>
     <p><code>packages/nikcli-plugin/src/index.ts</code> exports the standalone nikcli bridge. Unlike most workspaces, it is configured for public npm publication, currently at version <code>0.1.0</code>. It discovers actions from a running CADCAMFUN application and invokes them over authenticated HTTP. It does not embed the CAD kernel or an independent action catalogue.</p>
     <p><code>@cadcamfun/plugin-sdk</code> implements plugin API major version <code>1</code>. Plugin identifiers are reverse-DNS names of 3–128 characters, such as <code>com.example.gear-generator</code>, and versions follow <code>major.minor.patch</code> with an optional pre-release suffix (<code>packages/plugin-sdk/src/manifest.ts</code>).</p>
   </section>
@@ -90,7 +90,7 @@ bun run --filter @cadcamfun/web build`}</DocCode>
         <tr><td>Call the complete typed HTTP contract</td><td><code>ApiClient</code> from <code>@cadcamfun/api</code></td><td>Sidecar base URL, application token, and Effect runtime/layers.</td></tr>
         <tr><td>Use Promise-based generated methods</td><td><code>@cadcamfun/api/sdk</code></td><td>SDK client options and endpoint inputs; check generation omissions first.</td></tr>
         <tr><td>Offer an application capability</td><td><code>@cadcamfun/plugin-sdk</code></td><td>A supported manifest, compatible module exports, and granted capabilities.</td></tr>
-        <tr><td>Drive project actions from standalone nikcli</td><td><code>@nikoemme_/cadcamfun-nikcli-plugin</code></td><td>The running app URL, scoped bridge token, and selected project.</td></tr>
+        <tr><td>Drive project actions from standalone nikcli</td><td><code>@cadcamfunv2/cadcamfun-nikcli-plugin</code></td><td>The running app URL, scoped bridge token, and selected project.</td></tr>
         <tr><td>Read documentation in a tool</td><td><code>/llm?path=/docs/…</code></td><td>A known documentation route; this does not invoke CAD/CAM project actions.</td></tr>
       </tbody>
     </table>
@@ -110,7 +110,7 @@ bun run --filter @cadcamfun/web build`}</DocCode>
         <tr><td><code>packages/workflow</code></td><td><code>@cadcamfun/workflow</code></td><td>—</td><td>5</td><td>320</td><td>1</td><td>Workflow file schema and run semantics</td></tr>
         <tr><td><code>packages/plugin-sdk</code></td><td><code>@cadcamfun/plugin-sdk</code></td><td>core</td><td>9</td><td>952</td><td>2</td><td>Plugin manifest, capabilities, test host</td></tr>
         <tr><td><code>packages/httpapi-codegen</code></td><td><code>@cadcamfun/httpapi-codegen</code></td><td>—</td><td>13</td><td>4,330</td><td>2</td><td>Client generator for HttpApi contracts</td></tr>
-        <tr><td><code>packages/nikcli-plugin</code></td><td><code>@nikoemme_/cadcamfun-nikcli-plugin</code></td><td>—</td><td>5</td><td>359</td><td>2</td><td>Plugin that exposes CADCAMFUN to the nikcli agent</td></tr>
+        <tr><td><code>packages/nikcli-plugin</code></td><td><code>@cadcamfunv2/cadcamfun-nikcli-plugin</code></td><td>—</td><td>5</td><td>359</td><td>2</td><td>Plugin that exposes CADCAMFUN to the nikcli agent</td></tr>
         <tr><td><code>packages/web</code></td><td><code>@cadcamfun/web</code></td><td>db</td><td>84</td><td>12,991</td><td>3</td><td>This documentation site, Studio, docs assistant</td></tr>
         <tr><td><code>apps/sidecar</code></td><td><code>@cadcamfun/sidecar</code></td><td>ai, api, core, db, plugin-sdk, vcs, workflow</td><td>172</td><td>20,797</td><td>73</td><td>Local HTTP server: <code>http/</code> (34), <code>repos/</code> (24), <code>services/</code> (29)</td></tr>
         <tr><td><code>apps/desktop</code></td><td><code>@cadcamfun/desktop</code></td><td>api, core</td><td>557</td><td>85,579</td><td>104</td><td>SolidJS webview (<code>features/</code> 280 files) + Rust shell in <code>src-tauri/</code></td></tr>

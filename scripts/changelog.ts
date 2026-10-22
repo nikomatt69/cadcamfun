@@ -14,8 +14,9 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { captureCommand } from "./release-helpers.ts";
-import { compareVersions } from "./release-version.ts";
+import { lastReleaseTag, latestReleaseTag } from "./release-version.ts";
 
 export interface CommitInfo {
   hash: string;
@@ -236,21 +237,7 @@ export async function gitCommits(from: string | null, to = "HEAD"): Promise<Comm
  * The per-platform tags (`v6.0.0-macos-arm64`) are releases of one platform, not versions
  * of the application, so they are not version numbers and are skipped.
  */
-export function latestReleaseTag(tags: readonly string[]): string | null {
-  const candidates = tags.filter((tag) => /^v\d+\.\d+\.\d+/.test(tag) && !/-(?:macos|windows|linux)-(?:arm64|x64)$/.test(tag));
-  let newest: string | null = null;
-  for (const tag of candidates) {
-    if (newest === null || compareVersions(tag, newest) > 0) newest = tag;
-  }
-  return newest;
-}
-
-/** The newest release tag in the repository, or `null` when it has never been released. */
-export async function lastReleaseTag(): Promise<string | null> {
-  const result = await captureCommand(["git", "tag", "--list"]);
-  if (result.code !== 0) return null;
-  return latestReleaseTag(result.stdout.split("\n").filter((tag) => tag.trim() !== ""));
-}
+export { latestReleaseTag, lastReleaseTag };
 
 /** Write the changelog file, creating it with the marker block when it does not exist. */
 export async function writeChangelog(root: string, section: string): Promise<string> {
@@ -313,7 +300,7 @@ if (import.meta.main) {
     if (!match?.[1]) throw new Error(`Invalid argument: ${arg}`);
     options.set(match[1], match[2] ?? "");
   }
-  const root = new URL("..", import.meta.url).pathname;
+  const root = fileURLToPath(new URL("..", import.meta.url));
   const from = options.get("from") ?? (await lastReleaseTag());
   const commits = await gitCommits(from);
   const notes = renderNotes(commits);

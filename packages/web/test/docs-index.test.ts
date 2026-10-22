@@ -116,7 +116,7 @@ describe("architecture map", () => {
       ["@cadcamfun/vcs", "packages/vcs"],
       ["@cadcamfun/workflow", "packages/workflow"],
       ["@cadcamfun/httpapi-codegen", "packages/httpapi-codegen"],
-      ["@nikoemme_/cadcamfun-nikcli-plugin", "packages/nikcli-plugin"],
+      ["@cadcamfunv2/cadcamfun-nikcli-plugin", "packages/nikcli-plugin"],
     ])
 
     expect(apps.map((unit) => [unit.name, unit.path])).toEqual([
