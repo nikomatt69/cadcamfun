@@ -166,7 +166,10 @@ describe("the chamfer's callout", () => {
     expect(massProperties(explicit.brep).volume).toBeCloseTo(massProperties(plain.brep).volume, 6)
     const meshed = blendEdges(mesh, findEdges(mesh).edges, 1, "chamfer", { secondDistance: 1 })
     expect(meshed.rejected).toEqual([])
-    expect(meshVolume(meshed.mesh)).toBeCloseTo(massProperties(plain.brep).volume, 3)
+    expect(meshed.blended).toBe(12)
+    // The mesh Boolean leaves about 0.05 mm³ at the eight corners (the exact volume is 5863.948). Skipping a vertical
+    // edge would keep several mm³, and the default equal chamfer has the same mesh gap.
+    expect(Math.abs(meshVolume(meshed.mesh) - massProperties(plain.brep).volume)).toBeLessThan(0.2)
   })
 
   test("a 60-degree callout on a 60-degree wedge has finite equal setbacks", () => {
