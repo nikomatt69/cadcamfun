@@ -90,6 +90,8 @@ interface CAMState {
   selectedWorkpieceElementId: string | null
   derivedWorkpieceDimensions: DerivedWorkpieceDimensions | null
   stockAllowance: number
+  /** The raw piece is recomputed from the selected elements (off = the stock set by hand stays). */
+  stockFollowsSelection: boolean
   isLatheSetup: boolean
   isLoading: boolean
   error: string | null
@@ -124,6 +126,7 @@ interface CAMState {
   clearOperationResults(): void
   toggleEntitySelection(id: string): void
   clearSelectedEntities(): void
+  setStockFollowsSelection(follows: boolean): void
   setSelectedWorkpieceElementId(id: string | null): void
   setDerivedWorkpieceDimensions(dimensions: DerivedWorkpieceDimensions | null): void
   setStockAllowance(allowance: number): void
@@ -154,6 +157,7 @@ const legacyInitial = {
   selectedWorkpieceElementId: null as string | null,
   derivedWorkpieceDimensions: null as DerivedWorkpieceDimensions | null,
   stockAllowance: 1.0,
+  stockFollowsSelection: true,
   isLatheSetup: false,
   isLoading: false,
   error: null as string | null,
@@ -230,6 +234,7 @@ export const useCamStore = create<CAMState>((set, get) => ({
     derivedWorkpieceDimensions: id ? state.derivedWorkpieceDimensions : null
   })),
   setDerivedWorkpieceDimensions: (dimensions) => set({ derivedWorkpieceDimensions: dimensions }),
+  setStockFollowsSelection: (follows) => set({ stockFollowsSelection: follows }),
   setStockAllowance: (allowance) => set({ stockAllowance: allowance >= 0 ? allowance : 0 }),
   setIsLatheSetup: (isLathe) => set({ isLatheSetup: isLathe }),
   setLoading: (loading) => set({ isLoading: loading }),

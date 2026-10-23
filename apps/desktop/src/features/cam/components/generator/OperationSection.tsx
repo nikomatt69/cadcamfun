@@ -120,6 +120,7 @@ function SelectedElementPanel(): JSX.Element {
   const camStore = useCamStore()
   // The raw piece follows the selection: every selected part fits inside it, plus the allowance.
   createEffect(() => {
+    if (!camStore.stockFollowsSelection) return
     const parts = job.selection()
     const allowance = camStore.stockAllowance
     const next = stockForSelection(parts, job.stock(), allowance)
@@ -178,6 +179,10 @@ function SelectedElementPanel(): JSX.Element {
               </Show>
               <div class="mt-2 border-t border-green-200 pt-2" data-testid="stock-size">
                 <p class="text-sm font-medium text-gray-700 mb-1">Stock:</p>
+                <label class="flex items-center gap-2 text-xs text-gray-700 mb-1">
+                  <input type="checkbox" checked={camStore.stockFollowsSelection} onChange={(event) => camStore.setStockFollowsSelection(event.currentTarget.checked)} />
+                  Stock follows the selected parts
+                </label>
                 <div class="grid grid-cols-2 gap-2 text-sm">
                   <For each={stock()}>{([label, value]) => <div class="flex justify-between"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>}</For>
                 </div>
