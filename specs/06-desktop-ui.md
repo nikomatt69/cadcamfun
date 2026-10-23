@@ -2,7 +2,7 @@
 
 ## Animated exploded view (2026-10-23)
 
-Status: in progress. Owner reference: https://x.com/10_X_eng/status/2113448035430908412,
+Status: implemented and verified with automated geometry and DOM tests. Owner reference: https://x.com/10_X_eng/status/2113448035430908412,
 an assembly separating into its constituent parts. WP6/WP7 scope is `features/cad`, CAD
 locale and matching desktop tests. Add an Inspect ribbon action with animated explode /
 assemble, separation slider and automatic radial or X/Y/Z layouts. Recurse through
@@ -115,6 +115,8 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 - Keyboard-only workflow for create project → draw → generate → export works.
 
 ## 5. Change log
+
+- 2026-10-23: added Inspect → Exploded view with animated explode/assemble, a 0–300% separation slider, automatic radial layout (axial packing for concentric parts) and X/Y/Z packing. Nested component/group parts move in world space through rotated/nonuniform scaled parents; stock, hidden children and display-edge helpers stay out of the part list. Rendering offsets never enter document history or CAM; scene export adapters clone assembled poses. The existing demand-driven scheduler owns transitions, reversal, reduced motion and cleanup; 2D restores immediately and viewport transform handles are hidden during presentation. Evidence: 13 targeted tests, all 858 desktop tests, desktop typecheck (1,135 files), Vite production build and generated API-reference freshness pass. The full suite requires local HTTP listeners outside the restricted sandbox. Native visual verification was not performed.
 
 - 2026-10-22: shipped the default on-demand CAD/CAM and CNC manuals catalogue (343 entries, 24 publishers), official publisher access labels, metadata-only refresh tooling, search/filter/pagination, and shell/workstation/palette navigation. Reused library workspace components and theme tokens; verified desktop tests, final targeted UI flows, typecheck and production build.
 
