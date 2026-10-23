@@ -80,7 +80,7 @@ CADCAM_DEVICE_ID=$(bun --no-env-file -e \
   "$CADCAM_PAIR_DIR/pairing.json")`}
     </DocCode>
     <p>Replace the example host with an address the phone can reach, or omit the optional host to use discovery. The name is trimmed and must contain 1–60 characters. Success is HTTP 201 with <code>id</code> and <code>link</code>. Creating a token does not enable the listener; enable it separately.</p>
-    <p>The link carries the device token, certificate fingerprint, primary HTTPS origin, name, and optional alternate hosts. Display or transfer it privately to the phone; it is a credential. The desktop stores the token hash rather than its plaintext. The record has no expiry field in this implementation, so revoke an obsolete device explicitly rather than assuming it will expire.</p>
+    <p>The link carries a single-use pairing code, the certificate fingerprint, the primary HTTPS origin, the name, and optional alternate hosts. It expires two minutes after it is shown and does not contain the device token. The phone redeems it with <code>POST /api/companion/redeem</code>; the desktop stores only the SHA-256 of the code and, after redeem, the SHA-256 of the device token in <code>CompanionDevice</code>, bound to the account signed in on the desktop. Revoke that row to disconnect the phone. The device token itself does not expire on its own.</p>
   </section>
 
   <section id="load-phone" class="doc-section">
@@ -116,7 +116,7 @@ CADCAM_DEVICE_ID=$(bun --no-env-file -e \
         <tr><td>Streaming chat, queue/abort, permission replies, session state/control</td><td>Other methods/paths absent from the allow-list</td></tr>
       </tbody>
     </table>
-    <p>The device token is limited by the method/path allow-list. It is not inherently read-only and does not select one project. Accepted requests are forwarded under the desktop's application identity and remain subject to endpoint authorization. Never describe pairing as merely granting passive monitoring.</p>
+    <p>The device token is limited by the method/path allow-list. It is not inherently read-only and does not select one project. Accepted requests run as the account stored on the device row (the account signed in when the QR was created) and remain subject to endpoint authorization. A phone-supplied identity or session header is not accepted. Never describe pairing as merely granting passive monitoring.</p>
     <p>Assistant permissions and pending questions are separate session interactions. Answer them in the mobile UI when requested. A token that can reach the reply endpoint does not mean every tool action has already been approved.</p>
   </section>
 
@@ -187,15 +187,15 @@ curl --fail-with-body "$CADCAM_URL/api/companion" \
 
   <section id="pairing-link" class="doc-section">
     <h2>Pairing link anatomy</h2>
-    <code>POST /api/companion/pair</code> with a device <code>name</code> (and optionally a <code>host</code>) creates a device token and returns its ID together with a link, which the desktop shows as a QR code:
+    <code>POST /api/companion/pair</code> with a device <code>name</code> (and optionally a <code>host</code>) creates a two-minute pairing code for the signed-in account and returns its ID together with a link, which the desktop shows as a QR code:
     <DocCode language="text" title="Pairing link format">
-{"cadcamfun://pair?host=https%3A%2F%2F192.168.1.20%3A8443&token=<43-char base64url>&fp=<sha256 hex>&name=Ada%27s+iPhone&hosts=https%3A%2F%2F100.64.0.7%3A8443"}
+{"cadcamfun://pair?host=https%3A%2F%2F192.168.1.20%3A8443&code=<43-char base64url>&fp=<sha256 hex>&name=Ada%27s+iPhone&exp=<unix ms>&hosts=https%3A%2F%2F100.64.0.7%3A8443"}
     </DocCode>
     <table>
       <thead><tr><th>Parameter</th><th>Content</th></tr></thead>
       <tbody>
         <tr><td><code>host</code></td><td>Preferred origin: the best private address of the desktop and the gateway port.</td></tr>
-        <tr><td><code>token</code></td><td>32 random bytes, base64url-encoded. It is shown once; the desktop stores only its SHA-256 hash, and device IDs are 12 hex characters.</td></tr>
+        <tr><td><code>code</code></td><td>32 random bytes, base64url-encoded. Single-use, two minutes. The desktop stores only its SHA-256 in <code>CompanionPairingCode</code>. Redeeming it inserts <code>CompanionDevice</code> (hash only) for the signed-in user and returns the device bearer once.</td></tr>
         <tr><td><code>fp</code></td><td>SHA-256 fingerprint of the gateway certificate, lowercase hex without colons. The phone pins it.</td></tr>
         <tr><td><code>name</code></td><td>Device name shown in the devices list.</td></tr>
         <tr><td><code>hosts</code></td><td>Up to five further candidate origins (six addresses in total), which the phone races to find one that answers.</td></tr>

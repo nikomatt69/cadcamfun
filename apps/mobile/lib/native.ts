@@ -1,6 +1,6 @@
 import { Platform } from "react-native"
 import CompanionNet from "@/modules/companion-net"
-import type { Pairing } from "./pairing"
+import { parsePairingGrant, redeemPairingLink, type Pairing } from "./pairing"
 import { createFetchTransport, createPinnedTransport } from "../modules/companion-net/transport"
 import type { Transport } from "./client"
 import { identityToken } from "./account"
@@ -40,6 +40,28 @@ export const warmLocalNetwork = (): void => {
   } catch {
     // Native module older than this build, or Expo Go: pairing still proceeds.
   }
+}
+
+/**
+ * Redeems a one-time QR. On iOS the request is certificate-pinned; the browser fallback is the
+ * same fetch the rest of the web dev client uses.
+ */
+export const redeemScannedLink = (link: string): Promise<Pairing> => {
+  if (Platform.OS === "web" || !nativeAvailable || !CompanionNet) return redeemPairingLink(link, fetch)
+  const net = CompanionNet
+  const grant = parsePairingGrant(link)
+  return redeemPairingLink(link, async (url, init) => {
+    const target = new URL(url)
+    const response = await net.request(
+      target.origin,
+      `${target.pathname}${target.search}`,
+      init?.method ?? "POST",
+      { accept: "application/json", "content-type": "application/json" },
+      typeof init?.body === "string" ? init.body : null,
+      grant.fingerprint,
+    )
+    return new Response(response.body, { status: response.status })
+  })
 }
 
 /** Never downgrade a native device to an unpinned browser connection. */

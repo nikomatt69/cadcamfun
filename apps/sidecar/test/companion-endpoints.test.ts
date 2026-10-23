@@ -6,7 +6,7 @@ import { Api } from "@cadcamfun/api"
 import { OpenApi } from "effect/unstable/httpapi"
 import { createFetchTransport } from "../../mobile/modules/companion-net/transport.ts"
 import { CompanionClient } from "../../mobile/lib/client.ts"
-import { parsePairingLink } from "../../mobile/lib/pairing.ts"
+import { redeemPairingLink } from "../../mobile/lib/pairing.ts"
 import { isCompanionRoute } from "../src/services/companion-gateway.ts"
 
 /**
@@ -99,9 +99,9 @@ describe("phone endpoints on the real HTTP server", () => {
       const gatewayPort = 20_000 + Math.floor(Math.random() * 20_000)
       await local("/api/companion/enable", { method: "POST", body: JSON.stringify({ port: gatewayPort }) })
       const paired = await (await local("/api/companion/pair", { method: "POST", body: JSON.stringify({ name: "Endpoint iPhone", host: "127.0.0.1" }) })).json()
-      const pairing = parsePairingLink(paired.link)
       const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
       const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
+      const pairing = await redeemPairingLink(paired.link, pinned)
       const transport = createFetchTransport(pairing, pinned)
       const phone = new CompanionClient(transport)
 

@@ -64822,13 +64822,28 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "userId": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
                           "id",
                           "name",
                           "createdAt",
-                          "lastSeen"
+                          "lastSeen",
+                          "userId",
+                          "email"
                         ],
                         "additionalProperties": false
                       }
@@ -64950,13 +64965,28 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "userId": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
                           "id",
                           "name",
                           "createdAt",
-                          "lastSeen"
+                          "lastSeen",
+                          "userId",
+                          "email"
                         ],
                         "additionalProperties": false
                       }
@@ -65133,13 +65163,28 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "userId": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
                           "id",
                           "name",
                           "createdAt",
-                          "lastSeen"
+                          "lastSeen",
+                          "userId",
+                          "email"
                         ],
                         "additionalProperties": false
                       }
@@ -65205,11 +65250,15 @@
                     },
                     "link": {
                       "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
                     }
                   },
                   "required": [
                     "id",
-                    "link"
+                    "link",
+                    "expiresAt"
                   ],
                   "additionalProperties": false
                 }
@@ -65279,6 +65328,143 @@
                 },
                 "required": [
                   "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/companion/redeem": {
+      "post": {
+        "tags": [
+          "companion"
+        ],
+        "operationId": "companion.redeem",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "token": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "name": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "token",
+                    "name",
+                    "user"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code"
                 ],
                 "additionalProperties": false
               }
@@ -65378,13 +65564,28 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "userId": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
                           "id",
                           "name",
                           "createdAt",
-                          "lastSeen"
+                          "lastSeen",
+                          "userId",
+                          "email"
                         ],
                         "additionalProperties": false
                       }

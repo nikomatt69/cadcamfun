@@ -6,7 +6,7 @@
  * therefore never holds the sidecar's own token and can never reach credentials, plugins, files or billing.
  * The phone pins the certificate's SHA-256 fingerprint, which it learns from the pairing QR code.
  */
-import { createHash, randomBytes, timingSafeEqual, X509Certificate } from "node:crypto"
+import { createHash, createHmac, randomBytes, timingSafeEqual, X509Certificate } from "node:crypto"
 import { networkInterfaces } from "node:os"
 import { generate } from "selfsigned"
 
@@ -163,10 +163,13 @@ export const isCompanionRoute = (method: string, pathname: string): boolean =>
 export interface TokenRecord {
   readonly id: string
   readonly name: string
-  /** SHA-256 of the token; the token itself is shown once, at pairing. */
+  /** SHA-256 of the token; the token itself is shown once, at redeem. */
   readonly hash: string
   readonly createdAt: string
   readonly lastSeen: string | null
+  /** Account this phone acts as. Absent only for a record that has not been migrated yet. */
+  readonly userId?: string
+  readonly expiresAt?: string | null
 }
 
 export const hashToken = (token: string): string => createHash("sha256").update(token).digest("hex")
@@ -175,14 +178,24 @@ export const newToken = (): { id: string; token: string } => ({ id: randomBytes(
 
 export const findToken = (records: readonly TokenRecord[], token: string): TokenRecord | undefined => {
   const hash = Buffer.from(hashToken(token))
+  const now = Date.now()
   // Compare against every record so timing does not reveal which prefix matched.
   let found: TokenRecord | undefined
   for (const r of records) {
+    if (r.expiresAt && Date.parse(r.expiresAt) <= now) continue
     const candidate = Buffer.from(r.hash)
     if (candidate.length === hash.length && timingSafeEqual(candidate, hash)) found = r
   }
   return found
 }
+
+/** The header that names the account a paired phone acts as. The gateway overwrites it; the phone's value is ignored. */
+export const COMPANION_USER_HEADER = "x-cadcamfun-companion-user"
+/** HMAC of device id + user id under the sidecar bearer. Proves the gateway, not the phone, chose the account. */
+export const COMPANION_PROOF_HEADER = "x-cadcamfun-companion-proof"
+
+export const companionProof = (deviceId: string, userId: string, secret: string): string =>
+  createHmac("sha256", secret).update(`${deviceId}\n${userId}`).digest("hex")
 
 // ── request policy ──────────────────────────────────────────────────────────
 
@@ -290,6 +303,11 @@ export interface GatewayOptions {
   readonly upstream: () => { readonly port: number; readonly token: string }
   readonly tokens: () => Promise<readonly TokenRecord[]>
   readonly touch?: (id: string) => void
+  /**
+   * Exchanges a one-time QR code for a device token. Unauthenticated on this socket: the code is the
+   * credential, and the handler must store only a hash of it. Omitted in tests that do not redeem.
+   */
+  readonly redeem?: (code: string) => Promise<Response>
   readonly limits?: DeviceLimits
   readonly log?: (entry: GatewayRequestLog) => void
   /** Overrides the per-kind timeouts, for tests. */
@@ -412,6 +430,30 @@ export const startGateway = (options: GatewayOptions): Gateway => {
         answer(Response.json({ message }, { status, ...(headers ? { headers } : {}) }), reason)
 
       if (blocked(ip, started)) return refuse(429, "Too many failed attempts", "rate-limited")
+      if (request.method === "POST" && url.pathname === "/api/companion/redeem") {
+        kind = "write"
+        if (!options.redeem) return refuse(404, "Pairing redeem is not available", "forbidden")
+        const raw = await readBody(request, 4096)
+        if (!raw) return refuse(413, "The request is too large for the desktop.", "too-large")
+        let code = ""
+        try {
+          const parsed = JSON.parse(new TextDecoder().decode(raw)) as { code?: unknown }
+          if (typeof parsed.code === "string") code = parsed.code.trim()
+        } catch {
+          code = ""
+        }
+        if (code.length < 16 || code.length > 256) {
+          fail(ip, started)
+          return refuse(400, "This pairing code has expired or was already used. Show a new QR code on the desktop.", "unauthorized")
+        }
+        try {
+          const response = await options.redeem(code)
+          if (response.status >= 400) fail(ip, started)
+          return answer(response)
+        } catch {
+          return refuse(502, "Desktop unavailable", "unavailable")
+        }
+      }
       const bearer = /^Bearer (.+)$/.exec(request.headers.get("authorization") ?? "")?.[1]
       const record = bearer ? findToken(await options.tokens(), bearer) : undefined
       if (!record) {
@@ -448,8 +490,17 @@ export const startGateway = (options: GatewayOptions): Gateway => {
       headers.delete("host")
       headers.delete("content-length")
       headers.delete("cookie")
+      // The phone does not choose the account. A signed-in desktop account was stored on the device row.
+      headers.delete("x-identity-token")
+      headers.delete("x-session-token")
+      headers.delete(COMPANION_USER_HEADER)
+      headers.delete(COMPANION_PROOF_HEADER)
       // Attribution for the audit trail; whatever the phone sent under this name is replaced, never trusted.
       headers.set(COMPANION_DEVICE_HEADER, record.id)
+      if (record.userId) {
+        headers.set(COMPANION_USER_HEADER, record.userId)
+        headers.set(COMPANION_PROOF_HEADER, companionProof(record.id, record.userId, upstream.token))
+      }
 
       const controller = new AbortController()
       const abort = () => controller.abort()
@@ -486,6 +537,20 @@ export const startGateway = (options: GatewayOptions): Gateway => {
 const originFor = (host: string, port: number): string => {
   const ipv6 = host.includes(":")
   return ipv6 ? `https://[${host}]:${port}` : `https://${host}:${port}`
+}
+
+/** One-time QR payload. The device secret is not in it; the phone redeems `code` over the pinned connection. */
+export const pairingGrantLink = (input: { host: string; port: number; code: string; fingerprint: string; name: string; hosts?: readonly string[]; expiresAt: number }): string => {
+  const params = new URLSearchParams({
+    host: originFor(input.host, input.port),
+    code: input.code,
+    fp: input.fingerprint,
+    name: input.name,
+    exp: String(input.expiresAt),
+  })
+  const extras = (input.hosts ?? []).filter((h) => h !== input.host)
+  if (extras.length > 0) params.set("hosts", extras.map((h) => originFor(h, input.port)).join(","))
+  return `cadcamfun://pair?${params}`
 }
 
 export const pairingLink = (input: { host: string; port: number; token: string; fingerprint: string; name: string; hosts?: readonly string[] }): string => {

@@ -1,10 +1,11 @@
 /**
  * Settings → Mobile companion: turn the phone gateway on or off, pair a phone with a QR code, revoke devices.
  *
- * The pairing link carries a one-time device token, so it is held in memory only while the QR code is on screen.
+ * The QR carries a short-lived single-use code, held in memory only while it is on screen.
+ * Redeeming it issues the device token and binds the phone to the signed-in account.
  * The user can either scan the QR code with the phone, or copy/paste the URL into CADCAM FUN manually.
  */
-import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
 import { Check, Copy, Smartphone } from "lucide-solid"
 import qrcode from "qrcode-generator"
 import { useApp } from "../../../shared/state/context.ts"
@@ -33,11 +34,27 @@ export function CompanionPanel(): JSX.Element {
   const status = useRead((c) => c.companion.status())
   const [name, setName] = createSignal("iPhone")
   const [host, setHost] = createSignal("")
+  const session = useRead((c) => c.auth.getSession())
   const [link, setLink] = createSignal<string>()
+  const [expiresAt, setExpiresAt] = createSignal<number>()
+  const [now, setNow] = createSignal(Date.now())
   const [copied, setCopied] = createSignal(false)
-  const qr = createMemo(() => { const l = link(); return l ? qrSvg(l) : undefined })
+  const clock = setInterval(() => setNow(Date.now()), 1000)
+  onCleanup(() => clearInterval(clock))
+  const qrLive = () => {
+    const current = link()
+    const exp = expiresAt()
+    return current !== undefined && (exp === undefined || exp > now())
+  }
+  const qr = createMemo(() => { const l = link(); return qrLive() && l ? qrSvg(l) : undefined })
+  const remaining = () => {
+    const exp = expiresAt()
+    if (exp === undefined) return ""
+    const seconds = Math.max(0, Math.ceil((exp - now()) / 1000))
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+  }
 
-  // The pairing link carries a one-time token, so the user can either scan the QR code
+  // The pairing link carries a one-time code, so the user can either scan the QR code
   // or copy/paste the URL into CADCAM FUN on their phone. The clipboard write can fail
   // (no permission, no document focus): show the error in a toast and leave the link
   // on screen so the user can still select it manually.
@@ -108,17 +125,23 @@ export function CompanionPanel(): JSX.Element {
                     <input class={FIELD} placeholder={s().host} value={host()} onInput={(e) => setHost(e.currentTarget.value)} />
                   </div>
                 </div>
+                <Show when={session.data()?.session.user.email}>
+                  {(email) => <p class="text-sm text-gray-600 dark:text-gray-300">{t("companion.pair.account", { email: email() })}</p>}
+                </Show>
                 <button class={PRIMARY} onClick={() => act(async () => {
                   const paired = await app.runtime.run(app.client.companion.pair({ payload: { name: name(), ...(host().trim() ? { host: host().trim() } : {}) } }))
+                  setExpiresAt(Date.parse(paired.expiresAt))
                   setLink(paired.link)
                 })}>{t("companion.pair.create")}</button>
-                <Show when={link()}>
+                <Show when={qrLive()} fallback={<Show when={link()}><p class="text-sm text-amber-700 dark:text-amber-300">{t("companion.pair.expired")}</p></Show>}>
+                  <Show when={link()}>
                   {(current) => (
                     <>
                       {/* eslint-disable-next-line solid/no-innerhtml -- generated locally from the pairing link, no user HTML */}
                       <Show when={qr()}>
                         <div class="mx-auto w-64 rounded-lg bg-white p-2 shadow-sm" innerHTML={qr()} />
                       </Show>
+                      <p class="text-center text-sm text-gray-700 dark:text-gray-200">{t("companion.pair.expires", { time: remaining() })}</p>
                       <p class="text-center text-xs text-gray-500 dark:text-gray-400">{t("companion.pair.hint")}</p>
                       <div class="space-y-1">
                         <label class={LABEL}>{t("companion.pair.link")}</label>
@@ -146,6 +169,7 @@ export function CompanionPanel(): JSX.Element {
                       </div>
                     </>
                   )}
+                  </Show>
                 </Show>
               </section>
             </Show>
@@ -160,6 +184,7 @@ export function CompanionPanel(): JSX.Element {
                         <Smartphone class="h-5 w-5 text-gray-400" aria-hidden="true" />
                         <div>
                           <p class="text-sm font-medium text-gray-900 dark:text-white">{d.name}</p>
+                          <p class="text-xs text-gray-500 dark:text-gray-400">{d.email ? t("companion.pair.account", { email: d.email }) : d.userId}</p>
                           <p class="text-xs text-gray-500 dark:text-gray-400">{d.lastSeen ? t("companion.devices.lastSeen", { when: new Date(d.lastSeen).toLocaleString() }) : t("companion.devices.never")}</p>
                         </div>
                       </div>

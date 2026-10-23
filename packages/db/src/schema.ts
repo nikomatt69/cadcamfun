@@ -1000,3 +1000,50 @@ export const localKeyValueTable = sqliteTable("LocalKeyValue", {
 export type LocalKeyValue = typeof localKeyValueTable.$inferSelect
 export type NewLocalKeyValue = typeof localKeyValueTable.$inferInsert
 
+/**
+ * A phone paired to this installation. Same idea as NikCLI `mobile_tokens`: the secret is stored
+ * only as a SHA-256 hash, `lastSeenAt` is debounced, and deleting the row revokes the phone.
+ * `userId` is the account that was signed in on the desktop when the QR was redeemed, so the phone
+ * reads and writes that account's rows in this same database.
+ */
+export const companionDeviceTable = sqliteTable(
+  "CompanionDevice",
+  {
+    id: text("id").primaryKey(),
+    userId: text("userId").notNull().references((): AnySQLiteColumn => userTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    hash: text("hash").notNull(),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    lastSeenAt: integer("lastSeenAt", { mode: "timestamp_ms" }),
+    expiresAt: integer("expiresAt", { mode: "timestamp_ms" }),
+  },
+  (t) => [
+    uniqueIndex("CompanionDevice_hash_key").on(t.hash),
+    index("CompanionDevice_userId_idx").on(t.userId),
+  ]
+)
+
+export type CompanionDeviceRow = typeof companionDeviceTable.$inferSelect
+
+/**
+ * The QR payload. Short-lived and single-use: redeeming it inserts one `CompanionDevice` and the
+ * raw code is never stored. NikCLI puts the device secret in the QR; this table is the extra step
+ * that keeps that secret off the screen.
+ */
+export const companionPairingCodeTable = sqliteTable(
+  "CompanionPairingCode",
+  {
+    id: text("id").primaryKey(),
+    userId: text("userId").notNull().references((): AnySQLiteColumn => userTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    codeHash: text("codeHash").notNull(),
+    expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
+    consumedAt: integer("consumedAt", { mode: "timestamp_ms" }),
+    deviceId: text("deviceId").references((): AnySQLiteColumn => companionDeviceTable.id, { onDelete: "set null" }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [uniqueIndex("CompanionPairingCode_codeHash_key").on(t.codeHash)]
+)
+
+export type CompanionPairingCodeRow = typeof companionPairingCodeTable.$inferSelect
+

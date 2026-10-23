@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { PairingError, desktopLabel, firstReachable, pairingCandidates, parsePairingLink, validatePairing } from "../lib/pairing"
+import { PairingError, desktopLabel, firstReachable, materializePairing, pairingCandidates, pairingFromRedeem, parsePairingGrant, parsePairingLink, redeemPairingLink, validatePairing } from "../lib/pairing"
 
 const link = (host = "https://192.168.1.7:8443", token = "0123456789abcdef", fp = "a".repeat(64), name = "MacBook", hosts?: string) => {
   const params = new URLSearchParams({ host, token, fp, name })
@@ -104,4 +104,36 @@ test("firstReachable keeps the first host that answers and aborts the rest", asy
 
 test("desktopLabel uses the host, not the phone name in the QR", () => {
   expect(desktopLabel(parsePairingLink(link()))).toBe("192.168.1.7:8443")
+})
+
+const grantLink = (code = "a".repeat(32)) => `cadcamfun://pair?${new URLSearchParams({
+  host: "https://192.168.1.7:8443",
+  hosts: "https://172.20.10.4:8443",
+  code,
+  fp: "ab".repeat(32),
+  name: "Studio",
+  exp: "1700000000000",
+})}`
+
+test("a QR code is a one-time grant and does not contain a device token", () => {
+  const grant = parsePairingGrant(grantLink())
+  expect(grant.code).toBe("a".repeat(32))
+  expect(grant.baseUrl).toBe("https://192.168.1.7:8443")
+  expect(grant.hosts).toEqual(["https://192.168.1.7:8443", "https://172.20.10.4:8443"])
+  expect(grant.expiresAt).toBe(1700000000000)
+  expect(() => parsePairingLink(grantLink())).toThrow(PairingError)
+})
+
+test("redeem exchanges the code once and keeps the pinned host", async () => {
+  const token = "device-token-value"
+  const fetcher = (async (url: string) => new Response(JSON.stringify({ token, name: "Studio" }), { status: url.includes("192.168.1.7") ? 200 : 500 })) as unknown as typeof fetch
+  const pairing = await redeemPairingLink(grantLink(), fetcher)
+  expect(pairing.token).toBe(token)
+  expect(pairing.baseUrl).toBe("https://192.168.1.7:8443")
+  expect(pairing.fingerprint).toBe("ab".repeat(32))
+  expect(pairing.hosts).toEqual(["https://192.168.1.7:8443", "https://172.20.10.4:8443"])
+  const saved = pairingFromRedeem(parsePairingGrant(grantLink()), token)
+  expect(saved).toEqual(pairing)
+  const legacy = await materializePairing(link())
+  expect(legacy.token).toBe("0123456789abcdef")
 })
