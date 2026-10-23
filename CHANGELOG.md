@@ -3,6 +3,20 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.5 (October 2026)
+
+## Desktop
+
+- Add animated exploded view feature with controls for separation and direction
+
+## Desktop (Tauri shell)
+
+- Enhance download experience by adding a dedicated download page and updating navigation links. The download page provides access to desktop installers for macOS, Windows, and Linux, along with checksums and Homebrew installation instructions. Additionally, the documentation has been updated to include guides for installation and account management.
+
+## Documentation
+
+- Document exploded view verification
+
 ## v0.1.4 (October 2026)
 
 ## Desktop (Tauri shell)
