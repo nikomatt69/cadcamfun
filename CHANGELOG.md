@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.6 (October 2026)
+
+## Desktop
+
+- Enhance CAD element selection and stock management features. Added a multi-part selection interface in CadElementPicker for improved user experience. Updated OperationSection to display part sizes and stock dimensions dynamically. Enhanced job logic to calculate stock based on selected elements and their dimensions, ensuring accurate machining depth and workpiece configuration.
+
 ## v0.1.5 (October 2026)
 
 ## Desktop
