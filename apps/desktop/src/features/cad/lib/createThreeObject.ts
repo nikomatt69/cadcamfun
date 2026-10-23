@@ -2245,6 +2245,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
 
       case "group":
         const group = new THREE.Group();
+        group.userData.assemblyContainer = true;
         group.position.set(
           (element.x || 0) + originOffset.x,
           (element.y || 0) + originOffset.y,
@@ -2266,6 +2267,8 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
               initializeElementTransform(childThreeObject, childElement);
               childThreeObject.userData.isCADElement = true;
               childThreeObject.userData.elementId = childElement.id;
+              childThreeObject.userData.assemblyPart = childElement.type !== "workpiece";
+              childThreeObject.visible = childElement.visible !== false;
               group.add(childThreeObject);
             }
           });
@@ -2303,6 +2306,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
 
       case "component":
         const componentThreeGroup = new THREE.Group();
+        componentThreeGroup.userData.assemblyContainer = true;
         componentThreeGroup.position.set(
           (element.x || 0) + originOffset.x,
           (element.y || 0) + originOffset.y,
@@ -2332,6 +2336,8 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
               childThreeObject.userData.elementId = element.id;
               childThreeObject.userData.isComponentChild = true;
               childThreeObject.userData.parentComponentId = element.id;
+              childThreeObject.userData.assemblyPart = childElement.type !== "workpiece";
+              childThreeObject.visible = childElement.visible !== false;
               componentThreeGroup.add(childThreeObject);
             }
           });
@@ -2351,6 +2357,8 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
               childThreeObject.userData.elementId = element.id;
               childThreeObject.userData.isComponentChild = true;
               childThreeObject.userData.parentComponentId = element.id;
+              childThreeObject.userData.assemblyPart = childElement.type !== "workpiece";
+              childThreeObject.visible = childElement.visible !== false;
               componentThreeGroup.add(childThreeObject);
             }
           });

@@ -1,5 +1,5 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
-import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench, FileText } from "lucide-solid"
+import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench, FileText, Maximize2 } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -10,6 +10,7 @@ import type { BooleanOperation } from "../lib/sceneHelpers.ts"
 import { SvgIcon } from "./icons.tsx"
 import { ElementForm, formPositionFor } from "./ToolPanel.tsx"
 import { isSectionAxis } from "../lib/section.ts"
+import { isExplodeAxis } from "../lib/exploded-view.ts"
 
 interface Props {
   readonly ready: boolean
@@ -84,6 +85,9 @@ export default function CadRibbon(props: Props): JSX.Element {
       <span class="cad-ribbon-heading">{t("cad.ribbon.inspect")}</span>
       <div class="cad-ribbon-actions">
         <Action label={t("cad.section")} icon={<Scissors size={13} />} active={cad.section.enabled} onClick={toggleSection} />
+        <Action label={t("cad.explode.title")} icon={<Maximize2 size={13} />} active={cad.explodedView.enabled}
+          disabled={!props.ready || (!cad.explodedView.enabled && cad.explodablePartCount < 2)}
+          hint={t("cad.explode.hint")} onClick={() => cad.setExplodedView({ enabled: !cad.explodedView.enabled })} />
       </div>
     </div>
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.edit")}>
@@ -122,6 +126,23 @@ export default function CadRibbon(props: Props): JSX.Element {
       <ElementForm type={type} formPosition={formPositionFor(window.innerWidth / 2 - 160, 100)} onCancel={() => setCreatePart(null)}
         onAdd={element => { if (creationBlocked()) return; elements.addElement(element); setCreatePart(null) }} />
     }</Show>
+    <Show when={cad.explodedView.enabled}>
+      <div class="cad-ribbon-group" role="group" aria-label={t("cad.explode.title")}>
+        <span class="cad-ribbon-heading">{t("cad.explode.title")}</span>
+        <div class="cad-ribbon-actions">
+          <select aria-label={t("cad.explode.direction")} value={cad.explodedView.axis} onChange={event => {
+            const axis = event.currentTarget.value
+            if (isExplodeAxis(axis)) cad.setExplodedView({ axis })
+          }}><option value="auto">{t("cad.explode.auto")}</option><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select>
+          <label class="flex items-center gap-1 text-xs" title={t("cad.explode.separation")}>
+            <input type="range" min="0" max="3" step="0.01" class="w-24" aria-label={t("cad.explode.separation")}
+              value={cad.explodedView.amount} onInput={event => cad.setExplodedView({ amount: Number(event.currentTarget.value) })} />
+            <output class="w-9 tabular-nums">{Math.round(cad.explodedView.amount * 100)}%</output>
+          </label>
+          <Action label={t("cad.explode.assemble")} icon={<Box size={13} />} onClick={() => cad.setExplodedView({ enabled: false })} />
+        </div>
+      </div>
+    </Show>
     <Show when={cad.section.enabled}>
       <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.sectionControls")}>
         <span class="cad-ribbon-heading">{t("cad.ribbon.sectionControls")}</span>

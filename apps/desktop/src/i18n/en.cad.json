@@ -489,5 +489,11 @@
   "cad.createComponent.created": "Component created",
   "cad.createComponent.retryProjects": "Could not load projects. Retry",
   "cad.createComponent.selectionChanged": "The selected geometry changed. Close and reopen this dialog to use the current selection.",
-  "cad.createComponent.duplicateHint": "This name is already used. Saving will create a separate library entry."
+  "cad.createComponent.duplicateHint": "This name is already used. Saving will create a separate library entry.",
+  "cad.explode.title": "Exploded view",
+  "cad.explode.hint": "Animate the separation of assembly parts (requires two visible parts)",
+  "cad.explode.direction": "Explosion direction",
+  "cad.explode.auto": "Automatic",
+  "cad.explode.separation": "Part separation",
+  "cad.explode.assemble": "Assemble"
 }

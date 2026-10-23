@@ -26,6 +26,7 @@ import {
 } from "../lib/sceneHelpers.ts"
 import { booleanFormed } from "../lib/createThreeObject.ts"
 import { FrameScheduler } from "../lib/frame-scheduler.ts"
+import { ExplodedView } from "../lib/exploded-view.ts"
 import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
 import { createSectionHelper } from "../lib/sectionHelper.ts"
@@ -102,6 +103,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   let orbit: OrbitControls | undefined
   let gizmo: TransformControls | undefined
   let frames: FrameScheduler | undefined
+  const exploded = new ExplodedView()
+  const [explosionActive, setExplosionActive] = createSignal(false)
+  let reducedMotion: MediaQueryList | undefined
   let dirty = true
   const invalidate = (): void => { dirty = true; frames?.invalidate() }
   const pivot = new THREE.Object3D()
@@ -255,18 +259,28 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     scene.add(gizmo.getHelper())
 
     frames = new FrameScheduler(() => {
+      const wasExploded = exploded.active
+      const animating = exploded.tick(performance.now())
+      if (wasExploded) dirty = true
+      if (!exploded.active) setExplosionActive(false)
       const moved = orbit?.update() === true
       if ((moved || dirty) && renderer && scene && camera) {
         dirty = false
         renderer.render(scene, camera)
       }
-      return moved
+      return moved || animating
     }, (callback) => window.requestAnimationFrame(callback), (id) => window.cancelAnimationFrame(id))
     orbit.addEventListener("change", invalidate)
     gizmo.addEventListener("change", invalidate)
     const visibility = () => frames?.suspend(document.hidden)
     document.addEventListener("visibilitychange", visibility)
     visibility()
+    reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")
+    const motionChange = () => {
+      if (reducedMotion?.matches) exploded.setTarget(cad.explodedView.enabled ? cad.explodedView.amount : 0, true)
+      invalidate()
+    }
+    reducedMotion?.addEventListener("change", motionChange)
     const unregisterCapture = registerViewportCapture("cad", () => {
       if (!renderer || !scene || !camera || !orbit || !renderer.domElement.isConnected || renderer.domElement.clientWidth === 0 || renderer.domElement.clientHeight === 0) return undefined
       renderer.render(scene, camera)
@@ -288,6 +302,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
     onCleanup(() => {
       unregisterCapture()
+      reducedMotion?.removeEventListener("change", motionChange)
+      exploded.dispose()
+      if (props.keyboard !== false) {
+        cad.setExplodedView({ enabled: false })
+        useCADStore.setState({ explodablePartCount: 0 })
+      }
       frames?.dispose()
       frames = undefined
       cancelAnimationFrame(mouseFrame)
@@ -357,9 +377,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
   const api: CADCanvasApi = {
     scene: () => scene, camera: () => camera, fitToView, zoom, boolean: runBoolean,
-    exportSTL: () => { if (scene) exportSTL(scene) },
-    exportOBJ: () => { if (scene) exportOBJ(scene) },
-    exportGLTF: () => (scene ? exportGLTF(scene) : Promise.resolve()),
+    exportSTL: () => { if (scene) exploded.assembled(() => exportSTL(scene!)) },
+    exportOBJ: () => { if (scene) exploded.assembled(() => exportOBJ(scene!)) },
+    exportGLTF: () => (scene ? exploded.assembled(() => exportGLTF(scene!)) : Promise.resolve()),
     toggleFullscreen, showShortcuts: () => setShowShortcuts(true)
   }
 
@@ -447,6 +467,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   // only when `shapeFingerprint` says the shape itself changed — a move or a turn is a matrix update.
   createEffect(() => {
     if (!ready() || !scene) return
+    exploded.release()
     const all = elements.elements
     const known = layers.layers
     cad.originOffset
@@ -495,6 +516,20 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     setRebuilds((count) => count + 1)
     invalidate()
     props.onElementsChange?.(all)
+  })
+
+  createEffect(() => {
+    rebuilds()
+    if (!ready()) return
+    const state = cad.explodedView
+    const excluded = new Set(elements.elements.filter(element => element.type === "workpiece").map(element => element.id))
+    exploded.configure(cadObjects().filter(object => !excluded.has(String(object.userData.elementId))), state.axis)
+    if (props.keyboard !== false) useCADStore.setState({ explodablePartCount: exploded.count })
+    const enabled = state.enabled && cad.viewMode === "3d"
+    // 2D needs assembled bounds immediately, rather than a closing 3D transition.
+    exploded.setTarget(enabled ? state.amount : 0, reducedMotion?.matches === true || cad.viewMode === "2d")
+    setExplosionActive(exploded.active)
+    invalidate()
   })
 
   // Hover / selection tint, applied to the delta only: moving the cursor between two parts must not
@@ -547,7 +582,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const mode = transformMode()
     if (!ready() || !gizmo || !scene) return
     const objects = selectedIds().flatMap((id) => objectOf(id) ?? [])
-    if (objects.length === 0 || isSelectionMode()) { gizmo.detach(); gizmo.getHelper().visible = false; return }
+    if (objects.length === 0 || isSelectionMode() || explosionActive() || cad.explodedView.enabled) { gizmo.detach(); gizmo.getHelper().visible = false; invalidate(); return }
     const center = new THREE.Vector3()
     if (objects.length === 1) center.copy(objects[0]!.userData.pivot as THREE.Vector3)
     else {
@@ -566,6 +601,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   })
 
   function beginDrag(): void {
+    if (explosionActive() || cad.explodedView.enabled) return
     useElementsStore.getState().beginEdit()
     pivot.updateMatrix()
     dragStart = {
@@ -600,7 +636,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     clearControlPoints()
     const ids = selectedIds()
     const element = ids.length === 1 ? elements.elements.find((candidate) => candidate.id === ids[0]) : undefined
-    if (!scene || !element || transformStore.mode !== "none") return
+    if (!scene || !element || transformStore.mode !== "none" || explosionActive() || cad.explodedView.enabled) return
     const e = element as Record<string, unknown>
     if (e.rotation || e.scale || e.translateX !== undefined) return
     controlPoints = createControlPointsForElement(element)
@@ -950,7 +986,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       {props.children}
 
       {/* Quick transform toolbar */}
-      <Show when={selectedIds().length > 0}>
+      <Show when={selectedIds().length > 0 && !explosionActive() && !cad.explodedView.enabled}>
         <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background-color:rgba(0,0,0,0.8);padding:8px 12px;border-radius:8px;z-index:1001">
           <button onClick={() => setMode("translate")} style={modeButton(transformMode() === "translate")}><Move size={14} />Move (G)</button>
           <button onClick={() => setMode("rotate")} style={modeButton(transformMode() === "rotate")}><RotateCw size={14} />Rotate (R)</button>

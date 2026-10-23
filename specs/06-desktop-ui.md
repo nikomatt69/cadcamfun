@@ -1,5 +1,22 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Animated exploded view (2026-10-23)
+
+Status: in progress. Owner reference: https://x.com/10_X_eng/status/2113448035430908412,
+an assembly separating into its constituent parts. WP6/WP7 scope is `features/cad`, CAD
+locale and matching desktop tests. Add an Inspect ribbon action with animated explode /
+assemble, separation slider and automatic radial or X/Y/Z layouts. Recurse through
+component/group children, keep each solid and its display edges together, and exclude
+stock and scene helpers. Coincident part centres must still separate deterministically.
+Use world-space bounds and convert offsets into each parent's frame, including rotated
+and scaled nested components. Restore exact assembled poses on close, 2D switch and
+unmount. Rendering offsets are transient: document/history, CAM and saved/exported CAD
+keep assembled geometry. Hide viewport transform handles during presentation to avoid
+committing display offsets. Reuse the demand-driven frame scheduler, support interrupted
+transitions and reduced motion, and retain orbit/zoom and fit-to-view. Verify real geometry
+and nested transforms, complete restoration and export isolation, scheduler convergence,
+and the ribbon DOM flow. This concrete feature does not advance unrelated RM steps.
+
 ## Default manuals catalogue (2026-10-22)
 
 Status: implemented and verified. Owner request: ship a `/manuals` section already populated with many official CNC machine/control manuals, CNC programming references, CAD/CAM and 3D modeling guides. Include FANUC, HEIDENHAIN, Siemens, Haas, Mazak, Okuma, Grbl and LinuxCNC; cover milling, turning, multi-axis machining, tooling, probing, additive manufacturing and supported geometry formats. Generic coding documentation is excluded. Latest owner clarification: documents are consulted on demand from their official sources, not downloaded or bundled in advance. The catalogue itself is included by default and requires no account, project or sidecar call. Opening a document explicitly launches its official URL in the system browser (Tauri) or a new browser tab. Never iframe third-party sites or bypass publisher authentication. Identify complete manuals, chapters, references and portals separately, with account requirements where known.

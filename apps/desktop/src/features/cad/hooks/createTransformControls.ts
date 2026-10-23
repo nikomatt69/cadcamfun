@@ -23,11 +23,11 @@ export function createTransformControls(options: UseTransformControlsOptions = {
   const { autoUpdateHandles = true, enableKeyboardShortcuts = true, enableSnapping = true } = options
   const store = useTransformControlsStore()
   const selection = useSelectionStore()
-  void useCADStore
+  const cad = useCADStore()
 
   const selectedIds = () => selection.selectedElementIds
   const selectedCount = () => selectedIds().length
-  const canTransform = () => selectedCount() > 0 && !store.isTransforming
+  const canTransform = () => selectedCount() > 0 && !store.isTransforming && !cad.explodedView.enabled
 
   const typing = (event: KeyboardEvent) => event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement
 
@@ -36,6 +36,7 @@ export function createTransformControls(options: UseTransformControlsOptions = {
     if (!enableKeyboardShortcuts) return
     const down = (event: KeyboardEvent) => {
       if (typing(event)) return
+      if (cad.explodedView.enabled) return
       const { ctrlKey, shiftKey } = event
       switch (event.key.toLowerCase()) {
         case "g": if (!ctrlKey && !shiftKey) { event.preventDefault(); store.setMode("translate") } break

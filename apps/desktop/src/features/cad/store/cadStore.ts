@@ -3,6 +3,7 @@ import { create } from "../../../shared/state/zustand.ts";
 import { DEFAULT_TOLERANCE } from "@cadcamfun/core";
 import { useElementsStore } from "./elementsStore.ts";
 import { DEFAULT_SECTION, type SectionState } from "../lib/section.ts";
+import { DEFAULT_EXPLODED_VIEW, type ExplodedViewState } from "../lib/exploded-view.ts";
 
 type ViewMode = "2d" | "3d";
 type OriginPreset =
@@ -108,10 +109,20 @@ interface CADState {
   /** The section view: a plane that cuts the model open at one point along an axis. */
   section: SectionState;
   setSection: (patch: Partial<SectionState>) => void;
+  explodedView: ExplodedViewState;
+  explodablePartCount: number;
+  setExplodedView: (patch: Partial<ExplodedViewState>) => void;
 }
 
 export const useCADStore = create<CADState>((set, get) => ({
   viewMode: "3d",
+  explodedView: DEFAULT_EXPLODED_VIEW,
+  explodablePartCount: 0,
+  setExplodedView: (patch) => set((state) => ({
+    explodedView: { ...state.explodedView, ...patch,
+      amount: patch.amount === undefined || !Number.isFinite(patch.amount) ? state.explodedView.amount : Math.max(0, Math.min(3, patch.amount)) },
+    ...(patch.enabled ? { viewMode: "3d" as const } : {})
+  })),
   section: DEFAULT_SECTION,
   setSection: (patch) => set((state) => ({ section: { ...state.section, ...patch } })),
   tolerance: DEFAULT_TOLERANCE,
@@ -144,7 +155,8 @@ export const useCADStore = create<CADState>((set, get) => ({
   setCtrlKeyPressed: (pressed) => set({ isCtrlKeyPressed: pressed }),
   setShiftKeyPressed: (pressed) => set({ isShiftKeyPressed: pressed }),
   setAltKeyPressed: (pressed) => set({ isAltKeyPressed: pressed }),
-  setViewMode: (mode) => set({ viewMode: mode }),
+  setViewMode: (mode) => set((state) => ({ viewMode: mode,
+    ...(mode === "2d" ? { explodedView: { ...state.explodedView, enabled: false } } : {}) })),
   setActiveTool: (tool) => set({ activeTool: tool }),
   toggleGrid: () => set((state) => ({ gridVisible: !state.gridVisible })),
   toggleAxis: () => set((state) => ({ axisVisible: !state.axisVisible })),
