@@ -3,6 +3,14 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.4 (October 2026)
+
+## Desktop (Tauri shell)
+
+- Refactor menu.rs to consolidate imports by including Manager in the main import statement.
+- Ship Linux desktop builds as Debian and RPM packages.
+- Update menu.rs to conditionally import Manager for debug builds
+
 ## v0.1.3 (October 2026)
 
 ## Build and release
