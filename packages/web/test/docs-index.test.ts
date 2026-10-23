@@ -34,6 +34,8 @@ const sidebarContract = [
   "/docs/workflows",
   "/docs/guides",
   "/docs/guides/quickstart",
+  "/docs/guides/install",
+  "/docs/guides/accounts",
   "/docs/guides/api-tour",
   "/docs/guides/local-dev",
   "/docs/guides/contributing",

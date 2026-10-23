@@ -1,0 +1,85 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Published installers", href: "#installers" },
+  { title: "Six desktop targets", href: "#targets" },
+  { title: "Checksums", href: "#checksums" },
+  { title: "In-app updates", href: "#updater" },
+  { title: "Homebrew", href: "#homebrew" },
+  { title: "Source checkout", href: "#source" },
+  { title: "Companion", href: "#companion" },
+]
+---
+
+<DocsLayout
+  title="Install"
+  subtitle="Install a published desktop build, or tell a source checkout apart from that installer."
+  description="Where CADCAMFUN desktop installers are published, which platforms they cover, how checksums and the in-app updater work, and what is not a download."
+  toc={toc}
+>
+  <section id="installers" class="doc-section">
+    <h2>Published installers</h2>
+    <p>The <a href="/download">download page</a> lists stable desktop installers from the GitHub releases of <code>nikomatt69/cadcamfun</code>. Each version is split across one index release, tagged <code>v&#123;version&#125;</code>, and six platform releases tagged <code>v&#123;version&#125;-&#123;slug&#125;</code>.</p>
+    <p>The index release carries <code>latest.json</code> for the in-app updater. The platform releases carry the files a person downloads. Asset names are prefixed with the Rust target triple, for example <code>aarch64-apple-darwin--</code>.</p>
+    <DocCallout type="note" title="A release tag is not proof that every installer exists">
+      <p>The download page shows only assets that are actually attached to a stable platform release. A missing card means that platform was not published for the selected version.</p>
+    </DocCallout>
+  </section>
+
+  <section id="targets" class="doc-section">
+    <h2>Six desktop targets</h2>
+    <table>
+      <thead><tr><th>Slug</th><th>Machine</th><th>Installer</th></tr></thead>
+      <tbody>
+        <tr><td><code>macos-arm64</code></td><td>macOS Apple Silicon</td><td><code>.dmg</code></td></tr>
+        <tr><td><code>macos-x64</code></td><td>macOS Intel</td><td><code>.dmg</code></td></tr>
+        <tr><td><code>windows-x64</code></td><td>Windows x64</td><td><code>.msi</code> and an NSIS <code>-setup.exe</code></td></tr>
+        <tr><td><code>windows-arm64</code></td><td>Windows ARM64</td><td><code>.msi</code> and an NSIS <code>-setup.exe</code></td></tr>
+        <tr><td><code>linux-x64</code></td><td>Linux x64</td><td><code>.deb</code> and <code>.rpm</code></td></tr>
+        <tr><td><code>linux-arm64</code></td><td>Linux ARM64</td><td><code>.deb</code> and <code>.rpm</code></td></tr>
+      </tbody>
+    </table>
+    <p>Linux jobs do not publish an AppImage. Updater archives (<code>.app.tar.gz</code> on macOS, the unsigned-for-humans Windows <code>.exe</code> used by the updater, and <code>.sig</code> files) are not offered as installers.</p>
+  </section>
+
+  <section id="checksums" class="doc-section">
+    <h2>Checksums</h2>
+    <p>Each platform release includes <code>SHA256SUMS</code>. Compare it with the file you downloaded before you treat the installer as the one the release built. The download page links that checksum file next to the installers for the same platform.</p>
+  </section>
+
+  <section id="updater" class="doc-section">
+    <h2>In-app updates</h2>
+    <p>An installed macOS or Windows app checks <code>https://github.com/nikomatt69/cadcamfun/releases/latest/download/latest.json</code>. That manifest has four platform keys: <code>darwin-aarch64</code>, <code>darwin-x86_64</code>, <code>windows-aarch64</code>, and <code>windows-x86_64</code>. Linux installs are replaced by installing a newer <code>.deb</code> or <code>.rpm</code>; they are not in <code>latest.json</code>.</p>
+    <p>The desktop still asks before it restarts into an update, and it will not install over unsaved work. Details of the check interval and the signing key are in <a href="/docs/release">Builds and releases</a>.</p>
+  </section>
+
+  <section id="homebrew" class="doc-section">
+    <h2>Homebrew</h2>
+    <p>On macOS, when the cask has been published for that release:</p>
+    <DocCode language="bash" title="macOS">{`brew install --cask nikomatt69/tap/cadcamfun`}</DocCode>
+    <p>The cask is a macOS install path. It does not install the Windows or Linux packages.</p>
+  </section>
+
+  <section id="source" class="doc-section">
+    <h2>Source checkout</h2>
+    <p><code>bun install</code> and <code>bun run desktop:dev</code> build the desktop from this repository. They do not download a release installer. Use them when you are changing the app. Use the download page when you want the published build.</p>
+    <p>The <a href="/docs/guides/quickstart">quickstart</a> is the source path: toolchain, database location, and the first window.</p>
+  </section>
+
+  <section id="companion" class="doc-section">
+    <h2>Companion</h2>
+    <p>There is no iOS App Store or TestFlight build, and no Android store package. The phone app is built from <code>apps/mobile</code> and paired with a desktop that is already running. Follow <a href="/docs/guides/companion-pairing">companion pairing</a>.</p>
+  </section>
+
+  <DocRelated items={[
+    { title: "Download", href: "/download" },
+    { title: "Quickstart", href: "/docs/guides/quickstart" },
+    { title: "Builds and releases", href: "/docs/release" },
+    { title: "Companion pairing", href: "/docs/guides/companion-pairing" },
+  ]} />
+</DocsLayout>

@@ -33,6 +33,8 @@ const toc = [
     <h2>Choose a guide</h2>
     <ul>
       <li><a href="/docs/guides/quickstart">Quickstart</a>: install dependencies, start the desktop, and locate its database.</li>
+      <li><a href="/docs/guides/install">Install</a>: download a published desktop build, check its checksum, and tell it apart from a source checkout.</li>
+      <li><a href="/docs/guides/accounts">Accounts</a>: edit profile, password, API keys, and git identity in local Studio.</li>
       <li><a href="/docs/guides/local-dev">Local development</a>: run a browser preview or real sidecar, configure processes, and diagnose startup.</li>
       <li><a href="/docs/guides/contributing">Contributing code</a>: locate modules, change shared contracts, and select checks.</li>
       <li><a href="/docs/packages">Packages</a>: navigate workspace responsibilities and public entry points.</li>
@@ -92,6 +94,7 @@ bun run --cwd packages/web start`}
     <table>
       <thead><tr><th>I want to…</th><th>Start here</th><th>Successful result</th></tr></thead>
       <tbody>
+        <tr><td>Install a published desktop build</td><td><a href="/docs/guides/install">Install</a></td><td>The matching installer from the selected GitHub release is downloaded, and its checksum matches <code>SHA256SUMS</code>.</td></tr>
         <tr><td>Run a native desktop checkout</td><td><a href="/docs/guides/quickstart#desktop">Open the desktop</a></td><td>Tauri opens and a real sidecar answers health; saved data can be reopened.</td></tr>
         <tr><td>Edit a screen without compiling Rust</td><td><a href="/docs/guides/local-dev#processes">Choose development processes</a></td><td>Vite serves the screen with either a fixture or explicitly selected API.</td></tr>
         <tr><td>Connect a phone</td><td><a href="/docs/mobile#pairing">Pair the iOS companion</a></td><td>A named desktop device authenticates through pinned HTTPS.</td></tr>
@@ -127,7 +130,7 @@ bun run --cwd packages/web start`}
         {guidePages.filter((guide) => guide.category === category).map((guide) => <DocCard title={guide.title} href={`/docs/guides/${guide.slug}`}><p>{guide.summary}</p></DocCard>)}
       </div>
     </>)}
-    <p>New to the checkout? Begin with <a href="/docs/guides/quickstart">Quickstart</a>. New to its HTTP behavior? Use the <a href="/docs/guides/api-tour">walkthrough with captured responses</a>, then choose a typed client or a resource in the <a href="/docs/api">complete API reference</a>.</p>
+    <p>New to a published build? Start at <a href="/docs/guides/install">Install</a>. New to the checkout? Begin with <a href="/docs/guides/quickstart">Quickstart</a>. New to its HTTP behavior? Use the <a href="/docs/guides/api-tour">walkthrough with captured responses</a>, then choose a typed client or a resource in the <a href="/docs/api">complete API reference</a>.</p>
   </section>
   <section id="complete-tasks" class="doc-section">
     <h2>Work through a complete task</h2>
@@ -153,6 +156,8 @@ bun run --cwd packages/web start`}
     <table>
       <thead><tr><th>Guide</th><th>You will</th><th>Needs</th></tr></thead>
       <tbody>
+        <tr><td><a href="/docs/guides/install">Install</a></td><td>Download a published desktop build</td><td>The download page</td></tr>
+        <tr><td><a href="/docs/guides/accounts">Accounts</a></td><td>Edit profile, password, keys, and git identity</td><td>Local Studio</td></tr>
         <tr><td><a href="/docs/guides/quickstart">Quickstart</a></td><td>Install, test and open the desktop</td><td>Bun, Rust</td></tr>
         <tr><td><a href="/docs/guides/local-dev">Local development</a></td><td>Run each process on its own and pick the right checks</td><td>A clone</td></tr>
         <tr><td><a href="/docs/guides/api-tour">API tour</a></td><td>Make real requests with curl and see the responses</td><td>A running sidecar</td></tr>

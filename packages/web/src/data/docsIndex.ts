@@ -29,6 +29,14 @@ const pageCopy: Record<string, DocsIndexCopy> = {
     summary: "Operate the Astro documentation site, API contract snapshots, navigation/retrieval, Markdown export, Workers AI or nikcli assistant, rate limits, capability-protected guide artifacts, local Studio, and deployment checks.",
     keywords: ["documentation", "Astro", "Cloudflare", "Worker", "Studio", "R2", "KV", "docs assistant", "Markdown", "llm", "deploy"],
   },
+  "/docs/guides/install": {
+    summary: "Install a published desktop build from GitHub releases: six platform installers, checksums, macOS and Windows updates, Homebrew, and the difference from a source checkout.",
+    keywords: ["install", "download", "dmg", "msi", "deb", "rpm", "latest.json", "homebrew", "checksum", "SHA256SUMS"],
+  },
+  "/docs/guides/accounts": {
+    summary: "Edit the signed-in user in local Studio: profile, password, API keys, and git identity, and how those fields map to the desktop user API.",
+    keywords: ["account", "studio", "profile", "password", "api key", "git profile", "User", "ApiKey", "session"],
+  },
   "/docs/guides/api-tour": {
     summary: "API requests with real captured handler responses from a disposable migrated database: public health, bearer rejection, project validation and creation, relation reads, JSON preference storage, and retry handling.",
     keywords: ["api walkthrough", "curl", "real responses", "projects", "key-value", "authorization", "400", "401", "404", "201", "integration", "example"],

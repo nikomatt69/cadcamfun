@@ -1,0 +1,225 @@
+---
+import Layout from "../layouts/Layout.astro"
+import Navbar from "../components/Navbar.astro"
+
+export const prerender = true
+
+const description = "Download CADCAMFUN for macOS, Windows, and Linux. Desktop installers from the GitHub releases, with checksums."
+
+const brand = [
+  { file: "icon.png", label: "App icon" },
+  { file: "logo.png", label: "Logo" },
+  { file: "logo-on-dark.png", label: "Logo on dark" },
+  { file: "og-image.png", label: "Social image" },
+]
+---
+
+<Layout title="Download — CADCAMFUN" description={description}>
+  <Navbar />
+  <main id="main-content" class="page-section">
+    <div class="page-shell">
+      <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-terminal-muted">Download</p>
+      <h1 class="font-display mt-3 max-w-3xl text-[clamp(2.2rem,5vw,3.6rem)] font-bold leading-[1.05] tracking-[-0.03em]">Get CADCAMFUN for your platform.</h1>
+      <p class="mt-4 max-w-2xl text-[16px] leading-relaxed text-terminal-muted">
+        Desktop installers for macOS, Windows, and Linux. Each file is the asset published on the matching GitHub release. The in-app updater covers macOS and Windows.
+      </p>
+      <p id="download-detected" class="mt-4 text-[14px] text-terminal-muted"></p>
+
+      <div class="mt-8 flex flex-wrap items-end gap-4">
+        <label class="block text-[13px] font-semibold" for="download-version">
+          Version
+          <select id="download-version" class="glass-chip mt-2 block bg-transparent px-3 py-2 text-[15px] font-medium"></select>
+        </label>
+        <a id="download-notes" class="pressable text-[14px] font-semibold text-terminal-accent" href="https://github.com/nikomatt69/cadcamfun/releases">All releases</a>
+      </div>
+      <p id="download-status" class="mt-6 text-[15px] text-terminal-muted" role="status">Loading releases…</p>
+      <div id="download-platforms" class="mt-8 flex flex-col gap-8"></div>
+
+      <section class="mt-14" aria-labelledby="homebrew-heading">
+        <h2 id="homebrew-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">macOS with Homebrew</h2>
+        <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">
+          When the release cask is published, this installs the macOS app. It does not replace the Windows or Linux packages above.
+        </p>
+        <div class="material mt-4 flex items-center justify-between gap-3 rounded-[var(--radius-card)] px-4 py-3">
+          <code class="overflow-x-auto font-mono text-[13px]">brew install --cask nikomatt69/tap/cadcamfun</code>
+          <button id="homebrew-copy" type="button" class="pressable glass-chip shrink-0 px-3 py-1.5 text-[13px] font-semibold">Copy</button>
+        </div>
+      </section>
+
+      <section class="mt-14" aria-labelledby="updater-heading">
+        <h2 id="updater-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">Updates</h2>
+        <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">
+          Installed macOS and Windows copies check <code>latest.json</code> on the latest GitHub release. Linux publishes <code>.deb</code> and <code>.rpm</code> only; there is no AppImage and no in-app Linux update. Checksums for a platform are the <code>SHA256SUMS</code> file on that platform’s release.
+        </p>
+      </section>
+
+      <section class="mt-14" aria-labelledby="companion-heading">
+        <h2 id="companion-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">iOS companion</h2>
+        <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">
+          The phone app is not an App Store or TestFlight download. Build it from the repository and pair it with a desktop that is already running.
+        </p>
+        <a href="/docs/guides/companion-pairing" class="pressable mt-4 inline-flex text-[14px] font-semibold text-terminal-accent">Companion pairing</a>
+      </section>
+
+      <section class="mt-14" aria-labelledby="brand-heading">
+        <h2 id="brand-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">Brand</h2>
+        <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">The marks shipped with this site. Download a file directly; there is no separate kit archive.</p>
+        <ul class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {brand.map((item) => (
+            <li class="material rounded-[var(--radius-card)] p-4">
+              <img src={`/brand/${item.file}`} alt="" class="h-16 w-auto object-contain" />
+              <p class="mt-3 text-[14px] font-semibold">{item.label}</p>
+              <a class="mt-1 inline-flex text-[13px] font-semibold text-terminal-accent" href={`/brand/${item.file}`} download>{item.file}</a>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <p class="mt-14 text-[14px] text-terminal-muted">
+        Developing the app from a clone uses <a class="font-semibold text-terminal-accent" href="/docs/guides/quickstart">Quickstart</a>, not these installers.
+        The asset list and updater limits are described in <a class="font-semibold text-terminal-accent" href="/docs/guides/install">Install</a>.
+      </p>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  type Kind = "dmg" | "msi" | "nsis" | "deb" | "rpm" | "checksums" | "notes"
+  type Asset = { name: string; url: string; size: number; kind: Kind }
+  type Platform = { slug: string; assets: Asset[] }
+  type Version = { version: string; publishedAt: string; platforms: Platform[] }
+
+  const KIND_LABEL: Record<Kind, string> = {
+    dmg: "Disk image",
+    msi: "MSI installer",
+    nsis: "NSIS installer",
+    deb: "Debian package",
+    rpm: "RPM package",
+    checksums: "SHA-256 checksums",
+    notes: "Release notes",
+  }
+  const SLUG_LABEL: Record<string, string> = {
+    "macos-arm64": "Apple Silicon",
+    "macos-x64": "Intel",
+    "windows-x64": "x64",
+    "windows-arm64": "ARM64",
+    "linux-x64": "x64",
+    "linux-arm64": "ARM64",
+  }
+  const GROUPS = [
+    { title: "macOS", slugs: ["macos-arm64", "macos-x64"] },
+    { title: "Windows", slugs: ["windows-x64", "windows-arm64"] },
+    { title: "Linux", slugs: ["linux-x64", "linux-arm64"] },
+  ]
+
+  const status = document.querySelector("#download-status")
+  const platforms = document.querySelector("#download-platforms")
+  const versionSelect = document.querySelector("#download-version") as HTMLSelectElement | null
+  const detected = document.querySelector("#download-detected")
+  let versions: Version[] = []
+
+  function detectedSlugs(): string[] {
+    const ua = navigator.userAgent
+    if (/Windows/i.test(ua)) return /ARM64|aarch64/i.test(ua) ? ["windows-arm64"] : ["windows-x64"]
+    if (/Linux/i.test(ua) && !/Android/i.test(ua)) return /aarch64|arm64/i.test(ua) ? ["linux-arm64"] : ["linux-x64"]
+    if (/Mac/i.test(ua)) return ["macos-arm64", "macos-x64"]
+    return []
+  }
+
+  function formatSize(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes <= 0) return ""
+    const units = ["B", "KB", "MB", "GB"]
+    let value = bytes
+    let index = 0
+    while (value >= 1024 && index < units.length - 1) {
+      value /= 1024
+      index += 1
+    }
+    const digits = value >= 10 || index === 0 ? 0 : 1
+    return `${value.toFixed(digits)} ${units[index]}`
+  }
+
+  function render(version: Version | undefined) {
+    if (!platforms) return
+    platforms.replaceChildren()
+    if (!version) return
+    const hits = new Set(detectedSlugs())
+    for (const group of GROUPS) {
+      const section = document.createElement("section")
+      const heading = document.createElement("h2")
+      heading.className = "font-display text-[1.6rem] font-bold tracking-[-0.03em]"
+      heading.textContent = group.title
+      section.append(heading)
+      const list = document.createElement("ul")
+      list.className = "mt-4 grid gap-3 sm:grid-cols-2"
+      for (const slug of group.slugs) {
+        const platform = version.platforms.find((item) => item.slug === slug)
+        const card = document.createElement("li")
+        card.className = "material rounded-[var(--radius-card)] p-4"
+        if (hits.has(slug)) card.classList.add("nav-current")
+        const title = document.createElement("h3")
+        title.className = "text-[15px] font-semibold"
+        title.textContent = SLUG_LABEL[slug] ?? slug
+        card.append(title)
+        if (!platform) {
+          const empty = document.createElement("p")
+          empty.className = "mt-2 text-[13px] text-terminal-muted"
+          empty.textContent = "Not in this release."
+          card.append(empty)
+        } else {
+          const assets = document.createElement("ul")
+          assets.className = "mt-3 flex flex-col gap-2"
+          for (const asset of platform.assets) {
+            const item = document.createElement("li")
+            const link = document.createElement("a")
+            link.href = asset.url
+            link.className = "text-[14px] font-semibold text-terminal-accent"
+            const size = formatSize(asset.size)
+            link.textContent = size ? `${KIND_LABEL[asset.kind]} · ${size}` : KIND_LABEL[asset.kind]
+            item.append(link)
+            assets.append(item)
+          }
+          card.append(assets)
+        }
+        list.append(card)
+      }
+      section.append(list)
+      platforms.append(section)
+    }
+  }
+
+  const highlighted = detectedSlugs()
+  if (detected) {
+    const os = highlighted[0]?.startsWith("macos") ? "macOS" : highlighted[0]?.startsWith("windows") ? "Windows" : highlighted[0]?.startsWith("linux") ? "Linux" : ""
+    detected.textContent = os ? `Detected ${os}. Matching builds are marked below.` : ""
+  }
+
+  document.querySelector("#homebrew-copy")?.addEventListener("click", async () => {
+    await navigator.clipboard.writeText("brew install --cask nikomatt69/tap/cadcamfun")
+  })
+
+  versionSelect?.addEventListener("change", () => {
+    render(versions.find((version) => version.version === versionSelect.value))
+  })
+
+  try {
+    const response = await fetch("/api/releases")
+    if (!response.ok) throw new Error("unavailable")
+    const body = (await response.json()) as { versions?: Version[] }
+    versions = body.versions ?? []
+    if (versions.length === 0) {
+      if (status) status.textContent = "No stable desktop installers are published yet. Build from source with the quickstart."
+    } else if (versionSelect) {
+      if (status) status.textContent = ""
+      for (const version of versions) {
+        const option = document.createElement("option")
+        option.value = version.version
+        option.textContent = version.version
+        versionSelect.append(option)
+      }
+      render(versions[0])
+    }
+  } catch {
+    if (status) status.textContent = "The release list could not be loaded. Open the GitHub releases page, or try again in a moment."
+  }
+</script>

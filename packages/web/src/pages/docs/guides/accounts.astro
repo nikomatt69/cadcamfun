@@ -1,0 +1,95 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Two places an account is edited", href: "#surfaces" },
+  { title: "Studio sign-in", href: "#studio-signin" },
+  { title: "Profile", href: "#profile" },
+  { title: "Password", href: "#password" },
+  { title: "API keys", href: "#api-keys" },
+  { title: "Git identity", href: "#git" },
+  { title: "Desktop settings", href: "#desktop" },
+  { title: "What Studio does not do", href: "#limits" },
+]
+---
+
+<DocsLayout
+  title="Accounts"
+  subtitle="Edit the signed-in user from local Studio, and see which of those fields the desktop settings screens use."
+  description="Local Studio profile, password, API keys, and git identity, and how they relate to the desktop user API."
+  toc={toc}
+>
+  <section id="surfaces" class="doc-section">
+    <h2>Two places an account is edited</h2>
+    <p>The desktop settings screens call the sidecar user API (<code>/api/user/profile</code>, <code>/api/user/password</code>, <code>/api/user/git-profile</code>, <code>/api/user/api-keys</code>). <a href="/studio">Studio</a> is a separate local page. After you sign in, it writes the same SQLite tables for that user: <code>User</code>, a credential <code>Account</code> row when one exists, <code>ApiKey</code>, and <code>GitProfile</code>.</p>
+    <p>Studio does not call the sidecar and it does not run on the public site’s database. <code>cadcam.fun</code> serves the page; the account form works when <code>bun run dev</code> in <code>packages/web</code> has started the local Studio API against your database file.</p>
+  </section>
+
+  <section id="studio-signin" class="doc-section">
+    <h2>Studio sign-in</h2>
+    <p>The login form checks <code>User.password</code> with <code>Bun.password</code> (bcrypt) and stores a row in <code>Session</code>. The browser keeps that session in the <code>cadcamfun-studio</code> cookie. Sign out deletes the session row.</p>
+    <p>This is not the desktop session. The desktop uses a launch bearer token plus an optional <code>x-session-token</code>. A Studio cookie does not authenticate sidecar requests, and a desktop session does not sign you into Studio.</p>
+    <DocCallout type="note" title="The public site cannot see your database">
+      <p>If the local API is not running, Studio says so and leaves the account forms hidden. Start it from <code>packages/web</code> with <code>bun run dev</code>. The database file is <code>CADCAMFUN_DB</code>, <code>DATABASE_URL</code>, or <code>data/cadcamfun.db</code> at the repository root.</p>
+    </DocCallout>
+  </section>
+
+  <section id="profile" class="doc-section">
+    <h2>Profile</h2>
+    <p>The account section edits name, title, company, location, website, bio, public profile, and show-email. Email is shown and is not changed. Name is required and must be at most 100 characters. Bio must be at most 500 characters. A website, when set, must be a URL.</p>
+    <p>The desktop profile screen sends the same fields to <code>PUT /api/user/profile</code>. A photo chosen in the desktop UI is stored in that browser’s local storage unless the multipart upload is actually sent; Studio does not upload a profile image.</p>
+  </section>
+
+  <section id="password" class="doc-section">
+    <h2>Password</h2>
+    <p>Studio checks the current password against <code>User.password</code>, the column its own login uses. The new password must be at least 8 characters. The new bcrypt hash is written back to <code>User.password</code>. If an <code>Account</code> row with <code>providerId</code> <code>credential</code> exists for that user, the same hash is written there too, because <code>PUT /api/user/password</code> on the sidecar reads that row.</p>
+    <p>There is no desktop settings control for this change-password route. Desktop sign-in, sign-up, and reset use <code>User.password</code> through <code>/api/auth/*</code>.</p>
+  </section>
+
+  <section id="api-keys" class="doc-section">
+    <h2>API keys</h2>
+    <p>Creating a key inserts an <code>ApiKey</code> row whose <code>keyHash</code> is the SHA-256 hex digest of a <code>cad_</code> secret. The secret is returned once. Later lists show the name and dates, not the secret. Revoking deletes that user’s row.</p>
+    <p>This is the real <code>/api/user/api-keys</code> store. <code>GET /api/user/tokens</code> and <code>POST /api/user/tokens</code> return a fixed demo list and do not persist anything. Studio does not offer that demo list. The desktop Account tab still reads the demo route; it is not a second key store.</p>
+  </section>
+
+  <section id="git" class="doc-section">
+    <h2>Git identity</h2>
+    <p>The git form reads and writes <code>GitProfile</code>: the name and email that sign this user’s commits. The desktop profile screen edits the same row through <code>GET</code> and <code>PUT /api/user/git-profile</code>. Saving in either place replaces the identity for that user id.</p>
+  </section>
+
+  <section id="desktop" class="doc-section">
+    <h2>Desktop settings</h2>
+    <p>Open <code>/settings</code> in the desktop app for the profile, account, security, notifications, AI, devices, and language tabs. Profile and git identity match the Studio fields above. The HTTP shape of every user and auth route is in <a href="/docs/api/users">Users</a> and <a href="/docs/api/authentication">Authentication</a>.</p>
+    <table>
+      <thead><tr><th>Studio field</th><th>Desktop</th><th>Stored in</th></tr></thead>
+      <tbody>
+        <tr><td>Profile</td><td>Settings → Profile, <code>PUT /api/user/profile</code></td><td><code>User</code></td></tr>
+        <tr><td>Password</td><td><code>PUT /api/user/password</code> (no settings control)</td><td><code>User.password</code> and credential <code>Account.password</code></td></tr>
+        <tr><td>API keys</td><td><code>/api/user/api-keys</code> (no settings control)</td><td><code>ApiKey</code></td></tr>
+        <tr><td>Git identity</td><td>Settings → Profile, <code>/api/user/git-profile</code></td><td><code>GitProfile</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="limits" class="doc-section">
+    <h2>What Studio does not do</h2>
+    <ul>
+      <li>It does not register a new user. Sign in with a user that already has a password in the selected database.</li>
+      <li>It does not delete an account. That cascade lives on <code>DELETE /api/user/delete-account</code> in the sidecar.</li>
+      <li>It does not manage passkeys. <code>POST /api/auth/passkey-register</code> answers 501.</li>
+      <li>It does not edit notification preferences, AI providers, or companion devices. Those stay in the desktop.</li>
+      <li>It does not accept the public site as a hosted account service. Without the local API, the forms stay unavailable.</li>
+    </ul>
+  </section>
+
+  <DocRelated items={[
+    { title: "Studio", href: "/studio" },
+    { title: "Users API", href: "/docs/api/users" },
+    { title: "Authentication API", href: "/docs/api/authentication" },
+    { title: "Desktop", href: "/docs/desktop" },
+    { title: "Local development", href: "/docs/guides/local-dev" },
+  ]} />
+</DocsLayout>

@@ -2,16 +2,15 @@
 import Mark from "./Mark.astro"
 
 const navItems = [
+  { href: "/download", label: "Download" },
   { href: "/docs", label: "Docs" },
-  { href: "/docs/architecture", label: "Architecture" },
-  { href: "/docs/guides/quickstart", label: "Quickstart" },
   { href: "/studio", label: "Studio" },
 ]
 
 const pathname = Astro.url.pathname.replace(/\/$/, "") || "/"
 
 function active(href: string) {
-  if (href === "/docs") return pathname === "/docs" || (pathname.startsWith("/docs") && !pathname.startsWith("/docs/guides") && pathname !== "/docs/architecture")
+  if (href === "/docs") return pathname === "/docs" || pathname.startsWith("/docs/")
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 ---
@@ -39,7 +38,9 @@ function active(href: string) {
               {item.label}
             </a>
           ))}
+          <a href="https://github.com/nikomatt69/cadcamfun" class="pressable relative rounded-[4px] px-3.5 py-[6px] text-[13px] font-semibold text-terminal-muted" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
+        <a href="/download" class="pressable btn-fill rounded-[4px] px-3.5 py-[6px] text-[13px] font-semibold">Install</a>
         <button
           id="theme-toggle"
           type="button"
@@ -68,6 +69,8 @@ function active(href: string) {
         {navItems.map((item) => (
           <a href={item.href} class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text">{item.label}</a>
         ))}
+        <a href="https://github.com/nikomatt69/cadcamfun" class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="/download" class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text">Install</a>
       </nav>
     </div>
   </div>

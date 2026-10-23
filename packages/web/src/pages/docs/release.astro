@@ -110,12 +110,12 @@ bun scripts/build.ts --only=artifacts --dry-run`}
         <tr><td>macOS Intel</td><td><code>x86_64-apple-darwin</code></td><td><code>darwin-x86_64</code></td><td><code>.app.tar.gz</code></td></tr>
         <tr><td>Windows ARM64</td><td><code>aarch64-pc-windows-msvc</code></td><td><code>windows-aarch64</code></td><td><code>.exe</code></td></tr>
         <tr><td>Windows x64</td><td><code>x86_64-pc-windows-msvc</code></td><td><code>windows-x86_64</code></td><td><code>.exe</code></td></tr>
-        <tr><td>Linux ARM64</td><td><code>aarch64-unknown-linux-gnu</code></td><td><code>linux-aarch64</code></td><td><code>.AppImage</code></td></tr>
-        <tr><td>Linux x64</td><td><code>x86_64-unknown-linux-gnu</code></td><td><code>linux-x86_64</code></td><td><code>.AppImage</code></td></tr>
+        <tr><td>Linux ARM64</td><td><code>aarch64-unknown-linux-gnu</code></td><td>—</td><td>not published</td></tr>
+        <tr><td>Linux x64</td><td><code>x86_64-unknown-linux-gnu</code></td><td>—</td><td>not published</td></tr>
       </tbody>
     </table>
-    <p>The manifest generator requires exactly one matching updater asset for the selected target, its adjacent <code>.sig</code> file, and release notes. Installer indexing prefixes asset names with <code>&lt;triple&gt;--</code>, rejects duplicate names, and rejects signatures without a matching asset. A DMG, MSI, DEB, or RPM installer does not replace the updater asset listed above.</p>
-    <p>Merged platform manifests must agree on version, publication date, and release notes. The release job requires all six expected manifest keys. URLs must be HTTPS with no embedded credentials, query string, or fragment. Staging checks that the target prefix, suffix, signature, and release URL match the platform.</p>
+    <p>The manifest generator requires exactly one matching updater asset for the selected target, its adjacent <code>.sig</code> file, and release notes. Installer indexing prefixes asset names with <code>&lt;triple&gt;--</code>, rejects duplicate names, and rejects signatures without a matching asset. A DMG, MSI, DEB, or RPM installer does not replace the updater asset listed above. Linux release jobs do not build an AppImage, so they publish <code>.deb</code> and <code>.rpm</code> installers and no updater manifest.</p>
+    <p>Merged platform manifests must agree on version, publication date, and release notes. The release job expects the four macOS and Windows manifest keys (<code>darwin-aarch64</code>, <code>darwin-x86_64</code>, <code>windows-aarch64</code>, <code>windows-x86_64</code>). URLs must be HTTPS with no embedded credentials, query string, or fragment. Staging checks that the target prefix, suffix, signature, and release URL match the platform.</p>
   </section>
 
   <section id="build-options" class="doc-section">
@@ -129,7 +129,7 @@ bun scripts/build.ts --only=artifacts --dry-run`}
 bun --no-env-file scripts/build.ts \
   --skip=install,check \
   --target=x86_64-unknown-linux-gnu \
-  --bundles=deb,appimage \
+  --bundles=deb,rpm \
   --no-updater \
   --dry-run`}
     </DocCode>
@@ -207,14 +207,14 @@ bun --no-env-file scripts/build.ts \
         <tr><td><code>x86_64-apple-darwin</code></td><td>macos-14</td><td>app, dmg</td><td>macos-x64</td></tr>
         <tr><td><code>x86_64-pc-windows-msvc</code></td><td>windows-latest</td><td>msi, nsis</td><td>windows-x64</td></tr>
         <tr><td><code>aarch64-pc-windows-msvc</code></td><td>windows-11-arm</td><td>msi, nsis</td><td>windows-arm64</td></tr>
-        <tr><td><code>x86_64-unknown-linux-gnu</code></td><td>ubuntu-22.04</td><td>deb, rpm, appimage</td><td>linux-x64</td></tr>
-        <tr><td><code>aarch64-unknown-linux-gnu</code></td><td>ubuntu-22.04-arm</td><td>deb, rpm, appimage</td><td>linux-arm64</td></tr>
+        <tr><td><code>x86_64-unknown-linux-gnu</code></td><td>ubuntu-22.04</td><td>deb, rpm</td><td>linux-x64</td></tr>
+        <tr><td><code>aarch64-unknown-linux-gnu</code></td><td>ubuntu-22.04-arm</td><td>deb, rpm</td><td>linux-arm64</td></tr>
         </tbody>
     </table>
     <ol>
       <li>A trusted job validates the release tag against the application version.</li>
-      <li>Each matrix job runs <code>bun --no-env-file scripts/build.ts --target=… --bundles=… --out-dir=release</code>, signs, and builds an architecture-specific updater manifest. Windows imports and afterwards removes its signing certificate.</li>
-      <li>A merge job validates all six updater manifests and merges them into one <code>latest.json</code>.</li>
+      <li>Each matrix job runs <code>bun --no-env-file scripts/build.ts --target=… --bundles=… --out-dir=release</code> and signs. macOS and Windows also build an architecture-specific updater manifest. Linux does not. Windows imports and afterwards removes its signing certificate.</li>
+      <li>A merge job validates the four macOS and Windows updater manifests and merges them into one <code>latest.json</code>.</li>
       <li>A publish job per platform uploads installers under the tag suffixed with the slug, for example <code>&lt;tag&gt;-macos-arm64</code>.</li>
     </ol>
     <p>CI on every push runs two jobs: install, typecheck and test (and stages the sidecar binary and migrations), and a Rust job with clippy and the <code>src-tauri</code> tests.</p>
@@ -222,9 +222,10 @@ bun --no-env-file scripts/build.ts \
 
   <section id="in-3d" class="doc-section">
     <h2>In 3D</h2>
-    <DocViewer3D title="Release matrix" caption="The six include entries of the release build job: runner, slug and bundles (one block per bundle format), read from release.yml." solids={[{"kind":"box","size":[14,10,3],"at":[0,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[0,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[0,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[0,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[30,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[30,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[30,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[30,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[60,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,0,8],"color":"#9fc88a"},{"kind":"box","size":[14,10,3],"at":[60,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[60,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,20,8],"color":"#9fc88a"}]} labels={[{"text":"app","at":[7,-1.5,1.5],"size":2.4},{"text":"dmg","at":[7,-1.5,5.5],"size":2.4},{"text":"macos-arm64 (macos-14)","at":[7,5,11],"size":2.8},{"text":"app","at":[7,18.5,1.5],"size":2.4},{"text":"dmg","at":[7,18.5,5.5],"size":2.4},{"text":"macos-x64 (macos-14)","at":[7,25,11],"size":2.8},{"text":"msi","at":[37,-1.5,1.5],"size":2.4},{"text":"nsis","at":[37,-1.5,5.5],"size":2.4},{"text":"windows-x64 (windows-latest)","at":[37,5,11],"size":2.8},{"text":"msi","at":[37,18.5,1.5],"size":2.4},{"text":"nsis","at":[37,18.5,5.5],"size":2.4},{"text":"windows-arm64 (windows-11-arm)","at":[37,25,11],"size":2.8},{"text":"deb","at":[67,-1.5,1.5],"size":2.4},{"text":"rpm","at":[67,-1.5,5.5],"size":2.4},{"text":"appimage","at":[67,-1.5,9.5],"size":2.4},{"text":"linux-x64 (ubuntu-22.04)","at":[67,5,15],"size":2.8},{"text":"deb","at":[67,18.5,1.5],"size":2.4},{"text":"rpm","at":[67,18.5,5.5],"size":2.4},{"text":"appimage","at":[67,18.5,9.5],"size":2.4},{"text":"linux-arm64 (ubuntu-22.04-arm)","at":[67,25,15],"size":2.8}]} height={400} />
+    <DocViewer3D title="Release matrix" caption="The six include entries of the release build job: runner, slug and bundles (one block per bundle format), read from release.yml." solids={[{"kind":"box","size":[14,10,3],"at":[0,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[0,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[0,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[0,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[30,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[30,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[30,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[30,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[60,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[60,20,4],"color":"#e0a030"}]} labels={[{"text":"app","at":[7,-1.5,1.5],"size":2.4},{"text":"dmg","at":[7,-1.5,5.5],"size":2.4},{"text":"macos-arm64 (macos-14)","at":[7,5,11],"size":2.8},{"text":"app","at":[7,18.5,1.5],"size":2.4},{"text":"dmg","at":[7,18.5,5.5],"size":2.4},{"text":"macos-x64 (macos-14)","at":[7,25,11],"size":2.8},{"text":"msi","at":[37,-1.5,1.5],"size":2.4},{"text":"nsis","at":[37,-1.5,5.5],"size":2.4},{"text":"windows-x64 (windows-latest)","at":[37,5,11],"size":2.8},{"text":"msi","at":[37,18.5,1.5],"size":2.4},{"text":"nsis","at":[37,18.5,5.5],"size":2.4},{"text":"windows-arm64 (windows-11-arm)","at":[37,25,11],"size":2.8},{"text":"deb","at":[67,-1.5,1.5],"size":2.4},{"text":"rpm","at":[67,-1.5,5.5],"size":2.4},{"text":"linux-x64 (ubuntu-22.04)","at":[67,5,11],"size":2.8},{"text":"deb","at":[67,18.5,1.5],"size":2.4},{"text":"rpm","at":[67,18.5,5.5],"size":2.4},{"text":"linux-arm64 (ubuntu-22.04-arm)","at":[67,25,11],"size":2.8}]} height={400} />
   </section>
   <DocRelated items={[
+      { title: "Install", href: "/docs/guides/install" },
       { title: "Quickstart", href: "/docs/guides/quickstart" },
       { title: "Database", href: "/docs/database" },
       { title: "Mobile companion", href: "/docs/mobile" }

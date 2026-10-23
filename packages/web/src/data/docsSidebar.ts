@@ -95,6 +95,8 @@ export const docsNav: readonly DocsSection[] = [
         items: [
           { title: "Guides", href: "/docs/guides" },
           { title: "Quickstart", href: "/docs/guides/quickstart" },
+          { title: "Install", href: "/docs/guides/install" },
+          { title: "Accounts", href: "/docs/guides/accounts" },
           { title: "API walkthrough", href: "/docs/guides/api-tour" },
         ],
       },

@@ -5,7 +5,7 @@ import Navbar from "../../components/Navbar.astro"
 export const prerender = false
 ---
 
-<Layout title="Studio — CADCAMFUN" description="CADCAMFUN Studio: projects and counts from the local Drizzle database.">
+<Layout title="Studio — CADCAMFUN" description="CADCAMFUN Studio: the local database, and the signed-in user's profile, password, API keys, and git identity.">
   <Navbar />
   <main id="main-content" class="page-section">
     <div class="page-shell">
@@ -17,8 +17,10 @@ export const prerender = false
         <button id="studio-logout" type="button" class="pressable glass-chip px-4 py-2 text-[13px] font-semibold">Sign out</button>
       </div>
       <p id="studio-who" class="mt-4 text-[15px] text-terminal-muted"></p>
-      <div id="studio-counts" class="mt-8 grid gap-3 sm:grid-cols-4"></div>
-      <div class="material mt-8 overflow-hidden rounded-[var(--radius-card)]">
+
+      <h2 class="font-display mt-10 text-[1.4rem] font-bold tracking-[-0.03em]">Workspace</h2>
+      <div id="studio-counts" class="mt-4 grid gap-3 sm:grid-cols-4"></div>
+      <div class="material mt-6 overflow-hidden rounded-[var(--radius-card)]">
         <table class="w-full text-left text-[14px]">
           <thead>
             <tr>
@@ -29,21 +31,172 @@ export const prerender = false
           <tbody id="studio-projects"></tbody>
         </table>
       </div>
+
+      <h2 id="account" class="font-display mt-14 text-[1.4rem] font-bold tracking-[-0.03em]">Account</h2>
+      <p class="mt-2 max-w-2xl text-[14px] leading-relaxed text-terminal-muted">
+        Profile, password, API keys, and the git name used for commits. These write the local database for the signed-in user. Email stays as stored.
+      </p>
+      <p id="account-status" class="mt-3 text-[14px] text-terminal-muted" role="status"></p>
+
+      <form id="profile-form" class="material mt-6 hidden rounded-[var(--radius-card)] p-6" hidden>
+        <h3 class="text-[15px] font-semibold">Profile</h3>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <label class="block text-[13px] font-semibold">Name<input id="profile-name" name="name" required maxlength="100" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">Email<input id="profile-email" type="email" readonly class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal text-terminal-muted" /></label>
+          <label class="block text-[13px] font-semibold">Title<input id="profile-title" name="title" maxlength="200" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">Company<input id="profile-company" name="company" maxlength="200" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">Location<input id="profile-location" name="location" maxlength="200" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">Website<input id="profile-website" name="website" maxlength="300" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+        </div>
+        <label class="mt-4 block text-[13px] font-semibold">Bio<textarea id="profile-bio" name="bio" maxlength="500" rows="3" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal"></textarea></label>
+        <div class="mt-4 flex flex-wrap gap-6 text-[14px]">
+          <label class="flex items-center gap-2 font-medium"><input id="profile-public" name="publicProfile" type="checkbox" /> Public profile</label>
+          <label class="flex items-center gap-2 font-medium"><input id="profile-show-email" name="showEmail" type="checkbox" /> Show email</label>
+        </div>
+        <p id="profile-error" class="mt-3 hidden text-[13px]" role="alert"></p>
+        <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">Save profile</button>
+      </form>
+
+      <form id="password-form" class="material mt-4 hidden rounded-[var(--radius-card)] p-6" hidden>
+        <h3 class="text-[15px] font-semibold">Password</h3>
+        <p class="mt-2 text-[13px] text-terminal-muted">Updates the password this Studio login checks. A desktop credential row for the same user is updated with the same hash.</p>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <label class="block text-[13px] font-semibold">Current password<input id="password-current" name="currentPassword" type="password" autocomplete="current-password" required class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">New password<input id="password-next" name="newPassword" type="password" autocomplete="new-password" required minlength="8" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+        </div>
+        <p id="password-error" class="mt-3 hidden text-[13px]" role="alert"></p>
+        <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">Change password</button>
+      </form>
+
+      <form id="git-form" class="material mt-4 hidden rounded-[var(--radius-card)] p-6" hidden>
+        <h3 class="text-[15px] font-semibold">Git identity</h3>
+        <p class="mt-2 text-[13px] text-terminal-muted">The name and email written on this user's commits.</p>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+          <label class="block text-[13px] font-semibold">Name<input id="git-name" name="name" required maxlength="100" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">Email<input id="git-email" name="email" type="email" required maxlength="254" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+        </div>
+        <p id="git-error" class="mt-3 hidden text-[13px]" role="alert"></p>
+        <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">Save git identity</button>
+      </form>
+
+      <section id="keys-panel" class="material mt-4 hidden rounded-[var(--radius-card)] p-6" hidden>
+        <h3 class="text-[15px] font-semibold">API keys</h3>
+        <p class="mt-2 text-[13px] text-terminal-muted">The secret is shown once. Studio stores only its SHA-256 hash, the same way the sidecar does.</p>
+        <ul id="keys-list" class="mt-4 flex flex-col gap-2 text-[14px]"></ul>
+        <form id="key-form" class="mt-4 flex flex-wrap items-end gap-3">
+          <label class="block text-[13px] font-semibold">Name<input id="key-name" name="name" required maxlength="100" class="glass-chip mt-2 w-64 bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <button type="submit" class="pressable btn-fill rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">Create key</button>
+        </form>
+        <p id="key-secret" class="mt-4 hidden break-all font-mono text-[13px]"></p>
+        <p id="key-error" class="mt-3 hidden text-[13px]" role="alert"></p>
+      </section>
     </div>
   </main>
 </Layout>
 
 <script>
+  type Profile = {
+    email: string | null
+    name: string | null
+    bio: string | null
+    location: string | null
+    website: string | null
+    company: string | null
+    title: string | null
+    publicProfile: boolean
+    showEmail: boolean
+  }
+  type ApiKeyRow = { id: string; name: string; createdAt: string; lastUsed: string | null }
+  type AccountBody = { profile: Profile; git: { name: string; email: string } | null; apiKeys: ApiKeyRow[] }
+
   const who = document.querySelector("#studio-who")
   const counts = document.querySelector("#studio-counts")
   const projects = document.querySelector("#studio-projects")
+  const accountStatus = document.querySelector("#account-status")
 
-  const response = await fetch("/studio/api/overview")
-  if (response.status === 401) location.href = "/studio/login"
-  else if (!response.ok) {
+  function show(id: string) {
+    const node = document.querySelector(id)
+    node?.classList.remove("hidden")
+    node?.removeAttribute("hidden")
+  }
+
+  function alertLine(id: string, message: string) {
+    const node = document.querySelector(id)
+    if (!node) return
+    node.textContent = message
+    node.classList.toggle("hidden", message.length === 0)
+  }
+
+  async function send(path: string, method: string, body?: unknown) {
+    const response = await fetch(path, {
+      method,
+      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null
+    if (response.status === 401) location.href = "/studio/login"
+    return { ok: response.ok, status: response.status, payload }
+  }
+
+  function fillProfile(profile: Profile) {
+    const set = (id: string, value: string | null) => {
+      const input = document.querySelector(id) as HTMLInputElement | HTMLTextAreaElement | null
+      if (input) input.value = value ?? ""
+    }
+    set("#profile-name", profile.name)
+    set("#profile-email", profile.email)
+    set("#profile-title", profile.title)
+    set("#profile-company", profile.company)
+    set("#profile-location", profile.location)
+    set("#profile-website", profile.website)
+    set("#profile-bio", profile.bio)
+    const pub = document.querySelector("#profile-public") as HTMLInputElement | null
+    const mail = document.querySelector("#profile-show-email") as HTMLInputElement | null
+    if (pub) pub.checked = profile.publicProfile
+    if (mail) mail.checked = profile.showEmail
+  }
+
+  function renderKeys(keys: ApiKeyRow[]) {
+    const list = document.querySelector("#keys-list")
+    if (!list) return
+    list.replaceChildren()
+    if (keys.length === 0) {
+      const empty = document.createElement("li")
+      empty.className = "text-terminal-muted"
+      empty.textContent = "No API keys."
+      list.append(empty)
+      return
+    }
+    for (const key of keys) {
+      const item = document.createElement("li")
+      item.className = "flex items-center justify-between gap-3"
+      const label = document.createElement("span")
+      label.textContent = `${key.name} · ${key.createdAt.slice(0, 10)}`
+      const button = document.createElement("button")
+      button.type = "button"
+      button.className = "pressable glass-chip px-3 py-1 text-[12px] font-semibold"
+      button.textContent = "Revoke"
+      button.addEventListener("click", async () => {
+        const result = await send(`/studio/api/api-keys?keyId=${encodeURIComponent(key.id)}`, "DELETE")
+        if (!result.ok) {
+          alertLine("#key-error", result.payload?.error ?? "Could not revoke the key")
+          return
+        }
+        alertLine("#key-error", "")
+        renderKeys((result.payload as { apiKeys?: ApiKeyRow[] } | null)?.apiKeys ?? [])
+      })
+      item.append(label, button)
+      list.append(item)
+    }
+  }
+
+  const overview = await fetch("/studio/api/overview")
+  if (overview.status === 401) location.href = "/studio/login"
+  else if (!overview.ok) {
     if (who) who.textContent = "The local Studio API is not running. Start it with bun run dev in packages/web."
+    if (accountStatus) accountStatus.textContent = "Account editing uses that same local API."
   } else {
-    const body = (await response.json()) as {
+    const body = (await overview.json()) as {
       user: { email: string | null; name: string | null }
       database: string
       counts: Record<string, number>
@@ -51,25 +204,123 @@ export const prerender = false
     }
     if (who) who.textContent = `${body.user.name ?? body.user.email ?? "Signed in"} · ${body.database}`
     if (counts) {
-      counts.innerHTML = Object.entries(body.counts)
-        .map(
-          ([key, value]) =>
-            `<div class="material rounded-[var(--radius-card)] px-4 py-4"><p class="font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">${key}</p><p class="font-display mt-2 text-[1.6rem] font-bold">${value}</p></div>`,
-        )
-        .join("")
+      for (const [key, value] of Object.entries(body.counts)) {
+        const card = document.createElement("div")
+        card.className = "material rounded-[var(--radius-card)] px-4 py-4"
+        const label = document.createElement("p")
+        label.className = "font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted"
+        label.textContent = key
+        const number = document.createElement("p")
+        number.className = "font-display mt-2 text-[1.6rem] font-bold"
+        number.textContent = String(value)
+        card.append(label, number)
+        counts.append(card)
+      }
     }
     if (projects) {
-      projects.innerHTML =
-        body.projects.length === 0
-          ? `<tr><td class="px-4 py-4 text-terminal-muted" colspan="2">No projects in this database.</td></tr>`
-          : body.projects
-              .map(
-                (project) =>
-                  `<tr><td class="px-4 py-3">${project.name}</td><td class="px-4 py-3 text-terminal-muted">${project.updatedAt.slice(0, 10)}</td></tr>`,
-              )
-              .join("")
+      if (body.projects.length === 0) {
+        const row = document.createElement("tr")
+        const cell = document.createElement("td")
+        cell.className = "px-4 py-4 text-terminal-muted"
+        cell.colSpan = 2
+        cell.textContent = "No projects in this database."
+        row.append(cell)
+        projects.append(row)
+      } else {
+        for (const project of body.projects) {
+          const row = document.createElement("tr")
+          const name = document.createElement("td")
+          name.className = "px-4 py-3"
+          name.textContent = project.name
+          const updated = document.createElement("td")
+          updated.className = "px-4 py-3 text-terminal-muted"
+          updated.textContent = project.updatedAt.slice(0, 10)
+          row.append(name, updated)
+          projects.append(row)
+        }
+      }
+    }
+
+    const account = await send("/studio/api/account", "GET")
+    if (account.ok && account.payload && "profile" in account.payload) {
+      const data = account.payload as AccountBody
+      fillProfile(data.profile)
+      const gitName = document.querySelector("#git-name") as HTMLInputElement | null
+      const gitEmail = document.querySelector("#git-email") as HTMLInputElement | null
+      if (gitName) gitName.value = data.git?.name ?? ""
+      if (gitEmail) gitEmail.value = data.git?.email ?? ""
+      renderKeys(data.apiKeys)
+      show("#profile-form")
+      show("#password-form")
+      show("#git-form")
+      show("#keys-panel")
+    } else if (accountStatus && account.status !== 401) {
+      accountStatus.textContent = account.payload?.error ?? "The account could not be loaded."
     }
   }
+
+  document.querySelector("#profile-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault()
+    const form = event.currentTarget as HTMLFormElement
+    const data = new FormData(form)
+    const result = await send("/studio/api/profile", "PUT", {
+      name: data.get("name"),
+      title: data.get("title"),
+      company: data.get("company"),
+      location: data.get("location"),
+      website: data.get("website"),
+      bio: data.get("bio"),
+      publicProfile: (document.querySelector("#profile-public") as HTMLInputElement | null)?.checked ?? false,
+      showEmail: (document.querySelector("#profile-show-email") as HTMLInputElement | null)?.checked ?? false,
+    })
+    if (!result.ok) {
+      alertLine("#profile-error", result.payload?.error ?? "Could not save the profile")
+      return
+    }
+    alertLine("#profile-error", "")
+    const profile = (result.payload as { profile?: Profile } | null)?.profile
+    if (profile) fillProfile(profile)
+    if (who && profile) who.textContent = who.textContent?.replace(/^[^·]+/, `${profile.name ?? profile.email ?? "Signed in"} `) ?? who.textContent
+  })
+
+  document.querySelector("#password-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault()
+    const form = event.currentTarget as HTMLFormElement
+    const data = new FormData(form)
+    const result = await send("/studio/api/password", "PUT", {
+      currentPassword: data.get("currentPassword"),
+      newPassword: data.get("newPassword"),
+    })
+    alertLine("#password-error", result.ok ? "" : (result.payload?.error ?? "Could not change the password"))
+    if (result.ok) form.reset()
+  })
+
+  document.querySelector("#git-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget as HTMLFormElement)
+    const result = await send("/studio/api/git-profile", "PUT", { name: data.get("name"), email: data.get("email") })
+    alertLine("#git-error", result.ok ? "" : (result.payload?.error ?? "Could not save the git identity"))
+  })
+
+  document.querySelector("#key-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault()
+    const form = event.currentTarget as HTMLFormElement
+    const data = new FormData(form)
+    const result = await send("/studio/api/api-keys", "POST", { name: data.get("name") })
+    if (!result.ok) {
+      alertLine("#key-error", result.payload?.error ?? "Could not create the key")
+      return
+    }
+    alertLine("#key-error", "")
+    const created = result.payload as { apiKey?: string; apiKeys?: ApiKeyRow[] } | null
+    const secret = document.querySelector("#key-secret")
+    if (secret) {
+      secret.textContent = created?.apiKey ? `Copy this key now. It will not be shown again: ${created.apiKey}` : ""
+      secret.classList.toggle("hidden", !created?.apiKey)
+    }
+    renderKeys(created?.apiKeys ?? [])
+    form.reset()
+  })
 
   document.querySelector("#studio-logout")?.addEventListener("click", async () => {
     await fetch("/studio/api/logout", { method: "POST" })

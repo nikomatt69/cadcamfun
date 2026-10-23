@@ -216,14 +216,14 @@ export const apiGroups: readonly ApiGroupCopy[] = [
     "slug": "authentication",
     "title": "Authentication",
     "summary": "Account sign-in, sign-up, recovery, verification, magic links, session lookup, and passkey registration.",
-    "guide": "/docs/api"
+    "guide": "/docs/guides/accounts"
   },
   {
     "tag": "user",
     "slug": "users",
     "title": "Users",
     "summary": "Profiles, account resources, API keys, token records, passwords, and account removal.",
-    "guide": "/docs/api"
+    "guide": "/docs/guides/accounts"
   },
   {
     "tag": "billing",
