@@ -224,6 +224,50 @@ export const depthForSelection = (e: CadElement, current: number): number => {
     case "sphere": return n(e["radius"]) * 2 || current
     case "hemisphere": return n(e["radius"]) || current
     case "ellipsoid": return n(e["radiusZ"]) * 2 || n(e["depth"]) || current
-    default: return current // 2D shapes keep the depth; the legacy code wrote 0 here for unknown types
+    default: {
+      // Solids without a formula here (parametric, revolve, mesh, ...) are as deep as their bounds; 2D shapes keep the depth.
+      const size = g.elementBounds(e).dimensions.depth
+      return Number.isFinite(size) && size > 0 ? Math.round(size * 1000) / 1000 : current
+    }
+  }
+}
+
+const fixed = (value: number): string => `${Math.round(value * 1000) / 1000} mm`
+
+/** Overall size and position of the selected element (its bounding box), whatever its type. */
+export const boundsRows = (e: CadElement): Array<readonly [string, string]> => {
+  const b = g.elementBounds(e)
+  if (![b.dimensions.width, b.dimensions.height, b.dimensions.depth].every(Number.isFinite)) return []
+  return [
+    ["Size X:", fixed(b.dimensions.width)], ["Size Y:", fixed(b.dimensions.height)], ["Size Z:", fixed(b.dimensions.depth)],
+    ["Centre X:", fixed(b.center.x)], ["Centre Y:", fixed(b.center.y)], ["Top Z:", fixed(b.max.z)], ["Bottom Z:", fixed(b.min.z)]
+  ]
+}
+
+/** Size of the raw piece, and how much of it the machining depth takes. */
+export const stockRows = (stock: Stock, depth: number): Array<readonly [string, string]> => [
+  ["Stock X:", fixed(stock.width)], ["Stock Y:", fixed(stock.height)], ["Stock Z:", fixed(stock.depth)],
+  ["Stock top Z:", fixed(stock.topZ ?? 0)], ["Allowance:", fixed(stock.allowance ?? 0)],
+  ["Stock left after cut:", fixed(stock.depth - depth)]
+]
+
+/**
+ * Raw piece for a selection: the union of the bounding boxes of every selected element, centred on it, top at the
+ * highest face. Flat selections (no height) keep the depth of the current stock.
+ */
+export const stockForSelection = (selection: ReadonlyArray<CadElement>, current: Stock, allowance: number): Stock | undefined => {
+  const boxes = selection.map(g.elementBounds).filter((b) => [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].every(Number.isFinite))
+  if (boxes.length === 0) return undefined
+  const lo = (axis: "x" | "y" | "z"): number => Math.min(...boxes.map((b) => b.min[axis]))
+  const hi = (axis: "x" | "y" | "z"): number => Math.max(...boxes.map((b) => b.max[axis]))
+  const round = (value: number): number => Math.round(value * 1000) / 1000
+  const width = hi("x") - lo("x"), height = hi("y") - lo("y"), depth = hi("z") - lo("z")
+  if (!(width > 0) || !(height > 0)) return undefined
+  const first = selection[0]
+  return {
+    width: round(width), height: round(height), depth: round(depth > 0 ? depth : current.depth),
+    radius: selection.length === 1 ? Number(first?.["radius"]) || 0 : 0,
+    x: round((lo("x") + hi("x")) / 2), y: round((lo("y") + hi("y")) / 2), topZ: round(hi("z")), allowance,
+    ...(current.material ? { material: current.material } : {})
   }
 }

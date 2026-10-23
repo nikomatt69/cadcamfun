@@ -1,7 +1,9 @@
-import { For, Match, Show, Switch, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createEffect, on, type JSX } from "solid-js"
 import { Cpu, Play } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
-import { dimensionRows, elementSummary, type CadElement } from "../../lib/job.ts"
+import { boundsRows, depthForSelection, dimensionRows, elementSummary, stockForSelection, stockRows, type CadElement } from "../../lib/job.ts"
+import { useCADStore } from "../../../cad/store/cadStore.ts"
+import { useCamStore } from "../../store/camStore.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { useGeneratorStore, type GeometryType } from "../../store/generatorStore.ts"
 import { CirclePreview, PolygonPreview, RectanglePreview } from "./GeometryPreview.tsx"
@@ -114,12 +116,36 @@ function PrinterElementSelection(): JSX.Element {
 function SelectedElementPanel(): JSX.Element {
   const gen = useGeneratorStore()
   const job = useJob()
+  const cad = useCADStore()
+  const camStore = useCamStore()
+  // The raw piece follows the selection: every selected part fits inside it, plus the allowance.
+  createEffect(() => {
+    const parts = job.selection()
+    const allowance = camStore.stockAllowance
+    const next = stockForSelection(parts, job.stock(), allowance)
+    if (next === undefined) return
+    const now = cad.workpiece
+    const same = now.configured && now.width === next.width && now.height === next.height && now.depth === next.depth
+      && now.x === next.x && now.y === next.y && now.topZ === next.topZ && now.allowance === next.allowance
+    if (same) return
+    cad.setWorkpiece({
+      ...now, configured: true, width: next.width, height: next.height, depth: next.depth, x: next.x, y: next.y,
+      topZ: next.topZ, allowance, radius: next.radius ?? 0, ...(parts.length === 1 && parts[0]?.["id"] ? { elementId: String(parts[0]["id"]) } : { elementId: undefined })
+    })
+  })
   return (
     <div class={`p-3 ${job.element() ? "bg-green-50" : "bg-yellow-50"} rounded-md`}>
       <CadElementPicker />
       <Show when={job.element()} fallback={<p class="text-sm text-yellow-700">{t("cam.generator.selectCadElementHint")}</p>}>
         {(element) => {
           const rows = () => dimensionRows(element(), gen.settings.depth)
+          const part = () => boundsRows(element())
+          const stock = () => stockRows(job.stock(), gen.settings.depth)
+          // Selecting an element sets the machining depth from its own height.
+          createEffect(on(() => element()["id"], () => {
+            const depth = depthForSelection(element(), gen.settings.depth)
+            if (depth !== gen.settings.depth) gen.updateSettings("depth", depth)
+          }))
           return (
             <div>
               <p class="text-sm text-green-700 font-medium mb-2">
@@ -141,6 +167,20 @@ function SelectedElementPanel(): JSX.Element {
                     </div>
                   </div>
                 </Show>
+              </div>
+              <Show when={part().length > 0}>
+                <div class="mt-2 border-t border-green-200 pt-2" data-testid="part-size">
+                  <p class="text-sm font-medium text-gray-700 mb-1">Part size:</p>
+                  <div class="grid grid-cols-2 gap-2 text-sm">
+                    <For each={part()}>{([label, value]) => <div class="flex justify-between"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>}</For>
+                  </div>
+                </div>
+              </Show>
+              <div class="mt-2 border-t border-green-200 pt-2" data-testid="stock-size">
+                <p class="text-sm font-medium text-gray-700 mb-1">Stock:</p>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                  <For each={stock()}>{([label, value]) => <div class="flex justify-between"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>}</For>
+                </div>
               </div>
               <DepthBox />
               <UseButtons element={element()} />
