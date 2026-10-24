@@ -6,7 +6,7 @@
  * The analysis is the one the sidecar (`/api/cad/exact/analyze`) and the assistant (`cad.exact`) run, `analyzeBrep` of
  * `@cadcamfun/core`, so the panel, the API and the CAM planner agree on holes and on how the part will be machined.
  */
-import { analyzeBrep, brep, elementBrep, type SceneHole, type SceneMachining } from "@cadcamfun/core"
+import { analyzeBrep, brep, elementBrep, sceneHoleEditBody, type SceneHole, type SceneMachining } from "@cadcamfun/core"
 
 export type ExactAnalysis =
   | {
@@ -57,4 +57,25 @@ export const elementStep = (element: Record<string, unknown>, all: ReadonlyArray
   if (placed.brep === undefined) return { reason: placed.reason }
   const name = typeof element["name"] === "string" && element["name"] !== "" ? (element["name"] as string) : String(element["type"] ?? "part")
   return { step: brep.writeStepBreps([{ name, brep: placed.brep }], { author: "CAD/CAM FUN" }) }
+}
+
+export type HoleChange = { readonly kind: "resize"; readonly diameter: number } | { readonly kind: "fill" }
+
+/**
+ * Resize or fill the `hole`-th recognised hole of an element (the order `ExactAnalysis.drilled` lists them in): the same checked
+ * construction as the sidecar's `/api/cad/exact/hole` and the assistant's `cad_edit.hole`. The result is a new solid for the
+ * drawing, never an edit in place; a refusal says why and changes nothing.
+ */
+export const editElementHole = (
+  element: Record<string, unknown>, all: ReadonlyArray<Record<string, unknown>>, hole: number, change: HoleChange
+): { readonly ok: true; readonly element: Record<string, unknown>; readonly volume: number; readonly volumeChange: number } | { readonly ok: false; readonly error: string } => {
+  let built: ReturnType<typeof sceneHoleEditBody>
+  try { built = sceneHoleEditBody(all, String(element["id"] ?? ""), hole, change) } catch (cause) { return { ok: false, error: cause instanceof Error ? cause.message : String(cause) } }
+  if (!built.ok) return built
+  const base = typeof element["name"] === "string" && element["name"] !== "" ? (element["name"] as string) : String(element["type"] ?? "part")
+  const what = change.kind === "fill" ? "filled" : `Ø${Math.round(change.diameter * 1000) / 1000}`
+  return {
+    ok: true, volume: built.report.volume, volumeChange: built.report.volumeChange,
+    element: { type: "brep", name: `${base} hole ${hole + 1} ${what}`, brep: built.brep, x: 0, y: 0, z: 0 }
+  }
 }

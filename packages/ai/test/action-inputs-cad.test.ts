@@ -45,6 +45,8 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.surface": { accept: [{ operation: "patch", patches: [{ data: { degreeU: 1, degreeV: 1, knotsU: [0, 0, 1, 1], knotsV: [0, 0, 1, 1], points: [[[0, 0, 0], [0, 1, 0]], [[1, 0, 0], [1, 1, 0]]] } }] }], refuse: [{ operation: "patch", patches: [] }] },
   "cad_edit.surface": { accept: [{ operation: "patch", patches: [{ data: { degreeU: 1, degreeV: 1, knotsU: [0, 0, 1, 1], knotsV: [0, 0, 1, 1], points: [[[0, 0, 0], [0, 1, 0]], [[1, 0, 0], [1, 1, 0]]] } }] }], refuse: [{ operation: "not-a-surface", patches: [] }] },
   "cad.exchange": { accept: [{ format: "iges" }, { format: "parasolid", ids: ["a"] }], refuse: [{ format: "stl" }, { format: "iges", ids: [] }] },
+  "cad.hole": { accept: [{ id: "a", hole: 0, diameter: 5 }, { id: "a", hole: 2, fill: true }], refuse: [{ id: "a" }, { id: "", hole: 0 }, { id: "a", hole: -1, fill: true }, { id: "a", hole: 0, diameter: 0 }] },
+  "cad_edit.hole": { accept: [{ id: "a", hole: 0, diameter: 5 }], refuse: [{ id: "a", hole: 0, diameter: -1 }] },
   "cad.offset": { accept: [{ id: "a", distance: 2 }], refuse: [{ id: "a", distance: 0 }, { id: "a" }] },
   "cad.motion": { accept: [{ model: { ground: "a", joints: [] }, sweep: { joint: "j", from: 0, to: 10, steps: 2 } }], refuse: [{}, { model: { ground: "a", joints: [] }, sweep: { joint: "j", from: 0, to: 10, steps: 101 } }] },
   "cad_edit.shell": { accept: [{ id: "a", thickness: 2, wallByFace: [{ face: "top", thickness: 1 }] }], refuse: [{ id: "a", thickness: 2, wallByFace: [{ face: "top", thickness: 0 }] }] },

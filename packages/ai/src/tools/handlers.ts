@@ -1,5 +1,5 @@
 import type { SetupCandidate, MachiningPlanInput, ManufactureInput } from "../actions/cam.ts"
-import type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadSetupsInput, CadShellInput, CadOffsetInput, CadMotionInput } from "../actions/cad.ts"
+import type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadSetupsInput, CadShellInput, CadOffsetInput, CadHoleInput, CadMotionInput } from "../actions/cad.ts"
 import type { CadComponentRelationsInput, CadInspectionInput } from "../actions/cad.ts"
 import type { ParametricHandlerInput } from "../actions/parametric.ts"
 export type { ParametricHandlerInput } from "../actions/parametric.ts"
@@ -53,9 +53,11 @@ export interface ToolHandlersShape {
   cadExchange?(projectId: string, input: CadExchangeInput): Promise<unknown>
   cadStoreBodies?(projectId: string, bodies: ReadonlyArray<{ readonly brep: cad.brep.Brep; readonly name: string; readonly kind: "solid" | "surface" }>): Promise<unknown>
   cadOffset?(projectId: string, input: CadOffsetInput): Promise<unknown>
+  cadHole?(projectId: string, input: CadHoleInput): Promise<unknown>
   cadMotion?(projectId: string, input: CadMotionInput): Promise<unknown>
   cadBuildShell?(projectId: string, input: CadShellInput): Promise<unknown>
   cadBuildOffset?(projectId: string, input: CadOffsetInput): Promise<unknown>
+  cadBuildHole?(projectId: string, input: CadHoleInput): Promise<unknown>
   /** The exact smallest gap between two solids, with the closest points. */
   cadDistance?(projectId: string, input: CadDistanceInput): Promise<unknown>
   webSearch?(input: WebSearchInput, signal?: AbortSignal): Promise<unknown>

@@ -153,3 +153,26 @@ export const CadSetupsReport = Schema.Struct({
   skipped
 })
 export type CadSetupsReport = typeof CadSetupsReport.Type
+
+export const CadHoleRequest = Schema.Struct({
+  ...source,
+  id,
+  /** Index in the solid's recognised holes, in the order `analyze` lists them. */
+  hole: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })),
+  /** New drill diameter, mm; exactly one of `diameter` and `fill`. */
+  diameter: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
+  fill: Schema.optionalKey(Schema.Boolean)
+})
+export type CadHoleRequest = typeof CadHoleRequest.Type
+
+/** What the edit would do, on paper: nothing in the drawing changes. A refusal is an `ok: false` answer with its reason. */
+export const CadHoleReport = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true), id: Schema.String, name: Schema.String, hole: int, holes: int,
+    before: Schema.Struct({ diameter: num, depth: num, form: Schema.Literals(["simple", "counterbore", "countersink"]) }),
+    edit: Schema.Union([Schema.Struct({ kind: Schema.Literal("resize"), diameter: num }), Schema.Struct({ kind: Schema.Literal("fill") })]),
+    volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
+  }),
+  Schema.Struct({ ok: Schema.Literal(false), error: Schema.String })
+])
+export type CadHoleReport = typeof CadHoleReport.Type

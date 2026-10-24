@@ -68,6 +68,15 @@ export type CadShellInput = typeof CadShellInput.Type
 export const CadOffsetInput = Schema.Struct({ id: nonEmpty, distance: positive.annotate({ description: "Outward offset distance in mm. Convex corners round. Unsupported geometry returns a reason." }) })
 export type CadOffsetInput = typeof CadOffsetInput.Type
 
+/** Edit one recognised hole of an exact solid: a new drill diameter, or fill it. The hole is its index in the holes `cad` `exact` lists. */
+export const CadHoleInput = Schema.Struct({
+  id: nonEmpty,
+  hole: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })).annotate({ description: "Index in the solid's recognised holes (the order `exact` lists them in)." }),
+  diameter: optional(positive.annotate({ description: "New drill diameter in mm; a counterbore or countersink above keeps its size and must stay wider." })),
+  fill: optional(Schema.Boolean.annotate({ description: "true fills the hole instead." }))
+})
+export type CadHoleInput = typeof CadHoleInput.Type
+
 const xyz = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
 const limits = Schema.Struct({ min: Schema.Finite, max: Schema.Finite })
 export const CadMotionInput = Schema.Struct({
@@ -175,12 +184,14 @@ export const CAD_ACTION_INPUTS = {
   "cad.setups": CadSetupsInput,
   "cad.shell": CadShellInput,
   "cad.offset": CadOffsetInput,
+  "cad.hole": CadHoleInput,
   "cad.motion": CadMotionInput,
   "cad.surface": CadSurfaceInput,
   "cad.exchange": CadExchangeInput,
   "cad_edit.surface": CadSurfaceInput,
   "cad_edit.shell": CadShellInput,
   "cad_edit.offset": CadOffsetInput,
+  "cad_edit.hole": CadHoleInput,
   "cad.distance": CadDistanceInput,
   "cad_edit.add_entities": Schema.Struct({ entities: Schema.Array(CadSketchEntity).check(Schema.isMinLength(1), Schema.isMaxLength(500)) }),
   "cad_edit.modify": Schema.Struct({

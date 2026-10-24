@@ -160,7 +160,7 @@ state.
 | C5 | Shell of a Boolean result, a loft, a partial revolution; per-face thickness | refused | housings built from several features |
 | C6 | Persistent naming (topological naming) | selections by point / box | edits upstream re-pick faces silently or fail |
 | C7 | Surface modelling: patch, trim, stitch, thicken, offset surface | absent | class-A and freeform parts |
-| C8 | Direct editing: offset / delete / replace face on any body | planar push-pull only (exact), curved by mesh | imported STEP editing |
+| C8 | Direct editing: offset / delete / replace face on any body | planar push-pull only (exact), curved by mesh. **Holes (2026-10-24):** resize the drill or fill any recognised hole of an exact body (`brep/hole-edit.ts`: fill with the old wall, cut the new bore; checked against the analytic cylinder volume, drill-point bottoms and bores that break into a counterbore refused). Wired through `sceneHoleEditBody`, `POST /api/cad/exact/hole` (preview), assistant `cad.hole` / `cad_edit.hole` (stores a copy) and the exact model panel. Delete / replace of other faces, fillet-radius change and boss resize stay open | imported STEP editing |
 | C9 | Pattern along a path, pattern of faces | pattern along a path done (mesh + exact + API/AI schema); pattern of faces still absent | chains, ribs on curves |
 | C10 | Sheet metal: flange on an edge, reliefs, corner closures, multi-bend unfold of a 3D part | base flange + hems + flat pattern | real sheet-metal parts |
 | C11 | Assembly joint solver (several joints, motion limits, cam/gear joints), motion study | one rigid `mate` per body | mechanisms (the rack-and-pinion target of the harness goal) |

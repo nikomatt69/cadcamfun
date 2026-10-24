@@ -1,7 +1,7 @@
 import { expect, setDefaultTimeout, test } from "bun:test"
 import type { History } from "./history.ts"
 import { model } from "./script.ts"
-import { analyzeBrep, analyzeScene, assemblyReport, setupsForScene } from "./scene-analysis.ts"
+import { analyzeBrep, analyzeScene, assemblyReport, sceneHoleEdit, sceneHoleEditBody, setupsForScene } from "./scene-analysis.ts"
 import { makeBox } from "./brep/index.ts"
 
 setDefaultTimeout(90_000)
@@ -143,4 +143,24 @@ test("the machining summary counts the islands standing in a pocket, and only th
   expect(withIsland.parts[0]!.machining).toMatchObject({ prismatic: true, pockets: 1, outlines: 1, islands: 1 })
   const plain = analyzeScene([{ id: "b", type: "parametric", name: "B", history: block(20, 6.8, 16), x: 0, y: 0, z: 0, layerId: "default" }])
   expect("islands" in plain.parts[0]!.machining).toBe(false)
+})
+
+test("a recognised hole of a solid of the scene is resized or filled, the other hole untouched, the volume moves by the cylinders", () => {
+  // Two holes drilled from the top of a 60 x 30 x 20 block: Ø6.8 x 16 at x 15 and x 45.
+  const elements = scene()
+  const r = sceneHoleEditBody(elements, "base", 1, { kind: "resize", diameter: 10 })
+  if (!r.ok) throw new Error(r.error)
+  const disc = (d: number, h: number) => Math.PI * (d / 2) ** 2 * h
+  expect(r.report.before.diameter).toBeCloseTo(6.8, 6)
+  expect(r.report.volumeChange).toBeCloseTo(-(disc(10, 16) - disc(6.8, 16)), 4)
+  expect(r.report.volume).toBeCloseTo(60 * 30 * 20 - disc(6.8, 16) - disc(10, 16), 4)
+  expect(r.report.valid).toBe(true)
+  const diameters = analyzeBrep("x", "x", r.brep).holes.map((h) => Math.round(h.diameter * 10) / 10).sort((a, b) => a - b)
+  expect(diameters).toEqual([6.8, 10])
+  const filled = sceneHoleEdit(elements, "base", 0, { kind: "fill" })
+  expect(filled).toMatchObject({ ok: true, valid: true })
+  if (filled.ok) expect(filled.volumeChange).toBeCloseTo(disc(6.8, 16), 4)
+  expect(sceneHoleEdit(elements, "base", 5, { kind: "fill" })).toMatchObject({ ok: false, error: expect.stringContaining("2 recognised holes") })
+  expect(sceneHoleEdit(elements, "nope", 0, { kind: "fill" })).toMatchObject({ ok: false })
+  expect(sceneHoleEdit(elements, "note", 0, { kind: "fill" })).toMatchObject({ ok: false })
 })

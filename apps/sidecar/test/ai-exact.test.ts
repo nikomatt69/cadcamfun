@@ -100,6 +100,31 @@ test("kernel actions preview without mutation and store checked copies only with
 })
 
 
+test("a recognised hole is previewed read-only and stored as a checked copy, with the analytic volume", async () => {
+  const project = (await app.call("/api/projects", { method: "POST", json: { name: "Hole edit" } })).body.id
+  await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Plate", data: { elements: [plate] } } })
+  const issue = async (mode: "read" | "write") => (await app.call("/api/ai/bridge/tokens", { method: "POST", json: { name: mode, projectId: project, mode } })).body.token as string
+  const read = await issue("read"), write = await issue("write")
+  const invoke = (token: string, tool: string, input: Record<string, unknown>) => app.call("/api/ai/actions/invoke", { method: "POST", auth: false, headers: { authorization: `Bearer ${token}` }, json: { projectId: project, tool, input } })
+  // The mounting plate has four Ø5.5 holes counterbored to Ø10 x 5.7; the drill grows to Ø7 over its 6.3 mm below the counterbore.
+  const preview = await invoke(read, "cad", { action: "hole", id: "plate", hole: 0, diameter: 7 })
+  expect(preview.status).toBe(200)
+  expect(preview.body.result).toMatchObject({ ok: true, valid: true, hole: 0, holes: 4, before: { form: "counterbore" } })
+  const disc = (d: number, h: number) => Math.PI * (d / 2) ** 2 * h
+  expect(preview.body.result.volumeChange).toBeCloseTo(-(disc(7, 6.3) - disc(5.5, 6.3)), 3)
+  expect((await invoke(read, "cad", { action: "hole", id: "plate", hole: 0 })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("exactly one") })
+  expect((await invoke(read, "cad", { action: "hole", id: "plate", hole: 9, fill: true })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("4 recognised holes") })
+  expect((await invoke(read, "cad_edit", { action: "hole", id: "plate", hole: 0, diameter: 7 })).status).toBe(400)
+  const stored = await invoke(write, "cad_edit", { action: "hole", id: "plate", hole: 0, fill: true })
+  expect(stored.body.result).toMatchObject({ ok: true })
+  const exact = await invoke(read, "cad", { action: "exact", ids: [stored.body.result.ids[0], "plate"] })
+  const parts = exact.body.result.parts as Array<{ id: string; volume: number; holesTotal: number }>
+  const copy = parts.find((p) => p.id === stored.body.result.ids[0])!, source = parts.find((p) => p.id === "plate")!
+  expect(copy.holesTotal).toBe(3)
+  expect(source.holesTotal).toBe(4)
+  expect(copy.volume - source.volume).toBeCloseTo(disc(5.5, 6.3) + disc(10, 5.7), 3)
+})
+
 test("the AI stores open NURBS surfaces separately from solids and exchanges IGES without losing topology", async () => {
   const projectId = (await app.call("/api/projects", { method: "POST", json: { name: "Surface and exchange" } })).body.id
   const token = (await app.call("/api/ai/bridge/tokens", { method: "POST", json: { name: "surfaces", projectId, mode: "write" } })).body.token as string

@@ -8,6 +8,7 @@
 import { brepFeatures, type ExactFeatures } from "../cam/brep-part.ts"
 import { planSetups, type SetupPlan, type SetupPlanOptions } from "../cam/setup-plan.ts"
 import { healBrep, massProperties, minimumDistance, recognizeHoles, offsetBrep, shellBrep, validateBrep, type Brep } from "./brep/index.ts"
+import { editHole, type HoleEdit } from "./brep/hole-edit.ts"
 import { brepBox } from "./history-brep.ts"
 import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
 import type { BomRow, InferredJoint } from "./assembly-analysis.ts"
@@ -248,6 +249,45 @@ export const sceneShellBody = (elements: ReadonlyArray<Element>, id: string, wal
     volume: massProperties(r.brep).volume, cavityVolume: massProperties(r.cavity).volume, originalVolume: massProperties(part.brep).volume,
     faces: r.brep.faces.length, shells: r.brep.shells.length, pieces: r.pieces, valid: validateBrep(r.brep).valid
   } }
+}
+
+export type SceneHoleEdit =
+  | {
+    readonly ok: true; readonly id: string; readonly name: string; readonly hole: number; readonly holes: number
+    readonly before: { readonly diameter: number; readonly depth: number; readonly form: "simple" | "counterbore" | "countersink" }
+    readonly edit: HoleEdit; readonly volume: number; readonly originalVolume: number; readonly volumeChange: number; readonly faces: number; readonly valid: boolean
+  }
+  | { readonly ok: false; readonly error: string }
+
+/**
+ * Edits one recognised hole of a solid of the drawing (`brep/hole-edit.ts`): the hole is the `hole`-th of `recognizeHoles`, the
+ * same order `analyzeScene` lists them in. The same checked construction serves the read preview and the governed write action.
+ */
+export const sceneHoleEditBody = (
+  elements: ReadonlyArray<Element>, id: string, hole: number, edit: HoleEdit
+): { readonly ok: true; readonly brep: Brep; readonly report: Extract<SceneHoleEdit, { ok: true }> } | { readonly ok: false; readonly error: string } => {
+  const scene = sceneParts(elements)
+  const part = scene.parts.find((p) => p.id === id)
+  if (part === undefined) {
+    const skipped = scene.skipped.find((s) => s.id === id)
+    return { ok: false, error: skipped !== undefined ? `'${id}' has no exact model: ${skipped.reason}` : `no solid '${id}' in the drawing` }
+  }
+  const holes = recognizeHoles(part.brep)
+  const target = holes[hole]
+  if (target === undefined) return { ok: false, error: holes.length === 0 ? `'${id}' has no recognised hole` : `'${id}' has ${holes.length} recognised holes (0..${holes.length - 1}), not a hole ${hole}` }
+  const r = editHole(part.brep, target, edit)
+  if (typeof r === "string") return { ok: false, error: r }
+  const originalVolume = massProperties(part.brep).volume
+  return { ok: true, brep: r.brep, report: {
+    ok: true, id, name: part.name, hole, holes: holes.length,
+    before: { diameter: target.diameter, depth: target.depth, form: target.form }, edit,
+    volume: originalVolume + r.volumeChange, originalVolume, volumeChange: r.volumeChange, faces: r.brep.faces.length, valid: validateBrep(r.brep).valid
+  } }
+}
+
+export const sceneHoleEdit = (elements: ReadonlyArray<Element>, id: string, hole: number, edit: HoleEdit): SceneHoleEdit => {
+  const built = sceneHoleEditBody(elements, id, hole, edit)
+  return built.ok ? built.report : built
 }
 
 export type SceneDistance =

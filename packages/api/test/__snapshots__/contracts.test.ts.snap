@@ -16678,6 +16678,263 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/cad/exact/hole": {
+      "post": {
+        "operationId": "cadExact.hole",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "diameter": {
+                    "exclusiveMinimum": 0,
+                    "type": "number",
+                  },
+                  "drawingId": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "elements": {
+                    "items": {
+                      "type": "object",
+                    },
+                    "maxItems": 2000,
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                  "fill": {
+                    "type": "boolean",
+                  },
+                  "hole": {
+                    "maximum": 9999,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "id": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "id",
+                  "hole",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "before": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "depth": {
+                              "type": "number",
+                            },
+                            "diameter": {
+                              "type": "number",
+                            },
+                            "form": {
+                              "enum": [
+                                "simple",
+                                "counterbore",
+                                "countersink",
+                              ],
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "diameter",
+                            "depth",
+                            "form",
+                          ],
+                          "type": "object",
+                        },
+                        "edit": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "diameter": {
+                                  "type": "number",
+                                },
+                                "kind": {
+                                  "enum": [
+                                    "resize",
+                                  ],
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "kind",
+                                "diameter",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "fill",
+                                  ],
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "kind",
+                              ],
+                              "type": "object",
+                            },
+                          ],
+                        },
+                        "faces": {
+                          "type": "integer",
+                        },
+                        "hole": {
+                          "type": "integer",
+                        },
+                        "holes": {
+                          "type": "integer",
+                        },
+                        "id": {
+                          "type": "string",
+                        },
+                        "name": {
+                          "type": "string",
+                        },
+                        "ok": {
+                          "enum": [
+                            true,
+                          ],
+                          "type": "boolean",
+                        },
+                        "originalVolume": {
+                          "type": "number",
+                        },
+                        "valid": {
+                          "type": "boolean",
+                        },
+                        "volume": {
+                          "type": "number",
+                        },
+                        "volumeChange": {
+                          "type": "number",
+                        },
+                      },
+                      "required": [
+                        "ok",
+                        "id",
+                        "name",
+                        "hole",
+                        "holes",
+                        "before",
+                        "edit",
+                        "volume",
+                        "originalVolume",
+                        "volumeChange",
+                        "faces",
+                        "valid",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                        },
+                        "ok": {
+                          "enum": [
+                            false,
+                          ],
+                          "type": "boolean",
+                        },
+                      },
+                      "required": [
+                        "ok",
+                        "error",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cadExact",
+        ],
+      },
+    },
     "/api/cad/exact/setups": {
       "post": {
         "operationId": "cadExact.setups",

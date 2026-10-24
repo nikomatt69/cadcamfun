@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
 import { buildRecipe } from "@cadcamfun/core"
-import { CadAssemblyReport, CadExactAnalysis, CadExactStep, CadSetupsReport } from "@cadcamfun/api"
+import { CadAssemblyReport, CadExactAnalysis, CadExactStep, CadHoleReport, CadSetupsReport } from "@cadcamfun/api"
 import { Schema } from "effect"
 import { makeApp } from "./helpers.ts"
 
@@ -15,7 +15,7 @@ const cube = (id: string, x: number) => ({ id, type: "cube", name: id, x, y: 0, 
 const post = (path: string, json: unknown, auth = true) => app.call(`/api/cad/exact/${path}`, { method: "POST", json, auth })
 
 test("the exact kernel routes are authenticated and need a source", async () => {
-  for (const path of ["analyze", "step", "assembly", "setups"]) {
+  for (const path of ["analyze", "step", "assembly", "setups", "hole"]) {
     expect((await post(path, { elements: [plate] }, false)).status).toBe(401)
     expect((await post(path, {})).status).toBe(400)
     expect((await post(path, { elements: [] })).status).toBe(400)
@@ -101,4 +101,17 @@ test("setups plan the orientations a part needs: a top-drilled plate one, a side
   expect(only.parts[0]!.plan.uncovered.length).toBeGreaterThan(0)
   expect(only.parts[0]!.plan.indexed).toHaveLength(1)
   expect((await post("setups", { elements: [sideHole], allowed: ["+W"] })).status).toBe(400)
+})
+
+test("hole previews the resize or fill of one recognised hole, exactly one change per request", async () => {
+  const resize = Schema.decodeUnknownSync(CadHoleReport)((await post("hole", { elements: [plate], id: "plate", hole: 1, diameter: 7 })).body)
+  expect(resize).toMatchObject({ ok: true, valid: true, hole: 1, holes: 4, edit: { kind: "resize", diameter: 7 } })
+  if (!resize.ok) throw new Error(resize.error)
+  const disc = (d: number, h: number) => Math.PI * (d / 2) ** 2 * h
+  expect(resize.volumeChange).toBeCloseTo(-(disc(7, 6.3) - disc(5.5, 6.3)), 3)
+  const wide = Schema.decodeUnknownSync(CadHoleReport)((await post("hole", { elements: [plate], id: "plate", hole: 0, diameter: 10 })).body)
+  expect(wide).toMatchObject({ ok: false, error: expect.stringContaining("counterbore") })
+  expect((await post("hole", { elements: [plate], id: "plate", hole: 0 })).status).toBe(400)
+  expect((await post("hole", { elements: [plate], id: "plate", hole: 0, diameter: 7, fill: true })).status).toBe(400)
+  expect((await post("hole", { elements: [plate], id: "plate", hole: 0, diameter: -3 })).status).toBe(400)
 })

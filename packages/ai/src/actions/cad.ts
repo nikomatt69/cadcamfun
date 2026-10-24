@@ -9,7 +9,7 @@ import { Schema } from "effect"
 import type { FilePart } from "../attachments.ts"
 import { ToolMediaResult } from "../tools/define.ts"
 import { defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
-import type { CadInspectionInput as CadInspectionInputWire, VisionInput } from "@cadcamfun/api"
+import type { CadHoleInput, CadInspectionInput as CadInspectionInputWire, VisionInput } from "@cadcamfun/api"
 import {
   runParametricDfm, runParametricDrawing, runParametricExact, runParametricFastener, runParametricFromElement, runParametricInspect, runParametricRecipe, runParametricTest, runParametricValidate
 } from "./parametric.ts"
@@ -44,7 +44,7 @@ const withDefaults = (value: Record<string, unknown>): Record<string, unknown> =
   }
 }
 
-export type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadSetupsInput, CadShellInput, CadOffsetInput, CadMotionInput } from "@cadcamfun/api"
+export type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadSetupsInput, CadShellInput, CadOffsetInput, CadHoleInput, CadMotionInput } from "@cadcamfun/api"
 
 const inspect = (action: string) => (input: unknown, context: ActionContext) =>
   context.handlers.cadInspect === undefined
@@ -70,6 +70,10 @@ export const vision = (mode: "cad" | "cam", filename: string, sheetName = filena
   }
   return new ToolMediaResult(result.evidence, files)
 }
+
+/** A hole edit names exactly one change: a new diameter, or fill. */
+export const holeInputProblem = (input: CadHoleInput): string | undefined =>
+  (input.diameter !== undefined) === (input.fill === true) ? "Give exactly one of diameter (resize the drill) or fill: true." : undefined
 
 export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({
@@ -179,6 +183,14 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     parameters: INPUTS["cad.shell"],
     run: (input, { handlers, projectId }) =>
       handlers.cadShell === undefined ? { ok: false, error: "Shell analysis is unavailable in this host." } : handlers.cadShell(projectId, input)
+  }),
+  defineWireAction({
+    id: "cad.hole", kind: "read", parameters: INPUTS["cad.hole"],
+    run: (input, { handlers, projectId }) => {
+      if (handlers.cadHole === undefined) return { ok: false, error: "Hole editing is unavailable in this host." }
+      const bad = holeInputProblem(input)
+      return bad !== undefined ? { ok: false, error: bad } : handlers.cadHole(projectId, input)
+    }
   }),
   defineWireAction({
     id: "cad.offset", kind: "read", parameters: INPUTS["cad.offset"],

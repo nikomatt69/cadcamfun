@@ -300,6 +300,10 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.shell": read(shell),
   "cad.surface": read(Schema.Struct({ ok: Schema.Literal(true), kind: Schema.Literals(["surface", "solid"]), valid: Schema.Boolean, faces: int, boundaryEdges: int })),
   "cad.exchange": read(Schema.Struct({ ok: Schema.Literal(true), format: Schema.Literals(["step", "iges"]), content: str, parts: int, warnings: strings })),
+  "cad.hole": read(Schema.Union([
+    Schema.Struct({ ok: Schema.Literal(true), id: str, name: str, hole: int, holes: int, before: record, edit: record, volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean }),
+    Schema.Struct({ ok: Schema.Literal(false), error: str })
+  ])),
   "cad.offset": read(Schema.Struct({ ok: Schema.Literal(true), id: str, name: str, distance: num, originalVolume: num, volume: num, faces: int, valid: Schema.Boolean })),
   "cad.motion": read(Schema.Struct({ ok: Schema.Literal(true), frames: Schema.Array(record), firstClash: Schema.optionalKey(record), firstViolation: Schema.optionalKey(record), firstContact: Schema.optionalKey(record), firstContactViolation: Schema.optionalKey(record) })),
   "cad.distance": read(distance),
@@ -310,6 +314,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad_edit.surface": write(["drawing"], added),
   "cad_edit.shell": write(["drawing"], added),
   "cad_edit.offset": write(["drawing"], added),
+  "cad_edit.hole": write(["drawing"], added),
   "cad_edit.add": write(["drawing"], added, "skipped"),
   "cad_edit.add_entities": write(["drawing"], added),
   "cad_edit.modify": write(["drawing"], modified),

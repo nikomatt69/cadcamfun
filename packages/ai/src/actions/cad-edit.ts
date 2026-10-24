@@ -14,6 +14,7 @@ import { ELEMENT_TYPES, MAX_ELEMENTS_PER_CALL, normalizeElement } from "../eleme
 import { attachmentNames, getAttachment } from "../attachments.ts"
 import { validated } from "../tools/define.ts"
 import { defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
+import { holeInputProblem } from "./cad.ts"
 import {
   runParametricConvert, runParametricCreate, runParametricRecipeCreate, runParametricUpdate
 } from "./parametric.ts"
@@ -209,6 +210,12 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
     } }),
   defineWireAction({ id: "cad_edit.shell", kind: "write", parameters: INPUTS["cad_edit.shell"],
     run: (input, { handlers, projectId }) => handlers.cadBuildShell === undefined ? { ok: false, error: "Shell construction is unavailable in this host." } : handlers.cadBuildShell(projectId, input) }),
+  defineWireAction({ id: "cad_edit.hole", kind: "write", parameters: INPUTS["cad_edit.hole"],
+    run: (input, { handlers, projectId }) => {
+      if (handlers.cadBuildHole === undefined) return { ok: false, error: "Hole editing is unavailable in this host." }
+      const bad = holeInputProblem(input)
+      return bad !== undefined ? { ok: false, error: bad } : handlers.cadBuildHole(projectId, input)
+    } }),
   defineWireAction({ id: "cad_edit.offset", kind: "write", parameters: INPUTS["cad_edit.offset"],
     run: (input, { handlers, projectId }) => handlers.cadBuildOffset === undefined ? { ok: false, error: "Offset construction is unavailable in this host." } : handlers.cadBuildOffset(projectId, input) }),
   defineWireAction({ id: "cad_edit.add", kind: "write", replaces: "cad_add_elements", parameters: addElementsParameters, run: runAddElements }),

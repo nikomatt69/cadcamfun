@@ -1681,6 +1681,15 @@ export type CadExactSetupsPayload = {
   readonly allowed?: ReadonlyArray<"+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y">
 }
 
+export type CadExactHolePayload = {
+  readonly elements?: ReadonlyArray<{ readonly [x: string]: JsonValue }>
+  readonly drawingId?: string
+  readonly id: string
+  readonly hole: number
+  readonly diameter?: number
+  readonly fill?: boolean
+}
+
 export type LibraryCreatePayload = {
   readonly name?: string | undefined
   readonly description?: string | null | undefined
@@ -6681,6 +6690,32 @@ export type CadExactSetupsOutput = {
   }>
   skipped: Array<{ id: string; name: string; reason: string }>
 }
+
+export type CadExactHoleInput = {
+  readonly elements?: CadExactHolePayload["elements"]
+  readonly drawingId?: CadExactHolePayload["drawingId"]
+  readonly id: CadExactHolePayload["id"]
+  readonly hole: CadExactHolePayload["hole"]
+  readonly diameter?: CadExactHolePayload["diameter"]
+  readonly fill?: CadExactHolePayload["fill"]
+}
+
+export type CadExactHoleOutput =
+  | {
+      ok: true
+      id: string
+      name: string
+      hole: number
+      holes: number
+      before: { diameter: number; depth: number; form: "simple" | "counterbore" | "countersink" }
+      edit: { kind: "resize"; diameter: number } | { kind: "fill" }
+      volume: number
+      originalVolume: number
+      volumeChange: number
+      faces: number
+      valid: boolean
+    }
+  | { ok: false; error: string }
 
 export type LibraryListInput = {
   readonly category?: {
