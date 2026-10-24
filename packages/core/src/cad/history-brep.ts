@@ -10,9 +10,10 @@
  * planar face, mates (the rigid motion from the exact faces), the analytic catalogue primitives (cube, cylinder, cone,
  * sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split and combine,
  * ribs, sheets, text and coils, and the union / subtract / intersect of every tool. A body that went through anything else
- * (loft, a modelled thread, drafts and push/pulls of curved faces, blends of non-coaxial curved edges, a non-uniform scale,
- * another catalogue element) keeps its mesh and says why it has no exact model; nothing is approximated behind the
- * caller's back.
+ * (a modelled thread, drafts and push/pulls of curved faces, a non-uniform scale, the catalogue elements ellipsoid / gear /
+ * capsule) keeps its mesh and says why it has no exact model; nothing is approximated behind the caller's back. A blend of a
+ * non-coaxial curved edge is refused by the rebuild with a message. `history-exactness.test.ts` records, for every feature
+ * kind and option, whether the cell is exact or mesh-only (spec 40 U0) and fails when one of them changes.
  */
 import { dimensionValue, type Dimension } from "./expr.ts"
 import { polygonArea, sketchProfiles, type Sketch } from "./sketch.ts"

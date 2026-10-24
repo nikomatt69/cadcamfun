@@ -17,7 +17,7 @@
  * Seams (an edge used twice by the same face, e.g. the generator line of a full cylinder) and poles (a loop that
  * passes through a degenerate point of the surface, e.g. a cone apex) need no special entities.
  */
-import { applyPoint, compose, IDENTITY, MODEL_TOL, near3, type Transform, type Vec3 } from "./math.ts"
+import { applyPoint, compose, IDENTITY, MODEL_TOL, near3, scaleOf, type Transform, type Vec3 } from "./math.ts"
 import { curvePoint, transformCurve, transformSurface, type Curve2, type Curve3, type Surface } from "./geom.ts"
 
 export interface Vertex {
@@ -164,8 +164,14 @@ const det = (m: Transform["m"]): number =>
  */
 export const transformBrep = (b: Brep, tr: Transform): Brep => {
   const mirror = det(tr.m) < 0
-  const vertices = b.vertices.map((v) => ({ point: applyPoint(tr, v.point), tol: v.tol }))
-  const edges = b.edges.map((e) => ({ ...e, curve: transformCurve(e.curve, tr) }))
+  // A scaling carries lengths with it: a line is parametrised by arc length (unit direction), so its bounds scale, and so do the tolerances.
+  const k = scaleOf(tr)
+  const scaled = Math.abs(k - 1) > 1e-12
+  const vertices = b.vertices.map((v) => ({ point: applyPoint(tr, v.point), tol: scaled ? v.tol * k : v.tol }))
+  const edges = b.edges.map((e) => {
+    const curve = transformCurve(e.curve, tr)
+    return scaled ? { ...e, curve, t0: e.curve.kind === "line" ? e.t0 * k : e.t0, t1: e.curve.kind === "line" ? e.t1 * k : e.t1, tol: e.tol * k } : { ...e, curve }
+  })
   const faces = b.faces.map((f): Face => {
     const surface = transformSurface(f.surface, tr)
     const loops = mirror
