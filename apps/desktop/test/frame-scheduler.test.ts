@@ -41,3 +41,17 @@ test("hidden and disposed views cancel work and cannot be revived after disposal
   h.scheduler.invalidate(); h.scheduler.dispose(); h.scheduler.suspend(false); h.scheduler.invalidate()
   expect(h.callbacks.size).toBe(0)
 })
+
+test("the browser's own requestAnimationFrame can be passed bare: it is never called as a method of the scheduler", () => {
+  // The window's functions throw "Illegal invocation" with any other `this`; the resource previews had no frame because of it.
+  let drawn = 0
+  const strict = function(this: unknown, callback: FrameRequestCallback): number {
+    if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation")
+    queueMicrotask(() => callback(0)); return 1
+  }
+  const scheduler = new FrameScheduler(() => { drawn++; return false }, strict, function(this: unknown) { if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation") })
+  scheduler.invalidate()
+  scheduler.suspend(true)
+  scheduler.dispose()
+  expect(drawn).toBe(0)
+})

@@ -39,7 +39,7 @@ export function ResourceGeometryPreview(props: {
     camera.position.set(0, 0, 5)
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
-    const frames = new FrameScheduler(() => { const moving = controls.update(); renderer.render(scene, camera); return moving }, requestAnimationFrame, cancelAnimationFrame)
+    const frames = new FrameScheduler(() => { const moving = controls.update(); renderer.render(scene, camera); return moving }, (callback) => requestAnimationFrame(callback), (id) => cancelAnimationFrame(id))
     controls.addEventListener("change", frames.invalidate)
     fit = () => {
       const center = fitCameraToObjects(camera, controls.target, content.children)

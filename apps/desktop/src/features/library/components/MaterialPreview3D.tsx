@@ -58,7 +58,7 @@ export function MaterialPreview3D(props: { readonly properties: Readonly<Record<
     controls.target.set(0, 0, 0.8)
     controls.enableDamping = true
     controls.update()
-    const frames = new FrameScheduler(() => { const moving = controls.update(); renderer.render(scene, camera); return moving }, requestAnimationFrame, cancelAnimationFrame)
+    const frames = new FrameScheduler(() => { const moving = controls.update(); renderer.render(scene, camera); return moving }, (callback) => requestAnimationFrame(callback), (id) => cancelAnimationFrame(id))
     controls.addEventListener("change", frames.invalidate)
     apply = () => {
       const sample = materialSample(props.properties)
