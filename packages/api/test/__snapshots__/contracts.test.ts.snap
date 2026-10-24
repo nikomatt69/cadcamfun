@@ -16793,6 +16793,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "minLength": 1,
                     "type": "string",
                   },
+                  "taper": {
+                    "maximum": 30,
+                    "minimum": 0,
+                    "type": "number",
+                  },
                 },
                 "required": [
                   "id",
@@ -16850,6 +16855,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "resize",
                                   ],
                                   "type": "string",
+                                },
+                                "taper": {
+                                  "type": "number",
                                 },
                               },
                               "required": [
@@ -16969,6 +16977,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "type": "boolean",
                         },
                         "originalVolume": {
+                          "type": "number",
+                        },
+                        "taper": {
                           "type": "number",
                         },
                         "valid": {

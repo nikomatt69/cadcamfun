@@ -2909,6 +2909,7 @@ type Endpoint28_4Input = {
   readonly hole?: Endpoint28_4Request["payload"]["hole"]
   readonly boss?: Endpoint28_4Request["payload"]["boss"]
   readonly diameter?: Endpoint28_4Request["payload"]["diameter"]
+  readonly taper?: Endpoint28_4Request["payload"]["taper"]
   readonly fill?: Endpoint28_4Request["payload"]["fill"]
 }
 const Endpoint28_4 = (raw: RawClient["cadExact"]) => (input: Endpoint28_4Input) =>
@@ -2920,6 +2921,7 @@ const Endpoint28_4 = (raw: RawClient["cadExact"]) => (input: Endpoint28_4Input) 
       hole: input["hole"],
       boss: input["boss"],
       diameter: input["diameter"],
+      taper: input["taper"],
       fill: input["fill"],
     },
   }).pipe(Effect.mapError(mapClientError))

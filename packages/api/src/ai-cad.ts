@@ -74,6 +74,7 @@ export const CadHoleInput = Schema.Struct({
   hole: optional(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })).annotate({ description: "Index in the solid's recognised holes (the order `exact` lists them in)." })),
   boss: optional(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })).annotate({ description: "Index in the solid's recognised bosses or shaft sections (`exact` lists them); takes diameter only." })),
   diameter: optional(positive.annotate({ description: "New diameter in mm: the drill of a hole (a counterbore or countersink above keeps its size and must stay wider) or a boss." })),
+  taper: optional(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 30 })).annotate({ description: "Draft angle of the new wall in degrees (0-30): the bore narrows towards its bottom, a boss towards its free end. Needs diameter." })),
   fill: optional(Schema.Boolean.annotate({ description: "true fills the hole instead." }))
 })
 export type CadHoleInput = typeof CadHoleInput.Type

@@ -169,6 +169,8 @@ export const CadHoleRequest = Schema.Struct({
   boss: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 }))),
   /** New diameter, mm: of the drill of a hole (exactly one of `diameter` and `fill`) or of a boss. */
   diameter: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
+  /** Draft angle of the new bore or boss wall, degrees (0-30): a cone narrowing towards the bottom of a hole or the free end of a boss. Needs `diameter`. */
+  taper: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 30 }))),
   fill: Schema.optionalKey(Schema.Boolean)
 })
 export type CadHoleRequest = typeof CadHoleRequest.Type
@@ -178,12 +180,12 @@ export const CadHoleReport = Schema.Union([
   Schema.Struct({
     ok: Schema.Literal(true), id: Schema.String, name: Schema.String, hole: int, holes: int,
     before: Schema.Struct({ diameter: num, depth: num, form: Schema.Literals(["simple", "counterbore", "countersink"]) }),
-    edit: Schema.Union([Schema.Struct({ kind: Schema.Literal("resize"), diameter: num }), Schema.Struct({ kind: Schema.Literal("fill") })]),
+    edit: Schema.Union([Schema.Struct({ kind: Schema.Literal("resize"), diameter: num, taper: Schema.optionalKey(num) }), Schema.Struct({ kind: Schema.Literal("fill") })]),
     volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
   }),
   Schema.Struct({
     ok: Schema.Literal(true), id: Schema.String, name: Schema.String, boss: int, bosses: int,
-    before: Schema.Struct({ diameter: num, length: num }), diameter: num,
+    before: Schema.Struct({ diameter: num, length: num }), diameter: num, taper: Schema.optionalKey(num),
     volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
   }),
   Schema.Struct({ ok: Schema.Literal(false), error: Schema.String })

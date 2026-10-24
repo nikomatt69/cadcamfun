@@ -60378,6 +60378,9 @@
                                 },
                                 "diameter": {
                                   "type": "number"
+                                },
+                                "taper": {
+                                  "type": "number"
                                 }
                               },
                               "required": [
@@ -60473,6 +60476,9 @@
                           "additionalProperties": false
                         },
                         "diameter": {
+                          "type": "number"
+                        },
+                        "taper": {
                           "type": "number"
                         },
                         "volume": {
@@ -60617,6 +60623,11 @@
                   "diameter": {
                     "type": "number",
                     "exclusiveMinimum": 0
+                  },
+                  "taper": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 30
                   },
                   "fill": {
                     "type": "boolean"

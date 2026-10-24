@@ -77,3 +77,37 @@ describe("editing a recognised boss", () => {
     expect(recognizeBosses(holed)).toHaveLength(0)
   })
 })
+
+describe("drafting a boss", () => {
+  const frustum = (r1: number, r2: number, h: number) => (Math.PI * h * (r1 * r1 + r1 * r2 + r2 * r2)) / 3
+  const tan = (deg: number) => Math.tan((deg * Math.PI) / 180)
+
+  test("a boss standing on the plate narrows towards its free end by the draft angle", () => {
+    const b = bossed()
+    const r = ok(resizeBoss(b, only(b), 10, 5))
+    expect(massProperties(r.brep).volume).toBeCloseTo(PLATE + frustum(5, 5 - 12 * tan(5), 12), 4)
+    expect(validateBrep(r.brep).valid).toBe(true)
+    expect(r.brep.faces.some((f) => f.surface.kind === "cone")).toBe(true)
+  })
+
+  test("a wider base with a draft grows where it is wider and shrinks where it is narrower", () => {
+    const b = bossed()
+    const r = ok(resizeBoss(b, only(b), 14, 3))
+    expect(massProperties(r.brep).volume).toBeCloseTo(PLATE + frustum(7, 7 - 12 * tan(3), 12), 4)
+  })
+
+  test("a boss hanging under the plate narrows towards its free end below", () => {
+    const hanging = union(makeBox(40, 30, 10), makeCylinder(5, 12, frame({ x: 20, y: 15, z: -12 }, Z)))
+    const boss = only(hanging)
+    expect(boss.free).toBe("near")
+    const r = ok(resizeBoss(hanging, boss, 10, 4))
+    expect(massProperties(r.brep).volume).toBeCloseTo(PLATE + frustum(5, 5 - 12 * tan(4), 12), 4)
+  })
+
+  test("a draft that closes the boss is refused", () => {
+    const b = bossed()
+    expect(resizeBoss(b, only(b), 4, 25)).toMatch(/closes the boss/)
+    expect(resizeBoss(b, only(b), 10, 40)).toMatch(/between 0 and 30/)
+  })
+})
+

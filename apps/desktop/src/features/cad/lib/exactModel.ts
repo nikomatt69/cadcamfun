@@ -61,7 +61,7 @@ export const elementStep = (element: Record<string, unknown>, all: ReadonlyArray
   return { step: brep.writeStepBreps([{ name, brep: placed.brep }], { author: "CAD/CAM FUN" }) }
 }
 
-export type HoleChange = { readonly kind: "resize"; readonly diameter: number } | { readonly kind: "fill" }
+export type HoleChange = { readonly kind: "resize"; readonly diameter: number; readonly taper?: number } | { readonly kind: "fill" }
 
 /**
  * Resize or fill the `hole`-th recognised hole of an element (the order `ExactAnalysis.drilled` lists them in): the same checked
@@ -75,7 +75,7 @@ export const editElementHole = (
   try { built = sceneHoleEditBody(all, String(element["id"] ?? ""), hole, change) } catch (cause) { return { ok: false, error: cause instanceof Error ? cause.message : String(cause) } }
   if (!built.ok) return built
   const base = typeof element["name"] === "string" && element["name"] !== "" ? (element["name"] as string) : String(element["type"] ?? "part")
-  const what = change.kind === "fill" ? "filled" : `Ø${Math.round(change.diameter * 1000) / 1000}`
+  const what = change.kind === "fill" ? "filled" : `Ø${Math.round(change.diameter * 1000) / 1000}${change.taper ? ` ${change.taper}°` : ""}`
   return {
     ok: true, volume: built.report.volume, volumeChange: built.report.volumeChange,
     element: { type: "brep", name: `${base} hole ${hole + 1} ${what}`, brep: built.brep, x: 0, y: 0, z: 0 }
@@ -84,14 +84,14 @@ export const editElementHole = (
 
 /** Resize the `boss`-th recognised boss of an element (the order `ExactAnalysis.bosses` lists them in) into a new solid. */
 export const editElementBoss = (
-  element: Record<string, unknown>, all: ReadonlyArray<Record<string, unknown>>, boss: number, diameter: number
+  element: Record<string, unknown>, all: ReadonlyArray<Record<string, unknown>>, boss: number, diameter: number, taper = 0
 ): { readonly ok: true; readonly element: Record<string, unknown>; readonly volume: number; readonly volumeChange: number } | { readonly ok: false; readonly error: string } => {
   let built: ReturnType<typeof sceneBossEditBody>
-  try { built = sceneBossEditBody(all, String(element["id"] ?? ""), boss, diameter) } catch (cause) { return { ok: false, error: cause instanceof Error ? cause.message : String(cause) } }
+  try { built = sceneBossEditBody(all, String(element["id"] ?? ""), boss, diameter, taper) } catch (cause) { return { ok: false, error: cause instanceof Error ? cause.message : String(cause) } }
   if (!built.ok) return built
   const base = typeof element["name"] === "string" && element["name"] !== "" ? (element["name"] as string) : String(element["type"] ?? "part")
   return {
     ok: true, volume: built.report.volume, volumeChange: built.report.volumeChange,
-    element: { type: "brep", name: `${base} boss ${boss + 1} Ø${Math.round(diameter * 1000) / 1000}`, brep: built.brep, x: 0, y: 0, z: 0 }
+    element: { type: "brep", name: `${base} boss ${boss + 1} Ø${Math.round(diameter * 1000) / 1000}${taper ? ` ${taper}°` : ""}`, brep: built.brep, x: 0, y: 0, z: 0 }
   }
 }

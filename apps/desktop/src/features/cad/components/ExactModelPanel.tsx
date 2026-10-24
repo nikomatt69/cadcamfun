@@ -35,20 +35,22 @@ export default function ExactModelPanel(props: Props): JSX.Element {
   /** The diameter typed for each hole, by index; the recognised one until the person types. */
   const [sizes, setSizes] = createSignal<Readonly<Record<number, number>>>({})
   const [note, setNote] = createSignal<{ readonly ok: boolean; readonly text: string } | undefined>(undefined)
+  /** Draft angle of the wall a resize makes, degrees; 0 leaves it straight. */
+  const [draft, setDraft] = createSignal(0)
   const changeHole = (index: number, change: HoleChange) => {
-    const r = editElementHole(props.element, props.all, index, change)
+    const r = editElementHole(props.element, props.all, index, change.kind === "resize" && draft() > 0 ? { ...change, taper: draft() } : change)
     if (!r.ok) { setNote({ ok: false, text: r.error }); return }
     useElementsStore.getState().addElements([r.element])
     setNote({ ok: true, text: `Added "${String(r.element["name"])}": volume ${fmt(r.volume)} mm³ (${r.volumeChange > 0 ? "+" : ""}${fmt(r.volumeChange)}).` })
   }
   const [bossSizes, setBossSizes] = createSignal<Readonly<Record<number, number>>>({})
   const changeBoss = (index: number, diameter: number) => {
-    const r = editElementBoss(props.element, props.all, index, diameter)
+    const r = editElementBoss(props.element, props.all, index, diameter, draft())
     if (!r.ok) { setNote({ ok: false, text: r.error }); return }
     useElementsStore.getState().addElements([r.element])
     setNote({ ok: true, text: `Added "${String(r.element["name"])}": volume ${fmt(r.volume)} mm³ (${r.volumeChange > 0 ? "+" : ""}${fmt(r.volumeChange)}).` })
   }
-  createEffect(on(() => props.element, () => { setSizes({}); setBossSizes({}); setNote(undefined) }))
+  createEffect(on(() => props.element, () => { setSizes({}); setBossSizes({}); setDraft(0); setNote(undefined) }))
   const exportStep = () => {
     const out = elementStep(props.element, props.all)
     if (!("step" in out)) { alert(`No exact model: ${out.reason}`); return }
@@ -96,6 +98,10 @@ export default function ExactModelPanel(props: Props): JSX.Element {
               <Show when={ok().drilled.length > 0 || ok().bosses.length > 0}>
                 <div class="mt-2 space-y-1 text-xs" data-testid="exact-hole-edit">
                   <p class="font-medium">Edit a hole or a boss (adds a new solid)</p>
+                  <div class="flex items-center gap-1">
+                    <span class="flex-1">Draft angle (°, 0 = straight)</span>
+                    <NumberField id="exact-draft" value={draft()} accept={(x) => x >= 0 && x <= 30} onValue={setDraft} />
+                  </div>
                   <For each={ok().drilled}>{(h, i) => (
                     <div class="flex items-center gap-1" data-hole={i()}>
                       <span class="flex-1">#{i() + 1} Ø{fmt(h.diameter)} × {fmt(h.depth)}</span>

@@ -204,6 +204,10 @@ test("a parametric part with an island in a pocket is machined from its exact mo
   expect(stored.body.gcode).toBe(artifact.value.nc)
   expect(artifact.value.claims.find((c) => c.id === "no-gouge")?.status).toBe("passed")
   expect(await handlers.reviewOperation!(project, saved.operationId)).toMatchObject({ status: artifact.value.release })
+  // Saving the program is in the project's audit trail, tied to the stored operation and the NC digest.
+  const trail = await app.call("/api/analytics/user-history?itemType=project&limit=100")
+  const saved_ = (trail.body.logs as Array<{ itemId: string; action: string; details: Record<string, unknown> }>).find((row) => row.itemId === project && row.action === "ai.cam.program_saved")
+  expect(saved_?.details).toMatchObject({ via: "assistant", operationId: saved.operationId, release: artifact.value.release, nc: artifact.value.identity.nc, operations: artifact.value.operations.length })
   // The setup sheet of the stored program says what the stored artifact says.
   const sheetResponse = await app.call(`/api/toolpaths/${saved.operationId}/setup-sheet`)
   expect(sheetResponse.status).toBe(200)

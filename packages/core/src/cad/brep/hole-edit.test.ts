@@ -88,3 +88,32 @@ describe("editing a recognised hole", () => {
     expect(typeof editHole(pointed, only(pointed), { kind: "resize", diameter: 4 })).not.toBe("string")
   })
 })
+
+const frustum = (r1: number, r2: number, h: number) => (Math.PI * h * (r1 * r1 + r1 * r2 + r2 * r2)) / 3
+
+describe("drafting the wall of a bore", () => {
+  const tan = (deg: number) => Math.tan((deg * Math.PI) / 180)
+
+  test("a through hole gets a 2 degree draft: the bore is the exact frustum", () => {
+    const b = through()
+    const r = ok(editHole(b, only(b), { kind: "resize", diameter: 8, taper: 2 }))
+    const bottom = 4 - 20 * tan(2)
+    expect(massProperties(r.brep).volume).toBeCloseTo(PLATE - frustum(4, bottom, 20), 4)
+    expect(validateBrep(r.brep).valid).toBe(true)
+    // The kernel reads the drafted wall as a cone, not a drill: the cylinder recogniser sees no hole any more.
+    expect(r.brep.faces.some((f) => f.surface.kind === "cone")).toBe(true)
+  })
+
+  test("a blind hole keeps its flat bottom with a 3 degree draft", () => {
+    const b = blind()
+    const r = ok(editHole(b, only(b), { kind: "resize", diameter: 8, taper: 3 }))
+    expect(massProperties(r.brep).volume).toBeCloseTo(PLATE - frustum(4, 4 - 12 * tan(3), 12), 4)
+  })
+
+  test("a draft that closes the bore, or one beyond 30 degrees, is refused", () => {
+    const b = blind()
+    expect(editHole(b, only(b), { kind: "resize", diameter: 2, taper: 29 })).toMatch(/closes the bore/)
+    expect(editHole(b, only(b), { kind: "resize", diameter: 8, taper: 45 })).toMatch(/between 0 and 30/)
+  })
+})
+

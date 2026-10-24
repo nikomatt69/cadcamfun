@@ -144,3 +144,22 @@ test("analyze lists the bosses and hole previews the resize of one, a boss takes
   expect((await post("hole", { elements: [bossed], id: "bossed", hole: 0, boss: 0, diameter: 8 })).status).toBe(400)
   expect((await post("hole", { elements: [bossed], id: "bossed", diameter: 8 })).status).toBe(400)
 })
+
+test("a draft angle narrows the new bore or boss wall: the previewed volume is the exact frustum, and it needs a diameter", async () => {
+  const frustum = (r1: number, r2: number, h: number) => (Math.PI * h * (r1 * r1 + r1 * r2 + r2 * r2)) / 3
+  const tan = (deg: number) => Math.tan((deg * Math.PI) / 180)
+  const disc = (d: number, h: number) => Math.PI * (d / 2) ** 2 * h
+  // The mounting plate's drill is Ø5.5 over 6.3 mm below the counterbore: drafted 3 degrees from Ø7.
+  const hole = Schema.decodeUnknownSync(CadHoleReport)((await post("hole", { elements: [plate], id: "plate", hole: 0, diameter: 7, taper: 3 })).body)
+  if (!hole.ok || !("hole" in hole)) throw new Error("expected a hole report")
+  expect(hole.volumeChange).toBeCloseTo(disc(5.5, 6.3) - frustum(3.5, 3.5 - 6.3 * tan(3), 6.3), 3)
+  expect(hole.edit).toEqual({ kind: "resize", diameter: 7, taper: 3 })
+  const boss = Schema.decodeUnknownSync(CadHoleReport)((await post("hole", { elements: [bossed], id: "bossed", boss: 0, diameter: 10, taper: 5 })).body)
+  if (!boss.ok || !("boss" in boss)) throw new Error("expected a boss report")
+  expect(boss.volumeChange).toBeCloseTo(frustum(5, 5 - 12 * tan(5), 12) - disc(10, 12), 3)
+  expect(boss.taper).toBe(5)
+  expect((await post("hole", { elements: [plate], id: "plate", hole: 0, fill: true, taper: 3 })).status).toBe(400)
+  expect((await post("hole", { elements: [plate], id: "plate", hole: 0, diameter: 7, taper: 31 })).status).toBe(400)
+  const closing = Schema.decodeUnknownSync(CadHoleReport)((await post("hole", { elements: [bossed], id: "bossed", boss: 0, diameter: 4, taper: 25 })).body)
+  expect(closing).toMatchObject({ ok: false, error: expect.stringContaining("closes the boss") })
+})

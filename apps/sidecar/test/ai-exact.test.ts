@@ -112,6 +112,11 @@ test("a recognised hole is previewed read-only and stored as a checked copy, wit
   expect(preview.body.result).toMatchObject({ ok: true, valid: true, hole: 0, holes: 4, before: { form: "counterbore" } })
   const disc = (d: number, h: number) => Math.PI * (d / 2) ** 2 * h
   expect(preview.body.result.volumeChange).toBeCloseTo(-(disc(7, 6.3) - disc(5.5, 6.3)), 3)
+  const frustum = (r1: number, r2: number, h: number) => (Math.PI * h * (r1 * r1 + r1 * r2 + r2 * r2)) / 3
+  const drafted = await invoke(read, "cad", { action: "hole", id: "plate", hole: 0, diameter: 7, taper: 3 })
+  expect(drafted.body.result).toMatchObject({ ok: true, valid: true, edit: { kind: "resize", diameter: 7, taper: 3 } })
+  expect(drafted.body.result.volumeChange).toBeCloseTo(disc(5.5, 6.3) - frustum(3.5, 3.5 - 6.3 * Math.tan((3 * Math.PI) / 180), 6.3), 3)
+  expect((await invoke(read, "cad", { action: "hole", id: "plate", hole: 0, fill: true, taper: 3 })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("needs a diameter") })
   expect((await invoke(read, "cad", { action: "hole", id: "plate", hole: 0 })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("exactly one") })
   expect((await invoke(read, "cad", { action: "hole", id: "plate", hole: 9, fill: true })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("4 recognised holes") })
   expect((await invoke(read, "cad_edit", { action: "hole", id: "plate", hole: 0, diameter: 7 })).status).toBe(400)
@@ -123,6 +128,12 @@ test("a recognised hole is previewed read-only and stored as a checked copy, wit
   expect(copy.holesTotal).toBe(3)
   expect(source.holesTotal).toBe(4)
   expect(copy.volume - source.volume).toBeCloseTo(disc(5.5, 6.3) + disc(10, 5.7), 3)
+  // The change is in the project's audit trail, with what was edited and by how much.
+  const history = await app.call("/api/analytics/user-history?itemType=project&limit=100")
+  const rows = (history.body.logs as Array<{ itemId: string; action: string; details: Record<string, unknown> }>).filter((row) => row.itemId === project)
+  const logged = rows.find((row) => row.action === "ai.cad.hole_edit")
+  expect(logged?.details).toMatchObject({ via: "assistant", source: "plate", hole: 0, fill: true, elementId: stored.body.result.ids[0] })
+  expect(Number(logged?.details["volumeChange"])).toBeCloseTo(disc(5.5, 6.3) + disc(10, 5.7), 3)
 })
 
 test("a boss is previewed read-only and stored as a checked copy with the analytic volume", async () => {
@@ -154,6 +165,11 @@ test("a boss is previewed read-only and stored as a checked copy with the analyt
   const parts = both.body.result.parts as Array<{ id: string; volume: number }>
   const copy = parts.find((p) => p.id === stored.body.result.ids[0])!, source = parts.find((p) => p.id === "bossed")!
   expect(source.volume - copy.volume).toBeCloseTo(disc(10, 12) - disc(6, 12), 3)
+  const history = await app.call("/api/analytics/user-history?itemType=project&limit=100")
+  const rows = (history.body.logs as Array<{ itemId: string; action: string; details: Record<string, unknown> }>).filter((row) => row.itemId === project)
+  expect(rows.find((row) => row.action === "ai.cad.boss_edit")?.details).toMatchObject({ via: "assistant", source: "bossed", boss: 0, diameter: 6 })
+  // A preview leaves no row: only the stored copy is a change.
+  expect(rows.filter((row) => row.action.startsWith("ai.cad."))).toHaveLength(1)
 })
 
 test("the AI stores open NURBS surfaces separately from solids and exchanges IGES without losing topology", async () => {

@@ -24,6 +24,7 @@ import { ComponentRepo } from "../repos/component-repo.ts"
 import { DrawingConflict, DrawingRepo, drawingContentHash } from "../repos/drawing-repo.ts"
 import { LibraryRepo } from "../repos/library-repo.ts"
 import { MachineConfigRepo } from "../repos/machine-config-repo.ts"
+import { MiscRepo } from "../repos/misc-repo.ts"
 import { MaterialRepo } from "../repos/material-repo.ts"
 import { ProductionCostRepo } from "../repos/production-cost-repo.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
@@ -116,6 +117,7 @@ const toolHandlers = Effect.gen(function*() {
   const machines = yield* MachineConfigRepo
   const libraryItems = yield* LibraryRepo
   const costs = yield* ProductionCostRepo
+  const misc = yield* MiscRepo
   const { user: local } = yield* LocalProfile
   const kv = yield* KvStore
   const actingCell = yield* ActingUser
@@ -246,10 +248,14 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, job, stockNote }
   }
 
-  const storeKernelBody = async (loaded: Awaited<ReturnType<typeof load>>, brep: cad.brep.Brep, name: string) => {
+  /** One row of the project's audit trail (`ActivityLog`) for a change the assistant made; a failure to log never fails the change. */
+  const audit = (projectId: string, action: string, details: Record<string, unknown>): Promise<void> =>
+    Effect.runPromise(misc.logActivity(acting().id, projectId, "project", action, { via: "assistant", ...details })).then(() => undefined, () => undefined)
+  const storeKernelBody = async (loaded: Awaited<ReturnType<typeof load>>, brep: cad.brep.Brep, name: string, change: { readonly action: string; readonly details?: Record<string, unknown> } = { action: "ai.cad.store_body" }) => {
     if (!loaded.id) return { ok: false, error: "No drawing is open." }
     const created: Element = { id: crypto.randomUUID(), type: "brep", name, brep, x: 0, y: 0, z: 0, layerId: "default" }
     await save(loaded, loaded.data, [...loaded.elements, created])
+    await audit(loaded.projectId, change.action, { drawingId: loaded.id, elementId: created.id, name, ...change.details })
     return { ok: true, ids: [created.id], elements: [created], ...where(loaded) }
   }
   const handlers: ToolHandlersShape = {
@@ -351,6 +357,10 @@ const toolHandlers = Effect.gen(function*() {
         projectId: loaded.projectId, drawingId: loaded.id, type: "mill", operationType: "kernel", gcode: artifact.nc,
         data: { kernelArtifact: artifact, kernelRequest, sourceRevision: revision }
       }))
+      await audit(loaded.projectId, "ai.cam.program_saved", {
+        drawingId: loaded.id, operationId: row.id, release: artifact.release, setupOrientation: artifact.setupOrientation ?? "+Z",
+        operations: artifact.operations.length, tools: artifact.tools.length, nc: artifact.identity.nc
+      })
       return { ok: true, operationId: row.id, release: artifact.release, identity: artifact.identity, ...where(loaded) }
     },
     validateMachiningPlan: async (projectId, input) => {
@@ -630,8 +640,8 @@ const toolHandlers = Effect.gen(function*() {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
       try {
-        const report = input.boss !== undefined ? cad.sceneBossEdit(loaded.elements, input.id, input.boss, input.diameter!)
-          : cad.sceneHoleEdit(loaded.elements, input.id, input.hole!, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter } : { kind: "fill" })
+        const report = input.boss !== undefined ? cad.sceneBossEdit(loaded.elements, input.id, input.boss, input.diameter!, input.taper ?? 0)
+          : cad.sceneHoleEdit(loaded.elements, input.id, input.hole!, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter, ...(input.taper !== undefined ? { taper: input.taper } : {}) } : { kind: "fill" })
         return { ...report, ...where(loaded) }
       }
       catch (error) { return { ok: false, error: `The hole edit failed: ${error instanceof Error ? error.message : String(error)}` } }
@@ -641,13 +651,17 @@ const toolHandlers = Effect.gen(function*() {
       const loaded = await load(projectId)
       try {
         if (input.boss !== undefined) {
-          const b = cad.sceneBossEditBody(loaded.elements, input.id, input.boss, input.diameter!)
+          const b = cad.sceneBossEditBody(loaded.elements, input.id, input.boss, input.diameter!, input.taper ?? 0)
           if (!b.ok) return b
-          return storeKernelBody(loaded, b.brep, `${b.report.name} boss ${input.boss} Ø${input.diameter}`)
+          return storeKernelBody(loaded, b.brep, `${b.report.name} boss ${input.boss} Ø${input.diameter}${input.taper ? ` ${input.taper}°` : ""}`, {
+            action: "ai.cad.boss_edit", details: { source: input.id, boss: input.boss, diameter: input.diameter, ...(input.taper ? { taper: input.taper } : {}), volumeChange: b.report.volumeChange }
+          })
         }
-        const r = cad.sceneHoleEditBody(loaded.elements, input.id, input.hole!, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter } : { kind: "fill" })
+        const r = cad.sceneHoleEditBody(loaded.elements, input.id, input.hole!, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter, ...(input.taper !== undefined ? { taper: input.taper } : {}) } : { kind: "fill" })
         if (!r.ok) return r
-        return storeKernelBody(loaded, r.brep, `${r.report.name} hole ${input.hole} ${input.diameter !== undefined ? `Ø${input.diameter}` : "filled"}`)
+        return storeKernelBody(loaded, r.brep, `${r.report.name} hole ${input.hole} ${input.diameter !== undefined ? `Ø${input.diameter}${input.taper ? ` ${input.taper}°` : ""}` : "filled"}`, {
+          action: "ai.cad.hole_edit", details: { source: input.id, hole: input.hole, ...(input.diameter !== undefined ? { diameter: input.diameter, ...(input.taper ? { taper: input.taper } : {}) } : { fill: true }), volumeChange: r.report.volumeChange }
+        })
       } catch (error) { return { ok: false, error: `The hole edit failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadBuildOffset: async (projectId, input) => {

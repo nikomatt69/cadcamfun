@@ -8,7 +8,8 @@
  *    directly. The counterbore or countersink above stays as it is, so the new bore must be narrower than it.
  *  - **fill**: the whole hole is filled, every segment, back to the surface it was cut in.
  *
- * Refused with a reason, the solid unchanged: a drill-point bottom (the cone would have to be rebuilt for the new diameter), a
+ * A resize may carry a `taper`, the draft angle of the bore wall in degrees: the bore is a cone narrowing towards the bottom (the
+ * volume check is then the exact frustum). Refused with a reason, the solid unchanged: a drill-point bottom (the cone would have to be rebuilt for the new diameter), a
  * bore that would break into its own counterbore or past a neighbouring wall (the result is checked: valid, the volume moved by
  * exactly the analytic cylinder), and a hole made of cones only.
  */
@@ -17,15 +18,17 @@ import { booleanBrep } from "./boolean.ts"
 import type { RecognizedHole } from "./features.ts"
 import { frame, type Vec3 } from "./math.ts"
 import { massProperties } from "./mass.ts"
-import { makeCylinder } from "./primitives.ts"
+import { makeCone, makeCylinder } from "./primitives.ts"
 import type { Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
 
 /** How far a cutter runs past an open end of the hole, mm: the subtraction never has to decide a coplanar end face. */
 const OVERRUN = 1
+/** Largest draft angle of a bore wall, degrees. */
+const MAX_TAPER = 30
 
 export type HoleEdit =
-  | { readonly kind: "resize"; readonly diameter: number }
+  | { readonly kind: "resize"; readonly diameter: number; readonly taper?: number }
   | { readonly kind: "fill" }
 
 export interface HoleEditResult {
@@ -52,6 +55,7 @@ export const editHole = (b: Brep, hole: RecognizedHole, edit: HoleEdit): HoleEdi
   if (hole.segments.every((s) => s.kind !== "cylinder")) return "the hole has no cylindrical wall to edit"
   if (edit.kind === "resize") {
     if (!(edit.diameter > 0) || !Number.isFinite(edit.diameter)) return "the diameter must be positive"
+    if (edit.taper !== undefined && !(edit.taper >= 0 && edit.taper <= MAX_TAPER)) return `the draft angle must be between 0 and ${MAX_TAPER} degrees`
     if (hole.bottom === "drill-point") return "the hole ends in a drill point: its cone would have to be rebuilt for the new diameter"
     if (edit.diameter >= (hole.headDiameter ?? Infinity) - 1e-6) return `the new diameter ${edit.diameter} would break into the ${hole.form} (Ø${hole.headDiameter})`
   }
@@ -63,7 +67,13 @@ export const editHole = (b: Brep, hole: RecognizedHole, edit: HoleEdit): HoleEdi
       ? hole.segments.filter((s) => s.kind === "cylinder").map((s) => ({ start: s.start, end: s.end, diameter: s.diameterStart }))
       : drillSegments(hole)
     if (edit.kind === "fill" && hole.segments.some((s) => s.kind === "cone")) return "a countersink or drill point cannot be filled by cylinders: fill the cone with its own body"
-    const grow = edit.kind === "resize" && edit.diameter > Math.max(...segments.map((s) => s.diameter))
+    const taper = edit.kind === "resize" ? edit.taper ?? 0 : 0
+    const slope = Math.tan((taper * Math.PI) / 180)
+    if (taper > 0) {
+      const bottom = Math.min(...segments.map((s) => edit.kind === "resize" ? edit.diameter / 2 - (s.end - s.start) * slope : 1))
+      if (!(bottom > 1e-6)) return `a draft of ${taper} degrees closes the bore before its bottom (the radius would be ${bottom.toFixed(3)} mm)`
+    }
+    const grow = taper === 0 && edit.kind === "resize" && edit.diameter > Math.max(...segments.map((s) => s.diameter))
     // 1. Fill what is there (unless a larger bore will remove it anyway). A filler ends exactly where the bore ends, so it never
     //    stands proud of the solid: its caps are coplanar with the faces the hole was cut in.
     if (!grow) {
@@ -75,7 +85,14 @@ export const editHole = (b: Brep, hole: RecognizedHole, edit: HoleEdit): HoleEdi
         const last = s.end >= hole.depth - 1e-6
         const from = s.start <= 1e-6 ? -OVERRUN : s.start
         const to = last && through ? hole.depth + OVERRUN : s.end
-        solid = booleanBrep(solid, cylinderAlong(hole.entry, hole.direction, from, to, edit.diameter), "subtract").brep
+        if (taper === 0) solid = booleanBrep(solid, cylinderAlong(hole.entry, hole.direction, from, to, edit.diameter), "subtract").brep
+        else {
+          // The cone keeps its slope through the overruns: radius edit.diameter / 2 at the segment start, narrowing by `slope` per mm.
+          const r = (t: number) => edit.diameter / 2 - (t - s.start) * slope
+          const closing = Math.min(to, s.start + (edit.diameter / 2 - 1e-3) / slope)
+          const end = Math.max(s.end, Math.min(to, closing))
+          solid = booleanBrep(solid, makeCone(r(from), r(end), end - from, frame(add3(hole.entry, scale3(hole.direction, from)), hole.direction)), "subtract").brep
+        }
       }
     }
     const report = validateBrep(solid)
@@ -83,9 +100,15 @@ export const editHole = (b: Brep, hole: RecognizedHole, edit: HoleEdit): HoleEdi
     const after = massProperties(solid).volume
     // The analytic change: the old drill volume against the new one over the same segments.
     const area = (d: number): number => Math.PI * (d / 2) ** 2
+    /** Volume of the new bore over a segment: a cylinder, or the frustum of the drafted cone. */
+    const bore = (s: { readonly start: number; readonly end: number }): number => {
+      if (edit.kind !== "resize") return 0
+      const L = s.end - s.start, r1 = edit.diameter / 2, r2 = r1 - L * slope
+      return taper === 0 ? area(edit.diameter) * L : (Math.PI * L * (r1 * r1 + r1 * r2 + r2 * r2)) / 3
+    }
     const expected = edit.kind === "fill"
       ? segments.reduce((v, s) => v + area(s.diameter) * (s.end - s.start), 0)
-      : segments.reduce((v, s) => v + (area(s.diameter) - area(edit.diameter)) * (s.end - s.start), 0)
+      : segments.reduce((v, s) => v + area(s.diameter) * (s.end - s.start) - bore(s), 0)
     if (Math.abs(after - before - expected) > 1e-6 * Math.max(before, 1) + 1e-6 * Math.abs(expected)) {
       return `the edit changed the volume by ${(after - before).toFixed(6)} mm³ where the cylinders account for ${expected.toFixed(6)} mm³: it broke into a neighbouring feature`
     }

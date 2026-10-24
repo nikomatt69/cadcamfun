@@ -1688,6 +1688,7 @@ export type CadExactHolePayload = {
   readonly hole?: number
   readonly boss?: number
   readonly diameter?: number
+  readonly taper?: number
   readonly fill?: boolean
 }
 
@@ -6760,6 +6761,7 @@ export type CadExactHoleInput = {
   readonly hole?: CadExactHolePayload["hole"]
   readonly boss?: CadExactHolePayload["boss"]
   readonly diameter?: CadExactHolePayload["diameter"]
+  readonly taper?: CadExactHolePayload["taper"]
   readonly fill?: CadExactHolePayload["fill"]
 }
 
@@ -6771,7 +6773,7 @@ export type CadExactHoleOutput =
       hole: number
       holes: number
       before: { diameter: number; depth: number; form: "simple" | "counterbore" | "countersink" }
-      edit: { kind: "resize"; diameter: number } | { kind: "fill" }
+      edit: { kind: "resize"; diameter: number; taper?: number } | { kind: "fill" }
       volume: number
       originalVolume: number
       volumeChange: number
@@ -6786,6 +6788,7 @@ export type CadExactHoleOutput =
       bosses: number
       before: { diameter: number; length: number }
       diameter: number
+      taper?: number
       volume: number
       originalVolume: number
       volumeChange: number

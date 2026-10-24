@@ -7,7 +7,8 @@
  *  - **grow**: a cylinder of the new radius over the boss's axial range is united with the solid.
  *  - **shrink**: the tube between the old and the new radius is subtracted over the same range.
  *
- * The result is checked like a hole edit: a valid solid whose volume moved by exactly pi (r'^2 - r^2) L. A boss whose ends are
+ * With a `taper` (draft angle, degrees) the boss becomes a cone narrowing towards its free end: the old cylinder is removed and the
+ * frustum united in its place. The result is checked like a hole edit: a valid solid whose volume moved by exactly pi (r'^2 - r^2) L. A boss whose ends are
  * not square to its axis (a chamfer, a fillet or a cone at the end), one that is split into several faces, and an edit that runs
  * into a neighbouring feature are refused with the reason, the solid unchanged.
  */
@@ -17,7 +18,7 @@ import { brepLocator } from "./classify.ts"
 import { curvePoint, surfaceNormal, surfaceProject } from "./geom.ts"
 import { massProperties } from "./mass.ts"
 import { MODEL_TOL, frame, type Vec3 } from "./math.ts"
-import { makeCylinder } from "./primitives.ts"
+import { makeCone, makeCylinder } from "./primitives.ts"
 import type { Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
 
@@ -91,10 +92,18 @@ export interface BossEditResult {
   readonly volumeChange: number
 }
 
-/** Resizes one boss to `diameter`. Checked before it is returned: valid, and the volume moved by the exact cylinder shell. */
-export const resizeBoss = (b: Brep, boss: RecognizedBoss, diameter: number): BossEditResult | string => {
+/** Largest draft angle of a boss wall, degrees. */
+const MAX_TAPER = 30
+
+/**
+ * Resizes one boss to `diameter` (at its base when drafted). Checked before it is returned: valid, and the volume moved by the
+ * exact cylinder shell (or frustum).
+ */
+export const resizeBoss = (b: Brep, boss: RecognizedBoss, diameter: number, taper = 0): BossEditResult | string => {
   if (!(diameter > 0) || !Number.isFinite(diameter)) return "the diameter must be positive"
-  if (Math.abs(diameter - boss.diameter) < 1e-9) return { brep: b, volumeChange: 0 }
+  if (!(taper >= 0 && taper <= MAX_TAPER)) return `the draft angle must be between 0 and ${MAX_TAPER} degrees`
+  if (taper === 0 && Math.abs(diameter - boss.diameter) < 1e-9) return { brep: b, volumeChange: 0 }
+  if (taper > 0) return draftBoss(b, boss, diameter, taper)
   const r0 = boss.diameter / 2, r1 = diameter / 2
   const before = massProperties(b).volume
   const cylinder = (radius: number, from: number, to: number): Brep => makeCylinder(radius, to - from, frame(add3(boss.origin, scale3(boss.axis, from)), boss.axis))
@@ -115,6 +124,36 @@ export const resizeBoss = (b: Brep, boss: RecognizedBoss, diameter: number): Bos
     const expected = Math.PI * (r1 * r1 - r0 * r0) * boss.length
     if (Math.abs(after - before - expected) > 1e-6 * Math.max(before, 1) + 1e-6 * Math.abs(expected)) {
       return `the edit changed the volume by ${(after - before).toFixed(6)} mm³ where the cylinder shell accounts for ${expected.toFixed(6)} mm³: it ran into a neighbouring feature (a chamfer, a fillet or another wall)`
+    }
+    return { brep: solid, volumeChange: after - before }
+  } catch (cause) {
+    return `the Boolean failed (${cause instanceof Error ? cause.message : String(cause)})`
+  }
+}
+
+/** A boss that narrows by `taper` degrees towards its free end (the far end when it has none), `diameter` at its base. */
+const draftBoss = (b: Brep, boss: RecognizedBoss, diameter: number, taper: number): BossEditResult | string => {
+  const slope = Math.tan((taper * Math.PI) / 180)
+  const r0 = boss.diameter / 2, r1 = diameter / 2, r2 = r1 - boss.length * slope
+  if (!(r2 > 1e-6)) return `a draft of ${taper} degrees closes the boss before its end (the radius would be ${r2.toFixed(3)} mm)`
+  const before = massProperties(b).volume
+  const towardsNear = boss.free === "near"
+  const at = (t: number) => add3(boss.origin, scale3(boss.axis, t))
+  try {
+    // Out with the cylinder (an overrun past its free end), in with the cone: wide at the base, narrow at the free end.
+    const from = boss.free === "near" || boss.free === "both" ? -OVERRUN : 0
+    const to = boss.free === "far" || boss.free === "both" ? boss.length + OVERRUN : boss.length
+    const old = makeCylinder(r0, to - from, frame(at(from), boss.axis))
+    const cone = towardsNear
+      ? makeCone(r1, r2, boss.length, frame(at(boss.length), scale3(boss.axis, -1)))
+      : makeCone(r1, r2, boss.length, frame(at(0), boss.axis))
+    const solid = booleanBrep(booleanBrep(b, old, "subtract").brep, cone, "union").brep
+    const report = validateBrep(solid)
+    if (!report.valid) return `the edited solid is not valid (${report.issues.slice(0, 2).map((i) => i.message).join("; ")})`
+    const after = massProperties(solid).volume
+    const expected = (Math.PI * boss.length * (r1 * r1 + r1 * r2 + r2 * r2)) / 3 - Math.PI * r0 * r0 * boss.length
+    if (Math.abs(after - before - expected) > 1e-6 * Math.max(before, 1) + 1e-6 * Math.abs(expected)) {
+      return `the edit changed the volume by ${(after - before).toFixed(6)} mm³ where the frustum accounts for ${expected.toFixed(6)} mm³: it ran into a neighbouring feature`
     }
     return { brep: solid, volumeChange: after - before }
   } catch (cause) {

@@ -4014,6 +4014,7 @@ export function make(options: ClientOptions) {
               hole: input["hole"],
               boss: input["boss"],
               diameter: input["diameter"],
+              taper: input["taper"],
               fill: input["fill"],
             },
             successStatus: 200,

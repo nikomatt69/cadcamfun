@@ -40,17 +40,34 @@ test("the exact model panel resizes and fills a recognised hole as a new solid a
     expect(created()).toHaveLength(1)
     expect(created()[0]!["name"]).toBe("plate hole 1 Ø14")
     expect(root.querySelector("[data-testid='exact-hole-message']")!.textContent).toContain(`volume ${(40 * 30 * 10 - disc(14, 10)).toLocaleString(undefined, { maximumFractionDigits: 3 })} mm³`)
+    // A draft angle: the new bore is the exact frustum, narrowing towards the bottom.
+    const draft = root.querySelector<HTMLInputElement>("#exact-draft")!
+    draft.value = "4"
+    draft.dispatchEvent(new window.Event("input", { bubbles: true }))
+    draft.dispatchEvent(new window.Event("change", { bubbles: true }))
+    field.value = "12"
+    field.dispatchEvent(new window.Event("input", { bubbles: true }))
+    field.dispatchEvent(new window.Event("change", { bubbles: true }))
+    root.querySelector<HTMLButtonElement>("[data-testid='exact-hole-resize']")!.click()
+    expect(created()).toHaveLength(2)
+    expect(created()[1]!["name"]).toBe("plate hole 1 Ø12 4°")
+    const r1 = 6, r2 = 6 - 10 * Math.tan((4 * Math.PI) / 180)
+    const bore = (Math.PI * 10 * (r1 * r1 + r1 * r2 + r2 * r2)) / 3
+    expect(root.querySelector("[data-testid='exact-hole-message']")!.textContent).toContain(`volume ${(40 * 30 * 10 - bore).toLocaleString(undefined, { maximumFractionDigits: 3 })} mm³`)
+    draft.value = "0"
+    draft.dispatchEvent(new window.Event("input", { bubbles: true }))
+    draft.dispatchEvent(new window.Event("change", { bubbles: true }))
     // Fill: the plate is whole again.
     root.querySelector<HTMLButtonElement>("[data-testid='exact-hole-fill']")!.click()
-    expect(created()).toHaveLength(2)
-    expect(created()[1]!["name"]).toBe("plate hole 1 filled")
+    expect(created()).toHaveLength(3)
+    expect(created()[2]!["name"]).toBe("plate hole 1 filled")
     expect(root.querySelector("[data-testid='exact-hole-message']")!.textContent).toContain(`volume ${(40 * 30 * 10).toLocaleString()} mm³`)
     // A diameter wider than the plate breaks into the walls: refused with the kernel's reason, nothing added.
     field.value = "60"
     field.dispatchEvent(new window.Event("input", { bubbles: true }))
     field.dispatchEvent(new window.Event("change", { bubbles: true }))
     root.querySelector<HTMLButtonElement>("[data-testid='exact-hole-resize']")!.click()
-    expect(created()).toHaveLength(2)
+    expect(created()).toHaveLength(3)
     expect(root.querySelector("[data-testid='exact-hole-message']")!.getAttribute("role")).toBe("alert")
   } finally { dispose() }
 })

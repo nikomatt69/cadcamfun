@@ -306,14 +306,14 @@ export const sceneHoleEdit = (elements: ReadonlyArray<Element>, id: string, hole
 export type SceneBossEdit =
   | {
     readonly ok: true; readonly id: string; readonly name: string; readonly boss: number; readonly bosses: number
-    readonly before: { readonly diameter: number; readonly length: number }; readonly diameter: number
+    readonly before: { readonly diameter: number; readonly length: number }; readonly diameter: number; readonly taper?: number
     readonly volume: number; readonly originalVolume: number; readonly volumeChange: number; readonly faces: number; readonly valid: boolean
   }
   | { readonly ok: false; readonly error: string }
 
 /** Resizes the `boss`-th recognised boss of a solid of the drawing (`brep/boss-edit.ts`); the order is `ScenePartAnalysis.bosses`. */
 export const sceneBossEditBody = (
-  elements: ReadonlyArray<Element>, id: string, boss: number, diameter: number
+  elements: ReadonlyArray<Element>, id: string, boss: number, diameter: number, taper = 0
 ): { readonly ok: true; readonly brep: Brep; readonly report: Extract<SceneBossEdit, { ok: true }> } | { readonly ok: false; readonly error: string } => {
   const scene = sceneParts(elements)
   const part = scene.parts.find((p) => p.id === id)
@@ -324,17 +324,17 @@ export const sceneBossEditBody = (
   const bosses = recognizeBosses(part.brep)
   const target = bosses[boss]
   if (target === undefined) return { ok: false, error: bosses.length === 0 ? `'${id}' has no recognised boss` : `'${id}' has ${bosses.length} recognised bosses (0..${bosses.length - 1}), not a boss ${boss}` }
-  const r = resizeBoss(part.brep, target, diameter)
+  const r = resizeBoss(part.brep, target, diameter, taper)
   if (typeof r === "string") return { ok: false, error: r }
   const originalVolume = massProperties(part.brep).volume
   return { ok: true, brep: r.brep, report: {
-    ok: true, id, name: part.name, boss, bosses: bosses.length, before: { diameter: target.diameter, length: target.length }, diameter,
+    ok: true, id, name: part.name, boss, bosses: bosses.length, before: { diameter: target.diameter, length: target.length }, diameter, ...(taper > 0 ? { taper } : {}),
     volume: originalVolume + r.volumeChange, originalVolume, volumeChange: r.volumeChange, faces: r.brep.faces.length, valid: validateBrep(r.brep).valid
   } }
 }
 
-export const sceneBossEdit = (elements: ReadonlyArray<Element>, id: string, boss: number, diameter: number): SceneBossEdit => {
-  const built = sceneBossEditBody(elements, id, boss, diameter)
+export const sceneBossEdit = (elements: ReadonlyArray<Element>, id: string, boss: number, diameter: number, taper = 0): SceneBossEdit => {
+  const built = sceneBossEditBody(elements, id, boss, diameter, taper)
   return built.ok ? built.report : built
 }
 
