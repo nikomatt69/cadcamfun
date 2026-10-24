@@ -1,5 +1,7 @@
 # 33 — CAD and CAM kernel gap analysis (Fusion 360 / hyperMILL reference)
 
+> 2026-10-24: the forward plan for every open item below (C*, M*, K3–K7) is [spec 39](39-professional-parity-master-plan.md) and specs 40–55. This spec stays the measured ledger of what was closed and when.
+
 ## Owner-authorized completion increment (2026-10-22)
 
 The owner accepted the current-source reclassification and requests implementation of the actual gaps, with regression
