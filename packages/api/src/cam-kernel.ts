@@ -24,6 +24,8 @@ export const CamKernelRequest = Schema.Struct({
   tools: CamManufactureInput.fields.tools,
   deburr: CamManufactureInput.fields.deburr,
   subprograms: CamManufactureInput.fields.subprograms,
+  /** A post definition (spec 54 C1; library category "post") that writes the NC in place of the machine's post; checked by the kernel. */
+  postDefinition: Schema.optionalKey(Schema.Json),
   print: CamManufactureInput.fields.print,
   /** Where to announce progress (a `cam.progress` frame per operation and stage on the project's live stream); never stored with the program. */
   progress: Schema.optionalKey(Schema.Struct({ projectId: id, runId: id }))

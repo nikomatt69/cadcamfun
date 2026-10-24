@@ -31,6 +31,8 @@ export interface KernelSnapshot {
   readonly deburr?: number
   /** Write toolpaths that repeat translated as `M98` subprograms (Fanuc and Haas posts). */
   readonly subprograms?: boolean
+  /** A post definition that writes the NC in place of the machine's built-in post (spec 54 C1). Inline, so a stored program re-runs with the post it was made with. */
+  readonly postDefinition?: unknown
   /** How a printer job is sliced (read only when the machine is a printer). */
   readonly print?: PrintRequirement
   readonly elements: ReadonlyArray<Readonly<Record<string, unknown>>>
@@ -70,7 +72,9 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
       ...(s.setupOrientation !== undefined ? { setupOrientation: s.setupOrientation } : {}),
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.workOffset !== undefined ? { workOffset: s.workOffset } : {}),
       ...(s.operations !== undefined ? { operations: s.operations } : {}), ...(s.tools !== undefined ? { tools: s.tools } : {}),
-      ...(s.subprograms === true ? { post: { options: { subprograms: true } } } : {}),
+      ...(s.subprograms === true || s.postDefinition !== undefined
+        ? { post: { ...(s.subprograms === true ? { options: { subprograms: true } } : {}), ...(s.postDefinition !== undefined ? { definition: s.postDefinition } : {}) } }
+        : {}),
       ...(s.print !== undefined ? { print: s.print } : {}),
       quality
     }

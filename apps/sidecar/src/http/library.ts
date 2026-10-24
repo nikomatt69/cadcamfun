@@ -1,4 +1,5 @@
 import { Api, BadRequest, CurrentUser, Forbidden, InternalError, KeyedInternal, NotFound } from "@cadcamfun/api"
+import { cam } from "@cadcamfun/core"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { LibraryRepo } from "../repos/library-repo.ts"
@@ -6,6 +7,13 @@ import { LibraryRepo } from "../repos/library-repo.ts"
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
 const keyed = (e: unknown) => Effect.logError("Error in library API", e).pipe(Effect.andThen(Effect.fail(new KeyedInternal({ error: "Internal server error" }))))
+
+/** A stored post definition (category "post", type "definition") is checked when it is saved: a library never holds one the kernel would refuse. */
+const postDefinitionProblem = (category: string | undefined, type: string | undefined, data: unknown): string | undefined => {
+  if (category !== "post" || type !== "definition") return undefined
+  const issues = cam.definitionIssues(data)
+  return issues.length === 0 ? undefined : `Invalid post definition: ${issues.slice(0, 5).map((i) => `${i.path === "" ? "(root)" : i.path}: ${i.message}`).join("; ")}`
+}
 
 export const LibraryHandlers = HttpApiBuilder.group(Api, "library", Effect.fn(function*(handlers) {
   const repo = yield* LibraryRepo
@@ -27,6 +35,8 @@ export const LibraryHandlers = HttpApiBuilder.group(Api, "library", Effect.fn(fu
       Effect.gen(function*() {
         const user = yield* CurrentUser
         if (!payload.name || !payload.category || !payload.type || !payload.data) return yield* new BadRequest({ message: "Missing required fields" })
+        const invalid = postDefinitionProblem(payload.category, payload.type, payload.data)
+        if (invalid !== undefined) return yield* new BadRequest({ message: invalid })
         if (payload.organizationId && !(yield* repo.isMember(user.id, payload.organizationId))) {
           return yield* new Forbidden({ message: "User does not belong to the specified organization" })
         }
@@ -38,6 +48,8 @@ export const LibraryHandlers = HttpApiBuilder.group(Api, "library", Effect.fn(fu
         const { user, item, role } = yield* load(params.id)
         const canUpdate = item.ownerId === user.id || (!!item.organizationId && (role === "ADMIN" || role === "MANAGER"))
         if (!canUpdate) return yield* new Forbidden({ message: "You do not have permission to update this item" })
+        const invalid = postDefinitionProblem(payload.category ?? item.category, payload.type ?? item.type, payload.data ?? item.data)
+        if (invalid !== undefined) return yield* new BadRequest({ message: invalid })
         return yield* repo.update(item, payload)
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to update library item"))))
     .handle("remove", ({ params }) =>

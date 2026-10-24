@@ -1477,6 +1477,7 @@ export type ToolpathGeneratorManufacturePayload = {
   }>
   readonly deburr?: number
   readonly subprograms?: boolean
+  readonly postDefinition?: JsonValue
   readonly print?: {
     readonly layerHeight?: number
     readonly firstLayerHeight?: number
@@ -6097,6 +6098,7 @@ export type ToolpathGeneratorManufactureInput = {
   readonly tools?: ToolpathGeneratorManufacturePayload["tools"]
   readonly deburr?: ToolpathGeneratorManufacturePayload["deburr"]
   readonly subprograms?: ToolpathGeneratorManufacturePayload["subprograms"]
+  readonly postDefinition?: ToolpathGeneratorManufacturePayload["postDefinition"]
   readonly print?: ToolpathGeneratorManufacturePayload["print"]
   readonly progress?: ToolpathGeneratorManufacturePayload["progress"]
 }

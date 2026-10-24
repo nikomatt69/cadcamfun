@@ -241,7 +241,8 @@ export interface ManufacturingJob {
   /** Operations in machining order, in oriented setup coordinates when specified; otherwise CAD world coordinates. Planned from the part when absent. */
   readonly operations?: ReadonlyArray<OperationSpec>
   readonly quality?: QualityRequirement
-  readonly post?: { readonly options?: Partial<PostOptions> }
+  /** `definition`: a post definition (`post/definition.ts`) that writes the NC instead of the machine's built-in post; a bad one fails the job before planning. */
+  readonly post?: { readonly options?: Partial<PostOptions>; readonly definition?: unknown }
   /** How a printer job is sliced (only read when the machine is a `printer`). */
   readonly print?: PrintRequirement
 }

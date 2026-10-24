@@ -58796,6 +58796,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     ],
                     "type": "string",
                   },
+                  "postDefinition": {},
                   "print": {
                     "additionalProperties": false,
                     "properties": {

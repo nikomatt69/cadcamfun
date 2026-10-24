@@ -55,3 +55,28 @@ describe("/api/library/{components,materials,tools}", () => {
     expect((await app.call("/api/library/tools", { auth: false })).status).toBe(401)
   })
 })
+
+describe("/api/library post definitions (spec 54 C1)", () => {
+  const definition = { schemaVersion: 1, name: "Shop", base: "generic", end: "M30", toolChange: ["T{tool} M6", "G43 H{tool}"] }
+  const post = { name: "Shop post", category: "post", type: "definition", data: definition }
+
+  test("a valid definition is stored as a library item and read back unchanged", async () => {
+    const r = await app.call("/api/library", { method: "POST", json: post })
+    expect(r.status).toBe(201)
+    expect((await app.call(`/api/library/${r.body.id}`)).body.data).toEqual(definition)
+    expect((await app.call("/api/library?category=post")).body.some((i: { id: string }) => i.id === r.body.id)).toBe(true)
+  })
+
+  test("a bad one is refused with the place of the mistake, on create and on update", async () => {
+    const bad = await app.call("/api/library", { method: "POST", json: { ...post, data: { ...definition, toolChange: ["T{toool} M6"] } } })
+    expect(bad.status).toBe(400)
+    expect(bad.body.message).toContain("toolChange[0]")
+    const good = await app.call("/api/library", { method: "POST", json: post })
+    const upd = await app.call(`/api/library/${good.body.id}`, { method: "PUT", json: { data: { ...definition, base: "mach9" } } })
+    expect(upd.status).toBe(400)
+    expect(upd.body.message).toContain("base")
+    expect((await app.call(`/api/library/${good.body.id}`)).body.data).toEqual(definition)
+    // Other categories are not looked at.
+    expect((await app.call("/api/library", { method: "POST", json: { ...post, category: "note", type: "text", data: { anything: 1 } } })).status).toBe(201)
+  })
+})

@@ -36,7 +36,7 @@ import { ProfileParams, generateProfile } from "../operations/profile.ts"
 import { SurfaceParams, generateSurface } from "../operations/surface.ts"
 import { ThreadParams, generateThread } from "../operations/thread.ts"
 import { ChamferParams, chamferGeometry, generateChamfer } from "../operations/chamfer.ts"
-import { dialectOf, getPost } from "../post/index.ts"
+import { compileDefinition, dialectOf, getPost } from "../post/index.ts"
 import { genericPost } from "../post/generic.ts"
 import { interpretGcode, type GSegment } from "../testing/gcode-interpreter.ts"
 import type { Stock } from "../tool.ts"
@@ -201,13 +201,17 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
   const origin: Vec3 = (job.origin ?? "stock-center") === "stock-corner"
     ? { x: stock.min.x, y: stock.min.y, z: stock.max.z }
     : { x: (stock.min.x + stock.max.x) / 2, y: (stock.min.y + stock.max.y) / 2, z: stock.max.z }
+  const definition = job.post?.definition === undefined ? undefined : compileDefinition(job.post.definition)
+  if (definition !== undefined && !definition.ok) {
+    return { status: "failed", issues: definition.issues.map((i) => issue("InvalidInput", "prepare", `Post definition ${i.path === "" ? "(root)" : i.path}: ${i.message}`)) }
+  }
   const finishAllowance = job.quality?.finishAllowance ?? material.finishAllowance
   const scallop = job.quality?.scallop ?? 0.01
   const plan = job.operations === undefined
     ? planJob({
         ...(job.setupOrientation !== undefined ? { setupOrientation: job.setupOrientation } : {}),
         elements, bounds, stock, tools, material, rigidity: machine.limits.rigidity ?? "standard", finishAllowance, scallop, flats: horizontalFaces(meshes),
-        rigidTap: dialectOf(machine.post)?.rigidTap !== undefined, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {})
+        rigidTap: (definition?.ok === true ? definition.dialect : dialectOf(machine.post))?.rigidTap !== undefined, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {})
       })
     : undefined
   const operations = job.operations ?? plan!.operations
@@ -676,7 +680,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     ...(job.workOffset !== undefined ? { workOffset: job.workOffset } : {}),
     metadata: { ...(job.setupOrientation !== undefined && job.setupOrientation !== "+Z" ? { setup: `Manual ${job.setupOrientation} setup - refixture and touch off; workholding unverified` } : {}), material: material.name, machine: machine.name, stock: `${width.toFixed(2)} x ${depthY.toFixed(2)} x ${(sMax.z - sMin.z).toFixed(2)} mm` }
   })
-  const post = getPost(machine.post) ?? genericPost
+  // `prepare` already refused a bad definition, so this one compiles.
+  const written = job.post?.definition === undefined ? undefined : compileDefinition(job.post.definition)
+  const post = written?.ok === true ? written.post : getPost(machine.post) ?? genericPost
   let nc = ""
   try {
     // The kernel writes machine coordinates (indexed setups): no tip-control word unless the caller asks for one.
