@@ -24,6 +24,7 @@
  */
 import { bodyTessellation, editHole, recognizeHoles, shadowSolid, transformBrep, type Brep, type RecognizedHole } from "../cad/brep/index.ts"
 import type { Transform } from "../cad/brep/math.ts"
+import { LONG_BUDGET_MS, withBudget } from "../cad/brep/budget.ts"
 import { elementBrep } from "../cad/scene-step.ts"
 import type { Vec2 } from "../cad/vec.ts"
 import { signedArea } from "../cad/shapes.ts"
@@ -331,7 +332,7 @@ export const exactFeatures = (e: CadElement, byId: ReadonlyMap<string, CadElemen
   const name = typeof e["name"] === "string" && e["name"] !== "" ? (e["name"] as string) : String(e["id"] ?? type)
   let result: ExactFeatures
   try {
-    const placed = elementBrep(e, byId)
+    const placed = withBudget(LONG_BUDGET_MS, () => elementBrep(e, byId))
     result = placed.brep === undefined ? { reason: `${name}: no exact model (${placed.reason})` } : brepFeatures(transform === undefined ? placed.brep : transformBrep(placed.brep, transform), name)
   } catch (cause) {
     result = { reason: `${name}: exact feature recognition failed (${cause instanceof Error ? cause.message : String(cause)})` }

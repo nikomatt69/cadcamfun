@@ -2,6 +2,7 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { elementBrep, sceneToStep, stepToElements } from "./scene-step.ts"
 import { brepBox } from "./history-brep.ts"
 import { massProperties, readStepBreps, validateBrep, writeStepBreps } from "./brep/index.ts"
+import { model } from "./script.ts"
 import { elementMesh, volumeOf } from "../cam/model/element-mesh.ts"
 
 setDefaultTimeout(60_000)
@@ -134,4 +135,19 @@ describe("STEP import heals what a foreign exporter left open", () => {
     expect(imported.warnings.some((w) => w.includes("healed on import"))).toBe(true)
     expect(rel(imported.report[0]!.volume, 6000)).toBeLessThan(1e-9)
   })
+})
+
+describe("a long thread in the exported drawing", () => {
+  test("a shaft with 31 turns of thread cut into it is written exact: the export can wait, an interactive rebuild could not", () => {
+    const m = model()
+    m.extrude(m.sketch("XY").circle([0, 0], 6), { depth: 36 })
+    m.thread({ kind: "external", diameter: 6, pitch: 1, length: 32, at: [0, 0], offset: 2, cut: true })
+    const part = { id: "rod", type: "parametric", name: "Rod", x: 0, y: 0, z: 0, history: m.build() }
+    const out = sceneToStep([part])
+    expect(out.skipped).toEqual([])
+    expect(out.parts.map((p) => p.exact)).toEqual([true])
+    expect(out.parts[0]!.valid).toBe(true)
+    expect(out.parts[0]!.faces).toBeGreaterThan(3000)
+    expect(readStepBreps(out.step!)).toBeDefined()
+  }, 120_000)
 })

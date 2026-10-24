@@ -1,7 +1,8 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { booleanBrep, makeBox, makeCylinder, massProperties, readStepBreps, validateBrep, writeStepBreps } from "./brep/index.ts"
 import { frame } from "./brep/math.ts"
-import { exactThreadPlan, exactThreadVolume, makeThreadBrep, makeThreadGrooveBrep, EXACT_THREAD_MAX_TURNS } from "./thread-brep.ts"
+import { withBudget } from "./brep/budget.ts"
+import { exactThreadPlan, exactThreadVolume, makeThreadBrep, makeThreadGrooveBrep, EXACT_THREAD_MAX_TURNS, EXACT_THREAD_QUICK_TURNS } from "./thread-brep.ts"
 import { rebuildExact } from "./history-brep.ts"
 import { model } from "./script.ts"
 import type { ThreadSpec } from "./thread.ts"
@@ -77,7 +78,7 @@ describe("the exact modelled thread (spec 40 U1)", () => {
     const cut = booleanBrep(shaft, makeThreadGrooveBrep(spec), "subtract").brep
     expect(validateBrep(cut).issues.map((i) => i.message)).toEqual([])
     // 6 mm of plain shaft plus the thread (its crest brought in by 0.03 mm: 0.5 % of the radius, so a little under the nominal).
-    const expected = Math.PI * 9 * 6 + (exactThreadVolume(spec) as number)
+    const expected = Math.PI * 9 * 6 + (withBudget(120_000, () => exactThreadVolume(spec)) as number)
     expect(rel(volume(cut), expected)).toBeLessThan(0.006)
     expect(volume(cut)).toBeLessThan(expected)
     // A shaft narrower than the thread's core is not thickened by it.
@@ -97,9 +98,14 @@ describe("the exact modelled thread (spec 40 U1)", () => {
 
   test("what it will not build is refused with its reason", () => {
     expect(exactThreadPlan({ ...M6, length: 1 })).toMatch(/too short/)
-    expect(exactThreadPlan({ ...M6, length: 40 })).toMatch(new RegExp(`at most ${EXACT_THREAD_MAX_TURNS} turns`))
+    // A long thread is a matter of time: a caller that limits it has the thread refused at once, with the time it would take.
+    expect(withBudget(2000, () => exactThreadPlan({ ...M6, length: 40 }))).toMatch(/needs at least 11\.7 s to build exactly, more than the \d\.\d s/)
+    // With no budget at all the caller is interactive: only the threads that build in a few seconds.
+    expect(exactThreadPlan({ ...M6, length: 40 })).toMatch(new RegExp(`at most ${EXACT_THREAD_QUICK_TURNS} turns`))
+    expect(typeof withBudget(60_000, () => exactThreadPlan({ ...M6, length: 40 }))).toBe("object")
+    expect(EXACT_THREAD_MAX_TURNS).toBeGreaterThanOrEqual(58)
     expect(exactThreadPlan({ ...M6, pitch: 5 })).toMatch(/too coarse/)
-    expect(() => makeThreadBrep({ ...M6, length: 40 })).toThrow(RangeError)
+    expect(() => withBudget(2000, () => makeThreadBrep({ ...M6, length: 40 }))).toThrow(RangeError)
     expect(() => makeThreadGrooveBrep({ ...M6, internal: true })).toThrow(/external/)
   })
 
@@ -113,7 +119,17 @@ describe("the exact modelled thread (spec 40 U1)", () => {
     const long = model()
     long.extrude(long.sketch("XY").circle([0, 0], 6), { depth: 60 })
     long.thread({ kind: "external", diameter: 6, pitch: 1, length: 50, at: [0, 0], offset: 0 })
-    // An external thread made a new body (a rod): that body says why it has no exact model, the shaft is untouched.
-    expect(rebuildExact(long.build()).bodies.map((b) => b.reason).find((r) => r !== undefined)).toMatch(/turns/)
+    // An external thread made a new body (a rod): under a time budget that body says why it has no exact model at once, the shaft is untouched.
+    expect(rebuildExact(long.build(), undefined, { budgetMs: 2000 }).bodies.map((b) => b.reason).find((r) => r !== undefined)).toMatch(/needs at least/)
   })
+
+  test("a thread of more than 24 turns is built when the caller gives the exact model a minute: valid, the volume within 0.2 % of the Pappus volume", () => {
+    const spec = { ...M6, length: 34 }
+    const rod = withBudget(120_000, () => makeThreadBrep(spec))
+    const plan = withBudget(120_000, () => exactThreadPlan(spec))
+    if (typeof plan === "string") throw new Error(plan)
+    expect(plan.turns).toBeGreaterThan(30)
+    expect(validateBrep(rod).valid).toBe(true)
+    expect(Math.abs(massProperties(rod).volume / (withBudget(120_000, () => exactThreadVolume(spec)) as number) - 1)).toBeLessThan(0.002)
+  }, 120_000)
 })

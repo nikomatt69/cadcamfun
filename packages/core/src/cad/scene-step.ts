@@ -6,6 +6,7 @@
  * has a mesh is written as a faceted solid and said so, a 2D or text element is skipped with the reason.
  */
 import { elementMesh, type Element } from "../cam/model/element-mesh.ts"
+import { LONG_BUDGET_MS, withBudget } from "./brep/budget.ts"
 import { catalogueBrep, rebuildExact, brepBox } from "./history-brep.ts"
 import type { History } from "./history.ts"
 import {
@@ -212,7 +213,7 @@ export const sceneToStep = (elements: ReadonlyArray<Element>, options: SceneStep
     const name = typeof e["name"] === "string" && e["name"] !== "" ? (e["name"] as string) : String(e["type"] ?? "element")
     if (e["visible"] === false || consumed.has(id)) continue
     if (e["type"] === "workpiece" || e["type"] === "stock") { skipped.push({ id, name, reason: "the stock is not a part of the model" }); continue }
-    const exact = elementBrep(e, byId)
+    const exact = withBudget(LONG_BUDGET_MS, () => elementBrep(e, byId))
     if (exact.brep !== undefined) {
       const rep = validateBrep(exact.brep, { skipVolume: true })
       breps.push({ name, brep: exact.brep })

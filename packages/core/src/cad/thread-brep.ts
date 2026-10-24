@@ -15,6 +15,7 @@
  *    keeps the facets within 0.02 mm of the helicoid and their radius is widened so that their area is the circle's (under 0.2 %).
  */
 import { booleanBrep } from "./brep/boolean.ts"
+import { remainingBudgetMs } from "./brep/budget.ts"
 import { frame, type Vec3 } from "./brep/math.ts"
 import { makeCylinder, polyhedron } from "./brep/primitives.ts"
 import type { Brep } from "./brep/topology.ts"
@@ -26,8 +27,17 @@ const TAN30 = Math.tan(Math.PI / 6)
  * start cap of the ridge and the seams of the cylinders do not line up for a Boolean to trip on.
  */
 const PHASE = 0.37
-/** Most turns of ridge the exact model builds: the Boolean work grows faster than the facets (an M6 of 39 turns takes 20 s, of 9 turns 3 s). */
-export const EXACT_THREAD_MAX_TURNS = 24
+/**
+ * Most turns of ridge the exact model builds when the caller says it can wait: the longest thread the standard sizes allow. The cost is
+ * the one Boolean that unites the ridge with its core, about 0.35 s a turn (an M6 of 13 turns takes 3 s, of 29 turns 9 s, of 39
+ * turns 14 s). A caller that gives the exact model a time budget (`withBudget`: the STEP export and the CAM kernel give a minute) gets a
+ * long thread built, or refused at once with the time it would take when the budget cannot cover it; a caller with no budget is an
+ * interactive one and gets the threads that build in a few seconds (`EXACT_THREAD_QUICK_TURNS`), the rest keep the mesh.
+ */
+export const EXACT_THREAD_MAX_TURNS = 60
+export const EXACT_THREAD_QUICK_TURNS = 24
+/** Seconds a turn of ridge takes at least; a thread is refused under a budget that cannot cover it (the measured cost is 0.31 to 0.36). */
+const SECONDS_PER_TURN = 0.3
 /** The facets stay this close to the helicoid, mm; the area compensation (`widen`) keeps the volume, not this, within 0.2 %. */
 const FACET_TOLERANCE = 0.02
 /** Facets per turn for a ridge reaching `radius`: chords of at most 13 degrees. */
@@ -42,7 +52,11 @@ export const exactThreadPlan = (t: ThreadSpec): { readonly turns: number; readon
   const baseWidth = sizes.rootWidth + 2 * sink * TAN30
   const turns = (t.length - baseWidth) / t.pitch
   if (!(turns > 0.25)) return `a thread of ${t.length} mm at a ${t.pitch} mm pitch is too short for a ridge (the profile alone is ${baseWidth.toFixed(2)} mm wide)`
-  if (turns > EXACT_THREAD_MAX_TURNS) return `a thread of ${turns.toFixed(1)} turns has more facets than the exact model builds (at most ${EXACT_THREAD_MAX_TURNS} turns)`
+  const left = remainingBudgetMs()
+  const most = Number.isFinite(left) ? EXACT_THREAD_MAX_TURNS : EXACT_THREAD_QUICK_TURNS
+  if (turns > most) return `a thread of ${turns.toFixed(1)} turns has more facets than the exact model builds without a time budget (at most ${most} turns)`
+  const needed = turns * SECONDS_PER_TURN * 1000
+  if (needed > left) return `a thread of ${turns.toFixed(1)} turns needs at least ${(needed / 1000).toFixed(1)} s to build exactly, more than the ${(left / 1000).toFixed(1)} s the exact model is given here`
   return { turns, steps: Math.ceil(turns * facetsPerTurn(sizes.major / 2)), sizes }
 }
 
@@ -64,6 +78,16 @@ export const exactThreadVolume = (t: ThreadSpec): number | string => {
 export const makeThreadBrep = (t: ThreadSpec, place?: (p: Vec3) => Vec3, crestTrim = 0, coreExtend = 0): Brep => {
   const plan = exactThreadPlan(t)
   if (typeof plan === "string") throw new RangeError(plan)
+  const move = place ?? ((p: Vec3) => p)
+  const core = makeCylinder(plan.sizes.minor / 2, t.length + 2 * coreExtend, coreFrame({ ...t, z0: (t.z0 ?? 0) - coreExtend }, move))
+  return booleanBrep(core, ridgeBrep(t, plan, move, crestTrim, 0, plan.turns), "union").brep
+}
+
+/**
+ * The faceted helicoid ridge for the turns `lo` to `hi` of the thread (0 to `plan.turns` is all of it): a closed polyhedron whose
+ * two ends are the profile in an axial plane. Ridges of consecutive turn ranges meet in the same plane with the same polygon.
+ */
+export const ridgeBrep = (t: ThreadSpec, plan: Exclude<ReturnType<typeof exactThreadPlan>, string>, move: (p: Vec3) => Vec3, crestTrim: number, lo: number, hi: number): Brep => {
   const { turns, steps, sizes } = plan
   const cx = t.cx ?? 0, cy = t.cy ?? 0, z0 = t.z0 ?? 0
   const rRoot = sizes.minor / 2
@@ -75,30 +99,30 @@ export const makeThreadBrep = (t: ThreadSpec, place?: (p: Vec3) => Vec3, crestTr
     { r: rRoot - sink, a: -baseWidth / 2 }, { r: rRoot + sizes.height - crestTrim, a: -sizes.crestWidth / 2 },
     { r: rRoot + sizes.height - crestTrim, a: sizes.crestWidth / 2 }, { r: rRoot - sink, a: baseWidth / 2 }
   ]
-  const move = place ?? ((p: Vec3) => p)
   // A step turns the profile by `alpha`; the polygon of N such steps has the area of the circle when its radius is widened by
   // sqrt(alpha / sin alpha), so the facets are inscribed and circumscribed in turn instead of all inside the true helicoid.
   const alpha = (2 * Math.PI * turns) / steps
   const widen = Math.sqrt(alpha / Math.sin(alpha))
+  // The steps of the whole thread are cut at the turn boundaries, so the facets of every range are those of the whole.
+  const kLo = Math.round((lo * steps) / turns), kHi = Math.round((hi * steps) / turns)
   const points: Vec3[] = []
-  for (let k = 0; k <= steps; k++) {
+  for (let k = kLo; k <= kHi; k++) {
     const turn = (turns * k) / steps
     const angle = PHASE + sign * 2 * Math.PI * turn
     for (const q of profile) points.push(move({ x: cx + widen * q.r * Math.cos(angle), y: cy + widen * q.r * Math.sin(angle), z: z0 + baseWidth / 2 + t.pitch * turn + q.a }))
   }
   const id = (k: number, j: number) => k * 4 + j
+  const count = kHi - kLo
   const faces: number[][] = []
-  for (let k = 0; k < steps; k++) {
+  for (let k = 0; k < count; k++) {
     for (let j = 0; j < 4; j++) {
       const j2 = (j + 1) % 4
       faces.push([id(k, j), id(k + 1, j), id(k + 1, j2)], [id(k, j), id(k + 1, j2), id(k, j2)])
     }
   }
-  faces.push([id(0, 0), id(0, 1), id(0, 2), id(0, 3)], [id(steps, 3), id(steps, 2), id(steps, 1), id(steps, 0)])
+  faces.push([id(0, 0), id(0, 1), id(0, 2), id(0, 3)], [id(count, 3), id(count, 2), id(count, 1), id(count, 0)])
   // A left-hand helix turns the other way: every face is wound the other way too, so the outside stays outside.
-  const ridge = polyhedron(points, sign < 0 ? faces.map((f) => [...f].reverse()) : faces)
-  const core = makeCylinder(rRoot, t.length + 2 * coreExtend, coreFrame({ ...t, z0: z0 - coreExtend }, move))
-  return booleanBrep(core, ridge, "union").brep
+  return polyhedron(points, sign < 0 ? faces.map((f) => [...f].reverse()) : faces)
 }
 
 /** The core's frame once `place` has carried the local Z axis to the world. */

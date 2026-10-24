@@ -326,9 +326,10 @@ describe("exact replay of a parametric history", () => {
   })
 
   test("features without an exact counterpart are never skipped silently", () => {
-    // A modelled thread is exact now (spec 40 U1); one of more than 24 turns still is not, and says why.
-    const threaded = rebuildExact(plate([{ id: "t", type: "thread", kind: "internal", diameter: 8, pitch: 1.25, length: 40, at: [20, 12.5] }]))
-    expect(threaded.bodies[0]!.reason).toContain("thread")
+    // A modelled thread is exact now (spec 40 U1); one too long for an interactive caller, or for the time it is given, is not, and says why.
+    const longThread = plate([{ id: "t", type: "thread", kind: "internal", diameter: 8, pitch: 1.25, length: 40, at: [20, 12.5] }])
+    expect(rebuildExact(longThread).bodies[0]!.reason).toContain("thread")
+    expect(rebuildExact(longThread, undefined, { budgetMs: 2000 }).bodies[0]!.reason).toContain("thread")
     expect(rebuildExact(plate([{ id: "t", type: "thread", kind: "internal", diameter: 8, pitch: 1.25, length: 6, at: [20, 12.5] }])).bodies[0]!.reason).toBeUndefined()
     // The draft of a hole wall is exact now (spec 40 U2); one that would widen the hole towards its bottom is an undercut, and says so
     // instead of leaving the body as it was.

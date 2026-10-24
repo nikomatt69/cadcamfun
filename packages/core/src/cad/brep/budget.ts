@@ -32,3 +32,9 @@ export const withBudget = <T>(ms: number, f: () => T): T => {
 export const checkBudget = (): void => {
   if (deadline !== Infinity && performance.now() > deadline) throw new BudgetExceeded(budget)
 }
+
+/** Milliseconds left of the current budget; `Infinity` without one. A builder that knows its cost refuses early instead of spending the budget on a failure. */
+export const remainingBudgetMs = (): number => (deadline === Infinity ? Infinity : Math.max(0, deadline - performance.now()))
+
+/** The budget of a caller that can wait (a STEP export, the CAM kernel preparing a part): long exact builds, such as a thread of dozens of turns, are allowed under it. */
+export const LONG_BUDGET_MS = 600_000
