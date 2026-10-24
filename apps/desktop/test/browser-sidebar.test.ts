@@ -172,3 +172,86 @@ describe("status strips", () => {
     } finally { dispose() }
   }, 120000)
 })
+
+// Exercise the controls moved into generator-style disclosures, over the same live stores.
+describe("sidebar controls", () => {
+  const tab = async (sidebar: Element, label: string) => {
+    const button = sidebar.querySelector<HTMLButtonElement>(`.sidebar-tabs button[aria-label="${label}"]`)!
+    button.click()
+    await settle()
+  }
+  const input = async (selector: string, value: string) => {
+    const field = await find<HTMLInputElement>(selector)
+    field.value = value
+    field.dispatchEvent(new window.Event("input", { bubbles: true }))
+    await settle()
+  }
+
+  test("CAD tools, layer editing, keyboard disclosure and collapsed tabs remain usable", async () => {
+    const { dispose } = app.visit("/cad")
+    try {
+      const sidebar = await find(".cad-workspace__sidebar")
+      await tab(sidebar, "Tools")
+      const section = sidebar.querySelector<HTMLElement>(".panel-section")!
+      const header = section.querySelector<HTMLElement>('[role="button"]')!
+      expect(header.getAttribute("aria-expanded")).toBe("true")
+      header.dispatchEvent(new window.KeyboardEvent("keydown", { key: " ", bubbles: true }))
+      expect(header.getAttribute("aria-expanded")).toBe("false")
+      header.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      expect(header.getAttribute("aria-expanded")).toBe("true")
+      expect(section.querySelector(".sidebar-tool")).not.toBeNull()
+
+      await tab(sidebar, "Layers")
+      sidebar.querySelector<HTMLButtonElement>('[aria-label="Add layer"]')!.click()
+      await input('input[placeholder="Layer name"]', "Sidebar fixture")
+      sidebar.querySelector<HTMLInputElement>('input[placeholder="Layer name"]')!.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }))
+      const { layers } = await stores()
+      expect(layers.getState().layers.some((layer) => layer.name === "Sidebar fixture")).toBe(true)
+      const row = [...sidebar.querySelectorAll<HTMLElement>(".sidebar-layer")].find((row) => row.textContent?.includes("Sidebar fixture"))!
+      row.querySelector<HTMLButtonElement>('[title="Edit Layer"]')!.click()
+      const name = row.querySelector<HTMLInputElement>('input[type="text"]')!
+      name.value = "Renamed fixture"
+      name.dispatchEvent(new window.Event("input", { bubbles: true }))
+      row.querySelector<HTMLButtonElement>('[aria-label="Save layer"]')!.click()
+      expect(layers.getState().layers.some((layer) => layer.name === "Renamed fixture")).toBe(true)
+
+      sidebar.querySelector<HTMLButtonElement>(".sidebar-footer button")!.click()
+      expect(sidebar.getAttribute("data-open")).toBe("false")
+      await tab(sidebar, "Explorer")
+      expect(sidebar.getAttribute("data-open")).toBe("true")
+      expect(sidebar.querySelector('[data-testid="browser-toolbar"]')).not.toBeNull()
+    } finally { dispose() }
+  }, 120000)
+
+  test("CAM stock, origin, view and snapping retain their values across disclosures", async () => {
+    const { dispose } = app.visit("/cam")
+    try {
+      const sidebar = await find(".cam-workspace__sidebar")
+      await find("#cam-stock-x")
+      await input("#cam-stock-x", "40/2+3")
+      await input("#workspace-origin-x", "-12,5")
+      const { useCamStore } = await import("../src/features/cam/store/camStore.ts")
+      const { cad } = await stores()
+      expect(useCamStore.getState().workpiece.x).toBe(23)
+      expect(cad.getState().originOffset.x).toBe(-12.5)
+      const header = sidebar.querySelector<HTMLElement>('#cam-workpiece [role="button"]')!
+      header.click()
+      expect(document.querySelector("#cam-stock-x")).toBeNull()
+      header.click()
+      expect(document.querySelector<HTMLInputElement>("#cam-stock-x")!.value).toBe("23")
+
+      await tab(sidebar, "Settings")
+      const before = cad.getState().gridVisible
+      sidebar.querySelector<HTMLInputElement>("#cam-view-grid")!.click()
+      expect(cad.getState().gridVisible).toBe(!before)
+      const snapping = sidebar.querySelector<HTMLInputElement>('#cam-snap input[type="checkbox"]')!
+      const enabled = snapping.checked
+      snapping.click()
+      expect(sidebar.querySelector<HTMLInputElement>('#cam-snap input[type="checkbox"]')!.checked).toBe(!enabled)
+      sidebar.querySelector<HTMLButtonElement>(".sidebar-footer button")!.click()
+      await tab(sidebar, "Machine")
+      expect(sidebar.getAttribute("data-open")).toBe("true")
+      expect(document.querySelector<HTMLInputElement>("#cam-stock-x")!.value).toBe("23")
+    } finally { dispose() }
+  }, 120000)
+})

@@ -86,6 +86,8 @@ export const printBodies = (selected: ReadonlyArray<CadElement>): PrintBodies =>
   for (const e of flat) {
     const id = typeof e["id"] === "string" ? e["id"] : undefined
     try {
+      const placement = sourceIssue(e)
+      if (placement !== undefined) { errors.push(placement); continue }
       if (id !== undefined && consumed.has(id)) {
         // A Boolean must not conceal an invalid source mesh among its consumed operands.
         if (e["type"] === "mesh") { const mesh = elementMesh(e); if (mesh === undefined) errors.push(`${label(e)}: source mesh could not be read`); else append(mesh, e, false) }
@@ -95,6 +97,7 @@ export const printBodies = (selected: ReadonlyArray<CadElement>): PrintBodies =>
         const result = booleanElementMesh(flat, e)
         warnings.push(...(result?.warnings ?? []))
         if (result === undefined) errors.push(`${label(e)}: Boolean result could not be meshed`)
+        else if (result.warnings.length > 0) errors.push(`${label(e)}: incomplete Boolean inputs: ${result.warnings.join("; ")}`)
         else append(wide(result.mesh), e)
         continue
       }

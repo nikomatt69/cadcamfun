@@ -1,3 +1,5 @@
+import { boxSelectionIncludes, projectedSelectionBounds, type ScreenBox } from "../lib/box-selection.ts"
+import "../../../styles/viewport-chrome.css"
 import { registerViewportCapture } from "../../ai/lib/viewport-capture.ts"
 import { spatialEvidence } from "../../ai/lib/spatial-evidence.ts"
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
@@ -69,6 +71,7 @@ export interface CADCanvasProps {
   /** A second canvas (for example in a dialog) leaves the global shortcuts to the main one. */
   readonly keyboard?: boolean
   /** Overlays the page adds on top of the viewport (transform panel, simulation toolbar, ...). */
+  readonly footerActions?: JSX.Element
   readonly children?: JSX.Element
 }
 
@@ -116,6 +119,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   let preview: THREE.Object3D | undefined
   let dragStart: DragStart | undefined
   let activeDragPoint: { elementId: string; pointIndex: number } | undefined
+  const [screenBox, setScreenBox] = createSignal<ScreenBox>()
   let pointerDown: { x: number; y: number; additive: boolean } | undefined
   /** One Three object per drawn element, with the shape it was built for. The canvas owns this map. */
   const objectsById = new Map<string, { object: THREE.Object3D; shape: number }>()
@@ -156,15 +160,6 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     return { x: ((vector.x + 1) / 2) * rect.width, y: ((-vector.y + 1) / 2) * rect.height }
   }
 
-  const screenToWorld = (screenX: number, screenY: number) => {
-    if (!container || !camera) return null
-    const rect = container.getBoundingClientRect()
-    const ndc = new THREE.Vector3((screenX / rect.width) * 2 - 1, -(screenY / rect.height) * 2 + 1, 0).unproject(camera)
-    const ray = new THREE.Raycaster(camera.position, ndc.sub(camera.position).normalize())
-    const hit = new THREE.Vector3()
-    return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), hit) ?? null
-  }
-
   const setPointer = (event: { clientX: number; clientY: number }) => {
     const rect = container.getBoundingClientRect()
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -192,7 +187,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
   const isLocked = (id: string) => {
     const element = elements.elements.find((candidate) => candidate.id === id)
-    return !!element && !!layers.layers.find((layer) => layer.id === element.layerId)?.locked
+    return !!element && (element.locked === true || !!layers.layers.find((layer) => layer.id === element.layerId)?.locked)
   }
 
   // ---------------------------------------------------------------------------------------------------- scene setup
@@ -297,8 +292,22 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       fullscreenTimer = setTimeout(() => { resize(); invalidate() }, 100)
     }
     document.addEventListener("fullscreenchange", fullscreen)
-    const release = () => finishInteraction()
+    const release = (event: MouseEvent) => onMouseUp(event)
+    const moveOutside = (event: MouseEvent) => {
+      if (screenBox() && !(event.target instanceof Node && container.contains(event.target))) updateScreenBox(event)
+    }
+    const stopOrbitSelection = (event: PointerEvent) => {
+      if (isSelectionMode() && event.button === 0 && event.target === renderer?.domElement) event.stopPropagation()
+    }
+    const cancelSelection = () => {
+      if (screenBox()) { selection.endBoxSelection(); setScreenBox(undefined); pointerDown = undefined; if (orbit) orbit.enabled = !isPlacing() }
+    }
+    const escapeSelection = (event: KeyboardEvent) => { if (event.key === "Escape") cancelSelection() }
+    container.addEventListener("pointerdown", stopOrbitSelection, true)
+    window.addEventListener("mousemove", moveOutside)
     window.addEventListener("mouseup", release)
+    window.addEventListener("blur", cancelSelection)
+    window.addEventListener("keydown", escapeSelection)
 
     onCleanup(() => {
       unregisterCapture()
@@ -318,6 +327,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       window.removeEventListener("resize", resize)
       document.removeEventListener("fullscreenchange", fullscreen)
       window.removeEventListener("mouseup", release)
+      window.removeEventListener("mousemove", moveOutside)
+      window.removeEventListener("blur", cancelSelection)
+      window.removeEventListener("keydown", escapeSelection)
+      container.removeEventListener("pointerdown", stopOrbitSelection, true)
+      if (screenBox()) selection.endBoxSelection()
       gizmo?.getHelper().removeFromParent()
       gizmo?.dispose()
       orbit?.dispose()
@@ -692,57 +706,34 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       endControlPointDrag()
       if (orbit) orbit.enabled = true
     }
-    if (selection.isBoxSelecting) {
-      selection.endBoxSelection(boxSelectionHits(), additive)
+    const box = screenBox()
+    if (box) {
+      const moved = Math.hypot(box.end.x - box.start.x, box.end.y - box.start.y) > 4
+      const hits = moved ? boxSelectionHits(box) : []
+      selection.endBoxSelection()
+      setScreenBox(undefined)
+      if (moved) selection.selectMultiple(additive ? [...selection.selectedElementIds, ...hits] : hits)
       if (orbit) orbit.enabled = !isPlacing()
     }
   }
 
-  const boxSelectionHits = (): string[] => {
-    const start = selection.boxStartPosition
-    const end = selection.boxEndPosition
-    if (!start || !end || !camera || !container || !scene) return []
-
+  const localScreenPoint = (event: { clientX: number; clientY: number }) => {
     const rect = container.getBoundingClientRect()
-    const activeCamera = camera!
-    const fromScreen = worldToScreen({ ...start, z: 0 })
-    const toScreen = worldToScreen({ ...end, z: 0 })
-    if (!fromScreen || !toScreen) return []
-    const leftToRight = toScreen.x >= fromScreen.x
-    const boxLeft = Math.min(fromScreen.x, toScreen.x) + rect.left
-    const boxRight = Math.max(fromScreen.x, toScreen.x) + rect.left
-    const boxTop = Math.min(fromScreen.y, toScreen.y) + rect.top
-    const boxBottom = Math.max(fromScreen.y, toScreen.y) + rect.top
-    const bounds = new THREE.Box3()
-    // One pass over the elements instead of a layer lookup per candidate object.
-    const lockedIds = new Set<string>()
-    for (const element of elements.elements) {
-      if (element.locked || layers.layers.find((layer) => layer.id === element.layerId)?.locked) lockedIds.add(element.id)
-    }
-    const entities = cadObjects().filter((object) => !lockedIds.has(object.userData.elementId as string))
-    const corner = new THREE.Vector3()
-    return entities.filter((object) => {
-      object.updateMatrixWorld(true)
-      bounds.setFromObject(object)
-      if (bounds.isEmpty()) return false
-      let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity
-      for (let index = 0; index < 8; index++) {
-        corner.set(
-          index & 4 ? bounds.max.x : bounds.min.x,
-          index & 2 ? bounds.max.y : bounds.min.y,
-          index & 1 ? bounds.max.z : bounds.min.z
-        ).project(activeCamera)
-        const x = rect.left + (corner.x + 1) * rect.width / 2
-        const y = rect.top + (1 - corner.y) * rect.height / 2
-        if (x < left) left = x
-        if (x > right) right = x
-        if (y < top) top = y
-        if (y > bottom) bottom = y
-      }
-      return leftToRight
-        ? left >= boxLeft && right <= boxRight && top >= boxTop && bottom <= boxBottom
-        : right >= boxLeft && left <= boxRight && bottom >= boxTop && top <= boxBottom
-    }).map((object) => object.userData.elementId as string)
+    return { x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)), y: Math.max(0, Math.min(rect.height, event.clientY - rect.top)) }
+  }
+  const updateScreenBox = (event: { clientX: number; clientY: number }) => {
+    const box = screenBox()
+    if (!box) return
+    setScreenBox({ start: box.start, end: localScreenPoint(event) })
+  }
+  const boxSelectionHits = (box: ScreenBox): string[] => {
+    if (!camera || !container) return []
+    const rect = container.getBoundingClientRect()
+    return visibleObjects.filter(object => {
+      if (isLocked(String(object.userData.elementId))) return false
+      const bounds = projectedSelectionBounds(object, camera!, rect.width, rect.height)
+      return bounds !== undefined && boxSelectionIncludes(box, bounds)
+    }).map(object => String(object.userData.elementId))
   }
 
   const snapped = (point: Point3): Point3 => (snap.snapSettings().enabled ? snap.snapToPoint(point) ?? point : point)
@@ -806,11 +797,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       invalidate()
       return
     }
-    if (selection.isBoxSelecting) {
-      const world = screenToWorld(event.clientX - rect.left, event.clientY - rect.top)
-      if (world) selection.updateBoxSelection({ x: world.x, y: world.y })
-      return
-    }
+    if (screenBox()) { updateScreenBox(event); return }
     if (activeDragPoint) {
       const hit = planePoint()
       if (hit) {
@@ -825,19 +812,18 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   }
 
   const onMouseDown = (event: MouseEvent) => {
-    if (!container || !scene || !camera) return
+    if (!container || !scene || !camera || event.target !== renderer?.domElement) return
     if (isPlacing()) { placeComponent(); return }
     if (event.button !== 0) return
     if (gizmo && (gizmo.dragging || gizmo.axis)) return
-    const rect = container.getBoundingClientRect()
+    pointerDown = { x: event.clientX, y: event.clientY, additive: event.shiftKey || event.ctrlKey || event.metaKey || isMultiSelectMode() }
     if (isSelectionMode()) {
-      const world = screenToWorld(event.clientX - rect.left, event.clientY - rect.top)
-      if (world) {
-        selection.startBoxSelection({ x: world.x, y: world.y })
-        if (orbit) orbit.enabled = false
-        event.preventDefault()
-        return
-      }
+      const start = localScreenPoint(event)
+      setScreenBox({ start, end: start })
+      selection.startBoxSelection(start)
+      if (orbit) orbit.enabled = false
+      event.preventDefault()
+      return
     }
     setPointer(event)
     const pointHit = raycaster.intersectObjects(controlPoints)[0]
@@ -852,8 +838,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
   const onMouseUp = (event: MouseEvent) => {
     const down = pointerDown
+    const box = screenBox()
+    if (box) updateScreenBox(event)
+    const boxMoved = box && Math.hypot(event.clientX - (down?.x ?? event.clientX), event.clientY - (down?.y ?? event.clientY)) > 4
     finishInteraction(down?.additive ?? (event.shiftKey || event.ctrlKey || event.metaKey || isMultiSelectMode()))
     pointerDown = undefined
+    if (boxMoved) return
     if (!down || !container || !camera || isPlacing()) return
     if (gizmo && (gizmo.dragging || gizmo.axis)) return
     if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return // an orbit drag, not a click
@@ -1006,34 +996,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </div>
       </Show>
 
-      <div class="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-1" data-testid="section-control">
-        <button
-          type="button"
-          class="rounded-md px-2 py-1 text-[11px] text-white"
-          style={{ "background-color": cad.section.enabled ? "#f57c00" : "rgba(0,0,0,0.7)" }}
-          aria-pressed={cad.section.enabled}
-          title={t("cad.section")}
-          onClick={() => {
-            const range = sectionRange()
-            const inside = cad.section.position >= range.min && cad.section.position <= range.max
-            cad.setSection({ enabled: !cad.section.enabled, ...(inside ? {} : { position: Math.round((range.min + range.max) / 2) }) })
-          }}
-        >{t("cad.section")}</button>
-        <Show when={cad.section.enabled}>
-          <div class="flex items-center gap-2 rounded-md bg-black/80 px-2 py-1.5 text-[11px] text-white">
-            <For each={SECTION_AXES}>{(axis) => (
-              <button type="button" aria-pressed={cad.section.axis === axis} aria-label={`${t("cad.section.axis")} ${axis.toUpperCase()}`}
-                class="rounded px-1.5 py-0.5 uppercase" style={{ "background-color": cad.section.axis === axis ? "#f57c00" : "#374151" }}
-                onClick={() => cad.setSection({ axis })}>{axis}</button>
-            )}</For>
-            <input type="range" aria-label={t("cad.section.constant")} min={sectionRange().min} max={sectionRange().max} step="0.5" value={cad.section.position}
-              onInput={(event) => cad.setSection({ position: Number(event.currentTarget.value) })} />
-            <input type="number" aria-label={t("cad.section.constant")} class="w-16 rounded bg-gray-700 px-1 text-right" step="0.5" value={cad.section.position}
-              onInput={(event) => { const next = Number(event.currentTarget.value); if (Number.isFinite(next)) cad.setSection({ position: next }) }} />
-            <label class="flex items-center gap-1"><input type="checkbox" checked={cad.section.inverted} onChange={(event) => cad.setSection({ inverted: event.currentTarget.checked })} />{t("cad.section.invert")}</label>
-          </div>
-        </Show>
-      </div>
+
 
       <SnapIndicator x={snapScreen().x} y={snapScreen().y} type={snapScreen().type} visible={snapScreen().visible} />
 
@@ -1051,7 +1014,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         />
       </div>
 
-      <BoxSelection worldToScreen={worldToScreen} />
+      <BoxSelection box={screenBox()} />
 
       <Show when={showElementsList()}>
         <div class="absolute top-16 cursor-pointer right-4 bottom-16 z-10"><ElementsListPanel onClose={() => setShowElementsList(false)} /></div>
@@ -1122,10 +1085,41 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         <Cog size={18} />
       </button>
 
-      <div class="absolute bottom-4 right-4 flex space-x-2">
-        <button onClick={toggleFullscreen} class="p-2 bg-[#F8FBFF] dark:bg-black dark:text-white bg-opacity-80 rounded-md shadow-md hover:bg-opacity-100 z-10 transition-all duration-200" title={isFullscreen() ? "Exit fullscreen mode" : "Fullscreen view"}>
-          <Show when={isFullscreen()} fallback={<Maximize2 size={20} class="text-gray-700" />}><Minimize2 size={20} class="text-gray-700" /></Show>
-        </button>
+      <div class="panel cad-viewport-footer" data-testid="cad-viewport-footer">
+      <div class="cad-viewport-footer__section" data-testid="section-control">
+        <button
+          type="button"
+          class="rounded-md px-2 py-1 text-[11px] text-white"
+          style={{ "background-color": cad.section.enabled ? "#f57c00" : "rgba(0,0,0,0.7)" }}
+          aria-pressed={cad.section.enabled}
+          title={t("cad.section")}
+          onClick={() => {
+            const range = sectionRange()
+            const inside = cad.section.position >= range.min && cad.section.position <= range.max
+            cad.setSection({ enabled: !cad.section.enabled, ...(inside ? {} : { position: Math.round((range.min + range.max) / 2) }) })
+          }}
+        >{t("cad.section")}</button>
+        <Show when={cad.section.enabled}>
+          <div class="cad-viewport-footer__section-fields">
+            <For each={SECTION_AXES}>{(axis) => (
+              <button type="button" aria-pressed={cad.section.axis === axis} aria-label={`${t("cad.section.axis")} ${axis.toUpperCase()}`}
+                class="rounded px-1.5 py-0.5 uppercase" style={{ "background-color": cad.section.axis === axis ? "#f57c00" : "#374151" }}
+                onClick={() => cad.setSection({ axis })}>{axis}</button>
+            )}</For>
+            <input type="range" aria-label={t("cad.section.constant")} min={sectionRange().min} max={sectionRange().max} step="0.5" value={cad.section.position}
+              onInput={(event) => cad.setSection({ position: Number(event.currentTarget.value) })} />
+            <input type="number" aria-label={t("cad.section.constant")} class="w-16 rounded bg-gray-700 px-1 text-right" step="0.5" value={cad.section.position}
+              onInput={(event) => { const next = Number(event.currentTarget.value); if (Number.isFinite(next)) cad.setSection({ position: next }) }} />
+            <label class="flex items-center gap-1"><input type="checkbox" checked={cad.section.inverted} onChange={(event) => cad.setSection({ inverted: event.currentTarget.checked })} />{t("cad.section.invert")}</label>
+          </div>
+        </Show>
+      </div>
+        <div class="cad-viewport-footer__actions">
+          {props.footerActions}
+          <button type="button" onClick={toggleFullscreen} class="panel-icon-btn" title={isFullscreen() ? "Exit fullscreen mode" : "Fullscreen view"} aria-label={isFullscreen() ? "Exit fullscreen mode" : "Fullscreen view"}>
+            <Show when={isFullscreen()} fallback={<Maximize2 size={18} />}><Minimize2 size={18} /></Show>
+          </button>
+        </div>
       </div>
       <div class="absolute bottom-4 left-4">
         <button onClick={() => setShowShortcuts(true)} class="p-2 bg-[#F8FBFF] dark:bg-gray-800 bg-opacity-80 rounded-full text-gray-700 dark:text-gray-200 hover:bg-opacity-100 shadow-md hover:shadow-lg transition-all duration-200" title="Show keyboard shortcuts (? or F2)">

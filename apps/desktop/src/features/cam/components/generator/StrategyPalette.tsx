@@ -4,8 +4,7 @@
  * Replaces the legacy `<select>` of `OperationSection` with a categorised icon palette:
  * the user picks the strategy family on the left (2.5D Milling, 3D Milling, Drilling,
  * Turning, Multi-Axis, 3D Printing), then the active strategy on the right. Every cell
- * shows an icon, a short label and a description that mirrors the language the
- * `cam.core` schema and the sidecar already use.
+ * shows a compact icon and label; the generator supplies a contextual 3D example.
  *
  * Operations are organised to mirror what users see in Fusion 360 / Hypermill so the
  * app reads as "production CAM" instead of a five-item dropdown.
@@ -312,7 +311,7 @@ export interface StrategyPaletteProps {
   readonly activeOperation: string
   /** Called with the strategy palette id (e.g. `contour`, `axis_5_swarf`). */
   readonly onSelect?: (paletteId: string) => void
-  /** Optional: render in a compact mode that hides the description panel. */
+  /** Optional compact palette layout. */
   readonly compact?: boolean
 }
 

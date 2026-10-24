@@ -1,3 +1,4 @@
+import { INPUT, PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
 import { drawing, type History } from "@cadcamfun/core"
 import { t } from "../../../i18n/index.ts"
@@ -5,8 +6,7 @@ import { useElementsStore } from "../store/elementsStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
 import { downloadDrawing, drawingPdf } from "../lib/drawing-export.ts"
 
-const INPUT = "w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800"
-const BUTTON = "rounded border border-gray-300 px-3 py-1.5 text-xs hover:bg-gray-100 disabled:opacity-40 dark:border-gray-600 dark:hover:bg-gray-700"
+const BUTTON = "panel-btn"
 type Principal = "front" | "top" | "right"
 
 /** Derived sheets stay separate from model geometry and undo history. Every source/options change invalidates the preview. */
@@ -59,8 +59,7 @@ export default function DrawingPanel(): JSX.Element {
   const preview = () => sheet() === undefined ? "" : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sheet()!.svg)}`
   const field = (label: string, value: () => string, set: (v: string) => void, numeric = false) =>
     <label class="block text-xs"><span class="mb-1 block text-gray-500">{label}</span><input class={INPUT} type={numeric ? "number" : "text"} step={numeric ? "any" : undefined} required={numeric} value={value()} onInput={(e) => set(e.currentTarget.value)} /></label>
-  return <section class="space-y-4 p-4 text-gray-900 dark:text-gray-100" data-testid="drawing-panel" aria-label={t("cad.drawing.title")}>
-    <h3 class="font-semibold">{t("cad.drawing.title")}</h3>
+  return <PanelCard title={t("cad.drawing.title")} testId="drawing-panel">
     <p class="text-xs text-gray-500">{t("cad.drawing.description")}</p>
     <Show when={parts().length > 0} fallback={<p>{t("cad.drawing.empty")}</p>}>
       <fieldset disabled={busy()} class="space-y-3">
@@ -80,7 +79,7 @@ export default function DrawingPanel(): JSX.Element {
           {field(t("cad.drawing.x"), x, setX, true)}{field(t("cad.drawing.y"), y, setY, true)}{field(t("cad.drawing.z"), z, setZ, true)}
           {field(t("cad.drawing.radius"), radius, setRadius, true)}{field(t("cad.drawing.factor"), factor, setFactor, true)}
         </div></Show>
-        <button type="button" class={`${BUTTON} w-full`} onClick={() => void generate()}>{t("cad.drawing.generate")}</button>
+        <button type="button" class={`${BUTTON} panel-btn--primary panel-btn--block`} onClick={() => void generate()}>{t("cad.drawing.generate")}</button>
       </fieldset>
       <Show when={busy()}><p role="status" class="text-xs">{t("cad.drawing.working")}</p></Show>
       <Show when={error()}><p role="alert" class="text-xs text-red-600">{error()}</p></Show>
@@ -95,5 +94,5 @@ export default function DrawingPanel(): JSX.Element {
         </dialog>
       </div>}</Show>
     </Show>
-  </section>
+  </PanelCard>
 }

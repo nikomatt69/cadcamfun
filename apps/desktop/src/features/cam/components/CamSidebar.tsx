@@ -56,7 +56,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
       class="cam-workspace__sidebar panel workspace-sidebar flex-shrink-0 h-full flex flex-col"
       data-open={props.isOpen}
     >
-      <SidebarTabs class="cam-workspace__tabs" open={props.isOpen} active={props.activeTab} onSelect={props.onSelectTab}
+      <SidebarTabs class="cam-workspace__tabs" open={props.isOpen} active={props.activeTab} onSelect={(tab) => { props.onSelectTab(tab); if (!props.isOpen) props.setIsOpen(true) }}
         tabs={TABS.map((tab) => ({ ...tab, label: t(tab.label), title: t(tab.title) }))} />
 
       <div class="sidebar-scroll min-h-0 flex-1 overflow-y-auto">
@@ -65,10 +65,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
           fallback={
             <div class="sidebar-rail">
               <Show when={props.activeTab === "explorer"}>
-                <div class="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
-                  <List size={20} class="mx-auto mb-2" />
-                  {t("cam.openSidebarHint")}
-                </div>
+                <button type="button" class="panel-icon-btn" title={t("cam.openSidebarHint")} aria-label={t("cam.openSidebarHint")} onClick={() => props.setIsOpen(true)}><List size={16} /></button>
               </Show>
               <Show when={props.activeTab === "settings"}>
                 <div class="space-y-4 p-1">

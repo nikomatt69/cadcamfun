@@ -1,8 +1,54 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Print deposition evidence (2026-10-24)
+
+The printing continuation owns only the existing print result/kernel/evidence panels and CAM
+locale for showing independent deposition measures and support/connectivity checks. Display
+the replay's actual cell size, occupied and extruded volume distinctly, and unsupported
+bearing area. Preserve preview/blocked releases and explain unqualified bridge evidence.
+No sidebar, boot, layout-system or CAD-panel changes belong to this increment.
+
+## Unified CAD and CAM panels (2026-10-24)
+
+Status: in progress. Owner extension: both left and right sidebars, including every
+internal panel in CAD and CAM, receive the care and CSS approach of the Toolpath
+Generator. WP6 owns the shared panel/sidebar primitives and styles, CAD/CAM page
+inspector chrome and panel components, locale and corresponding desktop tests.
+Build on the left-sidebar refinement below; extend it to CAD Properties, Modeling,
+Drawing, Settings, Plugins and Assembly, and CAM Generator, Cycles and Verify.
+Use the same tabs, independent scrolling, collapse controls, compact sections,
+fields, buttons, theme tokens and focus/selection/error states. Remove oversized
+spacing, glass surfaces and decorative per-control motion. Preserve editing,
+validation and every panel action. Verify both themes, narrow columns, panel
+switching and keyboard flows, then run the desktop typecheck/build and targeted
+regressions. API, geometry and persistence contracts stay unchanged.
+
+Further owner extension: apply the same shared panel CSS and information quality
+to the central CAM G-code editor and post-processor, including all controller
+options, presets and results. Add concise context derived from the current input
+and processing state; avoid static capability catalogues. Keep the toolpath
+visualization unchanged. Preserve editing, processing, controller selection and
+export behavior, and verify readable contrast in the supplied dark-theme case.
+
+Owner screenshot follow-up: CAD viewport Section View, assistant and fullscreen
+controls currently share absolute bottom-right coordinates. WP6/WP7 may edit
+CADCanvas overlay markup/CSS and the page's assistant placement to give them one
+bounded footer layout. The expanded section controls wrap above the action row;
+no button may overlap at narrow sizes or while sectioning is enabled. Keep scene,
+camera, rendering and toolpath visualization behavior unchanged.
+
+Owner selection follow-up: the CAD selection rectangle must track viewport-local
+CSS pixels, independently of the drawing plane and camera orientation. Preserve
+left-to-right containment and right-to-left crossing, multi-select/modifier
+behavior, locked/hidden exclusion and click selection. Overlay controls must not
+start a canvas gesture; releasing outside the canvas and Escape must end it
+cleanly. Test transformed 3D bounds and screen-space drag behavior.
+
 ## CAD and CAM left sidebar refinement (2026-10-24)
 
-Status: in progress. Owner-requested WP6 refinement covers all CAD left tabs
+Status: implemented; typecheck and interaction checks pass. Visual browser QA remains
+pending because browser-control is unavailable and the desktop UI bridge fails to start.
+Owner-requested WP6 refinement covers all CAD left tabs
 (Tools, Explorer, Layers) and CAM left tabs (Explorer, Settings, Machine).
 Reuse the generator's shared panel tokens, disclosure sections, numeric fields,
 compact controls, selection and focus states in both themes. Keep model browser
@@ -11,7 +57,16 @@ operations, quick navigation and collapse available. Shared sidebar chrome and
 styles live under `shared/components/panel` and `styles`; matching components,
 locale and desktop checks are WP6-owned. No state or API contracts change.
 
-Change log: 2026-10-24 — registered the owner-requested sidebar UI refinement.
+Change log: 2026-10-24 — implemented shared sidebar tabs, collapse controls and generator
+sections across all six tabs. Tool categories and layers have keyboard-operable disclosures;
+collapsed tabs reopen the chosen panel. Stock and origin reuse expression-aware numeric
+fields. Model browser rows fit narrow columns while preserving actions and assignment
+status. Shared sections and the floating creation form carry their own theme tokens for
+standalone use. Fourteen live UI/store tests and two workstation checks pass; the earlier
+browser/machine-data/workstation run also passed all 22 tests. Desktop typecheck and API
+reference regeneration pass. Native/browser screenshots could not be captured in this session. The production build
+was interrupted after remaining in dependency transformation without further output;
+production bundle verification remains pending.
 
 ## Generator contextual examples (2026-10-24)
 

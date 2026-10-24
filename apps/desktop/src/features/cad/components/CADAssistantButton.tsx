@@ -8,7 +8,9 @@ export function CADAssistantButton(props: Props): JSX.Element {
   return (
     <button
       onClick={() => props.toggleVisibility()}
-      class={`p-2 rounded-lg shadow-lg z-60 transition-colors ${props.isVisible ? "bg-blue-700 text-white z-60" : "bg-white text-blue-700 hover:bg-blue-50"} ${props.class ?? ""}`}
+      class={`panel-icon-btn ${props.class ?? ""}`}
+      aria-pressed={props.isVisible}
+      aria-label={props.isVisible ? "Hide CAD Assistant" : "Show CAD Assistant"}
       title={props.isVisible ? "Hide CAD Assistant" : "Show CAD Assistant"}
     >
       <Cpu size={18} />

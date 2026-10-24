@@ -1,3 +1,4 @@
+import { PanelCard } from "../../../../shared/components/panel/ui.tsx"
 /**
  * Component automations of the assembly workspace, on the exact model: insert the fasteners the parts' shared holes need, join
  * the parts on their shared hole axes (assembly joints), check every pair of parts for interference, and list the bill of
@@ -15,7 +16,7 @@ type Skipped = ReadonlyArray<{ readonly id: string; readonly name: string; reado
 
 const fmt = (x: number, d = 2) => x.toLocaleString(undefined, { maximumFractionDigits: d })
 const grid = "grid grid-cols-[1.5rem_1fr_2.5rem_4.5rem] gap-x-2"
-const button = "px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+const button = "panel-btn"
 
 export default function AssemblyAutomation(): JSX.Element {
   const store = useElementsStore()
@@ -74,8 +75,7 @@ export default function AssemblyAutomation(): JSX.Element {
   )
 
   return (
-    <section class="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700" data-testid="assembly-automation">
-      <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{t("cad.automation.title")}</h3>
+    <PanelCard title={t("cad.automation.title")} testId="assembly-automation">
 
       <div class="space-y-2">
         <div class="flex items-center justify-between gap-2">
@@ -192,6 +192,6 @@ export default function AssemblyAutomation(): JSX.Element {
       </div>
 
       <Show when={error()}><p class="text-xs text-red-700 dark:text-red-300">{error()}</p></Show>
-    </section>
+    </PanelCard>
   )
 }

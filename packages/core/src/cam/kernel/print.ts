@@ -112,6 +112,7 @@ export const runPrintJob = (job: ManufacturingJob, options: PrintRunOptions = {}
   const fail = (...issues: CamIssue[]): CamResult<CamArtifact> => ({ status: "failed", issues })
   if (machine?.kind !== "printer" || machine.printer === undefined) return fail(issue("InvalidInput", "prepare", "A print job needs a printer"))
   if (job.schemaVersion !== KERNEL_SCHEMA_VERSION) return fail(issue("InvalidInput", "prepare", `Unsupported job schema version ${String(job.schemaVersion)}`))
+  if (options.signal?.aborted === true) return fail(issue("Cancelled", "prepare", "The job was cancelled before source validation; no artifact was produced"))
 
   const filament = findFilament(job.material)
   const issues: CamIssue[] = []
@@ -121,7 +122,6 @@ export const runPrintJob = (job: ManufacturingJob, options: PrintRunOptions = {}
   if (part.errors.length > 0) return fail(...issues, ...part.errors.map((error) => issue("InvalidInput", "prepare", error)))
   let meshes = part.meshes
   if (meshes.length === 0) return fail(...issues, issue("InvalidInput", "prepare", part.skipped.length > 0 ? `Nothing to print: ${part.skipped.join(", ")} ${part.skipped.length === 1 ? "has" : "have"} no volume` : "The part has no solid to print"))
-  for (const m of meshes) if (!m.positions.every(Number.isFinite)) return fail(...issues, issue("InvalidInput", "prepare", "The part mesh has non-finite coordinates"))
   for (const w of part.warnings) issues.push(issue("InvalidInput", "prepare", w, { severity: "warning" }))
   for (const s of part.skipped) issues.push(issue("UnsupportedCapability", "prepare", `${s} is not a solid and was not printed`, { severity: "warning" }))
 

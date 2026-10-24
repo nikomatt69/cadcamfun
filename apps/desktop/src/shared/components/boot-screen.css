@@ -1,0 +1,55 @@
+/*
+ * Boot splash mark — the CADCAMFUN cube that breathes while the sidecar boots.
+ *
+ * The mark is the only element above the status lines ("Checking the API",
+ * "Waiting for the sidecar to answer"), so it has to carry the "still working"
+ * signal on its own. Scale + opacity only, so the loop stays on the compositor.
+ */
+
+.boot-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+}
+
+.boot-mark-image {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(15, 23, 42, 0.35));
+  animation: boot-mark-pulse 2s var(--ui-ease-in-out, cubic-bezier(0.77, 0, 0.175, 1)) infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes boot-mark-pulse {
+  0%, 100% { transform: scale(0.94); opacity: 0.55; }
+  50%      { transform: scale(1.04); opacity: 1; }
+}
+
+/* A soft halo behind the mark, so the pulse reads as "alive" in both themes. */
+.boot-mark-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.5) 0%, rgba(59, 130, 246, 0) 70%);
+  animation: boot-mark-glow 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes boot-mark-glow {
+  0%, 100% { opacity: 0.3; transform: scale(0.9); }
+  50%      { opacity: 0.85; transform: scale(1.06); }
+}
+
+/* Reduced motion: the mark stays, the breathing stops. */
+@media (prefers-reduced-motion: reduce) {
+  .boot-mark-image,
+  .boot-mark-glow {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

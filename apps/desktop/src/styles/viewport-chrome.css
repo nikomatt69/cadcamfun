@@ -1,0 +1,10 @@
+/* One footer owns the bottom-right corner, including the page's assistant action. */
+.cad-viewport-footer { position: absolute; right: 12px; bottom: 12px; z-index: 10; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: calc(100% - 72px); pointer-events: none; }
+.cad-viewport-footer > * { pointer-events: auto; max-width: 100%; }
+.cad-viewport-footer__section { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.cad-viewport-footer__section-fields { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; padding: 6px; border: 1px solid var(--panel-border); border-radius: 5px; background: var(--panel-bg); color: var(--panel-text); font-size: 11px; max-width: 100%; }
+.cad-viewport-footer__section-fields input[type="range"] { width: 100px; max-width: 100%; }
+.cad-viewport-footer__section-fields input[type="number"] { width: 58px; }
+.cad-viewport-footer__actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 4px; border: 1px solid var(--panel-border); border-radius: 5px; background: var(--panel-bg); }
+.cad-viewport-footer__actions .panel-icon-btn { width: 30px; height: 30px; box-shadow: none; }
+.cad-viewport-footer__actions .panel-icon-btn[aria-pressed="true"] { background: var(--panel-accent-soft); color: var(--panel-accent); }

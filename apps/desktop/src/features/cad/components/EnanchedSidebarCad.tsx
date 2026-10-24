@@ -42,10 +42,10 @@ export default function EnhancedSidebarCad(props: EnhancedSidebarProps): JSX.Ele
         </div>
       </Show>
       <Show when={props.activeSidebarTab === "layers"}>
-        <div class="text-center text-xs text-gray-500 mt-4"><Layers size={20} class="mx-auto mb-2" />{t("cad.openSidebarLayers")}</div>
+        <button type="button" class="panel-icon-btn" title={t("cad.openSidebarLayers")} aria-label={t("cad.openSidebarLayers")} onClick={() => props.setIsOpen(true)}><Layers size={16} /></button>
       </Show>
       <Show when={props.activeSidebarTab === "explorer"}>
-        <div class="text-center text-xs text-gray-500 mt-4"><List size={20} class="mx-auto mb-2" />{t("cad.openSidebarElements")}</div>
+        <button type="button" class="panel-icon-btn" title={t("cad.openSidebarElements")} aria-label={t("cad.openSidebarElements")} onClick={() => props.setIsOpen(true)}><List size={16} /></button>
       </Show>
     </div>
   )
@@ -55,7 +55,7 @@ export default function EnhancedSidebarCad(props: EnhancedSidebarProps): JSX.Ele
       class="cad-workspace__sidebar panel workspace-sidebar flex-shrink-0 h-full flex flex-col"
       data-open={props.isOpen}
     >
-      <SidebarTabs class="cad-workspace__tabs" open={props.isOpen} active={props.activeSidebarTab} onSelect={props.setActiveSidebarTab}
+      <SidebarTabs class="cad-workspace__tabs" open={props.isOpen} active={props.activeSidebarTab} onSelect={(tab) => { props.setActiveSidebarTab(tab); if (!props.isOpen) props.setIsOpen(true) }}
         tabs={[
           { id: "tools", label: t("cad.tools"), title: t("cad.tools"), icon: (size) => <Wrench size={size} /> },
           { id: "explorer", label: t("cad.explorer"), title: t("cad.elementExplorer"), icon: (size) => <List size={size} /> },

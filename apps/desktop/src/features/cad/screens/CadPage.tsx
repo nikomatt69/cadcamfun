@@ -3,7 +3,10 @@ import { Effect } from "effect"
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { ChevronLeft, ChevronRight, Eye, EyeOff, LayoutGrid, Network, Puzzle, Settings, Wrench } from "lucide-solid"
+import { WorkspaceInspector } from "../../../shared/components/panel/inspector.tsx"
+import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
+import { CheckRow, Field, Segmented } from "../../../shared/components/panel/ui.tsx"
+import { Eye, Magnet, Network, Puzzle, Settings, Wrench } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { useApp } from "../../../shared/state/context.ts"
 import { useCADStore } from "../store/cadStore.ts"
@@ -43,11 +46,6 @@ import "../../../styles/workstation.css"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
 type RightPanel = "proprieties" | "settings" | "constraints" | "modeling" | "assembly" | "drawing"
-
-const tabClass = (active: boolean) =>
-  `flex-1 py-3 px-3 text-sm font-medium rounded-lg transition-all duration-200 ${active ? "text-blue-600 dark:text-blue-400 bg-white/60 dark:bg-gray-700/60 shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-white/40 dark:hover:bg-gray-700/40"}`
-const toggleTrack = (on: boolean) => `h-4 w-8 rounded-full ${on ? "bg-blue-600" : "bg-gray-300"} relative transition-colors duration-200 ease-in-out`
-const toggleThumb = (on: boolean) => `absolute top-0.5 left-0.5 inline-block h-3 w-3 rounded-full bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white shadow transform ${on ? "translate-x-4" : ""} transition-transform duration-200 ease-in-out`
 
 /** The `/cad` editor: toolbar, sidebar, canvas with floating tools, right-hand properties/settings/plugins, status bar. */
 export default function CadPage(): JSX.Element {
@@ -239,79 +237,47 @@ export default function CadPage(): JSX.Element {
               width="100%" height="100%" previewComponent={libraryComponent()} previewLibraryItem={libraryItem()}
               onComponentPlaced={() => { toast.success("Component placed successfully!"); setLibraryComponent(null) }}
               onReady={setCanvas} onSave={openExport}
+              footerActions={<CADAssistantButton isVisible={showAssistant()} toggleVisibility={toggleAssistant} />}
             />
             <Show when={cad.showDimensions && canvas()}>{(api) => <DimensionsOverlay scene={api().scene} camera={api().camera} />}</Show>
             <Show when={showFloating()}>
               <FloatingToolbar initialPosition={{ x: 100, y: 100 }} onClose={() => setShowFloating(false)} library={() => <LibraryBrowser onSelectComponent={pickComponent} />} ai={() => <button class="cad-ribbon-action" onClick={() => app.setPanelOpen(true)}>{t("ai.title")}</button>} />
             </Show>
-            <Motion.div class="absolute bottom-4 rounded-lg right-16 z-40" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 1 }}>
-              <CADAssistantButton isVisible={showAssistant()} toggleVisibility={toggleAssistant} class="shadow-lg" />
-            </Motion.div>
+
             <Show when={showAssistant()}>
               <CADAssistantBridge isVisible initialContextData={assistantContext()} />
             </Show>
           </Motion.div>
 
-          <Motion.div
-            class="cad-workspace__inspector flex-shrink-0 dark:text-white overflow-y-auto"
-            data-open={rightOpen()}
-          >
-            <Motion.div class="cad-workspace__tabs w-full p-2 flex justify-center" {...rise} transition={{ duration: 0.6, delay: 0.8 }}>
-              <div class="flex justify-center w-full text-center">
-                <Motion.button aria-pressed={rightPanel() === "proprieties" || rightPanel() === "modeling"} onClick={() => setRightPanel("proprieties")} class={tabClass(rightPanel() === "proprieties" || rightPanel() === "modeling")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
-                  <div class="flex items-center justify-center"><Wrench size={16} class="mr-2" />{rightPanel() === "modeling" ? t("cad.ribbon.surface") : t("cad.properties")}</div>
-                </Motion.button>
-                <Motion.button aria-pressed={rightPanel() === "settings"} onClick={() => setRightPanel("settings")} class={tabClass(rightPanel() === "settings")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
-                  <div class="flex items-center justify-center"><Settings size={16} class="mr-2" />{t("cad.settings")}</div>
-                </Motion.button>
-                <Motion.button aria-pressed={rightPanel() === "constraints"} onClick={() => setRightPanel("constraints")} class={tabClass(rightPanel() === "constraints")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }} aria-label={t("cad.plugins")}>
-                  <div class="flex items-center justify-center"><Puzzle size={16} class="mr-2" /></div>
-                </Motion.button>
-                <Motion.button aria-pressed={rightPanel() === "assembly"} onClick={() => setRightPanel("assembly")} class={tabClass(rightPanel() === "assembly")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }} title={t("cad.assembly.title")}>
-                  <div class="flex items-center justify-center"><Network size={16} class="mr-2" />{t("cad.assembly.title")}</div>
-                </Motion.button>
-              </div>
-            </Motion.div>
-
-            <Motion.div class="workstation-panel-content flex flex-col" {...rise} transition={{ duration: 0.6, delay: 1 }}>
+          <WorkspaceInspector class="cad-workspace__inspector" open={rightOpen()}
+            active={rightPanel() === "modeling" || rightPanel() === "drawing" ? "proprieties" : rightPanel() as "proprieties" | "settings" | "constraints" | "assembly"}
+            onSelect={setRightPanel} onToggle={() => setRightOpen(!rightOpen())} collapseLabel={t("cad.toggleProperties")}
+            tabs={[
+              { id: "proprieties", label: rightPanel() === "modeling" ? t("cad.ribbon.surface") : t("cad.properties"), title: t("cad.properties"), icon: (size) => <Wrench size={size} /> },
+              { id: "settings", label: t("cad.settings"), title: t("cad.settings"), icon: (size) => <Settings size={size} /> },
+              { id: "constraints", label: t("cad.plugins"), title: t("cad.plugins"), icon: (size) => <Puzzle size={size} /> },
+              { id: "assembly", label: t("cad.assembly.title"), title: t("cad.assembly.title"), icon: (size) => <Network size={size} /> }
+            ]}>
+            <div class="workstation-panel-content inspector-panels">
               <Show when={rightPanel() === "drawing"}><DrawingPanel /></Show>
               <Show when={rightPanel() === "proprieties"}><PropertyPanel /></Show>
               <Show when={rightPanel() === "modeling"}><SurfacingPanel operation={surfaceOperation()} onOperationChange={setSurfaceOperation} /></Show>
 
               <Show when={rightPanel() === "settings"}>
-                <Motion.div class="backdrop-blur-md bg-white/90 dark:bg-gray-800/90 dark:text-white shadow-xl border border-white/30 dark:border-gray-600/30 rounded-2xl p-6 max-h-[calc(100vh-100px)] overflow-y-auto text-center w-full" {...rise} transition={{ duration: 0.5 }}>
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">{t("cad.viewSettings")}</h3>
-                  <div class="space-y-4">
-                    <div>
-                      <label class="text-sm font-medium text-gray-700 mb-1 block">{t("cad.viewMode")}</label>
-                      <div class="flex space-x-2 justify-center">
-                        <For each={["2d", "3d"] as const}>{(mode) =>
-                          <button onClick={() => cad.setViewMode(mode)} class={`px-3 py-2 rounded-md text-sm ${cad.viewMode === mode ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>{mode === "2d" ? t("cad.view2d") : t("cad.view3d")}</button>}
-                        </For>
-                      </div>
-                    </div>
-                    <div>
-                      <label class="text-sm font-medium text-gray-700 mb-1 block">{t("cad.displayOptions")}</label>
-                      <div class="space-y-2">
-                        <button onClick={() => cad.toggleGrid()} class="w-full flex items-center dark:text-blue-400 justify-between px-3 py-2 rounded-md text-sm bg-gray-100 hover:bg-gray-200">
-                          <span class="flex items-center"><LayoutGrid size={16} class="mr-2" />{t("cad.showGrid")}</span>
-                          <span class={toggleTrack(cad.gridVisible)}><span class={toggleThumb(cad.gridVisible)} /></span>
-                        </button>
-                        <button onClick={() => cad.toggleAxis()} class="w-full flex items-center dark:text-blue-400 justify-between px-3 py-2 rounded-md text-sm bg-gray-100 hover:bg-gray-200">
-                          <span class="flex items-center"><Show when={cad.axisVisible} fallback={<EyeOff size={16} class="mr-2" />}><Eye size={16} class="mr-2" /></Show>{t("cad.showAxis")}</span>
-                          <span class={toggleTrack(cad.axisVisible)}><span class={toggleThumb(cad.axisVisible)} /></span>
-                        </button>
-                      </div>
-                    </div>
-                    <OriginControls />
-                    <WorkpieceSetup />
-                    <SnapSettings />
-                  </div>
-                </Motion.div>
+                <SidebarSection id="cad-view" title={t("cad.viewSettings")} icon={Eye} summary={cad.viewMode.toUpperCase()}>
+                  <Field label={t("cad.viewMode")}>
+                    <Segmented label={t("cad.viewMode")} value={cad.viewMode} options={[["2d", t("cad.view2d")], ["3d", t("cad.view3d")]]} onChange={(mode) => cad.setViewMode(mode)} />
+                  </Field>
+                  <CheckRow id="cad-view-grid" checked={cad.gridVisible} onChange={() => cad.toggleGrid()}>{t("cad.showGrid")}</CheckRow>
+                  <CheckRow id="cad-view-axis" checked={cad.axisVisible} onChange={() => cad.toggleAxis()}>{t("cad.showAxis")}</CheckRow>
+                </SidebarSection>
+                <OriginControls />
+                <WorkpieceSetup />
+                <SidebarSection id="cad-snap" title={t("cad.snapSettings")} icon={Magnet}><SnapSettings /></SidebarSection>
               </Show>
 
               <Show when={rightPanel() === "constraints"}>
-                <div class="flex-1 flex flex-col overflow-hidden w-full">
+                <SidebarSection id="cad-plugins" title={t("cad.plugins")} icon={Puzzle}>
                   <div class="flex-shrink-0 flex space-x-1 px-2 pt-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
                     <For each={sidebarPlugins()}>{(plugin) =>
                       <button class={`px-3 py-2 rounded-t text-sm font-medium transition-colors ${pluginId() === plugin.id ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"}`} onClick={() => setPluginId(plugin.id)}>{plugin.title}</button>}
@@ -323,22 +289,12 @@ export default function CadPage(): JSX.Element {
                       <div class="h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">{t("cad.noSidebarPlugins")}</div>
                     </Show>
                   </div>
-                </div>
+                </SidebarSection>
               </Show>
 
               <Show when={rightPanel() === "assembly"}><AssemblyPanel /></Show>
-            </Motion.div>
-          </Motion.div>
-
-          <Motion.button
-            class="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 backdrop-blur-md bg-white/90 dark:bg-gray-800/90 dark:text-white p-3 rounded-l-2xl shadow-xl border border-white/30 dark:border-gray-600/30 hover:bg-white/95 dark:hover:bg-gray-700/95 transition-all duration-200"
-            onClick={() => setRightOpen(!rightOpen())} hover={{ scale: 1.05, x: -2 }} press={{ scale: 0.95 }}
-            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 1.2 }} aria-label={t("cad.toggleProperties")}
-          >
-            <Motion.div animate={{ rotate: rightOpen() ? 0 : 180 }} transition={{ duration: 0.3 }}>
-              <Show when={rightOpen()} fallback={<ChevronLeft size={20} class="text-gray-600 dark:text-gray-300" />}><ChevronRight size={20} class="text-gray-600 dark:text-gray-300" /></Show>
-            </Motion.div>
-          </Motion.button>
+            </div>
+          </WorkspaceInspector>
         </Motion.div>
 
         <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 1.4 }}><StatusBar /></Motion.div>

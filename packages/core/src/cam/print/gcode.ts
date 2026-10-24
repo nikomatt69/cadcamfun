@@ -8,6 +8,12 @@ import type { Extrusion, PathKind, PlannedLayer, PrintStats } from "./types.ts"
 
 const f3 = (n: number): string => n.toFixed(3)
 
+const quantizedFeed = (mmPerSecond: number): number => {
+  const feed = Math.floor(mmPerSecond * 60)
+  if (!Number.isFinite(feed) || feed < 1) throw new RangeError("The requested positive motion feed cannot be represented at 1 mm/min controller precision")
+  return feed
+}
+
 export interface EmitInput {
   readonly layers: ReadonlyArray<PlannedLayer>
   readonly profile: PrintProfile
@@ -53,6 +59,11 @@ const pathLength = (points: ReadonlyArray<Vec2>): number => {
   return l
 }
 
+/** The physical volume per mm of path, including extra flow and the bridge's circular strand. */
+const extrusionArea = (path: Extrusion, height: number, p: PrintProfile): number => (
+  path.kind === "bridge" ? Math.PI * (p.nozzleDiameter / 2) ** 2 * 0.95 : p.extrusionWidth * (path.widthScale ?? 1) * height
+) * p.flow
+
 const startBlock = (p: PrintProfile, firstZ: number): string => {
   // G90/G91 reset E mode on the supported controllers, so select E mode after XYZ mode.
   const modes = ["G21 ; Set units to millimeters", "G90 ; Use absolute coordinates", p.relativeExtrusion ? "M83 ; Set extruder to relative mode" : "M82 ; Set extruder to absolute mode"]
@@ -84,12 +95,13 @@ const primeLine = (p: PrintProfile, firstZ: number): { gcode: string; length: nu
   const area = p.extrusionWidth * 1.3 * firstZ
   const filament = (Math.PI * (p.filamentDiameter / 2) ** 2)
   const e = (length * area) / filament * p.flow
+  const speed = Math.min(20, p.printSpeed, p.maxVolumetricFlow > 0 ? p.maxVolumetricFlow / (area * p.flow) : Infinity)
   const absolute = !p.relativeExtrusion
   return {
     length,
     gcode:
       `G1 X${f3(x0)} Y${f3(y0)} Z${f3(firstZ)} F${Math.round(Math.min(50, p.travelSpeed) * 60)} ; Move to prime position\n` +
-      `G1 X${f3(x0 + length)} Y${f3(y0)} E${e.toFixed(5)} F${Math.round(Math.min(20, p.printSpeed) * 60)} ; Prime line\n` +
+      `G1 X${f3(x0 + length)} Y${f3(y0)} E${e.toFixed(5)} F${quantizedFeed(speed)} ; Prime line\n` +
       (absolute ? "G92 E0 ; Reset extruder position again\n" : "")
   }
 }
@@ -153,12 +165,12 @@ export const emitGcode = (input: EmitInput): EmitResult => {
     return word.toFixed(5)
   }
 
-  const f = (mmPerSecond: number): string => {
-    const v = Math.round(mmPerSecond * 60)
+  const feedCode = (v: number): string => {
     if (v === feed) return ""
     feed = v
     return ` F${v}`
   }
+  const f = (mmPerSecond: number): string => feedCode(quantizedFeed(mmPerSecond))
   const setFan = (percent: number): void => {
     const rounded = Math.round(Math.max(0, Math.min(100, percent)) * 2.55)
     if (rounded === fan) return
@@ -217,7 +229,7 @@ export const emitGcode = (input: EmitInput): EmitResult => {
     })
     let layerTime = 0
     layer.paths.forEach((path, idx) => {
-      const melt = p.maxVolumetricFlow > 0 ? p.maxVolumetricFlow / (p.extrusionWidth * (path.widthScale ?? 1) * layer.height) : Infinity
+      const melt = p.maxVolumetricFlow > 0 ? p.maxVolumetricFlow / extrusionArea(path, layer.height, p) : Infinity
       layerTime += pathLength(path.points) / Math.min(speeds[idx]!, melt)
     })
     const slow = p.minLayerTime > 0 && layerTime > 0 && layerTime < p.minLayerTime ? layerTime / p.minLayerTime : 1
@@ -229,13 +241,13 @@ export const emitGcode = (input: EmitInput): EmitResult => {
       const bridge = path.kind === "bridge"
       if (bridge && p.fanSpeed > 0) setFan(100)
       travel(points[0]!, z0)
-      const width = p.extrusionWidth * (path.widthScale ?? 1)
       // The hotend melts only so much per second: a thick, wide bead is printed slower than the speed asked for.
-      const melt = p.maxVolumetricFlow > 0 ? p.maxVolumetricFlow / (width * layer.height) : Infinity
+      const area = extrusionArea(path, layer.height, p)
+      const melt = p.maxVolumetricFlow > 0 ? p.maxVolumetricFlow / area : Infinity
       const limited = Math.min(speeds[idx]!, melt)
-      const speed = Math.max(Math.min(10, limited), limited * slow)
-      const area = bridge ? Math.PI * (p.nozzleDiameter / 2) ** 2 : width * layer.height
-      const perMm = (area / filamentArea) * p.flow * (bridge ? 0.95 : 1)
+      const speedFeed = quantizedFeed(Math.max(Math.min(10, limited), limited * slow))
+      const speed = speedFeed / 60
+      const perMm = area / filamentArea
       let prev = points[0]!
       let pathTime = speed / accel
       for (let k = 1; k < points.length; k++) {
@@ -245,11 +257,21 @@ export const emitGcode = (input: EmitInput): EmitResult => {
         const amount = len * perMm
         e += amount
         extrudedMm += amount
+        const previousZ = cz
         const z = path.zs?.[k]
         const zCode = z !== undefined ? ` Z${f3(z)}` : ""
         if (z !== undefined) cz = z
-        body.push(`G1 X${f3(q.x)} Y${f3(q.y)}${zCode} E${extrusionWord()}${f(speed)}`)
-        pathTime += len / speed
+        const beforeE = emittedE
+        const eCode = extrusionWord()
+        const pushed = emittedE - beforeE
+        const writtenLength = Math.hypot(Number(f3(q.x)) - Number(f3(prev.x)), Number(f3(q.y)) - Number(f3(prev.y)), Number(f3(cz)) - Number(f3(previousZ)))
+        // The controller runs rounded XYZ/E. A short rounded segment can demand more melt than
+        // its nominal cross-section predicts; a collapsed XYZ segment runs as an E-only move.
+        const motionLength = writtenLength > 0 ? writtenLength : Math.abs(pushed)
+        const actualLimit = p.maxVolumetricFlow > 0 && pushed > 0 ? p.maxVolumetricFlow * motionLength / (pushed * filamentArea) : Infinity
+        const segmentFeed = Math.min(speedFeed, actualLimit === Infinity ? speedFeed : quantizedFeed(actualLimit))
+        body.push(`G1 X${f3(q.x)} Y${f3(q.y)}${zCode} E${eCode}${feedCode(segmentFeed)}`)
+        pathTime += motionLength / (segmentFeed / 60)
         lengthByKind[path.kind] = (lengthByKind[path.kind] ?? 0) + len
         if (PART_KINDS.has(path.kind)) {
           if (q.x < minX) minX = q.x

@@ -1,17 +1,10 @@
-/**
- * Plain G-code editor (spec 06-desktop-ui.md §3 tab "Editor G-Code").
- *
- * A `<textarea>` per the spec is acceptable for v6 — we surface the text and
- * the user edits it. The `PostProcessorPanel` is the place that turns an
- * edited blob back into a structured program; this component stays a text
- * surface.
- */
-import { For, Show, createMemo, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
-import { Card } from "../../../shared/ui/card.tsx"
+/** The editable NC text uses the same panel vocabulary as the generator; processing still belongs to the page. */
+import { Show, createMemo, type JSX } from "solid-js"
+import { Code, Play } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
-
-const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
+import { Badge, Stat } from "../../../shared/components/panel/ui.tsx"
+import { gcodeSummary } from "../lib/gcode-summary.ts"
+import "../../../styles/cam-panels.css"
 
 export interface GCodeEditorProps {
   readonly value: string
@@ -20,41 +13,22 @@ export interface GCodeEditorProps {
 }
 
 export default function GCodeEditor(props: GCodeEditorProps): JSX.Element {
-  const lineCount = createMemo(() => {
-    if (props.value.length === 0) return 0
-    return props.value.split(/\r?\n/).filter((line) => line.trim().length > 0).length
-  })
-
-  return (
-    <Motion.div class="h-full w-full flex flex-col" {...rise} transition={{ duration: 0.5 }}>
-      <Card variant="default" class="flex-1 flex flex-col p-3">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100">{t("cam.editor")}</h3>
-          <span class="text-xs text-gray-500 dark:text-gray-400">
-            {t("cam.lines", { count: lineCount() })}
-          </span>
-        </div>
-        <textarea
-          aria-label={t("cam.editor")}
-          class="form-textarea flex-1 font-mono text-xs leading-5"
-          value={props.value}
-          spellcheck={false}
-          onInput={(event) => props.onChange(event.currentTarget.value)}
-        />
-        <div class="mt-2 flex gap-2">
-          <Motion.button
-            class="ui-btn ui-btn-primary"
-            hover={{ scale: 1.02 }}
-            press={{ scale: 0.97 }}
-            onClick={() => props.onProcess()}
-          >
-            {t("cam.process")}
-          </Motion.button>
-        </div>
-        <Show when={lineCount() === 0}>
-          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{t("cam.importHint")}</p>
-        </Show>
-      </Card>
-    </Motion.div>
-  )
+  const summary = createMemo(() => gcodeSummary(props.value))
+  return <section class="panel cam-editor cam-central-panel" data-testid="gcode-editor-panel">
+    <header class="panel-header">
+      <div class="cam-panel-heading"><Code size={15} /><h3 class="panel-header__title">{t("cam.editor")}</h3></div>
+      <Badge>{t("cam.lines", { count: summary().lines })}</Badge>
+    </header>
+    <div class="cam-program-summary" data-testid="editor-summary">
+      <Stat label={t("cam.panel.blocks")} value={String(summary().blocks)} />
+      <Stat label={t("cam.panel.tools")} value={summary().tools.length ? summary().tools.map(n => `T${n}`).join(" · ") : t("cam.panel.notSpecified")} />
+      <Stat label={t("cam.panel.offsets")} value={summary().offsets.join(" · ") || t("cam.panel.notSpecified")} />
+    </div>
+    <textarea aria-label={t("cam.editor")} class="cam-editor__code" value={props.value} spellcheck={false}
+      autocapitalize="off" autocomplete="off" onInput={(event) => props.onChange(event.currentTarget.value)} />
+    <footer class="cam-editor__footer">
+      <p class="panel-hint"><Show when={summary().blocks > 0} fallback={t("cam.importHint")}>{t("cam.panel.editorHint")}</Show></p>
+      <button type="button" class="panel-btn panel-btn--primary" disabled={summary().blocks === 0} onClick={() => props.onProcess()}><Play size={14} />{t("cam.process")}</button>
+    </footer>
+  </section>
 }

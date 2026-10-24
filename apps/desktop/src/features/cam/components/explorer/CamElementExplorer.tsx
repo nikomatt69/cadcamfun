@@ -169,7 +169,7 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
     return (
       <div class="select-none">
         <div
-          class={`flex items-center px-2 py-2 cursor-pointer text-sm group transition-all duration-150 border-l-2 ${isSelected() ? "bg-blue-50 dark:bg-blue-900/30 border-l-blue-500 text-blue-700 dark:text-blue-300" : "hover:bg-gray-50 dark:hover:bg-gray-800/60 border-l-transparent text-gray-700 dark:text-gray-300"}`}
+          class={`workstation-browser-row workstation-browser-row--cam flex items-center px-2 py-2 cursor-pointer text-sm group transition-colors duration-150 border-l-2 ${isSelected() ? "border-l-blue-500 text-blue-700 dark:text-blue-300" : "hover:bg-gray-50 dark:hover:bg-gray-800/60 border-l-transparent text-gray-700 dark:text-gray-300"}`}
           style={{ "padding-left": `${nodeProps.depth * 16 + 8}px` }}
           onClick={event => selectNode(id(), event)}
           data-testid={`cam-element-${id()}`}
@@ -185,9 +185,9 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
           <div class="mr-2 flex-shrink-0"><ElementIcon type={nodeProps.node.type} /></div>
           <RenameName id={id()} name={nodeProps.node.name} browser={browser} />
           <Show when={isStock()}>
-            <span class="mr-2 px-1.5 py-0.5 text-[10px] rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Raw piece">Stock</span>
+            <span class="sidebar-cam-stock mr-2 px-1.5 py-0.5 text-[10px] rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Raw piece">Stock</span>
           </Show>
-          <div class="flex items-center space-x-1 mr-2">
+          <div class="sidebar-cam-status flex items-center space-x-1 mr-2">
             <span class={`h-2 w-2 rounded-full inline-block ${toolOf(id()) ? "bg-green-500" : "bg-gray-300"}`} title={toolOf(id()) ? "Tool assigned" : "No tool"} />
             <span class={`h-2 w-2 rounded-full inline-block ${materialOf(id()) ? "bg-blue-500" : "bg-gray-300"}`} title={materialOf(id()) ? "Material assigned" : "No material"} />
             <span class={`h-2 w-2 rounded-full inline-block ${toolpathOf(id()) ? "bg-purple-500" : "bg-gray-300"}`} title={toolpathOf(id()) ? "GCode generated" : "No GCode"} />

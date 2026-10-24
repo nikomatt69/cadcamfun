@@ -1,3 +1,4 @@
+import { PanelCard } from "../../../../shared/components/panel/ui.tsx"
 /**
  * Constraints between assembly nodes (legacy `components/cad/assembly/AssemblyConstraints.tsx`).
  *
@@ -59,26 +60,25 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
   }
 
   return (
-    <section class="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
-      <header class="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-        <h3 class="text-sm font-medium text-gray-900 dark:text-white">{t("cad.assembly.constraints")}</h3>
-        <button type="button" class="px-2 py-1 text-xs rounded hover:bg-gray-200 dark:hover:bg-gray-600" onClick={() => setShowForm(!showForm())}>
+    <PanelCard title={t("cad.assembly.constraints")} actions={<>
+<button type="button" class="panel-btn" onClick={() => setShowForm(!showForm())}>
           {showForm() ? t("cad.assembly.cancel") : `+ ${t("cad.assembly.addConstraint")}`}
         </button>
-      </header>
+    </>}>
+
 
       <Show when={showForm()}>
         <div class="p-3 border-b border-gray-200 dark:border-gray-700 space-y-3">
           <label class="block">
             <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.constraintType")}</span>
-            <select class="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" value={constraintType()} onChange={(event) => setConstraintType(event.currentTarget.value as ConstraintType)}>
+            <select class="panel-input" value={constraintType()} onChange={(event) => setConstraintType(event.currentTarget.value as ConstraintType)}>
               <For each={CONSTRAINT_TYPES}>{(type) => <option value={type}>{t(CONSTRAINT_LABEL[type])}</option>}</For>
             </select>
           </label>
 
           <label class="block">
             <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.firstEntity")}</span>
-            <select class="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" value={firstEntityId()} onChange={(event) => setFirstEntityId(event.currentTarget.value)}>
+            <select class="panel-input" value={firstEntityId()} onChange={(event) => setFirstEntityId(event.currentTarget.value)}>
               <option value="">{t("cad.assembly.selectEntity")}</option>
               <For each={entities()}>{(node) => <option value={node.id}>{label(node)}</option>}</For>
             </select>
@@ -86,7 +86,7 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
 
           <label class="block">
             <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.secondEntity")}</span>
-            <select class="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" value={secondEntityId()} onChange={(event) => setSecondEntityId(event.currentTarget.value)}>
+            <select class="panel-input" value={secondEntityId()} onChange={(event) => setSecondEntityId(event.currentTarget.value)}>
               <option value="">{t("cad.assembly.selectEntity")}</option>
               <For each={entities()}>{(node) => <option value={node.id}>{label(node)}</option>}</For>
             </select>
@@ -95,19 +95,19 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
           <Show when={constraintType() === "distance"}>
             <label class="block">
               <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.distance")}</span>
-              <input type="number" min="0" step="0.1" class="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" value={distance()} onInput={(event) => setDistance(Number.parseFloat(event.currentTarget.value) || 0)} />
+              <input type="number" min="0" step="0.1" class="panel-input" value={distance()} onInput={(event) => setDistance(Number.parseFloat(event.currentTarget.value) || 0)} />
             </label>
           </Show>
 
           <Show when={constraintType() === "angle"}>
             <label class="block">
               <span class="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t("cad.assembly.angleDegrees")}</span>
-              <input type="number" min="0" max="360" step="1" class="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" value={angle()} onInput={(event) => setAngle(Number.parseFloat(event.currentTarget.value) || 0)} />
+              <input type="number" min="0" max="360" step="1" class="panel-input" value={angle()} onInput={(event) => setAngle(Number.parseFloat(event.currentTarget.value) || 0)} />
             </label>
           </Show>
 
           <div class="flex justify-end">
-            <button type="button" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50" disabled={!firstEntityId() || !secondEntityId()} onClick={add}>
+            <button type="button" class="panel-btn panel-btn--primary" disabled={!firstEntityId() || !secondEntityId()} onClick={add}>
               {t("cad.assembly.addConstraint")}
             </button>
           </div>
@@ -127,7 +127,7 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
                     <Show when={constraint.parameters["angle"] !== undefined}>{` (${constraint.parameters["angle"]}°)`}</Show>
                   </div>
                 </div>
-                <button type="button" class="p-1 text-xs rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-red-600" onClick={() => store.removeConstraint(constraint.id)} title={t("cad.assembly.removeConstraint")}>
+                <button type="button" class="panel-icon-btn panel-icon-btn--danger" onClick={() => store.removeConstraint(constraint.id)} title={t("cad.assembly.removeConstraint")}>
                   {t("cad.assembly.remove")}
                 </button>
               </li>
@@ -137,6 +137,6 @@ export default function AssemblyConstraints(props: AssemblyConstraintsProps): JS
           <div class="py-3 px-4 text-sm text-gray-500 dark:text-gray-400 italic">{t("cad.assembly.noConstraints")}</div>
         </Show>
       </div>
-    </section>
+    </PanelCard>
   )
 }

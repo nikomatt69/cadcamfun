@@ -7,7 +7,7 @@
  * as a height map with gouges in red. Nothing is checked that was not modelled, and the panel says so.
  */
 import { For, Show, createEffect, type JSX } from "solid-js"
-import { AlertTriangle, Check, ShieldCheck, Sparkles } from "lucide-solid"
+import { AlertTriangle, Check, Sparkles } from "lucide-solid"
 import { cam as camCore } from "@cadcamfun/core"
 import { t } from "../../../i18n/index.ts"
 import { fixVerificationPrompt, useAskAi } from "../../ai/lib/ask.ts"
@@ -19,7 +19,7 @@ import { buildVerifyRequest, heightColour, sortedIssues } from "../lib/verifyJob
 import { useCamStore } from "../store/camStore.ts"
 import { useGeneratorStore } from "../store/generatorStore.ts"
 import { useVerifyStore } from "../store/verifyStore.ts"
-import { INPUT, LABEL, NumberField } from "./generator/ui.tsx"
+import { INPUT, LABEL, NumberField, PanelCard } from "../../../shared/components/panel/ui.tsx"
 
 const SCALE = 5
 
@@ -83,11 +83,7 @@ export default function VerifyPanel(): JSX.Element {
   )
 
   return (
-    <div class="p-4 space-y-4" data-testid="verify-panel">
-      <div class="flex items-center space-x-2">
-        <ShieldCheck size={20} class="text-blue-600" />
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{t("cam.verify.title")}</h3>
-      </div>
+    <PanelCard title={t("cam.verify.title")} testId="verify-panel">
       <p class="text-xs text-gray-600 dark:text-gray-400">{t("cam.verify.hint")}</p>
 
       <div class="grid grid-cols-2 gap-3">
@@ -100,7 +96,7 @@ export default function VerifyPanel(): JSX.Element {
 
       <button
         type="button"
-        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-6 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        class="panel-btn panel-btn--primary panel-btn--block"
         disabled={verify.running || cam.gcode.trim().length === 0}
         onClick={() => void run()}
       >
@@ -127,7 +123,7 @@ export default function VerifyPanel(): JSX.Element {
               <span class="text-sm font-medium">{report().ok ? t("cam.verify.passed") : t("cam.verify.failed", { count: errors() })}</span>
             </div>
             <Show when={errors() > 0}>
-              <button type="button" class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-blue-300 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm" onClick={() => ask(fixVerificationPrompt(report().issues))} data-testid="verify-ask-ai">
+              <button type="button" class="panel-btn panel-btn--block" onClick={() => ask(fixVerificationPrompt(report().issues))} data-testid="verify-ask-ai">
                 <Sparkles size={16} />{t("cam.verify.askAssistant")}
               </button>
             </Show>
@@ -161,6 +157,6 @@ export default function VerifyPanel(): JSX.Element {
           </div>
         )}
       </Show>
-    </div>
+    </PanelCard>
   )
 }

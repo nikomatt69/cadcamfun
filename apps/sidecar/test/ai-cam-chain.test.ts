@@ -94,5 +94,17 @@ describe("cam.manufacture in the kernel worker", () => {
     expect(blocked.release).toBe("blocked")
     expect(blocked.claims.find((c: { id: string }) => c.id === "bed-fit").status).toBe("failed")
   }, 60_000)
+
+  test("the assistant preserves malformed mesh refusals without previewing the valid subset", async () => {
+    const pid = (await app.call("/api/projects", { method: "POST", json: { name: "Malformed print source" } })).body.id
+    const invalid = { id: "bad-mesh", type: "mesh", vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 1 }], faces: [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3], [0, 1]] }
+    await app.call(`/api/projects/${pid}/drawings`, { method: "POST", json: { name: "Invalid source", data: { elements: [{ id: "valid", type: "cube", width: 10, height: 10, depth: 2, z: 1 }, invalid] } } })
+    const tool = buildTools(handlers, pid).find((t) => t.id === "cam")!
+    const result = JSON.parse(await tool.execute({ action: "manufacture", material: "PLA", machine: "printer-desktop-220" }, { ...ctx, projectId: pid }))
+    expect(result.ok).toBe(false)
+    expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({ tag: "InvalidInput", message: expect.stringContaining("mesh face 4") })]))
+    expect(result.ncPreview).toBeUndefined()
+    expect(result.print).toBeUndefined()
+  })
 })
 

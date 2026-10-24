@@ -1,3 +1,4 @@
+import { Note, PanelCard } from "../../../shared/components/panel/ui.tsx"
 /**
  * Solid surfacing panel — Fusion/Hypermill-style CAD ops on closed solids.
  *
@@ -11,7 +12,7 @@
  * Falls back to a friendly empty state when no closed solid is selected.
  */
 import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
-import { Box, Layers, Plus, Sparkles, Wand2, Wrench } from "lucide-solid"
+import { Box, Layers, Plus, Wand2, Wrench } from "lucide-solid"
 import { cad as core } from "@cadcamfun/core"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
@@ -202,18 +203,8 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
   }
 
   return (
-    <div class="strategy-palette" data-testid="cad-surfacing-panel">
-      <div class="strategy-palette__head">
-        <div class="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          <Sparkles size={12} />
-          {t("cad.surfacing.subtitle")}
-        </div>
-        <div class="text-sm font-semibold text-gray-900 dark:text-white">
-          {t("cad.surfacing.title")}
-        </div>
-      </div>
-
-      <div class="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/20 p-2 text-xs">
+    <PanelCard title={t("cad.surfacing.title")} testId="cad-surfacing-panel">
+      <Note>
         <Show when={selectedSolid()} fallback={<p class="text-amber-700">{t("cad.surfacing.noSolid")}</p>}>
           {(solid) => (
             <p class="text-blue-700 dark:text-blue-300">
@@ -223,7 +214,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
             </p>
           )}
         </Show>
-      </div>
+      </Note>
 
       <div class="strategy-palette__body">
         <section class="strategy-palette__cat">
@@ -266,7 +257,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
               type="number"
               min="0.01"
               step="0.1"
-              class="mt-1 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm font-mono"
+              class="panel-input font-mono"
               value={distance()}
               onChange={(event) => setDistance(Math.max(0.01, Number(event.currentTarget.value)))}
             />
@@ -282,7 +273,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
               type="number"
               min="0.01"
               step="0.05"
-              class="mt-1 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm font-mono"
+              class="panel-input font-mono"
               value={thickness()}
               onChange={(event) => setThickness(Math.max(0.01, Number(event.currentTarget.value)))}
             />
@@ -291,7 +282,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
             <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.openFaces")}</span>
             <input
               type="text"
-              class="mt-1 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-sm font-mono"
+              class="panel-input font-mono"
               placeholder="0,1,2"
               value={openFaces()}
               onInput={(event) => setOpenFaces(event.currentTarget.value)}
@@ -306,7 +297,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
             <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.profilePoints")}</span>
             <textarea
               rows={4}
-              class="mt-1 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-xs font-mono"
+              class="panel-input font-mono"
               value={profileText()}
               onInput={(event) => setProfileText(event.currentTarget.value)}
             />
@@ -315,7 +306,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
             <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.pathPoints")}</span>
             <textarea
               rows={4}
-              class="mt-1 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-xs font-mono"
+              class="panel-input font-mono"
               value={pathText()}
               onInput={(event) => setPathText(event.currentTarget.value)}
             />
@@ -329,7 +320,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
             <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{t("cad.surfacing.sections")}</span>
             <textarea
               rows={6}
-              class="mt-1 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md text-xs font-mono"
+              class="panel-input font-mono"
               value={sectionsText()}
               onInput={(event) => setSectionsText(event.currentTarget.value)}
             />
@@ -339,7 +330,7 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
 
       <button
         type="button"
-        class="ui-btn ui-btn-primary w-full justify-center mt-3"
+        class="panel-btn panel-btn--primary panel-btn--block"
         onClick={apply}
         disabled={selectedSolid() === undefined}
       >
@@ -347,12 +338,12 @@ export default function SurfacingPanel(props: { readonly operation?: SurfacingOp
       </button>
 
       <Show when={success()}>
-        <p class="mt-2 p-2 text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 rounded-md" role="status">{success()}</p>
+        <Note kind="ok" role="status">{success()}</Note>
       </Show>
       <Show when={error()}>
-        <p class="mt-2 p-2 text-xs text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 rounded-md" role="alert">{error()}</p>
+        <Note kind="bad" role="alert">{error()}</Note>
       </Show>
-    </div>
+    </PanelCard>
   )
 }
 

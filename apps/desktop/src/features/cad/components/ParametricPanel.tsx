@@ -1,3 +1,5 @@
+import { PanelCard } from "../../../shared/components/panel/ui.tsx"
+import { t } from "../../../i18n/index.ts"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import {
   RECIPES, analyzeManufacturability, buildRecipe, runModelScript, dimensionValue, dimensionsOf, flatPatternDxf, historyVolume, meshBounds, moveFeature, rebuild, removeFeature, removeParameter, renameParameter, resolveParameters, setDimension, setParameter, usesOf,
@@ -5,8 +7,8 @@ import {
 } from "@cadcamfun/core"
 import { useElementsStore, type Element } from "../store/elementsStore.ts"
 
-const INPUT = "w-full px-2 py-1 border border-gray-300 rounded-md text-sm font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-const SMALL = "px-2 py-0.5 text-xs border border-gray-300 rounded hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-600 disabled:opacity-40"
+const INPUT = "panel-input font-mono"
+const SMALL = "panel-btn"
 
 const STATUS: Readonly<Record<string, { readonly text: string; readonly tone: string }>> = {
   "fully-constrained": { text: "fully constrained", tone: "text-green-700" },
@@ -16,7 +18,7 @@ const STATUS: Readonly<Record<string, { readonly text: string; readonly tone: st
   failed: { text: "failed", tone: "text-red-700" }
 }
 
-const SELECT = "w-full px-1 py-1 border border-gray-300 rounded-md text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+const SELECT = "panel-input"
 const SEVERITY_TONE: Readonly<Record<string, string>> = { error: "text-red-700", warning: "text-amber-700", info: "text-gray-600 dark:text-gray-300" }
 
 const SCRIPT_STARTER = `// A bracket: parameters, a sketch, an extrusion, a hole pattern, a rib and a chamfer.
@@ -235,9 +237,8 @@ export default function ParametricPanel(props: { readonly element: Element; read
   }
 
   return (
-    <div class="mt-6 space-y-5 border-t border-gray-200 pt-4 dark:border-gray-600" data-testid="parametric-panel">
+    <PanelCard title={t("cad.ribbon.parametric")} testId="parametric-panel">
       <div>
-        <h4 class="text-sm font-semibold text-gray-900 dark:text-white">Parametric part</h4>
         <Show when={built()} fallback={<p class="text-sm text-red-600">The history could not be rebuilt.</p>}>{(result) =>
           <p class="text-xs text-gray-600 dark:text-gray-300" data-testid="parametric-summary">
             {result().bodies.length} solid{result().bodies.length === 1 ? "" : "s"}, {format(historyVolume(result()) / 1000)} cm³
@@ -428,7 +429,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
         </div>
       </div>
 
-      <div data-testid="dfm-section">
+      <div class="panel-subsection" data-testid="dfm-section">
         <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Manufacturability</h5>
         <div class="grid grid-cols-3 gap-1">
           <label class="block text-xs text-gray-600 dark:text-gray-300"><span class="block">process</span>
@@ -462,7 +463,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
         </Show>
       </div>
 
-      <div data-testid="recipes-section">
+      <div class="panel-subsection" data-testid="recipes-section">
         <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Recipes</h5>
         <select class={SELECT} aria-label="Recipe" disabled={props.locked} value={recipeName()} onChange={(event) => { setRecipeName(event.currentTarget.value); setRecipeInput({}); setRecipeResult(undefined) }}>
           <For each={RECIPES}>{(r) => <option value={r.name}>{r.title}</option>}</For>
@@ -500,7 +501,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
         </Show>
       </div>
 
-      <div data-testid="script-section">
+      <div class="panel-subsection" data-testid="script-section">
         <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Script</h5>
         <p class="text-xs text-gray-500">JavaScript against <code>m</code>: <code>m.param</code>, <code>m.sketch(plane).rectangle/circle/polygon/slot/path</code>, <code>m.extrude/revolve/sweep/loft/hole/pattern/fillet/chamfer/shell/rib/sheet/thread/text/pushPull</code>. Runs with your privileges: only code you wrote or read.</p>
         <textarea class={`${INPUT} mt-1 h-40`} spellcheck={false} aria-label="Model script" disabled={props.locked} value={script()} onInput={(event) => setScript(event.currentTarget.value)} />
@@ -512,7 +513,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
       </div>
 
       <Show when={(built()?.issues.length ?? 0) > 0}>
-        <div data-testid="parametric-issues">
+        <div class="panel-subsection" data-testid="parametric-issues">
           <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Problems</h5>
           <ul class="space-y-1">
             <For each={built()?.issues ?? []}>{(issue) =>
@@ -521,6 +522,6 @@ export default function ParametricPanel(props: { readonly element: Element; read
           </ul>
         </div>
       </Show>
-    </div>
+    </PanelCard>
   )
 }

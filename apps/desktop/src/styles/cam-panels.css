@@ -1,0 +1,35 @@
+/* CAM text tools share panel tokens; the 3D visualization is deliberately outside this scope. */
+.cam-central-panel { height: 100%; min-height: 0; padding: 12px; background: var(--panel-bg); color: var(--panel-text); }
+.cam-panel-heading { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.cam-panel-heading > svg { flex: none; color: var(--panel-text-muted); }
+.cam-editor { display: flex; flex-direction: column; gap: 10px; }
+.cam-editor .panel-header { margin: 0; padding-bottom: 8px; flex-wrap: wrap; }
+.cam-program-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--panel-border); border: 1px solid var(--panel-border); border-radius: 5px; overflow: hidden; }
+.cam-program-summary .panel-stat { min-width: 0; padding: 6px 8px; }
+.cam-program-summary .panel-stat__value { font-size: 12px; overflow-wrap: anywhere; }
+.panel .cam-editor__code { flex: 1; min-height: 180px; width: 100%; resize: none; border: 1px solid var(--panel-border-strong); border-radius: 4px; padding: 10px 12px; background: var(--panel-bg-inset); color: var(--panel-text); font: 12px/20px ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; }
+.panel .cam-editor__code:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: -1px; }
+.cam-editor__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.cam-editor__footer p { flex: 1 1 220px; }
+.cam-post { overflow-y: auto; }
+.cam-post__content { display: grid; gap: 10px; }
+.cam-post__content > div { min-width: 0; }
+.cam-post__heading { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; justify-content: space-between; }
+.cam-post__setup { display: grid; gap: 10px; margin-bottom: 10px; }
+.cam-post__controls { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.cam-post__controls > .panel-field { flex: 1 1 180px; }
+.cam-post__controls > .panel-btn { flex: 0 0 auto; }
+.cam-post__presets { display: grid; gap: 4px; }
+.cam-post__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr)); gap: 16px 20px; }
+.cam-post__grid > * { min-width: 0; }
+.cam-post .panel-section__body > :is(.p-4, .pt-0) { padding: 0; }
+.cam-post h4 { margin: 0 0 7px; color: var(--panel-text-muted); font-size: 11px; font-weight: 600; }
+.cam-post .panel-check { align-items: flex-start; line-height: 18px; }
+.cam-post .panel-check input { flex: none; margin-top: 2px; }
+.cam-post .panel-check label { color: var(--panel-text); }
+.cam-post__result-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.cam-post .panel-section { margin-bottom: 10px; }
+.cam-post .panel-header { margin-bottom: 10px; }
+.cam-post .panel-note { margin: 0; }
+.cam-post [data-testid="post-preview"] { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .cam-central-panel { padding: 8px; } .cam-program-summary { grid-template-columns: 1fr; } }

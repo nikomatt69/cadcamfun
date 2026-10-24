@@ -12,6 +12,7 @@ type ControllerType = cam.advanced.ControllerType
 type Stats = cam.advanced.OptimizationStats
 
 interface WrapperProps {
+  readonly onControllerChange?: ((controller: ControllerType) => void) | undefined
   readonly initialGcode: string
   readonly onProcessedGcode: (gcode: string, stats?: Stats) => void
 }
@@ -19,7 +20,7 @@ interface WrapperProps {
 export function FanucPostProcessor(props: WrapperProps): JSX.Element {
   return (
     <div class="rounded-lg overflow-hidden">
-      <AdvancedPostProcessorPanel initialGcode={props.initialGcode} controllerType="fanuc" onProcessedGcode={props.onProcessedGcode} />
+      <AdvancedPostProcessorPanel initialGcode={props.initialGcode} controllerType="fanuc" onProcessedGcode={props.onProcessedGcode} onControllerChange={props.onControllerChange} />
     </div>
   )
 }
@@ -27,7 +28,7 @@ export function FanucPostProcessor(props: WrapperProps): JSX.Element {
 export function HeidenhainPostProcessor(props: WrapperProps): JSX.Element {
   return (
     <div class="rounded-lg overflow-hidden">
-      <AdvancedPostProcessorPanel initialGcode={props.initialGcode} controllerType="heidenhain" onProcessedGcode={props.onProcessedGcode} />
+      <AdvancedPostProcessorPanel initialGcode={props.initialGcode} controllerType="heidenhain" onProcessedGcode={props.onProcessedGcode} onControllerChange={props.onControllerChange} />
     </div>
   )
 }
@@ -35,7 +36,7 @@ export function HeidenhainPostProcessor(props: WrapperProps): JSX.Element {
 export function GenericPostProcessor(props: WrapperProps & { readonly controllerType: ControllerType }): JSX.Element {
   return (
     <div class="rounded-lg overflow-hidden">
-      <AdvancedPostProcessorPanel initialGcode={props.initialGcode} controllerType={props.controllerType} onProcessedGcode={props.onProcessedGcode} />
+      <AdvancedPostProcessorPanel initialGcode={props.initialGcode} controllerType={props.controllerType} onProcessedGcode={props.onProcessedGcode} onControllerChange={props.onControllerChange} />
     </div>
   )
 }
@@ -48,13 +49,13 @@ export default function PostProcessorPanel(props: PostProcessorPanelProps): JSX.
   return (
     <Switch>
       <Match when={props.controllerType === "fanuc"}>
-        <FanucPostProcessor initialGcode={props.initialGcode} onProcessedGcode={props.onProcessedGcode} />
+        <FanucPostProcessor initialGcode={props.initialGcode} onProcessedGcode={props.onProcessedGcode} onControllerChange={props.onControllerChange} />
       </Match>
       <Match when={props.controllerType === "heidenhain"}>
-        <HeidenhainPostProcessor initialGcode={props.initialGcode} onProcessedGcode={props.onProcessedGcode} />
+        <HeidenhainPostProcessor initialGcode={props.initialGcode} onProcessedGcode={props.onProcessedGcode} onControllerChange={props.onControllerChange} />
       </Match>
       <Match when={true}>
-        <GenericPostProcessor initialGcode={props.initialGcode} controllerType={props.controllerType} onProcessedGcode={props.onProcessedGcode} />
+        <GenericPostProcessor initialGcode={props.initialGcode} controllerType={props.controllerType} onProcessedGcode={props.onProcessedGcode} onControllerChange={props.onControllerChange} />
       </Match>
     </Switch>
   )

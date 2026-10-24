@@ -15,6 +15,7 @@ export const LABEL = "panel-label"
 export const CHECKBOX = ""
 
 export interface PanelSectionProps {
+  readonly class?: string
   readonly id: string
   readonly icon: Component<{ size?: number; class?: string }>
   readonly title: string
@@ -29,7 +30,7 @@ export interface PanelSectionProps {
 /** One collapsible block of a panel. The owner of the panel decides when it is open. */
 export function PanelSection(props: PanelSectionProps): JSX.Element {
   return (
-    <section class="panel-section" id={props.id} data-open={props.open} data-testid={props.testId}>
+    <section class={`panel-section${props.class ? ` ${props.class}` : ""}`} id={props.id} data-open={props.open} data-testid={props.testId}>
       <div
         class="panel-section__head"
         role="button"
@@ -160,4 +161,12 @@ export function Stat(props: { readonly label: string; readonly value: string; re
       <Show when={props.sub}><span class="panel-stat__sub">{props.sub}</span></Show>
     </div>
   );
+}
+
+/** A persistent panel group for forms that keep their own editing/disclosure state. */
+export function PanelCard(props: { readonly title: string; readonly actions?: JSX.Element; readonly children: JSX.Element; readonly testId?: string }): JSX.Element {
+  return <section class="panel-section panel-card" data-testid={props.testId}>
+    <header class="panel-card__head"><h3 class="panel-section__title">{props.title}</h3><Show when={props.actions}><div class="panel-card__actions">{props.actions}</div></Show></header>
+    <div class="panel-section__body">{props.children}</div>
+  </section>
 }

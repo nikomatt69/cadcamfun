@@ -755,3 +755,49 @@ Remaining component gates include structural mesh validation before typed-array 
 independent support/overhang and volumetric deposition evidence, stationary extrusion and
 all firmware-specific state changes, machine-geometry/thermal qualification, and complete
 rendered workflow acceptance. This ledger records progress without closing those gates.
+
+### 9.13 Source geometry and actual melt-flow gates (2026-10-24)
+
+**Source geometry:** the print path no longer coerces malformed triangle data or silently
+prints the valid subset of a request. Shared structural validation runs before Uint32
+conversion and before slicing. Empty/incomplete meshes, fractional/negative/out-of-range/
+non-finite indices and non-finite/incomplete XYZ coordinates return `InvalidInput` from
+both planning and execution. Serialized mesh faces and placement vectors are checked before
+legacy adapters can drop/default them; container-offset overflow is checked after flattening.
+Incomplete Boolean operands and failed unions cannot fall back to a partial printed body.
+
+Source closure is checked with the existing CAD topology implementation using a read-only
+array-like interface, so authoritative doubles are never narrowed to Float32 for diagnostics.
+Virtual vertex coincidence is explicitly 1e-7 mm. Source coordinates and indices are unchanged;
+openings are not filled. Diagnostic volume is computed about a source vertex to avoid
+large-offset cancellation. Open horizontal caps (despite closed planar slice outlines),
+misoriented faces and non-manifold/degenerate source topology are refused. Coincident split
+vertices, globally inward-facing closed shells and a 1e9 mm drawing offset remain printable.
+This gate does not prove absence of self-intersections or completeness of CAD feature history.
+
+**Melt flow:** five of six initial post fixtures exceeded the declared hotend limit. Flow
+150 %, bridge circular cross-sections and scaled-width raft beads were not included in the
+speed calculation; one bridge fixture demanded 1.501 mm³/s against a 0.503 mm³/s ceiling.
+The post now uses the same physical cross-section/flow for E and feed calculation, limits
+the wider purge line, rounds feed down and refuses feeds below controller precision. It
+additionally limits every serialized deposition block using actual rounded XYZ/E; tiny or
+collapsed XYZ segments cannot hide a higher commanded volume rate behind nominal geometry.
+The regression measures NC E-volume per second, not the planner's claimed speed.
+
+Evidence:
+- Before source correction: 13 failures and one passing compatibility fixture; after:
+  16 source tests pass, including the added Boolean and large-offset fixtures. The final
+  source/cancellation subset passes 17 tests (82 assertions).
+- Final complete print/slicer/kernel/flow run: **116 pass, 0 fail**, 23,427 assertions.
+- Existing shared CAD mesh-kernel suite: **11 pass**, 206 assertions; algorithm unchanged.
+- HTTP/AI source-boundary suite: **18 pass**, 110 assertions, including JSON malformed-face
+  refusals with no artifact or NC preview. The broader generator/adapter run passed 87 tests.
+- Live desktop print panel: **5 pass**, 22 assertions. Core (446 files), API (326), sidecar
+  (661) and desktop (1,174) typechecks pass. API-reference generation/freshness and whitespace
+  checks pass; no dependencies or HTTP schema changed.
+
+The old broad core run is still live and has additionally exposed CAD degenerate-alignment
+timeouts (torus/sphere, torus/cylinder and seed 114). It is not a green acceptance result for
+current source. Independent support/overhang and volumetric deposition verification,
+stationary extrusion replay, remaining firmware/machine geometry, feature-history diagnostic
+propagation and full workflow qualification remain open. The overall owner goal stays active.

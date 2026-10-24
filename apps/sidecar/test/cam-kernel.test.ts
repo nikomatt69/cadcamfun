@@ -160,3 +160,14 @@ test("a printer request is validated: a hotter nozzle than the printer has is a 
   expect(hot.status).toBe(200)
   expect(hot.body).toMatchObject({ status: "failed", issues: expect.arrayContaining([expect.objectContaining({ tag: "MachineLimit" })]) })
 })
+
+test("a malformed print mesh beside a valid solid returns InvalidInput without a partial artifact", async () => {
+  const malformed = { id: "bad-mesh", type: "mesh", vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 1 }], faces: [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3], [0, 1]] }
+  const response = await post({ ...input, material: "PLA", machine: "printer-desktop-220", elements: [...input.elements, malformed] })
+  expect(response.status).toBe(200)
+  const result = Schema.decodeUnknownSync(CamKernelResult)(response.body)
+  expect(result.status).toBe("failed")
+  if (result.status !== "failed") throw new Error("Malformed mesh unexpectedly produced a partial print")
+  expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({ tag: "InvalidInput", stage: "prepare", message: expect.stringContaining("mesh face 4") })]))
+  expect(response.body.value).toBeUndefined()
+})

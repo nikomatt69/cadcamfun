@@ -55,7 +55,8 @@ describe("print source mesh validation", () => {
       { ...source, faces: [...source.faces, null] },
       { ...source, vertices: source.vertices.map((v, i) => i === 0 ? { ...v, z: NaN } : v) },
       { ...source, rotation: { x: Infinity } },
-      { type: "component", x: NaN, elements: [source] }
+      { type: "component", x: NaN, elements: [source] },
+      { type: "component", x: Number.MAX_VALUE, elements: [{ ...source, x: Number.MAX_VALUE }] }
     ]
     for (const broken of corrupt) {
       const response = generate3DPrinterProgram([cube, broken], settings)
@@ -64,6 +65,16 @@ describe("print source mesh validation", () => {
       expect(response.gcode).not.toContain("G1")
       expect(response.stats).toBeUndefined()
     }
+  })
+
+  test("a Boolean with a missing third operand cannot print its surviving subset", () => {
+    const result = generate3DPrinterProgram([
+      { ...cube, id: "a" }, { ...cube, id: "b", x: 2 },
+      { type: "boolean-union", id: "union", operands: ["a", "b", "missing"] }
+    ], settings)
+    expect(result.error).toContain("Boolean")
+    expect(result.error).toContain("not in the drawing")
+    expect(result.stats).toBeUndefined()
   })
 
   test("coincident duplicate vertices and a globally inside-out shell stay printable", () => {
@@ -75,5 +86,18 @@ describe("print source mesh validation", () => {
       expect(result.status).toBe("ok")
       if (result.status === "ok") expect(result.value.release).toBe("verified-program")
     }
+  })
+
+  test("large drawing offsets preserve double precision and never mutate the source", () => {
+    const shifted = { positions: positions.map((v, i) => i % 3 === 0 ? v + 1e9 : v), indices: [...indices] }
+    const before = JSON.stringify(shifted)
+    const result = runJob(job({ kind: "meshes", meshes: [shifted] }))
+    expect(result.status).toBe("ok")
+    if (result.status === "ok") {
+      expect(result.value.release).toBe("verified-program")
+      expect(result.value.print!.size.z).toBeCloseTo(1, 6)
+      expect(result.value.stock.partVolume).toBe(16)
+    }
+    expect(JSON.stringify(shifted)).toBe(before)
   })
 })

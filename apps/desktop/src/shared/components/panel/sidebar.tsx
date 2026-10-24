@@ -20,10 +20,10 @@ export function SidebarTabs<T extends string>(props: {
   </div>
 }
 
-export function SidebarCollapse(props: { readonly open: boolean; readonly label: string; readonly onToggle: () => void }): JSX.Element {
+export function SidebarCollapse(props: { readonly open: boolean; readonly label: string; readonly onToggle: () => void; readonly side?: "left" | "right" }): JSX.Element {
   return <div class="sidebar-footer"><button type="button" class="panel-icon-btn" title={props.label} aria-label={props.label}
     aria-expanded={props.open} onClick={props.onToggle}>
-    <Show when={props.open} fallback={<ChevronRight size={16} />}><ChevronLeft size={16} /></Show>
+    <Show when={props.open !== (props.side === "right")} fallback={<ChevronRight size={16} />}><ChevronLeft size={16} /></Show>
   </button></div>
 }
 
@@ -37,6 +37,6 @@ export function SidebarSection(props: {
   readonly children: JSX.Element
 }): JSX.Element {
   const [open, setOpen] = createSignal(true)
-  return <PanelSection id={props.id} title={props.title} icon={props.icon} open={open()} onToggle={() => setOpen(!open())}
+  return <PanelSection class="panel" id={props.id} title={props.title} icon={props.icon} open={open()} onToggle={() => setOpen(!open())}
     summary={props.summary} {...(props.testId ? { testId: props.testId } : {})}>{props.children}</PanelSection>
 }

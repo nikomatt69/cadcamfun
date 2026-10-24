@@ -1,11 +1,13 @@
+import { Box } from "lucide-solid"
+import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
+import { INPUT as FIELD, LABEL } from "../../../shared/components/panel/ui.tsx"
+import { t } from "../../../i18n/index.ts"
 import { For, Show, createEffect, createSignal, onMount, type JSX } from "solid-js"
 import { useApp } from "../../../shared/state/context.ts"
 import { useCADStore, type MachineConfig } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 
-const FIELD = "block w-full py-2 px-3 border border-gray-300 bg-[#F8FBFF] dark:bg-gray-800 dark:text-white dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-const LABEL = "block text-sm font-medium text-gray-700 dark:text-gray-300"
 const MATERIALS = [["aluminum", "Aluminum"], ["steel", "Steel"], ["wood", "Wood"], ["plastic", "Plastic"], ["brass", "Brass"], ["titanium", "Titanium"], ["copper", "Copper"], ["composite", "Composite"], ["custom", "Other"]] as const
 
 /** Stock size, position and material, and the machine it is for; "Apply" (re)creates the workpiece element. */
@@ -78,8 +80,7 @@ export default function WorkpieceSetup(): JSX.Element {
   )
 
   return (
-    <div class="bg-[#F8FBFF] dark:bg-gray-800 dark:text-white shadow-md rounded-lg p-4 space-y-4">
-      <h3 class="text-lg font-medium text-gray-900 dark:text-white">Workpiece Setup</h3>
+    <SidebarSection id="cad-workpiece" title={t("cad.workpieceSetup")} icon={Box}>
       <div>
         <label class={LABEL}>Machine Configuration</label>
         <select name="machine" value={machineId()} onChange={(e) => changeMachine(e.currentTarget.value)} class={`mt-1 ${FIELD}`}>
@@ -87,9 +88,9 @@ export default function WorkpieceSetup(): JSX.Element {
           <For each={machines()}>{(config) => <option value={config.id}>{config.name} ({config.type ?? config.config.type ?? "machine"})</option>}</For>
         </select>
       </div>
-      <div class="grid grid-cols-3 gap-4">{number("width", "Width", true)}{number("height", "Height", true)}{number("depth", "Depth", true)}</div>
-      <div class="grid grid-cols-3 gap-4">{number("positionX", "Position X")}{number("positionY", "Position Y")}{number("positionZ", "Position Z")}</div>
-      <div class="grid grid-cols-2 gap-4">
+      <div class="panel-grid panel-grid--3">{number("width", "Width", true)}{number("height", "Height", true)}{number("depth", "Depth", true)}</div>
+      <div class="panel-grid panel-grid--3">{number("positionX", "Position X")}{number("positionY", "Position Y")}{number("positionZ", "Position Z")}</div>
+      <div class="panel-grid panel-grid--2">
         <div>
           <label class={LABEL}>Material</label>
           <select name="material" value={form().material} onChange={(e) => set("material", e.currentTarget.value)} class={`mt-1 ${FIELD}`}>
@@ -109,12 +110,12 @@ export default function WorkpieceSetup(): JSX.Element {
         </div>}
       </Show>
       <div class="pt-3 flex justify-between">
-        <button type="button" onClick={() => setForm(initial())} class="px-4 py-2 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500">Reset</button>
-        <button type="button" onClick={apply} class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Apply Changes</button>
+        <button type="button" onClick={() => setForm(initial())} class="panel-btn">Reset</button>
+        <button type="button" onClick={apply} class="panel-btn panel-btn--primary">Apply Changes</button>
       </div>
       <div class="text-xs text-gray-500 dark:text-gray-400 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
         <p>The workpiece will be created in the default layer &quot;{layers.layers[0]?.name}&quot; and will be available for both CAD and CAM.</p>
       </div>
-    </div>
+    </SidebarSection>
   )
 }

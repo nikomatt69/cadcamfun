@@ -1,6 +1,7 @@
 import { For, Match, Show, Switch, createEffect, createMemo, createSignal, untrack, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
-import { Copy, Lock, Trash2 } from "lucide-solid"
+import { INPUT, LABEL, Note, PanelCard } from "../../../shared/components/panel/ui.tsx"
+import { t } from "../../../i18n/index.ts"
+import { Copy, Trash2 } from "lucide-solid"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { getFieldsForElementType, numberRulesFor, type PropertyField } from "../lib/propertyFields.ts"
@@ -20,11 +21,8 @@ const SELF_LABELLED = new Set(["vector3", "point3d", "pointList", "list", "color
 
 type Props = Record<string, any>
 
-const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-const READONLY = "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-100 dark:bg-gray-700 dark:text-white"
-const LABEL = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+const READONLY = INPUT
 const ORIGIN = { x: 0, y: 0, z: 0 }
-const rise = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 } }
 const same = (a: unknown, b: unknown) => a === b || (typeof a === "object" && typeof b === "object" && JSON.stringify(a) === JSON.stringify(b))
 
 /** Edits the selected element: per-type fields, complex inputs, layer lock awareness, duplicate / delete / save to library. */
@@ -166,35 +164,31 @@ export default function PropertyPanel(): JSX.Element {
 
   return (
     <Show when={elements.selectedElement} fallback={
-      <Motion.div class="workstation-properties dark:text-white" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <h3 class="text-lg font-medium text-gray-900 mb-2">Properties</h3>
-        <p class="text-gray-500 text-sm">No element selected</p>
-      </Motion.div>
+      <div class="workstation-properties">
+        <PanelCard title={t("cad.properties")}><p class="panel-empty">{t("cad.noElementSelected")}</p></PanelCard>
+      </div>
     }>{(selected) =>
-      <Motion.div class="workstation-properties dark:text-white" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-medium text-gray-900 dark:text-white">Element Properties</h3>
-          <div class="flex space-x-2">
+      <div class="workstation-properties">
+        <PanelCard title={t("cad.elementProperties")} testId="property-panel" actions={<>
             <SaveElementToLibrary />
-            <Motion.button hover={{ scale: 1.1 }} press={{ scale: 0.9 }} onClick={() => elements.duplicateElement(selected().id)} class="p-1 rounded-full text-blue-600 hover:bg-blue-100 focus:outline-none" title="Duplicate Element" disabled={locked()}>
+            <button onClick={() => elements.duplicateElement(selected().id)} class="panel-icon-btn" title="Duplicate Element" disabled={locked()}>
               <Copy size={18} class={locked() ? "text-gray-400" : ""} />
-            </Motion.button>
-            <Motion.button hover={{ scale: 1.1 }} press={{ scale: 0.9 }} onClick={() => { if (window.confirm("Are you sure you want to delete this element?")) elements.deleteElement(selected().id) }} class="p-1 rounded-full text-red-600 hover:bg-red-100 focus:outline-none" title="Delete Element" disabled={locked()}>
+            </button>
+            <button onClick={() => { if (window.confirm("Are you sure you want to delete this element?")) elements.deleteElement(selected().id) }} class="panel-icon-btn panel-icon-btn--danger" title="Delete Element" disabled={locked()}>
               <Trash2 size={18} class={locked() ? "text-gray-400" : ""} />
-            </Motion.button>
-          </div>
-        </div>
+            </button>        </>}>
+
 
         <Show when={locked()}>
-          <div class="bg-yellow-50 text-yellow-800 p-3 rounded-md mb-4 text-sm flex items-center"><Lock size={16} class="mr-2" /><span>This element is on a locked layer and cannot be edited</span></div>
+          <Note kind="warn">{t("cad.layerLocked")}</Note>
         </Show>
 
         <form onSubmit={submit} onKeyDown={(event) => { if (event.key === "Escape" && editing()) { event.preventDefault(); cancel() } }}>
           <div class="space-y-4">
-            <Motion.div {...rise}><label for="name" class={LABEL}>Name</label><input type="text" id="name" name="name" class={READONLY} value={properties().name || ""} disabled /></Motion.div>
-            <Motion.div {...rise}><label for="id" class={LABEL}>ID</label><input type="text" id="id" name="id" class={READONLY} value={properties().id || ""} disabled /></Motion.div>
-            <Motion.div {...rise}><label for="type" class={LABEL}>Type</label><input type="text" id="type" name="type" class={READONLY} value={properties().type || ""} disabled /></Motion.div>
-            <Motion.div {...rise}>
+            <div><label for="name" class={LABEL}>Name</label><input type="text" id="name" name="name" class={READONLY} value={properties().name || ""} disabled /></div>
+            <div><label for="id" class={LABEL}>ID</label><input type="text" id="id" name="id" class={READONLY} value={properties().id || ""} disabled /></div>
+            <div><label for="type" class={LABEL}>Type</label><input type="text" id="type" name="type" class={READONLY} value={properties().type || ""} disabled /></div>
+            <div>
               <label class={LABEL}>Layer</label>
               <div class="flex items-center">
                 <div class="w-4 h-4 rounded-full mr-2" style={{ "background-color": layer()?.color || "#cccccc" }} />
@@ -203,15 +197,15 @@ export default function PropertyPanel(): JSX.Element {
                   <Show when={layer()?.locked}><span class="ml-2 text-xs text-gray-500">(locked)</span></Show>
                 </span>
               </div>
-            </Motion.div>
+            </div>
 
             <Show when={revision()} keyed>{(_revision: number) =>
               <For each={fields()}>{(field) =>
                 <Show when={!field.showIf || field.showIf(properties())}>
-                  <Motion.div {...rise}>
+                  <div>
                     <Show when={!SELF_LABELLED.has(field.type)}><label for={field.name} class={LABEL}>{field.label}</label></Show>
                     {control(field)}
-                  </Motion.div>
+                  </div>
                 </Show>}
               </For>}
             </Show>
@@ -219,17 +213,18 @@ export default function PropertyPanel(): JSX.Element {
             <Show when={tried() && Object.keys(errors()).length > 0}>
               <p class="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="property-errors">Fix the highlighted values before applying.</p>
             </Show>
-            <Motion.div class="mt-6 flex items-center justify-end gap-3" {...rise}>
+            <div class="panel-edit-actions">
               <Show when={editing()} fallback={
-                <Motion.button type="button" onClick={() => setEditing(true)} class="px-3 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" hover={{ scale: 1.05 }} press={{ scale: 0.95 }} disabled={locked()}>Edit Properties</Motion.button>
+                <button type="button" onClick={() => setEditing(true)} class="panel-btn panel-btn--primary" disabled={locked()}>{t("cad.editProperties")}</button>
               }>
               <span class="mr-auto text-xs text-gray-500 dark:text-gray-400">{changed() ? "Enter applies · Esc cancels" : "Type a value: 12,5 · 12.5 · 40/2+3"}</span>
-              <Motion.button type="button" onClick={cancel} class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-[#F8FBFF] dark:bg-gray-700 dark:text-white dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" hover={{ scale: 1.05 }} press={{ scale: 0.95 }}>Cancel</Motion.button>
-              <Motion.button type="submit" class="px-3 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" hover={{ scale: 1.05 }} press={{ scale: 0.95 }} disabled={locked()}>Apply</Motion.button>
+              <button type="button" onClick={cancel} class="panel-btn">{t("common.cancel")}</button>
+              <button type="submit" class="panel-btn panel-btn--primary" disabled={locked()}>{t("cad.surfacing.run")}</button>
               </Show>
-            </Motion.div>
+            </div>
           </div>
         </form>
+        </PanelCard>
 
         <Show when={selected().type === "parametric" && selected().history}>
           <ParametricPanel element={selected()} locked={locked()} />
@@ -240,22 +235,22 @@ export default function PropertyPanel(): JSX.Element {
         </Show>
 
         <Show when={canMakeParametric(selected())}>
-          <div class="mt-6 space-y-2 border-t border-gray-200 pt-4 dark:border-gray-600">
+          <div class="panel-section panel-section__body">
             <p class="text-sm text-gray-600 dark:text-gray-300">Turn this {String(selected().type)} into a parametric part: its measures become named parameters you can edit or drive by a formula.</p>
             <div class="flex flex-wrap gap-2">
-              <button type="button" class="px-3 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" disabled={locked()} onClick={() => convert(false)}>Make parametric</button>
-              <button type="button" class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:text-gray-200 dark:border-gray-600" disabled={locked()} onClick={() => { if (window.confirm("Replace this element with its parametric twin?")) convert(true) }}>Replace with parametric</button>
+              <button type="button" class="panel-btn panel-btn--primary" disabled={locked()} onClick={() => convert(false)}>Make parametric</button>
+              <button type="button" class="panel-btn" disabled={locked()} onClick={() => { if (window.confirm("Replace this element with its parametric twin?")) convert(true) }}>Replace with parametric</button>
             </div>
             <Show when={conversion() !== ""}><p class="text-xs text-gray-500 dark:text-gray-400">{conversion()}</p></Show>
           </div>
         </Show>
 
         <Show when={SOLID_TYPES_FOR_SURFACING.has(String(selected().type))}>
-          <div class="mt-6 space-y-4 border-t border-gray-200 pt-4 dark:border-gray-600">
+          <div class="mt-2">
             <SurfacingPanel />
           </div>
         </Show>
-      </Motion.div>}
+      </div>}
     </Show>
   )
 }

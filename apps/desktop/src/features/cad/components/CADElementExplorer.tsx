@@ -116,7 +116,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
     return (
       <div class="select-none">
         <div
-           class={`workstation-browser-row workstation-browser-row--cad flex items-center px-2 py-2 cursor-pointer text-sm group transition-colors duration-150 border-l-2 ${isSelected() ? "bg-blue-50 dark:bg-blue-900/30 border-l-blue-500 text-blue-700 dark:text-blue-300" : "hover:bg-gray-50 dark:hover:bg-gray-800/60 border-l-transparent text-gray-700 dark:text-gray-300"}`}
+           class={`workstation-browser-row workstation-browser-row--cad flex items-center px-2 py-2 cursor-pointer text-sm group transition-colors duration-150 border-l-2 ${isSelected() ? "border-l-blue-500 text-blue-700 dark:text-blue-300" : "hover:bg-gray-50 dark:hover:bg-gray-800/60 border-l-transparent text-gray-700 dark:text-gray-300"}`}
           style={{ "padding-left": `${nodeProps.depth * 16 + 8}px` }}
           onClick={(event) => selectNode(nodeProps.node.id, event)}
         >

@@ -3,11 +3,11 @@
  * "View logs" (spec 06-desktop-ui.md §1).
  */
 import { Show, type JSX } from "solid-js"
-import LoaderCircle from "lucide-solid/icons/loader-circle"
 import Terminal from "lucide-solid/icons/terminal"
 import Triangle from "lucide-solid/icons/triangle"
 import { t } from "../../i18n/index.ts"
 import type { BootState } from "../state/client.ts"
+import "./boot-screen.css"
 
 export interface BootScreenProps {
   readonly state: BootState
@@ -70,7 +70,20 @@ export function BootScreen(props: BootScreenProps): JSX.Element {
           }
         >
           <div class="mt-6 flex flex-col items-center gap-3">
-            <LoaderCircle size={28} aria-hidden="true" class="animate-spin text-blue-600" />
+            {/* The CADCAMFUN mark is the only thing above the status lines, and it
+                breathes while the sidecar answers — no spinner next to it. */}
+            <span class="boot-mark" aria-hidden="true">
+              <span class="boot-mark-glow" />
+              <img
+                class="boot-mark-image"
+                src="/icon.png"
+                alt=""
+                width="56"
+                height="56"
+                draggable={false}
+                decoding="async"
+              />
+            </span>
             <p class="text-sm">
               {props.state._tag === "starting" ? t("boot.connecting") : t("boot.checking")}
             </p>

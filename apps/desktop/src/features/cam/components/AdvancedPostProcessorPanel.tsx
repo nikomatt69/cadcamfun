@@ -6,9 +6,13 @@
  * The processing itself lives in the core (`cam.advanced.processGCode`); this component only edits the options
  * and shows the result.
  */
-import { For, Show, createEffect, createSignal, on, type JSX } from "solid-js"
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Cpu, Eye, Info, Loader, Save, Settings, Sliders } from "lucide-solid"
+import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
+import { AlertTriangle, Check, Cpu, Eye, Info, Loader, Save, Settings, Sliders } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
+import { t } from "../../../i18n/index.ts"
+import { CheckRow, Field, Note, PanelSection, Stat } from "../../../shared/components/panel/ui.tsx"
+import { gcodeSummary } from "../lib/gcode-summary.ts"
+import "../../../styles/cam-panels.css"
 
 const advanced = cam.advanced
 
@@ -17,14 +21,12 @@ type Options = cam.advanced.OptimizationOptions
 type Result = cam.advanced.OptimizationResult
 
 export interface AdvancedPostProcessorPanelProps {
+  readonly onControllerChange?: ((controller: ControllerType) => void) | undefined
   readonly initialGcode: string
   readonly controllerType: ControllerType
   /** Receives the processed program and its statistics (legacy `onProcessedGcode(code, stats)`). */
   readonly onProcessedGcode: (gcode: string, stats?: Result["stats"]) => void
 }
-
-const CHECKBOX = "h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-const CHECK_LABEL = "ml-2 block text-sm text-gray-700"
 
 interface OptionCheckboxProps {
   readonly id: string
@@ -34,21 +36,11 @@ interface OptionCheckboxProps {
 }
 
 function OptionCheckbox(props: OptionCheckboxProps): JSX.Element {
-  return (
-    <div class="flex items-center">
-      <input
-        type="checkbox"
-        id={props.id}
-        class={CHECKBOX}
-        checked={props.checked}
-        onChange={(event) => props.onChange(event.currentTarget.checked)}
-      />
-      <label for={props.id} class={CHECK_LABEL}>{props.label}</label>
-    </div>
-  )
+  return <CheckRow id={props.id} checked={props.checked ?? false} onChange={props.onChange}>{props.label}</CheckRow>
 }
 
 export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorPanelProps): JSX.Element {
+  const [preset, setPreset] = createSignal("custom")
   const [inputGcode, setInputGcode] = createSignal(props.initialGcode)
   const [outputGcode, setOutputGcode] = createSignal("")
   const [isProcessing, setIsProcessing] = createSignal(false)
@@ -71,14 +63,17 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
   }
 
   const updateOption = <K extends keyof Options>(key: K, value: Options[K]): void => {
+    setPreset("custom")
     setOptions((prev) => ({ ...prev, [key]: value }))
   }
 
   const updateFanuc = (key: keyof cam.advanced.FanucOptions, value: boolean): void => {
+    setPreset("custom")
     setOptions((prev) => ({ ...prev, controllerSpecific: { ...prev.controllerSpecific, fanuc: { ...prev.controllerSpecific.fanuc, [key]: value } } }))
   }
 
   const updateHeidenhain = (key: keyof cam.advanced.HeidenhainOptions, value: boolean): void => {
+    setPreset("custom")
     setOptions((prev) => ({ ...prev, controllerSpecific: { ...prev.controllerSpecific, heidenhain: { ...prev.controllerSpecific.heidenhain, [key]: value } } }))
   }
 
@@ -113,52 +108,31 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
     URL.revokeObjectURL(url)
   }
 
+  const summary = createMemo(() => gcodeSummary(inputGcode()))
   const controllerName = (): string => advanced.capitalise(selectedController())
   const fanuc = (): cam.advanced.FanucOptions => options().controllerSpecific.fanuc
   const heidenhain = (): cam.advanced.HeidenhainOptions => options().controllerSpecific.heidenhain
 
-  const SectionHeader = (p: { readonly section: keyof ReturnType<typeof expanded>; readonly icon: JSX.Element; readonly title: JSX.Element }): JSX.Element => (
-    <div
-      class="flex items-center justify-between p-4 cursor-pointer"
-      role="button"
-      tabIndex={0}
-      aria-expanded={expanded()[p.section]}
-      onClick={() => toggleSection(p.section)}
-      onKeyDown={(event: KeyboardEvent) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault()
-          toggleSection(p.section)
-        }
-      }}
-    >
-      <h3 class="text-lg font-medium text-gray-800 flex items-center">
-        {p.icon}
-        {p.title}
-      </h3>
-      {expanded()[p.section] ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-    </div>
-  )
-
   return (
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md" data-testid="advanced-post-processor">
-      <div class="p-4 border-b">
-        <h2 class="text-xl font-bold text-gray-800 flex items-center mb-2">
-          <Cpu size={20} class="mr-2 text-blue-600" />
+    <div class="panel cam-post__panel" data-testid="advanced-post-processor">
+      <div class="cam-post__setup">
+        <h2 class="panel-header__title cam-panel-heading">
+          <Cpu size={15} />
           Advanced Post-Processor
         </h2>
 
-        <p class="text-sm text-gray-600 mb-4">
-          Optimize and convert G-code for {controllerName()}{" "}
-          controllers. Configure options to adapt the code to your CNC specifications.
-        </p>
-
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Controller Type</label>
-          <div class="flex space-x-2">
-            <select
-              class="flex-grow p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+        <div class="cam-program-summary" data-testid="post-input-summary">
+          <Stat label={t("cam.panel.blocks")} value={String(summary().blocks)} />
+          <Stat label={t("cam.panel.tools")} value={summary().tools.map(n => `T${n}`).join(" · ") || t("cam.panel.notSpecified")} />
+          <Stat label={t("cam.panel.offsets")} value={summary().offsets.join(" · ") || t("cam.panel.notSpecified")} />
+        </div>
+        <Show when={summary().blocks === 0}><Note>{t("cam.panel.noInput")}</Note></Show>
+        <div class="cam-post__controls">
+          <Field label={t("cam.panel.controller")} for="post-processor-type">
+            <select id="post-processor-type"
+              class="panel-input"
               value={selectedController()}
-              onChange={(event) => setSelectedController(event.currentTarget.value as ControllerType)}
+              onChange={(event) => { const value = event.currentTarget.value as ControllerType; setSelectedController(value); props.onControllerChange?.(value) }}
               data-testid="advanced-controller"
             >
               <option value="fanuc">Fanuc</option>
@@ -169,63 +143,57 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
               <option value="okuma">Okuma</option>
               <option value="generic">Generic</option>
             </select>
+          </Field>
             <button
-              class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center"
+              class="panel-btn panel-btn--primary"
               onClick={() => void processGcode()}
-              disabled={isProcessing() || !inputGcode()}
+              disabled={isProcessing() || summary().blocks === 0}
               data-testid="process-gcode"
             >
               {isProcessing() ? <Loader size={18} class="mr-2 animate-spin" /> : <Settings size={18} class="mr-2" />}
               {isProcessing() ? "Processing..." : "Process G-code"}
             </button>
-          </div>
         </div>
 
-        <div class="flex flex-wrap gap-2 mb-4">
-          <span class="text-sm font-medium text-gray-700 self-center mr-2">Presets:</span>
+        <div class="cam-post__presets"><span class="panel-label">{t("cam.panel.presets")}</span><div class="cam-post__result-actions" style={{ "justify-content": "flex-start" }}>
           <button
             type="button"
-            class="px-3 py-1 bg-gray-100 text-gray-800 text-sm rounded hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400"
-            onClick={() => setOptions(advanced.applyPreset("basic", options()))}
+            class="panel-btn"
+            aria-pressed={preset() === "basic"} onClick={() => { setPreset("basic"); setOptions(advanced.applyPreset("basic", options())) }}
           >
             Basic
           </button>
           <button
             type="button"
-            class="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            onClick={() => setOptions(advanced.applyPreset("speed", options()))}
+            class="panel-btn"
+            aria-pressed={preset() === "speed"} onClick={() => { setPreset("speed"); setOptions(advanced.applyPreset("speed", options())) }}
           >
             Speed
           </button>
           <button
             type="button"
-            class="px-3 py-1 bg-green-100 text-green-800 text-sm rounded hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-400"
-            onClick={() => setOptions(advanced.applyPreset("quality", options()))}
+            class="panel-btn"
+            aria-pressed={preset() === "quality"} onClick={() => { setPreset("quality"); setOptions(advanced.applyPreset("quality", options())) }}
           >
             Quality
           </button>
           <button
             type="button"
-            class="px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            onClick={() => setOptions(advanced.applyPreset("advanced", options()))}
+            class="panel-btn"
+            aria-pressed={preset() === "advanced"} onClick={() => { setPreset("advanced"); setOptions(advanced.applyPreset("advanced", options())) }}
           >
             Advanced
           </button>
         </div>
 
-        <div class="p-3 bg-blue-50 rounded-md mb-4 text-sm text-blue-800">
-          <div class="flex items-start">
-            <Info size={16} class="mt-0.5 mr-2 flex-shrink-0 text-blue-600" />
-            <p>{advanced.controllerDescription(selectedController())}</p>
-          </div>
         </div>
+        <Note>{advanced.controllerDescription(selectedController())}</Note>
       </div>
 
-      <div class="border-b">
-        <SectionHeader section="generalOptions" icon={<Sliders size={18} class="mr-2 text-blue-600" />} title="General Options" />
+      <PanelSection id="post-general" title={t("cam.panel.general")} icon={Sliders} open={expanded().generalOptions} onToggle={() => toggleSection("generalOptions")}>
 
         <Show when={expanded().generalOptions}>
-          <div class="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="cam-post__grid">
             <div>
               <h4 class="font-medium text-gray-700 mb-2">Path Optimization</h4>
               <div class="space-y-2">
@@ -259,15 +227,14 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
             </div>
           </div>
         </Show>
-      </div>
+      </PanelSection>
 
-      <div class="border-b">
-        <SectionHeader section="controllerOptions" icon={<Settings size={18} class="mr-2 text-blue-600" />} title={<>{controllerName()} Specific Options</>} />
+      <PanelSection id="post-controller" title={`${controllerName()} Specific Options`} icon={Settings} open={expanded().controllerOptions} onToggle={() => toggleSection("controllerOptions")}>
 
         <Show when={expanded().controllerOptions}>
           <div class="p-4 pt-0">
             <Show when={selectedController() === "fanuc"}>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="cam-post__grid">
                 <div>
                   <h4 class="font-medium text-gray-700 mb-2">Format Optimization</h4>
                   <div class="space-y-2">
@@ -302,7 +269,7 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
             </Show>
 
             <Show when={selectedController() === "heidenhain"}>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="cam-post__grid">
                 <div>
                   <h4 class="font-medium text-gray-700 mb-2">Program Format</h4>
                   <div class="space-y-2">
@@ -350,16 +317,15 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
             </Show>
           </div>
         </Show>
-      </div>
+      </PanelSection>
 
       <Show when={result()}>
         {(current) => (
-          <div class="border-b" data-testid="post-results">
-            <SectionHeader section="results" icon={<Check size={18} class="mr-2 text-green-600" />} title="Optimization Results" />
+          <PanelSection id="post-results-section" testId="post-results" title="Optimization Results" icon={Check} open={expanded().results} onToggle={() => toggleSection("results")}>
 
             <Show when={expanded().results}>
               <div class="p-4 pt-0">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="cam-post__grid mb-4">
                   <div>
                     <h4 class="font-medium text-gray-700 mb-2">Statistics</h4>
                     <div class="bg-gray-50 p-3 rounded-md">
@@ -437,10 +403,10 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
                   </div>
                 </div>
 
-                <div class="flex justify-end space-x-2">
+                <div class="cam-post__result-actions">
                   <button
                     type="button"
-                    class="flex items-center px-4 py-2 text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="panel-btn"
                     onClick={() => toggleSection("preview")}
                   >
                     <Eye size={16} class="mr-2" />
@@ -449,7 +415,7 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
 
                   <button
                     type="button"
-                    class="flex items-center px-4 py-2 text-green-700 bg-green-100 rounded-md hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    class="panel-btn"
                     onClick={saveGcode}
                   >
                     <Save size={16} class="mr-2" />
@@ -458,7 +424,7 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
 
                   <button
                     type="button"
-                    class="flex items-center px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="panel-btn panel-btn--primary"
                     onClick={() => void processGcode()}
                     disabled={isProcessing()}
                   >
@@ -468,14 +434,14 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
                 </div>
               </div>
             </Show>
-          </div>
+          </PanelSection>
         )}
       </Show>
 
       <Show when={result() && expanded().preview}>
         <div class="p-4">
           <h3 class="text-lg font-medium text-gray-800 mb-2">Optimized G-code Preview</h3>
-          <div class="bg-gray-100 p-3 rounded-md overflow-auto max-h-96">
+          <div class="panel-code">
             <pre class="text-sm font-mono whitespace-pre-wrap" data-testid="post-preview">{outputGcode()}</pre>
           </div>
         </div>

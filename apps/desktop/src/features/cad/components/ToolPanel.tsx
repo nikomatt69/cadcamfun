@@ -1,4 +1,3 @@
-import { Wrench as SectionWrench } from "lucide-solid"
 import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
 /**
  * The "create" tool panel of the CAD editor: every element tool grouped by category, and the "Add element" form that
@@ -6,7 +5,7 @@ import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
  */
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
-import { Anchor, Box, Circle, Minus, Square, Triangle } from "lucide-solid"
+import { Anchor, Box, Circle, Minus, Square, Triangle, Wrench } from "lucide-solid"
 import { Motion, Presence } from "solid-motionone"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
@@ -147,7 +146,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
   const content = (
     <Motion.div
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-      class="bg-[#F8FBFF] dark:bg-gray-800 dark:text-white shadow-xl overflow-y-auto rounded-md p-4 w-[320px] max-h-[480px] border border-gray-200 dark:border-gray-600"
+      class="panel sidebar-element-form overflow-y-auto p-4 w-[320px] max-h-[480px]"
       style={{
         ...(props.formPosition ? { position: "fixed", top: `${props.formPosition.y}px`, left: `${props.formPosition.x}px`, "z-index": "2147483647", isolation: "isolate" } : {}),
         "scrollbar-width": "none"
@@ -167,8 +166,8 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
           </div>
         </Show>
         <div class="mt-4 flex justify-end space-x-2">
-          <button type="button" onClick={props.onCancel} class="px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700">Cancel</button>
-          <button type="submit" class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Add Element</button>
+          <button type="button" onClick={props.onCancel} class="panel-btn">Cancel</button>
+          <button type="submit" class="panel-btn panel-btn--primary">Add Element</button>
         </div>
       </form>
     </Motion.div>
@@ -204,13 +203,13 @@ export default function ToolPanel(): JSX.Element {
   }
 
   return (
-    <div class="sidebar-toolbox">
+    <div class="panel sidebar-toolbox">
       <Show when={!activeLayerInfo()}>
         <div class="bg-yellow-50 dark:bg-yellow-700 dark:text-yellow-100 text-yellow-800 p-3 rounded-md mb-3 text-xs">Please select a layer first to add elements.</div>
       </Show>
       <div class="space-y-3">
         <For each={CATEGORIZED_TOOLS}>{(category) =>
-          <SidebarSection id={`cad-tools-${category.name.toLowerCase().replaceAll(" ", "-")}`} title={category.name} icon={SectionWrench} summary={String(category.tools.length)}>
+          <SidebarSection id={`cad-tools-${category.name.toLowerCase().replaceAll(" ", "-")}`} title={category.name} icon={Wrench} summary={String(category.tools.length)}>
             <div class="grid grid-cols-4 gap-1">
               <For each={category.tools}>{(tool) =>
                 <Motion.button

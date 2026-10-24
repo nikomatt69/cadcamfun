@@ -2,6 +2,13 @@
 
 ## Additive assistant evidence (2026-10-24)
 
+Deposition increment: existing generator/kernel print reports gain optional raster deposition
+measures (resolution, occupied model/auxiliary volume, extruded volume, overhang bearing and
+floating volume), and the shared check/claim literals add `support-coverage` and
+`deposition-connectivity`. No new endpoint or action is introduced. Preserve unresolved and
+failed verdicts across HTTP and assistant results; regenerate both clients and the web API
+reference before validation. Older reports without the optional measures remain decodable.
+
 WP4's owner-requested print integration preserves the existing kernel `print` report in
 `cam.manufacture` results and printer profiles in configured-machine discovery. Printer
 stock notes describe a build plate and deposited filament rather than inferred milling
@@ -9,6 +16,12 @@ stock. WP8 owns the existing material/machine discovery action and its print gui
 (spec 08). These are additive fields within existing record-valued tool results; HTTP
 request/response schemas and action identities stay unchanged. Verify through the real
 tool catalogue, project handlers and kernel worker, including blocked releases.
+
+Source validation integration: HTTP manufacturing and the existing assistant manufacture
+action preserve WP2 mesh-input refusals as `InvalidInput` with the source reason. A malformed
+mesh beside a valid solid must not return a partial artifact or NC preview. No new endpoint,
+result tag or request schema is introduced; verify JSON-serialized malformed faces through
+both real adapters.
 
 ## Exact-replay diagnostic preservation (2026-10-22)
 
@@ -128,6 +141,11 @@ apps/sidecar/src/
 - `bunx tsc` clean for both packages; coverage of every endpoint by at least one in-process HTTP test.
 
 ## 5. Change log
+
+- 2026-10-24: source-mesh refusal integration verified through the real manufacturing HTTP
+  route and assistant action/worker. A malformed face beside a valid solid produces
+  `InvalidInput` and no partial artifact/preview. The two adapter suites pass 18 tests
+  (110 assertions); sidecar/API typechecks pass. No wire schema or endpoint changed.
 
 - 2026-10-24: additive assistant evidence implemented through existing handlers. Printer
   discovery retains profiles, manufacturing returns the kernel print report, and stock notes

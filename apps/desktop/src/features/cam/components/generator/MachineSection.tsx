@@ -4,9 +4,9 @@ import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { Field, INPUT, Section } from "./ui.tsx"
 
 const MACHINES = [
-  { id: "mill", label: "CNC mill", about: "Subtractive: flat faces, contours, pockets, holes and 3D surfaces cut from stock." },
-  { id: "lathe", label: "CNC lathe", about: "The part turns: shafts, bores, faces and threads on a revolved profile." },
-  { id: "3dprinter", label: "3D printer", about: "Additive: the part is sliced into layers and built up in filament, with walls, skin, infill and supports." }
+  { id: "mill", label: "CNC mill" },
+  { id: "lathe", label: "CNC lathe" },
+  { id: "3dprinter", label: "3D printer" }
 ] as const
 
 /** The machine the program is for: a mill, a lathe or a 3D printer, and what each one does with the part. */

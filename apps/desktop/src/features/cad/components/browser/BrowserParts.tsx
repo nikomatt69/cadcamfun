@@ -223,7 +223,7 @@ export function OriginBlock(): JSX.Element {
     setDocumentTolerance(app, mm)
   }
   return (
-    <details class="border-b border-gray-200 dark:border-gray-700" data-testid="browser-origin" open>
+    <details class="sidebar-browser-origin border-b border-gray-200 dark:border-gray-700" data-testid="browser-origin" open>
       <summary class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300 cursor-pointer select-none">Document &amp; Origin</summary>
       <div class="pb-1">
         <label class={TOGGLE_ROW}>

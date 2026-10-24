@@ -1,3 +1,5 @@
+import { PanelCard } from "../../../shared/components/panel/ui.tsx"
+import { t } from "../../../i18n/index.ts"
 import { For, Show, createEffect, createSignal, on, type JSX } from "solid-js"
 import { analyzeExact, elementStep, type ExactAnalysis } from "../lib/exactModel.ts"
 
@@ -41,21 +43,17 @@ export default function ExactModelPanel(props: Props): JSX.Element {
     URL.revokeObjectURL(url)
   }
   return (
-    <div class="mt-6 space-y-2 border-t border-gray-200 pt-4 dark:border-gray-600" data-testid="exact-model-panel">
-      <div class="flex items-center justify-between">
-        <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-100">Exact model (B-rep)</h4>
-        <div class="flex gap-2">
-          <button type="button" class="px-2 py-1 text-xs border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:border-gray-600 disabled:opacity-50" disabled={busy()} onClick={run}>{busy() ? "Analysing…" : "Analyse"}</button>
-          <button type="button" class="px-2 py-1 text-xs border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:border-gray-600" onClick={exportStep}>STEP</button>
-        </div>
-      </div>
+    <PanelCard title={t("cad.exactModel")} testId="exact-model-panel" actions={<>
+          <button type="button" class="panel-btn" disabled={busy()} onClick={run}>{busy() ? "Analysing…" : "Analyse"}</button>
+          <button type="button" class="panel-btn" onClick={exportStep}>STEP</button>
+    </>}>
       <Show when={analysis()}>
         {(a) => (
           <Show when={a().ok ? a() : undefined} fallback={<p class="text-xs text-amber-700 dark:text-amber-300" data-testid="exact-reason">Mesh only: {(a() as { reason: string }).reason}</p>}>
             {(ok) => {
               const v = ok() as Extract<ExactAnalysis, { ok: true }>
               return (
-                <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-700 dark:text-gray-300" data-testid="exact-stats">
+                <dl class="panel-kv" data-testid="exact-stats">
                   <dt>Volume</dt><dd>{fmt(v.volume)} mm³</dd>
                   <dt>Surface area</dt><dd>{fmt(v.area)} mm²</dd>
                   <dt>Centre of mass</dt><dd>{fmt(v.centroid.x)}, {fmt(v.centroid.y)}, {fmt(v.centroid.z)}</dd>
@@ -72,6 +70,6 @@ export default function ExactModelPanel(props: Props): JSX.Element {
           </Show>
         )}
       </Show>
-    </div>
+    </PanelCard>
   )
 }

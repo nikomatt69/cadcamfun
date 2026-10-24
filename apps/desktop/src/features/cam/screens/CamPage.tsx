@@ -10,7 +10,8 @@
 import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { Box, ChevronLeft, ChevronRight, ShieldCheck, Wrench } from "lucide-solid"
+import { WorkspaceInspector } from "../../../shared/components/panel/inspector.tsx"
+import { Box, ShieldCheck, Wrench } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
@@ -53,8 +54,7 @@ const PARSE_DELAY_MS = 400
 /** The rapid rate the CAM store's own estimates use (mm/min). */
 const RAPID_RATE_MM_PER_MIN = 5000
 
-const RIGHT_TAB_ON = "text-[#007ACC] bg-blue-50/80 dark:bg-blue-900/30 border-b-2 border-[#007ACC] shadow-md"
-const RIGHT_TAB_OFF = "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/40 dark:hover:bg-gray-700/40"
+
 
 /** Maps the seven legacy controller names onto the three the CAM store knows. */
 const storeController = (post: PostProcessorType): "gcode" | "grbl" | "fanuc" => (post === "fanuc" ? "fanuc" : "gcode")
@@ -332,23 +332,6 @@ export default function CamPage(): JSX.Element {
 
   const cycleController = (): "fanuc" | "heidenhain" => (selectedPostProcessor() === "heidenhain" ? "heidenhain" : "fanuc")
 
-  const rightTabButton = (id: "generator" | "cycles" | "verify", label: string, icon: (size: number) => JSX.Element): JSX.Element => (
-    <Show
-      when={camStore.rightOpen}
-      fallback={
-        <button class={`w-full py-5 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ${camStore.rightTab === id ? RIGHT_TAB_ON : RIGHT_TAB_OFF}`} aria-pressed={camStore.rightTab === id} onClick={() => camStore.setRightTab(id)} title={label}>
-          {icon(20)}
-        </button>
-      }
-    >
-      <button class={`flex-1 py-4 px-3 text-sm font-medium glass-hover-light rounded-xl transition-all duration-200 ${camStore.rightTab === id ? RIGHT_TAB_ON : RIGHT_TAB_OFF}`} aria-pressed={camStore.rightTab === id} onClick={() => camStore.setRightTab(id)}>
-        <div class="flex items-center justify-center">
-          <span class="mr-2">{icon(16)}</span>
-          {label}
-        </div>
-      </button>
-    </Show>
-  )
 
   return (
     <Motion.div
@@ -455,20 +438,16 @@ export default function CamPage(): JSX.Element {
             </Show>
           </Motion.div>
 
-          <Motion.div
-            class="cam-workspace__inspector flex-shrink-0 dark:text-white h-full flex flex-col"
-            data-open={camStore.rightOpen}
-          >
-            <div class="cam-workspace__tabs w-full flex justify-center">
-              <div class={camStore.rightOpen ? "flex justify-center w-full text-center" : "flex flex-col w-full"}>
-                {rightTabButton("generator", t("cam.generatorPanel"), (size) => <Wrench size={size} />)}
-                {rightTabButton("cycles", t("cam.cycles"), (size) => <Box size={size} />)}
-                {rightTabButton("verify", t("cam.verify"), (size) => <ShieldCheck size={size} />)}
-              </div>
-            </div>
-
-            <Show when={camStore.rightOpen}>
-              <div class="workstation-generator min-h-0 flex-1 overflow-y-auto">
+          <WorkspaceInspector class="cam-workspace__inspector" open={camStore.rightOpen}
+            active={camStore.rightTab === "control" ? "generator" : camStore.rightTab}
+            onSelect={(tab) => camStore.setRightTab(tab)} onToggle={() => camStore.toggleRight()}
+            collapseLabel={t("cam.toggleProperties")}
+            tabs={[
+              { id: "generator", label: t("cam.generatorPanel"), title: t("cam.generatorPanel"), icon: (size) => <Wrench size={size} /> },
+              { id: "cycles", label: t("cam.cycles"), title: t("cam.cycles"), icon: (size) => <Box size={size} /> },
+              { id: "verify", label: t("cam.verify"), title: t("cam.verify"), icon: (size) => <ShieldCheck size={size} /> }
+            ]}>
+              <div class="workstation-generator">
                 <Show when={camStore.rightTab === "generator" || camStore.rightTab === "control"}>
                   <ToolpathGenerator onGCodeGenerated={setGcode} onSave={() => saveGCode(true)} />
                 </Show>
@@ -482,25 +461,7 @@ export default function CamPage(): JSX.Element {
                   </Show>
                 </Show>
               </div>
-            </Show>
-          </Motion.div>
-
-          <Motion.button
-            class="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 glass-interactive backdrop-blur-md bg-white/90 dark:bg-gray-800/90 p-3 rounded-l-2xl shadow-xl border border-white/30 dark:border-gray-600/30 hover:bg-white/95 dark:hover:bg-gray-700/95 transition-all duration-200"
-            onClick={() => camStore.toggleRight()}
-            hover={{ scale: 1.05, x: -2 }}
-            press={{ scale: 0.95 }}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 1.4 }}
-            aria-label={t("cam.toggleProperties")}
-          >
-            <Motion.div animate={{ rotate: camStore.rightOpen ? 0 : 180 }} transition={{ duration: 0.3 }}>
-              <Show when={camStore.rightOpen} fallback={<ChevronLeft size={20} class="text-gray-600 dark:text-gray-300" />}>
-                <ChevronRight size={20} class="text-gray-600 dark:text-gray-300" />
-              </Show>
-            </Motion.div>
-          </Motion.button>
+          </WorkspaceInspector>
         </Motion.div>
 
         <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 1.6 }}>

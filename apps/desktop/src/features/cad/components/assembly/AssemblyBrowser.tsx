@@ -1,3 +1,4 @@
+import { PanelCard } from "../../../../shared/components/panel/ui.tsx"
 /**
  * The assembly tree (legacy `components/cad/assembly/AssemblyBrowser.tsx`).
  *
@@ -43,7 +44,7 @@ function Row(props: {
         style={{ "padding-left": `${props.depth * 12 + 4}px` }}
         onClick={() => props.onSelect(props.node.id)}
       >
-        <button type="button" class="mr-1 p-0.5 rounded-sm hover:bg-gray-200 dark:hover:bg-gray-600" onClick={(event) => { event.stopPropagation(); props.toggle(props.node.id) }}>
+        <button type="button" class="panel-btn" onClick={(event) => { event.stopPropagation(); props.toggle(props.node.id) }}>
           <Show when={children().length > 0} fallback={<span class="inline-block w-3 h-3" />}>
             <Show when={open()} fallback={<ChevronRight class="w-3 h-3 text-gray-500" />}><ChevronDown class="w-3 h-3 text-gray-500" /></Show>
           </Show>
@@ -100,35 +101,34 @@ export default function AssemblyBrowser(props: AssemblyBrowserProps): JSX.Elemen
   }
 
   return (
-    <section class="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
-      <header class="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-        <h3 class="text-sm font-medium text-gray-900 dark:text-white">{t("cad.assembly.structure")}</h3>
-        <div class="flex items-center gap-1">
-          <button type="button" class="px-2 py-1 text-xs rounded hover:bg-gray-200 dark:hover:bg-gray-600" onClick={() => setAdding(!adding())}>
+    <PanelCard title={t("cad.assembly.structure")} actions={<>
+<div class="flex items-center gap-1">
+          <button type="button" class="panel-btn" onClick={() => setAdding(!adding())}>
             {adding() ? t("cad.assembly.cancel") : `+ ${t("cad.assembly.add")}`}
           </button>
           <Show when={selected()}>
-            <button type="button" class="p-1 text-xs rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-red-600" onClick={removeSelected} title={t("cad.assembly.deleteNode")}>
+            <button type="button" class="panel-icon-btn panel-icon-btn--danger" onClick={removeSelected} title={t("cad.assembly.deleteNode")}>
               <Trash2 class="w-4 h-4" />
             </button>
           </Show>
         </div>
-      </header>
+    </>}>
+
 
       <Show when={adding()}>
         <div class="p-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
           <input
             type="text"
             placeholder={t("cad.assembly.nodeName")}
-            class="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            class="panel-input"
             value={name()}
             onInput={(event) => setName(event.currentTarget.value)}
             onKeyDown={(event) => { if (event.key === "Enter") addNode() }}
           />
-          <select class="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" value={kind()} onChange={(event) => setKind(event.currentTarget.value as NodeType)}>
+          <select class="panel-input" value={kind()} onChange={(event) => setKind(event.currentTarget.value as NodeType)}>
             <For each={Object.keys(KIND_LABEL) as ReadonlyArray<NodeType>}>{(option) => <option value={option}>{t(KIND_LABEL[option])}</option>}</For>
           </select>
-          <button type="button" class="w-full px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50" disabled={!name().trim()} onClick={addNode}>
+          <button type="button" class="panel-btn panel-btn--primary" disabled={!name().trim()} onClick={addNode}>
             {t("cad.assembly.addNode")}
           </button>
         </div>
@@ -143,6 +143,6 @@ export default function AssemblyBrowser(props: AssemblyBrowserProps): JSX.Elemen
           </div>
         </Show>
       </div>
-    </section>
+    </PanelCard>
   )
 }

@@ -20,9 +20,10 @@ export const PRINT_VERTEX_TOLERANCE = 1e-7
 
 /** Validate before Uint32/Float64 conversion: conversion can conceal fractional indices and missing coordinates. */
 export const printMeshIssue = (mesh: SliceMesh): string | undefined => {
+  if (typeof mesh !== "object" || mesh === null) return "Mesh requires positions and indices"
   const p = mesh.positions, idx = mesh.indices
-  if (p === undefined || !Number.isSafeInteger(p.length) || p.length < 9 || p.length % 3 !== 0) return "Mesh positions must contain complete XYZ triples for at least three vertices"
-  if (idx === undefined || !Number.isSafeInteger(idx.length) || idx.length < 3 || idx.length % 3 !== 0) return "Mesh indices must contain complete triangles"
+  if (p === undefined || p === null || !Number.isSafeInteger(p.length) || p.length < 9 || p.length % 3 !== 0) return "Mesh positions must contain complete XYZ triples for at least three vertices"
+  if (idx === undefined || idx === null || !Number.isSafeInteger(idx.length) || idx.length < 3 || idx.length % 3 !== 0) return "Mesh indices must contain complete triangles"
   const vertices = p.length / 3
   if (vertices >= 0x4000000) return "Mesh exceeds the 67,108,863 vertices supported by topology indexing"
   for (let i = 0; i < p.length; i++) if (!Number.isFinite(p[i])) return `Mesh coordinate ${i} must be finite`

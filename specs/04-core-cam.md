@@ -35,9 +35,31 @@ explicit homing plus nozzle/required-bed temperature waits before deposition. Cu
 macros are not evidence of completed homing or heating. This is commanded-state evidence,
 not a temperature-sensor or physical machine qualification.
 
-## Current-source kernel completion (2026-10-22)
-
 ## Additive source-mesh contract (2026-10-24)
+
+## Additive deposition and support evidence (2026-10-24)
+
+The owner-requested increment deepens print verification with an independent rolling
+layer-occupancy implementation. Its interface consumes replayed physical beads, authoritative
+layer slabs, source regions and explicit profile allowances, never the planner's support
+paths or support-demand mask. Raster occupancy integrates actual slab thickness into occupied
+model/auxiliary volume; extruded filament volume remains a separate measure, not a falsely
+equal volume. Feature annotations cannot create support or exempt outside material.
+Every occupied component is traced to the bed or already grounded material. Overhang demand
+is derived independently from source geometry and checked against grounded auxiliary material
+at the declared support gap. Intentional bridge spans are reported as unqualified when no
+process limit exists, rather than called verified supports. Resolution and bounded rolling
+history are disclosed; inadequate resolution is unresolved evidence. New `support-coverage`
+and `deposition-connectivity` checks govern release. This is sampled commanded deposition,
+not a strength, temperature-sensor or physical machine qualification.
+
+WP2 owns the pure implementation and generator/kernel result data; WP3/WP4 extend existing
+optional print-report fields and shared check literals, regenerate clients/reference and
+verify the real routes/actions. WP6 displays deposition measures and check labels in existing
+print panels; WP8 surfaces the exact report/limitations through existing manufacture tools.
+
+Status: implemented for the structural/manifold and adapter gates below; acceptance evidence
+is recorded in spec 33 §9.13. Intersection and full deposition qualification remain open.
 
 WP2's print module validates every supplied mesh before numeric coercion, placement, union,
 orientation or slicing. Coordinates must form finite XYZ triples; indices must form complete
@@ -53,6 +75,16 @@ changing the source coordinates or filling openings. A whole inside-out closed s
 supported by the slicer's documented winding correction. This check does not certify absence
 of geometric self-intersections. WP1's topology interface accepts read-only array-like doubles
 without Float32 narrowing; existing CAD behavior and callers remain unchanged.
+
+Additive melt-flow invariant: deposition speed uses the same bead cross-section and flow
+multiplier as E emission. Bridge circular sections and scaled-width raft/support paths must
+respect `maxVolumetricFlow` as well as rectangular model beads. Commanded feed is quantized
+down, never above that ceiling; an unrepresentable positive feed is explicitly refused.
+The authoritative regression measures deposited E volume per second from emitted NC, not
+from the planner's speed estimate. The emitter also bounds each serialized bead block from
+its rounded XYZ distance and E delta, including a bead block collapsed to E-only motion.
+
+## Current-source kernel completion (2026-10-22)
 
 The owner accepted spec 33's **Owner-authorized completion increment**. WP2 owns K0 final release consistency and K4–K6
 multiaxis execution, shared stock/quality evidence and turning/mill-turn in `cam/` and its tests. Collect machine-capacity
@@ -262,6 +294,15 @@ The `3d_surface` operation no longer follows each element's outline: the selecte
 - **Indexed (3+2)** (`indexing.ts`, `Orient` move in the IR, emitted as a rotary `G0 A.. B.. C..`): an operation is made on a tilted `WorkFrame`; `indexToolpath` turns the frame's z axis into trunnion-table angles (`table-AC`: C about Z then A tilt about X; `table-BC`: C then B about Y; each normal has two solutions, the smaller tilt inside the limits is taken) and carries every point from the work frame through the part to machine coordinates (`R (part - pivot) + pivot`). Because R lays the work plane horizontal, arcs stay arcs in G17, helices stay helices and a drilling cycle still runs down machine Z. Not covered: a head that tilts (the pivot then moves with the tool length), tilted-plane controller cycles (G68.2, CYCLE800), RTCP, and simultaneous 5-axis; `cam.verify` skips `Orient`, so a verification must be given the stock in machine coordinates.
 
 ## 9. Change log
+
+- 2026-10-24: source and melt-flow gates verified. Mesh structure is checked before coercion;
+  source/union topology uses unchanged double coordinates with explicitly toleranced virtual
+  welding. Malformed faces/transforms, open caps, flipped triangles and incomplete Boolean
+  operands refuse the whole print in planning, execution, generator, HTTP and AI adapters.
+  Deposition feeds now include flow multiplication, bridge/raft sections, purge volume and
+  actual rounded XYZ/E; unrepresentable feeds are refused. Printing passes 116 tests
+  (23,427 assertions); topology passes 11, HTTP/AI passes 18, and live print UI passes five.
+  Consumer typechecks and API-reference freshness pass. Detailed boundaries: spec 33 §9.13.
 
 - 2026-10-24: additive NC replay increment implemented. Beads and travel now use the shared
   interpreter; authoritative layer slabs replace NC HEIGHT/LAYER annotations as geometric

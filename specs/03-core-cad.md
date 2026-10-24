@@ -11,6 +11,8 @@ read-only array-like triangle-mesh input so WP2 can inspect Float64 geometry wit
 it to Float32. Their topology algorithm and CAD call-site behavior stay unchanged. WP2 owns
 structural validation and explicitly toleranced virtual point welding before this shared
 topology seam; it does not request automatic hole filling or claim intersection certification.
+Status: implemented; the existing 11 mesh-kernel tests pass, and WP2's source fixtures prove
+that large-offset doubles and coincident duplicate vertices remain supported without mutation.
 
 ### Kernel completion increment (2026-10-21, in progress)
 
@@ -307,6 +309,11 @@ Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 `bun --no-env-file test packages/core`, and `bun --no-env-file check -p packages/core/tsconfig.json`.
 
 ## 8. Change log
+
+- 2026-10-24: broadened only `meshTopology`'s read-only input interface from Float32 mesh
+  storage to array-like coordinates and indices, enabling the print source gate to preserve
+  doubles. The topology algorithm is unchanged. Existing mesh-kernel regressions pass 11
+  tests (206 assertions); core and consuming-package typechecks pass.
 
 - 2026-10-24: syntax-only integration repair removes an unmatched closing brace after
   `catalogueBrep` in the shared worktree. Core, AI, sidecar and desktop consumers compile again;
