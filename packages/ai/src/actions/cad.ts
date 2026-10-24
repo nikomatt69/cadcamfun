@@ -74,8 +74,12 @@ export const vision = (mode: "cad" | "cam", filename: string, sheetName = filena
 /** A hole or boss edit names one target and one change: a new diameter, or (holes) fill. */
 export const holeInputProblem = (input: CadHoleInput): string | undefined => {
   if ([input.hole, input.boss, input.fillet, input.nurbs].filter((v) => v !== undefined).length !== 1) return "Give exactly one of hole (a recognised hole), boss (a recognised boss), fillet (a recognised fillet) or nurbs (a free-form face)."
-  if (input.nurbs !== undefined) return input.distance === undefined || input.diameter !== undefined || input.fill === true || input.taper !== undefined || input.radius !== undefined ? "A free-form face takes a distance (and a direction) only." : undefined
-  if (input.distance !== undefined || input.direction !== undefined) return "distance and direction belong to a free-form face (nurbs)."
+  if (input.nurbs !== undefined) {
+    if (input.diameter !== undefined || input.fill === true || input.taper !== undefined || input.radius !== undefined) return "A free-form face takes a distance, or an angle for a draft: not a diameter, fill, taper or radius."
+    const bad = cad.nurbsEditOf(input)
+    return typeof bad === "string" ? `${bad[0]!.toUpperCase()}${bad.slice(1)}.` : undefined
+  }
+  if ([input.distance, input.direction, input.mode, input.angle, input.neutral, input.pull, input.tolerance].some((v) => v !== undefined)) return "distance, direction, mode, angle, neutral, pull and tolerance belong to a free-form face (nurbs)."
   if (input.fillet !== undefined) return input.radius === undefined || input.diameter !== undefined || input.fill === true || input.taper !== undefined ? "A fillet takes a radius only." : undefined
   if (input.taper !== undefined && input.diameter === undefined) return "A draft angle (taper) needs a diameter."
   if (input.boss !== undefined) return input.diameter === undefined || input.fill === true ? "A boss takes a diameter (fill applies to holes only)." : undefined

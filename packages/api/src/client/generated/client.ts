@@ -2925,6 +2925,11 @@ type Endpoint28_4Input = {
   readonly nurbs?: Endpoint28_4Request["payload"]["nurbs"]
   readonly distance?: Endpoint28_4Request["payload"]["distance"]
   readonly direction?: Endpoint28_4Request["payload"]["direction"]
+  readonly mode?: Endpoint28_4Request["payload"]["mode"]
+  readonly angle?: Endpoint28_4Request["payload"]["angle"]
+  readonly neutral?: Endpoint28_4Request["payload"]["neutral"]
+  readonly pull?: Endpoint28_4Request["payload"]["pull"]
+  readonly tolerance?: Endpoint28_4Request["payload"]["tolerance"]
   readonly radius?: Endpoint28_4Request["payload"]["radius"]
   readonly diameter?: Endpoint28_4Request["payload"]["diameter"]
   readonly taper?: Endpoint28_4Request["payload"]["taper"]
@@ -2942,6 +2947,11 @@ const Endpoint28_4 = (raw: RawClient["cadExact"]) => (input: Endpoint28_4Input) 
       nurbs: input["nurbs"],
       distance: input["distance"],
       direction: input["direction"],
+      mode: input["mode"],
+      angle: input["angle"],
+      neutral: input["neutral"],
+      pull: input["pull"],
+      tolerance: input["tolerance"],
       radius: input["radius"],
       diameter: input["diameter"],
       taper: input["taper"],

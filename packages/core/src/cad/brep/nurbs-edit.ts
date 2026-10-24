@@ -16,13 +16,29 @@ import { add3, cross3, dot3, length3, normalize3, scale3 } from "../vec.ts"
 import { surfaceDerivs, surfaceProject } from "./geom.ts"
 import { booleanBrep } from "./boolean.ts"
 import { curvePoint } from "./geom.ts"
-import { massProperties } from "./mass.ts"
+import { tessellateBrep } from "./tessellate.ts"
 import type { Vec3 } from "./math.ts"
 import type { NurbsSurfaceData } from "./nurbs.ts"
 import { surfaceDomain } from "./nurbs.ts"
 import { surfacePatch, thickenSurfacePatch, type PatchDomain } from "./surface-patch.ts"
 import type { Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
+
+/**
+ * Volume of the tessellation of a solid at a chord of 0.005 mm (divergence theorem on its triangles). The exact integral of a NURBS solid
+ * (`massProperties`) costs seconds a face; the checks of the free-form edits only need the volume to a few parts in 10^5, and the vertices of the
+ * tessellation lie on the exact surfaces.
+ */
+export const tessellatedVolume = (b: Brep): number => {
+  const m = tessellateBrep(b, { chordTol: 0.005 })
+  const P = m.positions
+  let v = 0
+  for (let i = 0; i < m.indices.length; i += 3) {
+    const a = m.indices[i]! * 3, q = m.indices[i + 1]! * 3, c = m.indices[i + 2]! * 3
+    v += (P[a]! * (P[q + 1]! * P[c + 2]! - P[q + 2]! * P[c + 1]!) - P[a + 1]! * (P[q]! * P[c + 2]! - P[q + 2]! * P[c]!) + P[a + 2]! * (P[q]! * P[c + 1]! - P[q + 1]! * P[c]!)) / 6
+  }
+  return v
+}
 
 /** How far the slab reaches into the solid past the face it moves, mm. */
 const SKIN = 0.5
@@ -36,7 +52,7 @@ export interface RecognizedNurbsFace {
   readonly spread: number
 }
 
-interface Patch {
+export interface Patch {
   readonly data: NurbsSurfaceData
   readonly domain: PatchDomain
   /** Outward unit normals on a grid over the face. */
@@ -46,7 +62,7 @@ interface Patch {
   readonly mean: Vec3
 }
 
-const readPatch = (b: Brep, face: number): Patch | string => {
+export const readPatch = (b: Brep, face: number): Patch | string => {
   const f = b.faces[face]
   if (f === undefined || f.surface.kind !== "nurbs") return "not a NURBS face"
   const s = f.surface
@@ -122,13 +138,13 @@ export const pushPullNurbsFace = (b: Brep, face: number, distance: number, direc
   try {
     const pure = slab(out ? 0 : -t, out ? t : 0)
     const tool = out ? slab(-SKIN, t) : slab(-t, SKIN)
-    const before = massProperties(b).volume
+    const before = tessellatedVolume(b)
     const solid = booleanBrep(b, tool, out ? "union" : "subtract").brep
     const report = validateBrep(solid)
     if (!report.valid) return `the edited solid is not valid (${report.issues.slice(0, 2).map((i) => i.message).join("; ")})`
-    const expected = (out ? 1 : -1) * massProperties(pure).volume
-    const after = massProperties(solid).volume
-    if (Math.abs(after - before - expected) > 1e-5 * Math.max(before, 1) + 1e-5 * Math.abs(expected)) {
+    const expected = (out ? 1 : -1) * tessellatedVolume(pure)
+    const after = tessellatedVolume(solid)
+    if (Math.abs(after - before - expected) > 1e-4 * Math.max(before, 1) + 1e-4 * Math.abs(expected)) {
       return `the edit changed the volume by ${(after - before).toFixed(6)} mm³ where the slab accounts for ${expected.toFixed(6)} mm³: the move runs into a neighbouring feature or the solid is thinner than the slab`
     }
     return solid

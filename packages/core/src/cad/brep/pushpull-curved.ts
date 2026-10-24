@@ -7,6 +7,7 @@
 import { recognizeBosses, resizeBoss } from "./boss-edit.ts"
 import { recognizeHoles } from "./features.ts"
 import { pushPullCone } from "./cone-edit.ts"
+import { pushPullChain } from "./chain-edit.ts"
 import { pushPullDome } from "./dome-edit.ts"
 import { editHole } from "./hole-edit.ts"
 import { makeSphere, makeTorus } from "./primitives.ts"
@@ -44,5 +45,6 @@ export const pushPullCylinder = (b: Brep, face: number, distance: number): Brep 
     const r = editHole(b, hole, { kind: "resize", diameter })
     return typeof r === "string" ? r : r.brep
   }
-  return "the cylindrical face is neither the wall of a hole nor the side of a boss (a rounded edge keeps the mesh: its offset moves the smooth chain it belongs to; `changeFilletRadius` edits its radius)"
+  // Neither a hole nor a boss: a rounded edge or a curved wall of an extrusion. The mesh rebuild offsets the whole smooth chain it belongs to.
+  return pushPullChain(b, face, distance)
 }

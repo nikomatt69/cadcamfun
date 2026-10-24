@@ -1701,6 +1701,11 @@ export type CadExactHolePayload = {
   readonly nurbs?: number
   readonly distance?: number
   readonly direction?: { readonly x: number; readonly y: number; readonly z: number }
+  readonly mode?: "move" | "offset" | "draft"
+  readonly angle?: number
+  readonly neutral?: number
+  readonly pull?: { readonly x: number; readonly y: number; readonly z: number }
+  readonly tolerance?: number
   readonly radius?: number
   readonly diameter?: number
   readonly taper?: number
@@ -6803,6 +6808,11 @@ export type CadExactHoleInput = {
   readonly nurbs?: CadExactHolePayload["nurbs"]
   readonly distance?: CadExactHolePayload["distance"]
   readonly direction?: CadExactHolePayload["direction"]
+  readonly mode?: CadExactHolePayload["mode"]
+  readonly angle?: CadExactHolePayload["angle"]
+  readonly neutral?: CadExactHolePayload["neutral"]
+  readonly pull?: CadExactHolePayload["pull"]
+  readonly tolerance?: CadExactHolePayload["tolerance"]
   readonly radius?: CadExactHolePayload["radius"]
   readonly diameter?: CadExactHolePayload["diameter"]
   readonly taper?: CadExactHolePayload["taper"]
@@ -6859,9 +6869,12 @@ export type CadExactHoleOutput =
       name: string
       nurbs: number
       nurbsFaces: number
+      mode: "move" | "offset" | "draft"
       before: { normal: { x: number; y: number; z: number }; spread: number }
-      distance: number
-      direction: { x: number; y: number; z: number }
+      distance?: number
+      direction?: { x: number; y: number; z: number }
+      angle?: number
+      approximate?: { deviation: number }
       volume: number
       originalVolume: number
       volumeChange: number

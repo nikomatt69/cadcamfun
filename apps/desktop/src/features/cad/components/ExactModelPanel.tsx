@@ -51,11 +51,11 @@ export default function ExactModelPanel(props: Props): JSX.Element {
     setNote({ ok: true, text: `Added "${String(r.element["name"])}": volume ${fmt(r.volume)} mm³ (${r.volumeChange > 0 ? "+" : ""}${fmt(r.volumeChange)}).` })
   }
   const [nurbsMoves, setNurbsMoves] = createSignal<Readonly<Record<number, number>>>({})
-  const changeNurbs = (index: number, distance: number) => {
-    const r = editElementNurbs(props.element, props.all, index, distance)
+  const changeNurbs = (index: number, how: Parameters<typeof editElementNurbs>[3]) => {
+    const r = editElementNurbs(props.element, props.all, index, how)
     if (!r.ok) { setNote({ ok: false, text: r.error }); return }
     useElementsStore.getState().addElements([r.element])
-    setNote({ ok: true, text: `Added "${String(r.element["name"])}": volume ${fmt(r.volume)} mm³ (${r.volumeChange > 0 ? "+" : ""}${fmt(r.volumeChange)}).` })
+    setNote({ ok: true, text: `Added "${String(r.element["name"])}": volume ${fmt(r.volume)} mm³ (${r.volumeChange > 0 ? "+" : ""}${fmt(r.volumeChange)})${r.deviation !== undefined ? `; approximate, the new face is within ${fmt(Math.max(r.deviation, 0.0001))} mm of the exact one` : ""}.` })
   }
   const [filletRadii, setFilletRadii] = createSignal<Readonly<Record<number, number>>>({})
   const changeFillet = (index: number, radius: number) => {
@@ -150,6 +150,8 @@ export default function ExactModelPanel(props: Props): JSX.Element {
                       <div class="flex items-center gap-1">
                         <div class="w-24"><NumberField id={`exact-nurbs-${i()}`} value={nurbsMoves()[i()] ?? 1} accept={(d) => d !== 0} onValue={(d) => setNurbsMoves({ ...nurbsMoves(), [i()]: d })} /></div>
                         <button type="button" class="panel-btn" data-testid="exact-nurbs-move" onClick={() => changeNurbs(i(), nurbsMoves()[i()] ?? 1)}>Move</button>
+                        <button type="button" class="panel-btn" data-testid="exact-nurbs-offset" title="Along the normals; approximate" onClick={() => changeNurbs(i(), { mode: "offset", distance: nurbsMoves()[i()] ?? 1 })}>Offset</button>
+                        <button type="button" class="panel-btn" data-testid="exact-nurbs-draft" title="About z = 0 along +Z, with the draft angle above; approximate" disabled={draft() === 0} onClick={() => changeNurbs(i(), { mode: "draft", angle: draft() })}>Draft</button>
                       </div>
                     </div>
                   )}</For>

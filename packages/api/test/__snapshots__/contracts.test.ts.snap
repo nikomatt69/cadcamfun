@@ -16897,6 +16897,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "angle": {
+                    "maximum": 45,
+                    "minimum": -45,
+                    "type": "number",
+                  },
                   "boss": {
                     "maximum": 9999,
                     "minimum": 0,
@@ -16958,10 +16963,41 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "minLength": 1,
                     "type": "string",
                   },
+                  "mode": {
+                    "enum": [
+                      "move",
+                      "offset",
+                      "draft",
+                    ],
+                    "type": "string",
+                  },
+                  "neutral": {
+                    "type": "number",
+                  },
                   "nurbs": {
                     "maximum": 9999,
                     "minimum": 0,
                     "type": "integer",
+                  },
+                  "pull": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                      },
+                      "y": {
+                        "type": "number",
+                      },
+                      "z": {
+                        "type": "number",
+                      },
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "z",
+                    ],
+                    "type": "object",
                   },
                   "radius": {
                     "exclusiveMinimum": 0,
@@ -16970,6 +17006,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "taper": {
                     "maximum": 30,
                     "minimum": 0,
+                    "type": "number",
+                  },
+                  "tolerance": {
+                    "exclusiveMinimum": 0,
                     "type": "number",
                   },
                 },
@@ -17257,6 +17297,21 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     {
                       "additionalProperties": false,
                       "properties": {
+                        "angle": {
+                          "type": "number",
+                        },
+                        "approximate": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "deviation": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "deviation",
+                          ],
+                          "type": "object",
+                        },
                         "before": {
                           "additionalProperties": false,
                           "properties": {
@@ -17319,6 +17374,14 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "id": {
                           "type": "string",
                         },
+                        "mode": {
+                          "enum": [
+                            "move",
+                            "offset",
+                            "draft",
+                          ],
+                          "type": "string",
+                        },
                         "name": {
                           "type": "string",
                         },
@@ -17353,9 +17416,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "name",
                         "nurbs",
                         "nurbsFaces",
+                        "mode",
                         "before",
-                        "distance",
-                        "direction",
                         "volume",
                         "originalVolume",
                         "volumeChange",

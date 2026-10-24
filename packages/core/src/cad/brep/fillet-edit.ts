@@ -3,7 +3,7 @@
  * round part (a torus), changed the way Fusion's Press Pull changes it: the two faces beside it stay tangent to it, the fillet gets the
  * radius `r - d` (a convex fillet pushed out of the solid is tighter) or `r + d` (a concave one, whose face looks into the void, is
  * fuller). Nothing else moves. It is not the history's `pushpull` of a curved face: that offsets the whole smooth chain of faces the
- * mesh rebuild finds, and the exact rebuild keeps the mesh for it (`history-exactness.test.ts`).
+ * mesh rebuild finds, which is `chain-edit.ts` for a closed wall.
  *
  * In the section square to the band the two faces beside it are lines meeting at the sharp corner E; a fillet of radius p has its centre
  * on the bisector at p / cos(D / 2) from E (D: the angle the arc turns through) and touches the lines at p / tan(theta / 2) from E. The two
@@ -79,7 +79,7 @@ const readBand = (b: Brep, face: number): Band | string => {
     if (!(span > 1e-3 && span < MAX_ARC)) return "the face is not a fillet band: its arc is not less than a half turn"
     const vTol = 1e-6 * Math.max(1, vHi - vLo)
     const onEdge = (u: number): boolean => { const d = (((u - gapEnd) % TAU) + TAU) % TAU; return d < 1e-6 || Math.abs(d - span) < 1e-6 }
-    for (const p of samples) if (Math.abs(p.v - vLo) > vTol && Math.abs(p.v - vHi) > vTol && !onEdge(p.u)) return "the band is not square-ended: it runs into another fillet or a corner"
+    for (const p of samples) if (Math.abs(p.v - vLo) > vTol && Math.abs(p.v - vHi) > vTol && !onEdge(p.u)) return "the band is not square-ended: it runs into another fillet or a corner blend, whose shape depends on every radius that meets there: edit the fillet feature of the history, which rebuilds the corner"
     return { kind: "cylinder", at: frame(add3(fr.origin, scale3(fr.z, vLo)), fr.z, fr.x), length: vHi - vLo, start: vLo, radius: s.radius, centre: { x: 0, y: 0 }, from: gapEnd, to: gapEnd + span, convex }
   }
   // A torus: a full ring whose boundary is two circles of constant tube angle.

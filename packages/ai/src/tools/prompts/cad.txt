@@ -22,7 +22,7 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - setups: ids?, fixture?, allowed?; setup orientations per solid.
 - distance: firstId, secondId; smallest exact gap and closest points.
 - shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]; preview. Get names from exact.
-- hole: id, hole|boss|fillet|nurbs, diameter?|fill?|radius?|distance? (+direction?), taper?; preview; indexes from exact.
+- hole: id, hole|boss|fillet|nurbs, diameter?|fill?|radius?|distance?|angle?, taper?, mode? (move|offset|draft), direction?, neutral?, pull?, tolerance?; preview; indexes from exact.
 - offset: id, distance; outward offset preview, rounded convex corners. Unsupported geometry returns a reason.
 - motion: model {ground,joints,couplings?,contacts?}, sweep {joint,from,to,steps,quantity?}; scene part ids, zero-pose world origins/axes. closesLoop constraints solve passive joints. Reports closure, contact gaps and clearance violations per frame; no contact-force simulation.
 - surface: operation patch|stitch|thicken, patches [{data:{degreeU,degreeV,knotsU,knotsV,points,weights?},trim?:{u0,u1,v0,v1}}], thickness?, direction? {x,y,z}, tolerance?, name?. points[u][v]=[x,y,z]. Rectangular isoparametric trim; stitch matching full boundaries. Curved thicken requires explicit axial direction. General curved normal offsets are refused. Open surfaces are not CAM solids.

@@ -57,6 +57,7 @@ const BASELINE: Readonly<Record<string, "exact" | "mesh">> = {
   "draft.planar": "exact",
   "pushpull.curved": "exact",
   "pushpull.hole": "exact",
+  "pushpull.fillet": "exact",
   "pushpull.boss": "exact",
   "draft.curved": "exact",
   "draft.hole": "exact",

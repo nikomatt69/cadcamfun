@@ -190,6 +190,14 @@ export const CadHoleRequest = Schema.Struct({
   /** How far the free-form face moves, mm: out of the solid when positive. */
   distance: Schema.optionalKey(Schema.Finite),
   direction: Schema.optionalKey(vec3),
+  /** `move` (default, exact: rigid, along `direction`), `offset` (along the normals, approximate) or `draft` (about a neutral plane, approximate: takes `angle`). */
+  mode: Schema.optionalKey(Schema.Literals(["move", "offset", "draft"])),
+  /** Draft angle of a free-form face, degrees, about the plane at height `neutral` along `pull` (default +Z). */
+  angle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: -45, maximum: 45 }))),
+  neutral: Schema.optionalKey(Schema.Finite),
+  pull: Schema.optionalKey(vec3),
+  /** Largest distance, mm, the fitted face of an approximate edit may be from the exact displaced surface (default 0.01). */
+  tolerance: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   /** New radius, mm, of a fillet. */
   radius: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   /** New diameter, mm: of the drill of a hole (exactly one of `diameter` and `fill`) or of a boss. */
@@ -219,8 +227,10 @@ export const CadHoleReport = Schema.Union([
     volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
   }),
   Schema.Struct({
-    ok: Schema.Literal(true), id: Schema.String, name: Schema.String, nurbs: int, nurbsFaces: int,
-    before: Schema.Struct({ normal: vec3, spread: num }), distance: num, direction: vec3,
+    ok: Schema.Literal(true), id: Schema.String, name: Schema.String, nurbs: int, nurbsFaces: int, mode: Schema.Literals(["move", "offset", "draft"]),
+    before: Schema.Struct({ normal: vec3, spread: num }), distance: Schema.optionalKey(num), direction: Schema.optionalKey(vec3), angle: Schema.optionalKey(num),
+    /** Present for the approximate edits (offset, draft): how far the fitted new face is from the exact displaced surface at the check points, mm. */
+    approximate: Schema.optionalKey(Schema.Struct({ deviation: num })),
     volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
   }),
   Schema.Struct({ ok: Schema.Literal(false), error: Schema.String })

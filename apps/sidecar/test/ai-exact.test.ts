@@ -268,3 +268,28 @@ test("a free-form face moves along a direction from the route and the assistant:
   const rows = ((await app.call("/api/analytics/user-history?itemType=project&limit=100")).body.logs as Array<{ itemId: string; action: string; details: Record<string, unknown> }>).filter((row) => row.itemId === project)
   expect(rows.find((row) => row.action === "ai.cad.nurbs_edit")?.details).toMatchObject({ via: "assistant", source: "free", nurbs: up, distance: -1 })
 })
+
+test("a free-form face is offset and drafted approximately, and the answer says how approximately", async () => {
+  // A flat wall 10 x 10 in the plane y = 0, thickened 4 mm towards -y (a free-form face looking along +y).
+  const wall = cad.brep.thickenSurfacePatch(cad.brep.surfacePatch({ degreeU: 1, degreeV: 1, knotsU: [0, 0, 1, 1], knotsV: [0, 0, 1, 1], points: [[[0, 0, 0], [0, 0, 10]], [[10, 0, 0], [10, 0, 10]]] }), 4, { x: 0, y: -1, z: 0 })
+  const free = { id: "wall", type: "brep", name: "Wall", x: 0, y: 0, z: 0, layerId: "default", brep: JSON.parse(JSON.stringify(wall)) }
+  const analysis = await app.call("/api/cad/exact/analyze", { method: "POST", json: { elements: [free] } })
+  const faces = analysis.body.parts[0].nurbsFaces as Array<{ normal: { y: number } }>
+  const looking = faces.findIndex((f) => f.normal.y > 0.9)
+  expect(looking).toBeGreaterThanOrEqual(0)
+  // Offset along the normals by 1: the wall moves out by 1 (volume +10 x 10 x 1).
+  const offset = await app.call("/api/cad/exact/hole", { method: "POST", json: { elements: [free], id: "wall", nurbs: looking, mode: "offset", distance: 1 } })
+  expect(offset.status).toBe(200)
+  expect(offset.body).toMatchObject({ ok: true, valid: true, mode: "offset" })
+  expect(typeof offset.body.approximate.deviation).toBe("number")
+  expect(offset.body.approximate.deviation).toBeLessThanOrEqual(0.01)
+  expect(offset.body.volumeChange).toBeCloseTo(100, 0)
+  // Draft 5 degrees about the foot: the wedge 1/2 tan(a) h^2 w comes off.
+  const draft = await app.call("/api/cad/exact/hole", { method: "POST", json: { elements: [free], id: "wall", nurbs: looking, mode: "draft", angle: 5 } })
+  expect(draft.body).toMatchObject({ ok: true, mode: "draft", angle: 5 })
+  expect(draft.body.volumeChange).toBeCloseTo(-0.5 * Math.tan((5 * Math.PI) / 180) * 100 * 10, 0)
+  // What does not belong is refused.
+  for (const bad of [{ mode: "draft" }, { mode: "offset" }, { mode: "offset", distance: 1, direction: { x: 0, y: 1, z: 0 } }, { mode: "draft", angle: 5, distance: 1 }, { distance: 1, tolerance: 0.1 }]) {
+    expect((await app.call("/api/cad/exact/hole", { method: "POST", json: { elements: [free], id: "wall", nurbs: looking, ...bad } })).status).toBe(400)
+  }
+})

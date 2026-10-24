@@ -6,7 +6,7 @@
  * The analysis is the one the sidecar (`/api/cad/exact/analyze`) and the assistant (`cad.exact`) run, `analyzeBrep` of
  * `@cadcamfun/core`, so the panel, the API and the CAM planner agree on holes and on how the part will be machined.
  */
-import { analyzeBrep, brep, elementBrep, sceneBossEditBody, sceneFilletEditBody, sceneHoleEditBody, sceneNurbsEditBody, type SceneBoss, type SceneFillet, type SceneNurbsFace, type SceneHole, type SceneMachining } from "@cadcamfun/core"
+import { analyzeBrep, brep, elementBrep, sceneBossEditBody, sceneFilletEditBody, sceneHoleEditBody, sceneNurbsEditBody, type NurbsEdit, type SceneBoss, type SceneFillet, type SceneNurbsFace, type SceneHole, type SceneMachining } from "@cadcamfun/core"
 
 export type ExactAnalysis =
   | {
@@ -114,16 +114,23 @@ export const editElementFillet = (
   }
 }
 
-/** Move the `nurbs`-th free-form patch face of an element along its mean normal by `distance` (out of the solid when positive), into a new solid. */
+/**
+ * Edit the `nurbs`-th free-form patch face of an element (the order `ExactAnalysis.nurbsFaces` lists them in) into a new solid: move it
+ * along its mean normal (exact), offset it along the normals or draft it (approximate: `deviation` says how far the fitted face is from the
+ * exact one).
+ */
 export const editElementNurbs = (
-  element: Record<string, unknown>, all: ReadonlyArray<Record<string, unknown>>, nurbs: number, distance: number
-): { readonly ok: true; readonly element: Record<string, unknown>; readonly volume: number; readonly volumeChange: number } | { readonly ok: false; readonly error: string } => {
+  element: Record<string, unknown>, all: ReadonlyArray<Record<string, unknown>>, nurbs: number, how: NurbsEdit | number
+): { readonly ok: true; readonly element: Record<string, unknown>; readonly volume: number; readonly volumeChange: number; readonly deviation?: number } | { readonly ok: false; readonly error: string } => {
+  const edit: NurbsEdit = typeof how === "number" ? { mode: "move", distance: how } : how
   let built: ReturnType<typeof sceneNurbsEditBody>
-  try { built = sceneNurbsEditBody(all, String(element["id"] ?? ""), nurbs, distance) } catch (cause) { return { ok: false, error: cause instanceof Error ? cause.message : String(cause) } }
+  try { built = sceneNurbsEditBody(all, String(element["id"] ?? ""), nurbs, edit) } catch (cause) { return { ok: false, error: cause instanceof Error ? cause.message : String(cause) } }
   if (!built.ok) return built
   const base = typeof element["name"] === "string" && element["name"] !== "" ? (element["name"] as string) : String(element["type"] ?? "part")
+  const label = edit.mode === "draft" ? `${edit.angle}°` : `${edit.distance > 0 ? "+" : ""}${Math.round(edit.distance * 1000) / 1000}`
   return {
     ok: true, volume: built.report.volume, volumeChange: built.report.volumeChange,
-    element: { type: "brep", name: `${base} free-form face ${nurbs + 1} ${distance > 0 ? "+" : ""}${Math.round(distance * 1000) / 1000}`, brep: built.brep, x: 0, y: 0, z: 0 }
+    ...(built.report.approximate !== undefined ? { deviation: built.report.approximate.deviation } : {}),
+    element: { type: "brep", name: `${base} free-form face ${nurbs + 1} ${edit.mode} ${label}`, brep: built.brep, x: 0, y: 0, z: 0 }
   }
 }

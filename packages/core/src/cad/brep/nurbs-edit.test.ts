@@ -1,13 +1,12 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { massProperties } from "./mass.ts"
 import { faceByName } from "./naming.ts"
-import { pushPullNurbsFace, recognizeNurbsFaces } from "./nurbs-edit.ts"
+import { pushPullNurbsFace, recognizeNurbsFaces, tessellatedVolume } from "./nurbs-edit.ts"
 import { surfacePatch, thickenSurfacePatch } from "./surface-patch.ts"
 import type { Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
 
 setDefaultTimeout(100_000)
-const volume = (b: Brep) => massProperties(b).volume
+const volume = tessellatedVolume
 const ok = (r: Brep | string): Brep => { if (typeof r === "string") throw new Error(r); return r }
 /** A biquadratic patch over the square 10 x 10 in x and y, rising and falling in z (a gentle bump): its projection on the XY plane is exactly 100 mm². */
 const bump = () => ({

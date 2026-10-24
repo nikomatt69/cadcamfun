@@ -12,7 +12,8 @@ import { healBrep, massProperties, minimumDistance, recognizeHoles, offsetBrep, 
 import { editHole, type HoleEdit } from "./brep/hole-edit.ts"
 import { recognizeBosses, resizeBoss } from "./brep/boss-edit.ts"
 import { recognizeFillets, setFilletRadius } from "./brep/fillet-edit.ts"
-import { pushPullNurbsFace, recognizeNurbsFaces } from "./brep/nurbs-edit.ts"
+import { pushPullNurbsFace, recognizeNurbsFaces, tessellatedVolume } from "./brep/nurbs-edit.ts"
+import { draftNurbsFace, offsetNurbsFace } from "./brep/nurbs-offset.ts"
 import { brepBox } from "./history-brep.ts"
 import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
 import type { BomRow, InferredJoint } from "./assembly-analysis.ts"
@@ -427,18 +428,48 @@ export const sceneFilletEdit = (elements: ReadonlyArray<Element>, id: string, fi
   return built.ok ? built.report : built
 }
 
+/**
+ * What is done to a free-form face: `move` is exact (the face moves rigidly along a direction); `offset` (along the normals) and `draft` are
+ * approximate, a fitted surface within `tolerance` mm (default 0.01), and the report says so.
+ */
+export type NurbsEdit =
+  | { readonly mode: "move"; readonly distance: number; readonly direction?: Vec3 }
+  | { readonly mode: "offset"; readonly distance: number; readonly tolerance?: number }
+  | { readonly mode: "draft"; readonly angle: number; readonly neutral?: number; readonly pull?: Vec3; readonly tolerance?: number }
+
+/** The edit a request means (mode default `move`), or what is missing or does not belong. */
+export const nurbsEditOf = (i: { readonly mode?: "move" | "offset" | "draft"; readonly distance?: number; readonly direction?: Vec3; readonly tolerance?: number; readonly angle?: number; readonly neutral?: number; readonly pull?: Vec3 }): NurbsEdit | string => {
+  const mode = i.mode ?? "move"
+  if (mode === "draft") {
+    if (i.angle === undefined) return "a draft of a free-form face takes an angle"
+    if (i.distance !== undefined || i.direction !== undefined) return "a draft takes an angle (and neutral, pull), not a distance or a direction"
+    return { mode, angle: i.angle, ...(i.neutral !== undefined ? { neutral: i.neutral } : {}), ...(i.pull !== undefined ? { pull: i.pull } : {}), ...(i.tolerance !== undefined ? { tolerance: i.tolerance } : {}) }
+  }
+  if (i.distance === undefined) return `a ${mode} of a free-form face takes a distance`
+  if (i.angle !== undefined || i.neutral !== undefined || i.pull !== undefined) return "angle, neutral and pull belong to a draft"
+  if (mode === "offset") {
+    if (i.direction !== undefined) return "an offset goes along the normals: it takes no direction"
+    return { mode, distance: i.distance, ...(i.tolerance !== undefined ? { tolerance: i.tolerance } : {}) }
+  }
+  if (i.tolerance !== undefined) return "a move is exact: it takes no tolerance"
+  return { mode, distance: i.distance, ...(i.direction !== undefined ? { direction: i.direction } : {}) }
+}
+
 export type SceneNurbsEdit =
   | {
-    readonly ok: true; readonly id: string; readonly name: string; readonly nurbs: number; readonly nurbsFaces: number
-    readonly before: { readonly normal: Vec3; readonly spread: number }; readonly distance: number; readonly direction: Vec3
+    readonly ok: true; readonly id: string; readonly name: string; readonly nurbs: number; readonly nurbsFaces: number; readonly mode: "move" | "offset" | "draft"
+    readonly before: { readonly normal: Vec3; readonly spread: number }; readonly distance?: number; readonly direction?: Vec3; readonly angle?: number
+    /** Present for the approximate edits: the largest distance, mm, between the fitted new face and the exact displaced surface. */
+    readonly approximate?: { readonly deviation: number }
     readonly volume: number; readonly originalVolume: number; readonly volumeChange: number; readonly faces: number; readonly valid: boolean
   }
   | { readonly ok: false; readonly error: string }
 
-/** Moves the `nurbs`-th free-form patch face of a solid of the drawing along a direction (`brep/nurbs-edit.ts`); the order is `ScenePartAnalysis.nurbsFaces`. */
+/** Edits the `nurbs`-th free-form patch face of a solid of the drawing (`brep/nurbs-edit.ts`, `brep/nurbs-offset.ts`); the order is `ScenePartAnalysis.nurbsFaces`. */
 export const sceneNurbsEditBody = (
-  elements: ReadonlyArray<Element>, id: string, nurbs: number, distance: number, direction?: Vec3
+  elements: ReadonlyArray<Element>, id: string, nurbs: number, how: NurbsEdit | number, direction?: Vec3
 ): { readonly ok: true; readonly brep: Brep; readonly report: Extract<SceneNurbsEdit, { ok: true }> } | { readonly ok: false; readonly error: string } => {
+  const edit: NurbsEdit = typeof how === "number" ? { mode: "move", distance: how, ...(direction !== undefined ? { direction } : {}) } : how
   const scene = sceneParts(elements)
   const part = scene.parts.find((p) => p.id === id)
   if (part === undefined) {
@@ -448,15 +479,30 @@ export const sceneNurbsEditBody = (
   const faces = recognizeNurbsFaces(part.brep)
   const target = faces[nurbs]
   if (target === undefined) return { ok: false, error: faces.length === 0 ? `'${id}' has no free-form patch face` : `'${id}' has ${faces.length} free-form patch faces (0..${faces.length - 1}), not a face ${nurbs}` }
-  const r = pushPullNurbsFace(part.brep, target.face, distance, direction)
-  if (typeof r === "string") return { ok: false, error: r }
-  const originalVolume = massProperties(part.brep).volume
-  const volume = massProperties(r).volume
-  return { ok: true, brep: r, report: { ok: true, id, name: part.name, nurbs, nurbsFaces: faces.length, before: { normal: target.normal, spread: target.spread }, distance, direction: direction ?? target.normal, volume, originalVolume, volumeChange: volume - originalVolume, faces: r.faces.length, valid: validateBrep(r).valid } }
+  let brepOut: Brep, approximate: { readonly deviation: number } | undefined
+  if (edit.mode === "move") {
+    const r = pushPullNurbsFace(part.brep, target.face, edit.distance, edit.direction)
+    if (typeof r === "string") return { ok: false, error: r }
+    brepOut = r
+  } else {
+    const r = edit.mode === "offset"
+      ? offsetNurbsFace(part.brep, target.face, edit.distance, edit.tolerance)
+      : draftNurbsFace(part.brep, target.face, { pull: edit.pull ?? { x: 0, y: 0, z: 1 }, neutral: edit.neutral ?? 0, angle: edit.angle }, edit.tolerance)
+    if (typeof r === "string") return { ok: false, error: r }
+    brepOut = r.brep; approximate = { deviation: r.deviation }
+  }
+  // A free-form solid's exact integral costs seconds a face: the tessellation's volume (0.005 mm chord) is what the report gives.
+  const originalVolume = tessellatedVolume(part.brep)
+  const volume = tessellatedVolume(brepOut)
+  return { ok: true, brep: brepOut, report: {
+    ok: true, id, name: part.name, nurbs, nurbsFaces: faces.length, mode: edit.mode, before: { normal: target.normal, spread: target.spread },
+    ...(edit.mode === "draft" ? { angle: edit.angle } : { distance: edit.distance }), ...(edit.mode === "move" ? { direction: edit.direction ?? target.normal } : {}),
+    ...(approximate !== undefined ? { approximate } : {}), volume, originalVolume, volumeChange: volume - originalVolume, faces: brepOut.faces.length, valid: validateBrep(brepOut).valid
+  } }
 }
 
-export const sceneNurbsEdit = (elements: ReadonlyArray<Element>, id: string, nurbs: number, distance: number, direction?: Vec3): SceneNurbsEdit => {
-  const built = sceneNurbsEditBody(elements, id, nurbs, distance, direction)
+export const sceneNurbsEdit = (elements: ReadonlyArray<Element>, id: string, nurbs: number, how: NurbsEdit | number, direction?: Vec3): SceneNurbsEdit => {
+  const built = sceneNurbsEditBody(elements, id, nurbs, how, direction)
   return built.ok ? built.report : built
 }
 
