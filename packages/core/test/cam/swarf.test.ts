@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import { booleanBrep } from "../../src/cad/brep/boolean.ts"
 import { frame } from "../../src/cad/brep/math.ts"
 import { makeBox, makeCone, makeCylinder } from "../../src/cad/brep/primitives.ts"
+import { extrudeProfile, polygonProfileLoop } from "../../src/cad/brep/sweep.ts"
 import { bodyTessellation } from "../../src/cad/brep/tessellate.ts"
 import type { Brep } from "../../src/cad/brep/topology.ts"
 import { fiveAxisKinematic } from "../../src/cam/five-axis.ts"
@@ -119,6 +120,49 @@ describe("flank milling a cone wall", () => {
     const rise = (tool.diameter / 2) * Math.sin(Math.atan(8 / 30))
     expect(Math.min(...poses.map((p) => p.tip.z - rise))).toBeCloseTo(PLATE.t, 3)
     expect(Math.max(...poses.map((p) => p.tip.z + p.axis.z * 10 - rise))).toBeCloseTo(PLATE.t + 30, 3)
+  })
+})
+
+describe("flank milling a leaning flat wall", () => {
+  // A trapezoid in XZ extruded 30 along Y: 40 wide at the foot, 20 at the top, 20 high; each side leans 26.6 degrees from vertical.
+  const wedge = () => extrudeProfile({ loops: [polygonProfileLoop([{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 30, y: -20 }, { x: 10, y: -20 }])] }, 30, { placement: frame({ x: 0, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, { x: 1, y: 0, z: 0 }) })
+  // The left side: through (0,0,0) and (10,*,20); its outward normal points to -X and up.
+  const nx = -20 / Math.hypot(20, 10), nz = 10 / Math.hypot(20, 10)
+  const distanceToLeft = (p: { x: number; y: number; z: number }) => p.x * nx + p.z * nz
+
+  test("the wall is read as rulings up its fall line, ends on the plane, normal away from the solid", () => {
+    const b = wedge()
+    const found = swarfWalls(b)
+    expect(found.walls).toHaveLength(4) // the two leaning sides and the two vertical ends
+    const wall = found.walls.find((w) => w.wall.normal[0]!.x < 0)!.wall
+    expect(wall.bottom.length).toBeGreaterThanOrEqual(2)
+    for (let i = 0; i < wall.bottom.length; i++) {
+      expect(Math.abs(distanceToLeft(wall.bottom[i]!))).toBeLessThan(1e-9)
+      expect(Math.abs(distanceToLeft(wall.top[i]!))).toBeLessThan(1e-9)
+      expect(wall.top[i]!.z - wall.bottom[i]!.z).toBeCloseTo(20, 9)
+    }
+    expect(wall.normal[0]!.x).toBeCloseTo(nx, 9)
+  })
+
+  test("the flank lies on the plane at every pose, and the passes reach the foot and the top", () => {
+    const b = wedge()
+    const wall = swarfWalls(b).walls.find((w) => w.wall.normal[0]!.x < 0)!.wall
+    const r = generateMultiaxis(params(), soupOf(b), tool, kin, [wall])
+    expect(r.warnings).toEqual([])
+    expect(r.stats.skipped).toBe(0)
+    expect(r.stats.sections).toBe(3)
+    const cuts = r.toolpath.moves.filter((m): m is Extract<Move, { _tag: "Linear" }> => m._tag === "Linear" && m.rotary !== undefined && m.feed === params().feed)
+    let worst = 0
+    const heights: number[] = []
+    for (const m of cuts) {
+      const { tip, axis } = poseOf(m)
+      expect(axis.x * nx + axis.z * nz).toBeCloseTo(0, 9) // the axis lies in the wall
+      for (const s of [0, 5, 10]) worst = Math.max(worst, Math.abs(distanceToLeft({ x: tip.x + axis.x * s, y: tip.y + axis.y * s, z: tip.z + axis.z * s }) - tool.diameter / 2))
+      heights.push(tip.z - (tool.diameter / 2) * nz, tip.z + axis.z * 10 - (tool.diameter / 2) * nz)
+    }
+    expect(worst).toBeLessThan(1e-6)
+    expect(Math.min(...heights)).toBeCloseTo(0, 3)
+    expect(Math.max(...heights)).toBeCloseTo(20, 3)
   })
 })
 

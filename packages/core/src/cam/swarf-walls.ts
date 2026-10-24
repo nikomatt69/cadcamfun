@@ -27,7 +27,8 @@ export const swarfWallOfFace = (b: Brep, face: number, tolerance = 0.005): Swarf
   const f = b.faces[face]
   if (f === undefined) return "the face does not exist"
   const s = f.surface
-  if (s.kind !== "cone" && s.kind !== "cylinder") return `a ${s.kind} face is not ruled by straight lines this model reads (cone and cylinder walls only)`
+  if (s.kind === "plane") return planarWall(b, face)
+  if (s.kind !== "cone" && s.kind !== "cylinder") return `a ${s.kind} face is not ruled by straight lines this model reads (plane, cone and cylinder walls only)`
   const frame = s.frame
   const slope = s.kind === "cone" ? Math.tan(s.semiAngle) : 0
   const samples: Array<{ readonly v: number; readonly u: number }> = []
@@ -92,12 +93,71 @@ export const swarfWallOfFace = (b: Brep, face: number, tolerance = 0.005): Swarf
   return { bottom, top, normal, ...(concave ? { concaveRadius: Math.min(rho(vLo), rho(vHi)) / cosHalf } : {}) }
 }
 
+/**
+ * A flat wall (vertical or leaning): its rulings run up the fall line, one at every vertex of the face across the wall (between two
+ * of them the ends of the ruling move along straight edges, so the cutter's path is exact). Convex faces with straight edges only.
+ */
+const planarWall = (b: Brep, face: number): SwarfWall | string => {
+  const f = b.faces[face]!
+  if (f.surface.kind !== "plane") return "not a plane"
+  const nat = f.surface.frame.z
+  const n = f.reversed ? { x: -nat.x, y: -nat.y, z: -nat.z } : nat
+  if (Math.abs(n.z) > 1 - 1e-6) return "the face is level: a floor, not a wall"
+  if (f.loops.length !== 1) return "the wall has a hole or several boundaries"
+  // Up the wall: +Z taken into the plane.
+  const up = { x: -n.x * n.z, y: -n.y * n.z, z: 1 - n.z * n.z }
+  const ul = Math.hypot(up.x, up.y, up.z)
+  const d = { x: up.x / ul, y: up.y / ul, z: up.z / ul }
+  const h = { x: n.y * d.z - n.z * d.y, y: n.z * d.x - n.x * d.z, z: n.x * d.y - n.y * d.x }
+  const verts: Vec3[] = []
+  for (const c of f.loops[0]!.coedges) {
+    const e = b.edges[c.edge]!
+    if (e.curve.kind !== "line") return "the wall has a curved edge"
+    const v = b.vertices[c.reversed ? e.v1 : e.v0]!.point
+    verts.push(v)
+  }
+  if (verts.length < 3) return "the wall has no area"
+  const o = verts[0]!
+  const at = (p: Vec3) => ({ s: dot({ x: p.x - o.x, y: p.y - o.y, z: p.z - o.z }, h), t: dot({ x: p.x - o.x, y: p.y - o.y, z: p.z - o.z }, d) })
+  const poly = verts.map(at)
+  let sign = 0
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!, p = poly[(i + 1) % poly.length]!, q = poly[(i + 2) % poly.length]!
+    const cr = (p.s - a.s) * (q.t - p.t) - (p.t - a.t) * (q.s - p.s)
+    if (Math.abs(cr) < 1e-9) continue
+    if (sign === 0) sign = Math.sign(cr)
+    else if (Math.sign(cr) !== sign) return "the wall is not convex"
+  }
+  const sMin = Math.min(...poly.map((p) => p.s)), sMax = Math.max(...poly.map((p) => p.s))
+  const span = sMax - sMin
+  if (!(span > 1e-6)) return "the wall has no width"
+  const inset = 1e-6 * Math.max(1, span)
+  const stations = [...new Set([...poly.map((p) => Math.min(sMax - inset, Math.max(sMin + inset, p.s))), sMin + inset, sMax - inset].map((x) => Math.round(x * 1e9) / 1e9))].sort((x, y) => x - y)
+  const bottom: Vec3[] = [], top: Vec3[] = [], normal: Vec3[] = []
+  for (const sv of stations) {
+    let lo = Infinity, hi = -Infinity
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i]!, p = poly[(i + 1) % poly.length]!
+      if ((a.s - sv) * (p.s - sv) > 0) continue
+      if (Math.abs(p.s - a.s) < 1e-12) { lo = Math.min(lo, a.t, p.t); hi = Math.max(hi, a.t, p.t); continue }
+      const t = a.t + ((p.t - a.t) * (sv - a.s)) / (p.s - a.s)
+      lo = Math.min(lo, t); hi = Math.max(hi, t)
+    }
+    if (!(hi - lo > 1e-6)) continue
+    const at3 = (t: number): Vec3 => ({ x: o.x + h.x * sv + d.x * t, y: o.y + h.y * sv + d.y * t, z: o.z + h.z * sv + d.z * t })
+    bottom.push(at3(lo)); top.push(at3(hi)); normal.push(n)
+  }
+  return bottom.length < 2 ? "the wall has no height" : { bottom, top, normal }
+}
+
 /** The walls of every cone and cylinder face of the solid that can be cut with the flank, with the reason for each that cannot. */
 export const swarfWalls = (b: Brep, tolerance = 0.005): { readonly walls: ReadonlyArray<{ readonly face: number; readonly wall: SwarfWall }>; readonly refused: ReadonlyArray<{ readonly face: number; readonly reason: string }> } => {
   const walls: Array<{ face: number; wall: SwarfWall }> = []
   const refused: Array<{ face: number; reason: string }> = []
   b.faces.forEach((f, face) => {
-    if (f.surface.kind !== "cone" && f.surface.kind !== "cylinder") return
+    if (f.surface.kind !== "cone" && f.surface.kind !== "cylinder" && f.surface.kind !== "plane") return
+    // A level or nearly level plane is a floor, not a wall, and is left to the face and pocket operations.
+    if (f.surface.kind === "plane" && Math.abs(f.surface.frame.z.z) > 1 - 1e-6) return
     const r = swarfWallOfFace(b, face, tolerance)
     if (typeof r === "string") refused.push({ face, reason: r })
     else walls.push({ face, wall: r })
