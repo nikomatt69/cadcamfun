@@ -119,12 +119,12 @@ export function WorkspacePage(props: WorkspacePageProps): JSX.Element {
 
         <div class="workspace-page__body cam-workspace__body flex flex-1 overflow-hidden w-full">
           <Show when={props.rail !== undefined}>
-            <aside class="workspace-page__rail cam-workspace__sidebar flex-shrink-0 mr-2 h-full flex flex-col" data-open="true" aria-label="Filters">
-              <div class="workspace-page__rail-card ui-card ui-card-light flex flex-col gap-3 !p-3 overflow-y-auto">{props.rail}</div>
+            <aside class="workspace-page__rail cam-workspace__sidebar flex-shrink-0 h-full flex flex-col" data-open="true" aria-label="Filters">
+              <div class="workspace-page__rail-card ui-card ui-card-light flex flex-col gap-3 overflow-y-auto">{props.rail}</div>
             </aside>
           </Show>
           <Motion.div
-            class="workspace-page__stage workspace-stage cam-workspace__stage ui-card ui-card-default flex-1 min-w-0 overflow-y-auto !p-3"
+            class="workspace-page__stage workspace-stage cam-workspace__stage ui-card ui-card-default flex-1 min-w-0 overflow-y-auto"
             initial={prefersReducedMotion() ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: prefersReducedMotion() ? ENTER_DURATION_REDUCED : ENTER_DURATION, delay: prefersReducedMotion() ? 0 : 0.04 }}
@@ -170,7 +170,7 @@ export function StageEmpty(props: { readonly icon: JSX.Element; readonly title: 
 /** The neutral banner at the top of a card, with the icon tile and optional corner badges. */
 export function CardBanner(props: { readonly icon: JSX.Element; readonly badge?: string; readonly leftBadge?: string }): JSX.Element {
   return (
-    <div class="relative flex h-16 items-center justify-center border-b border-slate-200 bg-slate-50 dark:border-slate-700/70 dark:bg-slate-800/40">
+    <div class="relative flex h-[72px] items-center justify-center border-b border-slate-200 bg-slate-50 dark:border-slate-700/70 dark:bg-slate-800/40">
       <div class="flex h-9 w-9 items-center justify-center rounded-[5px] border border-slate-200 bg-white text-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300">
         {props.icon}
       </div>
@@ -210,7 +210,7 @@ export function WorkspaceDetail(props: WorkspaceDetailProps): JSX.Element {
           <Show when={props.actions !== undefined}><div class="flex flex-wrap items-center gap-1.5">{props.actions}</div></Show>
         </Motion.div>
         <div class="workspace-page__body cam-workspace__body flex flex-1 overflow-hidden w-full">
-          <div class="workspace-page__stage workspace-stage cam-workspace__stage ui-card ui-card-default flex-1 min-w-0 overflow-y-auto !p-3">
+          <div class="workspace-page__stage workspace-stage cam-workspace__stage ui-card ui-card-default flex-1 min-w-0 overflow-y-auto">
             {props.children}
           </div>
         </div>

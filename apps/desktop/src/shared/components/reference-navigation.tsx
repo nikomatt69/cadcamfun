@@ -39,38 +39,45 @@ interface NavItem {
   readonly key: Key
   readonly href: string
   readonly icon: typeof Home
+  readonly group: "workspace" | "tools" | "system"
   readonly children?: ReadonlyArray<NavItem>
 }
 
 const navigation: ReadonlyArray<NavItem> = [
-  { key: "shell.dashboard", href: "/", icon: Home },
-  { key: "shell.projects", href: "/projects", icon: FileText, children: [
-    { key: "shell.allProjects", href: "/projects", icon: FileText },
-    { key: "shell.newProject", href: "/projects/create", icon: PlusSquare }
+  { key: "shell.dashboard", href: "/", icon: Home, group: "workspace" },
+  { key: "shell.projects", href: "/projects", icon: FileText, group: "workspace", children: [
+    { key: "shell.allProjects", href: "/projects", icon: FileText, group: "workspace" },
+    { key: "shell.newProject", href: "/projects/create", icon: PlusSquare, group: "workspace" }
   ] },
-  { key: "shell.cad", href: "/cad", icon: Grid },
-  { key: "shell.cam", href: "/cam", icon: Tool },
-  { key: "shell.manuals", href: "/manuals", icon: BookOpen },
-  { key: "shell.resources", href: "/library", icon: Package, children: [
-    { key: "shell.toolpaths", href: "/toolpaths", icon: Tool },
-    { key: "shell.components", href: "/components", icon: Package },
-    { key: "shell.materials", href: "/materials", icon: Database },
-    { key: "shell.configurations", href: "/machine", icon: Server },
-    { key: "shell.tools", href: "/tools", icon: Tool }
+  { key: "shell.cad", href: "/cad", icon: Grid, group: "workspace" },
+  { key: "shell.cam", href: "/cam", icon: Tool, group: "workspace" },
+  { key: "shell.manuals", href: "/manuals", icon: BookOpen, group: "workspace" },
+  { key: "shell.resources", href: "/library", icon: Package, group: "workspace", children: [
+    { key: "shell.toolpaths", href: "/toolpaths", icon: Tool, group: "workspace" },
+    { key: "shell.components", href: "/components", icon: Package, group: "workspace" },
+    { key: "shell.materials", href: "/materials", icon: Database, group: "workspace" },
+    { key: "shell.configurations", href: "/machine", icon: Server, group: "workspace" },
+    { key: "shell.tools", href: "/tools", icon: Tool, group: "workspace" }
   ] },
-  { key: "shell.organization", href: "/organizations", icon: Users },
-  { key: "shell.plugins", href: "/plugins", icon: Puzzle },
-  { key: "shell.website", href: "https://cadcam.fun", icon: Globe },
-  { key: "shell.ai", href: "/ai", icon: Cpu },
-  { key: "shell.analytics", href: "/analytics", icon: BarChart, children: [
-    { key: "shell.dashboard", href: "/analytics", icon: BarChart },
-    { key: "shell.history", href: "/analytics/history", icon: Activity }
+  { key: "shell.organization", href: "/organizations", icon: Users, group: "tools" },
+  { key: "shell.plugins", href: "/plugins", icon: Puzzle, group: "tools" },
+  { key: "shell.website", href: "https://cadcam.fun", icon: Globe, group: "tools" },
+  { key: "shell.ai", href: "/ai", icon: Cpu, group: "tools" },
+  { key: "shell.analytics", href: "/analytics", icon: BarChart, group: "tools", children: [
+    { key: "shell.dashboard", href: "/analytics", icon: BarChart, group: "tools" },
+    { key: "shell.history", href: "/analytics/history", icon: Activity, group: "tools" }
   ] },
-  { key: "shell.settings", href: "/settings", icon: Settings, children: [
-    { key: "shell.profile", href: "/profile", icon: User },
-    { key: "shell.preferences", href: "/settings", icon: Settings }
+  { key: "shell.settings", href: "/settings", icon: Settings, group: "system", children: [
+    { key: "shell.profile", href: "/profile", icon: User, group: "system" },
+    { key: "shell.preferences", href: "/settings", icon: Settings, group: "system" }
   ] }
 ]
+
+const navGroupLabel = (group: NavItem["group"]): Key =>
+  group === "workspace" ? "shell.group.workspace" : group === "tools" ? "shell.group.tools" : "shell.group.system"
+
+const navigationGroups: ReadonlyArray<{ readonly id: NavItem["group"]; readonly items: ReadonlyArray<NavItem> }> =
+  (["workspace", "tools", "system"] as const).map((id) => ({ id, items: navigation.filter((item) => item.group === id) }))
 
 export function ReferenceLink(props: { readonly href: string; readonly class?: string; readonly children: JSX.Element; readonly onNavigate?: () => void; readonly label?: string; readonly current?: boolean }): JSX.Element {
   const external = () => props.href.startsWith("https://")
@@ -124,22 +131,21 @@ export function ReferenceNavbar(props: { readonly sidebarOpen: boolean; readonly
     <div class="reference-navbar-inner">
       <div class="reference-navbar-left">
         <button type="button" class="reference-icon-button reference-navbar-menu" title={t("shell.toggleSidebar")} aria-label={t("shell.toggleSidebar")} aria-expanded={props.sidebarOpen} aria-controls="reference-sidebar" onClick={props.onToggleSidebar}><Menu size={18} /></button>
-        <span class="reference-navbar-sep" aria-hidden="true" />
-        <ReferenceLink href="/" class="reference-logo" label={t("shell.brand")}><img src="/logo.png" alt="" /></ReferenceLink>
       </div>
-      <div class="reference-navbar-actions">
+      <div class="reference-navbar-center">
         <button type="button" class="reference-navbar-search" title={t("palette.title")} aria-label={t("palette.title")} onClick={() => { close(); app.setPaletteOpen(true) }}>
           <Search size={14} aria-hidden="true" />
           <span class="reference-navbar-search__label">{t("shell.search")}</span>
           <kbd class="reference-navbar-kbd">{shortcut()}</kbd>
         </button>
+      </div>
+      <div class="reference-navbar-actions">
         <span class="reference-navbar-sep reference-navbar-sep--actions" aria-hidden="true" />
         <button type="button" class="reference-icon-button reference-theme-button" title={t("shell.toggleTheme")} aria-label={t("shell.toggleTheme")} onClick={() => app.settings.update({ theme: dark() ? "light" : "dark" })}><Show when={dark()} fallback={<Moon size={16} />}><Sun size={16} /></Show></button>
         <div class="relative">
           <button ref={notificationButton} type="button" class="reference-icon-button reference-navbar-bell" title={t("shell.notifications")} aria-label={t("shell.notifications")} aria-expanded={popover() === "notifications"} aria-controls="reference-notifications" onClick={() => { const next = popover() === "notifications" ? undefined : "notifications"; setPopover(next); if (next) void app.notifications.refresh() }}><Bell size={16} /><Show when={app.notifications.unreadCount() > 0}><span class="reference-navbar-unread" aria-label={`${app.notifications.unreadCount()} unread`}>{app.notifications.unreadCount()}</span></Show></button>
           <Show when={popover() === "notifications"}><section id="reference-notifications" class="reference-popover reference-notifications" aria-label={t("shell.notifications")}><div class="reference-notifications__head"><h2>{t("shell.notifications")}</h2><Show when={app.notifications.unreadCount() > 0}><button type="button" class="reference-notifications__action" onClick={() => void app.notifications.markAllRead()}>Mark all read</button></Show></div><Show when={app.notifications.rows().length > 0} fallback={<p>No notifications yet. Project, workflow and assistant updates will appear here.</p>}><ul class="reference-notifications__list"><For each={app.notifications.rows().slice(0, 20)}>{(row) => <li><button type="button" class="reference-notifications__item" onClick={() => { close(); if (!row.isRead) void app.notifications.markRead(row); if (row.linkUrl) navigate(row.linkUrl) }}><strong>{row.isRead ? row.title : `• ${row.title}`}</strong><span>{row.content}</span><small>{new Date(row.createdAt).toLocaleString()}</small></button></li>}</For></ul></Show></section></Show>
         </div>
-        <ReferenceLink href="/settings" class="reference-icon-button reference-navbar-settings" label={t("shell.settings")}><Settings size={16} /></ReferenceLink>
         <div class="relative">
           <button ref={profileButton} type="button" class="reference-avatar" title={displayName()} aria-label={t("shell.openUserMenu")} aria-expanded={popover() === "profile"} aria-controls="reference-profile-menu" onClick={() => setPopover(popover() === "profile" ? undefined : "profile")}><span>{initial()}</span></button>
           <Show when={popover() === "profile"}><nav id="reference-profile-menu" class="reference-popover" aria-label={t("shell.openUserMenu")}>
@@ -183,14 +189,27 @@ export function ReferenceSidebar(props: { readonly open: boolean; readonly mobil
   return <Show when={!props.mobile || props.open}>
     <Show when={props.mobile}><button type="button" class="reference-sidebar-scrim" aria-label={t("shell.closeSidebar")} onClick={() => props.onOpenChange(false)} /></Show>
     <aside id="reference-sidebar" class="reference-sidebar panel" classList={{ "is-collapsed": !props.open, "is-mobile": props.mobile }}>
-      <div class="reference-sidebar-heading"><img src="/icon.png" alt={t("shell.brand")} /><Show when={props.open}><span>{t("shell.menu")}</span></Show><Show when={props.mobile}><button type="button" class="reference-icon-button ml-auto" aria-label={t("shell.closeSidebar")} onClick={() => props.onOpenChange(false)}><X size={20} /></button></Show></div>
-      <Show when={!props.mobile}><button type="button" class="reference-sidebar-toggle" aria-label={t(props.open ? "shell.collapseSidebar" : "shell.expandSidebar")} onClick={() => props.onOpenChange(!props.open)}><Show when={props.open} fallback={<ChevronRight size={14} />}><ChevronLeft size={14} /></Show></button></Show>
-      <nav class="reference-sidebar-nav" aria-label={t("shell.navigation")}><For each={navigation}>{(item) => <div class="reference-nav-group">
-        <Show when={item.children} fallback={<ReferenceLink href={item.href} class={`reference-nav-item ${current(item) ? "is-current" : ""}`} current={current(item)} label={t(item.key)} onNavigate={follow}><item.icon size={20} /><Show when={props.open}><span>{t(item.key)}</span></Show></ReferenceLink>}>
-          <button type="button" class={`reference-nav-item ${current(item) ? "is-current" : ""}`} aria-label={t(item.key)} title={t(item.key)} aria-expanded={props.open && !!expanded()[item.key]} aria-controls={`reference-group-${item.key}`} onClick={() => toggle(item)}><item.icon size={20} /><Show when={props.open}><span>{t(item.key)}</span><ChevronDown size={16} class={expanded()[item.key] ? "rotate-180" : ""} /></Show></button>
-          <Show when={props.open && expanded()[item.key]}><div class="reference-nav-children" id={`reference-group-${item.key}`}><For each={item.children}>{(child) => <ReferenceLink href={child.href} class={`reference-nav-item ${location.pathname === child.href ? "is-current" : ""}`} current={location.pathname === child.href} onNavigate={follow}><child.icon size={16} /><span>{t(child.key)}</span></ReferenceLink>}</For></div></Show>
-        </Show>
-      </div>}</For></nav>
+      <div class="reference-sidebar-heading">
+        <ReferenceLink href="/" class="reference-sidebar-brand" label={t("shell.brand")} onNavigate={follow}>
+          <img src="/icon.png" alt="" />
+          <Show when={props.open}><span class="reference-sidebar-brand-text"><strong>{t("shell.brand")}</strong><small>{t("shell.workstation")}</small></span></Show>
+        </ReferenceLink>
+        <Show when={props.mobile}><button type="button" class="reference-icon-button ml-auto" aria-label={t("shell.closeSidebar")} onClick={() => props.onOpenChange(false)}><X size={18} /></button></Show>
+      </div>
+      <nav class="reference-sidebar-nav" aria-label={t("shell.navigation")}><For each={navigationGroups}>{(group) => <section class="reference-nav-section" aria-labelledby={`reference-nav-${group.id}`}>
+        <Show when={props.open}><h2 id={`reference-nav-${group.id}`} class="reference-nav-section-title">{t(navGroupLabel(group.id))}</h2></Show>
+        <For each={group.items}>{(item) => <div class="reference-nav-group">
+          <Show when={item.children} fallback={<ReferenceLink href={item.href} class={`reference-nav-item ${current(item) ? "is-current" : ""}`} current={current(item)} label={t(item.key)} onNavigate={follow}><item.icon size={18} /><Show when={props.open}><span>{t(item.key)}</span></Show></ReferenceLink>}>
+            <button type="button" class={`reference-nav-item ${current(item) ? "is-current" : ""}`} aria-label={t(item.key)} title={t(item.key)} aria-expanded={props.open && !!expanded()[item.key]} aria-controls={`reference-group-${item.key}`} onClick={() => toggle(item)}><item.icon size={18} /><Show when={props.open}><span>{t(item.key)}</span><ChevronDown size={15} class={expanded()[item.key] ? "rotate-180" : ""} /></Show></button>
+            <Show when={props.open && expanded()[item.key]}><div class="reference-nav-children" id={`reference-group-${item.key}`}><For each={item.children}>{(child) => <ReferenceLink href={child.href} class={`reference-nav-item ${location.pathname === child.href ? "is-current" : ""}`} current={location.pathname === child.href} onNavigate={follow}><child.icon size={15} /><span>{t(child.key)}</span></ReferenceLink>}</For></div></Show>
+          </Show>
+        </div>}</For>
+      </section>}</For></nav>
+      <Show when={!props.mobile}><div class="reference-sidebar-foot">
+        <button type="button" class="reference-sidebar-collapse" title={t(props.open ? "shell.collapseSidebar" : "shell.expandSidebar")} aria-label={t(props.open ? "shell.collapseSidebar" : "shell.expandSidebar")} onClick={() => props.onOpenChange(!props.open)}>
+          <Show when={props.open} fallback={<ChevronRight size={16} />}><ChevronLeft size={16} /><span>{t("shell.collapseSidebar")}</span></Show>
+        </button>
+      </div></Show>
     </aside>
   </Show>
 }

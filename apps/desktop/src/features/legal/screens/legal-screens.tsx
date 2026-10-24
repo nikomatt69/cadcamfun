@@ -57,22 +57,20 @@ export function LegalScreen(props: { readonly kind: keyof typeof docs }): JSX.El
     const Component = doc().icon
     return <Component size={props.size ?? 28} aria-hidden="true" />
   }
-  return <div class="reference-page-container">
-    <article class="reference-legal-card">
-      <div class="reference-legal-icon"><Icon size={28} /></div>
-      <h1>{t(doc().titleKey)}</h1>
-      <p class="reference-legal-intro">{t(doc().introKey)}</p>
-      <For each={doc().sections}>{(section) => <>
-        <h2>{section.heading}</h2>
-        <p>{section.body}</p>
-      </>}</For>
-      <Show when={props.kind === "thirdParty"}>
-        <p class="reference-legal-footer">
-          <A href="/third-party-licenses">{t("legal.fullList")}</A>
-        </p>
-      </Show>
-    </article>
-  </div>
+  return <article class="reference-legal-card">
+    <div class="reference-legal-icon"><Icon size={28} /></div>
+    <h1>{t(doc().titleKey)}</h1>
+    <p class="reference-legal-intro">{t(doc().introKey)}</p>
+    <For each={doc().sections}>{(section) => <>
+      <h2>{section.heading}</h2>
+      <p>{section.body}</p>
+    </>}</For>
+    <Show when={props.kind === "thirdParty"}>
+      <p class="reference-legal-footer">
+        <A href="/third-party-licenses">{t("legal.fullList")}</A>
+      </p>
+    </Show>
+  </article>
 }
 
 export function TermsScreen(): JSX.Element { return <LegalScreen kind="terms" /> }

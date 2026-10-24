@@ -185,27 +185,27 @@ export function ProjectsScreen(): JSX.Element {
         <label class="block">
           <span class={RAIL_LABEL}>Search</span>
           <div class="relative">
-            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={15} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search projects..." value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
-        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-200" onClick={() => setSearch("")} disabled={search() === ""}>
-          <X size={14} aria-hidden="true" />Clear Filters
+        <button type="button" class="inline-flex h-7 items-center gap-1 self-start rounded-[4px] px-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-45 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" onClick={() => setSearch("")} disabled={search() === ""}>
+          <X size={13} aria-hidden="true" />Clear filters
         </button>
         <section aria-labelledby="recent-heading">
-          <h2 id="recent-heading" class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("projects.recent")}</h2>
-          <Show when={app.recents().length > 0} fallback={<p class="text-sm text-slate-500 dark:text-slate-400">{t("projects.recentEmpty")}</p>}>
-            <ul class="flex flex-col gap-1">
+          <h2 id="recent-heading" class="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">{t("projects.recent")}</h2>
+          <Show when={app.recents().length > 0} fallback={<p class="text-xs text-slate-500 dark:text-slate-400">{t("projects.recentEmpty")}</p>}>
+            <ul class="flex flex-col gap-0.5">
               <For each={app.recents()}>{(recent) => (
-                <li class="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm hover:bg-white/70 dark:hover:bg-slate-700/60">
-                  <button type="button" class="truncate text-left text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-200" onClick={() => open(recent)}>{recent.name}</button>
-                  <span class="shrink-0 text-xs text-slate-500">{formatRecent(recent.openedAt)}</span>
+                <li class="flex min-h-7 items-center justify-between gap-2 rounded-[4px] px-1.5 py-1 text-xs hover:bg-slate-100 dark:hover:bg-slate-800">
+                  <button type="button" class="truncate text-left text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-200" onClick={() => open(recent)}>{recent.name}</button>
+                  <span class="shrink-0 text-[10.5px] tabular-nums text-slate-500">{formatRecent(recent.openedAt)}</span>
                 </li>
               )}</For>
             </ul>
           </Show>
         </section>
-        <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {rows().length} projects</p>
+        <p class="mt-auto border-t border-slate-200 pt-2.5 text-[11px] tabular-nums text-slate-500 dark:border-slate-700 dark:text-slate-400" role="status">{filtered().length} of {rows().length} projects</p>
       </>}
     >
       <Show when={mutationError()}>{(message) => <div class="mb-4"><StageError message={message()} /></div>}</Show>
@@ -222,21 +222,21 @@ export function ProjectsScreen(): JSX.Element {
             </StageEmpty>
           }
         >
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div class="grid grid-cols-1 content-start gap-4 md:grid-cols-2 xl:grid-cols-3">
             <For each={filtered()}>{(row) => (
               <div class={`${CARD} cursor-pointer`} role="link" tabIndex={0} onClick={() => open(row)} onKeyDown={(event) => { if (event.key === "Enter") open(row) }}>
-                <CardBanner icon={<FolderKanban size={28} aria-hidden="true" />} badge="Project" />
-                <div class="flex flex-1 flex-col gap-2 p-4">
+                <CardBanner icon={<FolderKanban size={26} aria-hidden="true" />} badge="Project" />
+                <div class="flex flex-1 flex-col gap-2.5 p-4">
                   <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{row.name}</h3>
                   <Show when={row.description}><p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{row.description}</p></Show>
                   <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                    <div class="flex justify-between"><span>{t("projects.column.drawings")}:</span><span class="rounded-full bg-blue-100/80 px-2 py-0.5 font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{row._count.drawings}</span></div>
-                    <div class="flex justify-between"><span>{t("projects.column.components")}:</span><span class="rounded-full bg-blue-100/80 px-2 py-0.5 font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{row._count.components}</span></div>
-                    <div class="flex justify-between"><span>ID:</span><code class="font-mono text-blue-600 dark:text-blue-400">{row.id.substring(0, 8)}...</code></div>
+                    <div class="flex items-center justify-between gap-2"><span>{t("projects.column.drawings")}</span><span class="min-w-[22px] rounded-full bg-blue-100/80 px-1.5 py-0.5 text-center font-medium tabular-nums text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{row._count.drawings}</span></div>
+                    <div class="flex items-center justify-between gap-2"><span>{t("projects.column.components")}</span><span class="min-w-[22px] rounded-full bg-blue-100/80 px-1.5 py-0.5 text-center font-medium tabular-nums text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{row._count.components}</span></div>
+                    <div class="flex items-center justify-between gap-2"><span>ID</span><code class="truncate font-mono text-[11px] text-blue-600 dark:text-blue-400">{row.id.substring(0, 8)}…</code></div>
                   </div>
                 </div>
                 <div class="flex items-center justify-between border-t border-slate-200/60 bg-white/60 px-4 py-2.5 backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-800/40">
-                  <span class="text-xs text-slate-500 dark:text-slate-400">{t("projects.updated", { date: formatDate(row.updatedAt) })}</span>
+                  <span class="text-[11px] text-slate-500 dark:text-slate-400">{t("projects.updated", { date: formatDate(row.updatedAt) })}</span>
                   <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
                     <button type="button" class={ICON_BUTTON} title={t("projects.open")} aria-label={`${t("projects.open")}: ${row.name}`} onClick={() => open(row)}><FolderOpen size={16} aria-hidden="true" /></button>
                     <button type="button" class={ICON_BUTTON} title={t("projects.rename")} aria-label={`${t("projects.rename")}: ${row.name}`} onClick={() => openRename(row)}><Edit size={16} aria-hidden="true" /></button>

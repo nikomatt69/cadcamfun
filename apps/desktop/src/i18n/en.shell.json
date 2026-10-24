@@ -1,6 +1,10 @@
 {
   "shell.brand": "CAD/CAM FUN",
+  "shell.workstation": "Workstation",
   "shell.menu": "MENU",
+  "shell.group.workspace": "Workspace",
+  "shell.group.tools": "Tools",
+  "shell.group.system": "System",
   "shell.search": "Search or jump to…",
   "shell.navigation": "Main navigation",
   "shell.toggleSidebar": "Toggle sidebar",

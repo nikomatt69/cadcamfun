@@ -189,7 +189,7 @@ export function Shell(props: ShellProps): JSX.Element {
 
   return (
     <div class="reference-shell">
-      <TitleBar onMenu={onMenu} onOpenPalette={() => app.setPaletteOpen(true)} />
+      <TitleBar minimal={layout() !== "workspace"} onMenu={onMenu} onOpenPalette={() => app.setPaletteOpen(true)} />
       <Show when={layout() !== "workspace"}>
         <ReferenceNavbar sidebarOpen={sidebarOpen()} onToggleSidebar={() => setSidebarOpen(!sidebarOpen())} />
       </Show>
