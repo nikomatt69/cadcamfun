@@ -19,6 +19,8 @@ import { TitleBar } from "../shared/components/title-bar.tsx"
 import { CommandPalette, type PaletteCommand } from "../shared/components/command-palette.tsx"
 import { AssistantPanel } from "../features/ai/components/AssistantPanel.tsx"
 import { useApp } from "../shared/state/context.ts"
+import { projectSession } from "../features/projects/lib/project-session.ts"
+import { SaveSeg } from "../shared/components/workspace-strip.tsx"
 import { activeActivity, routeOf, type ActivityId } from "./layout.ts"
 import { findShortcut, shortcuts } from "./shortcuts.ts"
 
@@ -50,6 +52,9 @@ export function Shell(props: ShellProps): JSX.Element {
     setShowScrollTop(false)
     main?.scrollTo?.({ top: 0 })
   })
+
+  // The open project's save session lives as long as the shell: autosave, the status read-out and the window guards.
+  onMount(() => onCleanup(projectSession(app).start()))
 
   const go = (route: string): void => {
     navigate(route)
@@ -215,6 +220,7 @@ export function Shell(props: ShellProps): JSX.Element {
           sidecar={app.sidecar()}
           decimals={settings().decimals}
           toolLabel={toolLabel()}
+          saveSlot={<SaveSeg light />}
         />
       </Show>
 

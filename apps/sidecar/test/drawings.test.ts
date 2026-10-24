@@ -60,3 +60,52 @@ describe("/api/drawings/:id", () => {
     expect((await app.call(`/api/drawings/${d.id}`)).status).toBe(404)
   })
 })
+
+describe("optimistic saves and restore points", () => {
+  const draw = (n: number) => ({ elements: Array.from({ length: n }, (_, i) => ({ id: `e${i}`, type: "cube" })), version: "1.0" })
+
+  test("a save based on a stale copy is a 409 and writes nothing", async () => {
+    const { body: d } = await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "CAS", data: draw(1) } })
+    const first = await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: draw(2), baseUpdatedAt: d.updatedAt } })
+    expect(first.status).toBe(200)
+    // Someone else (the assistant, the phone) saved in between: the first copy is stale now.
+    await Bun.sleep(5)
+    const stale = await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: draw(9), baseUpdatedAt: d.updatedAt } })
+    expect(stale.status).toBe(409)
+    expect(stale.body.message).toContain("Nothing was overwritten")
+    expect((await app.call(`/api/drawings/${d.id}`)).body.data).toEqual(draw(2))
+    const fresh = await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: draw(3), baseUpdatedAt: first.body.updatedAt } })
+    expect(fresh.status).toBe(200)
+    // Without a base the legacy blind write still works.
+    expect((await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: draw(4) } })).status).toBe(200)
+  })
+
+  test("a save keeps the replaced document as a restore point, at most one per interval, and a restore is itself undoable", async () => {
+    const { body: d } = await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Versions", data: draw(1) } })
+    expect((await app.call(`/api/drawings/${d.id}/versions`)).body).toEqual([])
+    await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: draw(2) } })
+    await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: draw(3) } })
+    const versions = (await app.call(`/api/drawings/${d.id}/versions`)).body
+    expect(versions).toHaveLength(1) // the second save is inside the interval
+    expect(versions[0]).toMatchObject({ version: 1, elements: 1 })
+    const restored = await app.call(`/api/drawings/${d.id}/versions/${versions[0].id}/restore`, { method: "POST" })
+    expect(restored.status).toBe(200)
+    expect(restored.body.data).toEqual(draw(1))
+    const after = (await app.call(`/api/drawings/${d.id}/versions`)).body
+    expect(after.map((v: { elements: number }) => v.elements)).toEqual([3, 1]) // the document the restore replaced is kept
+    expect((await app.call(`/api/drawings/${d.id}/versions/nope/restore`, { method: "POST" })).status).toBe(404)
+    expect((await app.call(`/api/drawings/nope/versions`)).status).toBe(404)
+    expect((await app.call(`/api/drawings/${d.id}/versions`, { auth: false })).status).toBe(401)
+  })
+})
+
+describe("editor saves merge into the stored document", () => {
+  test("mergeData keeps what the editor does not own (the configured stock); a plain PUT still replaces", async () => {
+    const stock = { width: 100, height: 50, depth: 20 }
+    const { body: d } = await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Merge", data: { elements: [{ id: "a" }], stock, version: "1.0" } } })
+    const merged = await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: { elements: [{ id: "a" }, { id: "b" }], version: "1.0" }, mergeData: true } })
+    expect(merged.body.data).toEqual({ elements: [{ id: "a" }, { id: "b" }], stock, version: "1.0" })
+    const replaced = await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: { elements: [] } } })
+    expect(replaced.body.data).toEqual({ elements: [] })
+  })
+})

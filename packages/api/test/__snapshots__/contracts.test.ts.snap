@@ -19267,6 +19267,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "data": {
                     "anyOf": [
                       {},
@@ -19286,6 +19296,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "type": "null",
                           },
                         ],
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "mergeData": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
                       },
                       {
                         "type": "null",
@@ -19425,6 +19445,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
           },
           "500": {
             "content": {
@@ -20164,6 +20194,281 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
         "tags": [
           "toolpaths",
+        ],
+      },
+    },
+    "/api/drawings/{id}/versions": {
+      "get": {
+        "operationId": "drawings.versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "createdAt": {
+                        "type": "string",
+                      },
+                      "elements": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                      "id": {
+                        "type": "string",
+                      },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "createdAt",
+                      "elements",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "drawings",
+        ],
+      },
+    },
+    "/api/drawings/{id}/versions/{versionId}/restore": {
+      "post": {
+        "operationId": "drawings.restoreVersion",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "versionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "createdAt": {
+                      "type": "string",
+                    },
+                    "data": {},
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "id": {
+                      "type": "string",
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                    "projectId": {
+                      "type": "string",
+                    },
+                    "thumbnail": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "data",
+                    "thumbnail",
+                    "createdAt",
+                    "updatedAt",
+                    "projectId",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "drawings",
         ],
       },
     },
@@ -45425,6 +45730,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "data": {
                     "anyOf": [
                       {},
@@ -45444,6 +45759,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "type": "null",
                           },
                         ],
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "mergeData": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
                       },
                       {
                         "type": "null",

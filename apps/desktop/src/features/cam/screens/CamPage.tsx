@@ -37,6 +37,7 @@ import CamRibbon from "../components/CamRibbon.tsx"
 import { FixedCycleEditor } from "../components/generator/FixedCyclesSection.tsx"
 import "../../../styles/workstation.css"
 import SaveCamModal from "../components/SaveCamModal.tsx"
+import { projectSession } from "../../projects/lib/project-session.ts"
 import { restoreCamProgram, SavedCamProgram } from "../lib/saved-program.ts"
 import { Schema } from "effect"
 import { cam } from "@cadcamfun/core"
@@ -159,6 +160,15 @@ export default function CamPage(): JSX.Element {
     const key = (event: KeyboardEvent): void => {
       if (event.defaultPrevented || !(event.ctrlKey || event.metaKey) || event.altKey || document.querySelector('[role="dialog"]')) return
       const lower = event.key.toLowerCase(), history = useCamHistoryStore.getState()
+      if (lower === "s" && !event.shiftKey) {
+        // Save: a program that already has a stored copy is updated in place (with the drawing it belongs to); a new one, or
+        // the Post tab's processed text, goes through the save dialog.
+        event.preventDefault(); event.stopPropagation()
+        const saved = camStore.savedProgram
+        if (saved && !saved.postProcessed && camStore.activeTab !== "post") void projectSession(app).saveInteractive()
+        else saveGCode()
+        return
+      }
       if (lower !== "z" && lower !== "y") return
       event.preventDefault(); event.stopPropagation()
       if (lower === "y" || event.shiftKey) history.redo(); else history.undo()

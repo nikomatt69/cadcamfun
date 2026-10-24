@@ -1,4 +1,4 @@
-import { Api, BadRequest, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
+import { Api, BadRequest, Conflict, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
@@ -33,8 +33,20 @@ export const DrawingsHandlers = HttpApiBuilder.group(Api, "drawings", Effect.fn(
     .handle("update", ({ params, payload }) =>
       Effect.gen(function*() {
         yield* load(params.id)
-        return yield* drawings.update(params.id, payload)
+        const { baseUpdatedAt, mergeData, ...fields } = payload
+        const saved = yield* drawings.save(params.id, fields, baseUpdatedAt, mergeData === true)
+        if (!saved.ok) return yield* new Conflict({ message: `The drawing was saved elsewhere since it was read (${saved.currentUpdatedAt}). Nothing was overwritten.` })
+        return saved.row
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to update drawing"))))
+    .handle("versions", ({ params }) =>
+      load(params.id).pipe(Effect.andThen(drawings.versions(params.id)), Effect.catchTag("DatabaseError", fail("Failed to fetch drawing versions"))))
+    .handle("restoreVersion", ({ params }) =>
+      Effect.gen(function*() {
+        yield* load(params.id)
+        const row = yield* drawings.restoreVersion(params.id, params.versionId)
+        if (!row) return yield* new NotFound({ message: "Version not found" })
+        return row
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to restore drawing version"))))
     .handle("remove", ({ params }) =>
       Effect.gen(function*() {
         const { user, drawing } = yield* load(params.id)

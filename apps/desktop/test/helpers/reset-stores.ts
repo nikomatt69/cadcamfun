@@ -8,6 +8,8 @@ import { useGeneratorStore } from "../../src/features/cam/store/generatorStore.t
 import { useDocumentStore } from "../../src/features/cad/store/documentStore.ts"
 import { DEFAULT_SECTION } from "../../src/features/cad/lib/section.ts"
 import { forgetPushed } from "../../src/features/ai/lib/editor-sync.ts"
+import { forgetStoredRevision } from "../../src/features/cad/lib/stored-revision.ts"
+import { clearDraft } from "../../src/features/cad/lib/draft.ts"
 
 /** The stock as the store starts with it, taken when this helper is first loaded (before any test changes it). */
 const INITIAL_WORKPIECE = structuredClone(useCADStore.getState().workpiece)
@@ -18,6 +20,8 @@ export const resetStores = (): void => {
   useVerifyStore.getState().reset()
   useDocumentStore.getState().clear()
   forgetPushed()
+  forgetStoredRevision()
+  clearDraft()
   useCamStore.getState().reset()
   // The kernel panel's own settings (side setup, edited plan, cutter library) must not carry into the next file either.
   useGeneratorStore.getState().reset()

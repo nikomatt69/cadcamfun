@@ -24,6 +24,7 @@ import { PasskeySettings } from "../components/passkey-settings.tsx"
 import { AISettingsPanel } from "../components/ai-settings-panel.tsx"
 import { CompanionPanel } from "../../companion/screens/companion.tsx"
 import { LanguageSelector, SUPPORTED_LANGUAGES } from "../components/language-selector.tsx"
+import { AutosaveSettings } from "../components/autosave-settings.tsx"
 
 type TabId = "profile" | "account" | "security" | "notifications" | "ai" | "devices" | "language"
 
@@ -158,6 +159,8 @@ export function SettingsScreen(): JSX.Element {
                 <span>{t("settings.glass.body")}</span>
               </label>
             </div>
+
+            <AutosaveSettings />
 
             <div class="mt-8">
               <h4 class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.lang.available")}</h4>

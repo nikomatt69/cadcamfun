@@ -1,6 +1,6 @@
 import type { DrawingDetail, DrawingRow } from "@cadcamfun/api"
-import { Database, DatabaseError, schema } from "@cadcamfun/db"
-import { desc, eq } from "drizzle-orm"
+import { Database, DatabaseError, schema, type Db } from "@cadcamfun/db"
+import { and, desc, eq } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
 import { cam } from "@cadcamfun/core"
@@ -31,6 +31,26 @@ export type DrawingWrite =
   | { readonly ok: true; readonly drawingId: string; readonly previousHash: string; readonly contentHash: string; readonly updatedAt: string }
   | { readonly ok: false; readonly reason: "conflict"; readonly drawingId: string; readonly expectedHash: string; readonly currentHash: string }
   | { readonly ok: false; readonly reason: "missing"; readonly drawingId: string }
+/** A stored restore point of a drawing: the document as it was before a save replaced it. */
+export interface DrawingVersionRow { readonly id: string; readonly version: number; readonly createdAt: string; readonly elements: number }
+
+/** The answer of `save`: the stored row, or the `updatedAt` that was found when the caller's copy was stale. */
+export type DrawingSaved =
+  | { readonly ok: true; readonly row: DrawingRow }
+  | { readonly ok: false; readonly reason: "conflict"; readonly currentUpdatedAt: string }
+
+/** A save keeps a restore point of the replaced document when the newest one is older than this. */
+export const VERSION_INTERVAL_MS = 10 * 60_000
+/** Restore points kept per drawing; the oldest are dropped. */
+export const VERSION_LIMIT = 30
+
+const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value)
+
+const elementCount = (data: unknown): number => {
+  const list = data !== null && typeof data === "object" ? (data as { elements?: unknown }).elements : undefined
+  return Array.isArray(list) ? list.length : 0
+}
+
 export const toDrawingRow = (d: Row): DrawingRow => ({ ...d, createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString() })
 
 export class DrawingRepo extends Context.Service<DrawingRepo, {
@@ -39,6 +59,16 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
   listByProject(projectId: string): Effect.Effect<DrawingRow[], DatabaseError>
   create(projectId: string, d: { name: string; description?: string | null | undefined; data?: unknown }): Effect.Effect<DrawingRow, DatabaseError>
   update(id: string, d: { name?: string | undefined; description?: string | null | undefined; data?: unknown; thumbnail?: string | null | undefined }): Effect.Effect<DrawingRow, DatabaseError>
+  /**
+   * `update` for an editor that holds a copy: with `baseUpdatedAt` the write happens only if the drawing was not saved by
+   * anyone else since that copy was read (check and write are one transaction). With `mergeData` the given document is merged into
+   * the stored one key by key, so fields the caller does not know (the configured stock) survive. The replaced document is kept as a restore point.
+   */
+  save(id: string, d: { name?: string | undefined; description?: string | null | undefined; data?: unknown; thumbnail?: string | null | undefined }, baseUpdatedAt: string | undefined, mergeData?: boolean): Effect.Effect<DrawingSaved, DatabaseError>
+  /** The drawing's restore points, newest first. */
+  versions(id: string): Effect.Effect<DrawingVersionRow[], DatabaseError>
+  /** Puts a restore point back as the document (the current one is kept as a restore point first); undefined for an unknown version. */
+  restoreVersion(id: string, versionId: string): Effect.Effect<DrawingRow | undefined, DatabaseError>
   /**
    * Replaces the document only if it still has the content the caller read (`expectedHash`): the check and the write are one
    * transaction, so a concurrent save (another window, another turn) is a conflict and is never overwritten.
@@ -60,6 +90,33 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
       const announceDrawing = (id: string) => query("drawings.changedProject", async (db) =>
         (await db.select({ projectId: T.projectId }).from(T).where(eq(T.id, id)))[0]
       ).pipe(Effect.flatMap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void))
+      const V = schema.drawingVersionTable
+      type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0]
+      /** Keeps `previous` as a restore point (always when `force`, else when the newest one is old enough), then prunes the oldest. */
+      const keepVersion = (tx: Tx, id: string, previous: unknown, force: boolean, now = Date.now()): void => {
+        if (previous === null || typeof previous !== "object" || Object.keys(previous as object).length === 0) return
+        const newest = tx.select().from(V).where(eq(V.drawingId, id)).orderBy(desc(V.version)).limit(1).get()
+        if (!force && newest && now - newest.createdAt.getTime() < VERSION_INTERVAL_MS) return
+        if (newest && drawingContentHash(newest.data) === drawingContentHash(previous)) return
+        tx.insert(V).values({ version: (newest?.version ?? 0) + 1, data: previous, drawingId: id, createdAt: new Date(now) }).run()
+        const stale = tx.select({ id: V.id }).from(V).where(eq(V.drawingId, id)).orderBy(desc(V.version)).all().slice(VERSION_LIMIT)
+        for (const row of stale) tx.delete(V).where(eq(V.id, row.id)).run()
+      }
+      const saveRow = (id: string, d: { name?: string | undefined; description?: string | null | undefined; data?: unknown; thumbnail?: string | null | undefined }, baseUpdatedAt: string | undefined, mergeData = false) =>
+        query("drawings.update", (db) => db.transaction((tx): DrawingSaved => {
+          const current = tx.select().from(T).where(eq(T.id, id)).get()
+          if (!current) throw new Error("Drawing disappeared before it was saved.")
+          if (baseUpdatedAt !== undefined && current.updatedAt.toISOString() !== baseUpdatedAt) return { ok: false, reason: "conflict", currentUpdatedAt: current.updatedAt.toISOString() }
+          if (d.data) keepVersion(tx, id, current.data, false)
+          const row = tx.update(T).set({
+            ...(d.name && { name: d.name }),
+            ...(d.description !== undefined && { description: d.description }),
+            ...(d.data ? { data: mergeData && isRecord(current.data) && isRecord(d.data) ? { ...current.data, ...d.data } : d.data } : {}),
+            ...(d.thumbnail && { thumbnail: d.thumbnail }),
+            updatedAt: new Date()
+          }).where(eq(T.id, id)).returning().get()!
+          return { ok: true, row: toDrawingRow(row) }
+        })).pipe(Effect.tap((saved) => saved.ok ? events.workspaceChanged(saved.row.projectId) : Effect.void))
       return DrawingRepo.of({
         find: (userId, id) =>
           query("drawings.find", async (db) => {
@@ -82,23 +139,28 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
             const [row] = await db.insert(T).values({ name: d.name, description: d.description ?? null, data: d.data || {}, projectId }).returning()
             return toDrawingRow(row!)
           }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
-        update: (id, d) =>
-          query("drawings.update", async (db) => {
-            const [row] = await db.update(T).set({
-              ...(d.name && { name: d.name }),
-              ...(d.description !== undefined && { description: d.description }),
-              ...(d.data ? { data: d.data } : {}),
-              ...(d.thumbnail && { thumbnail: d.thumbnail }),
-              updatedAt: new Date()
-            }).where(eq(T.id, id)).returning()
-            return toDrawingRow(row!)
-          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
+        update: (id, d) => saveRow(id, d, undefined).pipe(Effect.map((saved) => {
+          if (!saved.ok) throw new Error("A write without a base copy cannot conflict.")
+          return saved.row
+        })),
+        save: (id, d, baseUpdatedAt, mergeData) => saveRow(id, d, baseUpdatedAt, mergeData === true),
+        versions: (id) => query("drawings.versions", async (db) =>
+          (await db.select().from(V).where(eq(V.drawingId, id)).orderBy(desc(V.version)))
+            .map((row) => ({ id: row.id, version: row.version, createdAt: row.createdAt.toISOString(), elements: elementCount(row.data) }))),
+        restoreVersion: (id, versionId) => query("drawings.restoreVersion", (db) => db.transaction((tx) => {
+          const version = tx.select().from(V).where(and(eq(V.id, versionId), eq(V.drawingId, id))).get()
+          const current = tx.select().from(T).where(eq(T.id, id)).get()
+          if (!version || !current) return undefined
+          keepVersion(tx, id, current.data, true)
+          return toDrawingRow(tx.update(T).set({ data: version.data, updatedAt: new Date() }).where(eq(T.id, id)).returning().get()!)
+        })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         writeIfUnchanged: (id, expectedHash, data) => query("drawings.writeIfUnchanged", (db) => db.transaction((tx): DrawingWrite => {
           const row = tx.select({ data: T.data }).from(T).where(eq(T.id, id)).get()
           if (!row) return { ok: false, reason: "missing", drawingId: id }
           const currentHash = drawingContentHash(row.data)
           if (currentHash !== expectedHash) return { ok: false, reason: "conflict", drawingId: id, expectedHash, currentHash }
           const updatedAt = new Date()
+          keepVersion(tx, id, row.data, false)
           tx.update(T).set({ data, updatedAt }).where(eq(T.id, id)).run()
           return { ok: true, drawingId: id, previousHash: currentHash, contentHash: drawingContentHash(data), updatedAt: updatedAt.toISOString() }
         })).pipe(Effect.tap((result) => result.ok ? announceDrawing(id) : Effect.void)),

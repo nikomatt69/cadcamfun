@@ -13,6 +13,7 @@ import { useCADStore } from "../../cad/store/cadStore.ts"
 import { useDocumentStore } from "../../cad/store/documentStore.ts"
 import { useLayerStore } from "../../cad/store/layerStore.ts"
 import { mergeSection } from "../../cad/lib/section.ts"
+import { noteStoredRevision } from "../../cad/lib/stored-revision.ts"
 import { canonicalTool } from "./tools.ts"
 
 export interface EditorOwner {
@@ -326,8 +327,10 @@ export async function reconcileFromStored(app: { readonly client: unknown; reado
   const { drawingId } = owner
   if (drawingId === null || !owner.current()) return none
   const client = app.client as { drawings: { get: (input: { params: { id: string } }) => unknown } }
-  const row = await app.runtime.run(client.drawings.get({ params: { id: drawingId } }) as never) as { data: unknown }
+  const row = await app.runtime.run(client.drawings.get({ params: { id: drawingId } }) as never) as { data: unknown; updatedAt?: string }
   if (!owner.current()) return none
+  // The copy the editor now merges is the one stored at `updatedAt`: the next save is based on it.
+  noteStoredRevision(drawingId, row.updatedAt)
   const data = row.data !== null && typeof row.data === "object" ? (row.data as { elements?: unknown; entities?: unknown; layers?: unknown }) : {}
   const layers = Array.isArray(data.layers) ? (data.layers as Array<{ id?: string; name?: string }>) : []
   const name = (id: string): string | undefined => layers.find((layer) => layer.id === id)?.name

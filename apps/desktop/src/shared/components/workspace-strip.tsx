@@ -10,6 +10,8 @@ import { t } from "../../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { UNIT_TABLE, formatLength } from "../../viewport/units.ts"
 import { sidecarKey } from "./status-bar.tsx"
+import { projectSession } from "../../features/projects/lib/project-session.ts"
+import { describeSave } from "../../features/projects/lib/save-status.ts"
 
 const HIDE = { md: "hidden md:flex", lg: "hidden lg:flex", xl: "hidden xl:flex", "2xl": "hidden 2xl:flex" } as const
 export type HideBelow = keyof typeof HIDE
@@ -84,6 +86,37 @@ export function Strip(props: { readonly left: JSX.Element; readonly right?: JSX.
   )
 }
 
+const LIGHT_TONES = {
+  green: "text-green-700 dark:text-green-300", amber: "text-amber-700 dark:text-amber-300", blue: "text-blue-700 dark:text-blue-300",
+  red: "text-red-700 dark:text-red-400", muted: "text-gray-500"
+} as const
+
+/**
+ * Whether the open project's drawing and CAM program are saved, with the time of the last save; a click saves now.
+ * `light` is for the shell's footer (light surface); the workspace strips are dark.
+ */
+export function SaveSeg(props: { readonly light?: boolean } = {}): JSX.Element {
+  const app = useApp()
+  const session = projectSession(app)
+  const view = () => describeSave(session.summary())
+  return (
+    <Show when={view()}>
+      {(shown) => (
+        <Show
+          when={props.light}
+          fallback={<Seg value={shown().text} tone={shown().tone} title={shown().title} testId="status-save"
+            {...(shown().saveable ? { onClick: () => { void session.saveInteractive() } } : {})} />}
+        >
+          <Show when={shown().saveable} fallback={<span class={LIGHT_TONES[shown().tone]} title={shown().title} data-testid="status-save">{shown().text}</span>}>
+            <button type="button" class={`rounded px-1 hover:bg-gray-100 dark:hover:bg-gray-700 ${LIGHT_TONES[shown().tone]}`} title={shown().title} data-testid="status-save"
+              onClick={() => { void session.saveInteractive() }}>{shown().text}</button>
+          </Show>
+        </Show>
+      )}
+    </Show>
+  )
+}
+
 /** What the shell's footer shows on other pages: display units, snap and the sidecar state. */
 export function ShellSegs(): JSX.Element {
   const app = useApp()
@@ -91,6 +124,7 @@ export function ShellSegs(): JSX.Element {
   const ready = (): boolean => app.sidecar() === "ready"
   return (
     <>
+      <SaveSeg />
       <Seg label="Units" value={UNIT_TABLE[settings().units].label} tone="amber" testId="status-units" />
       <Seg label={t("status.tolerance")} value={formatLength(settings().tolerance, settings().units, settings().decimals)} tone="cyan" title={t("status.toleranceTitle")} testId="status-tolerance" />
       <Seg label={t("status.snap")} value={settings().snapEnabled ? t("shell.snapOn") : t("status.snapOff")} tone={settings().snapEnabled ? "green" : "muted"} hideBelow="md" testId="status-snap" />

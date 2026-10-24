@@ -11,6 +11,8 @@ import { documentSettings } from "../../../shared/state/document-settings.ts"
 import type { AppState } from "../../../shared/state/context.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
+import { setupPayload } from "./document-setup.ts"
+import { cam } from "@cadcamfun/core"
 import { useLocalComponentsLibraryStore } from "../store/localComponentsLibraryStore.ts"
 
 /** How the screens run typed client calls without importing Effect types here. */
@@ -26,7 +28,7 @@ export interface ComponentClient {
   }
   readonly drawings: {
     readonly createForProject: (input: { readonly params: { readonly id: string }; readonly payload: { readonly name: string; readonly description: string | null; readonly data: unknown } }) => Promise<{ readonly id: string; readonly name: string }>
-    readonly update: (input: { readonly params: { readonly id: string }; readonly payload: { readonly data: unknown } }) => Promise<unknown>
+    readonly update: (input: { readonly params: { readonly id: string }; readonly payload: { readonly data: unknown; readonly baseUpdatedAt?: string; readonly mergeData?: boolean } }) => Promise<unknown>
   }
   readonly components: {
     readonly listForProject: (input: { readonly params: { readonly id: string } }) => Promise<ReadonlyArray<{ readonly id: string; readonly name: string }>>
@@ -45,14 +47,26 @@ export const drawingPayload = (app: Pick<AppState, "settings">): Record<string, 
     layers,
     selectedElement: selectedElement?.id ?? null,
     settings: documentSettings(app),
+    setup: setupPayload(),
     version: "1.0"
   }) as Record<string, unknown>
+}
+
+/**
+ * What identifies the stored content of a drawing payload: everything that is saved except the selection, so selecting a
+ * part is not an unsaved change but moving it is.
+ */
+export const payloadRevision = (payload: Record<string, unknown>): string => {
+  const { selectedElement: _selection, ...stored } = payload
+  return cam.kernel.sha256(JSON.stringify(stored))
 }
 
 /** What a save actually put in the project, so the caller can report it instead of guessing. */
 export interface ProjectContents {
   readonly drawingId: string
   readonly componentIds: ReadonlyArray<string>
+  /** `updatedAt` the sidecar stored the drawing with; the base of the next save. Absent when nothing was written. */
+  readonly updatedAt?: string
 }
 
 /** Creates the project's drawing; returns the new drawing id. */
@@ -129,6 +143,16 @@ export async function createProjectWithContents(
   return { projectId: project.id, drawingId, componentIds }
 }
 
+/** What a "Save" writes besides the drawing, and the stored copy it is based on. */
+export interface SyncOptions {
+  /** Add the library components the project still lacks (default true). Autosave skips it unless the library changed. */
+  readonly components?: boolean
+  /** `updatedAt` of the stored copy the editor holds; the write is refused (409) when the drawing has moved on. */
+  readonly baseUpdatedAt?: string | undefined
+  /** The payload to store, when the caller already built it (so the revision it computed is the revision written). */
+  readonly payload?: Record<string, unknown>
+}
+
 /**
  * "Save": updates the drawing this project already has and adds the components it is still missing.
  */
@@ -136,11 +160,16 @@ export async function syncProjectContents(
   app: Pick<AppState, "client" | "runtime" | "settings">,
   projectId: string,
   drawingId: string,
-  run: Run
+  run: Run,
+  options: SyncOptions = {}
 ): Promise<ProjectContents> {
   if (projectId === "") throw new Error("This document is not in a project yet; use Save as Project.")
-  const known = new Set(await existingNames(app, projectId, run))
-  const componentIds = await writeComponents(app, projectId, run, known)
-  if (drawingId !== "") await run(app.client.drawings.update({ params: { id: drawingId }, payload: { data: drawingPayload(app) } }))
-  return { drawingId, componentIds }
+  const componentIds = options.components === false ? [] : await writeComponents(app, projectId, run, new Set(await existingNames(app, projectId, run)))
+  if (drawingId === "") return { drawingId, componentIds }
+  const row = await run<{ readonly updatedAt?: string } | undefined>(app.client.drawings.update({
+    params: { id: drawingId },
+    // `mergeData`: the editor does not own everything in the stored document (the stock the assistant configured), so it must not replace it.
+    payload: { data: options.payload ?? drawingPayload(app), mergeData: true, ...(options.baseUpdatedAt !== undefined ? { baseUpdatedAt: options.baseUpdatedAt } : {}) }
+  }))
+  return { drawingId, componentIds, ...(typeof row?.updatedAt === "string" ? { updatedAt: row.updatedAt } : {}) }
 }

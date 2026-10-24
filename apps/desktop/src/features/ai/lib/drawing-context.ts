@@ -20,6 +20,7 @@ import { useGeneratorStore } from "../../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../../cam/store/verifyStore.ts"
 import { previewSummary } from "../../cam/lib/machine-view.ts"
 import { drawingPayload } from "../../cad/lib/projectSnapshot.ts"
+import { noteStoredRevision } from "../../cad/lib/stored-revision.ts"
 import { toJsonSafe } from "../../../shared/state/json-safe.ts"
 
 const { estimateTime } = cam
@@ -166,11 +167,12 @@ export async function pushLiveDrawing(app: AppState, drawingId: string): Promise
   const elements = payload["elements"] as ReadonlyArray<Record<string, unknown>>
   const row = await run(app)<{ readonly data?: unknown }>(app.client.drawings.get({ params: { id: drawingId } }))
   const stored = row.data !== null && typeof row.data === "object" ? row.data as Record<string, unknown> : {}
-  await run(app)(app.client.drawings.update({
+  const written = await run(app)<{ readonly updatedAt?: string } | undefined>(app.client.drawings.update({
     params: { id: drawingId },
     // Keep server-owned drawing fields (most importantly an AI-set stock) when this page has not loaded them yet.
     payload: { data: { ...stored, ...payload } }
   }))
+  noteStoredRevision(drawingId, written?.updatedAt)
   rememberPushed(elements, drawingId)
 }
 

@@ -2,7 +2,7 @@ import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
 import { A } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { Activity, Blocks, BookOpen, ChevronDown, Copy, Maximize, Menu, MousePointer, Moon, RotateCcw, RotateCw, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
+import { Activity, Blocks, BookOpen, ChevronDown, Copy, Maximize, Menu, MousePointer, Moon, History, RotateCcw, RotateCw, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -17,6 +17,8 @@ export interface EnhancedToolbarProps {
   readonly sidebarOpen: boolean
   setSidebarOpen(open: boolean): void
   handleSaveProject(): void
+  /** Opens the drawing's restore points. */
+  onShowVersions?(): void
   setDialogMode(mode: "import" | "export"): void
   setShowImportExportDialog(show: boolean): void
   setShowLibraryView(show: boolean): void
@@ -118,6 +120,11 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
           <Motion.button onClick={props.handleSaveProject} class={GLASS_BUTTON} title={t("cad.saveProject")} hover={hover} press={press}>
             <Save size={16} class="text-gray-600 dark:text-gray-400" />
           </Motion.button>
+          <Show when={props.onShowVersions}>
+            <Motion.button onClick={() => props.onShowVersions?.()} class={GLASS_BUTTON} title={t("save.versions.title")} hover={hover} press={press} data-testid="open-versions">
+              <History size={16} class="text-gray-600 dark:text-gray-400" />
+            </Motion.button>
+          </Show>
           <Motion.button onClick={() => { props.setDialogMode("import"); props.setShowImportExportDialog(true) }} class={GLASS_BUTTON} title={t("cad.importProject")} hover={hover} press={press}>
             <Upload size={16} class="text-gray-600 dark:text-gray-400" />
           </Motion.button>

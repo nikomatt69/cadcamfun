@@ -53,7 +53,7 @@ interface CAMState {
   setKernelProgress(progress: KernelProgress | undefined): void
   kernelRequest: CamKernelRequest | undefined
   setKernelRequest(request: CamKernelRequest | undefined): void
-  savedProgram: { readonly id: string; readonly projectId: string; readonly drawingId: string | null; readonly name: string; readonly description?: string | null; readonly isPublic?: boolean; readonly editorRevision?: string; readonly storedRevision?: string } | undefined
+  savedProgram: { readonly id: string; readonly projectId: string; readonly drawingId: string | null; readonly name: string; readonly description?: string | null; readonly isPublic?: boolean; readonly editorRevision?: string; readonly storedRevision?: string; /** The stored G-code is the post-processed text of the Post tab, not the editor's program: autosave must not replace it. */ readonly postProcessed?: boolean } | undefined
   setSavedProgram(program: CAMState["savedProgram"]): void
   kernelArtifact: cam.kernel.CamArtifact | undefined
   setKernelArtifact(artifact: cam.kernel.CamArtifact | undefined): void

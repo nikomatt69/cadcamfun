@@ -32,9 +32,13 @@ import CustomElementsEditor from "../components/custom-elements/CustomElementsEd
 import AssemblyPanel from "../components/assembly/AssemblyPanel.tsx"
 import { CADAssistantButton } from "../components/CADAssistantButton.tsx"
 import { CADAssistantBridge } from "../../ai/components/CADAssistantBridge.tsx"
-import { FIT_VIEW_EVENT, rememberPushed } from "../../ai/lib/editor-sync.ts"
-import { restoreDocumentSettings, syncDocumentSettings } from "../../../shared/state/document-settings.ts"
-import { syncProjectContents } from "../lib/projectSnapshot.ts"
+import { FIT_VIEW_EVENT } from "../../ai/lib/editor-sync.ts"
+import { syncDocumentSettings } from "../../../shared/state/document-settings.ts"
+import { applyStoredDrawing } from "../lib/open-drawing.ts"
+import { readDraft } from "../lib/draft.ts"
+import { restoreLayers } from "../lib/document-setup.ts"
+import { projectSession } from "../../projects/lib/project-session.ts"
+import DrawingVersionsDialog from "../components/DrawingVersionsDialog.tsx"
 import "../../../styles/workstation.css"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
@@ -62,6 +66,7 @@ export default function CadPage(): JSX.Element {
   const [surfaceOperation, setSurfaceOperation] = createSignal<SurfacingOp>("chamferBox")
   const [rightPanel, setRightPanel] = createSignal<RightPanel>("proprieties")
   const [showImportExport, setShowImportExport] = createSignal(false)
+  const [showVersions, setShowVersions] = createSignal(false)
   const [dialogMode, setDialogMode] = createSignal<"import" | "export">("export")
   const [showFloating, setShowFloating] = createSignal(true)
   const [libraryItem, setLibraryItem] = createSignal<LibraryComponent | null>(null)
@@ -103,37 +108,31 @@ export default function CadPage(): JSX.Element {
       if (loadedFor === target) return
       loadedFor = target
       await app.runtime.run(app.client.drawings.get({ params: { id: target } })).then((row) => {
-        const stored = row.data as { elements?: unknown; settings?: unknown } | null
-        restoreDocumentSettings(app, stored?.settings)
-        const fallbackLayer = layers.activeLayer
-        const known = new Set(layers.layers.map((layer) => layer.id))
-        const loaded = (Array.isArray(stored?.elements) ? stored.elements : []).map((element: Record<string, unknown>) =>
-          known.has(String(element["layerId"])) ? element : { ...element, layerId: fallbackLayer })
-        useElementsStore.setState({ elements: loaded as never, selectedElement: null })
-        selection.clearSelection()
+        applyStoredDrawing(app, row)
         setDrawingId(row.id)
         setDrawingName(row.name)
-        useDocumentStore.getState().setDocument({ projectId: row.project.id, drawingId: row.id, name: row.name })
-        rememberPushed(useElementsStore.getState().elements as unknown as ReadonlyArray<Record<string, unknown>>, row.id)
-        app.rememberProject(row.project.id, row.project.name)
         toast.success(`Drawing "${row.name}" opened`)
       }, () => toast.error("The drawing could not be opened"))
     })().catch(() => { if (current === generation) toast.error("The drawing could not be opened") })
   })
 
-  /** Saves the open stored drawing in place; a drawing that was never stored goes through the export / save-as dialog. */
+  /**
+   * Saves the open drawing and the CAM program linked to it in place (the same path autosave takes); a drawing that was never
+   * stored goes through the export / save-as dialog.
+   */
   const save = (): void => {
-    const id = drawingId()
-    if (id === null) { openExport(); return }
-    const projectId = useDocumentStore.getState().projectId
-    if (projectId === null) { openExport(); return }
-    void syncProjectContents(app, projectId, id, app.runtime.run as <A>(effect: unknown) => Promise<A>).then(
-      (contents) => toast.success(contents.componentIds.length > 0
-        ? `Saved "${drawingName() ?? "drawing"}" · ${contents.componentIds.length} new component(s) added to the project`
-        : `Saved "${drawingName() ?? "drawing"}"`),
-      () => toast.error("The drawing could not be saved")
-    )
+    void projectSession(app).saveInteractive().then((outcome) => { if (outcome?.document === "no-destination") openExport() })
   }
+  // A drawing that was never saved and has no project: offer back what the last session left in the recovery draft.
+  onMount(() => {
+    if (requestedDrawing() !== undefined || requestedProject() !== undefined) return
+    if (useDocumentStore.getState().drawingId !== null || useElementsStore.getState().elements.length > 0) return
+    const draft = readDraft()
+    if (draft === undefined) return
+    restoreLayers(draft.layers)
+    useElementsStore.setState({ elements: draft.elements as never, selectedElement: null })
+    toast.info(t("save.draftRestored", { time: new Date(draft.savedAt).toLocaleString() }))
+  })
   // The assistant added something: frame it once the canvas has drawn it.
   onMount(() => {
     const onFit = () => { setTimeout(() => canvas()?.fitToView(), 150) }
@@ -222,7 +221,7 @@ export default function CadPage(): JSX.Element {
     >
       <Motion.div class="cad-workspace__frame flex flex-col h-full w-full" {...rise} transition={{ duration: 0.8, delay: 0.2 }}>
         <EnhancedToolbar
-          sidebarOpen={sidebarOpen()} setSidebarOpen={setSidebarOpen} handleSaveProject={save}
+          sidebarOpen={sidebarOpen()} setSidebarOpen={setSidebarOpen} handleSaveProject={save} onShowVersions={() => setShowVersions(true)}
           setDialogMode={setDialogMode} setShowImportExportDialog={setShowImportExport} setShowLibraryView={() => navigate("/library")}
           setShowUnifiedLibrary={setShowLibrary} setShowCustomElements={setShowCustomElements} setShowFloatingToolbar={setShowFloating} showFloatingToolbar={showFloating()}
           selectedLibraryComponent={libraryComponent()} setSelectedLibraryComponent={setLibraryComponent} setIsPlacingComponent={() => undefined}
@@ -345,6 +344,7 @@ export default function CadPage(): JSX.Element {
         <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 1.4 }}><StatusBar /></Motion.div>
       </Motion.div>
 
+      <DrawingVersionsDialog open={showVersions()} onClose={() => setShowVersions(false)} />
       <ImportExportDialog isOpen={showImportExport()} mode={dialogMode()} onClose={() => setShowImportExport(false)} canvas={canvas()} />
       <UnifiedLibraryModal isOpen={showLibrary()} onClose={() => setShowLibrary(false)}><LibraryBrowser onSelectComponent={pickComponent} /></UnifiedLibraryModal>
       <CustomElementsEditor isOpen={showCustomElements()} onClose={() => setShowCustomElements(false)} />

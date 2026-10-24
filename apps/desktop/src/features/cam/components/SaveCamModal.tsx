@@ -8,7 +8,7 @@ import { t } from "../../../i18n/index.ts"
 import { captureEditorOwner } from "../../ai/lib/editor-sync.ts"
 import { useDocumentStore } from "../../cad/store/documentStore.ts"
 import { combineOperationResults, useCamStore } from "../store/camStore.ts"
-import { camEditorRevision, downloadCamFile, savedProgramData, snapshotCamProgram, storedProgramRevision, SavedCamProgram } from "../lib/saved-program.ts"
+import { camEditorRevision, downloadCamFile, savedProgramData, snapshotCamProgram, storedProgramRevision, SavedCamProgram, updateSavedProgram } from "../lib/saved-program.ts"
 import { Schema } from "effect"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
 import { useCADStore } from "../../cad/store/cadStore.ts"
@@ -87,10 +87,8 @@ export default function SaveCamModal(props: { readonly code: string; readonly ex
       const base = { name: title, description: description().trim() || null, isPublic: isPublic(), gcode: snapshot.gcode, type: settings.machineType, operationType: snapshot.kernelArtifact ? "kernel" : (snapshot.operations?.length ?? 0) > 1 ? "multi-operation" : settings.operationType }
       let row
       if (selectedMode === "update" && saved) {
-        const previous = await app.runtime.run(app.client.toolpaths.get({ params: { id: saved.id } }))
-        // Preserve the previous complete program before replacing it; the detail screen can restore this version.
-        await app.runtime.run(app.client.toolpathExtras.createVersion({ params: { id: saved.id }, payload: { data: previous.data, gcode: previous.gcode ?? "", changeMessage: t("cam.save.previousVersion") } }))
-        row = await app.runtime.run(app.client.toolpaths.update({ params: { id: saved.id }, payload: { ...base, data: savedProgramData(previous.data, snapshot) } }))
+        await updateSavedProgram(app, { auto: false, gcode: props.code, name: title, description: description().trim() || null, isPublic: isPublic() })
+        row = undefined
       } else {
         const payload = { ...base, projectId: targetProject, data: savedProgramData(undefined, snapshot) }
         row = targetDrawing
@@ -99,7 +97,7 @@ export default function SaveCamModal(props: { readonly code: string; readonly ex
       }
       invalidatePrefix(app.cache, "toolpaths")
       invalidatePrefix(app.cache, "projects")
-      if (!disposed && owner.current() && store.gcode === snapshot.gcode) {
+      if (row && !disposed && owner.current() && store.gcode === snapshot.gcode) {
         if (selectedMode === "new" && createdTarget) useDocumentStore.getState().setDocument({ ...createdTarget, name: newName })
         store.setSavedProgram({ id: row.id, name: row.name, projectId: row.projectId, drawingId: row.drawingId, description: row.description,
           isPublic: row.isPublic, editorRevision: camEditorRevision(), storedRevision: storedProgramRevision(row) })

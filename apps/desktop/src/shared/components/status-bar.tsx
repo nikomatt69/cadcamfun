@@ -78,6 +78,8 @@ export interface StatusBarProps {
   readonly sidecar: SidecarStatus
   readonly decimals: number
   readonly toolLabel?: string
+  /** The save-state read-out, supplied by the shell (this module cannot import the project session without a cycle). */
+  readonly saveSlot?: JSX.Element
 }
 
 export const sidecarKey = (status: SidecarStatus): Key => {
@@ -118,6 +120,7 @@ export function StatusBar(props: StatusBarProps): JSX.Element {
           {t("status.tool")}: {props.toolLabel}
         </span>
       </Show>
+      {props.saveSlot}
       <span class="ml-auto font-mono">
         {t("status.cursor")}: {cursor()}
       </span>

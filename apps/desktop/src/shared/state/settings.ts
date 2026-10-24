@@ -33,7 +33,14 @@ export interface Settings {
   readonly glass: boolean
   /** Native OS popups for important synced notifications (Tauri notification plugin); the feed syncs regardless. */
   readonly nativeNotifications: boolean
+  /** Save the open drawing and CAM program on their own while they have unsaved changes. */
+  readonly autosave: boolean
+  /** Minutes between automatic saves (one of `AUTOSAVE_MINUTES`). */
+  readonly autosaveMinutes: number
 }
+
+/** The intervals the settings offer; a stored value outside this list falls back to the default. */
+export const AUTOSAVE_MINUTES = [1, 2, 5, 10, 15, 30] as const
 
 export const DEFAULT_SETTINGS: Settings = {
   units: "mm",
@@ -44,7 +51,9 @@ export const DEFAULT_SETTINGS: Settings = {
   snapEnabled: true,
   tolerance: DEFAULT_TOLERANCE,
   glass: true,
-  nativeNotifications: true
+  nativeNotifications: true,
+  autosave: true,
+  autosaveMinutes: 2
 }
 
 const STORAGE_KEY = "cadcamfun.settings"
@@ -72,7 +81,9 @@ export const decodeSettings = (raw: unknown): Settings => {
       typeof record["snapEnabled"] === "boolean" ? record["snapEnabled"] : DEFAULT_SETTINGS.snapEnabled,
     tolerance: isTolerance(record["tolerance"]) ? record["tolerance"] : DEFAULT_SETTINGS.tolerance,
     glass: typeof record["glass"] === "boolean" ? record["glass"] : DEFAULT_SETTINGS.glass,
-    nativeNotifications: typeof record["nativeNotifications"] === "boolean" ? record["nativeNotifications"] : DEFAULT_SETTINGS.nativeNotifications
+    nativeNotifications: typeof record["nativeNotifications"] === "boolean" ? record["nativeNotifications"] : DEFAULT_SETTINGS.nativeNotifications,
+    autosave: typeof record["autosave"] === "boolean" ? record["autosave"] : DEFAULT_SETTINGS.autosave,
+    autosaveMinutes: (AUTOSAVE_MINUTES as ReadonlyArray<unknown>).includes(record["autosaveMinutes"]) ? record["autosaveMinutes"] as number : DEFAULT_SETTINGS.autosaveMinutes
   }
 }
 

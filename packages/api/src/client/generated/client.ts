@@ -2307,6 +2307,8 @@ type Endpoint23_1Input = {
   readonly description?: Endpoint23_1Request["payload"]["description"]
   readonly data?: Endpoint23_1Request["payload"]["data"]
   readonly thumbnail?: Endpoint23_1Request["payload"]["thumbnail"]
+  readonly baseUpdatedAt?: Endpoint23_1Request["payload"]["baseUpdatedAt"]
+  readonly mergeData?: Endpoint23_1Request["payload"]["mergeData"]
 }
 const Endpoint23_1 = (raw: RawClient["drawings"]) => (input: Endpoint23_1Input) =>
   raw["update"]({
@@ -2316,28 +2318,47 @@ const Endpoint23_1 = (raw: RawClient["drawings"]) => (input: Endpoint23_1Input) 
       description: input["description"],
       data: input["data"],
       thumbnail: input["thumbnail"],
+      baseUpdatedAt: input["baseUpdatedAt"],
+      mergeData: input["mergeData"],
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint23_2Request = Parameters<RawClient["drawings"]["remove"]>[0]
+type Endpoint23_2Request = Parameters<RawClient["drawings"]["versions"]>[0]
 type Endpoint23_2Input = { readonly id: Endpoint23_2Request["params"]["id"] }
 const Endpoint23_2 = (raw: RawClient["drawings"]) => (input: Endpoint23_2Input) =>
+  raw["versions"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint23_3Request = Parameters<RawClient["drawings"]["restoreVersion"]>[0]
+type Endpoint23_3Input = {
+  readonly id: Endpoint23_3Request["params"]["id"]
+  readonly versionId: Endpoint23_3Request["params"]["versionId"]
+}
+const Endpoint23_3 = (raw: RawClient["drawings"]) => (input: Endpoint23_3Input) =>
+  raw["restoreVersion"]({ params: { id: input["id"], versionId: input["versionId"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint23_4Request = Parameters<RawClient["drawings"]["remove"]>[0]
+type Endpoint23_4Input = { readonly id: Endpoint23_4Request["params"]["id"] }
+const Endpoint23_4 = (raw: RawClient["drawings"]) => (input: Endpoint23_4Input) =>
   raw["remove"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint23_3Request = Parameters<RawClient["drawings"]["listForProject"]>[0]
-type Endpoint23_3Input = { readonly id: Endpoint23_3Request["params"]["id"] }
-const Endpoint23_3 = (raw: RawClient["drawings"]) => (input: Endpoint23_3Input) =>
+type Endpoint23_5Request = Parameters<RawClient["drawings"]["listForProject"]>[0]
+type Endpoint23_5Input = { readonly id: Endpoint23_5Request["params"]["id"] }
+const Endpoint23_5 = (raw: RawClient["drawings"]) => (input: Endpoint23_5Input) =>
   raw["listForProject"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint23_4Request = Parameters<RawClient["drawings"]["createForProject"]>[0]
-type Endpoint23_4Input = {
-  readonly id: Endpoint23_4Request["params"]["id"]
-  readonly name?: Endpoint23_4Request["payload"]["name"]
-  readonly description?: Endpoint23_4Request["payload"]["description"]
-  readonly data?: Endpoint23_4Request["payload"]["data"]
-  readonly thumbnail?: Endpoint23_4Request["payload"]["thumbnail"]
+type Endpoint23_6Request = Parameters<RawClient["drawings"]["createForProject"]>[0]
+type Endpoint23_6Input = {
+  readonly id: Endpoint23_6Request["params"]["id"]
+  readonly name?: Endpoint23_6Request["payload"]["name"]
+  readonly description?: Endpoint23_6Request["payload"]["description"]
+  readonly data?: Endpoint23_6Request["payload"]["data"]
+  readonly thumbnail?: Endpoint23_6Request["payload"]["thumbnail"]
+  readonly baseUpdatedAt?: Endpoint23_6Request["payload"]["baseUpdatedAt"]
+  readonly mergeData?: Endpoint23_6Request["payload"]["mergeData"]
 }
-const Endpoint23_4 = (raw: RawClient["drawings"]) => (input: Endpoint23_4Input) =>
+const Endpoint23_6 = (raw: RawClient["drawings"]) => (input: Endpoint23_6Input) =>
   raw["createForProject"]({
     params: { id: input["id"] },
     payload: {
@@ -2345,15 +2366,19 @@ const Endpoint23_4 = (raw: RawClient["drawings"]) => (input: Endpoint23_4Input) 
       description: input["description"],
       data: input["data"],
       thumbnail: input["thumbnail"],
+      baseUpdatedAt: input["baseUpdatedAt"],
+      mergeData: input["mergeData"],
     },
   }).pipe(Effect.mapError(mapClientError))
 
 const adaptGroup23 = (raw: RawClient["drawings"]) => ({
   get: Endpoint23_0(raw),
   update: Endpoint23_1(raw),
-  remove: Endpoint23_2(raw),
-  listForProject: Endpoint23_3(raw),
-  createForProject: Endpoint23_4(raw),
+  versions: Endpoint23_2(raw),
+  restoreVersion: Endpoint23_3(raw),
+  remove: Endpoint23_4(raw),
+  listForProject: Endpoint23_5(raw),
+  createForProject: Endpoint23_6(raw),
 })
 
 type Endpoint24_0Request = Parameters<RawClient["components"]["get"]>[0]

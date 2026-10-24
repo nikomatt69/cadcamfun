@@ -1093,6 +1093,8 @@ export type DrawingsUpdatePayload = {
   readonly description?: string | null | undefined
   readonly data?: unknown | undefined
   readonly thumbnail?: string | null | undefined
+  readonly baseUpdatedAt?: string | undefined
+  readonly mergeData?: boolean | undefined
 }
 
 export type DrawingsCreateForProjectPayload = {
@@ -1100,6 +1102,8 @@ export type DrawingsCreateForProjectPayload = {
   readonly description?: string | null | undefined
   readonly data?: unknown | undefined
   readonly thumbnail?: string | null | undefined
+  readonly baseUpdatedAt?: string | undefined
+  readonly mergeData?: boolean | undefined
 }
 
 export type ComponentsUpdatePayload = {
@@ -5443,6 +5447,8 @@ export type DrawingsListForProjectOutput = Array<{
   name: string
   description: string | null
   data: unknown
+  readonly baseUpdatedAt?: DrawingsUpdatePayload["baseUpdatedAt"]
+  readonly mergeData?: DrawingsUpdatePayload["mergeData"]
   thumbnail: string | null
   createdAt: string
   updatedAt: string
@@ -5456,6 +5462,26 @@ export type DrawingsCreateForProjectInput = {
   readonly data?: DrawingsCreateForProjectPayload["data"]
   readonly thumbnail?: DrawingsCreateForProjectPayload["thumbnail"]
 }
+export type DrawingsVersionsInput = { readonly id: { readonly id: string }["id"] }
+
+export type DrawingsVersionsOutput = Array<{ id: string; version: number; createdAt: string; elements: number }>
+
+export type DrawingsRestoreVersionInput = {
+  readonly id: { readonly id: string; readonly versionId: string }["id"]
+  readonly versionId: { readonly id: string; readonly versionId: string }["versionId"]
+}
+
+export type DrawingsRestoreVersionOutput = {
+  id: string
+  name: string
+  description: string | null
+  data: unknown
+  thumbnail: string | null
+  createdAt: string
+  updatedAt: string
+  projectId: string
+}
+
 
 export type DrawingsCreateForProjectOutput = {
   id: string
@@ -5479,6 +5505,8 @@ export type ComponentsGetOutput = {
   type: string | null
   isPublic: boolean
   createdAt: string
+  readonly baseUpdatedAt?: DrawingsCreateForProjectPayload["baseUpdatedAt"]
+  readonly mergeData?: DrawingsCreateForProjectPayload["mergeData"]
   updatedAt: string
   projectId: string
   project: { id: string; name: string; ownerId: string }
