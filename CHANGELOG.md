@@ -3,6 +3,19 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.8 (October 2026)
+
+## Core
+
+- Refactor authentication screens to use new UI components and improve layout
+- Draft the wall of a hole or boss, and audit what the assistant stores (spec 40 U2)
+- Hand out the setup sheet of a kernel program (spec 54 H1)
+- Resize a boss or shaft section of any exact solid (spec 33 C8)
+- Leave a boss standing in a pocket to the exact recognition, and prove the island program persists
+- Resize or fill a recognised hole of any exact solid (spec 33 C8)
+- Recognise islands standing in a pocket of an exact solid and machine around them (spec 54 R1)
+- Plan the manual three-axis setups of a part from its exact model (spec 54 R4)
+
 ## v0.1.7 (October 2026)
 
 ## Core
