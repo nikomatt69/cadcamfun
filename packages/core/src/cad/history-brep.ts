@@ -10,8 +10,9 @@
  * planar face, mates (the rigid motion from the exact faces), the analytic catalogue primitives (cube, cylinder, cone,
  * sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split and combine,
  * ribs, sheets, text, coils and modelled threads (`thread-brep.ts`: a faceted helicoid of at most 24 turns), and the union /
- * subtract / intersect of every tool. A body that went through anything else (drafts and push/pulls of curved faces, the
- * catalogue elements ellipsoid / gear, a thread of more than 24 turns) keeps its mesh and says why it has no exact model; nothing is approximated behind the caller's back. A blend of a
+ * subtract / intersect of every tool, and the draft of a hole wall or a boss side along the pull (`brep/draft-curved.ts`). A body
+ * that went through anything else (the draft of other curved faces, the push/pull of curved faces, the catalogue elements
+ * ellipsoid / gear, a thread of more than 24 turns) keeps its mesh and says why it has no exact model; nothing is approximated behind the caller's back. A blend of a
  * non-coaxial curved edge is refused by the rebuild with a message. `history-exactness.test.ts` records, for every feature
  * kind and option, whether the cell is exact or mesh-only (spec 40 U0) and fails when one of them changes.
  */
@@ -44,6 +45,7 @@ import {
   makeSphere,
   makeTorus,
   makeCapsule,
+  draftCurvedFace,
   draftPlanarFace,
   BudgetExceeded,
   checkBudget,
@@ -1145,8 +1147,13 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
             break
           }
           const target = chosen.body
-          if (!chosen.planar) { bodies[bodies.indexOf(target)] = { ...target, exact: no("a draft of a curved face has no exact model yet") }; break }
           const len = Math.hypot(raw.x, raw.y, raw.z)
+          if (!chosen.planar) {
+            // The wall of a hole or the side of a boss along the pull is a cone (`brep/draft-curved.ts`); any other curved face keeps the mesh.
+            const cone = draftCurvedFace(target.exact.brep!, { near, pull: { x: raw.x / len, y: raw.y / len, z: raw.z / len }, neutral: f.neutral === undefined ? 0 : dim(f.neutral), angle: dim(f.angle) })
+            bodies[bodies.indexOf(target)] = { ...target, exact: typeof cone === "string" ? no(cone) : ok(cone) }
+            break
+          }
           const drafted = draftPlanarFace(target.exact.brep!, { near, ...(hint !== undefined ? { normal: hint } : {}), pull: { x: raw.x / len, y: raw.y / len, z: raw.z / len }, neutral: f.neutral === undefined ? 0 : dim(f.neutral), angle: dim(f.angle) })
           bodies[bodies.indexOf(target)] = { ...target, exact: typeof drafted === "string" ? no(drafted) : ok(drafted) }
           break

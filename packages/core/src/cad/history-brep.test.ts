@@ -327,9 +327,11 @@ describe("exact replay of a parametric history", () => {
     const threaded = rebuildExact(plate([{ id: "t", type: "thread", kind: "internal", diameter: 8, pitch: 1.25, length: 40, at: [20, 12.5] }]))
     expect(threaded.bodies[0]!.reason).toContain("thread")
     expect(rebuildExact(plate([{ id: "t", type: "thread", kind: "internal", diameter: 8, pitch: 1.25, length: 6, at: [20, 12.5] }])).bodies[0]!.reason).toBeUndefined()
-    // A hole wall is curved: its draft says so instead of leaving the body as it was.
-    const bored = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, { id: "lean", type: "draft", near: [24, 12.5, 3], angle: 3 }])
-    expect(rebuildExact(bored).bodies[0]!.reason).toContain("curved face")
+    // The draft of a hole wall is exact now (spec 40 U2); one that would widen the hole towards its bottom is an undercut, and says so
+    // instead of leaving the body as it was.
+    const bored = (angle: number) => plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, { id: "lean", type: "draft", near: [24, 12.5, 3], angle, neutral: 6 }])
+    expect(rebuildExact(bored(3)).bodies[0]!.reason).toBeUndefined()
+    expect(rebuildExact(bored(-3)).bodies[0]!.reason).toContain("undercut")
   })
 
   test("a shell hollows the extrusion exactly: closed, open at the top, a tube around a bore, a rounded box", () => {
