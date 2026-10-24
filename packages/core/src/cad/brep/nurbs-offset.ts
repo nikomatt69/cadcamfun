@@ -18,10 +18,11 @@
  */
 import { add3, cross3, dot3, length3, normalize3, scale3, sub3 } from "../vec.ts"
 import { booleanBrep } from "./boolean.ts"
+import { BudgetExceeded, LONG_BUDGET_MS, withBudget } from "./budget.ts"
 import { surfaceNormal, surfacePoint, surfaceProject } from "./geom.ts"
 import type { Vec3 } from "./math.ts"
 import { basisFuns, clampedUniformKnots, findSpan, nurbsSurfaceDerivs, type NurbsSurfaceData } from "./nurbs.ts"
-import { extentAlong, FOOTPRINT_CHORD, readPatch, tessellatedVolume, trimPrism, type Patch } from "./nurbs-edit.ts"
+import { budgetRefusal, extentAlong, FOOTPRINT_CHORD, readPatch, tessellatedVolume, trimPrism, type Patch } from "./nurbs-edit.ts"
 import { BrepBuilder, type Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
 
@@ -173,7 +174,7 @@ const normalAt = (smp: Sampler): ((t: number, s: number) => Vec3) => (t, s) => {
 
 export interface ApproximateEdit { readonly brep: Brep; /** The largest distance, mm, between the fitted new face and the exact displaced surface at the check points. */ readonly deviation: number }
 
-const replaceFace = (b: Brep, face: number, displace: Displace, tolerance: number): ApproximateEdit | string => {
+const fitFace = (b: Brep, face: number, displace: Displace, tolerance: number): ApproximateEdit | string => {
   if (!(tolerance > 0)) return "the tolerance must be positive"
   const patch = readPatch(b, face)
   if (typeof patch === "string") return patch
@@ -222,11 +223,12 @@ const replaceFace = (b: Brep, face: number, displace: Displace, tolerance: numbe
     if (chosen.deviation > tolerance * 4) return `the displaced surface cannot be fitted to ${tolerance} mm with a 48 x 48 net (it reaches ${chosen.deviation.toFixed(4)} mm): the face is too strongly curved or too large for this edit`
     const before = tessellatedVolume(b)
     const cut = booleanBrep(b, cutWide(slab(chosen.cutLow, chosen.cutHigh)), "subtract").brep
-    const solid = booleanBrep(cut, cutTo(slab(chosen.fillLow, chosen.fillTop)), "union").brep
+    const fill = cutTo(slab(chosen.fillLow, chosen.fillTop))
+    const solid = booleanBrep(cut, fill, "union").brep
     const report = validateBrep(solid)
     if (!report.valid) return `the edited solid is not valid (${report.issues.slice(0, 2).map((i) => i.message).join("; ")})`
     const plainSlab = Math.abs(tessellatedVolume(cutTo(slab(chosen.fillLow, chosen.plain))))
-    const expected = Math.abs(tessellatedVolume(cutTo(slab(chosen.fillLow, chosen.fillTop)))) - plainSlab
+    const expected = Math.abs(tessellatedVolume(fill)) - plainSlab
     const after = tessellatedVolume(solid)
     // The volume must follow the slabs to within what the fit's deviation allows over the face's area.
     const area = plainSlab / fillDepth
@@ -239,9 +241,13 @@ const replaceFace = (b: Brep, face: number, displace: Displace, tolerance: numbe
     }
     return { brep: solid, deviation: chosen.deviation + trimSlack }
   } catch (cause) {
+    if (cause instanceof BudgetExceeded) return budgetRefusal(cause)
     return `the fitted edit failed (${cause instanceof Error ? cause.message : String(cause)})`
   }
 }
+
+/** `fitFace` under the long budget: past it the edit is refused with the solid unchanged, never left running. */
+const replaceFace = (b: Brep, face: number, displace: Displace, tolerance: number): ApproximateEdit | string => withBudget(LONG_BUDGET_MS, () => fitFace(b, face, displace, tolerance))
 
 /** The free-form face offset along its normals by `distance` (out of the solid when positive), approximately: see the module comment. */
 export const offsetNurbsFace = (b: Brep, face: number, distance: number, tolerance = 0.01): ApproximateEdit | string => {

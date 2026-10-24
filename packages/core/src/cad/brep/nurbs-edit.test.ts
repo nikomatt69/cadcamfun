@@ -1,9 +1,10 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { faceByName } from "./naming.ts"
 import { booleanBrep } from "./boolean.ts"
+import { withBudget } from "./budget.ts"
 import { frame } from "./math.ts"
 import { makeCylinder } from "./primitives.ts"
-import { moveNurbsFace, pushPullNurbsFace, recognizeNurbsFaces, tessellatedVolume } from "./nurbs-edit.ts"
+import { FOOTPRINT_CHORD, footprintArea, moveNurbsFace, pushPullNurbsFace, readPatch, recognizeNurbsFaces, tessellatedVolume } from "./nurbs-edit.ts"
 import { surfacePatch, thickenSurfacePatch } from "./surface-patch.ts"
 import type { Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
@@ -64,11 +65,29 @@ describe("moving a free-form face", () => {
     const wall = b.faces.findIndex((f) => f.surface.kind === "extrusion")
     expect(pushPullNurbsFace(b, wall, 1)).toMatch(/not a NURBS face/)
   })
+
+  test("an edit that outruns its time budget is refused with the solid unchanged, it does not throw or run on", () => {
+    const b = block()
+    const before = volume(b)
+    const refused = withBudget(0.001, () => pushPullNurbsFace(b, top(b), 1, { x: 0, y: 0, z: 1 }))
+    expect(refused).toMatch(/needs more than .* minutes/)
+    expect(volume(b)).toBeCloseTo(before, 9)
+  })
 })
 
 describe("a free-form face trimmed by a circle", () => {
   /** The thickened bump cut by a vertical cylinder of radius 4 at (5, 5): its top face is the bump trimmed by a circle. */
   const disc = () => booleanBrep(block(), makeCylinder(4, 20, frame({ x: 5, y: 5, z: -5 }, { x: 0, y: 0, z: 1 })), "intersect").brep
+
+  test("the footprint's area is the disc's to within the polyline's chord, from either side: it is the volume a move sweeps per mm", () => {
+    const b = disc()
+    const up = recognizeNurbsFaces(b).find((f) => f.normal.z > 0.9)!
+    const patch = readPatch(b, up.face)
+    if (typeof patch === "string") throw new Error(patch)
+    const area = footprintArea(patch, { x: 0, y: 0, z: 1 })
+    expect(Math.abs(area - Math.PI * 16)).toBeLessThan(2 * Math.PI * 4 * FOOTPRINT_CHORD)
+    expect(footprintArea(patch, { x: 0, y: 0, z: -1 })).toBeCloseTo(area, 9)
+  })
 
   test("the trimmed face is read, and moved with its footprint: the volume grows by the disc's area x d (closed form), the deviation of the polyline is reported", () => {
     const b = disc()

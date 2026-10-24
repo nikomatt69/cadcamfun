@@ -17,6 +17,7 @@
 import { add3, cross3, dot3, length3, normalize3, scale3, sub3 } from "../vec.ts"
 import { surfaceDerivs, surfacePoint, surfaceProject } from "./geom.ts"
 import { booleanBrep } from "./boolean.ts"
+import { BudgetExceeded, LONG_BUDGET_MS, withBudget } from "./budget.ts"
 import { curvePoint } from "./geom.ts"
 import { tessellateBrep } from "./tessellate.ts"
 import { frame, type Vec3 } from "./math.ts"
@@ -142,21 +143,33 @@ export const readPatch = (b: Brep, face: number): Patch | string => {
   return { data: s.data, domain: { u0, u1, v0, v1 }, trimmed, loops: loops3, normals, sense, mean: normalize3(sum) }
 }
 
-/**
- * The prism over the footprint of a trimmed face along the unit `w`, from `lo` to `hi` along it: a slab built over the bounding rectangle of the
- * trim is cut to the face by intersecting it with this. The footprint is the polylines of the trim projected on the plane square to `w`.
- */
-export const trimPrism = (patch: Patch, w: Vec3, lo: number, hi: number, grow = 0): Brep => {
+/** The polylines of the trim projected on the plane square to the unit `w`, in the frame the prism is built in. */
+const footprintOf = (patch: Patch, w: Vec3) => {
   const origin = patch.loops[0]![0]!
   const f = frame(origin, w)
   const polygons = patch.loops.map((loop) => {
     const pts = loop.map((p) => { const q = sub3(p, origin); return { x: dot3(q, f.x), y: dot3(q, f.y) } })
     return polygonProfileLoop(pts.filter((p, i) => i === 0 || Math.hypot(p.x - pts[i - 1]!.x, p.y - pts[i - 1]!.y) > 1e-9))
   })
+  const outer = polygons.reduce((best, l, i) => (Math.abs(loopArea(l)) > Math.abs(loopArea(polygons[best]!)) ? i : best), 0)
+  return { origin, f, polygons, outer }
+}
+
+/** The area of the trim's footprint on the plane square to the unit `w` (the outer loop less the holes). */
+export const footprintArea = (patch: Patch, w: Vec3): number => {
+  const { polygons, outer } = footprintOf(patch, w)
+  return polygons.reduce((sum, l, i) => sum + (i === outer ? 1 : -1) * Math.abs(loopArea(l)), 0)
+}
+
+/**
+ * The prism over the footprint of a trimmed face along the unit `w`, from `lo` to `hi` along it: a slab built over the bounding rectangle of the
+ * trim is cut to the face by intersecting it with this. The footprint is the polylines of the trim projected on the plane square to `w`.
+ */
+export const trimPrism = (patch: Patch, w: Vec3, lo: number, hi: number, grow = 0): Brep => {
+  const { origin, f, polygons, outer } = footprintOf(patch, w)
   // `grow` widens the footprint (the outer loop out, the holes in), a negative one narrows it: a tool must not touch the trim's vertices, which
   // lie on the solid's own wall, because a Boolean cannot decide a plane that only grazes a cylinder along a line (the one that subtracts
   // is widened, the one that adds narrowed, so neither takes or gives material the trim does not bound).
-  const outer = polygons.reduce((best, l, i) => (Math.abs(loopArea(l)) > Math.abs(loopArea(polygons[best]!)) ? i : best), 0)
   const loops = grow !== 0 ? polygons.map((l, i) => offsetLoop(l, i === outer ? -grow : grow)) : polygons
   return extrudeProfile({ loops }, hi - lo, { placement: frame(add3(origin, scale3(w, lo - dot3(origin, w))), w, f.x) })
 }
@@ -200,7 +213,7 @@ export interface MovedFace {
  * trimmed by anything but its four boundary isoparametric curves moves with its footprint along the direction (the slab is cut to the polyline of
  * its trim), and the result then carries the deviation of that polyline.
  */
-export const moveNurbsFace = (b: Brep, face: number, distance: number, direction?: Vec3): MovedFace | string => {
+const moveFace = (b: Brep, face: number, distance: number, direction?: Vec3): MovedFace | string => {
   if (!(Math.abs(distance) > 1e-9) || !Number.isFinite(distance)) return "the distance must be a non-zero number"
   const patch = readPatch(b, face)
   if (typeof patch === "string") return patch
@@ -222,13 +235,14 @@ export const moveNurbsFace = (b: Brep, face: number, distance: number, direction
     return cut(thickenSurfacePatch(body, c - a, patch.sense === 1 ? w : scale3(w, -1)), grow)
   }
   try {
-    const pure = slab(out ? 0 : -t, out ? t : 0)
+    // A move along the direction sweeps the footprint through `t`: its volume is `t` times the footprint's area. Only an untrimmed face needs its slab built to measure it.
+    const pure = patch.trimmed ? undefined : slab(out ? 0 : -t, out ? t : 0)
     const tool = out ? slab(-SKIN, t, -2 * FOOTPRINT_CHORD) : slab(-t, SKIN, 2 * FOOTPRINT_CHORD)
     const before = tessellatedVolume(b)
     const solid = booleanBrep(b, tool, out ? "union" : "subtract").brep
     const report = validateBrep(solid)
     if (!report.valid) return `the edited solid is not valid (${report.issues.slice(0, 2).map((i) => i.message).join("; ")})`
-    const expected = (out ? 1 : -1) * tessellatedVolume(pure)
+    const expected = (out ? 1 : -1) * (pure === undefined ? t * footprintArea(patch, w) : tessellatedVolume(pure))
     const after = tessellatedVolume(solid)
     // The volumes are those of tessellations; a trimmed face adds the polyline of its trim, whose chord error is of the same order.
     const slack = patch.trimmed ? 2e-3 : 1e-4
@@ -237,9 +251,16 @@ export const moveNurbsFace = (b: Brep, face: number, distance: number, direction
     }
     return { brep: solid, ...(patch.trimmed ? { deviation: 3 * FOOTPRINT_CHORD } : {}) }
   } catch (cause) {
+    if (cause instanceof BudgetExceeded) return budgetRefusal(cause)
     return `the move failed (${cause instanceof Error ? cause.message : String(cause)})`
   }
 }
+
+/** What an edit that ran out of its time budget says: the solid is untouched. */
+export const budgetRefusal = (e: BudgetExceeded): string => `the edit needs more than ${Math.round(e.budgetMs / 60_000)} minutes (the Boolean of a free-form face against a curved wall can take that long): it was stopped and the solid is unchanged; split or simplify the face and try again`
+
+/** A free-form edit never holds the thread for more than the long budget (`LONG_BUDGET_MS`): past it the edit is refused, not left running. */
+export const moveNurbsFace = (b: Brep, face: number, distance: number, direction?: Vec3): MovedFace | string => withBudget(LONG_BUDGET_MS, () => moveFace(b, face, distance, direction))
 
 /** `moveNurbsFace`, the solid only (see it for what a trimmed face means). */
 export const pushPullNurbsFace = (b: Brep, face: number, distance: number, direction?: Vec3): Brep | string => {
