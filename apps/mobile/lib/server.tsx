@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PropsWithChildren } from "react"
 import { AppState, Platform } from "react-native"
 import { CompanionClient, CompanionError, type AiStatusInfo } from "./client"
-import { launchPairLink, nativeAvailable, pinnedTransport, warmLocalNetwork } from "./native"
+import { launchPairLink, nativeAvailable, pinnedTransport, redeemScannedLink, warmLocalNetwork } from "./native"
 import { pairingStore } from "./storage"
 import { accountStore, restoreAccount } from "./account"
-import { desktopLabel, firstReachable, parsePairingLink, type Pairing } from "./pairing"
+import { desktopLabel, firstReachable, materializePairing, type Pairing } from "./pairing"
 import { drainQueueWith, refreshOfflineQueueCount } from "./offline-queue"
 import { uiPreferencesReady, useUIStore } from "./store"
 import { ServerContext, type Connectivity, type DesktopBootstrap, type ServerValue } from "./server-context"
@@ -158,7 +158,7 @@ export function ServerProvider({ children }: PropsWithChildren) {
         if (!mounted.current || version !== generation.current) return
         let pairing: Pairing | undefined
         if (launched) {
-          pairing = parsePairingLink(launched)
+          pairing = await materializePairing(launched, redeemScannedLink)
           await storePairing(() => pairingStore.save(pairing!))
         } else pairing = await pairingStore.load()
         if (!mounted.current || version !== generation.current) return

@@ -529,6 +529,8 @@ import type {
   CompanionDisableOutput,
   CompanionPairInput,
   CompanionPairOutput,
+  CompanionRedeemInput,
+  CompanionRedeemOutput,
   CompanionRevokeInput,
   CompanionRevokeOutput,
   WorkspaceDrawingsInput,
@@ -4480,6 +4482,18 @@ export function make(options: ClientOptions) {
             method: "POST",
             path: `/api/companion/pair`,
             body: { name: input["name"], host: input["host"] },
+            successStatus: 201,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      redeem: (input: CompanionRedeemInput, requestOptions?: RequestOptions) =>
+        request<CompanionRedeemOutput>(
+          {
+            method: "POST",
+            path: `/api/companion/redeem`,
+            body: { code: input["code"] },
             successStatus: 201,
             declaredStatuses: [400, 404, 500, 401],
             empty: false,

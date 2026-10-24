@@ -3355,9 +3355,14 @@ type Endpoint33_3Input = {
 const Endpoint33_3 = (raw: RawClient["companion"]) => (input: Endpoint33_3Input) =>
   raw["pair"]({ payload: { name: input["name"], host: input["host"] } }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint33_4Request = Parameters<RawClient["companion"]["revoke"]>[0]
-type Endpoint33_4Input = { readonly id: Endpoint33_4Request["params"]["id"] }
+type Endpoint33_4Request = Parameters<RawClient["companion"]["redeem"]>[0]
+type Endpoint33_4Input = { readonly code: Endpoint33_4Request["payload"]["code"] }
 const Endpoint33_4 = (raw: RawClient["companion"]) => (input: Endpoint33_4Input) =>
+  raw["redeem"]({ payload: { code: input["code"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint33_5Request = Parameters<RawClient["companion"]["revoke"]>[0]
+type Endpoint33_5Input = { readonly id: Endpoint33_5Request["params"]["id"] }
+const Endpoint33_5 = (raw: RawClient["companion"]) => (input: Endpoint33_5Input) =>
   raw["revoke"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
 const adaptGroup33 = (raw: RawClient["companion"]) => ({
@@ -3365,7 +3370,8 @@ const adaptGroup33 = (raw: RawClient["companion"]) => ({
   enable: Endpoint33_1(raw),
   disable: Endpoint33_2(raw),
   pair: Endpoint33_3(raw),
-  revoke: Endpoint33_4(raw),
+  redeem: Endpoint33_4(raw),
+  revoke: Endpoint33_5(raw),
 })
 
 type Endpoint34_0Request = Parameters<RawClient["workspace"]["drawings"]>[0]

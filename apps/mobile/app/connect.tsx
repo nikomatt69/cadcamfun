@@ -8,7 +8,8 @@ import { Link2, MonitorSmartphone, ScanLine, ShieldCheck, X } from "lucide-react
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
 import { nativeAvailable } from "@/lib/native"
 import { useServer } from "@/lib/server"
-import { desktopLabel, parsePairingLink, type Pairing } from "@/lib/pairing"
+import { desktopLabel, materializePairing, type Pairing } from "@/lib/pairing"
+import { redeemScannedLink } from "@/lib/native"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { ActionButton } from "@/components/ui/ActionButton"
@@ -49,7 +50,7 @@ export default function ConnectScreen() {
       setBusy(true)
       setError(null)
       try {
-        const pairing: Pairing = parsePairingLink(link)
+        const pairing: Pairing = await materializePairing(link, redeemScannedLink)
         const ok = await save(pairing)
         if (!ok) {
           setError(`The desktop at ${desktopLabel(pairing)} did not answer. Join the same Wi-Fi or Personal Hotspot as the Mac, or type a Tailscale address. Is the companion gateway on?`)

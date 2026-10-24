@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { startFakeOpenAi, type FakeOpenAi } from "../../../packages/ai/test/helpers/fake-openai.ts"
 import { createFetchTransport } from "../../mobile/modules/companion-net/transport.ts"
 import { CompanionClient } from "../../mobile/lib/client.ts"
-import { parsePairingLink } from "../../mobile/lib/pairing.ts"
+import { redeemPairingLink } from "../../mobile/lib/pairing.ts"
 import type { ChatEvent } from "../../mobile/lib/sse.ts"
 
 setDefaultTimeout(120_000)
@@ -87,9 +87,9 @@ describe("the assistant from the phone", () => {
     const gatewayPort = 20_000 + Math.floor(Math.random() * 20_000)
     await local("/api/companion/enable", { method: "POST", body: JSON.stringify({ port: gatewayPort }) })
     const paired = await (await local("/api/companion/pair", { method: "POST", body: JSON.stringify({ name: "iPhone", host: "127.0.0.1" }) })).json()
-    const pairing = parsePairingLink(paired.link)
     const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
     const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
+    const pairing = await redeemPairingLink(paired.link, pinned)
     raw = createFetchTransport(pairing, pinned)
     phone = new CompanionClient(raw)
 

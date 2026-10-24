@@ -1,4 +1,4 @@
-import { Api, BadRequest, InternalError, NotFound } from "@cadcamfun/api"
+import { Api, BadRequest, CurrentUser, InternalError, NotFound } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Companion, CompanionError } from "../services/companion.ts"
@@ -14,6 +14,10 @@ export const CompanionHandlers = HttpApiBuilder.group(Api, "companion", Effect.f
     .handle("status", () => companion.status)
     .handle("enable", ({ payload }) => wire(companion.enable(payload.port)))
     .handle("disable", () => companion.disable.pipe(Effect.mapError((e) => new InternalError({ message: e.message }))))
-    .handle("pair", ({ payload }) => wire(companion.pair(payload.name, payload.host)))
+    .handle("pair", ({ payload }) => Effect.gen(function*() {
+      const user = yield* CurrentUser
+      return yield* wire(companion.pair(payload.name, payload.host, user))
+    }))
+    .handle("redeem", ({ payload }) => wire(companion.redeem(payload.code)))
     .handle("revoke", ({ params }) => wire(companion.revoke(params.id)))
 }))

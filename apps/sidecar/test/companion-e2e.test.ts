@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createFetchTransport } from "../../mobile/modules/companion-net/transport.ts"
 import { CompanionClient } from "../../mobile/lib/client.ts"
-import { parsePairingLink } from "../../mobile/lib/pairing.ts"
+import { parsePairingGrant, redeemPairingLink } from "../../mobile/lib/pairing.ts"
 import { fingerprintOf } from "../src/services/companion-gateway.ts"
 import { sseParser } from "../../mobile/lib/sse.ts"
 
@@ -41,9 +41,9 @@ describe("companion end to end", () => {
       const gatewayPort = 20_000 + Math.floor(Math.random() * 20_000)
       await sidecar.local("/api/companion/enable", { method: "POST", body: JSON.stringify({ port: gatewayPort }) })
       const paired = await (await sidecar.local("/api/companion/pair", { method: "POST", body: JSON.stringify({ name: "Sync iPhone", host: "127.0.0.1" }) })).json()
-      const pairing = parsePairingLink(paired.link)
       const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
       const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
+      const pairing = await redeemPairingLink(paired.link, pinned)
       const phone = new CompanionClient(createFetchTransport(pairing, pinned))
       const desktopEvents: Record<string, unknown>[] = [], phoneEvents: Record<string, unknown>[] = []
       tails.push((async () => {
@@ -94,12 +94,16 @@ describe("companion end to end", () => {
       expect(enabled).toMatchObject({ enabled: true, port: gatewayPort })
       const paired = await (await sidecar.local("/api/companion/pair", { method: "POST", body: JSON.stringify({ name: "Test iPhone", host: "127.0.0.1" }) })).json()
 
-      const pairing = parsePairingLink(paired.link)
-      expect(pairing.baseUrl).toBe(`https://127.0.0.1:${gatewayPort}`)
+      const grant = parsePairingGrant(paired.link)
+      expect(grant.baseUrl).toBe(`https://127.0.0.1:${gatewayPort}`)
+      expect(paired.link).not.toContain("token=")
       // The phone pins the fingerprint from the QR; here we verify it matches what the gateway really serves.
       const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
-      expect(fingerprintOf(pem)).toBe(pairing.fingerprint)
+      expect(fingerprintOf(pem)).toBe(grant.fingerprint)
       const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
+      const pairing = await redeemPairingLink(paired.link, pinned)
+      expect(pairing.token).not.toBe(grant.code)
+      expect((await pinned(`${grant.baseUrl}/api/companion/redeem`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: grant.code }) })).status).toBe(400)
       const phone = new CompanionClient(createFetchTransport(pairing, pinned))
 
       const project = await (await sidecar.local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Bracket" }) })).json()
@@ -121,7 +125,8 @@ describe("companion end to end", () => {
       // Revoking from the desktop cuts the phone off at once.
       const status = await (await sidecar.local("/api/companion")).json()
       expect(status.devices).toHaveLength(1)
-      await sidecar.local(`/api/companion/devices/${paired.id}`, { method: "DELETE" })
+      expect(status.devices[0].email).toBe("local@cadcamfun.local")
+      await sidecar.local(`/api/companion/devices/${status.devices[0].id}`, { method: "DELETE" })
       expect(await phone.projects().then(() => "ok", (e) => e.status)).toBe(401)
     } finally {
       sidecar.child.kill("SIGTERM")
@@ -137,9 +142,9 @@ describe("companion end to end", () => {
       const gatewayPort = 20_000 + Math.floor(Math.random() * 20_000)
       await sidecar.local("/api/companion/enable", { method: "POST", body: JSON.stringify({ port: gatewayPort }) })
       const paired = await (await sidecar.local("/api/companion/pair", { method: "POST", body: JSON.stringify({ name: "Test iPhone", host: "127.0.0.1" }) })).json()
-      const pairing = parsePairingLink(paired.link)
       const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
       const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
+      const pairing = await redeemPairingLink(paired.link, pinned)
       const phone = new CompanionClient(createFetchTransport(pairing, pinned))
 
       const project = await (await sidecar.local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Bracket" }) })).json()

@@ -6,6 +6,8 @@ import { AppConfigService } from "../config.ts"
 import { AuthRepo } from "../repos/auth-repo.ts"
 import { AuthTokens } from "../services/auth-tokens.ts"
 import { BridgeTokens } from "../services/bridge-tokens.ts"
+import { COMPANION_DEVICE_HEADER, COMPANION_PROOF_HEADER, COMPANION_USER_HEADER, companionProof } from "../services/companion-gateway.ts"
+import { Companion } from "../services/companion.ts"
 import { Identity } from "../services/identity.ts"
 import { LocalProfile } from "../services/local-profile.ts"
 
@@ -32,10 +34,19 @@ export const AuthorizationLive = Layer.effect(
     const identity = yield* Identity
     const bridge = yield* BridgeTokens
     const repo = yield* AuthRepo
+    const companion = yield* Companion
     const { user: local } = yield* LocalProfile
 
     const sessionUser = Effect.fn("Authorization.sessionUser")(function*() {
       const request = yield* HttpServerRequest.HttpServerRequest
+      const deviceUser = request.headers[COMPANION_USER_HEADER]
+      const proof = request.headers[COMPANION_PROOF_HEADER]
+      const deviceId = request.headers[COMPANION_DEVICE_HEADER]
+      if (deviceId && deviceUser && proof && safeEqual(proof, companionProof(deviceId, deviceUser, Redacted.value(config.token)))) {
+        const actor = yield* companion.actor(deviceId, deviceUser)
+        if (!actor) return yield* new Unauthorized({ message: "Paired device is no longer valid" })
+        return actor
+      }
       const accountToken = request.headers["x-identity-token"]
       if (accountToken) return yield* identity.user(accountToken)
       const token = request.headers[SESSION_HEADER]

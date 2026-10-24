@@ -1765,6 +1765,8 @@ export type CompanionEnablePayload = { readonly port?: number | undefined }
 
 export type CompanionPairPayload = { readonly name: string; readonly host?: string | undefined }
 
+export type CompanionRedeemPayload = { readonly code: string }
+
 export type HealthCheckOutput = { status: string; timestamp: string }
 
 export type SystemReadyOutput = { status: string; timestamp: string }
@@ -7612,7 +7614,14 @@ export type CompanionStatusOutput = {
   port: number | null
   fingerprint: string | null
   host: string
-  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+  devices: Array<{
+    id: string
+    name: string
+    createdAt: string
+    lastSeen: string | null
+    userId: string
+    email: string | null
+  }>
 }
 
 export type CompanionEnableInput = { readonly port?: CompanionEnablePayload["port"] }
@@ -7622,7 +7631,14 @@ export type CompanionEnableOutput = {
   port: number | null
   fingerprint: string | null
   host: string
-  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+  devices: Array<{
+    id: string
+    name: string
+    createdAt: string
+    lastSeen: string | null
+    userId: string
+    email: string | null
+  }>
 }
 
 export type CompanionDisableOutput = {
@@ -7630,7 +7646,14 @@ export type CompanionDisableOutput = {
   port: number | null
   fingerprint: string | null
   host: string
-  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+  devices: Array<{
+    id: string
+    name: string
+    createdAt: string
+    lastSeen: string | null
+    userId: string
+    email: string | null
+  }>
 }
 
 export type CompanionPairInput = {
@@ -7638,7 +7661,16 @@ export type CompanionPairInput = {
   readonly host?: CompanionPairPayload["host"]
 }
 
-export type CompanionPairOutput = { id: string; link: string }
+export type CompanionPairOutput = { id: string; link: string; expiresAt: string }
+
+export type CompanionRedeemInput = { readonly code: CompanionRedeemPayload["code"] }
+
+export type CompanionRedeemOutput = {
+  id: string
+  token: string
+  name: string
+  user: { id: string; email: string | null; name: string | null }
+}
 
 export type CompanionRevokeInput = { readonly id: { readonly id: string }["id"] }
 
@@ -7647,7 +7679,14 @@ export type CompanionRevokeOutput = {
   port: number | null
   fingerprint: string | null
   host: string
-  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+  devices: Array<{
+    id: string
+    name: string
+    createdAt: string
+    lastSeen: string | null
+    userId: string
+    email: string | null
+  }>
 }
 
 export type WorkspaceDrawingsInput = { readonly id: { readonly id: string }["id"] }

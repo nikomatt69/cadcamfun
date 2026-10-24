@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, Platform, Text } from "react-native"
 import { Stack, useLocalSearchParams, useRouter } from "expo-router"
-import { parsePairingLink } from "@/lib/pairing"
+import { materializePairing, parsePairingLink } from "@/lib/pairing"
+import { redeemScannedLink } from "@/lib/native"
 import { nativeAvailable } from "@/lib/native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
@@ -14,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context"
 
 /** Pairing URLs share the scanner's validation and never render their credentials. */
 export default function PairLinkScreen() {
-  const params = useLocalSearchParams<{ host?: string; token?: string; fp?: string; name?: string; hosts?: string }>()
+  const params = useLocalSearchParams<{ host?: string; token?: string; code?: string; fp?: string; name?: string; hosts?: string; exp?: string }>()
   const router = useRouter()
   const { palette } = useTheme()
   const { save, booting } = useServer()
@@ -22,15 +23,20 @@ export default function PairLinkScreen() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const supported = Platform.OS === "web" || nativeAvailable
-  const host = params.host, token = params.token, fingerprint = params.fp, name = params.name, extraHosts = params.hosts
+  const host = params.host, token = params.token, code = params.code, fingerprint = params.fp, name = params.name, extraHosts = params.hosts, exp = params.exp
   const connect = useCallback(async () => {
     if (!supported) throw new Error("Secure pairing requires the CADCAMFUN development build. Install it with bun run ios from apps/mobile and open it instead of Expo Go.")
-    if (typeof host !== "string" || typeof token !== "string" || typeof fingerprint !== "string" || name !== undefined && typeof name !== "string") throw new Error("The pairing link is incomplete. Scan a new QR code from the desktop.")
-    const query = new URLSearchParams({ host, token, fp: fingerprint, name: name ?? "Desktop" })
+    if (typeof host !== "string" || typeof fingerprint !== "string" || name !== undefined && typeof name !== "string") throw new Error("The pairing link is incomplete. Scan a new QR code from the desktop.")
+    const query = new URLSearchParams({ host, fp: fingerprint, name: name ?? "Desktop" })
+    if (typeof code === "string" && code) query.set("code", code)
+    else if (typeof token === "string") query.set("token", token)
+    else throw new Error("The pairing link is incomplete. Scan a new QR code from the desktop.")
     if (typeof extraHosts === "string" && extraHosts) query.set("hosts", extraHosts)
-    const pairing = parsePairingLink(`cadcamfun://pair?${query}`)
+    if (typeof exp === "string" && exp) query.set("exp", exp)
+    const link = `cadcamfun://pair?${query}`
+    const pairing = query.get("code") ? await materializePairing(link, redeemScannedLink) : parsePairingLink(link)
     if (!await save(pairing)) throw new Error("The desktop did not answer. Join the same Wi-Fi or Personal Hotspot as the Mac, or type a Tailscale address, then retry.")
-  }, [supported, host, token, fingerprint, name, extraHosts, save])
+  }, [supported, host, token, code, fingerprint, name, extraHosts, exp, save])
   useEffect(() => {
     if (booting) return
     let active = true

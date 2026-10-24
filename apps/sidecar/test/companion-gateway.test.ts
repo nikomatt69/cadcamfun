@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { COMPANION_DEVICE_HEADER, generateCertificate, hashToken, isCompanionRoute, newToken, pairingHosts, pairingLink, rankAddress, reachableAddressesFrom, routePolicy, startGateway, fingerprintOf, TokenBucket, WRITE_BODY_LIMIT, type Gateway, type CompanionCertificate, type GatewayRequestLog, type TokenRecord } from "../src/services/companion-gateway.ts"
+import { COMPANION_DEVICE_HEADER, COMPANION_PROOF_HEADER, COMPANION_USER_HEADER, companionProof, generateCertificate, hashToken, isCompanionRoute, newToken, pairingHosts, pairingLink, rankAddress, reachableAddressesFrom, routePolicy, startGateway, fingerprintOf, TokenBucket, WRITE_BODY_LIMIT, type Gateway, type CompanionCertificate, type GatewayRequestLog, type TokenRecord } from "../src/services/companion-gateway.ts"
 
 let upstream: ReturnType<typeof Bun.serve>
 let gateway: Gateway
 let cert: CompanionCertificate
 let tokens: TokenRecord[]
 let valid: string
-const seen: Array<{ method: string; path: string; auth: string | null; body: string; device: string | null }> = []
+const seen: Array<{ method: string; path: string; auth: string | null; body: string; device: string | null; identity: string | null; user: string | null; proof: string | null }> = []
+let redeemed = ""
 const logs: GatewayRequestLog[] = []
 const touched: string[] = []
 
@@ -16,7 +17,7 @@ beforeAll(async () => {
     hostname: "127.0.0.1",
     async fetch(req) {
       const url = new URL(req.url)
-      seen.push({ method: req.method, path: url.pathname + url.search, auth: req.headers.get("authorization"), body: await req.text(), device: req.headers.get(COMPANION_DEVICE_HEADER) })
+      seen.push({ method: req.method, path: url.pathname + url.search, auth: req.headers.get("authorization"), body: await req.text(), device: req.headers.get(COMPANION_DEVICE_HEADER), identity: req.headers.get("x-identity-token"), user: req.headers.get(COMPANION_USER_HEADER), proof: req.headers.get(COMPANION_PROOF_HEADER) })
       if (url.pathname === "/api/projects/slow") {
         await Bun.sleep(400)
         return Response.json({ late: true })
@@ -41,6 +42,11 @@ beforeAll(async () => {
     upstream: () => ({ port: upstream.port!, token: "REAL-SIDECAR-TOKEN" }),
     tokens: async () => tokens,
     touch: (id) => void touched.push(id),
+    redeem: async (code) => {
+      redeemed = code
+      if (code === "valid-pairing-code") return Response.json({ id: "device-1", token: "t".repeat(32), name: "Phone", user: { id: "user-ada", email: "ada@example.com", name: "Ada" } }, { status: 201 })
+      return Response.json({ message: "This pairing code has expired or was already used. Show a new QR code on the desktop." }, { status: 400 })
+    },
     log: (entry) => void logs.push(entry),
   })
 })
@@ -89,6 +95,21 @@ describe("companion gateway", () => {
     expect(url.searchParams.get("host")).toBe("https://192.168.1.20:8443")
     expect(url.searchParams.get("hosts")).toBe("https://172.20.10.4:8443,https://100.64.96.71:8443")
     expect(pairingHosts("172.20.10.4")[0]).toBe("172.20.10.4")
+  })
+
+  test("a one-time code is redeemed without a device bearer, and the phone cannot choose the account", async () => {
+    const before = seen.length
+    expect((await call("/api/companion/redeem", { method: "POST", token: null, body: JSON.stringify({ code: "short" }) })).status).toBe(400)
+    const ok = await call("/api/companion/redeem", { method: "POST", token: null, body: JSON.stringify({ code: "valid-pairing-code" }), headers: { "content-type": "application/json", "x-identity-token": "stolen" } })
+    expect(ok.status).toBe(201)
+    expect(redeemed).toBe("valid-pairing-code")
+    expect(seen.length).toBe(before)
+    tokens[0] = { ...tokens[0]!, userId: "user-ada" }
+    expect((await call("/api/projects", { headers: { "x-identity-token": "stolen-jwt", "x-session-token": "stolen-session" } })).status).toBe(200)
+    const last = seen.at(-1)!
+    expect(last.identity).toBeNull()
+    expect(last.user).toBe("user-ada")
+    expect(last.proof).toBe(companionProof(tokens[0]!.id, "user-ada", "REAL-SIDECAR-TOKEN"))
   })
 
   test("rejects missing and wrong tokens, never forwarding them", async () => {
