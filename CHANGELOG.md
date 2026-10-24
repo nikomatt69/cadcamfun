@@ -3,6 +3,33 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.10 (October 2026)
+
+## Core
+
+- Push and pull the spherical bottom of a bore and the hemispherical end of a pin (spec 40 U2)
+- List the flank-cut walls of an exact solid and add one to the plan from the kernel panel (spec 51 F4)
+- Check the shank and the holder of the cutter in the swarf operation (spec 51 F4)
+- Read flat walls as rulings for the swarf operation (spec 51 F4)
+- Build threads of more than 24 turns exactly when the caller can wait (spec 40 U1)
+- Read a bar and a dome from above in the shadow solid (spec 54 R1)
+- Flank-cut a cone or cylinder wall with a five-axis swarf operation (spec 51 F4)
+- Fix the refusal expected for a sphere on a plate
+- Push and pull the dome that ends a round boss exactly (spec 40 U2)
+- Push, pull and draft the side of a conical boss, a ball and a ring exactly (spec 40 U2)
+- Store post definitions in the library and run a kernel job with one (spec 54 C1)
+- Describe a post as data and check it through the API (spec 54 C1)
+- Write the tool-centre-point commands of each control around a five-axis section (spec 51 F9)
+- Push and pull the wall of a hole and the side of a boss exactly (spec 40 U2)
+- Draft the wall of a hole and the side of a boss exactly from the history (spec 40 U2)
+- Give the modelled thread an exact model (spec 40 U1)
+
+## Desktop
+
+- Name a post on a saved machine and in the assistant's manufacture input (spec 54 C1)
+- Edit, check, use and store a post definition in the desktop kernel panel (spec 54 C1)
+- CAM page test: the cycle fields are prefixed cycle-<name> since the UI refactor
+
 ## v0.1.9 (October 2026)
 
 ## Core
