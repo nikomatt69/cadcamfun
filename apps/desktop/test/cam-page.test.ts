@@ -133,7 +133,7 @@ describe("CAM page", () => {
       const before = editor()!.value
       // The legacy flow: pick a template, edit a parameter, preview the block, Insert Cycle.
       await clickText("button", "Simple Drilling")
-      const depth = await find<HTMLInputElement>('input#depth')
+      const depth = await find<HTMLInputElement>('input#cycle-depth')
       depth.value = "12"
       depth.dispatchEvent(new window.Event("input", { bubbles: true }))
       await app.wait(() => document.querySelector('[data-testid="cycle-preview"]')?.textContent?.includes("Z-12"))
