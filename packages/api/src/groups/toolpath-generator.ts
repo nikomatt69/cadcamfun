@@ -1,10 +1,14 @@
 import { cam } from "@cadcamfun/core"
+import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import { BadRequest, InternalError } from "../errors.ts"
-import { CamKernelRequest, CamKernelResult } from "../cam-kernel.ts"
+import { CamKernelRequest, CamKernelResult, CamProgressTarget } from "../cam-kernel.ts"
 
 const g = cam.generator
 const v = cam.verify
+
+/** The generate request plus where to announce its steps (a `cam.progress` frame per step); the progress target is not part of the job. */
+export const GenerateRequestWithProgress = Schema.Struct({ ...g.GenerateRequestSchema.fields, progress: Schema.optionalKey(CamProgressTarget) })
 
 /**
  * Toolpath generator (legacy `ToolpathGenerator` panel): the legacy app generated G-code in the browser;
@@ -18,7 +22,7 @@ export class ToolpathGeneratorGroup extends HttpApiGroup.make("toolpathGenerator
   }))
   .add(
     HttpApiEndpoint.post("generate", "/api/toolpaths/generate", {
-      payload: g.GenerateRequestSchema, success: g.GenerateResponseSchema, error: [BadRequest, InternalError]
+      payload: GenerateRequestWithProgress, success: g.GenerateResponseSchema, error: [BadRequest, InternalError]
     }),
     HttpApiEndpoint.post("suggest", "/api/toolpaths/suggest", {
       payload: g.SuggestRequestSchema, success: g.SuggestResponseSchema, error: [BadRequest, InternalError]

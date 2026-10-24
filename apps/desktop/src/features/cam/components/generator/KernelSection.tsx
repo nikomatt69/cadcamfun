@@ -121,7 +121,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
     const p = store.kernelProgress
     if (p === undefined || p.runId !== runId) return undefined
     if (p.stage === "operations" && p.operationId !== undefined) return t("cam.kernel.progress.operation", { index: (p.index ?? 0) + 1, count: p.count ?? 1, id: p.operationId })
-    return p.stage === undefined ? undefined : t(`cam.kernel.progress.${p.stage}`)
+    return p.stage === "operations" || p.stage === "post" || p.stage === "replay" || p.stage === "evidence" ? t(`cam.kernel.progress.${p.stage}`) : undefined
   }
 
   /** The kernel's plan for the current part, into the editable list. */

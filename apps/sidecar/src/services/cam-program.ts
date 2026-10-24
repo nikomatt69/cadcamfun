@@ -15,7 +15,7 @@ export const drawingRevision = (loaded: { readonly id: string; readonly elements
 }
 
 /** The same request adapter serves preview generation and persistence revalidation. */
-export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payload: CamKernelRequest, report?: (progress: cam.kernel.KernelProgress | "done" | "cancelled") => void) {
+export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payload: CamKernelRequest, report?: (progress: cam.kernel.KernelProgress | cam.generator.GenerateProgress | "done" | "cancelled") => void) {
   const job = cam.kernel.jobOfSnapshot(payload)
   if (job.status === "failed") return yield* new BadRequest({ message: job.issues.map((i) => i.message).join("; ") })
   // In a scoped worker: the event loop keeps serving while the kernel works, a dropped request interrupts the fiber (its signal

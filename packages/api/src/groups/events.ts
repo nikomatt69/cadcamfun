@@ -90,7 +90,7 @@ export const CamProgress = Schema.Struct({
   projectId: Schema.String,
   runId: Schema.String,
   phase: Schema.Literals(["running", "done", "cancelled"]),
-  stage: Schema.optional(Schema.Literals(["operations", "post", "replay", "evidence"])),
+  stage: Schema.optional(Schema.Literals(["operations", "post", "replay", "evidence", "toolpath", "optimize", "arcs", "feeds", "analysis", "cycles", "record"])),
   operationId: Schema.optional(Schema.String),
   index: Schema.optional(Schema.Number),
   count: Schema.optional(Schema.Number)

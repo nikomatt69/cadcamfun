@@ -200,27 +200,55 @@ export interface GenerateOutcome {
   readonly error?: string
 }
 
-export const generateToolpath = (request: GenerateRequest): GenerateOutcome => {
+/** The steps a generate run goes through, in order; a step that the request switches off is not reported. */
+export type GenerateStage = "toolpath" | "optimize" | "arcs" | "feeds" | "analysis" | "cycles" | "record"
+
+/** Where a generate run is: the step about to start and its place among the steps this request runs. */
+export interface GenerateProgress {
+  readonly stage: GenerateStage
+  readonly step: { readonly index: number; readonly count: number }
+}
+
+export interface GenerateRunOptions {
+  /** Called before each step. The run is synchronous: a host that wants the callback delivered while it works runs it in a worker. */
+  readonly onProgress?: (progress: GenerateProgress) => void
+}
+
+export const generateToolpath = (request: GenerateRequest, options: GenerateRunOptions = {}): GenerateOutcome => {
   const { settings } = request
-  const generated = text(request)
-  let gcode = generated.gcode
   // Multi-axis text is written by a post (rotary words, TCP codes): the text passes below would not understand B and C.
   const multiaxis = settings.operationType === "multiaxis"
   // The text passes know X Y Z and F, not the extruder: on a printer they would drop extruding moves and write arcs without E.
   const printer = settings.machineType === "3dprinter"
-  if (!multiaxis && !printer && settings.optimizePath) gcode = optimizeToolpath(gcode, settings.tolerance)
-  if (!multiaxis && !printer && settings.useArcFitting) gcode = convertLinesToArcs(gcode, settings.tolerance)
+  const optimize = !multiaxis && !printer && settings.optimizePath
+  const arcs = !multiaxis && !printer && settings.useArcFitting
   // Feed that follows the path is a mill's concern: a printer or a lathe has its own feed model.
-  if (!multiaxis && settings.useAdaptiveFeeds && settings.machineType === "mill") gcode = adaptFeeds(gcode, settings.toolDiameter)
+  const feeds = !multiaxis && settings.useAdaptiveFeeds && settings.machineType === "mill"
+  const evidence = request.evidence !== false
+  const stages: ReadonlyArray<GenerateStage> = [
+    "toolpath", ...(optimize ? ["optimize" as const] : []), ...(arcs ? ["arcs" as const] : []), ...(feeds ? ["feeds" as const] : []),
+    "analysis", "cycles", ...(evidence ? ["record" as const] : [])
+  ]
+  const enter = (stage: GenerateStage): void => options.onProgress?.({ stage, step: { index: stages.indexOf(stage), count: stages.length } })
+  enter("toolpath")
+  const generated = text(request)
+  let gcode = generated.gcode
+  if (optimize) { enter("optimize"); gcode = optimizeToolpath(gcode, settings.tolerance) }
+  if (arcs) { enter("arcs"); gcode = convertLinesToArcs(gcode, settings.tolerance) }
+  if (feeds) { enter("feeds"); gcode = adaptFeeds(gcode, settings.toolDiameter) }
+  enter("analysis")
   const analysis = analyseGcode(gcode, `${settings.machineType}-${settings.operationType}`)
+  enter("cycles")
+  const cycles = detectFixedCycles(gcode)
+  if (evidence) enter("record")
   return {
     response: {
       gcode,
-      cycles: detectFixedCycles(gcode),
+      cycles,
       warnings: [...warningsIn(gcode), ...(generated.warnings ?? [])],
       stats: analysis.stats,
       program: analysis.program,
-      ...(request.evidence === false ? {} : { evidence: programRecord(request, gcode, analysis.stats, generated.error, generated.checks) }),
+      ...(evidence ? { evidence: programRecord(request, gcode, analysis.stats, generated.error, generated.checks) } : {}),
       ...(generated.print !== undefined ? { print: generated.print } : {})
     },
     ...(generated.error !== undefined ? { error: generated.error } : {})

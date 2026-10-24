@@ -2782,6 +2782,7 @@ type Endpoint27_1Input = {
   readonly machine?: Endpoint27_1Request["payload"]["machine"]
   readonly stamp?: Endpoint27_1Request["payload"]["stamp"]
   readonly evidence?: Endpoint27_1Request["payload"]["evidence"]
+  readonly progress?: Endpoint27_1Request["payload"]["progress"]
 }
 const Endpoint27_1 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_1Input) =>
   raw["generate"]({
@@ -2792,6 +2793,7 @@ const Endpoint27_1 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27
       machine: input["machine"],
       stamp: input["stamp"],
       evidence: input["evidence"],
+      progress: input["progress"],
     },
   }).pipe(Effect.mapError(mapClientError))
 

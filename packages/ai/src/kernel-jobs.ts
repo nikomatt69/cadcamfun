@@ -15,10 +15,12 @@ export interface KernelJobs {
   /** The CAM kernel on a whole job (spec 29): NC plus evidence; progress is reported before each operation and stage. */
   readonly "cam-manufacture": { readonly input: ManufacturingInput; readonly output: ReturnType<typeof cam.kernel.runJob> }
   readonly "cam-plan": { readonly input: ManufacturingInput; readonly output: ReturnType<typeof cam.kernel.planOnly> }
+  /** The toolpath generator on one request (the panel's Generate button): G-code plus evidence; progress is reported before each step. */
+  readonly "cam-generate": { readonly input: cam.generator.GenerateRequest; readonly output: cam.generator.GenerateOutcome }
 }
 
-/** Progress a job may report while it runs (only the CAM kernel does). */
-export type KernelJobProgress = cam.kernel.KernelProgress
+/** Progress a job may report while it runs (only the CAM jobs do): a kernel stage or a generator step. */
+export type KernelJobProgress = cam.kernel.KernelProgress | cam.generator.GenerateProgress
 
 export type KernelJobName = keyof KernelJobs
 
@@ -26,5 +28,6 @@ export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]
   acceptance: (input) => acceptPart(parseHistory(input.history), input.checks, input.budgetMs === undefined ? {} : { budgetMs: input.budgetMs }),
   "parametric-report": (input) => parametricReport(parseHistory(input.history)),
   "cam-manufacture": ({ stockFromPartBottom, ...job }, report) => cam.kernel.runJob(job, { ...(stockFromPartBottom !== undefined ? { stockFromPartBottom } : {}), ...(report === undefined ? {} : { onProgress: report }) }),
-  "cam-plan": ({ stockFromPartBottom, ...job }) => cam.kernel.planOnly(job, stockFromPartBottom === undefined ? {} : { stockFromPartBottom })
+  "cam-plan": ({ stockFromPartBottom, ...job }) => cam.kernel.planOnly(job, stockFromPartBottom === undefined ? {} : { stockFromPartBottom }),
+  "cam-generate": (request, report) => cam.generator.generateToolpath(request, report === undefined ? {} : { onProgress: report })
 }

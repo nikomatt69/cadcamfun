@@ -323,3 +323,29 @@ describe("suggestions", () => {
     expect(suggestFor(settings(), { ...DEFAULT_GEOMETRY }).parameters).toBeUndefined()
   })
 })
+
+describe("generate progress", () => {
+  const seen = (s: ToolpathSettings, evidence = true) => {
+    const steps: Array<{ stage: string; index: number; count: number }> = []
+    generateToolpath({ settings: s, geometry: DEFAULT_GEOMETRY as never, printer: DEFAULT_PRINTER_EXTRAS, evidence }, { onProgress: (p) => steps.push({ stage: p.stage, ...p.step }) })
+    return steps
+  }
+
+  test("each step is announced before it runs, numbered among the steps of this request", () => {
+    const steps = seen(settings({ optimizePath: true, useArcFitting: true, useAdaptiveFeeds: true }))
+    expect(steps.map((s) => s.stage)).toEqual(["toolpath", "optimize", "arcs", "feeds", "analysis", "cycles", "record"])
+    expect(steps.map((s) => s.index)).toEqual([0, 1, 2, 3, 4, 5, 6])
+    expect(new Set(steps.map((s) => s.count))).toEqual(new Set([7]))
+  })
+
+  test("a step the request switches off is not announced and the count follows", () => {
+    const steps = seen(settings({ optimizePath: false, useArcFitting: false, useAdaptiveFeeds: false }), false)
+    expect(steps.map((s) => s.stage)).toEqual(["toolpath", "analysis", "cycles"])
+    expect(steps.at(-1)).toMatchObject({ index: 2, count: 3 })
+  })
+
+  test("the program is the same with or without a listener", () => {
+    const request = { settings: settings(), geometry: DEFAULT_GEOMETRY as never, printer: DEFAULT_PRINTER_EXTRAS }
+    expect(generateToolpath(request, { onProgress: () => {} }).response.gcode).toBe(generateToolpath(request).response.gcode)
+  })
+})

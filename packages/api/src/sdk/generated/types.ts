@@ -7465,7 +7465,19 @@ export type EventsSubscribeOutput =
       projectId: string
       runId: string
       phase: "running" | "done" | "cancelled"
-      stage?: "operations" | "post" | "replay" | "evidence" | undefined
+      stage?:
+        | "operations"
+        | "post"
+        | "replay"
+        | "evidence"
+        | "toolpath"
+        | "optimize"
+        | "arcs"
+        | "feeds"
+        | "analysis"
+        | "cycles"
+        | "record"
+        | undefined
       operationId?: string | undefined
       index?: number | undefined
       count?: number | undefined
@@ -7589,7 +7601,19 @@ export type EventsSubscribeAllOutput =
       projectId: string
       runId: string
       phase: "running" | "done" | "cancelled"
-      stage?: "operations" | "post" | "replay" | "evidence" | undefined
+      stage?:
+        | "operations"
+        | "post"
+        | "replay"
+        | "evidence"
+        | "toolpath"
+        | "optimize"
+        | "arcs"
+        | "feeds"
+        | "analysis"
+        | "cycles"
+        | "record"
+        | undefined
       operationId?: string | undefined
       index?: number | undefined
       count?: number | undefined

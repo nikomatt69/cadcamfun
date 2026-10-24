@@ -2,6 +2,7 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { KernelJobError, kernelWorkerUrl, runKernelJob, runKernelJobInline } from "../src/kernel-job.ts"
 import type { AcceptanceCheck } from "../src/acceptance.ts"
 import { cam } from "@cadcamfun/core"
+import { Schema } from "effect"
 
 setDefaultTimeout(120_000)
 
@@ -108,5 +109,18 @@ describe("the CAM kernel as a worker job", () => {
       expect(await runKernelJob("cam-plan", { ...camJob, setupOrientation, stockFromPartBottom }))
         .toEqual(runKernelJobInline("cam-plan", { ...explicit, setupOrientation }))
     }
+  })
+})
+
+describe("the toolpath generator as a worker job", () => {
+  const request = Schema.decodeUnknownSync(cam.generator.GenerateRequestSchema)({})
+
+  test("the worker returns the program the inline run returns and reports each step on the way", async () => {
+    const seen: Array<string> = []
+    const inline = runKernelJobInline("cam-generate", request)
+    const worker = await runKernelJob("cam-generate", request, { onProgress: (p) => seen.push(p.stage) })
+    expect(worker.response.gcode).toBe(inline.response.gcode)
+    expect(seen[0]).toBe("toolpath")
+    expect(seen.slice(-2)).toEqual(["cycles", "record"])
   })
 })

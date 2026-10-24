@@ -81,3 +81,18 @@ test("a dropped request ends the worker and announces the run as cancelled", asy
   await Bun.sleep(800)
   expect(seen.length).toBe(frozen)
 })
+
+test("generate announces its steps under the caller's run id and answers like before", async () => {
+  const project = (await app.call("/api/projects", { method: "POST", json: { name: "Generate progress" } })).body.id
+  const plain = await app.call("/api/toolpaths/generate", { method: "POST", json: {} })
+  expect(plain.status).toBe(200)
+  const withTarget = await app.call("/api/toolpaths/generate", { method: "POST", json: { progress: { projectId: project, runId: "run-g" } } })
+  expect(withTarget.status).toBe(200)
+  expect(withTarget.body.gcode).toBe(plain.body.gcode)
+  const refused = await app.call("/api/toolpaths/generate", { method: "POST", json: { progress: { projectId: "nope", runId: "run-h" } } })
+  expect(refused.status).toBe(400)
+})
+
+test("a generator step becomes a frame with its place among the steps", () => {
+  expect(camProgressFrame("p", "r", { stage: "arcs", step: { index: 1, count: 5 } }, "t")).toEqual({ type: "cam.progress", projectId: "p", runId: "r", phase: "running", stage: "arcs", index: 1, count: 5, at: "t" })
+})

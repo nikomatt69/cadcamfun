@@ -6,13 +6,14 @@
  * result goes to the CAM page (`onGCodeGenerated`) and into the CAM store, where the viewport, the post-processor
  * and the assistant read it.
  */
-import { Show, createSignal, type JSX } from "solid-js"
+import { Show, createSignal, onCleanup, type JSX } from "solid-js"
 import { Code, Cpu, CircleHelp, Maximize2, Minimize2, Save, Upload } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { makeToolpathGenerator, type GenerateResponse } from "../api/generator.ts"
 import { geometryOf } from "../lib/job.ts"
+import { captureEditorOwner } from "../../ai/lib/editor-sync.ts"
 import { useJob } from "../hooks/useJob.ts"
 import { useCamStore } from "../store/camStore.ts"
 import { loadConfig, saveConfig, useGeneratorStore, type LibraryTool } from "../store/generatorStore.ts"
@@ -42,6 +43,9 @@ export interface ToolpathGeneratorProps {
   readonly onToolSelected?: (tool: LibraryTool) => void
 }
 
+/** The generator's steps (the kernel's own stages share the frame, with other names). */
+const STEPS = ["toolpath", "optimize", "arcs", "feeds", "analysis", "cycles", "record"] as const
+
 export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.Element {
   const app = useApp()
   const [saveOpen, setSaveOpen] = createSignal(false)
@@ -50,15 +54,41 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
   const job = useJob()
   const generator = makeToolpathGenerator(app.client)
 
+  // What this button's run is doing: the sidecar's step frames under this run's id, and the seconds since it started, so a long
+  // run never looks stuck even inside one step.
+  let runId: string | undefined
+  const [elapsed, setElapsed] = createSignal(0)
+  const [running, setRunning] = createSignal(false)
+  let ticker: ReturnType<typeof setInterval> | undefined
+  const stopTicker = (): void => { if (ticker !== undefined) clearInterval(ticker); ticker = undefined; setRunning(false) }
+  onCleanup(stopTicker)
+  const progressLabel = (): string => {
+    const p = camStore.kernelProgress
+    const stage = p?.runId === runId ? STEPS.find((step) => step === p?.stage) : undefined
+    const step = p !== undefined && stage !== undefined && p.index !== undefined && p.count !== undefined
+      ? t("cam.generator.progress.step", { index: p.index + 1, count: p.count, label: t(`cam.generator.progress.${stage}`) })
+      : t("cam.generator.progress.start")
+    return `${step} · ${elapsed()} s`
+  }
+
   const generate = async (): Promise<void> => {
     gen.setGenerating(true)
     gen.setError(null)
     gen.setSuccess(null)
+    const projectId = captureEditorOwner().projectId
+    runId = crypto.randomUUID()
+    camStore.setKernelProgress(undefined)
+    setElapsed(0)
+    const started = Date.now()
+    stopTicker()
+    ticker = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000)
+    setRunning(true)
     try {
       const response: GenerateResponse = await app.runtime.run(generator.generate({
         settings: gen.settings,
         geometry: geometryOf(gen, job.sources()),
-        printer: gen.printer
+        printer: gen.printer,
+        ...(projectId == null ? {} : { progress: { projectId, runId } })
       }))
       gen.setResult(response.gcode, response.cycles, response.evidence, response.print)
       camStore.setGcode(response.gcode)
@@ -71,6 +101,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
       if (gen.settings.machineType === "3dprinter") toast.error(message)
       gen.setError(gen.settings.machineType === "3dprinter" ? message : message || t("cam.generator.error"))
     } finally {
+      stopTicker()
       gen.setGenerating(false)
     }
   }
@@ -146,6 +177,9 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
               <Cpu size={14} />{t("cam.generator.generating")}
             </Show>
           </button>
+          <Show when={running()}>
+            <p class="text-[10px] text-gray-500 text-center" data-testid="generate-progress" aria-live="polite">{progressLabel()}</p>
+          </Show>
           <button type="button" onClick={saveAsToolpath} class="panel-btn panel-btn--block">
             <Save size={14} />{t("cam.generator.saveAsToolpath")}
           </button>

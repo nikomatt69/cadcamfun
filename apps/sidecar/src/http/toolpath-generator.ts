@@ -1,3 +1,4 @@
+import { runKernelJob } from "@cadcamfun/ai"
 import { Api, BadRequest, CurrentUser, InternalError } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
 import { Effect } from "effect"
@@ -18,20 +19,33 @@ const guarded = <A>(label: string, run: () => A) =>
 export const ToolpathGeneratorHandlers = HttpApiBuilder.group(Api, "toolpathGenerator", Effect.fn(function*(handlers) {
   const events = yield* LiveEvents
   const projects = yield* ProjectRepo
+  // Progress frames go only to a project the caller can open: the same check the stream applies when it delivers them.
+  const progressTarget = (projectId: string) => Effect.gen(function*() {
+    const user = yield* CurrentUser
+    const project = yield* projects.find(user.id, projectId).pipe(Effect.catch(() => Effect.succeed(undefined)))
+    if (project === undefined) return yield* new BadRequest({ message: "Progress target: project not found" })
+  })
   return handlers
     .handle("manufacture", ({ payload }) => Effect.gen(function*() {
-      // Progress frames go only to a project the caller can open: the same check the stream applies when it delivers them.
       const target = payload.progress
-      if (target !== undefined) {
-        const user = yield* CurrentUser
-        const project = yield* projects.find(user.id, target.projectId).pipe(Effect.catch(() => Effect.succeed(undefined)))
-        if (project === undefined) return yield* new BadRequest({ message: "Progress target: project not found" })
-      }
+      if (target !== undefined) yield* progressTarget(target.projectId)
       return yield* runKernelRequest(payload, target === undefined ? undefined : camProgressReporter(events, target.projectId, target.runId))
     }))
     .handle("generate", ({ payload }) =>
       Effect.gen(function*() {
-        const outcome = yield* guarded("Failed to generate toolpath", () => g.generateToolpath(payload))
+        const { progress: target, ...request } = payload
+        if (target !== undefined) yield* progressTarget(target.projectId)
+        const report = target === undefined ? undefined : camProgressReporter(events, target.projectId, target.runId)
+        // In a scoped worker like the kernel: the event loop keeps serving, so each step's frame reaches the stream while the run works,
+        // and a dropped request interrupts the fiber and terminates the worker.
+        const outcome = yield* Effect.tryPromise({
+          try: (signal) => runKernelJob("cam-generate", request, { signal, ...(report !== undefined ? { onProgress: report } : {}) }),
+          catch: (cause) => cause
+        }).pipe(
+          Effect.catch((cause) => Effect.logError("Failed to generate toolpath", cause).pipe(Effect.andThen(Effect.fail(new InternalError({ message: "Failed to generate toolpath" }))))),
+          Effect.onInterrupt(() => Effect.sync(() => report?.("cancelled")))
+        )
+        report?.("done")
         if (outcome.error !== undefined) return yield* new BadRequest({ message: outcome.error })
         return outcome.response
       }))

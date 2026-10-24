@@ -6,6 +6,9 @@ const positive = Schema.Finite.check(Schema.isGreaterThan(0))
 const strings = Schema.Array(Schema.String)
 const id = Schema.NonEmptyString
 
+/** Where to announce a run's progress: a `cam.progress` frame per step on the project's live stream; never stored with the program. */
+export const CamProgressTarget = Schema.Struct({ projectId: id, runId: id })
+
 /** An explicit CAD snapshot: no stored document or AI session is mutated by this endpoint. */
 export const CamKernelRequest = Schema.Struct({
   setupOrientation: CamManufactureInput.fields.setupOrientation,
@@ -28,7 +31,7 @@ export const CamKernelRequest = Schema.Struct({
   postDefinition: CamManufactureInput.fields.postDefinition,
   print: CamManufactureInput.fields.print,
   /** Where to announce progress (a `cam.progress` frame per operation and stage on the project's live stream); never stored with the program. */
-  progress: Schema.optionalKey(Schema.Struct({ projectId: id, runId: id }))
+  progress: Schema.optionalKey(CamProgressTarget)
 })
 export type CamKernelRequest = typeof CamKernelRequest.Type
 
