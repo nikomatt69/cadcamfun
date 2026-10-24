@@ -2,7 +2,7 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { booleanBrep } from "./boolean.ts"
 import { frame } from "./math.ts"
 import { massProperties } from "./mass.ts"
-import { makeBox, makeCone, makeCylinder } from "./primitives.ts"
+import { makeBox, makeCone, makeCylinder, makeSphere } from "./primitives.ts"
 import { shadowSolid } from "./shadow.ts"
 import type { Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
@@ -58,5 +58,26 @@ describe("the shadow of a solid from above", () => {
     expect(shadowSolid(open)).toMatch(/cone face that can be seen from above/)
     const bulb = sub(makeBox(40, 30, 10), makeCone(8, 2, 6, frame({ x: 20, y: 15, z: 4 }, Z)))
     expect(typeof shadowSolid(bulb)).toBe("object")
+  })
+
+  test("a round bar lying on the block: the columns under its upper arc are filled, the hidden cavity too (closed form)", () => {
+    // A bar of radius 4 along X, 30 long, its axis 3 mm above the block's top (so it is sunk 1 mm and its face goes below the axis).
+    const block = sub(makeBox(40, 40, 20), makeBox(10, 10, 6, frame({ x: 15, y: 15, z: 8 }, Z)))
+    const part = uni(block, makeCylinder(4, 30, frame({ x: 5, y: 20, z: 23 }, X)))
+    const sh = ok(shadowSolid(part))
+    // Under the arc and above the block's top: the upper half disc plus the 3 mm strip between the top and the axis, 8 mm wide.
+    expect(volume(sh.brep)).toBeCloseTo(40 * 40 * 20 + (Math.PI * 16 / 2 + 8 * 3) * 30, 3)
+    expect(validateBrep(sh.brep).valid).toBe(true)
+    expect(sh.hidden).toBeGreaterThan(0)
+  })
+
+  test("a dome on a pin: the column under the rim and the cap over it, revolved", () => {
+    const Q = Math.sqrt(64 - 25), centre = { x: 20, y: 15, z: 16 - Q }
+    const head = booleanBrep(makeSphere(8, frame(centre, Z)), makeCylinder(5, 14, frame({ x: 20, y: 15, z: 10 }, Z)), "intersect").brep
+    const part = uni(sub(makeBox(40, 30, 10), makeBox(8, 8, 4, frame({ x: 5, y: 5, z: 3 }, Z))), head)
+    const sh = ok(shadowSolid(part))
+    const h = 8 - Q
+    expect(volume(sh.brep)).toBeCloseTo(40 * 30 * 10 + Math.PI * 25 * 6 + (Math.PI * h * h * (3 * 8 - h)) / 3, 3)
+    expect(validateBrep(sh.brep).valid).toBe(true)
   })
 })
