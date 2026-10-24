@@ -15731,6 +15731,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   "holes": {
                                     "type": "integer",
                                   },
+                                  "islands": {
+                                    "type": "integer",
+                                  },
                                   "outlines": {
                                     "type": "integer",
                                   },
@@ -57424,6 +57427,61 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             },
                             "top": {
                               "type": "number",
+                            },
+                            "within": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "boundary": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "maxItems": 20000,
+                                  "minItems": 3,
+                                  "type": "array",
+                                },
+                                "islands": {
+                                  "items": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "maxItems": 20000,
+                                    "minItems": 3,
+                                    "type": "array",
+                                  },
+                                  "maxItems": 500,
+                                  "type": "array",
+                                },
+                              },
+                              "required": [
+                                "boundary",
+                              ],
+                              "type": "object",
                             },
                           },
                           "required": [

@@ -97,6 +97,23 @@ export const offsetRing = (ring: ReadonlyArray<Vec2>, d: number): Vec2[] | undef
   return best === undefined ? undefined : ccw(best)
 }
 
+/**
+ * The narrowest gap between an island and the walls around it (the boundary and the other islands), mm: the widest cutter that
+ * can go all the way round. Polygon to polygon, so the minimum is reached at a vertex of one or the other. Infinity without islands.
+ */
+export const corridorWidth = (boundary: ReadonlyArray<Vec2>, islands: ReadonlyArray<ReadonlyArray<Vec2>>): number => {
+  let best = Infinity
+  const between = (a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): void => {
+    for (const p of a) best = Math.min(best, distanceToChain(p, b, true))
+    for (const p of b) best = Math.min(best, distanceToChain(p, a, true))
+  }
+  islands.forEach((island, i) => {
+    between(island, boundary)
+    for (let j = i + 1; j < islands.length; j++) between(island, islands[j]!)
+  })
+  return best
+}
+
 /** Radius of the largest circle that fits in a region (sampled on a grid, then refined around the best node). */
 export const inscribedRadius = (boundary: ReadonlyArray<Vec2>, islands: ReadonlyArray<ReadonlyArray<Vec2>> = []): number => {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -194,9 +211,9 @@ export const planJob = (input: PlanInput): Plan => {
   // ------------------------------------------------------------ roughing
   const finishes: OperationSpec[] = []
   const outlines = features.flatMap((f) => f.outlines).sort((a, b) => b.top - a.top)
-  const pocketRegions: Array<{ id: string; loop: ReadonlyArray<Vec2>; top: number; floor: number }> = []
-  for (const f of features) for (const p of f.pockets) pocketRegions.push({ id: p.id, loop: p.loop, top: Math.min(p.top, partTop), floor: p.floor })
-  for (const o of outlines) o.inner.forEach((loop, i) => pocketRegions.push({ id: `${o.id}-opening${i}`, loop, top: o.top, floor: o.bottom }))
+  const pocketRegions: Array<{ id: string; loop: ReadonlyArray<Vec2>; islands: ReadonlyArray<ReadonlyArray<Vec2>>; top: number; floor: number }> = []
+  for (const f of features) for (const p of f.pockets) pocketRegions.push({ id: p.id, loop: p.loop, islands: p.islands ?? [], top: Math.min(p.top, partTop), floor: p.floor })
+  for (const o of outlines) o.inner.forEach((loop, i) => pocketRegions.push({ id: `${o.id}-opening${i}`, loop, islands: [], top: o.top, floor: o.bottom }))
 
   const stockRing = (grow: number): Vec2[] => [
     { x: stock.min.x - grow, y: stock.min.y - grow }, { x: stock.max.x + grow, y: stock.min.y - grow },
@@ -245,20 +262,28 @@ export const planJob = (input: PlanInput): Plan => {
     const depth = p.top - p.floor
     if (depth <= 1e-6) continue
     const loop = ccw(p.loop)
-    const radius = inscribedRadius(loop)
-    const tool = endMill(Math.min(maxRough, 1.6 * radius), depth)
-    if (tool === undefined) { unmachined.push(`Pocket ${p.id}: no end mill fits its ${r3(2 * radius)} mm width`); continue }
+    const islands = p.islands.map(ccw)
+    const radius = inscribedRadius(loop, islands)
+    // With islands the cutter must also go through the narrowest gap around them, with the finishing allowance on both walls.
+    const corridor = corridorWidth(loop, islands) - 2 * allowance
+    const tool = endMill(Math.min(maxRough, 1.6 * radius, corridor), depth)
+    if (tool === undefined) { unmachined.push(`Pocket ${p.id}: no end mill fits its ${r3(2 * radius)} mm width${islands.length > 0 ? ` and the ${r3(corridor + 2 * allowance)} mm gap around its islands` : ""}`); continue }
     reachNote(tool, depth, `Pocket ${p.id}`)
     const through = p.floor <= partBottom + 1e-6
     const floor = through ? p.floor - 0.3 : p.floor
     if (through) notes.push(`Pocket ${p.id} is open at the bottom: cut 0.3 mm into the fixture plate`)
     const shrunk = offsetRing(loop, -allowance)
+    // The islands stay `allowance` proud of their walls, like the boundary: the walls are finished afterwards.
+    const grown = islands.flatMap((i) => { const g = offsetRing(i, allowance); return g === undefined ? [] : [g] })
     if (2 * radius >= 3 * tool.diameter && shrunk !== undefined) {
-      ops.push({ id: `rough-${p.id}`, name: `Adaptive rough ${p.id}`, strategy: "adaptive", tool: tool.id, region: { boundary: shrunk }, top: p.top, bottom: floor })
+      ops.push({ id: `rough-${p.id}`, name: `Adaptive rough ${p.id}`, strategy: "adaptive", tool: tool.id, region: { boundary: shrunk, ...(grown.length > 0 ? { islands: grown } : {}) }, top: p.top, bottom: floor })
     } else {
-      ops.push({ id: `rough-${p.id}`, name: `Rough ${p.id}`, strategy: "pocket", tool: tool.id, region: { boundary: loop }, top: p.top, bottom: floor, allowance })
+      ops.push({ id: `rough-${p.id}`, name: `Rough ${p.id}`, strategy: "pocket", tool: tool.id, region: { boundary: loop, ...(islands.length > 0 ? { islands } : {}) }, top: p.top, bottom: floor, allowance })
     }
-    finishes.push({ id: `finish-${p.id}`, name: `Finish walls of ${p.id}`, strategy: "profile", tool: tool.id, loop, side: "inside", top: p.top, bottom: floor, allowance: 0, finish: true })
+    // Lead-ins of the wall passes stay in the free ground between the walls and the islands.
+    const within = islands.length > 0 ? { within: { boundary: loop, islands } } : {}
+    finishes.push({ id: `finish-${p.id}`, name: `Finish walls of ${p.id}`, strategy: "profile", tool: tool.id, loop, side: "inside", top: p.top, bottom: floor, allowance: 0, finish: true, ...within })
+    islands.forEach((island, k) => finishes.push({ id: `finish-${p.id}-island${k + 1}`, name: `Finish walls of island ${k + 1} in ${p.id}`, strategy: "profile", tool: tool.id, loop: island, side: "outside", top: p.top, bottom: floor, allowance: 0, finish: true, ...within }))
   }
 
   // ------------------------------------------------------------ holes

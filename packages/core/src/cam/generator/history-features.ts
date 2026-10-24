@@ -62,6 +62,8 @@ export interface MachiningPocket {
   readonly id: string
   readonly feature: string
   readonly loop: ReadonlyArray<Vec2>
+  /** Material standing inside the region (an exact B-rep reads them; a history pocket has none): the tool must not cut them between `floor` and `top`. */
+  readonly islands?: ReadonlyArray<ReadonlyArray<Vec2>>
   readonly top: number
   readonly floor: number
 }
@@ -172,7 +174,7 @@ export const historyFeatures = (e: CadElement): HistoryFeatures | undefined => {
   const move2 = (p: Vec2): Vec2 => ({ x: p.x + shift.x, y: p.y + shift.y })
   return {
     holes: local.holes.map((h) => ({ ...h, entry: add(h.entry, shift) })),
-    pockets: local.pockets.map((p) => ({ ...p, loop: p.loop.map(move2), top: p.top + shift.z, floor: p.floor + shift.z })),
+    pockets: local.pockets.map((p) => ({ ...p, loop: p.loop.map(move2), ...(p.islands !== undefined ? { islands: p.islands.map((i) => i.map(move2)) } : {}), top: p.top + shift.z, floor: p.floor + shift.z })),
     outlines: local.outlines.map((o) => ({ ...o, outer: o.outer.map(move2), inner: o.inner.map((l) => l.map(move2)), top: o.top + shift.z, bottom: o.bottom + shift.z })),
     turned: local.turned.map((t) => {
       const by = t.axis === "x" ? shift.x : t.axis === "y" ? shift.y : shift.z

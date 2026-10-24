@@ -7,7 +7,7 @@ import { elementBrep, stepToElements } from "../cad/scene-step.ts"
 import { signedArea } from "../cad/shapes.ts"
 import { brepFeatures, exactFeatures } from "./brep-part.ts"
 import { historyFeatures } from "./generator/history-features.ts"
-import { planOnly, runJob, type ManufacturingJob } from "./kernel/index.ts"
+import { DEFAULT_CUTTERS, planOnly, runJob, type ManufacturingJob } from "./kernel/index.ts"
 
 setDefaultTimeout(100_000)
 
@@ -193,5 +193,97 @@ describe("the planner uses them", () => {
     expect(a.claims.find((c) => c.id === "nc-replay")!.status).toBe("passed")
     expect(a.operations.some((o) => o.strategy === "drill" && o.status === "ok")).toBe(true)
     expect(a.nc).toMatch(/G8[13]/)
+  })
+})
+
+describe("islands standing in a pocket", () => {
+  /** Plate 100x60x10, a 60x40 pocket 6 deep (floor at z 4), and a 20x20 island on its floor `h` high (the rim is at z 10). */
+  const islandPart = (h: number, extra: Feature[] = []) => history([
+    rect("base", 0, 0, 100, 60), { id: "plate", type: "extrude", sketch: "base", depth: 10, operation: "new" },
+    rect("pocketSketch", 20, 10, 60, 40, 10), { id: "pocket", type: "extrude", sketch: "pocketSketch", depth: 6, direction: "down", operation: "subtract" },
+    rect("islandSketch", 40, 20, 20, 20, 4), { id: "island", type: "extrude", sketch: "islandSketch", depth: h, operation: "union" },
+    ...extra
+  ])
+  const volume = (f: NonNullable<ReturnType<typeof brepFeatures>["features"]>) =>
+    f.outlines.reduce((v, o) => v + area(o.outer) * (o.top - o.bottom), 0) -
+    f.pockets.reduce((v, p) => v + (area(p.loop) - (p.islands ?? []).reduce((a, i) => a + area(i), 0)) * (p.top - p.floor), 0)
+
+  test("an island as tall as the rim is an island of the pocket, and the sections explain the exact volume", () => {
+    const b = brepOf(islandPart(6))
+    const f = brepFeatures(b, "island")
+    expect(f.reason).toBeUndefined()
+    const { pockets, outlines } = f.features!
+    expect(outlines).toHaveLength(1)
+    expect(pockets).toHaveLength(1)
+    expect([pockets[0]!.floor, pockets[0]!.top]).toEqual([4, 10])
+    expect(pockets[0]!.islands).toHaveLength(1)
+    expect(area(pockets[0]!.islands![0]!)).toBeCloseTo(20 * 20, 6)
+    expect(area(pockets[0]!.loop)).toBeCloseTo(60 * 40, 6)
+    // Closed form: plate - pocket + island.
+    expect(massProperties(b).volume).toBeCloseTo(100 * 60 * 10 - 60 * 40 * 6 + 20 * 20 * 6, 6)
+    expect(volume(f.features!)).toBeCloseTo(massProperties(b).volume, 0)
+  })
+
+  test("an island lower than the rim splits the pocket in two: the channel around it and the open pocket above", () => {
+    const b = brepOf(islandPart(3))
+    const f = brepFeatures(b, "low-island").features!
+    expect(f.pockets.map((p) => [p.floor, p.top, (p.islands ?? []).length])).toEqual([[7, 10, 0], [4, 7, 1]])
+    expect(massProperties(b).volume).toBeCloseTo(100 * 60 * 10 - 60 * 40 * 6 + 20 * 20 * 3, 6)
+    expect(volume(f)).toBeCloseTo(massProperties(b).volume, 0)
+  })
+
+  test("a part without islands is reported exactly as before: no islands key at all", () => {
+    const f = brepFeatures(brepOf(stepped), "stepped").features!
+    expect(f.pockets.every((p) => !("islands" in p))).toBe(true)
+  })
+
+  test("a pocket cut into the island is refused with its reason", () => {
+    const h = islandPart(6, [rect("inner", 45, 25, 10, 10, 10), { id: "dimple", type: "extrude", sketch: "inner", depth: 2, direction: "down", operation: "subtract" }])
+    expect(brepFeatures(brepOf(h), "nested").reason).toMatch(/nested: has a pocket cut into an island/)
+  })
+
+  test("the planner roughs around the island and finishes its walls; the program passes gouge check and replay", () => {
+    const element = { id: "stp", type: "brep", name: "Island", brep: brepOf(islandPart(6)), x: 0, y: 0, z: 0 }
+    const j: ManufacturingJob = { schemaVersion: 1, id: "j", name: "J", material: "6061", part: { kind: "elements", elements: [element] }, stock: { min: { x: -3, y: -3, z: 0 }, max: { x: 103, y: 63, z: 11 } } }
+    const plan = planOnly(j)
+    if (plan.status !== "ok") throw new Error(plan.issues.map((i) => i.message).join("; "))
+    const rough = plan.value.operations.find((o) => o.id === "rough-pocket-1")!
+    expect(rough).toBeDefined()
+    if (rough.strategy !== "adaptive" && rough.strategy !== "pocket") throw new Error(`unexpected ${rough.strategy}`)
+    expect(rough.region.islands).toHaveLength(1)
+    const wall = plan.value.operations.find((o) => o.id === "finish-pocket-1-island1")!
+    expect(wall).toMatchObject({ strategy: "profile", side: "outside", top: 10, bottom: 4 })
+    const result = runJob(j)
+    if (result.status !== "ok") throw new Error(result.issues.map((i) => i.message).join("; "))
+    expect(result.value.release).not.toBe("blocked")
+    expect(result.value.claims.find((c) => c.id === "no-gouge")!.status).toBe("passed")
+    expect(result.value.claims.find((c) => c.id === "nc-replay")!.status).toBe("passed")
+    // What is left is the corner remnants of a round cutter in the four inside corners of the pocket, (1 - pi/4) r^2 x depth each:
+    // the island itself is not left standing in a cut region nor cut away.
+    const radius = DEFAULT_CUTTERS.find((c) => c.id === rough.tool)!.diameter / 2
+    const left = Number(/([0-9.]+) mm³ left/.exec(result.value.claims.find((c) => c.id === "material-removed")!.detail ?? "")?.[1] ?? 0)
+    expect(left).toBeLessThanOrEqual(4 * (1 - Math.PI / 4) * radius * radius * 6 + 1)
+  })
+
+  test("an island close to the wall: the cutter is chosen for the narrow gap and no lead-in swings into the island", () => {
+    // 60x40 pocket, 20x20 island 4 mm from the left wall: the gap is 4 mm, so the cutter is at most 4 - 2 x allowance.
+    const h = history([
+      rect("base", 0, 0, 100, 60), { id: "plate", type: "extrude", sketch: "base", depth: 10, operation: "new" },
+      rect("pocketSketch", 20, 10, 60, 40, 10), { id: "pocket", type: "extrude", sketch: "pocketSketch", depth: 6, direction: "down", operation: "subtract" },
+      rect("islandSketch", 24, 20, 20, 20, 4), { id: "island", type: "extrude", sketch: "islandSketch", depth: 6, operation: "union" }
+    ])
+    const element = { id: "stp", type: "brep", name: "Tight", brep: brepOf(h), x: 0, y: 0, z: 0 }
+    const j: ManufacturingJob = { schemaVersion: 1, id: "j", name: "J", material: "6061", part: { kind: "elements", elements: [element] }, stock: { min: { x: -3, y: -3, z: 0 }, max: { x: 103, y: 63, z: 11 } } }
+    const plan = planOnly(j)
+    if (plan.status !== "ok") throw new Error(plan.issues.map((i) => i.message).join("; "))
+    const rough = plan.value.operations.find((o) => o.id === "rough-pocket-1")!
+    const tool = DEFAULT_CUTTERS.find((c) => c.id === rough.tool)!
+    expect(tool.diameter).toBeLessThan(4)
+    const wall = plan.value.operations.find((o) => o.id === "finish-pocket-1")!
+    expect(wall.strategy === "profile" && wall.within?.islands).toHaveLength(1)
+    const result = runJob(j)
+    if (result.status !== "ok") throw new Error(result.issues.map((i) => i.message).join("; "))
+    expect(result.value.claims.find((c) => c.id === "no-gouge")!.status).toBe("passed")
+    expect(result.value.claims.find((c) => c.id === "nc-replay")!.status).toBe("passed")
   })
 })

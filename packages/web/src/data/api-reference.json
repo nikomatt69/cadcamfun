@@ -51963,6 +51963,61 @@
                             },
                             "finish": {
                               "type": "boolean"
+                            },
+                            "within": {
+                              "type": "object",
+                              "properties": {
+                                "boundary": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number"
+                                      },
+                                      "y": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 3,
+                                  "maxItems": 20000
+                                },
+                                "islands": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 3,
+                                    "maxItems": 20000
+                                  },
+                                  "maxItems": 500
+                                }
+                              },
+                              "required": [
+                                "boundary"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -58082,6 +58137,9 @@
                                   },
                                   "bottom": {
                                     "type": "number"
+                                  },
+                                  "islands": {
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [

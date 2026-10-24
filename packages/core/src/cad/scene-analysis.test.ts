@@ -133,3 +133,14 @@ test("setups are planned for the solids of the scene, a component's child includ
   expect(setupsForScene(scene(), { ids: ["plate"] }).parts.map((p) => p.id)).toEqual(["plate"])
   expect(setupsForScene(scene(), { fixture: "none" }).parts[0]!.plan.setups.map((s) => s.orientation).sort()).toEqual(["+Z", "-Z"])
 })
+
+test("the machining summary counts the islands standing in a pocket, and only then", () => {
+  const m = model()
+  m.extrude(m.sketch("XY").rectangle([0, 0], 100, 60), { depth: 10, id: "plate" })
+  m.extrude(m.sketch("XY", 10).rectangle([20, 10], 60, 40), { depth: 6, direction: "down", operation: "subtract", id: "pocket" })
+  m.extrude(m.sketch("XY", 4).rectangle([40, 20], 20, 20), { depth: 6, operation: "union", id: "island" })
+  const withIsland = analyzeScene([{ id: "p", type: "parametric", name: "P", history: m.build(), x: 0, y: 0, z: 0, layerId: "default" }])
+  expect(withIsland.parts[0]!.machining).toMatchObject({ prismatic: true, pockets: 1, outlines: 1, islands: 1 })
+  const plain = analyzeScene([{ id: "b", type: "parametric", name: "B", history: block(20, 6.8, 16), x: 0, y: 0, z: 0, layerId: "default" }])
+  expect("islands" in plain.parts[0]!.machining).toBe(false)
+})

@@ -1275,6 +1275,10 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly bottom: number
         readonly allowance?: number
         readonly finish?: boolean
+        readonly within?: {
+          readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+        }
       }
     | {
         readonly id: string
@@ -6528,7 +6532,15 @@ export type CadExactAnalyzeOutput = {
       headDepth?: number
     }>
     machining:
-      | { prismatic: true; holes: number; pockets: number; outlines: number; top: number; bottom: number }
+      | {
+          prismatic: true
+          holes: number
+          pockets: number
+          outlines: number
+          top: number
+          bottom: number
+          islands?: number
+        }
       | { prismatic: false; reason: string }
     faceNames?: Array<string>
     repair?: {

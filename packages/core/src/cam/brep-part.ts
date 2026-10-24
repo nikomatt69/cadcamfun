@@ -10,7 +10,8 @@
  *    surface job and the reason is returned (never a silent partial plan);
  *  - the horizontal faces cut the part into slabs of constant cross-section; each slab is sectioned on the watertight
  *    tessellation at its mid height and the loops are nested (material / void). Material must only shrink going up (no bridge,
- *    no cavity), a void may widen going up (a stepped pocket), an island inside a pocket is refused;
+ *    no cavity), a void may widen going up (a stepped pocket); material standing inside a void is an island of that pocket
+ *    (the pocket carries its loop), a pocket inside an island is refused;
  *  - consecutive slabs with the same outer loop merge into one outline, with the same void loop into one pocket.
  *
  * The result has the shape of `historyFeatures` (`generator/history-features.ts`), so the planner, the generator and the DFM
@@ -38,10 +39,10 @@ export type ExactFeatures = { readonly features: HistoryFeatures; readonly reaso
 interface Section {
   readonly z0: number
   readonly z1: number
-  /** Boundaries of the material components (even nesting depth). */
+  /** Boundaries of the material components (nesting depth 0). */
   readonly outers: ReadonlyArray<ReadonlyArray<Vec2>>
-  /** Voids inside the material (odd nesting depth), each with the index of the component that holds it. */
-  readonly voids: ReadonlyArray<{ readonly loop: ReadonlyArray<Vec2>; readonly parent: number }>
+  /** Voids inside the material (depth 1), each with the index of the component that holds it and the islands standing in it (depth 2). */
+  readonly voids: ReadonlyArray<{ readonly loop: ReadonlyArray<Vec2>; readonly parent: number; readonly islands: ReadonlyArray<ReadonlyArray<Vec2>> }>
 }
 
 const key = (p: Vec2): string => `${Math.round(p.x * 1e5)},${Math.round(p.y * 1e5)}`
@@ -71,6 +72,10 @@ const distToRing = (p: Vec2, ring: ReadonlyArray<Vec2>): number => {
 
 const sameLoop = (a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>): boolean =>
   a.every((p) => distToRing(p, b) <= LOOP_TOL) && b.every((p) => distToRing(p, a) <= LOOP_TOL)
+
+/** The same set of loops, in any order. */
+const sameLoops = (a: ReadonlyArray<ReadonlyArray<Vec2>>, b: ReadonlyArray<ReadonlyArray<Vec2>>): boolean =>
+  a.length === b.length && a.every((l) => b.some((m) => sameLoop(l, m)))
 
 /** Closed loops of the intersection of a welded triangle mesh with the plane `z`, or undefined when a chain does not close. */
 const sectionLoops = (positions: Float64Array, indices: Uint32Array, z: number): Vec2[][] | undefined => {
@@ -196,28 +201,36 @@ export const brepFeatures = (b: Brep, name = "part"): ExactFeatures => {
     if (all === undefined) return refuse(`section at Z ${((z0 + z1) / 2).toFixed(3)} does not close; the solid is not watertight`)
     const loops = all.map(simplify).filter((l) => !drilled(l))
     const depth = loops.map((l, k) => loops.reduce((n, o, j) => n + (j !== k && inside(l[0]!, o) ? 1 : 0), 0))
-    if (depth.some((d) => d >= 2)) return refuse("has an island standing inside a pocket; it needs the surface strategies")
+    if (depth.some((d) => d >= 3)) return refuse("has a pocket cut into an island standing inside a pocket; it needs the surface strategies")
     const outers: Vec2[][] = []
-    const voids: Array<{ loop: Vec2[]; parent: number }> = []
+    const voids: Array<{ loop: Vec2[]; parent: number; islands: Vec2[][] }> = []
     loops.forEach((l, k) => { if (depth[k] === 0) outers.push(l) })
     loops.forEach((l, k) => {
-      if (depth[k] === 1) voids.push({ loop: l, parent: outers.findIndex((o) => inside(l[0]!, o)) })
+      if (depth[k] === 1) voids.push({ loop: l, parent: outers.findIndex((o) => inside(l[0]!, o)), islands: [] })
+    })
+    // An island belongs to the void that holds it: the innermost loop around it that is a void.
+    loops.forEach((l, k) => {
+      if (depth[k] !== 2) return
+      const holder = voids.find((v) => inside(l[0]!, v.loop))
+      if (holder === undefined) throw new Error("brepFeatures: an island has no void around it")
+      holder.islands.push(l)
     })
     sections.push({ z0, z1, outers, voids })
   }
   if (sections.length === 0) return refuse("has no material section")
 
   // 4. Material only shrinks going up: no bridge, no cavity under a roof.
-  const material = (s: Section, p: Vec2): boolean => s.outers.some((o) => inside(p, o)) && !s.voids.some((v) => inside(p, v.loop))
-  const near = (s: Section, p: Vec2): boolean => [...s.outers, ...s.voids.map((v) => v.loop)].some((l) => distToRing(p, l) <= LOOP_TOL)
+  const material = (s: Section, p: Vec2): boolean =>
+    s.outers.some((o) => inside(p, o)) && !s.voids.some((v) => inside(p, v.loop) && !v.islands.some((i) => inside(p, i)))
+  const near = (s: Section, p: Vec2): boolean => [...s.outers, ...s.voids.flatMap((v) => [v.loop, ...v.islands])].some((l) => distToRing(p, l) <= LOOP_TOL)
   for (let i = 1; i < sections.length; i++) {
     const below = sections[i - 1]!, here = sections[i]!
-    const loops = [...here.outers, ...here.voids.map((v) => v.loop)]
+    const loops = [...here.outers, ...here.voids.flatMap((v) => [v.loop, ...v.islands])]
     for (const l of loops) for (const p of l) if (!near(below, p) && !material(below, p)) return refuse(`has material at Z ${here.z0.toFixed(3)} that overhangs the level below (a bridge or a cavity); it is not machinable from above`)
   }
 
   // 5. Outlines and pockets, merged across slabs.
-  type Span<T> = { loop: T; z0: number; z1: number }
+  type Span<T> = { loop: T; z0: number; z1: number; islands?: ReadonlyArray<ReadonlyArray<Vec2>> }
   const outlines: Array<Span<Vec2[]>> = []
   const pockets: Array<Span<Vec2[]>> = []
   const open = { outline: [] as Array<Span<Vec2[]>>, pocket: [] as Array<Span<Vec2[]>> }
@@ -230,8 +243,9 @@ export const brepFeatures = (b: Brep, name = "part"): ExactFeatures => {
     open.outline = nextOutline
     const nextPocket: Array<Span<Vec2[]>> = []
     for (const v of s.voids) {
-      const prev = open.pocket.find((x) => sameLoop(x.loop, v.loop))
-      if (prev !== undefined) { prev.z1 = s.z1; nextPocket.push(prev) } else { const x = { loop: [...v.loop], z0: s.z0, z1: s.z1 }; pockets.push(x); nextPocket.push(x) }
+      // Slabs merge into one pocket only when the loop and the islands standing in it are the same.
+      const prev = open.pocket.find((x) => sameLoop(x.loop, v.loop) && sameLoops(x.islands ?? [], v.islands))
+      if (prev !== undefined) { prev.z1 = s.z1; nextPocket.push(prev) } else { const x = { loop: [...v.loop], z0: s.z0, z1: s.z1, islands: v.islands.map((i) => [...i]) }; pockets.push(x); nextPocket.push(x) }
     }
     open.pocket = nextPocket
   }
@@ -242,7 +256,10 @@ export const brepFeatures = (b: Brep, name = "part"): ExactFeatures => {
     ...(h.headDiameter !== undefined ? { headDiameter: h.headDiameter } : {}), ...(h.headDepth !== undefined ? { headDepth: h.headDepth } : {})
   }))
   const machiningPockets: MachiningPocket[] = pockets.sort((p, q) => q.z1 - p.z1 || q.z0 - p.z0)
-    .map((p, i) => ({ id: `pocket-${i + 1}`, feature: "brep", loop: ccw(p.loop), top: p.z1, floor: p.z0 }))
+    .map((p, i) => ({
+      id: `pocket-${i + 1}`, feature: "brep", loop: ccw(p.loop), top: p.z1, floor: p.z0,
+      ...(p.islands !== undefined && p.islands.length > 0 ? { islands: p.islands.map(ccw) } : {})
+    }))
   const machiningOutlines: MachiningOutline[] = outlines.sort((p, q) => q.z1 - p.z1)
     .map((o, i) => ({ id: `outline-${i + 1}`, feature: "brep", outer: ccw(o.loop), inner: [], top: o.z1, bottom: o.z0 }))
   return {

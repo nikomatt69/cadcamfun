@@ -370,21 +370,42 @@ const emitPlan = (b: MoveBuilder, plan: ProfilePlan, params: ProfileParams, tool
   leaveCut(b, plan, params, levels)
 }
 
+/** The area the tool centre must stay in, a tool radius off every wall: the pocket the profile is cut in and the islands standing in it. */
+export interface ProfileWithin {
+  readonly boundary: ReadonlyArray<Vec2>
+  readonly islands: ReadonlyArray<ReadonlyArray<Vec2>>
+}
+
+/** Narrows where lead-ins and helices may go to `within`: they must not swing into a neighbouring wall or island. */
+const keepWithin = (plan: ProfilePlan, within: ProfileWithin, d: number): ProfilePlan => {
+  if (plan.feasible === undefined) return plan
+  const own = plan.feasible
+  return {
+    path: plan.path,
+    feasible: (p) =>
+      own(p) && pointInRing(p, within.boundary) && distanceToChain(p, within.boundary, true) >= d - TOL &&
+      within.islands.every((i) => !pointInRing(p, i) && distanceToChain(p, i, true) >= d - TOL)
+  }
+}
+
 /**
  * Generates a profile toolpath. Pure: the same inputs always yield the same
- * moves, which is what makes golden G-code tests possible.
+ * moves, which is what makes golden G-code tests possible. `within` (optional) is the region the tool stays in; it only
+ * changes where the lead-ins may be placed, never the path.
  */
 export const generateProfile = (
   params: ProfileParams,
   geometry: GeometryInput,
   tool: Tool,
-  stock: Stock
+  stock: Stock,
+  within?: ProfileWithin
 ): Toolpath => {
   const levels = levelsOf(params, stock.origin.z)
   const b = new MoveBuilder()
   b.comment(`Profile ${params.side}: ${params.name}`)
+  const d = toolRadius(tool) + params.allowance
   for (const source of sourcesOf(geometry, params.tolerance)) {
-    for (const plan of planSource(source, params, tool)) emitPlan(b, plan, params, tool, levels)
+    for (const plan of planSource(source, params, tool)) emitPlan(b, within === undefined ? plan : keepWithin(plan, within, d), params, tool, levels)
   }
   if (!b.started) b.comment("nothing to cut: the offset contour collapsed")
   finish(b, levels)

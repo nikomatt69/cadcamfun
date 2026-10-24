@@ -19,6 +19,7 @@ A real part has many operations. Plan them in this order and do not skip ahead.
 - Curved face: `steep-shallow` (waterline on walls, raster on flats) or `scallop` (constant 3D stepover on slopes, walls over 80° need a waterline); `spiral` / `radial` (with `center`) for round domes and bosses; pencil = rest finishing after a larger ball.
 - Horizontal faces at size: `flat` (the kernel plans it on freeform parts with ledges).
 - Deep pockets: `adaptive` then `rest`.
+- Islands standing in a pocket of an exact solid (STEP, Boolean, history) are read from the B-rep: the pocket is roughed around them, their walls get their own finish pass, and the cutter is limited to the narrowest gap (`cad` `exact` reports `machining.islands`). A pocket cut into an island is refused to the surface strategies.
 - Lathe body: `facing`, then `turning_od`, then `parting`; `threading_od` if needed.
 - Five-axis mill: pick the machine by its rotary words. `trunnion-5ax` writes A+C, `trunnion-5ax-bc` writes B+C on the same cutting blocks (simultaneous). `cam.materials` lists each preset's `fiveAxis` layout, pivot and tilt range: choose from that, never guess. A `multiaxis` operation on a machine without `fiveAxis` fails.
 - Reading a five-axis result: `stock.fiveAxis` is the voxel bracket of the turned moves (removed/remaining lower–upper, mm³, `voxelMm`); the height-field volumes do not cover those moves, and `material-removed` stays unresolved. Do not quote a single removed volume for a five-axis program.

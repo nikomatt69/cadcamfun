@@ -552,7 +552,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
             ...common, side: op.side, allowance: allowance ?? 0, leadIn: "arc", leadRadius: Math.max(0.5, Math.min(radius, 5)),
             helixPitch: data.helixPitch, rampAngle: Math.max(0.1, Math.min(45, data.rampAngle)), arcFit: true, tolerance: prepared.tolerance
           })
-          generated = { toolpath: generateProfile(params, { points: op.loop.map((p) => shift2(p, o)), closed: true }, legacy, opStock), warnings: [] }
+          const within = op.within === undefined ? undefined : { boundary: op.within.boundary.map((p) => shift2(p, o)), islands: (op.within.islands ?? []).map((r) => r.map((p) => shift2(p, o))) }
+          generated = { toolpath: generateProfile(params, { points: op.loop.map((p) => shift2(p, o)), closed: true }, legacy, opStock, within), warnings: [] }
           break
         }
         case "drill": {

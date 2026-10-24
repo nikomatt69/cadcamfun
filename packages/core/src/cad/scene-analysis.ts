@@ -30,7 +30,7 @@ export interface SceneHole {
 
 /** How the CAM planner treats the solid: a 2.5D part machined by its features, or a surface job and why. */
 export type SceneMachining =
-  | { readonly prismatic: true; readonly holes: number; readonly pockets: number; readonly outlines: number; readonly top: number; readonly bottom: number }
+  | { readonly prismatic: true; readonly holes: number; readonly pockets: number; readonly outlines: number; readonly top: number; readonly bottom: number; readonly islands?: number }
   | { readonly prismatic: false; readonly reason: string }
 
 export interface ScenePartAnalysis {
@@ -67,7 +67,9 @@ const machiningOf = (f: ExactFeatures): SceneMachining =>
     ? { prismatic: false, reason: f.reason }
     : {
         prismatic: true, holes: f.features.holes.length, pockets: f.features.pockets.length, outlines: f.features.outlines.length,
-        top: f.features.bounds?.max.z ?? 0, bottom: f.features.bounds?.min.z ?? 0
+        top: f.features.bounds?.max.z ?? 0, bottom: f.features.bounds?.min.z ?? 0,
+        // Islands standing in the pockets, only when there are some: a part without them reports exactly what it always did.
+        ...(f.features.pockets.some((p) => (p.islands ?? []).length > 0) ? { islands: f.features.pockets.reduce((n, p) => n + (p.islands ?? []).length, 0) } : {})
       }
 
 /** Exact analysis of one solid. */
