@@ -178,6 +178,33 @@ describe("a table that cannot wind a full turn", () => {
   })
 })
 
+describe("the shank and the holder", () => {
+  const b = tapered()
+  const wall = swarfWalls(b).walls.find((w) => b.faces[w.face]!.surface.kind === "cone")!.wall
+  const run = (cutter: { fluteLength: number; shankDiameter: number; stickout: number; holder?: { diameter: number; length: number } }) => generateMultiaxis(params(), soupOf(b), tool, kin, [wall], cutter)
+
+  test("a holder wider than the room beside the wall is inside the boss's top at the low bands: those poses are left out, counted and named", () => {
+    // Tip at the foot (z = 10), holder from 25 mm up: a Ø40 holder centred 5 mm off a wall that leans in cuts into the boss (radius 12 at z = 40).
+    const r = run({ fluteLength: 10, shankDiameter: 10, stickout: 25, holder: { diameter: 40, length: 20 } })
+    expect(r.stats.collided).toBeGreaterThan(0)
+    expect(r.stats.skipped).toBe(r.stats.collided!)
+    expect(r.warnings.join(" ")).toContain("shank or the holder")
+    // The top band's holder is above the boss: some poses survive.
+    expect(r.toolpath.moves.some((m) => m._tag === "Linear" && m.rotary !== undefined)).toBe(true)
+  })
+
+  test("a holder no wider than the cutter lies beside the wall everywhere: nothing is left out (a Ø12 one would dig 1 mm into it)", () => {
+    expect(run({ fluteLength: 10, shankDiameter: 10, stickout: 25, holder: { diameter: 12, length: 20 } }).stats.collided).toBeGreaterThan(0)
+    const r = run({ fluteLength: 10, shankDiameter: 10, stickout: 25, holder: { diameter: 9.9, length: 20 } })
+    expect(r.stats.collided ?? 0).toBe(0)
+    expect(r.stats.skipped).toBe(0)
+  })
+
+  test("the flutes' length is the cutter's own: a 6 mm flute makes more bands up the wall than a 10 mm one", () => {
+    expect(run({ fluteLength: 6, shankDiameter: 10, stickout: 25 }).stats.sections).toBeGreaterThan(run({ fluteLength: 10, shankDiameter: 10, stickout: 25 }).stats.sections)
+  })
+})
+
 describe("what the flank cannot do", () => {
   test("a concave wall tighter than the cutter, a ball nose and a missing wall are reported, not cut", () => {
     const b = tapered()

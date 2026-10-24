@@ -621,7 +621,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           // The soup and the program are in work coordinates.
           const move = (p: Vec3): Vec3 => ({ x: p.x - o.x, y: p.y - o.y, z: p.z - o.z })
           const walls = given.map((w) => ({ bottom: w.bottom.map(move), top: w.top.map(move), normal: w.normal, ...(w.concaveRadius !== undefined ? { concaveRadius: w.concaveRadius } : {}) }))
-          const r = generateMultiaxis(params, soup, legacyTool(tool), kin, walls)
+          const r = generateMultiaxis(params, soup, legacyTool(tool), kin, walls, op.mode === "swarf" ? { fluteLength: tool.fluteLength, shankDiameter: tool.shankDiameter, stickout: tool.stickout, ...(tool.holder !== undefined ? { holder: tool.holder } : {}) } : undefined)
           generated = { toolpath: r.toolpath, skippedSamples: r.stats.skipped, warnings: [...r.warnings, ...(r.stats.skipped > 0 ? [`${op.id}: ${r.stats.skipped} points skipped (no lean clears the part, or the table cannot reach it)`] : [])] }
           break
         }

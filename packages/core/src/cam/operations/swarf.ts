@@ -51,14 +51,24 @@ const unwrapC = (angles: RotaryAngles, previous: RotaryAngles | undefined, k: Fi
   return c < lo - 1e-9 || c > hi + 1e-9 ? undefined : { ...angles, c }
 }
 
+/** The cutter as the kernel's library describes it: the flutes cut the band, the shank and the holder must stay out of the part. */
+export interface SwarfCutter {
+  readonly fluteLength: number
+  readonly shankDiameter: number
+  readonly stickout: number
+  readonly holder?: { readonly diameter: number; readonly length: number }
+}
+
 export interface SwarfStats {
   lines: number
   skipped: number
+  /** Poses left out because the shank or the holder would be inside the part (counted in `skipped` too). */
+  collided?: number
 }
 
 /** The sections (one per pass up a wall) of the samples that cut `walls` with the side of `tool`, or why none could be cut in `warnings`. */
 export const swarfSections = (
-  walls: ReadonlyArray<SwarfWall>, params: MultiaxisParams, tool: Tool, soup: TriangleSoup, k: FiveAxisKinematic, stats: SwarfStats, warnings: string[]
+  walls: ReadonlyArray<SwarfWall>, params: MultiaxisParams, tool: Tool, soup: TriangleSoup, k: FiveAxisKinematic, stats: SwarfStats, warnings: string[], cutter?: SwarfCutter
 ): Sample[][] => {
   const R = tool.diameter / 2
   const out: Sample[][] = []
@@ -82,7 +92,7 @@ export const swarfSections = (
     })
     const shortest = Math.min(...rulings.map((r) => r.length))
     // Flutes: `flute` radii long; a taller wall is cut in bands that overlap by a fifth.
-    const cutLength = Math.min(shortest, params.flute * R)
+    const cutLength = Math.min(shortest, cutter !== undefined ? cutter.fluteLength : params.flute * R)
     const bands = shortest <= cutLength + 1e-9 ? 1 : Math.ceil((shortest - cutLength) / (0.8 * cutLength)) + 1
     for (let band = 0; band < bands; band++) {
       const reverse = !params.oneWay && band % 2 === 1
@@ -111,7 +121,24 @@ export const swarfSections = (
             if (soup.inside(q)) free = false
           }
         }
-        if (!free || angles === undefined) {
+        // Above the flutes: the shank, and the holder past the stickout, with the part's material nowhere inside them.
+        let collides = false
+        if (free && cutter !== undefined) {
+          const ring = (h: number, radius: number): boolean => {
+            const centre = add(tip, mul(r.dir, h))
+            for (let a = 0; a < 8; a++) {
+              const ang = (a * Math.PI) / 4
+              if (soup.inside(add(centre, add(mul(u, radius * Math.cos(ang)), mul(v, radius * Math.sin(ang)))))) return true
+            }
+            return false
+          }
+          // A shank as wide as the flutes is their continuation, lying against the wall along the same line: shrunk like the flutes, so touching is not a collision.
+          const shank = cutter.shankDiameter / 2 - SHRINK
+          for (const f of [0.05, 0.35, 0.7, 1]) if (!collides && ring(cutter.fluteLength + f * Math.max(0, cutter.stickout - cutter.fluteLength), shank)) collides = true
+          if (cutter.holder !== undefined) for (const f of [0, 0.35, 0.7, 1]) if (!collides && ring(cutter.stickout + f * cutter.holder.length, cutter.holder.diameter / 2)) collides = true
+          if (collides) stats.collided = (stats.collided ?? 0) + 1
+        }
+        if (!free || collides || angles === undefined) {
           stats.skipped += 1
           flush()
           continue

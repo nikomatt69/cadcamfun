@@ -26,7 +26,7 @@ import { partToMachine, type RotaryAngles } from "../indexing.ts"
 import { TriangleSoup, type SurfaceHit } from "../model/mesh-queries.ts"
 import { contour, sampleNodes, simplify, type Rect } from "./surface-field.ts"
 import { scallopSpacing } from "./surface.ts"
-import { swarfSections, type SwarfWall } from "./swarf.ts"
+import { swarfSections, type SwarfCutter, type SwarfWall } from "./swarf.ts"
 
 export const MultiaxisStrategySchema = Schema.Literals(["parallel", "contour", "swarf"])
 export type MultiaxisStrategy = typeof MultiaxisStrategySchema.Type
@@ -213,11 +213,11 @@ const sampleAt = (
 
 // ---------------------------------------------------------------- the operation
 
-export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, tool: Tool, k: FiveAxisKinematic, walls?: ReadonlyArray<SwarfWall>): MultiaxisResult => {
+export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, tool: Tool, k: FiveAxisKinematic, walls?: ReadonlyArray<SwarfWall>, cutter?: SwarfCutter): MultiaxisResult => {
   const warnings: string[] = []
   const bounds = soup.bounds
   const topZ = bounds.max[2]
-  const stats = { lines: 0, sections: 0, points: 0, leaned: 0, skipped: 0 }
+  const stats: { lines: number; sections: number; points: number; leaned: number; skipped: number; collided?: number } = { lines: 0, sections: 0, points: 0, leaned: 0, skipped: 0 }
   const sections: Sample[][] = []
   const take = (sample: Sample | undefined): Sample | undefined => {
     if (sample === undefined) stats.skipped += 1
@@ -240,7 +240,8 @@ export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, t
       warnings.push("Swarf milling needs the walls to cut: none was given")
       return done([])
     }
-    const found = swarfSections(walls, params, tool, soup, k, stats, warnings)
+    const found = swarfSections(walls, params, tool, soup, k, stats, warnings, cutter)
+    if (stats.collided !== undefined && stats.collided > 0) warnings.push(`Swarf: ${stats.collided} pose(s) left out because the shank or the holder would be inside the part`)
     return emit(found, params, topZ, stats, warnings, done, k, bounds)
   }
 
