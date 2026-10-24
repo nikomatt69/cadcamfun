@@ -58583,6 +58583,9 @@
                                   },
                                   "sideHoles": {
                                     "type": "integer"
+                                  },
+                                  "hiddenFaces": {
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [

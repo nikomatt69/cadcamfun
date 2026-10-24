@@ -15799,6 +15799,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   "bottom": {
                                     "type": "number",
                                   },
+                                  "hiddenFaces": {
+                                    "type": "integer",
+                                  },
                                   "holes": {
                                     "type": "integer",
                                   },

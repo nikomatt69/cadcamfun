@@ -97,6 +97,8 @@ export interface HistoryFeatures {
   readonly bounds: { readonly min: V3; readonly max: V3 } | undefined
   /** Holes along other axes than Z that the exact recognition left to their own setup (it plugged them to read this one). */
   readonly sideHoles?: number
+  /** Faces of the solid hidden from above (under a roof, sideways, facing down) that the exact recognition left to other setups. */
+  readonly hiddenFaces?: number
   /** What the derivation left out and why (a feature it does not machine, a hole that is not reachable from above). */
   readonly notes: ReadonlyArray<string>
 }

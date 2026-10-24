@@ -7,6 +7,9 @@
  *  - the holes come from `recognizeHoles` (coaxial concave cylinders and cones, counterbores, countersinks, drill points); a hole
  *    drilled along another axis than Z belongs to another setup: it is plugged (`brep/hole-edit.ts`, an exact fill) before the
  *    sections are cut, so it neither refuses the part nor becomes a notch of its outline, and it is counted in `sideHoles`;
+ *  - when the part as it is cannot be read (an undercut, a pocket that opens sideways, material overhanging a level), the same
+ *    analysis runs on its shadow from above (`brep/shadow.ts`: what a tool coming down can make, the hidden voids filled), and the
+ *    hidden faces are counted in `hiddenFaces`; a visible freeform face still refuses;
  *  - every other face must be machinable from above (a 2.5D part): planar walls, planar floors facing up, the underside at the
  *    lowest level, cylindrical walls parallel to Z. A chamfer, a dome, a sloped face or an undercut makes the whole part a
  *    surface job and the reason is returned (never a silent partial plan);
@@ -19,7 +22,7 @@
  * The result has the shape of `historyFeatures` (`generator/history-features.ts`), so the planner, the generator and the DFM
  * see one kind of feature whatever the part came from. Everything is in the element's world coordinates, millimetres.
  */
-import { bodyTessellation, editHole, recognizeHoles, transformBrep, type Brep, type RecognizedHole } from "../cad/brep/index.ts"
+import { bodyTessellation, editHole, recognizeHoles, shadowSolid, transformBrep, type Brep, type RecognizedHole } from "../cad/brep/index.ts"
 import type { Transform } from "../cad/brep/math.ts"
 import { elementBrep } from "../cad/scene-step.ts"
 import type { Vec2 } from "../cad/vec.ts"
@@ -170,10 +173,21 @@ const plugSideHoles = (b: Brep): { readonly brep: Brep; readonly plugged: Readon
 
 /** The 2.5D machining features of an exact solid, or why it is not machinable from above as one setup. */
 export const brepFeatures = (original: Brep, name = "part"): ExactFeatures => {
-  const refuse = (reason: string): ExactFeatures => ({ reason: `${name}: ${reason}` })
   const side = plugSideHoles(original)
-  if (typeof side === "string") return refuse(side)
-  const b = side.brep
+  if (typeof side === "string") return { reason: `${name}: ${side}` }
+  const direct = readFeatures(side.brep, name, side.plugged.length)
+  if (direct.features !== undefined) return direct
+  // What a tool from above can make of the part: its shadow. Visible freeform faces refuse there too, with their own reason.
+  const shadow = shadowSolid(side.brep)
+  if (typeof shadow === "string") return direct
+  const seen = readFeatures(shadow.brep, name, side.plugged.length, shadow.hidden)
+  return seen.features !== undefined ? seen : direct
+}
+
+/** The 2.5D features of a solid that is already read as one setup: the holes along other axes (`plugged`) are left out. */
+const readFeatures = (b: Brep, name: string, plugged: number, hidden = 0): ExactFeatures => {
+  const refuse = (reason: string): ExactFeatures => ({ reason: `${name}: ${reason}` })
+  const side = { plugged: { length: plugged } }
   const holes = recognizeHoles(b)
 
   // 1. Every face is a hole wall, a vertical wall or a horizontal floor.
@@ -291,9 +305,11 @@ export const brepFeatures = (original: Brep, name = "part"): ExactFeatures => {
       holes: machiningHoles, pockets: machiningPockets, outlines: machiningOutlines, turned: [],
       bounds: { min: { x: min.x, y: min.y, z: zMin }, max: { x: max.x, y: max.y, z: zMax } },
       ...(side.plugged.length > 0 ? { sideHoles: side.plugged.length } : {}),
+      ...(hidden > 0 ? { hiddenFaces: hidden } : {}),
       notes: [
         `${name}: ${machiningHoles.length} holes, ${machiningPockets.length} pockets and ${machiningOutlines.length} outlines recognised on the exact B-rep`,
-        ...(side.plugged.length > 0 ? [`${name}: ${side.plugged.length} hole(s) along other axes (${side.plugged.map((h) => `Ø${Math.round(h.diameter * 1000) / 1000} along ${["x", "y", "z"].map((k) => `${k}${Math.round((h.direction as unknown as Record<string, number>)[k]! * 100) / 100}`).join(" ")}`).join(", ")}) are left to their own setup`] : [])
+        ...(side.plugged.length > 0 ? [`${name}: ${side.plugged.length} hole(s) along other axes are left to their own setup`] : []),
+        ...(hidden > 0 ? [`${name}: ${hidden} face(s) hidden from this side (under a roof, sideways or facing down) are left to their own setup`] : [])
       ]
     }
   }

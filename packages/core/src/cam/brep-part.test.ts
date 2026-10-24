@@ -1,11 +1,12 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { massProperties } from "../cad/brep/index.ts"
+import { massProperties, transformBrep } from "../cad/brep/index.ts"
 import { historyToStep, rebuildExact } from "../cad/history-brep.ts"
 import type { Feature, History } from "../cad/history.ts"
 import { buildRecipe } from "../cad/recipes.ts"
 import { elementBrep, stepToElements } from "../cad/scene-step.ts"
 import { signedArea } from "../cad/shapes.ts"
 import { brepFeatures, exactFeatures } from "./brep-part.ts"
+import { setupTransform } from "./setup.ts"
 import { historyFeatures } from "./generator/history-features.ts"
 import { DEFAULT_CUTTERS, planOnly, runJob, type ManufacturingJob } from "./kernel/index.ts"
 
@@ -119,12 +120,24 @@ describe("what is refused, and why", () => {
     expect(brepFeatures(placed.brep!, "ball").reason).toMatch(/sphere/)
   })
 
-  test("material that overhangs the level below is refused", () => {
+  test("material that overhangs the level below is read from its shadow: the undercut is left out and says so, never machined or hidden", () => {
     const h = history([
       rect("a", 0, 0, 40, 40), { id: "low", type: "extrude", sketch: "a", depth: 10, operation: "new" },
       rect("b", -10, 10, 60, 20, 10), { id: "high", type: "extrude", sketch: "b", depth: 10, operation: "union" }
     ])
-    expect(brepFeatures(brepOf(h), "overhang").reason).toMatch(/overhang/)
+    const f = brepFeatures(brepOf(h), "overhang")
+    expect(f.reason).toBeUndefined()
+    expect(f.features!.hiddenFaces).toBeGreaterThan(0)
+    expect(f.features!.notes.join(" ")).toMatch(/hidden from this side/)
+    // The program is a preview with the coverage it cannot prove said out loud: never blocked, never a silent claim of the whole part.
+    const element = { id: "stp", type: "brep", name: "Overhang", brep: brepOf(h), x: 0, y: 0, z: 0 }
+    const j: ManufacturingJob = { schemaVersion: 1, id: "j", name: "J", material: "6061", part: { kind: "elements", elements: [element] }, stock: { min: { x: -13, y: -3, z: 0 }, max: { x: 53, y: 43, z: 21 } } }
+    const result = runJob(j)
+    if (result.status !== "ok") throw new Error(result.issues.map((i) => i.message).join("; "))
+    expect(result.value.release).toBe("preview")
+    expect(result.value.claims.find((c) => c.id === "no-gouge")!.status).toBe("passed")
+    expect(result.value.claims.find((c) => c.id === "nc-replay")!.status).toBe("passed")
+    expect(result.value.claims.find((c) => c.id === "part-coverage")!.status).toBe("unresolved")
   })
 
   test("elements without an exact model are not this module's business", () => {
@@ -313,7 +326,7 @@ describe("holes along other axes", () => {
     expect(f.features!.outlines).toHaveLength(1)
     expect(area(f.features!.outlines[0]!.outer)).toBeCloseTo(100 * 60, 6)
     expect(f.features!.outlines[0]!.outer).toHaveLength(4)
-    expect(f.features!.notes.join(" ")).toMatch(/1 hole\(s\) along other axes \(Ø5 .* left to their own setup/)
+    expect(f.features!.notes.join(" ")).toMatch(/1 hole\(s\) along other axes are left to their own setup/)
   })
 
   test("the planner drills the top hole and carries the note, and the program passes gouge check and replay", () => {
@@ -336,3 +349,62 @@ describe("holes along other axes", () => {
     expect(brepFeatures(placed.brep!, "pin").reason).toMatch(/pin: .*not parallel to Z/)
   })
 })
+
+describe("a part read one side at a time", () => {
+  /** Plate 100x60x10, a 60x40 pocket on top with an island, a Ø8 boss, a Ø6 hole on top and a Ø5 hole 12 deep in the +X face at mid height. */
+  const everything = () => history([
+    rect("base", 0, 0, 100, 60), { id: "plate", type: "extrude", sketch: "base", depth: 10, operation: "new" },
+    rect("p", 20, 10, 60, 40, 10), { id: "pocket", type: "extrude", sketch: "p", depth: 6, direction: "down", operation: "subtract" },
+    rect("i", 40, 20, 20, 20, 4), { id: "island", type: "extrude", sketch: "i", depth: 6, operation: "union" },
+    { id: "top", type: "hole", plane: "XY", offset: 4, at: [30, 30], diameter: 6, depth: 4 },
+    { id: "side", type: "hole", plane: "YZ", offset: 100, at: [30, 5], diameter: 5, depth: 12 }
+  ])
+
+  test("seen from +Z the part keeps its pocket, island and top hole, and the side hole is left to its setup", () => {
+    const f = brepFeatures(brepOf(everything()), "all")
+    expect(f.reason).toBeUndefined()
+    expect(f.features!.pockets).toHaveLength(1)
+    expect(f.features!.pockets[0]!.islands).toHaveLength(1)
+    expect(f.features!.holes).toHaveLength(1)
+    expect(f.features!.sideHoles).toBe(1)
+  })
+
+  test("seen from +X the pocket on top is under the side wall: the shadow fills it and the side hole is the feature of that setup", () => {
+    const turned = transformBrep(brepOf(everything()), setupTransform("+X"))
+    const f = brepFeatures(turned, "all +X")
+    expect(f.reason).toBeUndefined()
+    expect(f.features!.holes).toHaveLength(1)
+    expect(f.features!.holes[0]!.diameter).toBeCloseTo(5, 6)
+    expect(f.features!.holes[0]!.depth).toBeCloseTo(12, 6)
+    expect(f.features!.pockets).toHaveLength(0)
+    expect(f.features!.hiddenFaces).toBeGreaterThan(0)
+    expect(f.features!.sideHoles).toBe(1) // the Ø6 hole drilled from the top is along another axis here
+    expect(f.features!.notes.join(" ")).toMatch(/hidden from this side/)
+    // The outline is the plate seen from +X: 60 wide and 10 high.
+    const o = f.features!.outlines[0]!.outer
+    expect(area(o)).toBeCloseTo(60 * 10, 6)
+  })
+
+  test("the +X program is a feature program that drills the side hole, and passes gouge check and replay", () => {
+    const element = { id: "stp", type: "brep", name: "All", brep: brepOf(everything()), x: 0, y: 0, z: 0 }
+    const j: ManufacturingJob = {
+      schemaVersion: 1, id: "j", name: "J", material: "6061", setupOrientation: "+X", part: { kind: "elements", elements: [element] },
+      stock: { min: { x: -3, y: -3, z: 0 }, max: { x: 103, y: 63, z: 11 } }
+    }
+    const plan = planOnly(j)
+    if (plan.status !== "ok") throw new Error(plan.issues.map((i) => i.message).join("; "))
+    const strategies = plan.value.operations.map((o) => o.strategy)
+    expect(strategies).toContain("drill")
+    expect(strategies).not.toContain("surface")
+    const result = runJob(j)
+    if (result.status !== "ok") throw new Error(result.issues.map((i) => i.message).join("; "))
+    expect(result.value.claims.find((c) => c.id === "no-gouge")!.status).toBe("passed")
+    expect(result.value.claims.find((c) => c.id === "nc-replay")!.status).toBe("passed")
+  })
+
+  test("a visible freeform face is still a surface job: nothing is filled to hide it", () => {
+    const placed = elementBrep({ id: "s", type: "sphere", x: 0, y: 0, z: 0, radius: 10 })
+    expect(brepFeatures(placed.brep!, "ball").reason).toMatch(/ball: .*sphere/)
+  })
+})
+

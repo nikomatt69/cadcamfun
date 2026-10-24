@@ -310,7 +310,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `plugin-authoring` | dev | 1659 | — |
 | `parametric-design` | cad | 6985 | cad, cad_edit, parts, vcs_edit |
 | `fusion-360-modelling` | cad | 12010 | cad, cad_edit, cam, parts |
-| `composed-cam-programs` | cam | 6730 | cad, cam, cam_edit, library, parts |
+| `composed-cam-programs` | cam | 7046 | cad, cam, cam_edit, library, parts |
 | `version-control-cadcam` | vcs | 1671 | vcs, vcs_edit, agent |
 | `workflows-cadcam` | workflows | 1468 | cam, vcs_edit |
 | `machining-cycle-presets` | cam | 1320 | cam, cam_edit, library |
