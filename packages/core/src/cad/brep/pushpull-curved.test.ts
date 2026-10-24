@@ -63,6 +63,6 @@ describe("push/pull of a cylindrical wall", () => {
     const sinkFace = sink.faces.findIndex((f) => f.surface.kind === "cone")
     expect(pushPullCylinder(sink, sinkFace, 1)).toMatch(/not the side of a boss/)
     const domed = uni(makeBox(40, 30, 10), makeSphere(5, frame({ x: 20, y: 15, z: 10 }, Z)))
-    expect(pushPullCylinder(domed, domed.faces.findIndex((f) => f.surface.kind === "sphere"), 1)).toMatch(/sphere face/)
+    expect(pushPullCylinder(domed, domed.faces.findIndex((f) => f.surface.kind === "sphere"), 1)).toMatch(/hemisphere/)
   })
 })
