@@ -12,6 +12,7 @@ import { kernelMachineConfigsOf, machinesFromResponse } from "../../lib/machines
 import { useCamStore } from "../../store/camStore.ts"
 import { ToolSilhouette } from "../ToolSilhouette.tsx"
 import KernelSetups from "./KernelSetups.tsx"
+import KernelPost from "./KernelPost.tsx"
 import { downloadText, setupSheetFile } from "../../lib/setupSheet.ts"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { useVerifyStore } from "../../store/verifyStore.ts"
@@ -90,7 +91,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
       stockChanged || value.program.workOffset !== (current.workOffset ?? "G54") ||
       source !== undefined && ((source.tolerance ?? 0.01) !== (current.tolerance ?? 0.01) || (source.origin ?? "stock-center") !== (current.origin ?? "stock-center") || source.finishAllowance !== current.finishAllowance || source.scallop !== current.scallop || source.resolution !== current.resolution) ||
       value.identity.part !== cam.kernel.digestOf("cam-kernel/part@1", { kind: "elements", elements: current.elements }) ||
-      source !== undefined && cam.kernel.canonicalJson([source.operations ?? null, source.tools ?? null, source.deburr ?? null, source.subprograms ?? false]) !== cam.kernel.canonicalJson([current.operations ?? null, current.tools ?? null, current.deburr ?? null, current.subprograms ?? false])
+      source !== undefined && cam.kernel.canonicalJson([source.operations ?? null, source.tools ?? null, source.deburr ?? null, source.subprograms ?? false, source.postDefinition ?? null]) !== cam.kernel.canonicalJson([current.operations ?? null, current.tools ?? null, current.deburr ?? null, current.subprograms ?? false, current.postDefinition ?? null])
   }
   const requestId = createMemo(() => request()?.id)
   createEffect(() => {
@@ -245,6 +246,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
         elements={request()?.elements as ReadonlyArray<Record<string, unknown>> | undefined} current={settings().setupOrientation}
         onUse={(orientation) => { gen.patchKernelSettings({ setupOrientation: orientation, operations: undefined }); gen.updateSettings("workholdingConfigured", false); setPlanNotes([]) }}
       />
+      <KernelPost current={settings().postDefinition} onUse={(definition) => gen.patchKernelSettings({ postDefinition: definition as never })} />
       <details class="border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="kernel-settings">
         <summary class="cursor-pointer text-sm font-medium">{t("cam.kernel.settings")}</summary>
         <div class="space-y-3 pt-3">

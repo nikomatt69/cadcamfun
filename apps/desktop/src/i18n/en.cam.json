@@ -622,5 +622,15 @@
   "cam.generator.cadElement": "CAD element",
   "cam.generator.chooseCadElement": "Choose a CAD element…",
   "cam.generator.selectCadElementHint": "No element selected. Choose a CAD element above or select one in the CAD Editor.",
-  "cam.generator.noCadElements": "No CAD parts in this drawing. Add or open a part in the CAD Editor."
+  "cam.generator.noCadElements": "No CAD parts in this drawing. Add or open a part in the CAD Editor.",
+  "cam.post.title": "Post as data",
+  "cam.post.active": "in use",
+  "cam.post.hint": "A post definition says in JSON what the control wants (tool change, setup words, the end of the program). Check it to see the program it writes; use it for this program, or keep it in the library.",
+  "cam.post.startFrom": "Start from {post}",
+  "cam.post.stored": "Stored posts",
+  "cam.post.choose": "Choose a stored post...",
+  "cam.post.check": "Check and preview",
+  "cam.post.use": "Use for this program",
+  "cam.post.save": "Save to the library",
+  "cam.post.clear": "Use the machine's post"
 }
