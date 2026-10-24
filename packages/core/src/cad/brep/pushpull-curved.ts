@@ -1,7 +1,7 @@
 /**
  * The push/pull of a cylindrical wall on the exact model (spec 40 U2): moving the side of a boss or the wall of a hole along its
  * normal is a change of radius, which is what the boss and hole edits do exactly. A positive distance goes out of the solid: a boss
- * grows by it, a hole shrinks by it (the material comes into the bore). The side of a conical boss is the same change on its frustum (`cone-edit.ts`). Any other curved face (the sphere of a socket, a torus that is not the whole solid, NURBS, a countersink); the dome that ends a round boss is `dome-edit.ts`; a ball and a ring alone are the same surface with the radius moved and the
+ * grows by it, a hole shrinks by it (the material comes into the bore). The side of a conical boss is the same change on its frustum (`cone-edit.ts`). Any other curved face (a fillet band, a torus that is not the whole solid, NURBS, a countersink); the dome that ends a round pin and the socket that ends a bore are `dome-edit.ts`; a ball and a ring alone are the same surface with the radius moved and the
  * counterbore wall of a hole have no exact push/pull here and are refused with the reason.
  */
 import { recognizeBosses, resizeBoss } from "./boss-edit.ts"

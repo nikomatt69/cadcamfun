@@ -5,7 +5,22 @@
 WP10 follow-up: register and retrieve the same updater state type, bound/coalesce check requests, run checks serially in an async task, stop the task on application exit, check unsaved work before consuming pending updates, bound the network recheck and enforce the announced version before install. Installation errors retain the pending announcement for retry.
 
 
-Status: release automation aligned with nikcli and locally verified; cross-platform release acceptance remains unverified. This follow-up owns `.github/workflows/`, `.github/actions/`, `.github/actionlint.yaml`, `scripts/`, root release commands, the release lockfile and the Tauri resources mapping. Updater runtime and database backup behaviour remain owned by their existing agents and are not verified here.
+Status: single-release consolidation implemented and locally verified; actual GitHub publication and cross-platform release acceptance remain unverified. This follow-up owns `.github/workflows/`, `.github/actions/`, `.github/actionlint.yaml`, `scripts/`, root release commands and README release instructions, the release lockfile and the Tauri resources mapping. Updater runtime and database backup behaviour remain owned by their existing agents and are not verified here.
+
+### Single-release contract (2026-10-24)
+
+Each version has one GitHub release (`v<version>`), matching nikcli's
+[`desktop-release.yml`](https://github.com/nikcli/nikcli/blob/live-main/.github/workflows/desktop-release.yml).
+All six targets' installers and signatures, one combined
+`SHA256SUMS`, release notes and `latest.json` belong to that release. Builders
+produce Actions artifacts only. The final publish job downloads all six installer
+artifacts, verifies their checksums, target prefixes, package formats and common
+notes, validates updater signatures and URLs against those actual assets, then
+uploads everything to the existing draft and publishes it last. Missing or invalid
+platform output prevents publication. Updater and Homebrew URLs use the base
+version tag. No platform-specific releases or tags are created. Historical platform
+tags remain excluded from version and changelog discovery. Existing published
+releases are not modified by this change.
 
 ### Release completion contract (2026-10-22)
 
@@ -15,7 +30,7 @@ Status: release automation aligned with nikcli and locally verified; cross-platf
 - All six builders produce identical release notes (including a common platform signing summary), so strict updater manifest merging can compare their metadata.
 - Use the running Bun executable for nested build commands, preserve Windows executable extensions in temporary compile paths, and refresh the API reference before workspace typechecking. Lint workflows in CI and before publishing.
 - Install actionlint 1.7.12 with its pinned upstream download script through `.github/actions/setup-actionlint`; both CI and publish use this action. `taiki-e/install-action` remains for supported Rust tools only.
-- Serialize publication across versions and branches. Publish the index only after every platform succeeds and the updater manifest is attached. Like nikcli, publish the optional Homebrew cask afterwards; a tap failure is reported as a warning. Preserve prerelease status, skip stable cask updates for prereleases and use a valid cask in `Casks/cadcamfun.rb`.
+- Serialize publication across versions and branches. Publish the release only after every platform succeeds and the updater manifest is attached. Like nikcli, publish the optional Homebrew cask afterwards; a tap failure is reported as a warning. Preserve prerelease status, skip stable cask updates for prereleases and use a valid cask in `Casks/cadcamfun.rb`.
 
 Legacy reference: `.reference/.github/workflows/desktop-build.yml`, `.reference/scripts/{build-desktop.sh,build-macos.sh,build-windows.bat,build-linux.sh}`, README "Auto-Updates" and "Distribution" sections.
 
@@ -38,13 +53,13 @@ Scripts must fail fast, print each step, and never read `.env*`.
 
 - `ci-pipeline.yml` on main pushes, PRs and manual dispatch: call reusable `ci.yml` for validation, then call `publish.yml` with `prevalidated: true` and a patch bump on successful main pushes in the canonical repository. Release commits (`release: v…`) and generated/update housekeeping commits do not trigger another publication. PRs and manual validation runs do not publish.
 - `ci.yml` is reusable and also runs directly on non-main branch pushes and manual dispatch: ubuntu runs install + typecheck + tests (including `cargo clippy`, `cargo test` for `src-tauri`); caches Bun and Cargo. Main pushes and PRs use the pipeline entry point to avoid duplicate validation runs. Main pipelines are not cancelled by a newer push while publication is running.
-- `publish.yml` is the release entry point, in the shape of nikcli's `publish.yml`: it resolves the version, stamps it across the workspace, writes the changelog, publishes npm, commits and pushes the release, tags it and creates the **draft** index release; it then calls `release.yml` for the six platform releases and, in a last job, attaches the updater manifest, makes the release public and publishes the optional Homebrew cask.
-- `release.yml` is called by `publish.yml` with the resolved tag (and can be dispatched by hand to rebuild an existing tag): six-target matrix for macOS, Windows and Linux on arm64 + x64 → build, sign, notarise, upload to a draft GitHub Release, generate the updater manifest. It follows nikcli's native-runner approach: both macOS targets use `macos-14` (Intel is cross-compiled), Windows ARM uses `windows-11-arm`, and Linux ARM uses `ubuntu-22.04-arm`.
+- `publish.yml` is the release entry point, in the shape of nikcli's `publish.yml`: it resolves the version, stamps it across the workspace, writes the changelog, publishes npm, commits and pushes the release, tags it and creates the **draft** version release; it then calls `release.yml` to build all six targets and, in a last job, verifies and attaches every installer, signature, checksum file and updater manifest, makes the release public and publishes the optional Homebrew cask.
+- `release.yml` is called by `publish.yml` with the resolved tag (and can be dispatched by hand to rebuild an existing tag): six-target matrix for macOS, Windows and Linux on arm64 + x64 → build, sign, notarise, upload Actions artifacts and generate the updater manifest. Manual dispatch produces artifacts only; `publish.yml` owns GitHub publication. It follows nikcli's native-runner approach: both macOS targets use `macos-14` (Intel is cross-compiled), Windows ARM uses `windows-11-arm`, and Linux ARM uses `ubuntu-22.04-arm`.
 - `build-platforms.yml` on a `build/**` branch or manual dispatch uses the same six native targets to produce downloadable installer artifacts without requiring release/updater signing credentials. Like nikcli's desktop scripts, the sidecar is prepared for the explicit Rust target before Tauri bundles on the matching native runner.
 - Linux packages `.deb` and `.rpm` (the same set as nikcli's desktop; no AppImage). macOS builds separate `.app` + `.dmg` artifacts per architecture so Tauri also emits the updater `.app.tar.gz`. Windows packages `.msi` + NSIS `.exe`.
 - macOS uses separate arm64 and x64 installers, not a universal binary. Updater assets are `.app.tar.gz` and NSIS `.exe`, with sibling `.sig` files. Linux releases carry the packages only; the in-app updater has no Linux entry.
 - Manual releases require an existing `v`-prefixed tag input. The gate checks out that tag, installs Bun, verifies the checked-out commit and configured app version, and outputs immutable SHA/version/date metadata. Secret-bearing builds depend on this gate; branch pushes and fork release workflows are excluded. Windows imports the owner-provided certificate, passes its thumbprint to Tauri signing configuration, then removes it even on failure. No secret appears in an `if` expression.
-- `updater-manifest.ts` validates object shapes and consistent version/date/notes, rejects duplicate platforms, and requires the macOS and Windows updater keys when merging. `stage-release.ts` checks each downloaded target's checksums, rejects unexpected/duplicate files, compares notes and signatures for updater platforms, verifies exact release URLs against copied assets, and stages each platform's flat asset set with `SHA256SUMS`. Linux is staged from checksums alone. Published releases are not modified by a rerun. The index remains a draft until the final publish job; draft assets are not an active updater feed.
+- `updater-manifest.ts` validates object shapes and consistent version/date/notes, rejects duplicate platforms, and requires the macOS and Windows updater keys when merging. `stage-release.ts` checks each downloaded target's checksums, rejects unexpected/duplicate files, compares notes and signatures for updater platforms, verifies exact release URLs against copied assets, and stages all six platforms into a single flat asset set with combined `SHA256SUMS`. Linux contributes packages without updater entries. Published releases are not modified by a rerun. The version release remains a draft until the final publish job; draft assets are not an active updater feed.
 - Required secrets (names only, set by the owner in GitHub): `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`, `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD`. Workflows must not echo them and must not run on forks' PRs with secrets.
 
 ## 2.1 Release pipeline (nikcli parity, 2026-10-22)
@@ -63,13 +78,14 @@ version, the changelog and the publishing are the pipeline's job**, not the owne
 
 1. **`publish`** — resolve the version, stamp it across the workspace, write the
    changelog, publish npm, commit and push the release, tag it, create the **draft**
-   index release.
-2. **`desktop`** — call `release.yml`, which builds, signs and publishes the six platform
-   releases and merges the updater manifest.
-3. **`publish-release`** — attach the updater manifest to the index release, make the
-   release public, then publish the optional Homebrew cask.
+   version release.
+2. **`desktop`** — call `release.yml`, which builds and signs all six targets as
+   Actions artifacts and merges the updater manifest.
+3. **`publish-release`** — verify and attach all installers, signatures, combined
+   checksums and updater manifest to the version release, make it public, then
+   publish the optional Homebrew cask.
 
-The index release stays a **draft** until the last job, so a release that fails halfway is
+The version release stays a **draft** until the last job, so a release that fails halfway is
 never visible to a user and the updater feed never points at a missing installer. This is
 nikcli's split between `publish-start.ts` and `publish-complete.ts`, with the same
 consequence: the release is published last or not at all.
@@ -105,16 +121,16 @@ nikcli's `--raw` mode does in CI.
 - **npm** — the workspace packages that are not private (the nikcli plugin). A version
   that is already on the registry is skipped, so a re-run is harmless; a prerelease goes
   to the `next` tag, a release to `latest`. A rate-limited registry is retried.
-- **GitHub releases** — the six platform releases (`v6.0.1-macos-arm64`, …) and the index
-  release (`v6.0.1`) that carries `latest.json` for the in-app updater.
+- **GitHub release** — one version release (`v6.0.1`) carries all six targets,
+  signatures, combined checksums, release notes and `latest.json` for the in-app updater.
 - **Homebrew** — a cask for the two macOS builds, generated from the checksums the
   release build already verified, and pushed to the tap repository as
   `Casks/cadcamfun.rb`, which is where Homebrew looks for a cask.
 
-### The updater feed is the index release
+### The updater feed is the version release
 
 The in-app updater reads `https://github.com/nikomatt69/cadcamfun/releases/latest/download/latest.json`:
-the index release is the one GitHub marks as the latest, and it carries the merged,
+the stable version release is the one GitHub marks as the latest, and it carries the merged,
 signed manifest. The endpoint is written in `tauri.conf.json` and is the same
 repository the publish workflow releases to; a feed that pointed at another repository
 would resolve to nothing, so `scripts/release-target.test.ts` checks the two against
@@ -215,6 +231,8 @@ files and use the existing authenticated Cloudflare account.
 
 ### Verification recorded for this follow-up
 
+- 2026-10-24 single-release consolidation: `bun --no-env-file test scripts` passes 74 tests (351 assertions). Filesystem fixtures cover all six targets, combined checksum verification, matching notes and signatures, missing or unexpected targets/packages, tampered assets, historical platform URLs and manifest version/platform mismatch. Completion is exercised through the actual CLI with a local fake `gh`: exactly one asset upload to the version tag precedes publication; invalid output, an already published release and upload failure prevent publication; prereleases preserve their status and do not become latest. The six build planners pass. Workspace typechecking passes for all 15 packages and root scripts, followed by a root check after the final test changes. All six workflows pass actionlint. API reference generation and freshness verification pass; the generated reference is included. No commit, push, GitHub release or tap update was performed; live platform builds and updater installation were not exercised by this change.
+
 - 2026-10-22 actionlint installer fix: executed the shared action's exact Bash step in a temporary directory, downloaded the official 1.7.12 binary and confirmed its version. That downloaded binary validates all six workflows; shell syntax and diff whitespace checks pass. The previous GitHub run already passed workspace typechecking, Rust checks and companion validation before the unsupported actionlint installer stopped the workspace job.
 - 2026-10-22 CI pipeline/Bun 1.4.4 follow-up: frozen-lockfile installation succeeds without a lockfile change; 57 script tests pass, including build plans for all six targets with no test command. All six workflows pass actionlint; root scripts and web documentation pass typechecking, including docs-index and API-reference freshness checks. The API reference was regenerated and is unchanged. Workspace typechecking currently reports `TS2322` in the separately modified `packages/core/src/cad/sketch-edit.test.ts:98` (`Dimension` versus `number`); no CAD source was changed by this follow-up. No cross-platform installers or release publication were run.
 - 2026-10-22 completion: `bun --no-env-file test scripts` passes 57 tests, including all six build planners, staging/tamper checks, signing plans, version/lockfile stamping and npm outcome handling. `bun --no-env-file run typecheck` passes across all 15 workspace packages and root scripts (13 packages reused cached checks); the API reference was regenerated first and its freshness check remains enabled. Workflow lint passes for all five workflows. `ruby -c` accepts both one- and two-architecture generated casks. A real `bun-darwin-arm64` sidecar was compiled into a temporary directory with every required nikcli host patch applied. Actual cross-platform installer signing, publication and updater installation were not run.
@@ -231,6 +249,7 @@ Earlier checkpoints:
 
 ## 7. Change log
 
+- 2026-10-24: replace six platform releases plus an index with one release per version, following nikcli's desktop artifact uploads. Consolidate installers, signatures and checksums before publication; point updater and Homebrew downloads at the same version tag. Historical releases remain unchanged.
 - 2026-10-23: Linux desktop packages match nikcli: `.deb` and `.rpm` only. The AppImage bundler aborts on the aarch64 Bun sidecar, so Linux platform releases no longer carry an updater artifact. The in-app updater manifest is macOS and Windows.
 - v1: initial spec.
 - 2026-10-22: fixed the failed actionlint installation in CI and publish. The Rust installer does not support actionlint and falls back to looking for a nonexistent crate; both workflows now use a shared action invoking actionlint's official version-pinned binary installer.

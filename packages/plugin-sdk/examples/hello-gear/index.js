@@ -7297,6 +7297,10 @@ var CONTAINERS2 = new Set(["component", "group", "assembly"]);
 // packages/core/src/cam/brep-part.ts
 var cache = new WeakMap;
 
+// packages/core/src/cam/swarf-walls.ts
+var TAU12 = 2 * Math.PI;
+var MAX_GAP3 = Math.PI / 3;
+
 // packages/core/src/cam/setup.ts
 var SETUP_ORIENTATIONS = ["+Z", "-Z", "+X", "-X", "+Y", "-Y"];
 // packages/core/src/cam/ir.ts
@@ -8837,10 +8841,6 @@ var machineConfigOf = (machine) => {
   };
 };
 var DEFAULT_MACHINE_CONFIGS = MACHINE_CATALOGUE.map(machineConfigOf);
-// packages/core/src/cam/swarf-walls.ts
-var TAU12 = 2 * Math.PI;
-var MAX_GAP3 = Math.PI / 3;
-
 // packages/core/src/cam/kernel/head.ts
 var DEG3 = Math.PI / 180;
 

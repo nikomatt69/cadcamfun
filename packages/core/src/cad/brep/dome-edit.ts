@@ -10,8 +10,13 @@
  * centre, with the cylinder wall of that radius continuing below the rim. The result is checked like every edit of the kind: a valid
  * solid whose volume moved by exactly  (2 pi / 3) [ (R'^3 - (R'^2 - a^2)^1.5) - (R^3 - (R^2 - a^2)^1.5) ]  (a: the boss radius).
  *
- * A dome that is more than a hemisphere (an overhang), one whose sphere is tangent to the wall (a radius within 0.02 mm of the boss's)
- * before or after the edit, and a sphere that is not the end of a boss are refused with the reason.
+ * The twin of the dome is the **socket**: the spherical bottom of a bore (a ball-end hole). Its sphere is concave, its centre is in the void,
+ * and the same closed form holds with the signs turned: the bottom moves up into the bore when pushed out of the solid (R' = R - d) and
+ * deeper when pulled. A hemispherical dome or socket (rim through the centre, the sphere tangent to the wall: the end of a ball-nose
+ * pin or of a ball-end bore) can be edited when the new sphere is not tangent; its axis is then read from the wall it ends.
+ *
+ * A cap that is more than a hemisphere (an overhang), a sphere that would be tangent to the wall (a radius within 0.02 mm of the
+ * wall's) after the edit, one pulled in below the wall's radius and a sphere that is not the end of a straight wall are refused with the reason.
  */
 import { add3, cross3, dot3, length3, normalize3, scale3, sub3 } from "../vec.ts"
 import { booleanBrep } from "./boolean.ts"
@@ -25,79 +30,119 @@ import { validateBrep } from "./validate.ts"
 
 /** Smallest gap between the sphere and the boss wall the Boolean can decide (see the thread's crest trim). */
 const MIN_GAP = 0.02
+/** How much thicker than its socket the ball that fills it is taken, mm: more than the smallest gap a Boolean decides, so no sphere is coincident. */
+const SKIN = 0.05
 
 export interface RecognizedDome {
   readonly face: number
   readonly centre: Vec3
   readonly radius: number
-  /** Unit axis, pointing from the boss to the apex. */
+  /** Unit axis, pointing from the sphere's centre to the pole of the cap (the apex of a dome, the lowest point of a socket). */
   readonly axis: Vec3
-  /** The boss radius (the rim circle). */
+  /** The wall radius (the rim circle). */
   readonly boss: number
-  /** Height of the rim above the sphere's centre along the axis; positive for a cap smaller than a hemisphere. */
+  /** Height of the rim from the sphere's centre along the axis; zero for a hemisphere, positive for a smaller cap. */
   readonly rim: number
+  /** True for a socket (the sphere is concave: the centre is in the void). */
+  readonly concave: boolean
 }
 
-/** The dome whose sphere face is `face`, or why that face is not one. */
+/** The face of the straight cylinder wall that shares the rim `edge`, with its axis and radius. */
+const wallAt = (b: Brep, edge: number, not: number): { readonly axis: Vec3; readonly radius: number } | undefined => {
+  for (let g = 0; g < b.faces.length; g++) {
+    if (g === not) continue
+    const s = b.faces[g]!.surface
+    if (s.kind !== "cylinder") continue
+    for (const loop of b.faces[g]!.loops) if (loop.coedges.some((c) => c.edge === edge)) return { axis: s.frame.z, radius: s.radius }
+  }
+  return undefined
+}
+
+/** The dome or socket whose sphere face is `face`, or why that face is not one. */
 export const recognizeDome = (b: Brep, face: number): RecognizedDome | string => {
   const f = b.faces[face]
   if (f === undefined || f.surface.kind !== "sphere") return "the face is not a sphere"
-  if (f.reversed) return "the sphere face is concave (a socket), not a dome"
   const s = f.surface
   const pts: Vec3[] = []
   // The seam of a sphere is an edge the loop walks twice; the rim is what is walked once.
   const walked = new Map<number, number>()
   for (const loop of f.loops) for (const c of loop.coedges) walked.set(c.edge, (walked.get(c.edge) ?? 0) + 1)
+  let rimEdge = -1
   for (const loop of f.loops) for (const c of loop.coedges) {
     if (walked.get(c.edge) !== 1) continue
+    rimEdge = c.edge
     const e = b.edges[c.edge]!
     for (let k = 0; k <= 8; k++) pts.push(curvePoint(e.curve, e.t0 + ((e.t1 - e.t0) * k) / 8))
   }
-  if (pts.length < 3 || f.loops.length !== 1) return "the sphere face has no single rim circle (it is not the cap of a boss)"
+  if (pts.length < 3 || f.loops.length !== 1) return "the sphere face has no single rim circle (it is not the end of a round wall)"
   // The rim is a circle in a plane square to the line through the centre: its centre (from three of its points) lies on that line,
   // and every point is at one height and one distance from it.
   const [p0, p1, p2] = [pts[0]!, pts[Math.floor(pts.length / 3)]!, pts[Math.floor((2 * pts.length) / 3)]!]
   const u = sub3(p1, p0), v = sub3(p2, p0), w = cross3(u, v)
   if (length3(w) < 1e-9) return "the rim of the sphere face is degenerate"
-  const centre = add3(p0, scale3(add3(scale3(cross3(w, u), dot3(v, v)), scale3(cross3(v, w), dot3(u, u))), 1 / (2 * dot3(w, w))))
-  const toMean = sub3(centre, s.frame.origin)
-  if (length3(toMean) < 1e-9) return "the rim passes through the sphere's centre (a hemisphere's rim is tangent to the wall)"
-  const axis = normalize3(toMean)
-  const tol = 1e-6 * Math.max(1, s.radius)
-  const rim = dot3(toMean, axis)
+  const rc = add3(p0, scale3(add3(scale3(cross3(w, u), dot3(v, v)), scale3(cross3(v, w), dot3(u, u))), 1 / (2 * dot3(w, w))))
+  const toRim = sub3(rc, s.frame.origin)
+  const R = s.radius
+  const wall = wallAt(b, rimEdge, face)
+  const locator = brepLocator(b)
+  const onFace = (dir: Vec3): boolean => locator.closest(add3(s.frame.origin, scale3(dir, R))).face === face
+  let axis: Vec3
+  if (length3(toRim) < 1e-6 * R) {
+    // A hemisphere: the rim passes through the centre, and the axis is the one of the wall the sphere ends.
+    if (wall === undefined) return "the rim passes through the sphere's centre and no straight wall ends there: it is not the end of a round wall"
+    const up = normalize3(wall.axis)
+    axis = onFace(up) ? up : onFace(scale3(up, -1)) ? scale3(up, -1) : up
+  } else {
+    axis = normalize3(toRim)
+  }
+  const rim = dot3(toRim, axis)
+  const tol = 1e-6 * Math.max(1, R)
   let a = 0
   for (const p of pts) {
     const q = sub3(p, s.frame.origin)
     if (Math.abs(dot3(q, axis) - rim) > tol) return "the rim of the sphere face is not a circle square to the axis through its centre"
     a = Math.max(a, length3(sub3(q, scale3(axis, dot3(q, axis)))))
   }
-  if (!(rim > 0)) return "the dome is a hemisphere or more (an overhang), which has no exact push/pull yet"
-  // The apex must belong to this face (the cap, not the rest of the sphere), and the boss wall must continue below the rim.
-  const locator = brepLocator(b)
-  const apex = add3(s.frame.origin, scale3(axis, s.radius))
-  const onApex = locator.closest(apex)
-  if (onApex.face !== face) return "the apex of the sphere is not on this face: it is not the cap of a boss"
-  const below = add3(s.frame.origin, scale3(axis, rim - Math.min(1, rim * 0.5)))
-  if (locator.classify(add3(below, { x: 0, y: 0, z: 0 }), 1e-6) === "out") return "the boss does not continue below the dome"
-  return { face, centre: s.frame.origin, radius: s.radius, axis, boss: a, rim }
+  if (rim < -tol) return "the cap is more than a hemisphere (an overhang), which has no exact push/pull yet"
+  if (!onFace(axis)) return "the pole of the sphere is not on this face: it is not the end of a round wall"
+  if (wall === undefined) return "no straight wall of the rim's radius continues from the sphere"
+  if (Math.abs(Math.abs(dot3(normalize3(wall.axis), axis)) - 1) > 1e-6 || Math.abs(wall.radius - a) > 1e-6 * Math.max(1, a)) return "the wall beside the sphere is not a cylinder on the same axis and radius"
+  return { face, centre: s.frame.origin, radius: R, axis, boss: a, rim: Math.max(0, rim), concave: f.reversed }
 }
 
 const cap = (R: number, a: number): number => R ** 3 - (R * R - a * a) ** 1.5
 
-/** The solid with the dome `face` moved by `distance` along its normal (positive grows it), or why not. */
+/**
+ * The solid with the dome or socket `face` moved by `distance` along its outward normal, or why not. Positive grows a dome and shrinks
+ * a socket (the material comes into the bore).
+ */
 export const pushPullDome = (b: Brep, face: number, distance: number): Brep | string => {
   const dome = recognizeDome(b, face)
   if (typeof dome === "string") return dome
-  const R = dome.radius, a = dome.boss, R2 = R + distance
-  if (Math.abs(R - a) < MIN_GAP || Math.abs(R2 - a) < MIN_GAP) return `the sphere would be tangent to the wall of the boss (radius ${R2.toFixed(3)} against ${a.toFixed(3)} mm): the Boolean cannot decide a gap under ${MIN_GAP} mm`
-  if (!(R2 > a)) return `the new dome (radius ${R2.toFixed(3)} mm) is smaller than the boss it ends (${a.toFixed(3)} mm): it would leave a shoulder, which this edit does not model`
+  const R = dome.radius, a = dome.boss
+  const R2 = dome.concave ? R - distance : R + distance
+  if (Math.abs(R2 - a) < MIN_GAP) return `the sphere would be tangent to the wall (radius ${R2.toFixed(3)} against ${a.toFixed(3)} mm): the Boolean cannot decide a gap under ${MIN_GAP} mm`
+  if (!(R2 > a)) return `the new sphere (radius ${R2.toFixed(3)} mm) is smaller than the wall it ends (${a.toFixed(3)} mm): it would leave a shoulder, which this edit does not model`
   const rim2 = Math.sqrt(R2 * R2 - a * a)
   const before = massProperties(b).volume
   const at = (t: number): Vec3 => add3(dome.centre, scale3(dome.axis, t))
   const ball = makeSphere(R2, frame(dome.centre, dome.axis))
   try {
     let solid: Brep
-    if (distance >= 0) {
+    if (dome.concave) {
+      if (distance > 0) {
+        // The bottom comes up: what is inside the old ball and outside the new one, inside the bore's cylinder from the centre to the pole,
+        // becomes material. The old ball is taken a little larger so that its sphere is not coincident with the socket's own (a coincident
+        // sphere shifts the operand and costs 1e-4 of the volume): what the larger ball adds is material already, under the bottom.
+        const old = makeSphere(R + SKIN, frame(dome.centre, dome.axis))
+        const down = makeCylinder(a, R + SKIN + 1, frame(dome.centre, dome.axis))
+        solid = booleanBrep(b, booleanBrep(booleanBrep(old, down, "intersect").brep, ball, "subtract").brep, "union").brep
+      } else {
+        // The bottom goes deeper: the bigger ball inside the bore's cylinder, from the centre to the pole, is cut away.
+        const down = makeCylinder(a, R2 + 1, frame(dome.centre, dome.axis))
+        solid = booleanBrep(b, booleanBrep(ball, down, "intersect").brep, "subtract").brep
+      }
+    } else if (distance >= 0) {
       // Above the old rim, inside the boss's cylinder, inside the bigger ball.
       const up = makeCylinder(a, R2 + 1 - dome.rim, frame(at(dome.rim), dome.axis))
       solid = booleanBrep(b, booleanBrep(ball, up, "intersect").brep, "union").brep
@@ -109,9 +154,10 @@ export const pushPullDome = (b: Brep, face: number, distance: number): Brep | st
     const report = validateBrep(solid)
     if (!report.valid) return `the edited solid is not valid (${report.issues.slice(0, 2).map((i) => i.message).join("; ")})`
     const after = massProperties(solid).volume
-    const expected = ((2 * Math.PI) / 3) * (cap(R2, a) - cap(R, a))
+    const sign = dome.concave ? -1 : 1
+    const expected = sign * ((2 * Math.PI) / 3) * (cap(R2, a) - cap(R, a))
     if (Math.abs(after - before - expected) > 1e-6 * Math.max(before, 1) + 1e-6 * Math.abs(expected)) {
-      return `the edit changed the volume by ${(after - before).toFixed(6)} mm³ where the dome accounts for ${expected.toFixed(6)} mm³: it ran into a neighbouring feature`
+      return `the edit changed the volume by ${(after - before).toFixed(6)} mm³ where the ${dome.concave ? "socket" : "dome"} accounts for ${expected.toFixed(6)} mm³: it ran into a neighbouring feature`
     }
     return solid
   } catch (cause) {

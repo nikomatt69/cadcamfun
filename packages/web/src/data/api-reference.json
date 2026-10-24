@@ -48120,6 +48120,114 @@
         }
       }
     },
+    "/api/toolpaths/post-check": {
+      "post": {
+        "tags": [
+          "toolpaths"
+        ],
+        "operationId": "toolpaths.postCheck",
+        "parameters": [],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "issues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "sample": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "valid",
+                    "issues"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "definition": {},
+                  "sample": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "definition"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/drawings/{id}/toolpaths": {
       "get": {
         "tags": [
@@ -53302,7 +53410,8 @@
                               "type": "string",
                               "enum": [
                                 "parallel",
-                                "contour"
+                                "contour",
+                                "swarf"
                               ]
                             },
                             "top": {
@@ -53327,6 +53436,125 @@
                               "type": "number",
                               "minimum": -85,
                               "maximum": 85
+                            },
+                            "walls": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "bottom": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 2,
+                                    "maxItems": 2000
+                                  },
+                                  "top": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 2,
+                                    "maxItems": 2000
+                                  },
+                                  "normal": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "z": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "minItems": 2,
+                                    "maxItems": 2000
+                                  },
+                                  "concaveRadius": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "bottom",
+                                  "top",
+                                  "normal"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "maxItems": 64
+                            },
+                            "near": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "z": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "minItems": 1,
+                              "maxItems": 64
                             }
                           },
                           "required": [
@@ -53485,6 +53713,7 @@
                   "subprograms": {
                     "type": "boolean"
                   },
+                  "postDefinition": {},
                   "print": {
                     "type": "object",
                     "properties": {
@@ -58686,6 +58915,62 @@
                                 "free",
                                 "origin",
                                 "axis"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "swarfWalls": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "face": {
+                                  "type": "integer"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "plane",
+                                    "cone",
+                                    "cylinder"
+                                  ]
+                                },
+                                "near": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "height": {
+                                  "type": "number"
+                                },
+                                "lean": {
+                                  "type": "number"
+                                },
+                                "concaveRadius": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "face",
+                                "kind",
+                                "near",
+                                "height",
+                                "lean"
                               ],
                               "additionalProperties": false
                             }
