@@ -10,6 +10,7 @@ import type { PostId, PostOptions } from "../post/types.ts"
 import type { Cutter } from "./cutters.ts"
 import type { CutClass, CuttingData, MachineLimits } from "./cutting-data.ts"
 import type { MultiaxisStrategy } from "../operations/multiaxis.ts"
+import type { SwarfWall } from "../operations/swarf.ts"
 
 export const KERNEL_SCHEMA_VERSION = 1
 
@@ -167,7 +168,7 @@ export type OperationSpec =
    * Simultaneous five-axis finishing on a trunnion table: the tool leans off the surface normal (`lead` towards the travel, `tilt`
    * sideways) and the table turns with the linear axes. The moves carry A/B/C words; `top` is the highest the tool may be.
    */
-  | (OperationBase & { readonly strategy: "multiaxis"; readonly mode?: MultiaxisStrategy; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead"; readonly lead?: number; readonly tilt?: number })
+  | (OperationBase & { readonly strategy: "multiaxis"; readonly mode?: MultiaxisStrategy; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead"; readonly lead?: number; readonly tilt?: number; readonly walls?: ReadonlyArray<SwarfWall>; readonly near?: ReadonlyArray<Vec3> })
 
 export type Strategy = OperationSpec["strategy"]
 

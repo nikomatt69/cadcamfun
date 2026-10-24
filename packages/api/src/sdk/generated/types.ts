@@ -1437,12 +1437,19 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly coolant?: "off" | "flood" | "mist"
         readonly radialEngagement?: number
         readonly strategy: "multiaxis"
-        readonly mode?: "parallel" | "contour"
+        readonly mode?: "parallel" | "contour" | "swarf"
         readonly top: number
         readonly angle?: number
         readonly toolAxis?: "normal" | "lead"
         readonly lead?: number
         readonly tilt?: number
+        readonly walls?: ReadonlyArray<{
+          readonly bottom: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+          readonly top: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+          readonly normal: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
+          readonly concaveRadius?: number
+        }>
+        readonly near?: ReadonlyArray<{ readonly x: number; readonly y: number; readonly z: number }>
       }
   >
   readonly tools?: ReadonlyArray<{

@@ -65,7 +65,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // Raised to 31 600 when cad setups (the manual three-axis setup plan, one line) joined the cad tool.
     // Raised to 31 700 when cad hole (resize or fill one recognised hole, preview and store) joined cad and cad_edit.
     // Raised to 31 800 when cam setup_sheet (the shop sheet of a saved kernel program) joined the cam tool.
-    expect(total).toBeLessThan(31_800)
+    // Raised to 32 000 when the swarf operation (a flank cut of a cone or cylinder wall) joined the cam tool.
+    expect(total).toBeLessThan(32_000)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

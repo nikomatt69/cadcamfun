@@ -7,6 +7,7 @@
  *              (towards the direction of travel) and `tilt` (sideways). Where the leaned cutter would cut the part,
  *              the lean is increased until it clears (`gouge`); a point no lean clears is skipped and counted.
  *   contour    Constant-Z contours of the part (the contour engine of `surface-field.ts`), walked with the same rule.
+ *   swarf      The side of the cutter laid against a ruled wall, one ruling at a time (`swarf.ts`).
  *
  * Every sample is converted for the machine by `five-axis.ts`: the table angles that turn the tool axis to machine +Z
  * and the tip position in the frame the program is written in. A table change larger than `maxRotaryStep` degrees
@@ -25,8 +26,9 @@ import { partToMachine, type RotaryAngles } from "../indexing.ts"
 import { TriangleSoup, type SurfaceHit } from "../model/mesh-queries.ts"
 import { contour, sampleNodes, simplify, type Rect } from "./surface-field.ts"
 import { scallopSpacing } from "./surface.ts"
+import { swarfSections, type SwarfWall } from "./swarf.ts"
 
-export const MultiaxisStrategySchema = Schema.Literals(["parallel", "contour"])
+export const MultiaxisStrategySchema = Schema.Literals(["parallel", "contour", "swarf"])
 export type MultiaxisStrategy = typeof MultiaxisStrategySchema.Type
 
 export const ToolAxisSchema = Schema.Literals(["normal", "lead"])
@@ -157,7 +159,7 @@ export const envelopeOf = (p: Vec3, axis: Vec3, tool: Tool, flute: number): { cu
 
 // ---------------------------------------------------------------- samples
 
-interface Sample {
+export interface Sample {
   readonly point: Vec3
   readonly angles: RotaryAngles
   readonly tip: Vec3
@@ -211,7 +213,7 @@ const sampleAt = (
 
 // ---------------------------------------------------------------- the operation
 
-export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, tool: Tool, k: FiveAxisKinematic): MultiaxisResult => {
+export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, tool: Tool, k: FiveAxisKinematic, walls?: ReadonlyArray<SwarfWall>): MultiaxisResult => {
   const warnings: string[] = []
   const bounds = soup.bounds
   const topZ = bounds.max[2]
@@ -231,6 +233,15 @@ export const generateMultiaxis = (params: MultiaxisParams, soup: TriangleSoup, t
   if (tool.kind === "drill" || tool.kind === "vbit" || tool.kind === "facemill") {
     warnings.push(`A ${tool.kind} cannot machine a 5-axis surface; use an end mill or a ball nose cutter.`)
     return done([])
+  }
+
+  if (params.strategy === "swarf") {
+    if (walls === undefined || walls.length === 0) {
+      warnings.push("Swarf milling needs the walls to cut: none was given")
+      return done([])
+    }
+    const found = swarfSections(walls, params, tool, soup, k, stats, warnings)
+    return emit(found, params, topZ, stats, warnings, done, k, bounds)
   }
 
   if (params.strategy === "contour") {

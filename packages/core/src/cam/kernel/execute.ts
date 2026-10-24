@@ -27,6 +27,7 @@ import { DrillParams, generateDrill } from "../operations/drill.ts"
 import { EngraveParams, generateEngrave } from "../operations/engrave.ts"
 import { FaceParams, generateFace } from "../operations/face.ts"
 import { MultiaxisParams, generateMultiaxis } from "../operations/multiaxis.ts"
+import { swarfWallsNear } from "../swarf-walls.ts"
 import { fiveAxisKinematic } from "../five-axis.ts"
 import { tableRotation, type RotaryAngles, type RotaryLayout } from "../indexing.ts"
 import { carryHeightField, remainingVolume, removeTipPath, stockContact, voxelStock, type VoxelStock } from "./stock.ts"
@@ -612,7 +613,15 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
             layout: five.layout, limits: { tilt: five.tilt, ...(five.rotation !== undefined ? { rotation: five.rotation } : {}) },
             pivot: five.pivot, tcp: "program"
           })
-          const r = generateMultiaxis(params, soup, legacyTool(tool), kin)
+          // The walls are given as rulings or as points on them; the exact solid answers the points. CAD world coordinates.
+          const named = op.mode === "swarf" && op.near !== undefined && job.part.kind === "elements" ? swarfWallsNear(job.part.elements as ReadonlyArray<CadElement>, op.near) : undefined
+          if (named !== undefined && named.problems.length > 0) { fail("InvalidInput", `${op.id}: ${named.problems.join("; ")}`, data); return }
+          const given = [...(op.walls ?? []), ...(named?.walls ?? [])]
+          if (op.mode === "swarf" && given.length === 0) { fail("InvalidInput", `${op.id}: swarf milling needs the walls to cut (strategy multiaxis, mode swarf, walls or near)`, data); return }
+          // The soup and the program are in work coordinates.
+          const move = (p: Vec3): Vec3 => ({ x: p.x - o.x, y: p.y - o.y, z: p.z - o.z })
+          const walls = given.map((w) => ({ bottom: w.bottom.map(move), top: w.top.map(move), normal: w.normal, ...(w.concaveRadius !== undefined ? { concaveRadius: w.concaveRadius } : {}) }))
+          const r = generateMultiaxis(params, soup, legacyTool(tool), kin, walls)
           generated = { toolpath: r.toolpath, skippedSamples: r.stats.skipped, warnings: [...r.warnings, ...(r.stats.skipped > 0 ? [`${op.id}: ${r.stats.skipped} points skipped (no lean clears the part, or the table cannot reach it)`] : [])] }
           break
         }

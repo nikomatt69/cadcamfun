@@ -58721,12 +58721,38 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "enum": [
                                 "parallel",
                                 "contour",
+                                "swarf",
                               ],
                               "type": "string",
                             },
                             "name": {
                               "maxLength": 120,
                               "type": "string",
+                            },
+                            "near": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                  "z": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                ],
+                                "type": "object",
+                              },
+                              "maxItems": 64,
+                              "minItems": 1,
+                              "type": "array",
                             },
                             "plungeFeed": {
                               "exclusiveMinimum": 0,
@@ -58773,6 +58799,100 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             },
                             "top": {
                               "type": "number",
+                            },
+                            "walls": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "bottom": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                        "z": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "maxItems": 2000,
+                                    "minItems": 2,
+                                    "type": "array",
+                                  },
+                                  "concaveRadius": {
+                                    "exclusiveMinimum": 0,
+                                    "type": "number",
+                                  },
+                                  "normal": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                        "z": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "maxItems": 2000,
+                                    "minItems": 2,
+                                    "type": "array",
+                                  },
+                                  "top": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                        "z": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "maxItems": 2000,
+                                    "minItems": 2,
+                                    "type": "array",
+                                  },
+                                },
+                                "required": [
+                                  "bottom",
+                                  "top",
+                                  "normal",
+                                ],
+                                "type": "object",
+                              },
+                              "maxItems": 64,
+                              "type": "array",
                             },
                           },
                           "required": [

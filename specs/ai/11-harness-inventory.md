@@ -26,7 +26,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | --- | --- | --- | --- | --- |
 | `cad` | read | 29 | primary:general, primary:cad, primary:cam, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3579 |
 | `cad_edit` | destructive | 16 | primary:general, primary:cad, editor, modeler | 3428 |
-| `cam` | read | 16 | primary:general, primary:cad, primary:cam, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3432 |
+| `cam` | read | 16 | primary:general, primary:cad, primary:cam, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3567 |
 | `cam_edit` | write | 7 | primary:general, primary:cam, machinist, optimizer | 2456 |
 | `library` | read | 5 | primary:general, primary:cad, primary:cam, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1400 |
 | `parts` | destructive | 3 | primary:general, primary:cad, editor, modeler | 1395 |
@@ -256,7 +256,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1668 | ai-specialists.test.ts, prompt-corpus.test.ts, specialists-host.test.ts |
 | `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 3579 | ai-specialists.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts |
 | `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3428 | fusion-modelling.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, specialists-host.test.ts |
-| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 3432 | modes.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 3567 | modes.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2456 | prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
 | `packages/ai/src/tools/prompts/cam_verify.txt` | tool description | tools/prompts/index.ts toolPrompt | 1524 | prompt-corpus.test.ts, tool-definitions.test.ts |
 | `packages/ai/src/tools/prompts/library.txt` | tool description | tools/prompts/index.ts toolPrompt | 1400 | prompt-corpus.test.ts |

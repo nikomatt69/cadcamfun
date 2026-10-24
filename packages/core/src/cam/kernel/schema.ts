@@ -16,6 +16,14 @@ const positive = Schema.Finite.check(Schema.isGreaterThan(0))
 const nonNegative = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
 const id = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))
 const point = Schema.Struct({ x: Schema.Finite, y: Schema.Finite })
+const vec3 = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
+/** The rulings of a ruled wall for a flank cut (CAD world mm): see `operations/swarf.ts`. */
+export const SwarfWallSchema = Schema.Struct({
+  bottom: Schema.Array(vec3).check(Schema.isMinLength(2), Schema.isMaxLength(2000)),
+  top: Schema.Array(vec3).check(Schema.isMinLength(2), Schema.isMaxLength(2000)),
+  normal: Schema.Array(vec3).check(Schema.isMinLength(2), Schema.isMaxLength(2000)),
+  concaveRadius: Schema.optionalKey(positive)
+})
 const ring = Schema.Array(point).check(Schema.isMinLength(3), Schema.isMaxLength(20_000))
 
 export const CutterSchema = Schema.Struct({
@@ -60,7 +68,11 @@ export const OperationSpecSchema = Schema.Union([
     ...overrides, strategy: Schema.Literal("multiaxis"), mode: Schema.optionalKey(MultiaxisStrategySchema), top: Schema.Finite, stepover: positive,
     angle: Schema.optionalKey(Schema.Finite), toolAxis: Schema.optionalKey(Schema.Literals(["normal", "lead"])),
     lead: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 }))),
-    tilt: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 })))
+    tilt: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 }))),
+    /** `mode: "swarf"`: the walls to cut with the side of the cutter (read from the exact solid by `swarfWalls`). */
+    walls: Schema.optionalKey(Schema.Array(SwarfWallSchema).check(Schema.isMaxLength(64))),
+    /** `mode: "swarf"`: a point on each wall to cut (CAD world mm); the kernel reads the rulings from the exact solid. */
+    near: Schema.optionalKey(Schema.Array(vec3).check(Schema.isMinLength(1), Schema.isMaxLength(64)))
   })
 ])
 
