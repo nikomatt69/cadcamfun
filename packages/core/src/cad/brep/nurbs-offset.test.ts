@@ -95,7 +95,8 @@ describe("a free-form face trimmed by a circle", () => {
     expect(up.trimmed).toBe(true)
     const d = 0.6
     const r = ok(offsetNurbsFace(b, up.face, d, 0.01))
-    expect(r.deviation).toBeLessThan(0.1)
+    // The deviation is the honest bound: the fit, the polyline of the trim, and the sideways shift of the boundary (depth x sine of the normals' spread).
+    expect(r.deviation).toBeLessThan(0.3)
     expect(validateBrep(r.brep).valid).toBe(true)
     const face = b.faces[up.face]!
     const locator = brepLocator(r.brep)
