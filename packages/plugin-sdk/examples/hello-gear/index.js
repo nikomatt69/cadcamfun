@@ -6253,6 +6253,9 @@ var MAX_GAP = Math.PI / 3;
 // packages/core/src/cad/brep/boss-edit.ts
 var TAU9 = 2 * Math.PI;
 var MAX_GAP2 = Math.PI / 3;
+// packages/core/src/cad/brep/fillet-edit.ts
+var TAU10 = 2 * Math.PI;
+var MAX_ARC = Math.PI - 0.001;
 // packages/core/src/cad/brep/shell.ts
 var CROSS = 1 + 0.000001;
 // packages/core/src/cad/brep/export-mesh.ts
@@ -6267,11 +6270,11 @@ var CRC_TABLE = (() => {
   return t;
 })();
 // packages/core/src/cad/brep/iges.ts
-var TAU10 = Math.PI * 2;
+var TAU11 = Math.PI * 2;
 // packages/core/src/cad/history.ts
 var PRIMITIVE_MAY_BE_ZERO = new Set(["holeDiameter", "phiStart"]);
 // packages/core/src/cad/sketch-edit.ts
-var TAU11 = Math.PI * 2;
+var TAU12 = Math.PI * 2;
 // packages/core/src/cad/kinematics.ts
 var RAD = Math.PI / 180;
 // packages/core/src/cad/parametric-from-element.ts
@@ -7298,15 +7301,11 @@ var CONTAINERS2 = new Set(["component", "group", "assembly"]);
 var cache = new WeakMap;
 
 // packages/core/src/cam/swarf-walls.ts
-var TAU12 = 2 * Math.PI;
+var TAU13 = 2 * Math.PI;
 var MAX_GAP3 = Math.PI / 3;
 
 // packages/core/src/cam/setup.ts
 var SETUP_ORIENTATIONS = ["+Z", "-Z", "+X", "-X", "+Y", "-Y"];
-
-// packages/core/src/cad/brep/fillet-edit.ts
-var TAU13 = 2 * Math.PI;
-var MAX_ARC = Math.PI - 0.001;
 // packages/core/src/cam/ir.ts
 var Positive = Finite.check(isGreaterThan2(0));
 var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));

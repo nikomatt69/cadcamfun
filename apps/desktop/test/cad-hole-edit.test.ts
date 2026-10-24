@@ -138,3 +138,41 @@ test("the exact model panel lists the rounded edges of a solid and gives one a n
     expect(root.querySelector("[data-testid='exact-hole-message']")!.textContent).toContain(`volume ${volume.toLocaleString(undefined, { maximumFractionDigits: 3 })} mm³`)
   } finally { dispose() }
 })
+
+test("the exact model panel lists the free-form faces of a solid and moves one along its normal into a new solid", async () => {
+  installDom("http://localhost/cad")
+  const { render } = await import("solid-js/web")
+  const { brep } = await import("@cadcamfun/core")
+  const { default: ExactModelPanel } = await import("../src/features/cad/components/ExactModelPanel.tsx")
+  const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
+  useElementsStore.setState({ elements: [] })
+  const patch = {
+    degreeU: 2, degreeV: 2, knotsU: [0, 0, 0, 1, 1, 1], knotsV: [0, 0, 0, 1, 1, 1],
+    points: [0, 5, 10].map((x) => [0, 5, 10].map((y) => [x, y, x === 5 && y === 5 ? 0.5 : 0]))
+  }
+  const solid = brep.thickenSurfacePatch(brep.surfacePatch(patch), 2, { x: 0, y: 0, z: 1 })
+  const element = { id: "free", type: "brep", name: "Free", x: 0, y: 0, z: 0, layerId: "default", brep: JSON.parse(JSON.stringify(solid)) } as Record<string, unknown>
+  const root = document.createElement("div")
+  document.body.append(root)
+  const dispose = render(() => ExactModelPanel({ element, all: [element] }), root)
+  try {
+    for (let k = 0; k < 50 && root.querySelectorAll("[data-nurbs]").length === 0; k++) await new Promise((resolve) => setTimeout(resolve, 100))
+    const rows = [...root.querySelectorAll<HTMLElement>("[data-nurbs]")]
+    expect(rows).toHaveLength(2)
+    // The top face looks up: its row says so.
+    const upIndex = rows.findIndex((r) => /normal [-\d.]+, [-\d.]+, (0\.[5-9]\d*|1)/.test(r.textContent ?? ""))
+    expect(upIndex).toBeGreaterThanOrEqual(0)
+    const field = root.querySelector<HTMLInputElement>(`#exact-nurbs-${upIndex}`)!
+    field.value = "2"
+    field.dispatchEvent(new window.Event("input", { bubbles: true }))
+    field.dispatchEvent(new window.Event("change", { bubbles: true }))
+    rows[upIndex]!.querySelector<HTMLButtonElement>("[data-testid='exact-nurbs-move']")!.click()
+    const created = useElementsStore.getState().elements.filter((e) => e["type"] === "brep" && e["id"] !== "free")
+    expect(created).toHaveLength(1)
+    // The face moves along its mean normal (a little off Z): the slab is close to 100 x 2 mm³.
+    const text = root.querySelector("[data-testid='exact-hole-message']")!.textContent ?? ""
+    const volume = Number(/volume ([\d,.]+) mm³/.exec(text)![1]!.replace(/,/g, ""))
+    expect(volume).toBeGreaterThan(200 + 190)
+    expect(volume).toBeLessThan(200 + 210)
+  } finally { dispose() }
+})

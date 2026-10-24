@@ -6,7 +6,7 @@
  * The analysis is the one the sidecar (`/api/cad/exact/analyze`) and the assistant (`cad.exact`) run, `analyzeBrep` of
  * `@cadcamfun/core`, so the panel, the API and the CAM planner agree on holes and on how the part will be machined.
  */
-import { analyzeBrep, brep, elementBrep, sceneBossEditBody, sceneFilletEditBody, sceneHoleEditBody, type SceneBoss, type SceneFillet, type SceneHole, type SceneMachining } from "@cadcamfun/core"
+import { analyzeBrep, brep, elementBrep, sceneBossEditBody, sceneFilletEditBody, sceneHoleEditBody, sceneNurbsEditBody, type SceneBoss, type SceneFillet, type SceneNurbsFace, type SceneHole, type SceneMachining } from "@cadcamfun/core"
 
 export type ExactAnalysis =
   | {
@@ -26,6 +26,8 @@ export type ExactAnalysis =
       readonly drilled: ReadonlyArray<SceneHole>
       /** The bosses, pins and shaft sections (convex cylinders all the way round), in the order the boss edit indexes them. */
       readonly bosses: ReadonlyArray<SceneBoss>
+      /** The free-form patch faces that can be moved along a direction, in the order the move indexes them. */
+      readonly nurbsFaces: ReadonlyArray<SceneNurbsFace>
       /** The rounded edges and rims whose radius can be edited, in the order the fillet edit indexes them. */
       readonly fillets: ReadonlyArray<SceneFillet>
       /** Whether the CAM planner machines the solid by its features (holes, pockets, outlines) or as a 3D surface job, and why. */
@@ -51,7 +53,7 @@ export const analyzeExact = (element: Record<string, unknown>, all: ReadonlyArra
   return {
     ok: true, faces: a.faces, edges: a.edges, vertices: a.vertices, surfaces: a.surfaces,
     volume: a.volume, area: a.area, centroid: a.centroid, holes: a.throughHoles, valid: a.valid, issues: a.issues.slice(0, 5),
-    drilled: a.holes, bosses: a.bosses, fillets: a.fillets ?? [], machining: a.machining
+    drilled: a.holes, bosses: a.bosses, fillets: a.fillets ?? [], nurbsFaces: a.nurbsFaces ?? [], machining: a.machining
   }
 }
 
@@ -109,5 +111,19 @@ export const editElementFillet = (
   return {
     ok: true, volume: built.report.volume, volumeChange: built.report.volumeChange,
     element: { type: "brep", name: `${base} fillet ${fillet + 1} R${Math.round(radius * 1000) / 1000}`, brep: built.brep, x: 0, y: 0, z: 0 }
+  }
+}
+
+/** Move the `nurbs`-th free-form patch face of an element along its mean normal by `distance` (out of the solid when positive), into a new solid. */
+export const editElementNurbs = (
+  element: Record<string, unknown>, all: ReadonlyArray<Record<string, unknown>>, nurbs: number, distance: number
+): { readonly ok: true; readonly element: Record<string, unknown>; readonly volume: number; readonly volumeChange: number } | { readonly ok: false; readonly error: string } => {
+  let built: ReturnType<typeof sceneNurbsEditBody>
+  try { built = sceneNurbsEditBody(all, String(element["id"] ?? ""), nurbs, distance) } catch (cause) { return { ok: false, error: cause instanceof Error ? cause.message : String(cause) } }
+  if (!built.ok) return built
+  const base = typeof element["name"] === "string" && element["name"] !== "" ? (element["name"] as string) : String(element["type"] ?? "part")
+  return {
+    ok: true, volume: built.report.volume, volumeChange: built.report.volumeChange,
+    element: { type: "brep", name: `${base} free-form face ${nurbs + 1} ${distance > 0 ? "+" : ""}${Math.round(distance * 1000) / 1000}`, brep: built.brep, x: 0, y: 0, z: 0 }
   }
 }

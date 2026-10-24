@@ -12,6 +12,7 @@ import { healBrep, massProperties, minimumDistance, recognizeHoles, offsetBrep, 
 import { editHole, type HoleEdit } from "./brep/hole-edit.ts"
 import { recognizeBosses, resizeBoss } from "./brep/boss-edit.ts"
 import { recognizeFillets, setFilletRadius } from "./brep/fillet-edit.ts"
+import { pushPullNurbsFace, recognizeNurbsFaces } from "./brep/nurbs-edit.ts"
 import { brepBox } from "./history-brep.ts"
 import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
 import type { BomRow, InferredJoint } from "./assembly-analysis.ts"
@@ -67,6 +68,15 @@ export interface SceneFillet {
   readonly length: number
 }
 
+/** A free-form patch face that can be moved along a direction, in the order `cad_edit` `hole` takes a `nurbs` index. */
+export interface SceneNurbsFace {
+  readonly face: number
+  /** Mean outward unit normal: the default direction of the move. */
+  readonly normal: Vec3
+  /** Largest angle between a normal of the face and the mean one, degrees. */
+  readonly spread: number
+}
+
 export interface ScenePartAnalysis {
   readonly id: string
   readonly name: string
@@ -85,6 +95,8 @@ export interface ScenePartAnalysis {
   readonly holes: ReadonlyArray<SceneHole>
   /** The bosses and shaft sections, in the order `cad_edit` `hole` takes a `boss` index. */
   readonly bosses: ReadonlyArray<SceneBoss>
+  /** The free-form patch faces that can be moved along a direction. */
+  readonly nurbsFaces?: ReadonlyArray<SceneNurbsFace>
   /** The rounded edges and rims whose radius can be edited. */
   readonly fillets?: ReadonlyArray<SceneFillet>
   readonly machining: SceneMachining
@@ -144,7 +156,9 @@ export const analyzeBrep = (id: string, name: string, b: Brep, options: { readon
     }
   })
   const fillets = recognizeFillets(b)
+  const free = recognizeNurbsFaces(b)
   return {
+    ...(free.length > 0 ? { nurbsFaces: free.map((x): SceneNurbsFace => ({ face: x.face, normal: x.normal, spread: x.spread })) } : {}),
     ...(fillets.length > 0 ? { fillets: fillets.map((x): SceneFillet => ({ face: x.face, kind: x.kind, radius: x.radius, convex: x.convex, length: x.length })) } : {}),
     ...(walls.length > 0 ? { swarfWalls: walls } : {}),
     ...(names.length > 0 ? { faceNames: names.slice(0, 40) } : {}),
@@ -410,6 +424,39 @@ export const sceneFilletEditBody = (
 
 export const sceneFilletEdit = (elements: ReadonlyArray<Element>, id: string, fillet: number, radius: number): SceneFilletEdit => {
   const built = sceneFilletEditBody(elements, id, fillet, radius)
+  return built.ok ? built.report : built
+}
+
+export type SceneNurbsEdit =
+  | {
+    readonly ok: true; readonly id: string; readonly name: string; readonly nurbs: number; readonly nurbsFaces: number
+    readonly before: { readonly normal: Vec3; readonly spread: number }; readonly distance: number; readonly direction: Vec3
+    readonly volume: number; readonly originalVolume: number; readonly volumeChange: number; readonly faces: number; readonly valid: boolean
+  }
+  | { readonly ok: false; readonly error: string }
+
+/** Moves the `nurbs`-th free-form patch face of a solid of the drawing along a direction (`brep/nurbs-edit.ts`); the order is `ScenePartAnalysis.nurbsFaces`. */
+export const sceneNurbsEditBody = (
+  elements: ReadonlyArray<Element>, id: string, nurbs: number, distance: number, direction?: Vec3
+): { readonly ok: true; readonly brep: Brep; readonly report: Extract<SceneNurbsEdit, { ok: true }> } | { readonly ok: false; readonly error: string } => {
+  const scene = sceneParts(elements)
+  const part = scene.parts.find((p) => p.id === id)
+  if (part === undefined) {
+    const skipped = scene.skipped.find((s) => s.id === id)
+    return { ok: false, error: skipped !== undefined ? `'${id}' has no exact model: ${skipped.reason}` : `no solid '${id}' in the drawing` }
+  }
+  const faces = recognizeNurbsFaces(part.brep)
+  const target = faces[nurbs]
+  if (target === undefined) return { ok: false, error: faces.length === 0 ? `'${id}' has no free-form patch face` : `'${id}' has ${faces.length} free-form patch faces (0..${faces.length - 1}), not a face ${nurbs}` }
+  const r = pushPullNurbsFace(part.brep, target.face, distance, direction)
+  if (typeof r === "string") return { ok: false, error: r }
+  const originalVolume = massProperties(part.brep).volume
+  const volume = massProperties(r).volume
+  return { ok: true, brep: r, report: { ok: true, id, name: part.name, nurbs, nurbsFaces: faces.length, before: { normal: target.normal, spread: target.spread }, distance, direction: direction ?? target.normal, volume, originalVolume, volumeChange: volume - originalVolume, faces: r.faces.length, valid: validateBrep(r).valid } }
+}
+
+export const sceneNurbsEdit = (elements: ReadonlyArray<Element>, id: string, nurbs: number, distance: number, direction?: Vec3): SceneNurbsEdit => {
+  const built = sceneNurbsEditBody(elements, id, nurbs, distance, direction)
   return built.ok ? built.report : built
 }
 

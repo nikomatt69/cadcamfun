@@ -72,6 +72,9 @@ export type CadOffsetInput = typeof CadOffsetInput.Type
 export const CadHoleInput = Schema.Struct({
   id: nonEmpty,
   hole: optional(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })).annotate({ description: "Index in the solid's recognised holes (the order `exact` lists them in)." })),
+  nurbs: optional(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })).annotate({ description: "Index in the solid's free-form patch faces (`exact` lists them as nurbsFaces); takes distance (and direction) only." })),
+  distance: optional(Schema.Finite.annotate({ description: "How far a free-form face moves, mm, out of the solid when positive: the face moves as a rigid piece along `direction`, it is not offset along its normals." })),
+  direction: optional(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }).annotate({ description: "Direction of the move (default: the face's mean outward normal); every normal of the face needs a part along it." })),
   fillet: optional(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })).annotate({ description: "Index in the solid's recognised fillets (`exact` lists them); takes radius only." })),
   radius: optional(positive.annotate({ description: "New radius in mm of a fillet: the faces beside it stay tangent (a convex one pushed out of the solid is tighter)." })),
   boss: optional(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })).annotate({ description: "Index in the solid's recognised bosses or shaft sections (`exact` lists them); takes diameter only." })),

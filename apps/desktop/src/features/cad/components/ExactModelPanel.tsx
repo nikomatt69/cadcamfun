@@ -2,7 +2,7 @@ import { PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { For, Show, createEffect, createSignal, on, type JSX } from "solid-js"
 import { NumberField } from "../../../shared/components/panel/ui.tsx"
-import { analyzeExact, editElementBoss, editElementFillet, editElementHole, elementStep, type ExactAnalysis, type HoleChange } from "../lib/exactModel.ts"
+import { analyzeExact, editElementBoss, editElementFillet, editElementHole, editElementNurbs, elementStep, type ExactAnalysis, type HoleChange } from "../lib/exactModel.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 
 interface Props {
@@ -50,6 +50,13 @@ export default function ExactModelPanel(props: Props): JSX.Element {
     useElementsStore.getState().addElements([r.element])
     setNote({ ok: true, text: `Added "${String(r.element["name"])}": volume ${fmt(r.volume)} mm³ (${r.volumeChange > 0 ? "+" : ""}${fmt(r.volumeChange)}).` })
   }
+  const [nurbsMoves, setNurbsMoves] = createSignal<Readonly<Record<number, number>>>({})
+  const changeNurbs = (index: number, distance: number) => {
+    const r = editElementNurbs(props.element, props.all, index, distance)
+    if (!r.ok) { setNote({ ok: false, text: r.error }); return }
+    useElementsStore.getState().addElements([r.element])
+    setNote({ ok: true, text: `Added "${String(r.element["name"])}": volume ${fmt(r.volume)} mm³ (${r.volumeChange > 0 ? "+" : ""}${fmt(r.volumeChange)}).` })
+  }
   const [filletRadii, setFilletRadii] = createSignal<Readonly<Record<number, number>>>({})
   const changeFillet = (index: number, radius: number) => {
     const r = editElementFillet(props.element, props.all, index, radius)
@@ -57,7 +64,7 @@ export default function ExactModelPanel(props: Props): JSX.Element {
     useElementsStore.getState().addElements([r.element])
     setNote({ ok: true, text: `Added "${String(r.element["name"])}": volume ${fmt(r.volume)} mm³ (${r.volumeChange > 0 ? "+" : ""}${fmt(r.volumeChange)}).` })
   }
-  createEffect(on(() => props.element, () => { setSizes({}); setBossSizes({}); setFilletRadii({}); setDraft(0); setNote(undefined) }))
+  createEffect(on(() => props.element, () => { setSizes({}); setBossSizes({}); setFilletRadii({}); setNurbsMoves({}); setDraft(0); setNote(undefined) }))
   const exportStep = () => {
     const out = elementStep(props.element, props.all)
     if (!("step" in out)) { alert(`No exact model: ${out.reason}`); return }
@@ -102,9 +109,9 @@ export default function ExactModelPanel(props: Props): JSX.Element {
         {(a) => (
           <Show when={a().ok ? (a() as Extract<ExactAnalysis, { ok: true }>) : undefined}>
             {(ok) => (
-              <Show when={ok().drilled.length > 0 || ok().bosses.length > 0 || ok().fillets.length > 0}>
+              <Show when={ok().drilled.length > 0 || ok().bosses.length > 0 || ok().fillets.length > 0 || ok().nurbsFaces.length > 0}>
                 <div class="mt-2 space-y-1 text-xs" data-testid="exact-hole-edit">
-                  <p class="font-medium">Edit a hole, a boss or a fillet (adds a new solid)</p>
+                  <p class="font-medium">Edit a hole, a boss, a fillet or a free-form face (adds a new solid)</p>
                   <div class="space-y-0.5">
                     <div>Draft angle (°, 0 = straight)</div>
                     <div class="w-24"><NumberField id="exact-draft" value={draft()} accept={(x) => x >= 0 && x <= 30} onValue={setDraft} /></div>
@@ -134,6 +141,15 @@ export default function ExactModelPanel(props: Props): JSX.Element {
                       <div class="flex items-center gap-1">
                         <div class="w-24"><NumberField id={`exact-fillet-${i()}`} value={filletRadii()[i()] ?? x.radius} accept={(r) => r > 0} onValue={(r) => setFilletRadii({ ...filletRadii(), [i()]: r })} /></div>
                         <button type="button" class="panel-btn" data-testid="exact-fillet-resize" onClick={() => changeFillet(i(), filletRadii()[i()] ?? x.radius)}>Set radius</button>
+                      </div>
+                    </div>
+                  )}</For>
+                  <For each={ok().nurbsFaces}>{(x, i) => (
+                    <div class="space-y-0.5" data-nurbs={i()}>
+                      <div>Free-form face #{i() + 1} (normal {fmt(x.normal.x)}, {fmt(x.normal.y)}, {fmt(x.normal.z)})</div>
+                      <div class="flex items-center gap-1">
+                        <div class="w-24"><NumberField id={`exact-nurbs-${i()}`} value={nurbsMoves()[i()] ?? 1} accept={(d) => d !== 0} onValue={(d) => setNurbsMoves({ ...nurbsMoves(), [i()]: d })} /></div>
+                        <button type="button" class="panel-btn" data-testid="exact-nurbs-move" onClick={() => changeNurbs(i(), nurbsMoves()[i()] ?? 1)}>Move</button>
                       </div>
                     </div>
                   )}</For>

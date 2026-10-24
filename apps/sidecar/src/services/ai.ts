@@ -668,7 +668,7 @@ const toolHandlers = Effect.gen(function*() {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
       try {
-        const report = input.fillet !== undefined ? cad.sceneFilletEdit(loaded.elements, input.id, input.fillet, input.radius!) : input.boss !== undefined ? cad.sceneBossEdit(loaded.elements, input.id, input.boss, input.diameter!, input.taper ?? 0)
+        const report = input.nurbs !== undefined ? cad.sceneNurbsEdit(loaded.elements, input.id, input.nurbs, input.distance!, input.direction) : input.fillet !== undefined ? cad.sceneFilletEdit(loaded.elements, input.id, input.fillet, input.radius!) : input.boss !== undefined ? cad.sceneBossEdit(loaded.elements, input.id, input.boss, input.diameter!, input.taper ?? 0)
           : cad.sceneHoleEdit(loaded.elements, input.id, input.hole!, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter, ...(input.taper !== undefined ? { taper: input.taper } : {}) } : { kind: "fill" })
         return { ...report, ...where(loaded) }
       }
@@ -678,6 +678,13 @@ const toolHandlers = Effect.gen(function*() {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
       try {
+        if (input.nurbs !== undefined) {
+          const n = cad.sceneNurbsEditBody(loaded.elements, input.id, input.nurbs, input.distance!, input.direction)
+          if (!n.ok) return n
+          return storeKernelBody(loaded, n.brep, `${n.report.name} free-form face ${input.nurbs} ${input.distance! > 0 ? "+" : ""}${input.distance}`, {
+            action: "ai.cad.nurbs_edit", details: { source: input.id, nurbs: input.nurbs, distance: input.distance, ...(input.direction !== undefined ? { direction: input.direction } : {}), volumeChange: n.report.volumeChange }
+          })
+        }
         if (input.fillet !== undefined) {
           const f = cad.sceneFilletEditBody(loaded.elements, input.id, input.fillet, input.radius!)
           if (!f.ok) return f

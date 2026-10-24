@@ -2922,6 +2922,9 @@ type Endpoint28_4Input = {
   readonly hole?: Endpoint28_4Request["payload"]["hole"]
   readonly boss?: Endpoint28_4Request["payload"]["boss"]
   readonly fillet?: Endpoint28_4Request["payload"]["fillet"]
+  readonly nurbs?: Endpoint28_4Request["payload"]["nurbs"]
+  readonly distance?: Endpoint28_4Request["payload"]["distance"]
+  readonly direction?: Endpoint28_4Request["payload"]["direction"]
   readonly radius?: Endpoint28_4Request["payload"]["radius"]
   readonly diameter?: Endpoint28_4Request["payload"]["diameter"]
   readonly taper?: Endpoint28_4Request["payload"]["taper"]
@@ -2936,6 +2939,9 @@ const Endpoint28_4 = (raw: RawClient["cadExact"]) => (input: Endpoint28_4Input) 
       hole: input["hole"],
       boss: input["boss"],
       fillet: input["fillet"],
+      nurbs: input["nurbs"],
+      distance: input["distance"],
+      direction: input["direction"],
       radius: input["radius"],
       diameter: input["diameter"],
       taper: input["taper"],

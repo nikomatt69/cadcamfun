@@ -66,6 +66,8 @@ export const CadExactFillet = Schema.Struct({
   face: int, kind: Schema.Literals(["cylinder", "torus"]), radius: num, convex: Schema.Boolean, length: num
 })
 
+export const CadExactNurbsFace = Schema.Struct({ face: int, normal: vec3, spread: num })
+
 export const CadExactPart = Schema.Struct({
   id: Schema.String, name: Schema.String, valid: Schema.Boolean, issues: Schema.Array(Schema.String),
   volume: num, area: num, centroid: vec3, bounds: Schema.Struct({ min: vec3, max: vec3 }),
@@ -74,6 +76,8 @@ export const CadExactPart = Schema.Struct({
   holes: Schema.Array(CadExactHole), machining: CadExactMachining,
   /** Bosses, pins and shaft sections (convex cylinders all the way round); `boss` indexes of the hole / boss edit. */
   bosses: Schema.Array(CadExactBoss),
+  /** Free-form patch faces that can be moved along a direction (`nurbs` index of the hole / boss edit). */
+  nurbsFaces: Schema.optionalKey(Schema.Array(CadExactNurbsFace)),
   /** Rounded edges and rims whose radius can be edited (`fillet` index of the hole / boss edit). */
   fillets: Schema.optionalKey(Schema.Array(CadExactFillet)),
   /** Walls a five-axis flank cut (swarf) can take, each with a point on it to name it by. */
@@ -175,12 +179,17 @@ export type CadSetupsReport = typeof CadSetupsReport.Type
 export const CadHoleRequest = Schema.Struct({
   ...source,
   id,
-  /** Index in the solid's recognised holes, in the order `analyze` lists them; exactly one of `hole`, `boss` and `fillet`. */
+  /** Index in the solid's recognised holes, in the order `analyze` lists them; exactly one of `hole`, `boss`, `fillet` and `nurbs`. */
   hole: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 }))),
   /** Index in the solid's recognised bosses (`analyze` lists them); a boss takes a `diameter` only. */
   boss: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 }))),
   /** Index in the solid's recognised fillets (`analyze` lists them); a fillet takes a `radius` only. */
   fillet: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 }))),
+  /** Index in the solid's recognised free-form patch faces (`analyze` lists them); it takes `distance`, and a `direction` when the mean normal is not the one wanted. */
+  nurbs: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 }))),
+  /** How far the free-form face moves, mm: out of the solid when positive. */
+  distance: Schema.optionalKey(Schema.Finite),
+  direction: Schema.optionalKey(vec3),
   /** New radius, mm, of a fillet. */
   radius: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   /** New diameter, mm: of the drill of a hole (exactly one of `diameter` and `fill`) or of a boss. */
@@ -207,6 +216,11 @@ export const CadHoleReport = Schema.Union([
   Schema.Struct({
     ok: Schema.Literal(true), id: Schema.String, name: Schema.String, fillet: int, fillets: int,
     before: Schema.Struct({ radius: num, convex: Schema.Boolean }), radius: num,
+    volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
+  }),
+  Schema.Struct({
+    ok: Schema.Literal(true), id: Schema.String, name: Schema.String, nurbs: int, nurbsFaces: int,
+    before: Schema.Struct({ normal: vec3, spread: num }), distance: num, direction: vec3,
     volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
   }),
   Schema.Struct({ ok: Schema.Literal(false), error: Schema.String })

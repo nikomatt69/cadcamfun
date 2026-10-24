@@ -58919,6 +58919,41 @@
                               "additionalProperties": false
                             }
                           },
+                          "fillets": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "face": {
+                                  "type": "integer"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "cylinder",
+                                    "torus"
+                                  ]
+                                },
+                                "radius": {
+                                  "type": "number"
+                                },
+                                "convex": {
+                                  "type": "boolean"
+                                },
+                                "length": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "face",
+                                "kind",
+                                "radius",
+                                "convex",
+                                "length"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
                           "swarfWalls": {
                             "type": "array",
                             "items": {
@@ -60810,6 +60845,78 @@
                         "ok": {
                           "type": "boolean",
                           "enum": [
+                            true
+                          ]
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "fillet": {
+                          "type": "integer"
+                        },
+                        "fillets": {
+                          "type": "integer"
+                        },
+                        "before": {
+                          "type": "object",
+                          "properties": {
+                            "radius": {
+                              "type": "number"
+                            },
+                            "convex": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "radius",
+                            "convex"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "radius": {
+                          "type": "number"
+                        },
+                        "volume": {
+                          "type": "number"
+                        },
+                        "originalVolume": {
+                          "type": "number"
+                        },
+                        "volumeChange": {
+                          "type": "number"
+                        },
+                        "faces": {
+                          "type": "integer"
+                        },
+                        "valid": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "id",
+                        "name",
+                        "fillet",
+                        "fillets",
+                        "before",
+                        "radius",
+                        "volume",
+                        "originalVolume",
+                        "volumeChange",
+                        "faces",
+                        "valid"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
                             false
                           ]
                         },
@@ -60910,6 +61017,15 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 9999
+                  },
+                  "fillet": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9999
+                  },
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
                   },
                   "diameter": {
                     "type": "number",

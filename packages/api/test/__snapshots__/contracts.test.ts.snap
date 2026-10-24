@@ -15896,6 +15896,46 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "name": {
                             "type": "string",
                           },
+                          "nurbsFaces": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "face": {
+                                  "type": "integer",
+                                },
+                                "normal": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "spread": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "face",
+                                "normal",
+                                "spread",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
                           "repair": {
                             "additionalProperties": false,
                             "properties": {
@@ -16866,6 +16906,29 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "exclusiveMinimum": 0,
                     "type": "number",
                   },
+                  "direction": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "x": {
+                        "type": "number",
+                      },
+                      "y": {
+                        "type": "number",
+                      },
+                      "z": {
+                        "type": "number",
+                      },
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "z",
+                    ],
+                    "type": "object",
+                  },
+                  "distance": {
+                    "type": "number",
+                  },
                   "drawingId": {
                     "minLength": 1,
                     "type": "string",
@@ -16894,6 +16957,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "id": {
                     "minLength": 1,
                     "type": "string",
+                  },
+                  "nurbs": {
+                    "maximum": 9999,
+                    "minimum": 0,
+                    "type": "integer",
                   },
                   "radius": {
                     "exclusiveMinimum": 0,
@@ -17178,6 +17246,116 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "fillets",
                         "before",
                         "radius",
+                        "volume",
+                        "originalVolume",
+                        "volumeChange",
+                        "faces",
+                        "valid",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "before": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "normal": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "x": {
+                                  "type": "number",
+                                },
+                                "y": {
+                                  "type": "number",
+                                },
+                                "z": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z",
+                              ],
+                              "type": "object",
+                            },
+                            "spread": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "normal",
+                            "spread",
+                          ],
+                          "type": "object",
+                        },
+                        "direction": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                            },
+                            "y": {
+                              "type": "number",
+                            },
+                            "z": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "z",
+                          ],
+                          "type": "object",
+                        },
+                        "distance": {
+                          "type": "number",
+                        },
+                        "faces": {
+                          "type": "integer",
+                        },
+                        "id": {
+                          "type": "string",
+                        },
+                        "name": {
+                          "type": "string",
+                        },
+                        "nurbs": {
+                          "type": "integer",
+                        },
+                        "nurbsFaces": {
+                          "type": "integer",
+                        },
+                        "ok": {
+                          "enum": [
+                            true,
+                          ],
+                          "type": "boolean",
+                        },
+                        "originalVolume": {
+                          "type": "number",
+                        },
+                        "valid": {
+                          "type": "boolean",
+                        },
+                        "volume": {
+                          "type": "number",
+                        },
+                        "volumeChange": {
+                          "type": "number",
+                        },
+                      },
+                      "required": [
+                        "ok",
+                        "id",
+                        "name",
+                        "nurbs",
+                        "nurbsFaces",
+                        "before",
+                        "distance",
+                        "direction",
                         "volume",
                         "originalVolume",
                         "volumeChange",

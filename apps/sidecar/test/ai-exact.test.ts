@@ -230,3 +230,41 @@ test("a fillet's radius is edited from the assistant: previewed read-only, store
   const rows = (history.body.logs as Array<{ itemId: string; action: string; details: Record<string, unknown> }>).filter((row) => row.itemId === project)
   expect(rows.find((row) => row.action === "ai.cad.fillet_edit")?.details).toMatchObject({ via: "assistant", source: "rounded", fillet: 0, radius: 2 })
 })
+
+test("a free-form face moves along a direction from the route and the assistant: the volume grows by the projected area x the distance", async () => {
+  const patch = {
+    degreeU: 2, degreeV: 2, knotsU: [0, 0, 0, 1, 1, 1], knotsV: [0, 0, 0, 1, 1, 1],
+    points: [0, 5, 10].map((x) => [0, 5, 10].map((y) => [x, y, x === 5 && y === 5 ? 3 : x === 5 || y === 5 ? 1 : 0]))
+  }
+  const solid = cad.brep.thickenSurfacePatch(cad.brep.surfacePatch(patch), 2, { x: 0, y: 0, z: 1 })
+  const free = { id: "free", type: "brep", name: "Free-form", x: 0, y: 0, z: 0, layerId: "default", brep: JSON.parse(JSON.stringify(solid)) }
+  const project = (await app.call("/api/projects", { method: "POST", json: { name: "Free-form edit" } })).body.id
+  await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Free", data: { elements: [free] } } })
+  const issue = async (mode: "read" | "write") => (await app.call("/api/ai/bridge/tokens", { method: "POST", json: { name: mode, projectId: project, mode } })).body.token as string
+  const read = await issue("read"), write = await issue("write")
+  const invoke = (token: string, tool: string, input: Record<string, unknown>) => app.call("/api/ai/actions/invoke", { method: "POST", auth: false, headers: { authorization: `Bearer ${token}` }, json: { projectId: project, tool, input } })
+  const exact = await invoke(read, "cad", { action: "exact", ids: ["free"] })
+  expect(exact.body.result.parts[0]).toMatchObject({ nurbsFacesTotal: 2 })
+  const faces = exact.body.result.parts[0].nurbsFaces as Array<{ normal: { z: number } }>
+  const up = faces.findIndex((f) => f.normal.z > 0)
+  expect(up).toBeGreaterThanOrEqual(0)
+  const preview = await invoke(read, "cad", { action: "hole", id: "free", nurbs: up, distance: 1.5, direction: { x: 0, y: 0, z: 1 } })
+  expect(preview.body.result).toMatchObject({ ok: true, valid: true, nurbs: up, nurbsFaces: 2 })
+  expect(preview.body.result.volumeChange).toBeCloseTo(150, 3)
+  expect((await invoke(read, "cad", { action: "hole", id: "free", nurbs: up })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("distance") })
+  expect((await invoke(read, "cad", { action: "hole", id: "free", nurbs: up, distance: 1, radius: 2 })).body.result).toMatchObject({ ok: false })
+  expect((await invoke(read, "cad", { action: "hole", id: "free", nurbs: up, distance: 1, direction: { x: 1, y: 0, z: 0 } })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("folds") })
+  const stored = await invoke(write, "cad_edit", { action: "hole", id: "free", nurbs: up, distance: -1, direction: { x: 0, y: 0, z: 1 } })
+  expect(stored.body.result).toMatchObject({ ok: true })
+  const both = await invoke(read, "cad", { action: "exact", ids: [stored.body.result.ids[0], "free"] })
+  const parts = both.body.result.parts as Array<{ id: string; volume: number }>
+  expect(parts.find((p) => p.id === stored.body.result.ids[0])!.volume).toBeCloseTo(100, 3)
+  // The same through the route.
+  const route = await app.call("/api/cad/exact/hole", { method: "POST", json: { elements: [free], id: "free", nurbs: up, distance: 2 } })
+  expect(route.status).toBe(200)
+  expect(route.body).toMatchObject({ ok: true, valid: true })
+  expect((await app.call("/api/cad/exact/hole", { method: "POST", json: { elements: [free], id: "free", nurbs: up } })).status).toBe(400)
+  expect((await app.call("/api/cad/exact/hole", { method: "POST", json: { elements: [free], id: "free", hole: 0, distance: 2 } })).status).toBe(400)
+  const rows = ((await app.call("/api/analytics/user-history?itemType=project&limit=100")).body.logs as Array<{ itemId: string; action: string; details: Record<string, unknown> }>).filter((row) => row.itemId === project)
+  expect(rows.find((row) => row.action === "ai.cad.nurbs_edit")?.details).toMatchObject({ via: "assistant", source: "free", nurbs: up, distance: -1 })
+})

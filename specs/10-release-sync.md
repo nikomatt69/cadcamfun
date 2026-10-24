@@ -16,11 +16,26 @@ All six targets' installers and signatures, one combined
 produce Actions artifacts only. The final publish job downloads all six installer
 artifacts, verifies their checksums, target prefixes, package formats and common
 notes, validates updater signatures and URLs against those actual assets, then
-uploads everything to the existing draft and publishes it last. Missing or invalid
+creates the draft after verification, uploads everything and publishes it last. Missing or invalid
 platform output prevents publication. Updater and Homebrew URLs use the base
 version tag. No platform-specific releases or tags are created. Historical platform
 tags remain excluded from version and changelog discovery. Existing published
 releases are not modified by this change.
+
+### CI orchestration and asset-first creation (2026-10-24)
+
+The `ci-pipeline.yml` owns the visible job sequence, following nikcli's
+[`ci-pipeline.yml`](https://github.com/nikcli/nikcli/blob/live-main/.github/workflows/ci-pipeline.yml):
+`validate` → `publish` (prepare metadata and tag) → `desktop` (build all six
+targets) → `publish-release` (verify assets, create the release and publish it).
+`publish.yml` is reusable metadata preparation only and must not publish npm or create a GitHub release. npm publication belongs to completion after asset verification.
+`publish-release.yml` is the reusable completion job. A new release is created
+only after all installer artifacts and the merged updater manifest are built and
+verified locally. An existing draft can be resumed; a published release or a failed
+lookup other than a missing release stops completion. Build or verification failure
+must leave no new GitHub release, including drafts. `scripts/release` dispatches
+`ci-pipeline.yml` with an explicit release flag; a default manual CI run and PRs
+only validate. Automatic main pushes keep the patch bump and anti-loop filters.
 
 ### Release completion contract (2026-10-22)
 
@@ -51,10 +66,10 @@ Scripts must fail fast, print each step, and never read `.env*`.
 
 ## 2. CI (GitHub Actions)
 
-- `ci-pipeline.yml` on main pushes, PRs and manual dispatch: call reusable `ci.yml` for validation, then call `publish.yml` with `prevalidated: true` and a patch bump on successful main pushes in the canonical repository. Release commits (`release: v…`) and generated/update housekeeping commits do not trigger another publication. PRs and manual validation runs do not publish.
+- `ci-pipeline.yml` on main pushes, PRs and manual dispatch: call reusable `ci.yml` for validation, then orchestrate `publish.yml` (metadata), `release.yml` (desktop assets) and `publish-release.yml` (publication) as separate jobs. Successful main pushes in the canonical repository use a patch bump and `prevalidated: true`. Explicit manual release runs pass the requested bump/version through the same jobs. Release commits (`release: v…`) and generated/update housekeeping commits do not trigger another publication. PRs and manual validation runs do not publish.
 - `ci.yml` is reusable and also runs directly on non-main branch pushes and manual dispatch: ubuntu runs install + typecheck + tests (including `cargo clippy`, `cargo test` for `src-tauri`); caches Bun and Cargo. Main pushes and PRs use the pipeline entry point to avoid duplicate validation runs. Main pipelines are not cancelled by a newer push while publication is running.
-- `publish.yml` is the release entry point, in the shape of nikcli's `publish.yml`: it resolves the version, stamps it across the workspace, writes the changelog, publishes npm, commits and pushes the release, tags it and creates the **draft** version release; it then calls `release.yml` to build all six targets and, in a last job, verifies and attaches every installer, signature, checksum file and updater manifest, makes the release public and publishes the optional Homebrew cask.
-- `release.yml` is called by `publish.yml` with the resolved tag (and can be dispatched by hand to rebuild an existing tag): six-target matrix for macOS, Windows and Linux on arm64 + x64 → build, sign, notarise, upload Actions artifacts and generate the updater manifest. Manual dispatch produces artifacts only; `publish.yml` owns GitHub publication. It follows nikcli's native-runner approach: both macOS targets use `macos-14` (Intel is cross-compiled), Windows ARM uses `windows-11-arm`, and Linux ARM uses `ubuntu-22.04-arm`.
+- `publish.yml` is reusable metadata preparation: resolve the version, stamp the workspace, write the changelog, commit/push the release metadata and tag it. It does not create a GitHub release or publish npm. `publish-release.yml` verifies the built assets, publishes npm, creates or resumes the draft, uploads all assets, publishes the release and updates the optional Homebrew cask.
+- `release.yml` is called by `ci-pipeline.yml` with the resolved tag (and can be dispatched by hand to rebuild an existing tag): six-target matrix for macOS, Windows and Linux on arm64 + x64 → build, sign, notarise, upload Actions artifacts and generate the updater manifest. Manual dispatch produces artifacts only; `publish-release.yml` owns GitHub publication. It follows nikcli's native-runner approach: both macOS targets use `macos-14` (Intel is cross-compiled), Windows ARM uses `windows-11-arm`, and Linux ARM uses `ubuntu-22.04-arm`.
 - `build-platforms.yml` on a `build/**` branch or manual dispatch uses the same six native targets to produce downloadable installer artifacts without requiring release/updater signing credentials. Like nikcli's desktop scripts, the sidecar is prepared for the explicit Rust target before Tauri bundles on the matching native runner.
 - Linux packages `.deb` and `.rpm` (the same set as nikcli's desktop; no AppImage). macOS builds separate `.app` + `.dmg` artifacts per architecture so Tauri also emits the updater `.app.tar.gz`. Windows packages `.msi` + NSIS `.exe`.
 - macOS uses separate arm64 and x64 installers, not a universal binary. Updater assets are `.app.tar.gz` and NSIS `.exe`, with sibling `.sig` files. Linux releases carry the packages only; the in-app updater has no Linux entry.
@@ -74,21 +89,16 @@ version, the changelog and the publishing are the pipeline's job**, not the owne
 ./scripts/release 6.2.0     # an explicit version
 ```
 
-`scripts/release` triggers the `publish` workflow, which runs in three jobs:
+`scripts/release` triggers `ci-pipeline.yml` with `release=true`. The visible sequence is:
 
-1. **`publish`** — resolve the version, stamp it across the workspace, write the
-   changelog, publish npm, commit and push the release, tag it, create the **draft**
-   version release.
-2. **`desktop`** — call `release.yml`, which builds and signs all six targets as
-   Actions artifacts and merges the updater manifest.
-3. **`publish-release`** — verify and attach all installers, signatures, combined
-   checksums and updater manifest to the version release, make it public, then
-   publish the optional Homebrew cask.
+1. **`validate`** — validate the workspace and workflows.
+2. **`publish`** — prepare the version, changelog, commit and tag through `publish.yml`.
+3. **`desktop`** — build and sign all six targets as Actions artifacts and merge the updater manifest through `release.yml`.
+4. **`publish-release`** — verify every installer and the manifest, publish npm, create the GitHub draft, attach the complete asset set and publish it, then update the optional Homebrew cask.
 
-The version release stays a **draft** until the last job, so a release that fails halfway is
-never visible to a user and the updater feed never points at a missing installer. This is
-nikcli's split between `publish-start.ts` and `publish-complete.ts`, with the same
-consequence: the release is published last or not at all.
+The GitHub release is created only after all desktop jobs and asset verification
+succeed. Upload failure leaves a resumable draft. An existing public release is
+never modified. Manual CI dispatch defaults to validation only; PRs never publish.
 
 ### The version is one version
 
@@ -231,6 +241,8 @@ files and use the existing authenticated Cloudflare account.
 
 ### Verification recorded for this follow-up
 
+- 2026-10-24 asset-first CI follow-up: 81 script tests pass (405 assertions), including the reusable workflow dependency graph, manual patch/explicit-version dispatch and dry-run without dispatch. CLI completion tests prove that invalid assets trigger no GitHub calls, release creation follows verification, existing drafts resume, lookup/create/upload failures prevent publication, published releases remain unchanged and prerelease flags are preserved. All 15 workspace typechecks and root scripts pass; API reference generation/freshness, seven workflow lint checks, shell syntax and whitespace checks pass. CI now runs the release regression suite. No commit, push, npm publish or real GitHub release was performed.
+
 - 2026-10-24 single-release consolidation: `bun --no-env-file test scripts` passes 74 tests (351 assertions). Filesystem fixtures cover all six targets, combined checksum verification, matching notes and signatures, missing or unexpected targets/packages, tampered assets, historical platform URLs and manifest version/platform mismatch. Completion is exercised through the actual CLI with a local fake `gh`: exactly one asset upload to the version tag precedes publication; invalid output, an already published release and upload failure prevent publication; prereleases preserve their status and do not become latest. The six build planners pass. Workspace typechecking passes for all 15 packages and root scripts, followed by a root check after the final test changes. All six workflows pass actionlint. API reference generation and freshness verification pass; the generated reference is included. No commit, push, GitHub release or tap update was performed; live platform builds and updater installation were not exercised by this change.
 
 - 2026-10-22 actionlint installer fix: executed the shared action's exact Bash step in a temporary directory, downloaded the official 1.7.12 binary and confirmed its version. That downloaded binary validates all six workflows; shell syntax and diff whitespace checks pass. The previous GitHub run already passed workspace typechecking, Rust checks and companion validation before the unsupported actionlint installer stopped the workspace job.
@@ -248,6 +260,8 @@ Earlier checkpoints:
 - At the 2026-10-05 checkpoint, actual signed installers, notarization, GitHub publication, updater signature verification, runtime update flow and backup/rollback acceptance had not run. The updater key was still a placeholder; the local signing follow-up below supersedes that key configuration status.
 
 ## 7. Change log
+
+- 2026-10-24 follow-up: expose preparation, desktop builds and completion as separate jobs in `ci-pipeline.yml`; defer GitHub release creation until all six targets pass asset verification. Manual release commands dispatch the full CI pipeline.
 
 - 2026-10-24: replace six platform releases plus an index with one release per version, following nikcli's desktop artifact uploads. Consolidate installers, signatures and checksums before publication; point updater and Homebrew downloads at the same version tag. Historical releases remain unchanged.
 - 2026-10-23: Linux desktop packages match nikcli: `.deb` and `.rpm` only. The AppImage bundler aborts on the aarch64 Bun sidecar, so Linux platform releases no longer carry an updater artifact. The in-app updater manifest is macOS and Windows.
