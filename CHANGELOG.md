@@ -3,6 +3,17 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.9 (October 2026)
+
+## Core
+
+- Read a part one side at a time from its shadow, and share the line-of-sight test (spec 54 R4)
+- Derive one tessellation per body and share it (spec 40 U6)
+
+## Integrations
+
+- Rebuild the hello-gear plugin bundle with the current core
+
 ## v0.1.8 (October 2026)
 
 ## Core
