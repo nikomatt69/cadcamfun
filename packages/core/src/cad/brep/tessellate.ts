@@ -836,6 +836,33 @@ export const tessellateBrep = (b: Brep, options: TessellateOptions = {}): BrepTe
   }
 }
 
+const derived = new WeakMap<Brep, Map<string, BrepTessellation>>()
+/** Entries kept per body: a viewport, a CAM section and an export each ask for their own tolerance. */
+const DERIVED_PER_BODY = 6
+
+/**
+ * The tessellation of a body as a **derived** value (spec 40 U6): one per body and set of options, shared by everyone who needs a
+ * mesh of the exact model (the CAM planner's sections, the setup planner, the CAM part model, the exports). The result is the
+ * very object `tessellateBrep` returns, so callers must treat it as read-only; a body is immutable, so it cannot go stale, and it
+ * is released with the body. Partial or reused tessellations (`faces`, `reuse`) are not derived values and bypass the cache.
+ */
+export const bodyTessellation = (b: Brep, options: TessellateOptions = {}): BrepTessellation => {
+  if (options.faces !== undefined || options.reuse === true) return tessellateBrep(b, options)
+  const key = `${options.chordTol ?? ""}|${options.angleTolDeg ?? ""}|${options.maxEdge ?? ""}|${options.maxPointsPerFace ?? ""}|${options.paramStep ?? ""}`
+  let byOptions = derived.get(b)
+  if (byOptions === undefined) { byOptions = new Map(); derived.set(b, byOptions) }
+  const hit = byOptions.get(key)
+  if (hit !== undefined) { derivedStats.hits++; return hit }
+  derivedStats.misses++
+  const fresh = tessellateBrep(b, options)
+  if (byOptions.size >= DERIVED_PER_BODY) byOptions.delete(byOptions.keys().next().value!)
+  byOptions.set(key, fresh)
+  return fresh
+}
+
+/** Hits and misses of `bodyTessellation`, for the tests and the evidence. */
+export const derivedStats = { hits: 0, misses: 0 }
+
 export interface UvSample {
   readonly u: number
   readonly v: number

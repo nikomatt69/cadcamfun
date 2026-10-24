@@ -4,7 +4,7 @@
  * tolerance (`chordTol`, mm; `angleTolDeg`), in millimetres, with outward normals; shared vertices are welded so the formats that
  * index them (OBJ, glTF, 3MF) get a closed manifold mesh. Every writer returns the text or bytes and the triangle count.
  */
-import { tessellateBrep, type TessellateOptions } from "./tessellate.ts"
+import { bodyTessellation, type TessellateOptions } from "./tessellate.ts"
 import type { Brep } from "./topology.ts"
 
 export interface MeshExportOptions extends TessellateOptions {
@@ -21,7 +21,7 @@ interface Mesh {
 }
 
 const meshOf = (b: Brep, o: MeshExportOptions): Mesh => {
-  const t = tessellateBrep(b, { angleTolDeg: 15, ...o })
+  const t = bodyTessellation(b, { angleTolDeg: 15, ...o })
   const weld = new Map<string, number>()
   const pos: number[] = []
   const idx: number[] = []

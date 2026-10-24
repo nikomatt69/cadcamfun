@@ -29,7 +29,7 @@ import { COIL_STEPS_PER_TURN, coilGeometry, rebuild, type History } from "../../
 import { loftSolid, sweepSolid, type P3 } from "../../cad/sweep-loft.ts"
 import { signedArea } from "../../cad/shapes.ts"
 import { segmentsFor } from "../../cad/tolerance.ts"
-import { tessellateBrep } from "../../cad/brep/tessellate.ts"
+import { bodyTessellation } from "../../cad/brep/tessellate.ts"
 import type { Brep } from "../../cad/brep/topology.ts"
 import { triangulateRing } from "../../cad/triangulate.ts"
 import type { Vec2 } from "../../cad/vec.ts"
@@ -222,24 +222,21 @@ const profileOf = (value: unknown): Vec2[] =>
 
 /**
  * An exact solid (`brep` element: a STEP import or a converted part) as its watertight tessellation within `tolerance`,
- * cached per B-rep object.
+ * derived once per B-rep object and tolerance (`bodyTessellation`).
  */
-const brepMeshCache = new WeakMap<object, Map<number, Mesh64 | null>>()
+/** The same mesh object for the same derived tessellation: callers key their own caches on it. */
+const meshOfTessellation = new WeakMap<object, Mesh64>()
 const brepElementMesh = (value: unknown, tolerance: number): Mesh64 | undefined => {
   if (typeof value !== "object" || value === null || !Array.isArray((value as Brep).faces)) return undefined
-  let byTol = brepMeshCache.get(value)
-  if (byTol === undefined) { byTol = new Map(); brepMeshCache.set(value, byTol) }
-  const hit = byTol.get(tolerance)
-  if (hit !== undefined) return hit ?? undefined
-  let mesh: Mesh64 | undefined
   try {
-    const t = tessellateBrep(value as Brep, { chordTol: tolerance })
-    mesh = t.indices.length >= 12 ? { positions: t.positions, indices: t.indices } : undefined
+    const t = bodyTessellation(value as Brep, { chordTol: tolerance })
+    if (t.indices.length < 12) return undefined
+    let mesh = meshOfTessellation.get(t)
+    if (mesh === undefined) { mesh = { positions: t.positions, indices: t.indices }; meshOfTessellation.set(t, mesh) }
+    return mesh
   } catch {
-    mesh = undefined
+    return undefined
   }
-  byTol.set(tolerance, mesh ?? null)
-  return mesh
 }
 
 const meshOfElement = (e: Element): Mesh64 | undefined => {

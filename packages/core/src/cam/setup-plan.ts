@@ -23,7 +23,7 @@
  * Nothing here claims the part is machinable: it says what the geometry allows. Workholding, cutter fit and collision stay
  * with the kernel's claims.
  */
-import { tessellateBrep, transformBrep, type Brep, type BrepTessellation } from "../cad/brep/index.ts"
+import { bodyTessellation, transformBrep, type Brep, type BrepTessellation } from "../cad/brep/index.ts"
 import { recognizeHoles } from "../cad/brep/features.ts"
 import type { Vec3 } from "../cad/brep/math.ts"
 import { brepFeatures } from "./brep-part.ts"
@@ -232,7 +232,7 @@ export const planSetups = (b: Brep, options: SetupPlanOptions = {}): SetupPlan =
 
   let lo = { x: Infinity, y: Infinity, z: Infinity }, hi = { x: -Infinity, y: -Infinity, z: -Infinity }
   let chord = options.chordTol
-  let mesh = tessellateBrep(b, chord === undefined ? {} : { chordTol: chord })
+  let mesh = bodyTessellation(b, chord === undefined ? {} : { chordTol: chord })
   for (let i = 0; i < mesh.positions.length; i += 3) {
     lo = { x: Math.min(lo.x, mesh.positions[i]!), y: Math.min(lo.y, mesh.positions[i + 1]!), z: Math.min(lo.z, mesh.positions[i + 2]!) }
     hi = { x: Math.max(hi.x, mesh.positions[i]!), y: Math.max(hi.y, mesh.positions[i + 1]!), z: Math.max(hi.z, mesh.positions[i + 2]!) }
@@ -240,11 +240,11 @@ export const planSetups = (b: Brep, options: SetupPlanOptions = {}): SetupPlan =
   const diagonal = Math.hypot(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z)
   if (chord === undefined) {
     chord = Math.max(0.02, diagonal / 1000)
-    mesh = tessellateBrep(b, { chordTol: chord })
+    mesh = bodyTessellation(b, { chordTol: chord })
   }
   while (mesh.indices.length / 3 > MAX_TRIANGLES && chord < diagonal / 20) {
     chord *= 2
-    mesh = tessellateBrep(b, { chordTol: chord })
+    mesh = bodyTessellation(b, { chordTol: chord })
     notes.push(`the tessellation was coarsened to a chord of ${chord.toFixed(3)} mm to keep the reach test under ${MAX_TRIANGLES} triangles`)
   }
   const faces = b.faces.length

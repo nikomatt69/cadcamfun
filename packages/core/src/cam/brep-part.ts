@@ -19,7 +19,7 @@
  * The result has the shape of `historyFeatures` (`generator/history-features.ts`), so the planner, the generator and the DFM
  * see one kind of feature whatever the part came from. Everything is in the element's world coordinates, millimetres.
  */
-import { editHole, recognizeHoles, tessellateBrep, transformBrep, type Brep, type RecognizedHole } from "../cad/brep/index.ts"
+import { bodyTessellation, editHole, recognizeHoles, transformBrep, type Brep, type RecognizedHole } from "../cad/brep/index.ts"
 import type { Transform } from "../cad/brep/math.ts"
 import { elementBrep } from "../cad/scene-step.ts"
 import type { Vec2 } from "../cad/vec.ts"
@@ -198,7 +198,7 @@ export const brepFeatures = (original: Brep, name = "part"): ExactFeatures => {
   for (const h of holes) if (Math.abs(h.direction.x) > 1e-6 || Math.abs(h.direction.y) > 1e-6) return refuse("has a hole that is not parallel to Z; it needs another setup or 3+2 indexing")
 
   // 2. Slabs between the levels of the horizontal faces.
-  const mesh = tessellateBrep(b, { chordTol: CHORD })
+  const mesh = bodyTessellation(b, { chordTol: CHORD })
   let zMin = Infinity, zMax = -Infinity
   const min = { x: Infinity, y: Infinity }, max = { x: -Infinity, y: -Infinity }
   for (let i = 0; i < mesh.positions.length; i += 3) {

@@ -76,7 +76,9 @@ describe("sheets drawn from the exact model", () => {
   })
 
   test("a feature with no exact model falls back to the mesh, and says so", () => {
-    const m = plate()
+    // A non-uniform scale of a plate is exact now (spec 40 U4); that of a sphere is an ellipsoid, which the kernel has no surface for.
+    const m = model()
+    m.primitive({ element: "sphere", params: { radius: 6 } })
     m.scale({ factor: [1, 2, 1] })
     const sheet = generateSheet(m.build(), { views: ["front"], iso: false })
     expect(sheet.edgeSource).toBe("mesh")

@@ -38,13 +38,13 @@ const withoutGizmo = (element: Record<string, unknown>): Record<string, unknown>
   ...element, rotation: undefined, scale: undefined, translateX: 0, translateY: 0, translateZ: 0
 });
 // Cache immutable geometry, never Three resources: two canvases must be able to highlight/dispose independently.
-const brepGeometryCache = new WeakMap<object, { readonly model: brep.Brep; readonly tessellation: ReturnType<typeof brep.tessellateBrep> }>();
+const brepGeometryCache = new WeakMap<object, { readonly model: brep.Brep; readonly tessellation: ReturnType<typeof brep.bodyTessellation> }>();
 const brepObject = (element: any, offset: { x: number; y: number; z: number }): THREE.Group | null => {
   let cached = brepGeometryCache.get(element);
   if (!cached) {
     const placed = cadElementBrep(withoutGizmo(element));
     if (!placed.brep) return null;
-    cached = { model: placed.brep, tessellation: brep.tessellateBrep(placed.brep, { chordTol: typeof element.tolerance === "number" ? element.tolerance : 0.01 }) };
+    cached = { model: placed.brep, tessellation: brep.bodyTessellation(placed.brep, { chordTol: typeof element.tolerance === "number" ? element.tolerance : 0.01 }) };
     brepGeometryCache.set(element, cached);
   }
   const t = cached.tessellation;
