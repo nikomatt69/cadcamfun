@@ -6225,10 +6225,11 @@ var ICC_BOUND = (10 + 96 * EPS) * EPS;
 var TAU3 = Math.PI * 2;
 var objectIds = new WeakMap;
 var faceMeshes = new WeakMap;
+var derived = new WeakMap;
 
 // ../../../packages/core/src/cam/model/element-mesh.ts
 var TAU4 = 2 * Math.PI;
-var brepMeshCache = new WeakMap;
+var meshOfTessellation = new WeakMap;
 var parametricCache = new Map;
 // ../../../packages/core/src/cad/brep/primitives.ts
 var TAU5 = Math.PI * 2;
