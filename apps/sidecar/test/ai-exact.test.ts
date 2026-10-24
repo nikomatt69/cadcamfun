@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
-import { buildRecipe, cad } from "@cadcamfun/core"
+import { buildRecipe, cad, model } from "@cadcamfun/core"
 import { makeApp } from "./helpers.ts"
 
 setDefaultTimeout(90_000)
@@ -201,4 +201,32 @@ test("the AI stores open NURBS surfaces separately from solids and exchanges IGE
   expect(unsupported.body.result.error).toContain("x_t is a text")
   const all = await invoke("cad", { action: "exact" })
   expect(all.body.result.totals.parts).toBe(2)
+})
+
+test("a fillet's radius is edited from the assistant: previewed read-only, stored as a checked copy, logged", async () => {
+  const m = model()
+  m.extrude(m.sketch("XY").rectangle([0, 0], 60, 40), { depth: 10 })
+  m.fillet({ radius: 3, edges: { parallel: "z" } })
+  const rounded = { id: "rounded", type: "parametric", name: "Rounded", x: 0, y: 0, z: 0, layerId: "default", history: JSON.parse(JSON.stringify(m.build())) }
+  const project = (await app.call("/api/projects", { method: "POST", json: { name: "Fillet edit" } })).body.id
+  await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Rounded", data: { elements: [rounded] } } })
+  const issue = async (mode: "read" | "write") => (await app.call("/api/ai/bridge/tokens", { method: "POST", json: { name: mode, projectId: project, mode } })).body.token as string
+  const read = await issue("read"), write = await issue("write")
+  const invoke = (token: string, tool: string, input: Record<string, unknown>) => app.call("/api/ai/actions/invoke", { method: "POST", auth: false, headers: { authorization: `Bearer ${token}` }, json: { projectId: project, tool, input } })
+  const exact = await invoke(read, "cad", { action: "exact", ids: ["rounded"] })
+  expect(exact.body.result.parts[0]).toMatchObject({ filletsTotal: 4, fillets: [{ kind: "cylinder", radius: 3, convex: true, length: 10 }, {}, {}, {}] })
+  const gain = (1 - Math.PI / 4) * (9 - 4) * 10
+  const preview = await invoke(read, "cad", { action: "hole", id: "rounded", fillet: 0, radius: 2 })
+  expect(preview.body.result).toMatchObject({ ok: true, valid: true, fillet: 0, fillets: 4 })
+  expect(preview.body.result.volumeChange).toBeCloseTo(gain, 3)
+  expect((await invoke(read, "cad", { action: "hole", id: "rounded", fillet: 0 })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("radius only") })
+  expect((await invoke(read, "cad", { action: "hole", id: "rounded", fillet: 0, boss: 0, radius: 2 })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("exactly one") })
+  const stored = await invoke(write, "cad_edit", { action: "hole", id: "rounded", fillet: 0, radius: 2 })
+  expect(stored.body.result).toMatchObject({ ok: true })
+  const both = await invoke(read, "cad", { action: "exact", ids: [stored.body.result.ids[0], "rounded"] })
+  const parts = both.body.result.parts as Array<{ id: string; volume: number }>
+  expect(parts.find((p) => p.id === stored.body.result.ids[0])!.volume - parts.find((p) => p.id === "rounded")!.volume).toBeCloseTo(gain, 3)
+  const history = await app.call("/api/analytics/user-history?itemType=project&limit=100")
+  const rows = (history.body.logs as Array<{ itemId: string; action: string; details: Record<string, unknown> }>).filter((row) => row.itemId === project)
+  expect(rows.find((row) => row.action === "ai.cad.fillet_edit")?.details).toMatchObject({ via: "assistant", source: "rounded", fillet: 0, radius: 2 })
 })

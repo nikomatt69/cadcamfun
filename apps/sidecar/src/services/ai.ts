@@ -668,7 +668,7 @@ const toolHandlers = Effect.gen(function*() {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
       try {
-        const report = input.boss !== undefined ? cad.sceneBossEdit(loaded.elements, input.id, input.boss, input.diameter!, input.taper ?? 0)
+        const report = input.fillet !== undefined ? cad.sceneFilletEdit(loaded.elements, input.id, input.fillet, input.radius!) : input.boss !== undefined ? cad.sceneBossEdit(loaded.elements, input.id, input.boss, input.diameter!, input.taper ?? 0)
           : cad.sceneHoleEdit(loaded.elements, input.id, input.hole!, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter, ...(input.taper !== undefined ? { taper: input.taper } : {}) } : { kind: "fill" })
         return { ...report, ...where(loaded) }
       }
@@ -678,6 +678,13 @@ const toolHandlers = Effect.gen(function*() {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
       try {
+        if (input.fillet !== undefined) {
+          const f = cad.sceneFilletEditBody(loaded.elements, input.id, input.fillet, input.radius!)
+          if (!f.ok) return f
+          return storeKernelBody(loaded, f.brep, `${f.report.name} fillet ${input.fillet} R${input.radius}`, {
+            action: "ai.cad.fillet_edit", details: { source: input.id, fillet: input.fillet, radius: input.radius, volumeChange: f.report.volumeChange }
+          })
+        }
         if (input.boss !== undefined) {
           const b = cad.sceneBossEditBody(loaded.elements, input.id, input.boss, input.diameter!, input.taper ?? 0)
           if (!b.ok) return b

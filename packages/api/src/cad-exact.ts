@@ -62,6 +62,10 @@ export const CadExactSwarfWall = Schema.Struct({
   face: int, kind: Schema.Literals(["plane", "cone", "cylinder"]), near: vec3, height: num, lean: num, concaveRadius: Schema.optionalKey(num)
 })
 
+export const CadExactFillet = Schema.Struct({
+  face: int, kind: Schema.Literals(["cylinder", "torus"]), radius: num, convex: Schema.Boolean, length: num
+})
+
 export const CadExactPart = Schema.Struct({
   id: Schema.String, name: Schema.String, valid: Schema.Boolean, issues: Schema.Array(Schema.String),
   volume: num, area: num, centroid: vec3, bounds: Schema.Struct({ min: vec3, max: vec3 }),
@@ -70,6 +74,8 @@ export const CadExactPart = Schema.Struct({
   holes: Schema.Array(CadExactHole), machining: CadExactMachining,
   /** Bosses, pins and shaft sections (convex cylinders all the way round); `boss` indexes of the hole / boss edit. */
   bosses: Schema.Array(CadExactBoss),
+  /** Rounded edges and rims whose radius can be edited (`fillet` index of the hole / boss edit). */
+  fillets: Schema.optionalKey(Schema.Array(CadExactFillet)),
   /** Walls a five-axis flank cut (swarf) can take, each with a point on it to name it by. */
   swarfWalls: Schema.optionalKey(Schema.Array(CadExactSwarfWall)),
   /** Names of the faces (the first 40): the handles `cad.shell` takes for open faces. */
@@ -169,10 +175,14 @@ export type CadSetupsReport = typeof CadSetupsReport.Type
 export const CadHoleRequest = Schema.Struct({
   ...source,
   id,
-  /** Index in the solid's recognised holes, in the order `analyze` lists them; exactly one of `hole` and `boss`. */
+  /** Index in the solid's recognised holes, in the order `analyze` lists them; exactly one of `hole`, `boss` and `fillet`. */
   hole: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 }))),
   /** Index in the solid's recognised bosses (`analyze` lists them); a boss takes a `diameter` only. */
   boss: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 }))),
+  /** Index in the solid's recognised fillets (`analyze` lists them); a fillet takes a `radius` only. */
+  fillet: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 }))),
+  /** New radius, mm, of a fillet. */
+  radius: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   /** New diameter, mm: of the drill of a hole (exactly one of `diameter` and `fill`) or of a boss. */
   diameter: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   /** Draft angle of the new bore or boss wall, degrees (0-30): a cone narrowing towards the bottom of a hole or the free end of a boss. Needs `diameter`. */
@@ -192,6 +202,11 @@ export const CadHoleReport = Schema.Union([
   Schema.Struct({
     ok: Schema.Literal(true), id: Schema.String, name: Schema.String, boss: int, bosses: int,
     before: Schema.Struct({ diameter: num, length: num }), diameter: num, taper: Schema.optionalKey(num),
+    volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
+  }),
+  Schema.Struct({
+    ok: Schema.Literal(true), id: Schema.String, name: Schema.String, fillet: int, fillets: int,
+    before: Schema.Struct({ radius: num, convex: Schema.Boolean }), radius: num,
     volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
   }),
   Schema.Struct({ ok: Schema.Literal(false), error: Schema.String })

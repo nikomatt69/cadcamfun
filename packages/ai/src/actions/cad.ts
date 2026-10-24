@@ -73,7 +73,8 @@ export const vision = (mode: "cad" | "cam", filename: string, sheetName = filena
 
 /** A hole or boss edit names one target and one change: a new diameter, or (holes) fill. */
 export const holeInputProblem = (input: CadHoleInput): string | undefined => {
-  if ((input.hole !== undefined) === (input.boss !== undefined)) return "Give exactly one of hole (a recognised hole) or boss (a recognised boss)."
+  if ([input.hole, input.boss, input.fillet].filter((v) => v !== undefined).length !== 1) return "Give exactly one of hole (a recognised hole), boss (a recognised boss) or fillet (a recognised fillet)."
+  if (input.fillet !== undefined) return input.radius === undefined || input.diameter !== undefined || input.fill === true || input.taper !== undefined ? "A fillet takes a radius only." : undefined
   if (input.taper !== undefined && input.diameter === undefined) return "A draft angle (taper) needs a diameter."
   if (input.boss !== undefined) return input.diameter === undefined || input.fill === true ? "A boss takes a diameter (fill applies to holes only)." : undefined
   return (input.diameter !== undefined) === (input.fill === true) ? "Give exactly one of diameter (resize the drill) or fill: true." : undefined

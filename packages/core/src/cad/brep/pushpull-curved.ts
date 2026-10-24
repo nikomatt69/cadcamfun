@@ -8,7 +8,6 @@ import { recognizeBosses, resizeBoss } from "./boss-edit.ts"
 import { recognizeHoles } from "./features.ts"
 import { pushPullCone } from "./cone-edit.ts"
 import { pushPullDome } from "./dome-edit.ts"
-import { pushPullFillet } from "./fillet-edit.ts"
 import { editHole } from "./hole-edit.ts"
 import { makeSphere, makeTorus } from "./primitives.ts"
 import type { Brep } from "./topology.ts"
@@ -19,7 +18,6 @@ export const pushPullCylinder = (b: Brep, face: number, distance: number): Brep 
   if (f === undefined) return "the pushed face could not be found on the exact model"
   if (f.surface.kind === "cone") return pushPullCone(b, face, distance)
   if (f.surface.kind === "sphere" && b.faces.length > 1) return pushPullDome(b, face, distance)
-  if (f.surface.kind === "torus" && b.faces.length > 1) return pushPullFillet(b, face, distance)
   // A ball and a ring are one face each: their offset is the same surface with the radius moved by the distance.
   if (b.faces.length === 1 && !f.reversed) {
     const s = f.surface
@@ -46,6 +44,5 @@ export const pushPullCylinder = (b: Brep, face: number, distance: number): Brep 
     const r = editHole(b, hole, { kind: "resize", diameter })
     return typeof r === "string" ? r : r.brep
   }
-  // Not a hole and not a boss: a rounded edge. Its push/pull is a change of the fillet's radius.
-  return pushPullFillet(b, face, distance)
+  return "the cylindrical face is neither the wall of a hole nor the side of a boss (a rounded edge keeps the mesh: its offset moves the smooth chain it belongs to; `changeFilletRadius` edits its radius)"
 }

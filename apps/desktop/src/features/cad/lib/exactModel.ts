@@ -6,7 +6,7 @@
  * The analysis is the one the sidecar (`/api/cad/exact/analyze`) and the assistant (`cad.exact`) run, `analyzeBrep` of
  * `@cadcamfun/core`, so the panel, the API and the CAM planner agree on holes and on how the part will be machined.
  */
-import { analyzeBrep, brep, elementBrep, sceneBossEditBody, sceneHoleEditBody, type SceneBoss, type SceneHole, type SceneMachining } from "@cadcamfun/core"
+import { analyzeBrep, brep, elementBrep, sceneBossEditBody, sceneFilletEditBody, sceneHoleEditBody, type SceneBoss, type SceneFillet, type SceneHole, type SceneMachining } from "@cadcamfun/core"
 
 export type ExactAnalysis =
   | {
@@ -26,6 +26,8 @@ export type ExactAnalysis =
       readonly drilled: ReadonlyArray<SceneHole>
       /** The bosses, pins and shaft sections (convex cylinders all the way round), in the order the boss edit indexes them. */
       readonly bosses: ReadonlyArray<SceneBoss>
+      /** The rounded edges and rims whose radius can be edited, in the order the fillet edit indexes them. */
+      readonly fillets: ReadonlyArray<SceneFillet>
       /** Whether the CAM planner machines the solid by its features (holes, pockets, outlines) or as a 3D surface job, and why. */
       readonly machining: SceneMachining
     }
@@ -49,7 +51,7 @@ export const analyzeExact = (element: Record<string, unknown>, all: ReadonlyArra
   return {
     ok: true, faces: a.faces, edges: a.edges, vertices: a.vertices, surfaces: a.surfaces,
     volume: a.volume, area: a.area, centroid: a.centroid, holes: a.throughHoles, valid: a.valid, issues: a.issues.slice(0, 5),
-    drilled: a.holes, bosses: a.bosses, machining: a.machining
+    drilled: a.holes, bosses: a.bosses, fillets: a.fillets ?? [], machining: a.machining
   }
 }
 
@@ -93,5 +95,19 @@ export const editElementBoss = (
   return {
     ok: true, volume: built.report.volume, volumeChange: built.report.volumeChange,
     element: { type: "brep", name: `${base} boss ${boss + 1} Ø${Math.round(diameter * 1000) / 1000}${taper ? ` ${taper}°` : ""}`, brep: built.brep, x: 0, y: 0, z: 0 }
+  }
+}
+
+/** Give the `fillet`-th recognised fillet of an element (the order `ExactAnalysis.fillets` lists them in) a new radius, into a new solid. */
+export const editElementFillet = (
+  element: Record<string, unknown>, all: ReadonlyArray<Record<string, unknown>>, fillet: number, radius: number
+): { readonly ok: true; readonly element: Record<string, unknown>; readonly volume: number; readonly volumeChange: number } | { readonly ok: false; readonly error: string } => {
+  let built: ReturnType<typeof sceneFilletEditBody>
+  try { built = sceneFilletEditBody(all, String(element["id"] ?? ""), fillet, radius) } catch (cause) { return { ok: false, error: cause instanceof Error ? cause.message : String(cause) } }
+  if (!built.ok) return built
+  const base = typeof element["name"] === "string" && element["name"] !== "" ? (element["name"] as string) : String(element["type"] ?? "part")
+  return {
+    ok: true, volume: built.report.volume, volumeChange: built.report.volumeChange,
+    element: { type: "brep", name: `${base} fillet ${fillet + 1} R${Math.round(radius * 1000) / 1000}`, brep: built.brep, x: 0, y: 0, z: 0 }
   }
 }

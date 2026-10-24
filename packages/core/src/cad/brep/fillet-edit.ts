@@ -1,8 +1,9 @@
 /**
- * Push/pull of a fillet band on the exact model (spec 40 U2): the rounded edge of an extrusion (a cylinder) or the rounded rim of a
- * round part (a torus), moved the way Fusion's Press Pull moves it, as a change of the fillet's radius: the two faces beside it stay
- * tangent to it, the fillet gets the radius `r - d` (a convex fillet pushed out of the solid is tighter) or `r + d` (a concave one,
- * whose face looks into the void, is fuller). Nothing else moves.
+ * The radius of a fillet band of the exact model (spec 40 U2): the rounded edge of an extrusion (a cylinder) or the rounded rim of a
+ * round part (a torus), changed the way Fusion's Press Pull changes it: the two faces beside it stay tangent to it, the fillet gets the
+ * radius `r - d` (a convex fillet pushed out of the solid is tighter) or `r + d` (a concave one, whose face looks into the void, is
+ * fuller). Nothing else moves. It is not the history's `pushpull` of a curved face: that offsets the whole smooth chain of faces the
+ * mesh rebuild finds, and the exact rebuild keeps the mesh for it (`history-exactness.test.ts`).
  *
  * In the section square to the band the two faces beside it are lines meeting at the sharp corner E; a fillet of radius p has its centre
  * on the bisector at p / cos(D / 2) from E (D: the angle the arc turns through) and touches the lines at p / tan(theta / 2) from E. The two
@@ -103,10 +104,11 @@ const readBand = (b: Brep, face: number): Band | string => {
   return { kind: "torus", at: frame(fr.origin, fr.z, fr.x), length: 0, start: 0, radius: s.minor, centre: { x: s.major, y: 0 }, from: mid.v + lo, to: mid.v + hi, convex }
 }
 
-export interface FilletEdit { readonly brep: Brep; readonly radius: number }
-
-/** The solid with the fillet band `face` pushed by `distance` (out of the solid when positive), or why that cannot be done. */
-export const pushPullFillet = (b: Brep, face: number, distance: number): Brep | string => {
+/**
+ * The solid with the fillet band `face` given a new radius (Fusion's Press Pull on a fillet): `distance` is how far the fillet surface
+ * moves out of the solid, so a convex fillet gets `r - distance` and a concave one `r + distance`. The faces beside it stay tangent.
+ */
+export const changeFilletRadius = (b: Brep, face: number, distance: number): Brep | string => {
   const band = readBand(b, face)
   if (typeof band === "string") return band
   const r = band.radius, r2 = band.convex ? r - distance : r + distance
@@ -178,4 +180,34 @@ export const pushPullFillet = (b: Brep, face: number, distance: number): Brep | 
   } catch (cause) {
     return `the Boolean failed (${cause instanceof Error ? cause.message : String(cause)})`
   }
+}
+
+
+export interface RecognizedFillet {
+  /** The cylinder or torus face. */
+  readonly face: number
+  readonly kind: "cylinder" | "torus"
+  readonly radius: number
+  /** True when the corner is rounded off (the centre of the arc is in the solid), false for a concave fillet. */
+  readonly convex: boolean
+  /** Length along the axis of a cylinder band, mm (0 for a ring). */
+  readonly length: number
+}
+
+/** The fillet bands of a solid that `setFilletRadius` can edit: square-ended arcs between two faces, a cylinder or a full ring. */
+export const recognizeFillets = (b: Brep): ReadonlyArray<RecognizedFillet> => {
+  const out: RecognizedFillet[] = []
+  b.faces.forEach((f, face) => {
+    if (f.surface.kind !== "cylinder" && f.surface.kind !== "torus") return
+    const band = readBand(b, face)
+    if (typeof band !== "string") out.push({ face, kind: band.kind, radius: band.radius, convex: band.convex, length: band.length })
+  })
+  return out
+}
+
+/** The solid with the fillet band `face` given the radius `radius` (see `changeFilletRadius`), or why that cannot be done. */
+export const setFilletRadius = (b: Brep, face: number, radius: number): Brep | string => {
+  const band = readBand(b, face)
+  if (typeof band === "string") return band
+  return changeFilletRadius(b, face, band.convex ? band.radius - radius : radius - band.radius)
 }

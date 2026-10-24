@@ -303,6 +303,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.hole": read(Schema.Union([
     Schema.Struct({ ok: Schema.Literal(true), id: str, name: str, hole: int, holes: int, before: record, edit: record, volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean }),
     Schema.Struct({ ok: Schema.Literal(true), id: str, name: str, boss: int, bosses: int, before: record, diameter: num, volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean }),
+    Schema.Struct({ ok: Schema.Literal(true), id: str, name: str, fillet: int, fillets: int, before: record, radius: num, volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean }),
     Schema.Struct({ ok: Schema.Literal(false), error: str })
   ])),
   "cad.offset": read(Schema.Struct({ ok: Schema.Literal(true), id: str, name: str, distance: num, originalVolume: num, volume: num, faces: int, valid: Schema.Boolean })),

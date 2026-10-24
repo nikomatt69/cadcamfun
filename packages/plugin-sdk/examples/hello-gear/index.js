@@ -7303,6 +7303,10 @@ var MAX_GAP3 = Math.PI / 3;
 
 // packages/core/src/cam/setup.ts
 var SETUP_ORIENTATIONS = ["+Z", "-Z", "+X", "-X", "+Y", "-Y"];
+
+// packages/core/src/cad/brep/fillet-edit.ts
+var TAU13 = 2 * Math.PI;
+var MAX_ARC = Math.PI - 0.001;
 // packages/core/src/cam/ir.ts
 var Positive = Finite.check(isGreaterThan2(0));
 var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));

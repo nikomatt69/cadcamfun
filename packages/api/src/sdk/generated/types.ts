@@ -1697,6 +1697,8 @@ export type CadExactHolePayload = {
   readonly id: string
   readonly hole?: number
   readonly boss?: number
+  readonly fillet?: number
+  readonly radius?: number
   readonly diameter?: number
   readonly taper?: number
   readonly fill?: boolean
@@ -6638,6 +6640,7 @@ export type CadExactAnalyzeOutput = {
       origin: { x: number; y: number; z: number }
       axis: { x: number; y: number; z: number }
     }>
+    fillets?: Array<{ face: number; kind: "cylinder" | "torus"; radius: number; convex: boolean; length: number }>
     swarfWalls?: Array<{
       face: number
       kind: "plane" | "cone" | "cylinder"
@@ -6792,6 +6795,8 @@ export type CadExactHoleInput = {
   readonly id: CadExactHolePayload["id"]
   readonly hole?: CadExactHolePayload["hole"]
   readonly boss?: CadExactHolePayload["boss"]
+  readonly fillet?: CadExactHolePayload["fillet"]
+  readonly radius?: CadExactHolePayload["radius"]
   readonly diameter?: CadExactHolePayload["diameter"]
   readonly taper?: CadExactHolePayload["taper"]
   readonly fill?: CadExactHolePayload["fill"]
@@ -6821,6 +6826,20 @@ export type CadExactHoleOutput =
       before: { diameter: number; length: number }
       diameter: number
       taper?: number
+      volume: number
+      originalVolume: number
+      volumeChange: number
+      faces: number
+      valid: boolean
+    }
+  | {
+      ok: true
+      id: string
+      name: string
+      fillet: number
+      fillets: number
+      before: { radius: number; convex: boolean }
+      radius: number
       volume: number
       originalVolume: number
       volumeChange: number

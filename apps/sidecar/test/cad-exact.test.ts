@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
-import { buildRecipe, cad } from "@cadcamfun/core"
+import { buildRecipe, cad, model } from "@cadcamfun/core"
 import { CadAssemblyReport, CadExactAnalysis, CadExactStep, CadHoleReport, CadSetupsReport } from "@cadcamfun/api"
 import { Schema } from "effect"
 import { makeApp } from "./helpers.ts"
@@ -186,4 +186,35 @@ test("analyze reads a threaded shaft on its exact model: valid, with the volume 
   // The same body goes out as STEP.
   const step = Schema.decodeUnknownSync(CadExactStep)((await post("step", { elements: [shaft] })).body)
   expect(step.parts).toEqual([expect.objectContaining({ id: "shaft", exact: true, valid: true })])
+})
+
+const rounded = (() => {
+  const m = model()
+  m.extrude(m.sketch("XY").rectangle([0, 0], 60, 40), { depth: 10 })
+  m.fillet({ radius: 3, edges: { parallel: "z" } })
+  return { id: "rounded", type: "parametric", name: "Rounded", x: 0, y: 0, z: 0, layerId: "default", history: JSON.parse(JSON.stringify(m.build())) }
+})()
+
+test("the rounded edges of a part are listed and a fillet takes a new radius: the volume moves by the sliver between the arcs", async () => {
+  const analysis = Schema.decodeUnknownSync(CadExactAnalysis)((await post("analyze", { elements: [rounded] })).body)
+  const fillets = analysis.parts[0]!.fillets
+  expect(fillets).toBeDefined()
+  expect(fillets!.length).toBeGreaterThanOrEqual(4)
+  const f = fillets![0]!
+  expect(f).toMatchObject({ kind: "cylinder", convex: true })
+  const radius = f.radius - 1
+  const response = await post("hole", { elements: [rounded], id: "rounded", fillet: 0, radius })
+  expect(response.status).toBe(200)
+  const report = Schema.decodeUnknownSync(CadHoleReport)(response.body)
+  if (!("fillet" in report) || !report.ok) throw new Error(JSON.stringify(report))
+  // A quarter-turn fillet leaves out r^2 (1 - pi/4): a tighter corner gains the difference, over the band's length.
+  expect(report.volumeChange).toBeCloseTo((1 - Math.PI / 4) * (f.radius ** 2 - radius ** 2) * f.length, 4)
+  expect(report.before).toEqual({ radius: f.radius, convex: true })
+  expect(report.valid).toBe(true)
+  // One target and one change.
+  expect((await post("hole", { elements: [rounded], id: "rounded", fillet: 0 })).status).toBe(400)
+  expect((await post("hole", { elements: [rounded], id: "rounded", fillet: 0, hole: 0, radius })).status).toBe(400)
+  expect((await post("hole", { elements: [rounded], id: "rounded", fillet: 0, radius, diameter: 3 })).status).toBe(400)
+  const refused = Schema.decodeUnknownSync(CadHoleReport)((await post("hole", { elements: [rounded], id: "rounded", fillet: 99, radius })).body)
+  expect(refused.ok).toBe(false)
 })

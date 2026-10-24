@@ -61,12 +61,13 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
       }))
     .handle("hole", ({ payload }) =>
       Effect.gen(function*() {
-        if ((payload.hole !== undefined) === (payload.boss !== undefined)) return yield* new BadRequest({ message: "Give exactly one of hole or boss" })
+        if ([payload.hole, payload.boss, payload.fillet].filter((v) => v !== undefined).length !== 1) return yield* new BadRequest({ message: "Give exactly one of hole, boss or fillet" })
+        if (payload.fillet !== undefined && (payload.radius === undefined || payload.diameter !== undefined || payload.fill === true || payload.taper !== undefined)) return yield* new BadRequest({ message: "A fillet takes a radius only" })
         if (payload.taper !== undefined && payload.diameter === undefined) return yield* new BadRequest({ message: "A draft angle (taper) needs a diameter" })
         if (payload.boss !== undefined && (payload.diameter === undefined || payload.fill === true)) return yield* new BadRequest({ message: "A boss takes a diameter (fill applies to holes only)" })
         if (payload.hole !== undefined && (payload.diameter !== undefined) === (payload.fill === true)) return yield* new BadRequest({ message: "Give exactly one of diameter (resize the drill) or fill: true" })
         const elements = yield* sceneOf(payload)
-        return yield* guarded("Failed to edit the feature", () => payload.boss !== undefined
+        return yield* guarded("Failed to edit the feature", () => payload.fillet !== undefined ? cad.sceneFilletEdit(elements, payload.id, payload.fillet, payload.radius!) : payload.boss !== undefined
           ? cad.sceneBossEdit(elements, payload.id, payload.boss, payload.diameter!, payload.taper ?? 0)
           : cad.sceneHoleEdit(elements, payload.id, payload.hole!, payload.diameter !== undefined ? { kind: "resize", diameter: payload.diameter, ...(payload.taper !== undefined ? { taper: payload.taper } : {}) } : { kind: "fill" }))
       }))

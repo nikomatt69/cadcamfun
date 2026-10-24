@@ -4028,6 +4028,8 @@ export function make(options: ClientOptions) {
               id: input["id"],
               hole: input["hole"],
               boss: input["boss"],
+              fillet: input["fillet"],
+              radius: input["radius"],
               diameter: input["diameter"],
               taper: input["taper"],
               fill: input["fill"],

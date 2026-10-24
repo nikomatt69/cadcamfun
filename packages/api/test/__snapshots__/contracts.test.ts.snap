@@ -15697,6 +15697,41 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "faces": {
                             "type": "integer",
                           },
+                          "fillets": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "convex": {
+                                  "type": "boolean",
+                                },
+                                "face": {
+                                  "type": "integer",
+                                },
+                                "kind": {
+                                  "enum": [
+                                    "cylinder",
+                                    "torus",
+                                  ],
+                                  "type": "string",
+                                },
+                                "length": {
+                                  "type": "number",
+                                },
+                                "radius": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "face",
+                                "kind",
+                                "radius",
+                                "convex",
+                                "length",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
                           "holes": {
                             "items": {
                               "additionalProperties": false,
@@ -16846,6 +16881,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "fill": {
                     "type": "boolean",
                   },
+                  "fillet": {
+                    "maximum": 9999,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
                   "hole": {
                     "maximum": 9999,
                     "minimum": 0,
@@ -16854,6 +16894,10 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "id": {
                     "minLength": 1,
                     "type": "string",
+                  },
+                  "radius": {
+                    "exclusiveMinimum": 0,
+                    "type": "number",
                   },
                   "taper": {
                     "maximum": 30,
@@ -17062,6 +17106,78 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "bosses",
                         "before",
                         "diameter",
+                        "volume",
+                        "originalVolume",
+                        "volumeChange",
+                        "faces",
+                        "valid",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "before": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "convex": {
+                              "type": "boolean",
+                            },
+                            "radius": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "radius",
+                            "convex",
+                          ],
+                          "type": "object",
+                        },
+                        "faces": {
+                          "type": "integer",
+                        },
+                        "fillet": {
+                          "type": "integer",
+                        },
+                        "fillets": {
+                          "type": "integer",
+                        },
+                        "id": {
+                          "type": "string",
+                        },
+                        "name": {
+                          "type": "string",
+                        },
+                        "ok": {
+                          "enum": [
+                            true,
+                          ],
+                          "type": "boolean",
+                        },
+                        "originalVolume": {
+                          "type": "number",
+                        },
+                        "radius": {
+                          "type": "number",
+                        },
+                        "valid": {
+                          "type": "boolean",
+                        },
+                        "volume": {
+                          "type": "number",
+                        },
+                        "volumeChange": {
+                          "type": "number",
+                        },
+                      },
+                      "required": [
+                        "ok",
+                        "id",
+                        "name",
+                        "fillet",
+                        "fillets",
+                        "before",
+                        "radius",
                         "volume",
                         "originalVolume",
                         "volumeChange",

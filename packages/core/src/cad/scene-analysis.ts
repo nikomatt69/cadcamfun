@@ -11,6 +11,7 @@ import { planSetups, type SetupPlan, type SetupPlanOptions } from "../cam/setup-
 import { healBrep, massProperties, minimumDistance, recognizeHoles, offsetBrep, shellBrep, validateBrep, type Brep } from "./brep/index.ts"
 import { editHole, type HoleEdit } from "./brep/hole-edit.ts"
 import { recognizeBosses, resizeBoss } from "./brep/boss-edit.ts"
+import { recognizeFillets, setFilletRadius } from "./brep/fillet-edit.ts"
 import { brepBox } from "./history-brep.ts"
 import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
 import type { BomRow, InferredJoint } from "./assembly-analysis.ts"
@@ -57,6 +58,15 @@ export interface SceneSwarfWall {
   readonly concaveRadius?: number
 }
 
+/** A fillet band (a rounded edge or rim) whose radius can be edited, in the order `cad_edit` `hole` takes a `fillet` index. */
+export interface SceneFillet {
+  readonly face: number
+  readonly kind: "cylinder" | "torus"
+  readonly radius: number
+  readonly convex: boolean
+  readonly length: number
+}
+
 export interface ScenePartAnalysis {
   readonly id: string
   readonly name: string
@@ -75,6 +85,8 @@ export interface ScenePartAnalysis {
   readonly holes: ReadonlyArray<SceneHole>
   /** The bosses and shaft sections, in the order `cad_edit` `hole` takes a `boss` index. */
   readonly bosses: ReadonlyArray<SceneBoss>
+  /** The rounded edges and rims whose radius can be edited. */
+  readonly fillets?: ReadonlyArray<SceneFillet>
   readonly machining: SceneMachining
   /** The cone, cylinder and flat walls a five-axis flank cut can take (absent when there are none or the machining was not evaluated). */
   readonly swarfWalls?: ReadonlyArray<SceneSwarfWall>
@@ -131,7 +143,9 @@ export const analyzeBrep = (id: string, name: string, b: Brep, options: { readon
       ...(wall.concaveRadius !== undefined ? { concaveRadius: wall.concaveRadius } : {})
     }
   })
+  const fillets = recognizeFillets(b)
   return {
+    ...(fillets.length > 0 ? { fillets: fillets.map((x): SceneFillet => ({ face: x.face, kind: x.kind, radius: x.radius, convex: x.convex, length: x.length })) } : {}),
     ...(walls.length > 0 ? { swarfWalls: walls } : {}),
     ...(names.length > 0 ? { faceNames: names.slice(0, 40) } : {}),
     ...(repair !== undefined ? { repair } : {}),
@@ -363,6 +377,39 @@ export const sceneBossEditBody = (
 
 export const sceneBossEdit = (elements: ReadonlyArray<Element>, id: string, boss: number, diameter: number, taper = 0): SceneBossEdit => {
   const built = sceneBossEditBody(elements, id, boss, diameter, taper)
+  return built.ok ? built.report : built
+}
+
+export type SceneFilletEdit =
+  | {
+    readonly ok: true; readonly id: string; readonly name: string; readonly fillet: number; readonly fillets: number
+    readonly before: { readonly radius: number; readonly convex: boolean }; readonly radius: number
+    readonly volume: number; readonly originalVolume: number; readonly volumeChange: number; readonly faces: number; readonly valid: boolean
+  }
+  | { readonly ok: false; readonly error: string }
+
+/** Gives the `fillet`-th recognised fillet band of a solid of the drawing a new radius (`brep/fillet-edit.ts`); the order is `ScenePartAnalysis.fillets`. */
+export const sceneFilletEditBody = (
+  elements: ReadonlyArray<Element>, id: string, fillet: number, radius: number
+): { readonly ok: true; readonly brep: Brep; readonly report: Extract<SceneFilletEdit, { ok: true }> } | { readonly ok: false; readonly error: string } => {
+  const scene = sceneParts(elements)
+  const part = scene.parts.find((p) => p.id === id)
+  if (part === undefined) {
+    const skipped = scene.skipped.find((s) => s.id === id)
+    return { ok: false, error: skipped !== undefined ? `'${id}' has no exact model: ${skipped.reason}` : `no solid '${id}' in the drawing` }
+  }
+  const fillets = recognizeFillets(part.brep)
+  const target = fillets[fillet]
+  if (target === undefined) return { ok: false, error: fillets.length === 0 ? `'${id}' has no recognised fillet` : `'${id}' has ${fillets.length} recognised fillets (0..${fillets.length - 1}), not a fillet ${fillet}` }
+  const r = setFilletRadius(part.brep, target.face, radius)
+  if (typeof r === "string") return { ok: false, error: r }
+  const originalVolume = massProperties(part.brep).volume
+  const volume = massProperties(r).volume
+  return { ok: true, brep: r, report: { ok: true, id, name: part.name, fillet, fillets: fillets.length, before: { radius: target.radius, convex: target.convex }, radius, volume, originalVolume, volumeChange: volume - originalVolume, faces: r.faces.length, valid: validateBrep(r).valid } }
+}
+
+export const sceneFilletEdit = (elements: ReadonlyArray<Element>, id: string, fillet: number, radius: number): SceneFilletEdit => {
+  const built = sceneFilletEditBody(elements, id, fillet, radius)
   return built.ok ? built.report : built
 }
 
