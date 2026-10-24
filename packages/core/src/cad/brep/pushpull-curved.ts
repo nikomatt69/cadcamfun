@@ -1,18 +1,30 @@
 /**
  * The push/pull of a cylindrical wall on the exact model (spec 40 U2): moving the side of a boss or the wall of a hole along its
  * normal is a change of radius, which is what the boss and hole edits do exactly. A positive distance goes out of the solid: a boss
- * grows by it, a hole shrinks by it (the material comes into the bore). Any other curved face (cone, sphere, torus, NURBS) and the
+ * grows by it, a hole shrinks by it (the material comes into the bore). The side of a conical boss is the same change on its frustum (`cone-edit.ts`). Any other curved face (a sphere or a torus that is not the whole solid, NURBS, a countersink); a ball and a ring alone are the same surface with the radius moved and the
  * counterbore wall of a hole have no exact push/pull here and are refused with the reason.
  */
 import { recognizeBosses, resizeBoss } from "./boss-edit.ts"
 import { recognizeHoles } from "./features.ts"
+import { pushPullCone } from "./cone-edit.ts"
 import { editHole } from "./hole-edit.ts"
+import { makeSphere, makeTorus } from "./primitives.ts"
 import type { Brep } from "./topology.ts"
 
 /** The solid with the wall `face` moved by `distance` (out of the solid when positive), or why it cannot be. */
 export const pushPullCylinder = (b: Brep, face: number, distance: number): Brep | string => {
   const f = b.faces[face]
   if (f === undefined) return "the pushed face could not be found on the exact model"
+  if (f.surface.kind === "cone") return pushPullCone(b, face, distance)
+  // A ball and a ring are one face each: their offset is the same surface with the radius moved by the distance.
+  if (b.faces.length === 1 && !f.reversed) {
+    const s = f.surface
+    if (s.kind === "sphere") return s.radius + distance > 1e-6 ? makeSphere(s.radius + distance, s.frame) : `pushing the sphere in by ${-distance} mm leaves nothing (its radius is ${s.radius})`
+    if (s.kind === "torus") {
+      return s.minor + distance > 1e-6 && s.minor + distance < s.major - 1e-6 ? makeTorus(s.major, s.minor + distance, s.frame)
+        : `the tube of the ring would be ${(s.minor + distance).toFixed(3)} mm (it must stay between 0 and the major radius ${s.major})`
+    }
+  }
   if (f.surface.kind !== "cylinder") return `a push/pull of a ${f.surface.kind} face has no exact model yet (only the wall of a hole or the side of a boss)`
   const boss = recognizeBosses(b).find((x) => x.face === face)
   if (boss !== undefined) {

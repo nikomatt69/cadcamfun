@@ -8,9 +8,11 @@
  *   hole   r(h) = r0 + (h - neutral) tan(angle)    wider where the pull points to (the opening, when pulled out of it)
  *
  * A draft that would widen a boss towards its free end, or a hole towards its bottom (an undercut), a wall that is not a cylinder
- * along the pull, and the counterbore wall of a hole (only its drill is drafted) are refused with the reason.
+ * along the pull, and the counterbore wall of a hole (only its drill is drafted) are refused with the reason. The side of a conical
+ * boss is drafted the same way about its neutral circle (`cone-edit.ts`).
  */
 import { dot3 } from "../vec.ts"
+import { draftCone } from "./cone-edit.ts"
 import { resizeBoss, recognizeBosses } from "./boss-edit.ts"
 import { brepLocator } from "./classify.ts"
 import { recognizeHoles } from "./features.ts"
@@ -35,6 +37,7 @@ export const draftCurvedFace = (b: Brep, d: CurvedDraft): Brep | string => {
   if (found.face === undefined) return "the drafted face could not be found on the exact model"
   const fi = found.face
   const s = b.faces[fi]!.surface
+  if (s.kind === "cone") return draftCone(b, d)
   if (s.kind !== "cylinder") return `a draft of a ${s.kind} face has no exact model yet (only the wall of a hole or the side of a boss along the pull)`
   if (Math.abs(Math.abs(dot3(s.frame.z, d.pull)) - 1) > 1e-6) return "a draft of a cylinder that is not along the pull direction has no exact model yet"
   const tan = Math.tan((d.angle * Math.PI) / 180)

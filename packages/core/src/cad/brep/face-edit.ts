@@ -86,7 +86,7 @@ export const pushPullFace = (b: Brep, o: PushPullOptions): Brep | string => {
   let pick: PlanarFacePick | undefined
   if (o.face !== undefined) {
     pick = pickOfFace(b, o.face)
-    if (pick === undefined) return b.faces[o.face]?.surface.kind === "cylinder" ? pushPullCylinder(b, o.face, o.distance) : "the named face is not a planar face of this body"
+    if (pick === undefined) return b.faces[o.face] !== undefined ? pushPullCylinder(b, o.face, o.distance) : "the named face is not a planar face of this body"
   } else {
     const found = nearestFace(b, o)
     if (found === undefined) return "no planar face near the given point"

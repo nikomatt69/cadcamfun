@@ -39,13 +39,23 @@ export interface RecognizedBoss {
   readonly free: "near" | "far" | "both" | "none"
 }
 
+/** A boss whose side is a cone: `diameter` is the diameter at `origin` (the start), `slope` the change of the radius per mm along the axis. */
+export interface RecognizedConeBoss extends RecognizedBoss {
+  readonly slope: number
+}
+
 /** Convex cylinders that go all the way round, with their axial range. */
-export const recognizeBosses = (b: Brep): ReadonlyArray<RecognizedBoss> => {
+export const recognizeBosses = (b: Brep): ReadonlyArray<RecognizedBoss> => roundSections(b, "cylinder")
+
+/** Convex cones (not pointed) that go all the way round, with their axial range: the side of a tapered boss, a conical pin or a drafted boss. */
+export const recognizeConeBosses = (b: Brep): ReadonlyArray<RecognizedConeBoss> => roundSections(b, "cone") as ReadonlyArray<RecognizedConeBoss>
+
+const roundSections = (b: Brep, kind: "cylinder" | "cone"): ReadonlyArray<RecognizedBoss> => {
   const out: RecognizedBoss[] = []
   const locator = brepLocator(b)
   for (let fi = 0; fi < b.faces.length; fi++) {
     const f = b.faces[fi]!, s = f.surface
-    if (s.kind !== "cylinder") continue
+    if (s.kind !== kind) continue
     const axis = s.frame.z
     const samples: Vec3[] = []
     for (const loop of f.loops) for (const c of loop.coedges) {
@@ -81,7 +91,14 @@ export const recognizeBosses = (b: Brep): ReadonlyArray<RecognizedBoss> => {
     const eps = Math.max(10 * MODEL_TOL, Math.min(0.05, s.radius * 0.05))
     const open = (t: number) => locator.classify(at(t), MODEL_TOL * 10) === "out"
     const near = open(lo - eps), far = open(hi + eps)
-    out.push({ face: fi, origin: at(lo), axis, diameter: 2 * s.radius, length: hi - lo, free: near && far ? "both" : near ? "near" : far ? "far" : "none" })
+    const free = near && far ? "both" as const : near ? "near" as const : far ? "far" as const : "none" as const
+    if (s.kind === "cone") {
+      const slope = Math.tan(s.semiAngle), rLo = s.radius + lo * slope, rHi = s.radius + hi * slope
+      if (!(rLo > 1e-6 && rHi > 1e-6)) continue // a pointed cone has no frustum to replace
+      out.push({ face: fi, origin: at(lo), axis, diameter: 2 * rLo, length: hi - lo, free, slope } as RecognizedConeBoss)
+    } else {
+      out.push({ face: fi, origin: at(lo), axis, diameter: 2 * s.radius, length: hi - lo, free })
+    }
   }
   return out
 }

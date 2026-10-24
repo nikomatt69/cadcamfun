@@ -3,7 +3,7 @@ import { booleanBrep } from "./boolean.ts"
 import { nearestFace, pushPullFace } from "./face-edit.ts"
 import { frame } from "./math.ts"
 import { massProperties } from "./mass.ts"
-import { makeBox, makeCone, makeCylinder, makeSphere } from "./primitives.ts"
+import { makeBox, makeCone, makeCylinder, makeSphere, makeTorus } from "./primitives.ts"
 import { pushPullCylinder } from "./pushpull-curved.ts"
 import type { Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
@@ -46,10 +46,23 @@ describe("push/pull of a cylindrical wall", () => {
     expect(volume(ok(pushPullFace(b, { near: { x: 0, y: 0, z: 0 }, distance: 1.5, face: wall })))).toBeCloseTo(PLATE + disc(11, 8), 4)
   })
 
-  test("the counterbore wall, a cone and a sphere are refused with the reason", () => {
+  test("a ball and a ring alone are the same surface with the radius moved by the distance", () => {
+    const ball = ok(pushPullCylinder(makeSphere(5), 0, 1.5))
+    expect(volume(ball)).toBeCloseTo((4 / 3) * Math.PI * 6.5 ** 3, 3)
+    expect(validateBrep(ball).valid).toBe(true)
+    expect(pushPullCylinder(makeSphere(5), 0, -5)).toMatch(/leaves nothing/)
+    const ring = ok(pushPullCylinder(makeTorus(10, 2), 0, 1))
+    expect(volume(ring)).toBeCloseTo(2 * Math.PI ** 2 * 10 * 3 ** 2, 3)
+    expect(pushPullCylinder(makeTorus(10, 2), 0, 8)).toMatch(/major radius/)
+  })
+
+  test("the counterbore wall, a countersink and a sphere are refused with the reason", () => {
     const cb = sub(holed(), makeCylinder(6, 4, frame({ x: 20, y: 15, z: 6 }, Z)))
     expect(pushPullFace(cb, { near: { x: 26, y: 15, z: 8 }, distance: 1 })).toMatch(/only the drill/)
-    expect(pushPullCylinder(makeCone(6, 3, 10), 0, 1)).toMatch(/cone face/)
-    expect(pushPullCylinder(makeSphere(5), 0, 1)).toMatch(/sphere face/)
+    const sink = sub(makeBox(40, 30, 10), makeCone(2, 6, 4, frame({ x: 20, y: 15, z: 6 }, Z)))
+    const sinkFace = sink.faces.findIndex((f) => f.surface.kind === "cone")
+    expect(pushPullCylinder(sink, sinkFace, 1)).toMatch(/not the side of a boss/)
+    const domed = uni(makeBox(40, 30, 10), makeSphere(5, frame({ x: 20, y: 15, z: 10 }, Z)))
+    expect(pushPullCylinder(domed, domed.faces.findIndex((f) => f.surface.kind === "sphere"), 1)).toMatch(/sphere face/)
   })
 })
