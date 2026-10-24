@@ -10,8 +10,8 @@
  * planar face, mates (the rigid motion from the exact faces), the analytic catalogue primitives (cube, cylinder, cone,
  * sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split and combine,
  * ribs, sheets, text, coils and modelled threads (`thread-brep.ts`: a faceted helicoid of at most 24 turns), and the union /
- * subtract / intersect of every tool, and the draft of a hole wall or a boss side along the pull (`brep/draft-curved.ts`). A body
- * that went through anything else (the draft of other curved faces, the push/pull of curved faces, the catalogue elements
+ * subtract / intersect of every tool, and the draft and the push/pull of a hole wall or a boss side (`brep/draft-curved.ts`,
+ * `brep/pushpull-curved.ts`). A body that went through anything else (the draft and push/pull of other curved faces, the catalogue elements
  * ellipsoid / gear, a thread of more than 24 turns) keeps its mesh and says why it has no exact model; nothing is approximated behind the caller's back. A blend of a
  * non-coaxial curved edge is refused by the rebuild with a message. `history-exactness.test.ts` records, for every feature
  * kind and option, whether the cell is exact or mesh-only (spec 40 U0) and fails when one of them changes.

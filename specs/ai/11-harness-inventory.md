@@ -308,7 +308,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `machines-and-axes` | cam | 9381 | cam, cam_edit, parts |
 | `drawings-and-images` | cad | 2381 | cad, cad_edit, parts |
 | `plugin-authoring` | dev | 1659 | — |
-| `parametric-design` | cad | 7340 | cad, cad_edit, parts, vcs_edit |
+| `parametric-design` | cad | 7441 | cad, cad_edit, parts, vcs_edit |
 | `fusion-360-modelling` | cad | 12177 | cad, cad_edit, cam, parts |
 | `composed-cam-programs` | cam | 7046 | cad, cam, cam_edit, library, parts |
 | `version-control-cadcam` | vcs | 1671 | vcs, vcs_edit, agent |

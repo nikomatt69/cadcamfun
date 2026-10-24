@@ -10,6 +10,7 @@ import { booleanBrep } from "./boolean.ts"
 import { brepLocator } from "./classify.ts"
 import { faceProfile, pickPlanarFace, type PlanarFacePick } from "./draft.ts"
 import { compose, frame, rotation, translation, type Transform, type Vec3 } from "./math.ts"
+import { pushPullCylinder } from "./pushpull-curved.ts"
 import { sewSolids } from "./sew.ts"
 import { extrudeProfile, loopMoments } from "./sweep.ts"
 import type { Brep } from "./topology.ts"
@@ -85,11 +86,15 @@ export const pushPullFace = (b: Brep, o: PushPullOptions): Brep | string => {
   let pick: PlanarFacePick | undefined
   if (o.face !== undefined) {
     pick = pickOfFace(b, o.face)
-    if (pick === undefined) return "the named face is not a planar face of this body"
+    if (pick === undefined) return b.faces[o.face]?.surface.kind === "cylinder" ? pushPullCylinder(b, o.face, o.distance) : "the named face is not a planar face of this body"
   } else {
     const found = nearestFace(b, o)
     if (found === undefined) return "no planar face near the given point"
-    if (!("pick" in found)) return "a push/pull of a curved face has no exact model yet"
+    if (!("pick" in found)) {
+      // The nearest face is curved: a boss side or a hole wall is a change of radius; any other curved face has no exact push/pull.
+      const nearest = brepLocator(b).closest(o.near).face
+      return nearest === undefined ? "no face near the given point" : pushPullCylinder(b, nearest, o.distance)
+    }
     pick = found.pick
   }
   const profile = faceProfile(b, pick)

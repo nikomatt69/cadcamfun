@@ -214,8 +214,11 @@ describe("exact replay of a parametric history", () => {
     // The top face of a bored plate is a ring: pulled up, the bore goes on through the new material.
     const bored = (extra: Feature[]) => plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, ...extra])
     expect(rel(exactVolume(bored([pp([5, 5, 6], 3)])), (1000 - 16 * PI) * 9)).toBeLessThan(1e-9)
-    // The bore's wall is curved: said, not approximated.
-    expect(rebuildExact(bored([pp([24, 12.5, 3], 1)])).bodies[0]!.reason).toContain("curved face")
+    // The bore's wall is a change of radius (spec 40 U2): pushed out of the solid by 1 mm the Ø8 bore becomes Ø6, to the closed form;
+    // pushed past its axis it would fill the bore, and says so instead of leaving the body as it was.
+    const V0 = exactVolume(plate([]))
+    expect(rel(exactVolume(bored([pp([24, 12.5, 3], 1)])), V0 - PI * 9 * 6)).toBeLessThan(1e-9)
+    expect(rebuildExact(bored([pp([24, 12.5, 3], 4)])).bodies[0]!.reason).toContain("fill the hole")
   })
 
   test("a named push/pull moves that face when the point is stale, and a missing name is an error", () => {

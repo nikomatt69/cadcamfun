@@ -59,6 +59,8 @@ export const CELLS: ReadonlyArray<Cell> = [
   { id: "draft.planar", build: (m) => { plate(m); m.draft({ near: [0, 15, 5], normal: [-1, 0, 0], angle: 3, pull: [0, 0, 1], neutral: 0 }) } },
   { id: "pushpull.curved", build: (m) => { m.extrude(m.sketch("XY").circle([0, 0], 10), { depth: 15 }); m.pushPull({ near: [10, 0, 7], normal: [1, 0, 0], distance: 2 }) } },
   { id: "draft.curved", build: (m) => { m.extrude(m.sketch("XY").circle([0, 0], 10), { depth: 15 }); m.draft({ near: [10, 0, 7], normal: [1, 0, 0], angle: 3, pull: [0, 0, 1], neutral: 0 }) } },
+  { id: "pushpull.hole", build: (m) => { plate(m); m.hole({ plane: "XY", offset: 10, at: [20, 15], diameter: 8, depth: 10 }); m.pushPull({ near: [24, 15, 5], distance: 1 }) } },
+  { id: "pushpull.boss", build: (m) => { plate(m); m.extrude(m.sketch("XY", 10).circle([20, 15], 8), { depth: 8, operation: "union" }); m.pushPull({ near: [24, 15, 14], distance: 1.5 }) } },
   { id: "draft.hole", build: (m) => { plate(m); m.hole({ plane: "XY", offset: 10, at: [20, 15], diameter: 6, depth: 10 }); m.draft({ near: [23, 15, 5], angle: 2, pull: [0, 0, 1], neutral: 10 }) } },
   { id: "draft.boss", build: (m) => { plate(m); m.extrude(m.sketch("XY", 10).circle([20, 15], 8), { depth: 8, operation: "union" }); m.draft({ near: [24, 15, 14], angle: 4, pull: [0, 0, 1], neutral: 10 }) } },
   // catalogue
