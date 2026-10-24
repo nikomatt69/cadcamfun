@@ -41,7 +41,7 @@ export interface RecognizedDome {
   readonly axis: Vec3
   /** The wall radius (the rim circle). */
   readonly boss: number
-  /** Height of the rim from the sphere's centre along the axis; zero for a hemisphere, positive for a smaller cap. */
+  /** Height of the rim from the sphere's centre along the axis: zero for a hemisphere, positive for a smaller cap, negative for a bigger one (a ball on a neck). */
   readonly rim: number
   /** True for a socket (the sphere is concave: the centre is in the void). */
   readonly concave: boolean
@@ -93,7 +93,9 @@ export const recognizeDome = (b: Brep, face: number): RecognizedDome | string =>
     const up = normalize3(wall.axis)
     axis = onFace(up) ? up : onFace(scale3(up, -1)) ? scale3(up, -1) : up
   } else {
-    axis = normalize3(toRim)
+    // The pole is on the face: towards the rim's side for a cap smaller than a hemisphere, on the other side for a bigger one.
+    const towards = normalize3(toRim)
+    axis = onFace(towards) ? towards : scale3(towards, -1)
   }
   const rim = dot3(toRim, axis)
   const tol = 1e-6 * Math.max(1, R)
@@ -103,11 +105,10 @@ export const recognizeDome = (b: Brep, face: number): RecognizedDome | string =>
     if (Math.abs(dot3(q, axis) - rim) > tol) return "the rim of the sphere face is not a circle square to the axis through its centre"
     a = Math.max(a, length3(sub3(q, scale3(axis, dot3(q, axis)))))
   }
-  if (rim < -tol) return "the cap is more than a hemisphere (an overhang), which has no exact push/pull yet"
   if (!onFace(axis)) return "the pole of the sphere is not on this face: it is not the end of a round wall"
   if (wall === undefined) return "no straight wall of the rim's radius continues from the sphere"
   if (Math.abs(Math.abs(dot3(normalize3(wall.axis), axis)) - 1) > 1e-6 || Math.abs(wall.radius - a) > 1e-6 * Math.max(1, a)) return "the wall beside the sphere is not a cylinder on the same axis and radius"
-  return { face, centre: s.frame.origin, radius: R, axis, boss: a, rim: Math.max(0, rim), concave: f.reversed }
+  return { face, centre: s.frame.origin, radius: R, axis, boss: a, rim: Math.abs(rim) < tol ? 0 : rim, concave: f.reversed }
 }
 
 const cap = (R: number, a: number): number => R ** 3 - (R * R - a * a) ** 1.5
@@ -121,6 +122,7 @@ export const pushPullDome = (b: Brep, face: number, distance: number): Brep | st
   if (typeof dome === "string") return dome
   const R = dome.radius, a = dome.boss
   const R2 = dome.concave ? R - distance : R + distance
+  if (dome.rim < -1e-9 * R) return pushPullBulb(b, dome, R2, distance)
   if (Math.abs(R2 - a) < MIN_GAP) return `the sphere would be tangent to the wall (radius ${R2.toFixed(3)} against ${a.toFixed(3)} mm): the Boolean cannot decide a gap under ${MIN_GAP} mm`
   if (!(R2 > a)) return `the new sphere (radius ${R2.toFixed(3)} mm) is smaller than the wall it ends (${a.toFixed(3)} mm): it would leave a shoulder, which this edit does not model`
   const rim2 = Math.sqrt(R2 * R2 - a * a)
@@ -159,6 +161,60 @@ export const pushPullDome = (b: Brep, face: number, distance: number): Brep | st
     if (Math.abs(after - before - expected) > 1e-6 * Math.max(before, 1) + 1e-6 * Math.abs(expected)) {
       return `the edit changed the volume by ${(after - before).toFixed(6)} mm³ where the ${dome.concave ? "socket" : "dome"} accounts for ${expected.toFixed(6)} mm³: it ran into a neighbouring feature`
     }
+    return solid
+  } catch (cause) {
+    return `the Boolean failed (${cause instanceof Error ? cause.message : String(cause)})`
+  }
+}
+
+/** Volume of the segment of a ball of radius R standing `h` above a plane that cuts it at height `h` from the pole side: pi h^2 (3R - h) / 3. */
+const segment = (R: number, h: number): number => (Math.PI * h * h * (3 * R - h)) / 3
+
+/**
+ * A cap of more than a hemisphere: the ball on a neck (a dome) or the round cavity behind a narrow bore (a socket). The sphere meets the
+ * wall below its centre, at a distance q = sqrt(R^2 - a^2); the new sphere (same centre, radius R') meets it at q' = sqrt(R'^2 - a^2).
+ *
+ *  - **dome, bigger**: the part of the bigger ball above the new rim's plane is united (the neck gets shorter by q' - q);
+ *  - **dome, smaller**: what is inside the slightly larger old ball above the old rim's plane and outside the new ball and the neck
+ *    prolonged up to the new rim is subtracted;
+ *  - **socket**: the same two tools, the other way round (a bigger cavity is cut, a smaller one filled).
+ *
+ * The solid's volume moves by V(R', H') - V(R, H) + pi a^2 (q - q') (H = R + q: the segment of the ball above the rim's plane), with the sign
+ * turned for a socket.
+ */
+const pushPullBulb = (b: Brep, dome: RecognizedDome, R2: number, distance: number): Brep | string => {
+  const R = dome.radius, a = dome.boss
+  if (Math.abs(R2 - a) < MIN_GAP) return `the sphere would be tangent to the wall (radius ${R2.toFixed(3)} against ${a.toFixed(3)} mm): the Boolean cannot decide a gap under ${MIN_GAP} mm`
+  if (!(R2 > a)) return `the new sphere (radius ${R2.toFixed(3)} mm) is smaller than the wall it meets (${a.toFixed(3)} mm): it would leave a shoulder, which this edit does not model`
+  const q = Math.sqrt(R * R - a * a), q2 = Math.sqrt(R2 * R2 - a * a)
+  const before = massProperties(b).volume
+  const at = (t: number): Vec3 => add3(dome.centre, scale3(dome.axis, t))
+  const up = (from: number, to: number) => makeCylinder(R + R2 + 2, to - from, frame(at(from), dome.axis))
+  try {
+    let solid: Brep
+    const growing = R2 > R
+    if (growing) {
+      // The bigger ball above its own rim's plane (the plane crosses the neck: the disc is inside the solid or the void of the bore).
+      const tool = booleanBrep(makeSphere(R2, frame(dome.centre, dome.axis)), up(-q2, R2 + 1), "intersect").brep
+      solid = booleanBrep(b, tool, dome.concave ? "subtract" : "union").brep
+    } else {
+      // Old ball (a little larger, so its sphere is not the solid's own) above the old rim, less the new ball and the neck up to the new rim.
+      // Both start a little below the old rim's plane, so that no face of the tool passes through the solid's own rim circle.
+      const below = 0.1
+      const old = booleanBrep(makeSphere(R + SKIN, frame(dome.centre, dome.axis)), up(-q - below, R + SKIN + 1), "intersect").brep
+      const keep = booleanBrep(makeSphere(R2, frame(dome.centre, dome.axis)), makeCylinder(a, q - q2 + below, frame(at(-q - below), dome.axis)), "union").brep
+      const tool = booleanBrep(old, keep, "subtract").brep
+      solid = booleanBrep(b, tool, dome.concave ? "union" : "subtract").brep
+    }
+    const report = validateBrep(solid)
+    if (!report.valid) return `the edited solid is not valid (${report.issues.slice(0, 2).map((i) => i.message).join("; ")})`
+    const after = massProperties(solid).volume
+    const delta = segment(R2, R2 + q2) - segment(R, R + q) + Math.PI * a * a * (q - q2)
+    const expected = dome.concave ? -delta : delta
+    if (Math.abs(after - before - expected) > 1e-6 * Math.max(before, 1) + 1e-6 * Math.abs(expected)) {
+      return `the edit changed the volume by ${(after - before).toFixed(6)} mm³ where the ${dome.concave ? "cavity" : "ball"} accounts for ${expected.toFixed(6)} mm³: it ran into a neighbouring feature`
+    }
+    void distance
     return solid
   } catch (cause) {
     return `the Boolean failed (${cause instanceof Error ? cause.message : String(cause)})`

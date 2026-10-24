@@ -1,6 +1,6 @@
 name: Release
 
-# Build all six targets as Actions artifacts. `publish.yml` verifies and uploads them
+# Build all six targets as Actions artifacts. `publish-release.yml` verifies and uploads them
 # together to the single version release, then publishes it. Manual dispatch rebuilds
 # an existing tag as downloadable artifacts without modifying published releases.
 on:

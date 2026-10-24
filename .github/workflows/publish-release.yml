@@ -1,0 +1,58 @@
+name: Publish release
+
+# Called only after every desktop target and the merged updater manifest succeed.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Existing version tag whose verified artifacts will be published
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    name: publish the release
+    if: github.repository == 'nikomatt69/cadcamfun'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+
+      - uses: ./.github/actions/setup-bun
+        with:
+          install: "false"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: latest-json
+          path: manifest
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          path: installers
+          merge-multiple: false
+
+      - name: Verify and upload all platforms, publish the release and the cask
+        run: bun --no-env-file scripts/release-publish.ts --phase=complete --tag="$RELEASE_TAG" --manifest=manifest/latest.json --installers=installers
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "false"
+          HOMEBREW_TAP_REPOSITORY: ${{ vars.HOMEBREW_TAP_REPOSITORY }}
+          HOMEBREW_TAP_BRANCH: ${{ vars.HOMEBREW_TAP_BRANCH }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

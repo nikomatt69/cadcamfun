@@ -154,13 +154,18 @@ const underDome = (b: Brep, face: number, zMin: number): { readonly brep: Brep; 
   const dome = recognizeDome(b, face)
   if (typeof dome === "string") return dome
   if (dome.axis.z < 1 - 1e-9) return "the dome does not point up"
-  const zc = dome.centre.z, zRim = zc + dome.rim
+  const zc = dome.centre.z
+  const R = dome.radius
+  // A ball on a neck (the sphere meets the wall below its centre): from above its widest circle is the ball's own, and the column under it
+  // is a cylinder of the ball's radius up to the centre.
+  const bulb = dome.rim < 0
+  const zRim = bulb ? zc : zc + dome.rim
   if (zRim - zMin < 1e-6) return "the rim is at the underside"
-  const R = dome.radius, a = dome.boss
+  const a = bulb ? R : dome.boss
   const loop: ProfileSegment[] = [
     { kind: "line", a: { x: 0, y: 0 }, b: { x: a, y: 0 } },
     { kind: "line", a: { x: a, y: 0 }, b: { x: a, y: zRim - zMin } },
-    { kind: "arc", center: { x: 0, y: zc - zMin }, radius: R, start: Math.atan2(dome.rim, a), end: Math.PI / 2 },
+    { kind: "arc", center: { x: 0, y: zc - zMin }, radius: R, start: bulb ? 0 : Math.atan2(dome.rim, a), end: Math.PI / 2 },
     { kind: "line", a: { x: 0, y: zc - zMin + R }, b: { x: 0, y: 0 } }
   ]
   return { brep: revolveProfile({ loops: [loop] }, 2 * Math.PI, { origin: { x: dome.centre.x, y: dome.centre.y, z: zMin }, axis: { x: 0, y: 0, z: 1 }, radial: { x: 1, y: 0, z: 0 } }), top: zc + R }

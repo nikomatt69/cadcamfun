@@ -1,19 +1,12 @@
 #!/usr/bin/env bun
 /**
- * The release pipeline, in the two phases nikcli splits it into.
+ * Two phases orchestrated by ci-pipeline.yml:
  *
- * Nikcli's `script/publish-start.ts` prepares and publishes the release, and its
- * `script/publish-complete.ts` finishes it once the desktop builds are on the release.
- * The same split is used here:
+ * --phase=start prepares the version, changelog, commit and tag.
+ * --phase=complete verifies all six targets, publishes npm, creates the draft and attaches all assets,
+ * publishes the release and updates the optional Homebrew cask.
  *
- *   --phase=start     resolve the version, stamp it across the workspace, write the
- *                     changelog, publish the npm package, commit and push the release,
- *                     tag it, and create the *draft* GitHub release.
- *   --phase=complete  verify and attach all six targets and the updater manifest,
- *                     make the release public and publish the Homebrew cask.
- *
- * The release stays a draft until the complete phase, so a release that fails halfway is
- * never visible to a user and the updater feed never points at a missing installer.
+ * No GitHub release exists until every desktop artifact has been built and verified.
  */
 
 import { $ } from "bun";
@@ -233,17 +226,6 @@ async function phaseStart(options: { bump?: string | undefined; version?: string
   await writeChangelog(ROOT, section);
   say(`wrote the changelog section for v${version} (${notes.length} note lines)`);
 
-  const channel = version.includes("-") ? "next" : "latest";
-  const token = env("NODE_AUTH_TOKEN") ?? env("NPM_TOKEN");
-  const packages = await publishablePackages(ROOT);
-  if (token === undefined) {
-    warn("NPM_TOKEN is not set; skipping the npm publish");
-  } else {
-    for (const pkg of packages) {
-      await publishNpmPackage(pkg, { channel, fallbackName: env("NPM_FALLBACK_NAME") });
-    }
-  }
-
   // Commit only what the release owns: the version holders, the changelog and the
   // lockfile. Anything else in the working tree belongs to somebody else.
   const staged = [...changed, "CHANGELOG.md", "bun.lock"];
@@ -263,19 +245,6 @@ async function phaseStart(options: { bump?: string | undefined; version?: string
     await pushBranch(section);
     await pushTag(tag);
   });
-
-  const directory = await mkdtemp(join(tmpdir(), "cadcam-release-"));
-  try {
-    const notesFile = join(directory, "NOTES.md");
-    await writeFile(notesFile, `${notes.join("\n") || `Release ${tag}`}\n`, "utf8");
-    const repo = repository();
-    const existing = await captureCommand(["gh", "release", "view", tag, "--repo", repo]);
-    if (existing.code === 0) throw new Error(`The release ${tag} already exists`);
-    await $`gh release create ${tag} --draft --title ${`CADCAM FUN ${tag}`} --notes-file ${notesFile} --repo ${repo}`.cwd(ROOT);
-    say(`created the draft release ${tag}`);
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
 
   if (process.env["GITHUB_OUTPUT"]) {
     await Bun.write(process.env["GITHUB_OUTPUT"], `tag=${tag}\nversion=${version}\n`);
@@ -420,11 +389,31 @@ async function phaseComplete(options: { tag: string; manifest: string; installer
 
   const directory = await mkdtemp(join(tmpdir(), "cadcam-release-"));
   try {
-    const existing = await captureCommand(["gh", "release", "view", tag, "--json", "isDraft", "--repo", repo]);
-    if (existing.code !== 0) throw new Error(`The release ${tag} does not exist`);
-    const isDraft = (JSON.parse(existing.stdout) as { isDraft?: boolean }).isDraft;
-    if (isDraft !== true) throw new Error(`The release ${tag} is already published and is not modified`);
     await stageRelease(options.installers, options.manifest, directory, downloadUrl, tag);
+    const existing = await captureCommand(["gh", "release", "view", tag, "--json", "isDraft", "--repo", repo]);
+    if (existing.code === 0) {
+      const isDraft = (JSON.parse(existing.stdout) as { isDraft?: boolean }).isDraft;
+      if (isDraft !== true) throw new Error(`The release ${tag} is already published and is not modified`);
+    } else {
+      if (!/release not found|HTTP 404/i.test(existing.stderr)) {
+        throw new Error(`Cannot inspect the release ${tag}: ${existing.stderr.trim()}`);
+      }
+    }
+    const version = tag.replace(/^v/, "");
+    const channel = version.includes("-") ? "next" : "latest";
+    const token = env("NODE_AUTH_TOKEN") ?? env("NPM_TOKEN");
+    const packages = await publishablePackages(ROOT);
+    if (token === undefined) {
+      warn("NPM_TOKEN is not set; skipping the npm publish");
+    } else {
+      for (const pkg of packages) {
+        await publishNpmPackage(pkg, { channel, fallbackName: env("NPM_FALLBACK_NAME") });
+      }
+    }
+    if (existing.code !== 0) {
+      await $`gh release create ${tag} --verify-tag --draft --title ${`CADCAM FUN ${tag}`} --notes-file ${join(directory, "RELEASE_NOTES.md")} --repo ${repo}`.cwd(ROOT);
+      say(`created the draft release ${tag} after verifying all six targets`);
+    }
     const files = (await readdir(directory)).sort().map((name) => join(directory, name));
     await $`gh release upload ${tag} ${files} --clobber --repo ${repo}`.cwd(ROOT);
     await $`gh release edit ${tag} --notes-file ${join(directory, "RELEASE_NOTES.md")} --repo ${repo}`.cwd(ROOT);

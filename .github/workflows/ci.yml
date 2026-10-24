@@ -93,6 +93,9 @@ jobs:
       - name: Validate workflows
         run: bun --no-env-file scripts/lint-workflows.ts
 
+      - name: Verify release automation
+        run: bun --no-env-file test scripts
+
 
       - name: Stage the sidecar binary and the migrations resource
         run: |

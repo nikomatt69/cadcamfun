@@ -3,6 +3,7 @@ import { booleanBrep } from "./boolean.ts"
 import { frame } from "./math.ts"
 import { massProperties } from "./mass.ts"
 import { makeBox, makeCone, makeCylinder, makeSphere } from "./primitives.ts"
+import { revolveProfile } from "./sweep.ts"
 import { shadowSolid } from "./shadow.ts"
 import type { Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
@@ -78,6 +79,18 @@ describe("the shadow of a solid from above", () => {
     const sh = ok(shadowSolid(part))
     const h = 8 - Q
     expect(volume(sh.brep)).toBeCloseTo(40 * 30 * 10 + Math.PI * 25 * 6 + (Math.PI * h * h * (3 * 8 - h)) / 3, 3)
+    expect(validateBrep(sh.brep).valid).toBe(true)
+  })
+
+  test("a ball on a neck: the column under it is a cylinder of the ball's radius up to its centre, and the cap over it (closed form)", () => {
+    const R = 6, a = 4, zc = 20, q = Math.sqrt(R * R - a * a)
+    const pin = revolveProfile({ loops: [[
+      { kind: "line", a: { x: 0, y: 0 }, b: { x: a, y: 0 } }, { kind: "line", a: { x: a, y: 0 }, b: { x: a, y: zc - q } },
+      { kind: "arc", center: { x: 0, y: zc }, radius: R, start: Math.atan2(-q, a), end: Math.PI / 2 }, { kind: "line", a: { x: 0, y: zc + R }, b: { x: 0, y: 0 } }
+    ]] }, 2 * Math.PI)
+    const sh = ok(shadowSolid(pin))
+    // Cylinder of radius 6 from the underside to the centre, plus the upper hemisphere.
+    expect(volume(sh.brep)).toBeCloseTo(Math.PI * R * R * zc + (2 / 3) * Math.PI * R ** 3, 3)
     expect(validateBrep(sh.brep).valid).toBe(true)
   })
 })

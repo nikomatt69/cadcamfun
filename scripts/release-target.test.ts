@@ -23,6 +23,31 @@ test("the publish workflow releases the same repository the feed reads", async (
   expect(workflow).toContain(`github.repository == '${RELEASE_REPOSITORY}'`);
 });
 
+test("CI publication depends on validation and all desktop assets through separate reusable jobs", async () => {
+  interface Job { needs?: string | string[]; uses?: string; steps?: { run?: string }[] }
+  interface Workflow { jobs: Record<string, Job>; on: Record<string, unknown> }
+  const readWorkflow = async (name: string) => Bun.YAML.parse(await readFile(join(ROOT, ".github/workflows", name), "utf8")) as Workflow;
+  const pipeline = await readWorkflow("ci-pipeline.yml");
+  const ancestors = (id: string): string[] => {
+    const needs = pipeline.jobs[id]?.needs ?? [];
+    const direct = typeof needs === "string" ? [needs] : needs;
+    return [...new Set(direct.flatMap((parent) => [parent, ...ancestors(parent)]))];
+  };
+  expect(ancestors("publish-release").sort()).toEqual(["desktop", "publish", "validate"]);
+  expect(pipeline.jobs.publish?.uses).toBe("./.github/workflows/publish.yml");
+  expect(pipeline.jobs.desktop?.uses).toBe("./.github/workflows/release.yml");
+  expect(pipeline.jobs["publish-release"]?.uses).toBe("./.github/workflows/publish-release.yml");
+  const preparation = await readWorkflow("publish.yml");
+  expect(Object.keys(preparation.jobs)).toEqual(["publish"]);
+  expect(preparation.on.workflow_dispatch).toBeUndefined();
+  const commands = Object.values(preparation.jobs).flatMap((job) => job.steps?.map((step) => step.run ?? "") ?? []).join("\n");
+  expect(commands).toContain("--phase=start");
+  expect(commands).not.toMatch(/--phase=complete|gh release create/);
+  const completion = await readWorkflow("publish-release.yml");
+  expect(completion.on.workflow_dispatch).toBeUndefined();
+  expect(Object.values(completion.jobs).flatMap((job) => job.steps?.map((step) => step.run ?? "") ?? []).join("\n")).toContain("--phase=complete");
+});
+
 test("the published plugin points at the same repository", async () => {
   const manifest = JSON.parse(await readFile(join(ROOT, "packages/nikcli-plugin/package.json"), "utf8")) as {
     repository: { url: string };

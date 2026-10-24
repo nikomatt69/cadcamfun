@@ -7,9 +7,9 @@
 #   ./scripts/release 6.2.0     # an explicit version
 #   ./scripts/release --dry-run # what a release would do, without starting one
 #
-# It only triggers the `publish` workflow; the workflow does the rest: it stamps the
-# version across the workspace, writes the changelog, publishes npm, builds and signs the
-# six targets into one release, attaches the updater manifest and publishes the Homebrew cask.
+# It triggers `ci-pipeline` with publication enabled. The workflow stamps the version,
+# writes the changelog, builds and verifies all six targets, then publishes npm and one
+# GitHub release with the updater manifest, followed by the optional Homebrew cask.
 set -euo pipefail
 
 BUMP="patch"
@@ -43,7 +43,10 @@ if ! gh auth status > /dev/null 2>&1; then
   exit 1
 fi
 
-args=(-f "bump=$BUMP")
+args=(-f "release=true")
+if [ -n "$BUMP" ]; then
+  args+=(-f "bump=$BUMP")
+fi
 if [ -n "$VERSION" ]; then
   args+=(-f "version=$VERSION")
 fi
@@ -51,8 +54,8 @@ fi
 # The workflow is read from the default branch, so a workflow that is not pushed yet
 # cannot be dispatched. The check says so plainly instead of failing with a 404.
 repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
-if ! gh api "repos/${repo}/contents/.github/workflows/publish.yml" > /dev/null 2>&1; then
-  echo "publish.yml is not on the default branch of ${repo} yet; push it before releasing" >&2
+if ! gh api "repos/${repo}/contents/.github/workflows/ci-pipeline.yml" > /dev/null 2>&1; then
+  echo "ci-pipeline.yml is not on the default branch of ${repo} yet; push it before releasing" >&2
   exit 1
 fi
 
@@ -65,6 +68,6 @@ if [ "$DRY_RUN" = "true" ]; then
   exit 0
 fi
 
-gh workflow run publish.yml "${args[@]}"
+gh workflow run ci-pipeline.yml "${args[@]}"
 
-echo "triggered publish.yml (${BUMP:-version $VERSION}) → v${version}"
+echo "triggered ci-pipeline.yml (${BUMP:-version $VERSION}) → v${version}"

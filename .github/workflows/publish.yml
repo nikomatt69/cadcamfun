@@ -1,17 +1,8 @@
 name: publish
 run-name: "${{ format('release {0}', inputs.version || inputs.bump) }}"
 
-# The release pipeline, in the same shape as nikcli's `publish.yml`:
-#
-#   publish          resolve the version, stamp it across the workspace, write the
-#                    changelog, publish npm, commit and push the release, tag it and
-#                    create the *draft* GitHub release.
-#   desktop          build and sign all six targets as Actions artifacts.
-#   publish-release  verify and upload all assets, make the release public and publish
-#                    the optional Homebrew cask.
-#
-# The release stays a draft until the last job, so a release that fails halfway is never
-# visible to a user and the updater feed never points at a missing installer.
+# Reusable metadata preparation. ci-pipeline.yml owns the release job sequence.
+# This job stamps the version and pushes its tag; it never creates a GitHub release.
 
 on:
   workflow_call:
@@ -36,20 +27,6 @@ on:
       version:
         description: "The released version, e.g. 6.0.1"
         value: ${{ jobs.publish.outputs.version }}
-  workflow_dispatch:
-    inputs:
-      bump:
-        description: "Bump type"
-        required: false
-        type: choice
-        options:
-          - major
-          - minor
-          - patch
-      version:
-        description: "An explicit version (optional, wins over the bump)"
-        required: false
-        type: string
 
 concurrency:
   group: cadcamfun-publish
@@ -83,11 +60,6 @@ jobs:
           # The validation step below installs the workspace with the frozen lockfile.
           install: "false"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-
       - name: Setup actionlint
         uses: ./.github/actions/setup-actionlint
 
@@ -109,53 +81,3 @@ jobs:
           CADCAM_VERSION: ${{ inputs.version }}
           GH_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          # The npm provenance attestation needs an OIDC identity the release token
-          # does not carry; the release is published without it, as in nikcli.
-          NPM_CONFIG_PROVENANCE: "false"
-
-  desktop:
-    name: build all six desktop targets
-    needs: publish
-    uses: ./.github/workflows/release.yml
-    with:
-      tag: ${{ needs.publish.outputs.tag }}
-      version: ${{ needs.publish.outputs.version }}
-    secrets: inherit
-
-  publish-release:
-    name: publish the release
-    needs: [publish, desktop]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.publish.outputs.tag }}
-
-      - uses: ./.github/actions/setup-bun
-        with:
-          install: "false"
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: latest-json
-          path: manifest
-
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: installers-*
-          path: installers
-          merge-multiple: false
-
-      - name: Verify and upload all platforms, publish the release and the cask
-        run: bun --no-env-file scripts/release-publish.ts --phase=complete --tag="$RELEASE_TAG" --manifest=manifest/latest.json --installers=installers
-        env:
-          RELEASE_TAG: ${{ needs.publish.outputs.tag }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_REPOSITORY: ${{ vars.HOMEBREW_TAP_REPOSITORY }}
-          HOMEBREW_TAP_BRANCH: ${{ vars.HOMEBREW_TAP_BRANCH }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

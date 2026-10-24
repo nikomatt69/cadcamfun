@@ -127,7 +127,36 @@ test("historical platform tags remain excluded from version discovery", () => {
   expect(previousReleaseTag(["v6.0.1-linux-x64", "v6.0.0-rc.1"], "v6.0.2")).toBe("v6.0.0-rc.1");
 });
 
-test.each(["success", "invalid assets", "published release", "failed upload", "prerelease"])("publish completion: %s", async (scenario) => {
+test.each(["patch", "99.0.0", "--dry-run"])("release command dispatches the full CI pipeline: %s", async (argument) => {
+  const root = await mkdtemp(join(tmpdir(), "cadcam-dispatch-"));
+  try {
+    const log = join(root, "gh.jsonl");
+    const gh = join(root, "gh");
+    await writeFile(gh, `#!/bin/sh
+printf '%s\\n' "$*" >> "$RELEASE_TEST_LOG"
+if [ "$1" = "repo" ]; then printf 'example/app\\n'; fi
+`);
+    await chmod(gh, 0o755);
+    const child = Bun.spawn(["/bin/bash", "scripts/release", argument], {
+      cwd: fileURLToPath(new URL("..", import.meta.url)),
+      env: { PATH: `${root}:${dirname(process.execPath)}:/usr/bin:/bin`, RELEASE_TEST_LOG: log },
+      stdout: "pipe", stderr: "pipe", stdin: "ignore",
+    });
+    const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+    expect(code).toBe(0);
+    expect(stderr).toBe("");
+    const calls = (await readFile(log, "utf8")).trim().split("\n");
+    const dispatches = calls.filter((line) => line.startsWith("workflow "));
+    if (argument === "--dry-run") {
+      expect(dispatches).toEqual([]);
+      expect(stdout).toContain("would release example/app");
+    } else {
+      expect(dispatches).toEqual([`workflow run ci-pipeline.yml -f release=true -f ${argument === "patch" ? "bump=patch" : "version=99.0.0"}`]);
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test.each(["success", "existing draft", "invalid assets", "published release", "lookup failure", "failed creation", "failed upload", "prerelease"])("publish completion: %s", async (scenario) => {
   const root = await mkdtemp(join(tmpdir(), "cadcam-publish-"));
   try {
     const { installers, manifest, manifestPath, names } = await fixture(root);
@@ -146,7 +175,13 @@ const args = process.argv.slice(2);
 const { appendFileSync } = require("node:fs");
 appendFileSync(process.env.RELEASE_TEST_LOG, JSON.stringify(args) + "\\n");
 if (args[0] === "release" && args[1] === "view") {
+  if (args.includes("isDraft") && !["existing draft", "published release"].includes(process.env.RELEASE_TEST_SCENARIO)) {
+    process.stderr.write(process.env.RELEASE_TEST_SCENARIO === "lookup failure" ? "connection failed" : "release not found");
+    process.exit(1);
+  }
   process.stdout.write(JSON.stringify(args.includes("isDraft") ? { isDraft: process.env.RELEASE_TEST_SCENARIO !== "published release" } : { databaseId: 42 }));
+} else if (args[0] === "release" && args[1] === "create" && process.env.RELEASE_TEST_SCENARIO === "failed creation") {
+  process.exit(1);
 } else if (args[0] === "release" && args[1] === "upload" && process.env.RELEASE_TEST_SCENARIO === "failed upload") {
   process.exit(1);
 }
@@ -162,12 +197,14 @@ if (args[0] === "release" && args[1] === "view") {
       stdout: "pipe", stderr: "pipe", stdin: "ignore",
     });
     const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
-    const calls = (await readFile(log, "utf8")).trim().split("\n").map((line) => JSON.parse(line) as string[]);
+    const calls = (await readFile(log, "utf8").catch(() => "")).trim().split("\n").filter(Boolean).map((line) => JSON.parse(line) as string[]);
     const uploads = calls.filter((args) => args[0] === "release" && args[1] === "upload");
+    const creations = calls.filter((args) => args[0] === "release" && args[1] === "create");
     const publications = calls.filter((args) => args[0] === "api");
-    if (scenario === "invalid assets" || scenario === "published release") {
+    if (["invalid assets", "published release", "lookup failure", "failed creation"].includes(scenario)) {
       expect(code).toBe(1);
-      expect(stderr).toContain(scenario === "invalid assets" ? "release target set" : "already published");
+      if (scenario !== "failed creation") expect(stderr).toContain(scenario === "invalid assets" ? "release target set" : scenario === "lookup failure" ? "Cannot inspect the release" : "already published");
+      expect(creations).toHaveLength(scenario === "failed creation" ? 1 : 0);
       expect(uploads).toEqual([]);
       expect(publications).toEqual([]);
     } else {
@@ -189,8 +226,16 @@ if (args[0] === "release" && args[1] === "view") {
         expect(calls.indexOf(publications[0] ?? [])).toBeGreaterThan(calls.indexOf(upload));
       }
     }
-    // Completion only attaches assets and publishes the existing version release.
-    expect(calls.some((args) => args[0] === "release" && args[1] === "create")).toBe(false);
+    if (scenario === "invalid assets") expect(calls).toEqual([]);
+    if (["success", "prerelease", "failed upload", "existing draft"].includes(scenario)) {
+      expect(creations).toHaveLength(scenario === "existing draft" ? 0 : 1);
+      if (scenario !== "existing draft") {
+        expect(creations[0]?.[2]).toBe(tag);
+        expect(creations[0]).toContain("--verify-tag");
+        expect(creations[0]).toContain("--draft");
+        expect(calls.indexOf(creations[0] ?? [])).toBeLessThan(calls.indexOf(uploads[0] ?? []));
+      }
+    }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

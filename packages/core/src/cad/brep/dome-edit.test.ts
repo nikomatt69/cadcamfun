@@ -157,3 +157,68 @@ describe("the hemisphere that ends a pin or a bore (the rim through the centre)"
     expect(pushPullDome(b, sphereFace(b), 1)).toMatch(/smaller than the wall/)
   })
 })
+
+describe("a cap of more than a hemisphere: a ball on a neck, and the round cavity behind a narrow bore", () => {
+  const Rb = 6, ab = 4, zc = 14
+  const seg = (r: number, a: number) => { const q = Math.sqrt(r * r - a * a); const h = r + q; return { q, volume: (Math.PI * h * h * (3 * r - h)) / 3 } }
+  /** A pin: neck of radius 4 from z = 0 up to the ball of radius `r` centred at z = 14, as one revolve. */
+  const pin = (r: number): Brep => {
+    const { q } = seg(r, ab)
+    return revolveProfile({ loops: [[
+      { kind: "line", a: { x: 0, y: 0 }, b: { x: ab, y: 0 } }, { kind: "line", a: { x: ab, y: 0 }, b: { x: ab, y: zc - q } },
+      { kind: "arc", center: { x: 0, y: zc }, radius: r, start: Math.atan2(-q, ab), end: Math.PI / 2 }, { kind: "line", a: { x: 0, y: zc + r }, b: { x: 0, y: 0 } }
+    ]] }, 2 * Math.PI)
+  }
+  /** A block 40 x 40 x 30 with a bore of radius 4 from the top ending in a round cavity of radius `r` centred at z = 14. */
+  const cavity = (r: number): Brep => {
+    const { q } = seg(r, ab)
+    const void_ = revolveProfile({ loops: [[
+      { kind: "line", a: { x: 0, y: zc - r }, b: { x: 0, y: 31 } }, { kind: "line", a: { x: 0, y: 31 }, b: { x: ab, y: 31 } }, { kind: "line", a: { x: ab, y: 31 }, b: { x: ab, y: zc + q } },
+      { kind: "arc", center: { x: 0, y: zc }, radius: r, start: Math.atan2(q, ab), end: -Math.PI / 2 }
+    ]] }, 2 * Math.PI, { origin: { x: 20, y: 20, z: 0 } })
+    return booleanBrep(makeBox(40, 40, 30), void_, "subtract").brep
+  }
+
+  test("the ball is recognised with its rim below the centre", () => {
+    const b = pin(Rb)
+    const d = recognizeDome(b, sphereFace(b))
+    if (typeof d === "string") throw new Error(d)
+    expect(d.rim).toBeCloseTo(-seg(Rb, ab).q, 6)
+    expect(d.axis.z).toBeCloseTo(1, 9)
+    expect(d.concave).toBe(false)
+  })
+
+  test("a bigger ball: the volume is the one of the pin built with the new radius (the neck gets shorter)", () => {
+    const b = pin(Rb)
+    for (const d of [1, 0.5]) {
+      const r = ok(pushPullDome(b, sphereFace(b), d))
+      expect(validateBrep(r).valid).toBe(true)
+      expect(volume(r)).toBeCloseTo(volume(pin(Rb + d)), 4)
+    }
+  })
+
+  test("a smaller ball: the neck is prolonged up to the new rim, the volume is the one of the pin built that way", () => {
+    const b = pin(Rb)
+    const r = ok(pushPullDome(b, sphereFace(b), -1))
+    expect(validateBrep(r).valid).toBe(true)
+    expect(volume(r)).toBeCloseTo(volume(pin(Rb - 1)), 4)
+  })
+
+  test("the cavity behind a narrow bore: pushed out of the solid it shrinks (material enters), pulled it grows", () => {
+    const b = cavity(Rb)
+    const d = recognizeDome(b, sphereFace(b))
+    if (typeof d === "string") throw new Error(d)
+    expect(d.concave).toBe(true)
+    expect(d.axis.z).toBeCloseTo(-1, 9)
+    expect(d.rim).toBeLessThan(0)
+    for (const move of [1, -1]) {
+      const r = ok(pushPullDome(b, sphereFace(b), move))
+      expect(validateBrep(r).valid).toBe(true)
+      expect(volume(r)).toBeCloseTo(volume(cavity(Rb - move)), 4)
+    }
+  })
+
+  test("a sphere that would not be wider than the neck is refused", () => {
+    expect(pushPullDome(pin(Rb), sphereFace(pin(Rb)), -2.5)).toMatch(/smaller than the wall|tangent/)
+  })
+})

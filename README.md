@@ -287,26 +287,27 @@ To start a release manually:
 ./scripts/release patch
 ```
 
-`minor`, `major` and an explicit semantic version are also supported. The GitHub CLI must be authenticated, and the publish workflow must exist on the repository's default branch. The dry run reports the prospective version without dispatching a workflow or publishing assets.
+`minor`, `major` and an explicit semantic version are also supported. The GitHub CLI must be authenticated, and the CI pipeline workflow must exist on the repository's default branch. The dry run reports the prospective version without dispatching a workflow or publishing assets.
 
 The pipeline:
 
 1. Validates the workspace and workflows, resolves a new version, stamps version holders and refreshes the lockfile.
-2. Builds the changelog from commits, publishes the public npm package, commits the release metadata and creates a draft version release.
+2. Builds the changelog from commits, commits the release metadata and pushes the version tag.
 3. Cross-compiles the six sidecar variants with Bun, then bundles the desktop on the corresponding native runners.
 4. Verifies installer checksums. macOS and Windows also check updater signatures and URLs. Linux publishes Debian and RPM packages. The updater manifest covers macOS and Windows.
-5. Uploads all six targets, signatures, combined checksums and updater manifest to that single version release, publishes it and then updates the optional Homebrew cask.
+5. Publishes npm, creates one version release after asset verification, uploads all six targets, signatures, combined checksums and updater manifest, publishes the release and then updates the optional Homebrew cask.
 
-The release stays a draft until the desktop jobs succeed. A failed optional Homebrew publication is reported separately. Prereleases do not advance the stable cask or become the latest stable updater release.
+The release is created only after all six desktop targets are built and verified. An upload failure leaves a resumable draft. A failed optional Homebrew publication is reported separately. Prereleases do not advance the stable cask or become the latest stable updater release.
 
 Release credentials belong in GitHub Actions secrets: `NPM_TOKEN`, the Tauri updater signing key/password, optional Apple/Windows signing credentials and `HOMEBREW_TAP_TOKEN`. The tap repository and branch are Actions variables. Credential values are never part of repository configuration. See the [release contract and setup](specs/10-release-sync.md) for the complete names, failure behaviour and acceptance record.
 
 CI definitions:
 
-- [ci-pipeline.yml](.github/workflows/ci-pipeline.yml): validation followed by automatic release publication on `main` pushes.
+- [ci-pipeline.yml](.github/workflows/ci-pipeline.yml): orchestrates validation → metadata/tag → all six desktop builds → release creation and publication on `main` pushes. Manual dispatch defaults to validation; `./scripts/release` enables publication.
 - [ci.yml](.github/workflows/ci.yml): reusable workspace validation, Rust checks and companion validation; also runs on other branch pushes.
 - [build-platforms.yml](.github/workflows/build-platforms.yml): downloadable platform build artifacts without requiring release signing credentials.
-- [publish.yml](.github/workflows/publish.yml): versioning, npm publication and final release orchestration.
+- [publish.yml](.github/workflows/publish.yml): reusable version, changelog, commit and tag preparation.
+- [publish-release.yml](.github/workflows/publish-release.yml): verifies all assets before npm publication and GitHub release creation, then uploads and publishes.
 - [release.yml](.github/workflows/release.yml): sidecar compilation, native installer artifacts and updater manifest validation. Manual dispatch rebuilds artifacts without modifying releases.
 
 ## Contributing and project governance

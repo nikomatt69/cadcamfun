@@ -5,6 +5,20 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: Build all desktop assets and publish a release after validation
+        type: boolean
+        default: false
+      bump:
+        description: Version bump for a manual release
+        type: choice
+        default: patch
+        options: [patch, minor, major]
+      version:
+        description: Explicit version override for a manual release
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -20,11 +34,12 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   publish:
-    name: publish all desktop releases
+    name: prepare release metadata
     needs: validate
     if: >-
       needs.validate.result == 'success' &&
-      github.event_name == 'push' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.release)) &&
       github.ref == 'refs/heads/main' &&
       github.repository == 'nikomatt69/cadcamfun' &&
       !startsWith(github.event.head_commit.message, 'release: v') &&
@@ -36,6 +51,28 @@ jobs:
       id-token: write
     uses: ./.github/workflows/publish.yml
     with:
-      bump: patch
+      bump: ${{ inputs.bump || 'patch' }}
+      version: ${{ inputs.version || '' }}
       prevalidated: true
+    secrets: inherit
+
+  desktop:
+    name: build all six desktop targets
+    needs: publish
+    if: needs.publish.result == 'success' && needs.publish.outputs.tag != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.publish.outputs.tag }}
+      version: ${{ needs.publish.outputs.version }}
+    secrets: inherit
+
+  publish-release:
+    name: create and publish the release
+    needs: [publish, desktop]
+    if: needs.publish.result == 'success' && needs.desktop.result == 'success'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/publish-release.yml
+    with:
+      tag: ${{ needs.publish.outputs.tag }}
     secrets: inherit
