@@ -107,6 +107,15 @@ conflict, stock preserved, setup/layers round trip, restore points, draft, CAM c
 with real timers. Tests: `apps/sidecar/test/drawings.test.ts` (409, restore points and retention, merge, toolpath 409), `apps/desktop/test/window-guard.test.ts`
 (close guard, update install), and the status-line / settings test at the end of `project-session.test.ts`.
 
+## 4b. Verified in a real browser (2026-10-24)
+
+The real sidecar process (`bun apps/sidecar/src/main.ts`), the Vite dev app and headless Chromium (Playwright) were run together
+against a throw-away data directory. Observed: the status line reads `Saved hh:mm` after the drawing loads and stays clean; an edit
+through the page's own store turns it to `Unsaved changes`; clicking it saves (stored value updated); Ctrl+S saves; a phone-style
+write made between two saves is merged (both elements stored, the editor's edit kept); the interval set to 1 minute in the real
+Settings UI fired an autosave exactly 60 s after the edit; one restore point existed afterwards. The Tauri-only parts (window
+close, update banner) were exercised over a mocked IPC, not in a packaged window.
+
 ## 5. Open items
 
 - Components and materials are per-project rows written on demand; they have no dirty state of their own.
