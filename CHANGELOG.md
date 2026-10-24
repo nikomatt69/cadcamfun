@@ -3,6 +3,29 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.7 (October 2026)
+
+## Core
+
+- Refactor CAD component structure and styling for improved usability
+- Refactor CAD component styles and structure for improved consistency
+- Add the exactness coverage matrix (spec 40 U0) and fix transformBrep under scaling
+
+## Desktop
+
+- Enhance UI components and improve styling consistency
+- Enhance UI and functionality across various components
+- Test the desktop close, destroy and update wiring through Tauri's real JS API over a mocked IPC
+- Make the assistant's drawing write a compare-and-swap and prove the autosave interval with real timers
+- Specify the path to Fusion/SolidWorks/Creo/hyperMILL parity: master plan and specs 40-55
+- Close the open items of project saving: toolpath compare-and-swap, retention policy, updater and close guard
+- Add autosave, safe project saves and restore points for the CAD drawing and the CAM program
+- Let the stock follow the selected parts, with a switch to keep a manual stock
+
+## Documentation
+
+- Record the real-browser verification of project saving in spec 38
+
 ## v0.1.6 (October 2026)
 
 ## Desktop
