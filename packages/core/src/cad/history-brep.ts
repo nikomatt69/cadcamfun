@@ -9,9 +9,9 @@
  * coaxial rims (plane, cylinder, cone), shells of extrusions, full revolutions and sweeps, the draft and the push/pull of a
  * planar face, mates (the rigid motion from the exact faces), the analytic catalogue primitives (cube, cylinder, cone,
  * sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split and combine,
- * ribs, sheets, text and coils, and the union / subtract / intersect of every tool. A body that went through anything else
- * (a modelled thread, drafts and push/pulls of curved faces, a non-uniform scale, the catalogue elements ellipsoid / gear /
- * capsule) keeps its mesh and says why it has no exact model; nothing is approximated behind the caller's back. A blend of a
+ * ribs, sheets, text, coils and modelled threads (`thread-brep.ts`: a faceted helicoid of at most 24 turns), and the union /
+ * subtract / intersect of every tool. A body that went through anything else (drafts and push/pulls of curved faces, the
+ * catalogue elements ellipsoid / gear, a thread of more than 24 turns) keeps its mesh and says why it has no exact model; nothing is approximated behind the caller's back. A blend of a
  * non-coaxial curved edge is refused by the rebuild with a message. `history-exactness.test.ts` records, for every feature
  * kind and option, whether the cell is exact or mesh-only (spec 40 U0) and fails when one of them changes.
  */
@@ -23,6 +23,8 @@ import { cornersOf, rebuild, type Feature, type History, type PlaneName, type Re
 import { sheetOutline, thickenPath, withHems, withEdgeFlanges, edgeFlangeReliefs } from "./sheet-metal.ts"
 import { textBars } from "./text-solid.ts"
 import { coilGeometry } from "./helix.ts"
+import { threadProblem } from "./thread.ts"
+import { makeThreadBrep, makeThreadGrooveBrep } from "./thread-brep.ts"
 import {
   blendBrep,
   blendCandidates,
@@ -1418,9 +1420,30 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
           apply(f.id, tool, f.operation, f.targets, f.id)
           break
         }
-        case "thread":
-          unsupported({ ...f, operation: f.cut === true ? "subtract" : f.operation ?? (f.kind === "internal" ? "subtract" : "new") }, "a modelled (helical) thread has no exact model yet")
+        case "thread": {
+          const diameter = dim(f.diameter), pitch = dim(f.pitch), length = dim(f.length)
+          const cx = f.at === undefined ? 0 : dim(f.at[0]), cy = f.at === undefined ? 0 : dim(f.at[1])
+          const z0 = f.offset === undefined ? 0 : dim(f.offset)
+          const operation = f.cut === true ? "subtract" : f.operation ?? (f.kind === "internal" ? "subtract" : "new")
+          const spec = { diameter, pitch, length, internal: f.kind === "internal", left: f.handedness === "left", cx, cy, z0 }
+          // The mesh rebuild reports a thread that cannot be built (and a cut that is wrong); the exact one only has to follow it.
+          if (threadProblem(spec) !== undefined || (f.cut === true && (f.kind === "internal" || (f.operation !== undefined && f.operation !== "subtract")))) break
+          // Built along Z, then carried to the axis: x runs on the YZ frame, y on ZX (the mesh rebuild's `place`).
+          const e = { x: { x: 1, y: 0, z: 0 }, y: { x: 0, y: 1, z: 0 }, z: { x: 0, y: 0, z: 1 } }
+          const [u, v, n] = f.axis === "x" ? [e.y, e.z, e.x] : f.axis === "y" ? [e.z, e.x, e.y] : [e.x, e.y, e.z]
+          const place = (p: { x: number; y: number; z: number }) => ({ x: u.x * p.x + v.x * p.y + n.x * p.z, y: u.y * p.x + v.y * p.y + n.y * p.z, z: u.z * p.x + v.z * p.y + n.z * p.z })
+          let solid: Brep
+          try {
+            solid = f.cut === true ? makeThreadGrooveBrep(spec, place) : makeThreadBrep(spec, place)
+          } catch (e2) {
+            unsupported({ ...f, operation }, e2 instanceof Error ? e2.message : String(e2))
+            break
+          }
+          const tool = ok(solid)
+          tools.set(f.id, { exact: [tool], operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, operation, f.targets, f.id)
           break
+        }
         case "pushpull": {
           const distance = dim(f.distance)
           if (distance === 0) break

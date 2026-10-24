@@ -73,6 +73,10 @@ export const CELLS: ReadonlyArray<Cell> = [
   // other features
   { id: "coil.round", build: (m) => { m.coil({ radius: 8, pitch: 4, turns: 5, wireDiameter: 1.2 }) } },
   { id: "thread.external", build: (m) => { m.extrude(m.sketch("XY").circle([0, 0], 3), { depth: 14 }); m.thread({ kind: "external", diameter: 6, pitch: 1, length: 8, at: [0, 0], offset: 0 }) } },
+  { id: "thread.internal", build: (m) => { plate(m, 12); m.thread({ kind: "internal", diameter: 6, pitch: 1, length: 8, at: [20, 15], offset: 2 }) } },
+  { id: "thread.left", build: (m) => { m.extrude(m.sketch("XY").circle([0, 0], 3), { depth: 14 }); m.thread({ kind: "external", diameter: 6, pitch: 1, length: 8, at: [0, 0], offset: 0, handedness: "left" }) } },
+  { id: "thread.cut", build: (m) => { m.extrude(m.sketch("XY").circle([0, 0], 3), { depth: 14 }); m.thread({ kind: "external", diameter: 6, pitch: 1, length: 8, at: [0, 0], offset: 2, cut: true }) } },
+  { id: "thread.axisX", build: (m) => { m.thread({ kind: "external", diameter: 8, pitch: 1.25, length: 10, at: [0, 0], offset: 0, axis: "x" }) } },
   { id: "rib", build: (m) => { plate(m); m.rib(m.sketch("ZX", 15).path([[10, 0], [10, 40]]), { thickness: 3, depth: 10 }) } },
   { id: "sheet.flange", build: (m) => { const path = m.sketch("ZX").path([[0, 0], [40, 0]]).toString(); m.add({ id: "sheet1", type: "sheet", sketch: path, thickness: 2, width: 30, bendRadius: 2, operation: "new", flanges: [{ end: "end", length: 12, angle: 90 }] }) } },
   { id: "text", build: (m) => { plate(m, 4); m.text({ text: "AB", height: 8, depth: 1, plane: "XY", offset: 4, at: [5, 10] }) } },

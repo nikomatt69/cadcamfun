@@ -6231,17 +6231,22 @@ var derived = new WeakMap;
 var TAU4 = 2 * Math.PI;
 var meshOfTessellation = new WeakMap;
 var parametricCache = new Map;
-// ../../../packages/core/src/cad/brep/primitives.ts
+
+// ../../../packages/core/src/cad/brep/boolean.ts
 var TAU5 = Math.PI * 2;
-// ../../../packages/core/src/cad/brep/sweep.ts
+var VOLUMES = new WeakMap;
+var SETS = new WeakMap;
+
+// ../../../packages/core/src/cad/brep/primitives.ts
 var TAU6 = Math.PI * 2;
+
+// ../../../packages/core/src/cad/thread-brep.ts
+var TAN302 = Math.tan(Math.PI / 6);
+// ../../../packages/core/src/cad/brep/sweep.ts
+var TAU7 = Math.PI * 2;
 var CORNER_TURN2 = 10 * Math.PI / 180;
 // ../../../packages/core/src/cad/brep/step.ts
 var SOLID_KINDS = new Set(["MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS", "SHELL_BASED_SURFACE_MODEL", "FACETED_BREP"]);
-// ../../../packages/core/src/cad/brep/boolean.ts
-var TAU7 = Math.PI * 2;
-var VOLUMES = new WeakMap;
-var SETS = new WeakMap;
 // ../../../packages/core/src/cad/brep/features.ts
 var TAU8 = 2 * Math.PI;
 var MAX_GAP = Math.PI / 3;

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
-import { buildRecipe } from "@cadcamfun/core"
+import { buildRecipe, cad } from "@cadcamfun/core"
 import { CadAssemblyReport, CadExactAnalysis, CadExactStep, CadHoleReport, CadSetupsReport } from "@cadcamfun/api"
 import { Schema } from "effect"
 import { makeApp } from "./helpers.ts"
@@ -162,4 +162,28 @@ test("a draft angle narrows the new bore or boss wall: the previewed volume is t
   expect((await post("hole", { elements: [plate], id: "plate", hole: 0, diameter: 7, taper: 31 })).status).toBe(400)
   const closing = Schema.decodeUnknownSync(CadHoleReport)((await post("hole", { elements: [bossed], id: "bossed", boss: 0, diameter: 4, taper: 25 })).body)
   expect(closing).toMatchObject({ ok: false, error: expect.stringContaining("closes the boss") })
+})
+
+test("analyze reads a threaded shaft on its exact model: valid, with the volume of the shaft and the thread", async () => {
+  const shaft = {
+    id: "shaft", type: "parametric", name: "Shaft", x: 0, y: 0, z: 0, layerId: "default",
+    history: { parameters: {}, features: [
+      { id: "s", type: "sketch", plane: "XY", sketch: { entities: [], constraints: [], shapes: [{ id: "c", kind: "circle", at: [0, 0], diameter: 6 }] } },
+      { id: "rod", type: "extrude", sketch: "s", depth: 14, operation: "new" },
+      { id: "t", type: "thread", kind: "external", diameter: 6, pitch: 1, length: 8, at: [0, 0], offset: 2, cut: true }
+    ] }
+  }
+  const result = Schema.decodeUnknownSync(CadExactAnalysis)((await post("analyze", { elements: [shaft] })).body)
+  expect(result.skipped).toEqual([])
+  const part = result.parts[0]!
+  expect(part.valid).toBe(true)
+  // 14 mm of Ø6 shaft, of which 8 mm carry the thread: the rest is a plain cylinder, the thread the ISO profile.
+  const threadVolume = cad.exactThreadVolume({ diameter: 6, pitch: 1, length: 8, internal: false }) as number
+  const expected = Math.PI * 9 * 6 + threadVolume
+  // The crest of a thread cut into a shaft of the major diameter is brought in by 0.03 mm so the Boolean can decide it: a little under the nominal.
+  expect(Math.abs(part.volume - expected) / expected).toBeLessThan(0.008)
+  expect(part.volume).toBeLessThan(expected)
+  // The same body goes out as STEP.
+  const step = Schema.decodeUnknownSync(CadExactStep)((await post("step", { elements: [shaft] })).body)
+  expect(step.parts).toEqual([expect.objectContaining({ id: "shaft", exact: true, valid: true })])
 })
