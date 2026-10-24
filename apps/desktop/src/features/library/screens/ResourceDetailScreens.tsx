@@ -8,31 +8,27 @@
  * machine configurations are free-form (`config` JSON), so their fields are read defensively.
  */
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
-import { A, useNavigate, useParams, useSearchParams } from "@solidjs/router"
-import { Motion } from "solid-motionone"
-import { ArrowLeft, Cpu, Layers, Package, Save, Settings, Trash2, Wrench, Box, Edit } from "lucide-solid"
+import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
+import { Cpu, Layers, Package, Save, Trash2, Wrench, Box, Edit } from "lucide-solid"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
 import { Modal } from "../../toolpaths/components/shared.tsx"
+import {
+  CANCEL_BUTTON, DANGER_BUTTON, INPUT, LABEL, PANEL, StageError, StageLoading, SUBMIT_BUTTON, TOOLBAR_BUTTON,
+  TOOLBAR_PRIMARY, WorkspaceDetail, WorkspaceTabs, type WorkspaceTabItem
+} from "../../../shared/components/WorkspacePage.tsx"
 import { ResourceGeometryPreview, resourceElements } from "../components/ResourceGeometryPreview.tsx"
 import { ToolPreview3D, toolResourceOf } from "../components/ToolPreview3D.tsx"
 import { NumberField } from "../../cad/components/property-inputs/NumberField.tsx"
 import { cam } from "@cadcamfun/core"
 import { componentEntries } from "../../cad/lib/component-assembly.ts"
 import { t } from "../../../i18n/index.ts"
-import "../../../styles/workstation.css"
 
 type Kind = "materials" | "tools" | "machines" | "components"
 type Row = Readonly<Record<string, unknown>>
 
-const TOOLBAR_BUTTON = "inline-flex items-center gap-1.5 rounded-lg border border-white/40 dark:border-gray-600/40 bg-white/60 px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-white/80 dark:bg-gray-800/60 dark:text-gray-200 dark:hover:bg-gray-700/80 disabled:opacity-50"
-const TOOLBAR_PRIMARY = "inline-flex items-center gap-1.5 rounded-lg bg-[#007ACC] px-3 py-1.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:bg-blue-700 disabled:opacity-50"
-const PANEL = "rounded-xl border border-white/40 bg-white/70 p-5 shadow-md backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/70"
-const INPUT = "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-const LABEL = "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
-const TAB_ON = "border-[#007ACC] text-[#007ACC] dark:text-blue-400"
-const TAB_OFF = "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+type DetailTab = "overview" | "details" | "raw" | "preview" | "structure"
 
 const CONFIG: Readonly<Record<Kind, { readonly title: string; readonly listPath: string; readonly icon: typeof Package; readonly plural: string }>> = {
   materials: { title: "Material", listPath: "/materials", icon: Layers, plural: "materials" },
@@ -180,117 +176,121 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const name = createMemo(() => str(row()?.["name"]) || meta.title)
   const Icon = meta.icon
 
+  const tabs = (): ReadonlyArray<WorkspaceTabItem<DetailTab>> => [
+    { id: "overview", label: "Overview" },
+    { id: "details", label: "Details" },
+    { id: "raw", label: "Raw data" },
+    ...(props.kind === "components" ? [
+      { id: "preview" as const, label: t("cam.resource.previewTab") },
+      { id: "structure" as const, label: t("cam.resource.structure") }
+    ] : [])
+  ]
+
   return (
-    <Motion.div class="cam-workspace h-full w-full flex flex-col overflow-hidden" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-      <div class="cam-workspace__frame flex flex-col h-full w-full">
-        <Motion.div class="workstation-toolbar w-full flex flex-wrap items-center justify-between gap-2" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.4 }}>
-          <div class="flex min-w-0 items-center gap-3">
-            <A href={meta.listPath} class="rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-200/60 dark:text-gray-300 dark:hover:bg-gray-800/60" aria-label={`Back to ${meta.plural}`}><ArrowLeft size={18} aria-hidden="true" /></A>
-            <Icon size={18} class="text-[#007ACC] dark:text-blue-300" aria-hidden="true" />
-            <div class="min-w-0">
-              <h1 class="truncate text-base font-semibold text-gray-900 dark:text-white">{name()}</h1>
-              <p class="text-xs text-gray-500 dark:text-gray-400">{meta.title}</p>
-            </div>
+    <WorkspaceDetail
+      testId={`${props.kind}-detail`}
+      title={name()}
+      subtitle={meta.title}
+      backHref={meta.listPath}
+      backLabel={`Back to ${meta.plural}`}
+      actions={
+        <Show when={!editing()} fallback={<>
+          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => void save()} disabled={busy()}><Save size={14} aria-hidden="true" />Save</button>
+          <button type="button" class={TOOLBAR_BUTTON} onClick={cancel} disabled={busy()}>Cancel</button>
+        </>}>
+          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => { setEditing(true); setTab("details") }} disabled={busy() || row() === undefined}><Edit size={14} aria-hidden="true" />Edit</button>
+          <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => setDeleteOpen(true)} disabled={busy() || row() === undefined}><Trash2 size={14} aria-hidden="true" />Delete</button>
+        </Show>
+      }
+      overlays={
+        <Modal open={deleteOpen()} title={`Delete ${meta.title.toLowerCase()}`} onClose={() => setDeleteOpen(false)}>
+          <p class="text-xs text-slate-600 dark:text-slate-300">Are you sure you want to delete this {meta.title.toLowerCase()}? This action cannot be undone.</p>
+          <div class="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+            <button type="button" class={CANCEL_BUTTON} onClick={() => setDeleteOpen(false)}>Cancel</button>
+            <button type="button" class={DANGER_BUTTON} disabled={busy()} onClick={() => void remove()}>Delete</button>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <Show when={!editing()} fallback={<>
-              <button type="button" class={TOOLBAR_PRIMARY} onClick={() => void save()} disabled={busy()}><Save size={16} aria-hidden="true" />Save</button>
-              <button type="button" class={TOOLBAR_BUTTON} onClick={cancel} disabled={busy()}>Cancel</button>
-            </>}>
-              <button type="button" class={TOOLBAR_PRIMARY} onClick={() => { setEditing(true); setTab("details") }} disabled={busy() || row() === undefined}><Edit size={16} aria-hidden="true" />Edit</button>
-              <button type="button" class={TOOLBAR_BUTTON} onClick={() => setDeleteOpen(true)} disabled={busy() || row() === undefined}><Trash2 size={16} aria-hidden="true" />Delete</button>
-            </Show>
-          </div>
-        </Motion.div>
+        </Modal>
+      }
+    >
+      <Show when={!loading()} fallback={<StageLoading label={`Loading ${meta.plural}...`} />}>
+        <Show when={error() === undefined} fallback={<StageError message={error() ?? ""} onRetry={() => void load()} />}>
+          <Show when={row()}>{(current) => <>
+            <WorkspaceTabs class="mb-3" tabs={tabs()} value={tab()} onChange={setTab} label={`${meta.title} sections`} />
 
-        <div class="flex flex-1 min-h-0 flex-col overflow-y-auto p-4">
-          <Show when={!loading()} fallback={<p class="p-8 text-center text-sm text-gray-500 dark:text-gray-400" role="status">Loading {meta.plural}...</p>}>
-            <Show when={error() === undefined} fallback={<div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300" role="alert">{error()}</div>}>
-              <Show when={row()}>{(current) => (
-                <>
-                  <nav class="mb-4 flex gap-6 border-b border-gray-200 dark:border-gray-700" aria-label={`${meta.title} sections`}>
-                    <For each={[{ id: "overview" as const, label: "Overview" }, { id: "details" as const, label: "Details" }, { id: "raw" as const, label: "Raw data" }, ...(props.kind === "components" ? [{ id: "preview" as const, label: t("cam.resource.previewTab") }, { id: "structure" as const, label: t("cam.resource.structure") }] : [])]}>{(item) => (
-                      <button type="button" aria-pressed={tab() === item.id} class={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${tab() === item.id ? TAB_ON : TAB_OFF}`} onClick={() => setTab(item.id)}>{item.label}</button>
-                    )}</For>
-                  </nav>
-
-                  <Show when={tab() === "overview"}>
-                    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-                      <div class={`${PANEL} md:col-span-2`}>
-                        <h2 class="mb-3 text-xl font-bold text-gray-900 dark:text-white">{name()}</h2>
-                        <Show when={str(current()["description"] ?? current()["notes"])} fallback={<p class="italic text-gray-500 dark:text-gray-400">No description provided</p>}>
-                          <p class="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{str(current()["description"] ?? current()["notes"])}</p>
-                        </Show>
-                        <Show when={props.kind === "components"}><div class="mt-5"><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div></Show>
-                        <Show when={props.kind === "tools"}><div class="mt-5"><ToolPreview3D tool={current()} /></div></Show>
-                        <div class="mt-5 grid grid-cols-2 gap-4">
-                          <For each={summaryFields(props.kind, current())}>{(field) => (
-                            <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">{field.label}</h3><p class="font-medium text-gray-900 dark:text-white">{field.value}</p></div>
-                          )}</For>
-                        </div>
+            <Show when={tab() === "overview"}>
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div class={`${PANEL} md:col-span-2 !p-3`}>
+                  <div class="mb-3 flex items-start gap-2">
+                    <span class="flex h-8 w-8 flex-none items-center justify-center rounded-[5px] border border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"><Icon size={16} aria-hidden="true" /></span>
+                    <div class="min-w-0">
+                      <h2 class="truncate text-[13px] font-semibold text-slate-900 dark:text-white">{name()}</h2>
+                      <p class="text-[11px] text-slate-500 dark:text-slate-400">{meta.title}</p>
+                    </div>
+                  </div>
+                  <Show when={str(current()["description"] ?? current()["notes"])} fallback={<p class="text-xs italic text-slate-500 dark:text-slate-400">No description provided</p>}>
+                    <p class="whitespace-pre-wrap text-xs leading-5 text-slate-600 dark:text-slate-300">{str(current()["description"] ?? current()["notes"])}</p>
+                  </Show>
+                  <Show when={props.kind === "components"}><div class="mt-3"><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div></Show>
+                  <Show when={props.kind === "tools"}><div class="mt-3"><ToolPreview3D tool={current()} /></div></Show>
+                  <div class="mt-3 grid grid-cols-2 gap-2">
+                    <For each={summaryFields(props.kind, current())}>{(field) => (
+                      <div class="rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40">
+                        <h3 class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{field.label}</h3>
+                        <p class="mt-0.5 text-xs font-medium text-slate-900 dark:text-white">{field.value}</p>
                       </div>
-                      <aside class={PANEL}>
-                        <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-white">Information</h3>
-                        <dl class="space-y-3 text-sm">
-                          <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Created</dt><dd class="font-medium text-gray-900 dark:text-white">{formatDate(current()["createdAt"]) || "-"}</dd></div>
-                          <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Last updated</dt><dd class="font-medium text-gray-900 dark:text-white">{formatDate(current()["updatedAt"]) || "-"}</dd></div>
-                          <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">ID</dt><dd class="font-mono text-gray-900 dark:text-white">{str(current()["id"]).substring(0, 8)}...</dd></div>
-                          <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Visibility</dt><dd class={`font-medium ${current()["isPublic"] === true ? "text-green-600 dark:text-green-400" : "text-gray-600 dark:text-gray-400"}`}>{current()["isPublic"] === true ? "Public" : "Private"}</dd></div>
-                        </dl>
-                      </aside>
-                    </div>
-                  </Show>
-
-                  <Show when={props.kind === "components" && tab() === "preview"}>
-                    <div class={PANEL}><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div>
-                  </Show>
-                  <Show when={props.kind === "components" && tab() === "structure"}>
-                    <div class={PANEL} data-testid="component-resource-structure">
-                      <h3 class="mb-3 font-medium text-gray-900 dark:text-white">{t("cam.resource.structure")}</h3>
-                      <p class="mb-3 text-sm text-gray-500">{t("cam.resource.elementCount", { count: componentEntries(resourceElements(current()["data"])).length })}</p>
-                      <ol class="space-y-1 text-sm text-gray-700 dark:text-gray-300"><For each={componentEntries(resourceElements(current()["data"]))}>{({ element, depth }) =>
-                        <li style={{ "padding-left": `${depth * 16}px` }}>{String(element["name"] ?? element.type)} <span class="text-xs text-gray-500">· {element.type}</span></li>
-                      }</For></ol>
-                    </div>
-                  </Show>
-
-                  <Show when={tab() === "details"}>
-                    <div class={PANEL}>
-                      <Show when={editing()} fallback={<DetailsView kind={props.kind} row={current()} />}>
-                        <Show when={props.kind === "tools"} fallback={<DetailsForm kind={props.kind} form={form()} onPatch={patch} onPatchConfig={patchConfig} />}>
-                          {/* The tool redraws as it is edited: what is saved is what the CAM preview will draw. */}
-                          <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                            <div class="lg:col-span-2"><DetailsForm kind={props.kind} form={form()} onPatch={patch} onPatchConfig={patchConfig} /></div>
-                            <ToolPreview3D tool={form()} />
-                          </div>
-                        </Show>
-                      </Show>
-                    </div>
-                  </Show>
-
-                  <Show when={tab() === "raw"}>
-                    <div class={PANEL}>
-                      <pre class="max-h-[60vh] overflow-auto rounded-md bg-gray-50 p-4 font-mono text-xs text-gray-800 dark:bg-gray-900 dark:text-gray-200">{JSON.stringify(current(), null, 2)}</pre>
-                    </div>
-                  </Show>
-                </>
-              )}</Show>
+                    )}</For>
+                  </div>
+                </div>
+                <aside class={`${PANEL} !p-3`}>
+                  <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">Information</h3>
+                  <dl class="panel-kv">
+                    <dt>Created</dt><dd>{formatDate(current()["createdAt"]) || "-"}</dd>
+                    <dt>Last updated</dt><dd>{formatDate(current()["updatedAt"]) || "-"}</dd>
+                    <dt>ID</dt><dd class="font-mono">{str(current()["id"]).substring(0, 8)}…</dd>
+                    <dt>Visibility</dt><dd class={current()["isPublic"] === true ? "text-green-700 dark:text-green-400" : ""}>{current()["isPublic"] === true ? "Public" : "Private"}</dd>
+                  </dl>
+                </aside>
+              </div>
             </Show>
-          </Show>
-        </div>
-      </div>
 
-      <Modal open={deleteOpen()} title={`Delete ${meta.title.toLowerCase()}`} onClose={() => setDeleteOpen(false)}>
-        <p class="text-sm text-gray-700 dark:text-gray-300">Are you sure you want to delete this {meta.title.toLowerCase()}? This action cannot be undone.</p>
-        <div class="flex justify-end gap-2 pt-2">
-          <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700" onClick={() => setDeleteOpen(false)}>Cancel</button>
-          <button type="button" class="rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50" disabled={busy()} onClick={() => void remove()}>Delete</button>
-        </div>
-      </Modal>
-    </Motion.div>
+            <Show when={props.kind === "components" && tab() === "preview"}>
+              <div class={`${PANEL} !p-3`}><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div>
+            </Show>
+            <Show when={props.kind === "components" && tab() === "structure"}>
+              <div class={`${PANEL} !p-3`} data-testid="component-resource-structure">
+                <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("cam.resource.structure")}</h3>
+                <p class="mb-2 text-[11px] text-slate-500 dark:text-slate-400">{t("cam.resource.elementCount", { count: componentEntries(resourceElements(current()["data"])).length })}</p>
+                <ol class="space-y-1 text-xs text-slate-700 dark:text-slate-300"><For each={componentEntries(resourceElements(current()["data"]))}>{({ element, depth }) =>
+                  <li style={{ "padding-left": `${depth * 16}px` }}>{String(element["name"] ?? element.type)} <span class="text-[10.5px] text-slate-500 dark:text-slate-400">· {element.type}</span></li>
+                }</For></ol>
+              </div>
+            </Show>
+
+            <Show when={tab() === "details"}>
+              <div class={`${PANEL} !p-3`}>
+                <Show when={editing()} fallback={<DetailsView kind={props.kind} row={current()} />}>
+                  <Show when={props.kind === "tools"} fallback={<DetailsForm kind={props.kind} form={form()} onPatch={patch} onPatchConfig={patchConfig} />}>
+                    {/* The tool redraws as it is edited: what is saved is what the CAM preview will draw. */}
+                    <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                      <div class="lg:col-span-2"><DetailsForm kind={props.kind} form={form()} onPatch={patch} onPatchConfig={patchConfig} /></div>
+                      <ToolPreview3D tool={form()} />
+                    </div>
+                  </Show>
+                </Show>
+              </div>
+            </Show>
+
+            <Show when={tab() === "raw"}>
+              <div class={`${PANEL} !p-3`}>
+                <pre class="max-h-[60vh] overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{JSON.stringify(current(), null, 2)}</pre>
+              </div>
+            </Show>
+          </>}</Show>
+        </Show>
+      </Show>
+    </WorkspaceDetail>
   )
 }
-
 /** The typed read for each kind; machines answer `{ data }` (free-form), the others the row itself. */
 const fetchEffect = (app: ReturnType<typeof useApp>, kind: Kind, id: string | undefined) => {
   const key = { params: { id: id ?? "" } }
@@ -317,9 +317,12 @@ const summaryFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: st
 }
 
 function DetailsView(props: { readonly kind: Kind; readonly row: Row | undefined }): JSX.Element {
-  return <dl class="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+  return <dl class="grid grid-cols-1 gap-2 md:grid-cols-2">
     <For each={summaryFields(props.kind, props.row ?? {})}>{(field) => (
-      <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><dt class="text-gray-500 dark:text-gray-400">{field.label}</dt><dd class="font-medium text-gray-900 dark:text-white">{field.value}</dd></div>
+      <div class="rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40">
+        <dt class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{field.label}</dt>
+        <dd class="mt-0.5 text-xs font-medium text-slate-900 dark:text-white">{field.value}</dd>
+      </div>
     )}</For>
   </dl>
 }
@@ -331,7 +334,7 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
       <input id={id} name={key} type={type} class={INPUT} value={str(props.form[key])} onInput={(e) => props.onPatch(key, type === "number" ? Number(e.currentTarget.value) : e.currentTarget.value)} />
     </div>
   )
-  return <form class="grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
+  return <form class="grid grid-cols-1 gap-3 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
     {input("res-name", "Name", "name")}
     <Show when={props.kind === "machines" || props.kind === "components"}>{input("res-type", "Type", "type")}</Show>
     <Show when={props.kind === "tools"}>
@@ -374,8 +377,8 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
       </div>
     </Show>
     <div class="flex items-center gap-2 md:col-span-2">
-      <input id="res-public" name="isPublic" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 dark:border-gray-700" checked={props.form["isPublic"] === true} onChange={(e) => props.onPatch("isPublic", e.currentTarget.checked)} />
-      <label for="res-public" class="text-sm text-gray-900 dark:text-gray-300">Make public (visible to all users)</label>
+      <input id="res-public" name="isPublic" type="checkbox" class="h-3.5 w-3.5 border-slate-300 accent-blue-600 dark:border-slate-600" checked={props.form["isPublic"] === true} onChange={(e) => props.onPatch("isPublic", e.currentTarget.checked)} />
+      <label for="res-public" class="text-xs text-slate-700 dark:text-slate-300">Make public (visible to all users)</label>
     </div>
   </form>
 }
@@ -461,7 +464,7 @@ function MachineProfileFields(props: { readonly form: Row; readonly onPatchConfi
     </div>
     <div class="md:col-span-2">
       <p class={LABEL}>Work volume (mm) — the space the part takes</p>
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-3 gap-2">
         {(["x", "y", "z"] as const).map((axis) => (
           <div>
             <label for={`res-work-${axis}`} class={LABEL}>{axis.toUpperCase()}</label>

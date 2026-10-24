@@ -41,7 +41,7 @@ export interface ActivityBarProps {
 export function ActivityBar(props: ActivityBarProps): JSX.Element {
   return (
     <nav
-      class="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-gray-200 bg-white py-2 dark:border-gray-700 dark:bg-gray-800"
+      class="flex w-16 shrink-0 flex-col items-center gap-1 border-r rounded-b-lg border-gray-200 bg-white py-2 dark:border-gray-700 dark:bg-gray-800"
       aria-label={t("activity.label")}
     >
       <For each={ACTIVITIES}>
@@ -104,7 +104,7 @@ export function StatusBar(props: StatusBarProps): JSX.Element {
   }
   return (
     <footer
-      class="reference-native-statusbar flex h-7 shrink-0 items-center gap-4 border-t border-gray-200 bg-white px-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+      class="reference-native-statusbar flex h-7 shrink-0 items-center gap-4 border-t rounded-b-lg border-gray-200 bg-white px-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
       aria-label={t("status.label")}
     >
       <span>

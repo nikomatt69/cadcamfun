@@ -1,12 +1,15 @@
 import { Box } from "lucide-solid"
+import { A } from "@solidjs/router"
+import { For, Show, createEffect, createMemo, createSignal, on, onMount, type JSX } from "solid-js"
 import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
 import { INPUT as FIELD, LABEL } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
-import { For, Show, createEffect, createSignal, onMount, type JSX } from "solid-js"
 import { useApp } from "../../../shared/state/context.ts"
 import { useCADStore, type MachineConfig } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
+import { pickMachine } from "../../cam/lib/machine-pick.ts"
+import { MACHINES_PATH, machineControllerOf, machineEnvelopeOf, machineFeedOf, machineSpindleOf, machineTypeLabel, machinesFromResponse } from "../../cam/lib/machines.ts"
 
 const MATERIALS = [["aluminum", "Aluminum"], ["steel", "Steel"], ["wood", "Wood"], ["plastic", "Plastic"], ["brass", "Brass"], ["titanium", "Titanium"], ["copper", "Copper"], ["composite", "Composite"], ["custom", "Other"]] as const
 
@@ -16,8 +19,11 @@ export default function WorkpieceSetup(): JSX.Element {
   const cad = useCADStore()
   const layers = useLayerStore()
   const elements = useElementsStore()
-  const [machines, setMachines] = createSignal<MachineConfig[]>([])
-  const [machineId, setMachineId] = createSignal("")
+  /** The built-in catalogue, then the Resources library: the same two lists the CAM sidebar's machine tab shows. */
+  const [builtins, setBuiltins] = createSignal<ReadonlyArray<MachineConfig>>([])
+  const [saved, setSaved] = createSignal<ReadonlyArray<MachineConfig>>([])
+  const [loading, setLoading] = createSignal(true)
+  const [error, setError] = createSignal<string>()
   const [workpieceId, setWorkpieceId] = createSignal<string | null>(null)
   const initial = () => ({
     width: cad.workpiece.width, height: cad.workpiece.height, depth: cad.workpiece.depth, radius: cad.workpiece.radius, material: cad.workpiece.material,
@@ -26,14 +32,47 @@ export default function WorkpieceSetup(): JSX.Element {
   const [form, setForm] = createSignal(initial())
   const set = (name: string, value: string) => setForm((previous) => ({ ...previous, [name]: name === "material" ? value : parseFloat(value) }))
 
-  onMount(() => {
-    app.runtime.run(app.client.machineConfigs.list({ query: {} })).then(
-      (result) => setMachines(Array.isArray(result.data) ? (result.data as MachineConfig[]) : []),
-      (cause) => { console.error("Error loading machine configurations:", cause); setMachines([]) }
-    )
+  /**
+   * Both answers are read through the shared normaliser: the list endpoint nests its rows
+   * (`{ success, data: { data, pagination } }`), so `data` is not itself the array.
+   */
+  const load = async (): Promise<void> => {
+    setLoading(true)
+    setError(undefined)
+    try {
+      const [catalogue, library] = await Promise.all([
+        app.runtime.run(app.client.machineConfigs.defaults({})),
+        app.runtime.run(app.client.machineConfigs.list({ query: {} }))
+      ])
+      setBuiltins(machinesFromResponse(catalogue))
+      setSaved(machinesFromResponse(library))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+      setBuiltins([])
+      setSaved([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  onMount(() => { void load() })
+
+  const machines = createMemo(() => [...builtins(), ...saved()])
+  const machineId = () => cad.selectedMachine?.id ?? ""
+
+  /** A machine restored with a drawing can outlive its library row: it is still listed, so the pick never looks empty. */
+  const orphan = createMemo(() => {
+    const pick = cad.selectedMachine
+    if (pick === null || loading() || machines().some((machine) => machine.id === pick.id)) return undefined
+    return pick
   })
 
-  createEffect(() => { if (cad.selectedMachine?.id) setMachineId(cad.selectedMachine.id) })
+  let machineSelect: HTMLSelectElement | undefined
+  // The options render after the first pass and the lists arrive late: put the pick back once its option exists.
+  createEffect(on([machines, loading, machineId], () => {
+    if (machineSelect === undefined || loading()) return
+    machineSelect.value = machineId()
+  }))
 
   createEffect(() => {
     const existing = elements.elements.find((element) => element.type === "workpiece")
@@ -47,12 +86,12 @@ export default function WorkpieceSetup(): JSX.Element {
   })
 
   const changeMachine = (id: string) => {
-    setMachineId(id)
-    const chosen = id ? machines().find((config) => config.id === id) : undefined
-    if (!chosen) { cad.setSelectedMachine(null); return }
-    cad.setSelectedMachine(chosen)
-    const volume = chosen.config?.workVolume
-    if (volume) setForm((previous) => ({ ...previous, width: volume.x, height: volume.y, depth: volume.z }))
+    if (id === "") { pickMachine(undefined); return }
+    const chosen = machines().find((machine) => machine.id === id) ?? (cad.selectedMachine?.id === id ? cad.selectedMachine : undefined)
+    if (chosen === undefined) return
+    pickMachine(chosen)
+    const volume = machineEnvelopeOf(chosen)
+    if (volume !== undefined) setForm((previous) => ({ ...previous, width: volume.x, height: volume.y, depth: volume.z }))
   }
 
   const apply = () => {
@@ -79,14 +118,34 @@ export default function WorkpieceSetup(): JSX.Element {
     </div>
   )
 
+  const option = (machine: MachineConfig) => <option value={machine.id}>{machine.name} ({machineTypeLabel(machine)})</option>
+
   return (
     <SidebarSection id="cad-workpiece" title={t("cad.workpieceSetup")} icon={Box}>
       <div>
-        <label class={LABEL}>Machine Configuration</label>
-        <select name="machine" value={machineId()} onChange={(e) => changeMachine(e.currentTarget.value)} class={`mt-1 ${FIELD}`}>
-          <option value="">Select a machine</option>
-          <For each={machines()}>{(config) => <option value={config.id}>{config.name} ({config.type ?? config.config.type ?? "machine"})</option>}</For>
+        <label class={LABEL} for="cad-workpiece-machine">{t("cad.machineConfiguration")}</label>
+        <select ref={machineSelect} id="cad-workpiece-machine" name="machine" data-testid="cad-workpiece-machine" value={machineId()}
+          onChange={(e) => changeMachine(e.currentTarget.value)} class={`mt-1 ${FIELD}`} disabled={loading()}>
+          <option value="">{loading() ? t("cad.machineLoading") : t("cad.machineSelect")}</option>
+          <Show when={builtins().length > 0}>
+            <optgroup label={t("cad.machineBuiltin")}><For each={builtins()}>{(machine) => option(machine)}</For></optgroup>
+          </Show>
+          <Show when={saved().length > 0}>
+            <optgroup label={t("cad.machineSaved")}><For each={saved()}>{(machine) => option(machine)}</For></optgroup>
+          </Show>
+          <Show when={orphan()}>{(machine) => <option value={machine().id}>{machine().name} ({machineTypeLabel(machine())}) — {t("cad.machineNotInLibrary")}</option>}</Show>
         </select>
+        <Show when={error()}>{(message) => (
+          <div class="mt-1 flex items-center gap-2 text-xs text-red-600 dark:text-red-400" role="alert">
+            <span title={message()}>{t("cad.machineError")}</span>
+            <button type="button" class="text-blue-600 hover:underline dark:text-blue-400" onClick={() => void load()}>{t("cad.machineRetry")}</button>
+          </div>
+        )}</Show>
+        <Show when={!loading() && error() === undefined && machines().length === 0}>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t("cad.machineEmpty")} <A href={MACHINES_PATH} class="text-blue-600 hover:underline dark:text-blue-400">{t("cad.machineCreate")}</A>
+          </p>
+        </Show>
       </div>
       <div class="panel-grid panel-grid--3">{number("width", "Width", true)}{number("height", "Height", true)}{number("depth", "Depth", true)}</div>
       <div class="panel-grid panel-grid--3">{number("positionX", "Position X")}{number("positionY", "Position Y")}{number("positionZ", "Position Z")}</div>
@@ -98,16 +157,21 @@ export default function WorkpieceSetup(): JSX.Element {
           </select>
         </div>
       </div>
-      <Show when={cad.selectedMachine}>{(machine) =>
+      <Show when={cad.selectedMachine}>{(machine) => (
         <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-md text-sm">
-          <h4 class="font-medium text-gray-700 dark:text-gray-300 mb-1">Machine Information</h4>
+          <h4 class="font-medium text-gray-700 dark:text-gray-300 mb-1">{t("cad.machineInformation")}</h4>
           <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600 dark:text-gray-400">
-            <div>Type: <span class="font-medium">{machine().type ?? machine().config.type ?? "machine"}</span></div>
-            <div>Work Volume: <span class="font-medium">{machine().config.workVolume?.x}×{machine().config.workVolume?.y}×{machine().config.workVolume?.z} mm</span></div>
-            <Show when={machine().config.maxSpindleSpeed}><div>Spindle Speed: <span class="font-medium">{machine().config.maxSpindleSpeed} rpm</span></div></Show>
-            <Show when={machine().config.maxFeedRate}><div>Feed Rate: <span class="font-medium">{machine().config.maxFeedRate} mm/min</span></div></Show>
+            <div>{t("cad.machineType")}: <span class="font-medium">{machineTypeLabel(machine())}</span></div>
+            <Show when={machineEnvelopeOf(machine())}>{(volume) =>
+              <div>{t("cad.machineWorkVolume")}: <span class="font-medium">{volume().x}×{volume().y}×{volume().z} mm</span></div>}</Show>
+            <Show when={machineSpindleOf(machine())}>{(rpm) =>
+              <div>{t("cad.machineSpindle")}: <span class="font-medium">{rpm()} rpm</span></div>}</Show>
+            <Show when={machineFeedOf(machine())}>{(feed) =>
+              <div>{t("cad.machineFeed")}: <span class="font-medium">{feed()} mm/min</span></div>}</Show>
+            <Show when={machineControllerOf(machine())}>{(controller) =>
+              <div>{t("cad.machineController")}: <span class="font-medium">{controller()}</span></div>}</Show>
           </div>
-        </div>}
+        </div>)}
       </Show>
       <div class="pt-3 flex justify-between">
         <button type="button" onClick={() => setForm(initial())} class="panel-btn">Reset</button>

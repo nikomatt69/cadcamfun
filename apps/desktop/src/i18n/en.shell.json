@@ -1,6 +1,7 @@
 {
   "shell.brand": "CAD/CAM FUN",
   "shell.menu": "MENU",
+  "shell.search": "Search or jump to…",
   "shell.navigation": "Main navigation",
   "shell.toggleSidebar": "Toggle sidebar",
   "shell.collapseSidebar": "Collapse sidebar",

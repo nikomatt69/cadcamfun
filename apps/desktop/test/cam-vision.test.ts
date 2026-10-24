@@ -69,12 +69,12 @@ describe("the CAM visual capture", () => {
     } finally { dispose() }
   }, 60000)
 
-  test("the sheet is still the capture on the preview tab", async () => {
+  test("the sheet is still the capture on the toolpath tab", async () => {
     const { dispose } = app.visit("/cam")
     try {
       await type("G21\nG0 X0 Y0\nM30")
-      const preview = await app.wait(() => byText("button", "Preview"), 30000)
-      preview.click()
+      const toolpath = await app.wait(() => [...document.querySelectorAll<HTMLElement>(".workstation-workspace-tabs button")].find((el) => el.textContent?.trim() === "Toolpath"), 30000)
+      toolpath.click()
       await new Promise((resolve) => setTimeout(resolve, 300))
       drawn.length = 0
       const capture = captureVisibleViewport("cam")

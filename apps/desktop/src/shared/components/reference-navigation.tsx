@@ -27,6 +27,7 @@ import Moon from "lucide-solid/icons/moon"
 import LogIn from "lucide-solid/icons/log-in"
 import LogOut from "lucide-solid/icons/log-out"
 import Bell from "lucide-solid/icons/bell"
+import Search from "lucide-solid/icons/search"
 import { openExternal } from "../../app/external.ts"
 import { isTauri } from "../../app/sidecar.ts"
 import { t, type Key } from "../../i18n/index.ts"
@@ -118,21 +119,29 @@ export function ReferenceNavbar(props: { readonly sidebarOpen: boolean; readonly
   }
   onMount(() => { document.addEventListener("pointerdown", outside); document.addEventListener("keydown", escape) })
   onCleanup(() => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape) })
+  const shortcut = (): string => (typeof navigator !== "undefined" && navigator.userAgent.includes("Mac") ? "⌘K" : "Ctrl K")
   return <header ref={header} class="reference-navbar">
     <div class="reference-navbar-inner">
-      <div class="flex items-center">
-        <button type="button" class="reference-icon-button mr-2" aria-label={t("shell.toggleSidebar")} aria-expanded={props.sidebarOpen} aria-controls="reference-sidebar" onClick={props.onToggleSidebar}><Menu size={24} /></button>
-        <ReferenceLink href="/" class="reference-logo"><img src="/logo.png" alt={t("shell.brand")} /></ReferenceLink>
+      <div class="reference-navbar-left">
+        <button type="button" class="reference-icon-button reference-navbar-menu" title={t("shell.toggleSidebar")} aria-label={t("shell.toggleSidebar")} aria-expanded={props.sidebarOpen} aria-controls="reference-sidebar" onClick={props.onToggleSidebar}><Menu size={18} /></button>
+        <span class="reference-navbar-sep" aria-hidden="true" />
+        <ReferenceLink href="/" class="reference-logo" label={t("shell.brand")}><img src="/logo.png" alt="" /></ReferenceLink>
       </div>
       <div class="reference-navbar-actions">
-        <button type="button" class="reference-icon-button reference-theme-button" aria-label={t("shell.toggleTheme")} onClick={() => app.settings.update({ theme: dark() ? "light" : "dark" })}><Show when={dark()} fallback={<Moon size={24} />}><Sun size={24} /></Show></button>
+        <button type="button" class="reference-navbar-search" title={t("palette.title")} aria-label={t("palette.title")} onClick={() => { close(); app.setPaletteOpen(true) }}>
+          <Search size={14} aria-hidden="true" />
+          <span class="reference-navbar-search__label">{t("shell.search")}</span>
+          <kbd class="reference-navbar-kbd">{shortcut()}</kbd>
+        </button>
+        <span class="reference-navbar-sep reference-navbar-sep--actions" aria-hidden="true" />
+        <button type="button" class="reference-icon-button reference-theme-button" title={t("shell.toggleTheme")} aria-label={t("shell.toggleTheme")} onClick={() => app.settings.update({ theme: dark() ? "light" : "dark" })}><Show when={dark()} fallback={<Moon size={16} />}><Sun size={16} /></Show></button>
         <div class="relative">
-          <button ref={notificationButton} type="button" class="reference-icon-button" style="position:relative" aria-label={t("shell.notifications")} aria-expanded={popover() === "notifications"} aria-controls="reference-notifications" onClick={() => { const next = popover() === "notifications" ? undefined : "notifications"; setPopover(next); if (next) void app.notifications.refresh() }}><Bell size={24} /><Show when={app.notifications.unreadCount() > 0}><span aria-label={`${app.notifications.unreadCount()} unread`} style="position:absolute;top:2px;right:2px;min-width:16px;height:16px;border-radius:8px;background:#dc2626;color:#fff;font-size:10px;line-height:16px;text-align:center;padding:0 4px">{app.notifications.unreadCount()}</span></Show></button>
-          <Show when={popover() === "notifications"}><section id="reference-notifications" class="reference-popover reference-notifications" aria-label={t("shell.notifications")}><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h2>{t("shell.notifications")}</h2><Show when={app.notifications.unreadCount() > 0}><button type="button" onClick={() => void app.notifications.markAllRead()}>Mark all read</button></Show></div><Show when={app.notifications.rows().length > 0} fallback={<p>No notifications yet. Project, workflow and assistant updates will appear here.</p>}><ul style="list-style:none;margin:0;padding:0;max-height:360px;overflow:auto"><For each={app.notifications.rows().slice(0, 20)}>{(row) => <li><button type="button" style="display:block;width:100%;text-align:left" onClick={() => { close(); if (!row.isRead) void app.notifications.markRead(row); if (row.linkUrl) navigate(row.linkUrl) }}><strong>{row.isRead ? row.title : `• ${row.title}`}</strong><span style="display:block">{row.content}</span><small>{new Date(row.createdAt).toLocaleString()}</small></button></li>}</For></ul></Show></section></Show>
+          <button ref={notificationButton} type="button" class="reference-icon-button reference-navbar-bell" title={t("shell.notifications")} aria-label={t("shell.notifications")} aria-expanded={popover() === "notifications"} aria-controls="reference-notifications" onClick={() => { const next = popover() === "notifications" ? undefined : "notifications"; setPopover(next); if (next) void app.notifications.refresh() }}><Bell size={16} /><Show when={app.notifications.unreadCount() > 0}><span class="reference-navbar-unread" aria-label={`${app.notifications.unreadCount()} unread`}>{app.notifications.unreadCount()}</span></Show></button>
+          <Show when={popover() === "notifications"}><section id="reference-notifications" class="reference-popover reference-notifications" aria-label={t("shell.notifications")}><div class="reference-notifications__head"><h2>{t("shell.notifications")}</h2><Show when={app.notifications.unreadCount() > 0}><button type="button" class="reference-notifications__action" onClick={() => void app.notifications.markAllRead()}>Mark all read</button></Show></div><Show when={app.notifications.rows().length > 0} fallback={<p>No notifications yet. Project, workflow and assistant updates will appear here.</p>}><ul class="reference-notifications__list"><For each={app.notifications.rows().slice(0, 20)}>{(row) => <li><button type="button" class="reference-notifications__item" onClick={() => { close(); if (!row.isRead) void app.notifications.markRead(row); if (row.linkUrl) navigate(row.linkUrl) }}><strong>{row.isRead ? row.title : `• ${row.title}`}</strong><span>{row.content}</span><small>{new Date(row.createdAt).toLocaleString()}</small></button></li>}</For></ul></Show></section></Show>
         </div>
-        <ReferenceLink href="/settings" class="reference-icon-button reference-navbar-settings" label={t("shell.settings")}><Settings size={24} /></ReferenceLink>
+        <ReferenceLink href="/settings" class="reference-icon-button reference-navbar-settings" label={t("shell.settings")}><Settings size={16} /></ReferenceLink>
         <div class="relative">
-          <button ref={profileButton} type="button" class="reference-avatar" aria-label={t("shell.openUserMenu")} aria-expanded={popover() === "profile"} aria-controls="reference-profile-menu" onClick={() => setPopover(popover() === "profile" ? undefined : "profile")}><span>{initial()}</span></button>
+          <button ref={profileButton} type="button" class="reference-avatar" title={displayName()} aria-label={t("shell.openUserMenu")} aria-expanded={popover() === "profile"} aria-controls="reference-profile-menu" onClick={() => setPopover(popover() === "profile" ? undefined : "profile")}><span>{initial()}</span></button>
           <Show when={popover() === "profile"}><nav id="reference-profile-menu" class="reference-popover" aria-label={t("shell.openUserMenu")}>
             <div class="reference-profile-heading"><p>{displayName()}</p><small>{signedIn() ? account()?.email : t("shell.localProfile")}</small></div>
             <For each={[
@@ -173,7 +182,7 @@ export function ReferenceSidebar(props: { readonly open: boolean; readonly mobil
   }
   return <Show when={!props.mobile || props.open}>
     <Show when={props.mobile}><button type="button" class="reference-sidebar-scrim" aria-label={t("shell.closeSidebar")} onClick={() => props.onOpenChange(false)} /></Show>
-    <aside id="reference-sidebar" class="reference-sidebar" classList={{ "is-collapsed": !props.open, "is-mobile": props.mobile }}>
+    <aside id="reference-sidebar" class="reference-sidebar panel" classList={{ "is-collapsed": !props.open, "is-mobile": props.mobile }}>
       <div class="reference-sidebar-heading"><img src="/icon.png" alt={t("shell.brand")} /><Show when={props.open}><span>{t("shell.menu")}</span></Show><Show when={props.mobile}><button type="button" class="reference-icon-button ml-auto" aria-label={t("shell.closeSidebar")} onClick={() => props.onOpenChange(false)}><X size={20} /></button></Show></div>
       <Show when={!props.mobile}><button type="button" class="reference-sidebar-toggle" aria-label={t(props.open ? "shell.collapseSidebar" : "shell.expandSidebar")} onClick={() => props.onOpenChange(!props.open)}><Show when={props.open} fallback={<ChevronRight size={14} />}><ChevronLeft size={14} /></Show></button></Show>
       <nav class="reference-sidebar-nav" aria-label={t("shell.navigation")}><For each={navigation}>{(item) => <div class="reference-nav-group">

@@ -71,14 +71,21 @@ export function Seg(props: SegProps): JSX.Element {
 /** Thin divider between groups. */
 export const Sep = (): JSX.Element => <span class="h-3 w-px shrink-0 bg-gray-700" aria-hidden="true" />
 
-/** The strip itself: `left` and `center` flow from the start, `right` is pushed to the end. */
+/**
+ * The strip itself: `left` and `center` flow from the start, `right` is pushed to the end.
+ *
+ * It is the bottom bar of the workspace, so its bottom corners are round like every other
+ * bottom bar of the shell (the shell's own status bar and the activity bar): the window's
+ * corner is far rounder than the workspace panels, and a square black bar running into it
+ * reads as a bar that was sliced off.
+ */
 export function Strip(props: { readonly left: JSX.Element; readonly right?: JSX.Element; readonly label: string; readonly testId?: string }): JSX.Element {
   return (
     <div
       role="status"
       aria-label={props.label}
       data-testid={props.testId}
-      class="flex h-6 shrink-0 items-center gap-3 overflow-hidden whitespace-nowrap border-t border-gray-700 bg-[#1b1b1d] px-3 text-[11px] leading-none text-gray-300"
+      class="flex h-6 shrink-0 items-center gap-3 overflow-hidden whitespace-nowrap rounded-b-lg border-t border-gray-700 bg-[#1b1b1d] px-3 text-[11px] leading-none text-gray-300"
     >
       <div class="flex min-w-0 items-center gap-3 overflow-hidden">{props.left}</div>
       <Show when={props.right}><div class="ml-auto flex shrink-0 items-center gap-3">{props.right}</div></Show>

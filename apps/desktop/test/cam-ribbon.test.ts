@@ -80,12 +80,12 @@ describe("CAM ribbon", () => {
     expect(routes).toContain("post-gcode")
   })
 
-  test("simulation tab opens verify / cycles / preview", () => {
+  test("simulation tab opens verify / cycles / toolpath", () => {
     const sim = RIBBON_GROUPS["simulation"]
     expect(sim.length).toBeGreaterThan(0)
     const routes = sim[0]!.actions.map((a) => a.route)
     expect(routes).toContain("right-verify")
     expect(routes).toContain("right-cycles")
-    expect(routes).toContain("active-preview")
+    expect(routes).toContain("active-toolpath")
   })
 })

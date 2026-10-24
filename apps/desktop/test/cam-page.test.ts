@@ -25,6 +25,12 @@ const clickText = async (tag: string, text: string): Promise<void> => {
   el.click()
   await settle()
 }
+/** The workspace tab strip's "Toolpath" tab: the one that shows the program in 3D. */
+const clickToolpathTab = async (): Promise<void> => {
+  const el = await app.wait(() => [...document.querySelectorAll<HTMLElement>(".workstation-workspace-tabs button")].find((button) => button.textContent?.trim() === "Toolpath"), 30000)
+  el.click()
+  await settle()
+}
 const editor = (): HTMLTextAreaElement | null => document.querySelector<HTMLTextAreaElement>("textarea")
 const type = async (el: HTMLTextAreaElement, value: string): Promise<void> => {
   el.value = value
@@ -38,7 +44,7 @@ describe("CAM page", () => {
     try {
       // Legacy default tab: the G-code editor.
       await app.wait(() => editor())
-      for (const label of ["Preview", "Editor G-Code", "Toolpath", "Post-Processor"]) expect(byText("button", label)).toBeDefined()
+      for (const label of ["Editor G-Code", "Toolpath", "Post-Processor"]) expect(byText("button", label)).toBeDefined()
       for (const title of ["Save G-Code", "Import G-Code", "Unified Library", "Costs", "Switch to CAD"]) {
         expect(document.querySelector(`[title="${title}"]`)).not.toBeNull()
       }
@@ -179,7 +185,7 @@ describe("CAM page", () => {
         "T2 M6", "S2000 M3", "G0 X10 Y10", "G81 X10 Y10 Z-10 R2 F100", "X30", "G80", "M30"
       ].join("\n")
       await type(editor()!, program)
-      await clickText("button", "Preview")
+      await clickToolpathTab()
       await app.wait(() => (document.querySelectorAll('[data-testid="timeline-band"]').length === 2 ? true : undefined), 30000)
       expect(document.querySelectorAll('[data-testid="timeline-tool-change"]').length).toBe(1)
       // Step to the second operation: the playhead moves to its start and the readout says the drill's tool.
@@ -226,7 +232,7 @@ describe("CAM page", () => {
     try {
       await app.wait(() => editor())
       await type(editor()!, "G21 G90 G17\nS8000 M3\nG0 X0 Y0 Z5\nG1 Z0 F300\nG1 X10 F800\nG0 X0 Y0 Z-6\nG0 Z20\nM30")
-      await clickText("button", "Preview")
+      await clickToolpathTab()
       const event = await app.wait(() => document.querySelector<HTMLButtonElement>('[data-testid="visualizer-collision"]') ?? undefined, 30000)
       expect(event.textContent).toContain("rapid")
       expect(document.querySelectorAll('[data-testid="timeline-marker"]').length).toBeGreaterThan(0)
@@ -245,7 +251,7 @@ describe("CAM page", () => {
     try {
       await app.wait(() => editor())
       await type(editor()!, "G18 G90 G21\nG96 S180 M3\nG50 S2500\nG0 X52 Z2\nG1 X44 F0.2\nG1 Z-40\nG51.1 Z0\nG0 X60 Z5\nM30")
-      await clickText("button", "Preview")
+      await clickToolpathTab()
       const badge = await app.wait(() => document.querySelector<HTMLElement>('[data-testid="machine-badge"]'), 30000)
       await app.wait(() => (badge.textContent === "Lathe" ? badge : undefined), 30000)
       const player = await find('[data-testid="simulation-mini-player"]')

@@ -15,14 +15,12 @@
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { BarChart2, Cpu, DollarSign, TrendingUp } from "lucide-solid"
-import { FIELD, PANEL, RAIL_LABEL, TOOLBAR_BUTTON, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+import { FIELD, PANEL, RAIL_LABEL, TOOLBAR_BUTTON, WorkspacePage, WorkspaceTabs } from "../../../shared/components/WorkspacePage.tsx"
 import { t, type Key } from "../../../i18n/index.ts"
 import { AnalyticsOverview } from "../components/analytics-overview.tsx"
 import { ActivityChart, type ChartMetric } from "../components/activity-chart.tsx"
 import { AiDashboard } from "../components/ai-dashboard.tsx"
 import { UserCostAnalytics } from "../components/user-cost-analytics.tsx"
-
-const TOOLBAR_ACTIVE = "inline-flex items-center gap-1.5 rounded-lg border border-[#007ACC]/60 bg-blue-50/80 px-3 py-1.5 text-sm font-medium text-blue-600 shadow-sm dark:bg-blue-900/40 dark:text-blue-300"
 
 type Section = "overview" | "charts" | "ai" | "costs"
 type Preset = "today" | "7days" | "30days" | "90days" | "year"
@@ -126,29 +124,12 @@ export function AnalyticsScreen(): JSX.Element {
   return (
     <WorkspacePage
       title={t("dash.title")}
-      actions={
-        <nav class="flex flex-wrap items-center gap-2" aria-label={t("dash.title")}>
-          <For each={TABS}>
-            {(tab) => (
-              <button
-                type="button"
-                aria-pressed={activeSection() === tab.key}
-                onClick={() => setActiveSection(tab.key)}
-                class={activeSection() === tab.key ? TOOLBAR_ACTIVE : TOOLBAR_BUTTON}
-              >
-                <tab.Icon size={16} aria-hidden="true" />
-                {t(tab.labelKey)}
-              </button>
-            )}
-          </For>
-        </nav>
-      }
       rail={<>
-        <p class="text-xs text-slate-500 dark:text-slate-400">{t("dash.subtitle")}</p>
-        <div class="flex flex-wrap gap-2">
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">{t("dash.subtitle")}</p>
+        <div class="flex flex-wrap gap-1.5">
           <For each={PRESETS}>
             {([preset, labelKey]) => (
-              <button type="button" onClick={() => setDateRangePreset(preset)} class="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-blue-900/30">
+              <button type="button" onClick={() => setDateRangePreset(preset)} class={TOOLBAR_BUTTON}>
                 {t(labelKey)}
               </button>
             )}
@@ -176,6 +157,14 @@ export function AnalyticsScreen(): JSX.Element {
         </Show>
       </>}
     >
+      <WorkspaceTabs
+        class="mb-3"
+        label={t("dash.title")}
+        value={activeSection()}
+        onChange={setActiveSection}
+        tabs={TABS.map((tab) => ({ id: tab.key, label: t(tab.labelKey), icon: <tab.Icon size={14} aria-hidden="true" /> }))}
+      />
+
       <Show when={activeSection() === "overview"} keyed>
         <Show when={rangeKey()} keyed>
           <AnalyticsOverview startDate={dateRange().startDate} endDate={dateRange().endDate} isAdmin={isAdmin} />

@@ -18,7 +18,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { endSession } from "../../../shared/state/session.ts"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { ProfileSettings } from "../components/profile-settings.tsx"
-import { WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+import { WorkspacePage, WorkspaceTabs, PANEL } from "../../../shared/components/WorkspacePage.tsx"
 import { SessionManagement } from "../components/session-management.tsx"
 import { PasskeySettings } from "../components/passkey-settings.tsx"
 import { AISettingsPanel } from "../components/ai-settings-panel.tsx"
@@ -365,65 +365,18 @@ export function SettingsScreen(): JSX.Element {
 
   return (
     <WorkspacePage title={t("settings.title")}>
-      <div class="mx-auto w-full max-w-7xl">
-        <p class="mb-4 text-sm text-slate-600 dark:text-slate-300">{t("settings.index.subtitle")}</p>
+      <div class="mx-auto w-full max-w-5xl">
+        <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">{t("settings.index.subtitle")}</p>
 
-        {/* Main Content */}
-        <div class="overflow-hidden rounded-xl border border-slate-200/70 bg-white/80 shadow-sm backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-900/60">
-          {/* Tabs - Desktop */}
-          <div class="hidden border-b border-slate-200/70 bg-slate-50/70 dark:border-slate-700/50 dark:bg-slate-800/30 sm:block">
-            <div class="px-4 sm:px-6 lg:px-8">
-              <nav class="-mb-px flex w-full justify-between">
-                <For each={tabs}>
-                  {(tab) => (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab(tab.id)}
-                      class="flex-1 whitespace-nowrap border-b-2 px-2 py-3.5 text-sm font-medium transition-colors duration-150 ease-out"
-                      classList={{
-                        "border-blue-600 text-slate-900 dark:border-blue-400 dark:text-white": activeTab() === tab.id,
-                        "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200":
-                          activeTab() !== tab.id
-                      }}
-                      aria-pressed={activeTab() === tab.id}
-                    >
-                      <span class="flex items-center justify-center">
-                        <span class="mr-1.5 flex-shrink-0"><tab.Icon size={16} /></span>
-                        <span class="hidden truncate md:inline-block">{tab.name}</span>
-                      </span>
-                    </button>
-                  )}
-                </For>
-              </nav>
-            </div>
-          </div>
+        <WorkspaceTabs
+          class="mb-4"
+          label={t("settings.title")}
+          value={activeTab()}
+          onChange={setActiveTab}
+          tabs={tabs.map((tab) => ({ id: tab.id, label: tab.name, icon: <tab.Icon size={14} /> }))}
+        />
 
-          {/* Tabs - Mobile */}
-          <div class="border-b border-slate-200/70 bg-slate-50/70 dark:border-slate-700/50 dark:bg-slate-800/30 sm:hidden">
-            <div class="px-1">
-              <div class="flex w-full justify-between py-1">
-                <For each={tabs}>
-                  {(tab) => (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab(tab.id)}
-                      class="flex flex-1 flex-col items-center rounded-lg px-1 py-2 text-xs font-medium transition-colors duration-150 ease-out"
-                      classList={{
-                        "text-blue-600 dark:text-blue-400": activeTab() === tab.id,
-                        "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300": activeTab() !== tab.id
-                      }}
-                      aria-pressed={activeTab() === tab.id}
-                    >
-                      <span class="mb-1"><tab.Icon size={16} /></span>
-                      <span class="max-w-full truncate text-center text-xs leading-tight">{tab.name}</span>
-                    </button>
-                  )}
-                </For>
-              </div>
-            </div>
-          </div>
-
-          {/* Tab Content */}
+        <div class={`${PANEL} !p-4 sm:!p-5`}>
           <Show when={activeTab()} keyed>
             {(tab) => tabPanel(tab)}
           </Show>

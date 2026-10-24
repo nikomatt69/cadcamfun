@@ -1,6 +1,6 @@
 /**
- * The 3D viewport that plays back a `cam.Program` (spec 06-desktop-ui.md §3 tab
- * "Preview").
+ * The 3D viewport that plays back a `cam.Program` (the CAM workspace's "Toolpath"
+ * tab).
  *
  * It re-uses the shared `View3D` component (the same one the CAD editor uses)
  * so the visual language is identical: same camera, same lighting, same

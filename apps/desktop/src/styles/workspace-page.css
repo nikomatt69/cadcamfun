@@ -1,0 +1,473 @@
+/* ==========================================================================
+   Workspace pages — the quiet workstation language of the CAD/CAM chrome,
+   applied to every non-CAD/CAM screen: flat 1 px surfaces, a 5 px radius
+   scale, 12 px base type, one blue accent, no gradients and no elevation.
+   Scoped to `.workspace-page` (rendered by `WorkspacePage` / `WorkspaceDetail`)
+   so the CAD and CAM pages keep their own panel / ribbon styling.
+   ========================================================================== */
+
+.workspace-page {
+  --wp-bg: #ffffff;
+  --wp-bg-subtle: #f6f7f9;
+  --wp-bg-inset: #eef0f3;
+  --wp-border: #dde1e7;
+  --wp-border-strong: #c3c9d2;
+  --wp-text: #1b2230;
+  --wp-text-muted: #5b6575;
+  --wp-text-faint: #8a93a1;
+  --wp-accent: #2557d6;
+  --wp-accent-hover: #1d47b3;
+  --wp-accent-soft: #e8eefc;
+  --wp-ok: #15803d;
+  --wp-ok-soft: #e7f5ec;
+  --wp-warn: #a15c07;
+  --wp-warn-soft: #fbf1df;
+  --wp-bad: #b42318;
+  --wp-bad-soft: #fbe9e7;
+  --wp-radius: 5px;
+  color: var(--wp-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+html.dark .workspace-page {
+  --wp-bg: #171b22;
+  --wp-bg-subtle: #1c212a;
+  --wp-bg-inset: #12161c;
+  --wp-border: #2b323d;
+  --wp-border-strong: #3a4352;
+  --wp-text: #e6e9ef;
+  --wp-text-muted: #9aa4b2;
+  --wp-text-faint: #6f7886;
+  --wp-accent: #6b95f2;
+  --wp-accent-hover: #86a9f5;
+  --wp-accent-soft: #1c2a47;
+  --wp-ok: #4cc07a;
+  --wp-ok-soft: #14291d;
+  --wp-warn: #e0a24a;
+  --wp-warn-soft: #2e2413;
+  --wp-bad: #f08a80;
+  --wp-bad-soft: #321a18;
+}
+
+/* ---- frame ------------------------------------------------------------- */
+.workspace-page__toolbar {
+  min-height: 40px;
+}
+
+.workspace-page__title {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.workspace-page__title h1 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--wp-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: -0.006em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-page__title p {
+  margin: 0;
+  color: var(--wp-text-muted);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.workspace-page__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: var(--wp-radius);
+  color: var(--wp-text-muted);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.workspace-page__back:hover {
+  background: var(--wp-bg-inset);
+  color: var(--wp-text);
+}
+
+.workspace-page__rail-card {
+  border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius);
+  background: var(--wp-bg-subtle);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.workspace-page__stage {
+  padding: 12px !important;
+  border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius);
+  background: var(--wp-bg);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* ---- surfaces ---------------------------------------------------------- */
+.workspace-page :is(.ui-card, .card, .glass-panel) {
+  border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius);
+  background: var(--wp-bg);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.workspace-page :is(.ui-card-light, .ui-card-heavy) {
+  background: var(--wp-bg-subtle);
+}
+
+.workspace-page__stage :is(.rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl) {
+  border-radius: var(--wp-radius);
+}
+
+.workspace-page__stage :is(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) {
+  box-shadow: none;
+}
+
+.workspace-page__stage [class*="hover:shadow"]:hover {
+  box-shadow: none;
+}
+
+.workspace-page__stage [class*="bg-gradient-to"] {
+  background-image: none;
+}
+
+.workspace-card {
+  color: var(--wp-text);
+}
+
+.workspace-card:hover {
+  border-color: color-mix(in srgb, var(--wp-accent) 45%, var(--wp-border));
+}
+
+.workspace-card :is(h2, h3) {
+  transition: color 120ms ease;
+}
+
+.workspace-card:hover :is(h2, h3) {
+  color: var(--wp-accent);
+}
+
+/* ---- type -------------------------------------------------------------- */
+.workspace-page__stage :is(h1, h2, h3, h4) {
+  color: var(--wp-text);
+  letter-spacing: -0.006em;
+}
+
+.workspace-page__stage h2 {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.workspace-page__stage h3 {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.workspace-page__stage h4 {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.workspace-page__stage .text-4xl { font-size: 24px; line-height: 30px; }
+.workspace-page__stage .text-3xl { font-size: 22px; line-height: 28px; }
+.workspace-page__stage .text-2xl { font-size: 18px; line-height: 24px; }
+.workspace-page__stage .text-xl { font-size: 16px; line-height: 22px; }
+.workspace-page__stage .text-lg { font-size: 14px; line-height: 20px; }
+.workspace-page__stage .text-base { font-size: 13px; line-height: 19px; }
+.workspace-page__stage .text-sm { font-size: 12px; line-height: 18px; }
+.workspace-page__stage .text-xs { font-size: 11px; line-height: 16px; }
+
+.workspace-page__stage p {
+  line-height: 1.5;
+}
+
+/* ---- controls ---------------------------------------------------------- */
+.workspace-page :is(button, .btn, input, select, textarea) {
+  border-radius: var(--wp-radius);
+}
+
+.workspace-page :is(button, .btn) {
+  box-shadow: none;
+}
+
+.workspace-page :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  select,
+  textarea
+) {
+  min-height: 30px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--wp-border-strong);
+  background: var(--wp-bg);
+  color: var(--wp-text);
+  font-size: 12px;
+  line-height: 18px;
+  box-shadow: none;
+}
+
+.workspace-page textarea {
+  min-height: 64px;
+  padding: 6px 8px;
+}
+
+.workspace-page :is(input, select, textarea)::placeholder {
+  color: var(--wp-text-faint);
+}
+
+.workspace-page :is(input, select, textarea):focus {
+  outline: none;
+  border-color: var(--wp-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wp-accent) 22%, transparent);
+}
+
+.workspace-page input[type="checkbox"],
+.workspace-page input[type="radio"] {
+  accent-color: var(--wp-accent);
+}
+
+.workspace-page :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--wp-accent);
+  outline-offset: 2px;
+}
+
+/* ---- tabs -------------------------------------------------------------- */
+.workspace-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  max-width: 100%;
+  padding: 3px;
+  overflow-x: auto;
+  border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius);
+  background: var(--wp-bg-subtle);
+  scrollbar-width: none;
+}
+
+.workspace-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace-tab,
+.workspace-page [role="tab"] {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wp-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.workspace-tab:hover,
+.workspace-page [role="tab"]:hover {
+  background: var(--wp-bg-inset);
+  color: var(--wp-text);
+}
+
+.workspace-tab[aria-selected="true"],
+.workspace-tab[aria-pressed="true"],
+.workspace-page [role="tab"][aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--wp-accent) 20%, transparent);
+  border-bottom-color: var(--wp-accent);
+  background: var(--wp-accent-soft);
+  color: var(--wp-accent);
+}
+
+/* ---- tables ------------------------------------------------------------ */
+.workspace-table {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius);
+  background: var(--wp-bg);
+}
+
+.workspace-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.workspace-table thead {
+  background: var(--wp-bg-subtle);
+}
+
+.workspace-table th {
+  padding: 7px 10px;
+  color: var(--wp-text-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.workspace-table td {
+  padding: 8px 10px;
+  border-top: 1px solid var(--wp-border);
+  color: var(--wp-text);
+  vertical-align: middle;
+}
+
+.workspace-table tbody tr {
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.workspace-table tbody tr:hover {
+  background: var(--wp-bg-subtle);
+}
+
+/* ---- segmented view switch -------------------------------------------- */
+.workspace-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--wp-border-strong);
+  border-radius: var(--wp-radius);
+  background: var(--wp-bg-inset);
+}
+
+.workspace-view-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--wp-text-muted);
+  cursor: pointer;
+}
+
+.workspace-view-toggle__btn:hover {
+  color: var(--wp-text);
+}
+
+.workspace-view-toggle__btn[aria-pressed="true"] {
+  background: var(--wp-bg);
+  color: var(--wp-accent);
+  box-shadow: 0 0 0 1px var(--wp-border-strong);
+}
+
+/* ---- empty / status --------------------------------------------------- */
+.workspace-empty {
+  max-width: 28rem;
+  margin: 24px auto 0;
+  padding: 28px 24px;
+  border: 1px dashed var(--wp-border-strong);
+  border-radius: var(--wp-radius);
+  background: var(--wp-bg-subtle);
+  text-align: center;
+}
+
+.workspace-empty__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 12px;
+  border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius);
+  background: var(--wp-bg);
+  color: var(--wp-text-faint);
+}
+
+.workspace-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--wp-bad) 35%, var(--wp-border));
+  border-radius: var(--wp-radius);
+  background: var(--wp-bad-soft);
+  color: var(--wp-bad);
+  font-size: 12px;
+}
+
+/* ---- badges ------------------------------------------------------------ */
+.workspace-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border: 1px solid var(--wp-border);
+  border-radius: 999px;
+  background: var(--wp-bg-subtle);
+  color: var(--wp-text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.workspace-badge--accent {
+  border-color: color-mix(in srgb, var(--wp-accent) 30%, transparent);
+  background: var(--wp-accent-soft);
+  color: var(--wp-accent);
+}
+
+.workspace-badge--ok {
+  border-color: color-mix(in srgb, var(--wp-ok) 30%, transparent);
+  background: var(--wp-ok-soft);
+  color: var(--wp-ok);
+}
+
+.workspace-badge--warn {
+  border-color: color-mix(in srgb, var(--wp-warn) 30%, transparent);
+  background: var(--wp-warn-soft);
+  color: var(--wp-warn);
+}
+
+/* ---- legacy spacing normalization ------------------------------------- */
+.workspace-page__stage :is(.space-y-4 > * + *, .space-y-5 > * + *, .space-y-6 > * + *) {
+  margin-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .workspace-page__stage {
+    padding: 10px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-page *,
+  .workspace-page *::before,
+  .workspace-page *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

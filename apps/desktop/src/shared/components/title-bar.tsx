@@ -85,6 +85,12 @@ export interface TitleBarProps {
   readonly onOpenPalette: () => void
   /** Forces the fallback menus on (used in browser dev and by the component test). */
   readonly forceMenus?: boolean
+  /**
+   * Page/standalone layouts already carry the brand and the command search in the
+   * navbar. The compact title bar keeps only the window drag region and the native
+   * menu fallback, so the two rows do not repeat the same controls.
+   */
+  readonly minimal?: boolean
 }
 
 /**
@@ -97,6 +103,7 @@ export const needsMenuFallback = (force?: boolean): boolean =>
 export function TitleBar(props: TitleBarProps): JSX.Element {
   const [open, setOpen] = createSignal<MenuId | undefined>(undefined)
   const withMenus = (): boolean => needsMenuFallback(props.forceMenus)
+  const compact = (): boolean => props.minimal === true
   let nav: HTMLElement | undefined
   let openTrigger: HTMLButtonElement | undefined
 
@@ -129,15 +136,17 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
 
   return (
     <header
-      class="reference-native-titlebar flex h-11 shrink-0 items-center gap-1 border-b border-gray-200 bg-white pl-20 pr-2 dark:border-gray-700 dark:bg-gray-800"
+      class={`reference-native-titlebar flex shrink-0 items-center gap-1 border-b border-gray-200 bg-white pl-20 pr-2 dark:border-gray-700 dark:bg-gray-800 ${compact() ? "reference-native-titlebar--compact h-8" : "h-11"}`}
       data-tauri-drag-region
     >
       <Show when={withMenus()} fallback={
-        <span class="px-2 text-sm font-semibold" data-tauri-drag-region>
-          {t("app.name")}
-        </span>
+        <Show when={!compact()}>
+          <span class="px-2 text-sm font-semibold" data-tauri-drag-region>
+            {t("app.name")}
+          </span>
+        </Show>
       }>
-        <nav ref={(element) => { nav = element }} aria-label={t("titlebar.menu")} class="flex items-center gap-1">
+        <nav ref={(element) => { nav = element }} aria-label={t("titlebar.menu")} class={`flex items-center gap-1 ${compact() ? "text-xs" : ""}`}>
           <For each={MENUS.filter((menu) => menu.items.length > 0)}>
             {(menu) => {
               let trigger: HTMLButtonElement | undefined
@@ -146,7 +155,7 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
                   <button
                     type="button"
                     ref={(element) => { trigger = element }}
-                    class="flex items-center gap-1 rounded px-2 py-1 text-sm hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700"
+                    class={`flex items-center gap-1 rounded px-2 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700 ${compact() ? "py-0.5 text-xs" : "py-1 text-sm"}`}
                     aria-haspopup="menu"
                     aria-expanded={open() === menu.id}
                     onClick={() => {
@@ -160,7 +169,7 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
                     }}
                   >
                     {t(menu.labelKey)}
-                    <ChevronDown size={14} aria-hidden="true" />
+                    <ChevronDown size={compact() ? 12 : 14} aria-hidden="true" />
                   </button>
                   <Show when={open() === menu.id}>
                     <ul
@@ -220,20 +229,22 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
         </nav>
       </Show>
 
-      <Show when={withMenus()}><span class="ml-2 text-sm font-semibold" data-tauri-drag-region>
+      <Show when={withMenus() && !compact()}><span class="ml-2 text-sm font-semibold" data-tauri-drag-region>
         {t("app.name")}
       </span></Show>
 
-      <button
-        type="button"
-        class="ml-auto flex items-center gap-2 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-600 dark:hover:bg-gray-700"
-        aria-label={t("settings.shortcut.palette")}
-        aria-keyshortcuts="Meta+K Control+K"
-        onClick={() => props.onOpenPalette()}
-      >
-        <Search size={14} aria-hidden="true" />
-        <kbd>Cmd/Ctrl+K</kbd>
-      </button>
+      <Show when={!compact()}>
+        <button
+          type="button"
+          class="ml-auto flex items-center gap-2 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-600 dark:hover:bg-gray-700"
+          aria-label={t("settings.shortcut.palette")}
+          aria-keyshortcuts="Meta+K Control+K"
+          onClick={() => props.onOpenPalette()}
+        >
+          <Search size={14} aria-hidden="true" />
+          <kbd>Cmd/Ctrl+K</kbd>
+        </button>
+      </Show>
     </header>
   )
 }

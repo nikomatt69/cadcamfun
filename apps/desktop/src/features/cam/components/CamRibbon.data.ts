@@ -36,7 +36,6 @@ export interface RibbonActionSpec {
     | "import"
     | "library"
     | "costs"
-    | "active-preview"
     | "active-editor"
     | "active-toolpath"
     | "active-post"
@@ -140,7 +139,6 @@ export const RIBBON_GROUPS: Readonly<Record<RibbonTabId, ReadonlyArray<RibbonGro
       titleKey: "cam.ribbon.group.workbench",
       accent: "purple",
       actions: [
-        { id: "preview", labelKey: "cam.ribbon.preview", accent: "purple", route: "active-preview" },
         { id: "editor", labelKey: "cam.ribbon.editor", accent: "purple", route: "active-editor" },
         { id: "toolpath", labelKey: "cam.ribbon.toolpath", accent: "purple", route: "active-toolpath" }
       ]
@@ -170,7 +168,7 @@ export const RIBBON_GROUPS: Readonly<Record<RibbonTabId, ReadonlyArray<RibbonGro
       actions: [
         { id: "open-cycles", labelKey: "cam.ribbon.cycles", accent: "cyan", route: "right-cycles" },
         { id: "open-verify", labelKey: "cam.ribbon.verify", accent: "green", route: "right-verify" },
-        { id: "open-preview", labelKey: "cam.ribbon.preview", accent: "green", route: "active-preview" },
+        { id: "open-toolpath", labelKey: "cam.ribbon.toolpath", accent: "green", route: "active-toolpath" },
         { id: "play-sim", labelKey: "cam.ribbon.editor", accent: "green", route: "play-simulation" }
       ]
     }
@@ -205,7 +203,6 @@ export const RIBBON_ROUTES = new Set<RibbonActionSpec["route"]>([
   "import",
   "library",
   "costs",
-  "active-preview",
   "active-editor",
   "active-toolpath",
   "active-post",

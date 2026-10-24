@@ -55,7 +55,7 @@ export function PricingScreen(): JSX.Element {
     return t("pricing.cta.choose")
   }
 
-  return <WorkspacePage title={t("pricing.title")}><section class="reference-page-container">
+  return <WorkspacePage title={t("pricing.title")}><section class="mx-auto w-full max-w-6xl">
     <div class="reference-pricing-hero">
       <div class="reference-pricing-icon"><Sparkles size={32} aria-hidden="true" /></div>
       <h2 class="reference-pricing-title">{t("pricing.title")}</h2>

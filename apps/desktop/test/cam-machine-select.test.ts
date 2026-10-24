@@ -81,9 +81,9 @@ describe("CAM sidebar machine picker", () => {
       expect(useCamStore.getState().machineOverride).toBe("mill")
       expect(option(millId)!.getAttribute("aria-selected")).toBe("true")
 
-      // The preview's badge follows the pick, and says the machine was chosen.
-      const previewTab = [...document.querySelectorAll<HTMLElement>("button")].find((el) => el.textContent?.trim() === "Preview")
-      previewTab?.click(); await settle()
+      // The toolpath view's badge follows the pick, and says the machine was chosen.
+      const toolpathTab = [...document.querySelectorAll<HTMLElement>(".workstation-workspace-tabs button")].find((el) => el.textContent?.trim() === "Toolpath")
+      toolpathTab?.click(); await settle()
       const badge = await app.wait(() => document.querySelector<HTMLElement>('[data-testid="machine-badge"]'), 30000)
       expect(badge.textContent).toBe("Mill")
       expect(badge.parentElement?.textContent).toContain("chosen")

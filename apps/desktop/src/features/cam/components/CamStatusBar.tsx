@@ -15,7 +15,7 @@ const clock = (seconds: number): string => {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`
 }
 
-const TAB_LABEL = { preview: "cam.preview", editor: "cam.editor", toolpath: "cam.toolpath", post: "cam.postTab" } as const
+const TAB_LABEL = { editor: "cam.editor", toolpath: "cam.toolpath", post: "cam.postTab" } as const
 
 /**
  * The CAM workspace's information strip, the same thin one-row component as the CAD editor's: the program

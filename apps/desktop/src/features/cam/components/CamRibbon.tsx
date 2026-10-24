@@ -65,7 +65,7 @@ export interface CamRibbonProps {
   /** Receives a click on the "Costs" action. */
   readonly onOpenCosts?: () => void
   /** Receives the active tab request (the page already keeps one). */
-  readonly onSelectActiveTab?: (tab: "preview" | "editor" | "toolpath" | "post") => void
+  readonly onSelectActiveTab?: (tab: "editor" | "toolpath" | "post") => void
   /** Receives a request to switch the right inspector to the named tab. */
   readonly onSelectRightTab?: (tab: "generator" | "cycles" | "verify") => void
   /** Receives a request to show a sidebar tab; workpiece and origin live in the machine tab. */
@@ -144,7 +144,6 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
           {
             titleKey: "cam.ribbon.group.workbench",
             actions: [
-              { id: "preview", labelKey: "cam.ribbon.preview", icon: (s, k) => <Box size={s} class={k} />, accent: "purple", onClick: () => props.onSelectActiveTab?.("preview") },
               { id: "editor", labelKey: "cam.ribbon.editor", icon: (s, k) => <Cog size={s} class={k} />, accent: "purple", onClick: () => props.onSelectActiveTab?.("editor") },
               { id: "toolpath", labelKey: "cam.ribbon.toolpath", icon: (s, k) => <Wand2 size={s} class={k} />, accent: "purple", onClick: () => props.onSelectActiveTab?.("toolpath") }
             ]
@@ -230,7 +229,7 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
             actions: [
               { id: "open-cycles", labelKey: "cam.ribbon.cycles", icon: (s, k) => <ListChecks size={s} class={k} />, accent: "cyan", onClick: () => props.onSelectRightTab?.("cycles") },
               { id: "open-verify", labelKey: "cam.ribbon.verify", icon: (s, k) => <ShieldCheck size={s} class={k} />, accent: "green", onClick: () => props.onSelectRightTab?.("verify") },
-              { id: "open-preview", labelKey: "cam.ribbon.preview", icon: (s, k) => <PlayCircle size={s} class={k} />, accent: "green", onClick: () => props.onSelectActiveTab?.("preview") }
+              { id: "open-toolpath", labelKey: "cam.ribbon.toolpath", icon: (s, k) => <PlayCircle size={s} class={k} />, accent: "green", onClick: () => props.onSelectActiveTab?.("toolpath") }
             ]
           }
         ]

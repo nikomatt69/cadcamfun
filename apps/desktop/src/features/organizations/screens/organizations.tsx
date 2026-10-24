@@ -19,24 +19,16 @@
  */
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { A, useNavigate, useParams } from "@solidjs/router"
-import { Effect } from "effect"
-import { Motion, Presence } from "solid-motionone"
-import { ArrowLeft, Building, Mail, Plus, Search, User, UserPlus, Users, X } from "lucide-solid"
+import { Building, FolderOpen, Plus, Search, User, UserPlus, Users, X } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { useRead } from "../../../app/queries.ts"
-import { ErrorState, LoadingState } from "../../../shared/components/screen-parts.tsx"
 import {
-  CANCEL_BUTTON, FIELD, INPUT, LABEL, PANEL, RAIL_LABEL, StageEmpty, StageError, StageLoading, SUBMIT_BUTTON, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage
+  BADGE, CANCEL_BUTTON, DANGER_BUTTON, FIELD, INPUT, LABEL, PANEL, RAIL_LABEL, StageEmpty, StageError, StageLoading,
+  SUBMIT_BUTTON, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage, WorkspaceTabs, type WorkspaceTabItem
 } from "../../../shared/components/WorkspacePage.tsx"
 import { Modal } from "../../toolpaths/components/shared.tsx"
 import { OrganizationCard } from "../components/organization-card.tsx"
-
-/** framer's page easing, verbatim from the legacy `pageVariants`. */
-const EASE: [number, number, number, number] = [0.25, 0.1, 0.25, 1]
-/** The spring (stiffness 300 / 400, damping 25 / 10) approximated with a tween. */
-const CARD_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
-const HOVER_SHADOW = "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)"
 
 /** Legacy shows `error.message || "An error occurred while creating the organization"`. */
 const messageOr = (cause: unknown, fallback: string): string => {
@@ -53,18 +45,10 @@ const formatDate = (dateString: string): string => {
 }
 
 const roleBadge = (role: "ADMIN" | "MANAGER" | "MEMBER"): string =>
-  role === "ADMIN" ? "bg-red-100 text-red-800" : role === "MANAGER" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-800"
+  role === "ADMIN" ? `${BADGE} workspace-badge--warn` : role === "MANAGER" ? `${BADGE} workspace-badge--accent` : BADGE
 
 type DetailTab = "overview" | "chat" | "members" | "projects" | "settings"
 type Role = "ADMIN" | "MANAGER" | "MEMBER"
-
-const TAB_BASE = "whitespace-nowrap rounded-md px-3 py-2 font-medium text-sm"
-const TAB_ACTIVE = "border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400"
-const TAB_IDLE = "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-
-const LEGACY_CARD = "ui-card ui-card-default"
-const LEGACY_INPUT =
-  "block w-full rounded-md border border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder-gray-400"
 
 /** `/organizations` — the list page with its create modal. */
 export function OrganizationsScreen(): JSX.Element {
@@ -221,7 +205,7 @@ export function CreateOrganizationScreen(): JSX.Element {
   )
 }
 
-/** `/organizations/:id` — header card, five tabs and the invite modal. */
+/** `/organizations/:id` — the organization overview, members, projects and settings. */
 export function OrganizationDetailScreen(): JSX.Element {
   const params = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -236,440 +220,197 @@ export function OrganizationDetailScreen(): JSX.Element {
     event.preventDefault()
   }
 
-  const notFound = (
-    <div class="p-6 text-center">
-      <h1 class="mb-4 text-2xl font-bold text-slate-900 dark:text-white">{t("org.notFound.title")}</h1>
-      <p class="mb-6 text-slate-600 dark:text-slate-400">{t("org.notFound.body")}</p>
-      <button
-        type="button"
-        onClick={() => navigate("/profile")}
-        class="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        {t("org.notFound.back")}
-      </button>
-    </div>
-  )
-
   return (
-    <Show
-      when={detail.data() !== undefined || !detail.loading()}
-      fallback={<LoadingState label={t("common.loading")} />}
+    <WorkspaceDetail
+      title={detail.data()?.name ?? t("org.title")}
+      subtitle={detail.data() === undefined ? undefined : `${t("org.detail.memberCount", { count: detail.data()!.members.length })} · ${t("org.detail.projectCount", { count: detail.data()!.projectCount })} · ${t("org.detail.created", { date: formatDate(detail.data()!.createdAt) })}`}
+      backHref="/organizations"
+      backLabel={t("common.back")}
+      actions={
+        <Show when={detail.data()}>
+          {(org) => <>
+            <button type="button" class={TOOLBAR_PRIMARY} onClick={() => navigate(`/projects/create?organizationId=${encodeURIComponent(params.id)}`)}><Plus size={14} aria-hidden="true" />{t("org.detail.newProject")}</button>
+            <Show when={org().userRole === "ADMIN" || org().userRole === "MANAGER"}>
+              <button type="button" class={TOOLBAR_BUTTON} onClick={() => setShowInviteModal(true)}><UserPlus size={14} aria-hidden="true" />{t("org.detail.inviteMember")}</button>
+            </Show>
+          </>}
+        </Show>
+      }
     >
-      <Show when={detail.data()} fallback={notFound}>
-        {(org) => {
-          const userRole = () => org().userRole
-          const canManageMembers = () => userRole() === "ADMIN" || userRole() === "MANAGER"
-          const canManageSettings = () => userRole() === "ADMIN"
-          const newProjectHref = () => `/projects/create?organizationId=${encodeURIComponent(params.id)}`
+      <Show when={detail.data() !== undefined || !detail.loading()} fallback={<StageLoading label={t("common.loading")} />}>
+        <Show when={detail.data()} fallback={
+          <StageEmpty icon={<Building size={22} aria-hidden="true" />} title={t("org.notFound.title")} hint={t("org.notFound.body")}>
+            <A href="/profile" class={TOOLBAR_BUTTON}>{t("org.notFound.back")}</A>
+          </StageEmpty>
+        }>
+          {(org) => {
+            const userRole = () => org().userRole
+            const canManageMembers = () => userRole() === "ADMIN" || userRole() === "MANAGER"
+            const canManageSettings = () => userRole() === "ADMIN"
+            const newProjectHref = () => `/projects/create?organizationId=${encodeURIComponent(params.id)}`
+            const tabs = (): ReadonlyArray<WorkspaceTabItem<DetailTab>> => [
+              { id: "overview", label: t("org.tab.overview") },
+              { id: "chat", label: t("org.tab.chat") },
+              { id: "members", label: t("org.tab.members") },
+              { id: "projects", label: t("org.tab.projects") },
+              ...(canManageSettings() ? [{ id: "settings" as const, label: t("org.tab.settings") }] : [])
+            ]
+            const selectTab = (id: DetailTab): void => {
+              if (id === "chat") { navigate(`/organizations/${encodeURIComponent(params.id)}/chat`); return }
+              setActiveTab(id)
+            }
 
-          return (
-            <WorkspaceDetail
-              title={org().name}
-              subtitle={`${t("org.detail.memberCount", { count: org().members.length })} · ${t("org.detail.projectCount", { count: org().projectCount })} · ${t("org.detail.created", { date: formatDate(org().createdAt) })}`}
-              backHref="/organizations"
-              backLabel={t("common.back")}
-              actions={<>
-                <button type="button" class={TOOLBAR_PRIMARY} onClick={() => navigate(newProjectHref())}><Plus size={16} aria-hidden="true" />{t("org.detail.newProject")}</button>
-                <Show when={canManageMembers()}>
-                  <button type="button" class={TOOLBAR_BUTTON} onClick={() => setShowInviteModal(true)}><UserPlus size={16} aria-hidden="true" />{t("org.detail.inviteMember")}</button>
-                </Show>
-              </>}
-            >
+            return <>
               <Show when={(org().description ?? "").length > 0}>
-                <p class="mb-4 text-sm text-slate-600 dark:text-slate-400">{org().description}</p>
+                <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">{org().description}</p>
               </Show>
 
-              {/* Tabs */}
-              <div class="mb-6 border-b border-slate-200/60 dark:border-slate-700/50">
-                <nav class="-mb-px flex space-x-4">
-                  <button
-                    type="button"
-                    class={`${TAB_BASE} ${activeTab() === "overview" ? TAB_ACTIVE : TAB_IDLE}`}
-                    onClick={() => setActiveTab("overview")}
-                  >
-                    {t("org.tab.overview")}
-                  </button>
-                  <button
-                    type="button"
-                    class={`${TAB_BASE} ${activeTab() === "chat" ? TAB_ACTIVE : TAB_IDLE}`}
-                    onClick={() => navigate(`/organizations/${encodeURIComponent(params.id)}/chat`)}
-                  >
-                    {t("org.tab.chat")}
-                  </button>
-                  <button
-                    type="button"
-                    class={`${TAB_BASE} ${activeTab() === "members" ? TAB_ACTIVE : TAB_IDLE}`}
-                    onClick={() => setActiveTab("members")}
-                  >
-                    {t("org.tab.members")}
-                  </button>
-                  <button
-                    type="button"
-                    class={`${TAB_BASE} ${activeTab() === "projects" ? TAB_ACTIVE : TAB_IDLE}`}
-                    onClick={() => setActiveTab("projects")}
-                  >
-                    {t("org.tab.projects")}
-                  </button>
-                  <Show when={canManageSettings()}>
-                    <button
-                      type="button"
-                      class={`${TAB_BASE} ${activeTab() === "settings" ? TAB_ACTIVE : TAB_IDLE}`}
-                      onClick={() => setActiveTab("settings")}
-                    >
-                      {t("org.tab.settings")}
-                    </button>
-                  </Show>
-                </nav>
-              </div>
+              <WorkspaceTabs class="mb-3" tabs={tabs()} value={activeTab()} onChange={selectTab} label={t("org.tab.overview")} />
 
-              {/* Tab content */}
-              <div class={LEGACY_CARD}>
-                <Show when={activeTab() === "overview"}>
-                  <div class="p-6">
-                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      <div>
-                        <h2 class="mb-4 text-lg font-medium text-slate-900 dark:text-blue-400">{t("org.overview.about")}</h2>
-                        <p class="text-slate-600 dark:text-slate-400">
-                          <Show
-                            when={(org().description ?? "").length > 0}
-                            fallback={t("org.overview.noDescription")}
-                          >
-                            {org().description}
-                          </Show>
-                        </p>
+              <Show when={activeTab() === "overview"}>
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <section class={`${PANEL} !p-3`}>
+                    <h2 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.overview.about")}</h2>
+                    <p class="text-xs leading-5 text-slate-600 dark:text-slate-400">
+                      <Show when={(org().description ?? "").length > 0} fallback={t("org.overview.noDescription")}>{org().description}</Show>
+                    </p>
+                    <h3 class="mb-1.5 mt-3 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{t("org.overview.details")}</h3>
+                    <dl class="panel-kv">
+                      <dt>{t("org.overview.created")}</dt><dd>{formatDate(org().createdAt)}</dd>
+                      <dt>{t("org.overview.updated")}</dt><dd>{formatDate(org().updatedAt)}</dd>
+                      <dt>{t("org.overview.members")}</dt><dd>{org().members.length}</dd>
+                      <dt>{t("org.overview.projects")}</dt><dd>{org().projectCount}</dd>
+                    </dl>
+                  </section>
 
-                        <h3 class="mb-2 mt-6 text-md font-medium text-slate-900 dark:text-blue-400">{t("org.overview.details")}</h3>
-                        <div class="rounded-md bg-slate-50/70 p-4 backdrop-blur-sm dark:bg-slate-800/50">
-                          <div class="grid grid-cols-2 gap-2 text-sm">
-                            <div>
-                              <span class="block text-slate-500 dark:text-slate-400">{t("org.overview.created")}</span>
-                              <span class="dark:text-slate-300">{formatDate(org().createdAt)}</span>
-                            </div>
-                            <div>
-                              <span class="block text-slate-500 dark:text-slate-400">{t("org.overview.updated")}</span>
-                              <span class="dark:text-slate-300">{formatDate(org().updatedAt)}</span>
-                            </div>
-                            <div>
-                              <span class="block text-slate-500 dark:text-slate-400">{t("org.overview.members")}</span>
-                              <span class="dark:text-slate-300">{org().members.length}</span>
-                            </div>
-                            <div>
-                              <span class="block text-slate-500 dark:text-slate-400">{t("org.overview.projects")}</span>
-                              <span class="dark:text-slate-300">{org().projectCount}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h2 class="mb-4 text-lg font-medium text-slate-900 dark:text-blue-400">{t("org.overview.activity")}</h2>
-                        <div class="divide-y rounded-md border border-slate-200/60 dark:divide-slate-700/50 dark:border-slate-700/50">
-                          <div class="p-4 text-center text-slate-500 dark:text-slate-400">
-                            {t("org.overview.noActivity")}
-                          </div>
-                        </div>
-                      </div>
+                  <section class={`${PANEL} !p-3`}>
+                    <h2 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.overview.activity")}</h2>
+                    <div class="workspace-empty !mt-0 !max-w-none !py-6">
+                      <div class="workspace-empty__icon"><Users size={20} aria-hidden="true" /></div>
+                      <p class="text-xs text-slate-500 dark:text-slate-400">{t("org.overview.noActivity")}</p>
                     </div>
+                  </section>
+                </div>
+              </Show>
+
+              <Show when={activeTab() === "members"}>
+                <section class={`${PANEL} !p-3`}>
+                  <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.members.title")}</h2>
+                    <Show when={canManageMembers()}>
+                      <button type="button" class={TOOLBAR_BUTTON} onClick={() => setShowInviteModal(true)}><UserPlus size={14} aria-hidden="true" />{t("org.members.invite")}</button>
+                    </Show>
                   </div>
-                </Show>
-
-                <Show when={activeTab() === "members"}>
-                  <div>
-                    <div class="flex items-center justify-between border-slate-200/60 p-6 dark:border-slate-700/50">
-                      <h2 class="text-lg font-medium text-slate-900 dark:text-blue-400">{t("org.members.title")}</h2>
-                      <Show when={canManageMembers()}>
-                        <button
-                          type="button"
-                          onClick={() => setShowInviteModal(true)}
-                          class="flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <UserPlus size={16} class="mr-1" />
-                          {t("org.members.invite")}
-                        </button>
-                      </Show>
-                    </div>
-                    <div class="p-6">
-                      <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-200/70 dark:divide-slate-700/50">
-                          <thead class="bg-slate-50/70 dark:bg-slate-800/40">
-                            <tr>
-                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                {t("org.members.member")}
-                              </th>
-                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                {t("org.members.role")}
-                              </th>
-                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                {t("org.members.joined")}
-                              </th>
-                              <Show when={canManageMembers()}>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                  {t("org.members.actions")}
-                                </th>
-                              </Show>
-                            </tr>
-                          </thead>
-                          <tbody class="divide-y divide-slate-200/70 bg-white/60 dark:divide-slate-700/50 dark:bg-slate-900/30">
-                            <For each={org().members}>
-                              {(member) => (
-                                <tr>
-                                  <td class="whitespace-nowrap px-6 py-4">
-                                    <div class="flex items-center">
-                                      <div class="h-10 w-10 flex-shrink-0">
-                                        <Show
-                                          when={member.image !== null && member.image.length > 0}
-                                          fallback={
-                                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-600">
-                                              <User class="h-6 w-6 text-slate-400 dark:text-slate-500" />
-                                            </div>
-                                          }
-                                        >
-                                          <img
-                                            class="h-10 w-10 rounded-full"
-                                            src={member.image ?? ""}
-                                            alt={member.name ?? t("org.members.avatarAlt")}
-                                          />
-                                        </Show>
-                                      </div>
-                                      <div class="ml-4">
-                                        <div class="text-sm font-medium text-slate-900 dark:text-blue-400">
-                                          {member.name ?? t("org.members.unnamed")}
-                                        </div>
-                                        <div class="text-sm text-slate-500 dark:text-slate-400">{member.email}</div>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td class="whitespace-nowrap px-6 py-4">
-                                    <span class={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 dark:text-slate-900 ${roleBadge(member.role)}`}>
-                                      {member.role}
-                                    </span>
-                                  </td>
-                                  <td class="whitespace-nowrap px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
-                                    {formatDate(member.joinedAt)}
-                                  </td>
-                                  <Show when={canManageMembers()}>
-                                    <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                                      {/* Legacy renders these two buttons without handlers; v6 has no member endpoints either. */}
-                                      <button type="button" class="mr-3 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-                                        {t("org.members.edit")}
-                                      </button>
-                                      <button type="button" class="text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300">
-                                        {t("org.members.remove")}
-                                      </button>
-                                    </td>
-                                  </Show>
-                                </tr>
-                              )}
-                            </For>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </Show>
-
-                <Show when={activeTab() === "projects"}>
-                  <div>
-                    <div class="flex items-center justify-between border-b border-slate-200/60 p-6 dark:border-slate-700/50">
-                      <h2 class="text-lg font-medium text-slate-900 dark:text-blue-400">{t("org.projects.title")}</h2>
-                      <button
-                        type="button"
-                        onClick={() => navigate(newProjectHref())}
-                        class="flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <Plus size={16} class="mr-1" />
-                        {t("org.detail.newProject")}
-                      </button>
-                    </div>
-                    <div class="p-6">
-                      {/* No organization-projects endpoint: the legacy empty state, always. */}
-                      <div class="py-12 text-center">
-                        <svg
-                          class="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="1.5"
-                            d="M9 12h6m-6 4h6m-6-8h6M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-4m-7 9.5V4.7c0-1 .573-1.902 1.465-2.332A2.066 2.066 0 0111.535 2c.365 0 .72.13 1 .366.28.236.47.56.535.92L14 8"
-                          />
-                        </svg>
-                        <h3 class="mt-2 text-sm font-medium text-slate-900 dark:text-blue-400">{t("org.projects.empty")}</h3>
-                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("org.projects.emptyBody")}</p>
-                        <div class="mt-6">
-                          <button
-                            type="button"
-                            onClick={() => navigate(newProjectHref())}
-                            class="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                          >
-                            {t("org.projects.create")}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Show>
-
-                <Show when={activeTab() === "settings" && canManageSettings()}>
-                  <div>
-                    <div class="border-b border-slate-200 p-6 dark:border-slate-700">
-                      <h2 class="text-lg font-medium text-slate-900 dark:text-blue-400">{t("org.settings.title")}</h2>
-                      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("org.settings.body")}</p>
-                    </div>
-                    <div class="p-6">
-                      {/* Legacy submits this form to nothing (no handler): it is inert here too. */}
-                      <form class="space-y-6" onSubmit={(event) => event.preventDefault()}>
-                        <div>
-                          <label for="orgName" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            {t("org.settings.name")}
-                          </label>
-                          <input type="text" name="orgName" id="orgName" class={`mt-1 ${LEGACY_INPUT}`} value={org().name} readonly />
-                        </div>
-
-                        <div>
-                          <label for="description" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                            {t("org.settings.description")}
-                          </label>
-                          <textarea
-                            id="description"
-                            name="description"
-                            rows={3}
-                            class={`mt-1 ${LEGACY_INPUT}`}
-                            value={org().description ?? ""}
-                            readonly
-                          />
-                        </div>
-
-                        <div>
-                          <button
-                            type="submit"
-                            class="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                          >
-                            {t("org.settings.save")}
-                          </button>
-                        </div>
-                      </form>
-
-                      <div class="mt-10 border-t border-slate-200 pt-10 dark:border-slate-700">
-                        <h3 class="text-lg font-medium text-red-700 dark:text-red-500">{t("org.settings.danger")}</h3>
-                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("org.settings.dangerBody")}</p>
-                        <div class="mt-3">
-                          {/* Inert: legacy never wired a handler to this button. */}
-                          <button
-                            type="button"
-                            class="inline-flex justify-center rounded-md border border-red-300 bg-white/60 px-4 py-2 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:border-red-600 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-800/30"
-                          >
-                            {t("org.settings.delete")}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Show>
-              </div>
-
-              {/* Invite Member Modal */}
-              <Presence>
-                <Show when={showInviteModal()}>
-                  <div class="fixed inset-0 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="invite-member-title">
-                    <div class="flex min-h-screen items-end justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
-                      <div
-                        class="fixed inset-0 bg-slate-500 bg-opacity-75 transition-opacity"
-                        aria-hidden="true"
-                        onClick={() => setShowInviteModal(false)}
-                      />
-
-                      <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">
-                        &#8203;
-                      </span>
-
-                      <Motion.div
-                        class="inline-block w-full max-w-lg overflow-hidden rounded-lg bg-white/60 text-left shadow-xl align-bottom sm:my-8 sm:align-middle dark:bg-slate-900"
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20, transition: { duration: 0.2, easing: EASE } }}
-                        transition={{ duration: 0.3, easing: CARD_EASE }}
-                      >
-                        <form onSubmit={submitInvite}>
-                          <div class="bg-white/60 px-4 pb-4 pt-5 sm:p-6 sm:pb-4 dark:bg-slate-900">
-                            <div class="sm:flex sm:items-start">
-                              <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10 dark:bg-slate-800">
-                                <Mail class="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                              </div>
-                              <div class="mt-3 w-full text-center sm:ml-4 sm:mt-0 sm:text-left">
-                                <h3 id="invite-member-title" class="text-lg font-medium leading-6 text-slate-900 dark:text-blue-400">
-                                  {t("org.invite.title")}
-                                </h3>
-                                <div class="mt-2">
-                                  <p class="text-sm text-slate-500 dark:text-slate-400">{t("org.invite.body")}</p>
-                                </div>
-
-                                <div class="mt-4">
-                                  <label for="email" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    {t("org.invite.email")}
-                                  </label>
-                                  <input
-                                    type="email"
-                                    name="email"
-                                    id="email"
-                                    required
-                                    placeholder={t("org.invite.emailPlaceholder")}
-                                    value={inviteEmail()}
-                                    onInput={(event) => setInviteEmail(event.currentTarget.value)}
-                                    class={`mt-1 ${LEGACY_INPUT}`}
-                                  />
-                                </div>
-
-                                <div class="mt-4">
-                                  <label for="role" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    {t("org.invite.role")}
-                                  </label>
-                                  <select
-                                    id="role"
-                                    name="role"
-                                    value={inviteRole()}
-                                    onChange={(event) => setInviteRole(event.currentTarget.value as Role)}
-                                    class={`mt-1 block w-full appearance-none rounded-md py-2 pl-3 pr-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-slate-800 dark:text-white ${LEGACY_INPUT}`}
-                                  >
-                                    <option value="MEMBER">{t("org.invite.roleMember")}</option>
-                                    <option value="MANAGER">{t("org.invite.roleManager")}</option>
-                                    <Show when={userRole() === "ADMIN"}>
-                                      <option value="ADMIN">{t("org.invite.roleAdmin")}</option>
-                                    </Show>
-                                  </select>
+                  <div class="workspace-table overflow-x-auto">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th scope="col">{t("org.members.member")}</th>
+                          <th scope="col">{t("org.members.role")}</th>
+                          <th scope="col">{t("org.members.joined")}</th>
+                          <Show when={canManageMembers()}><th scope="col" class="!text-right">{t("org.members.actions")}</th></Show>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <For each={org().members}>
+                          {(member) => <tr>
+                            <td>
+                              <div class="flex items-center gap-2">
+                                <Show
+                                  when={member.image !== null && member.image.length > 0}
+                                  fallback={<div class="flex h-7 w-7 flex-none items-center justify-center rounded-[4px] border border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800"><User size={15} aria-hidden="true" /></div>}
+                                >
+                                  <img class="h-7 w-7 flex-none rounded-[4px] object-cover" src={member.image ?? ""} alt={member.name ?? t("org.members.avatarAlt")} />
+                                </Show>
+                                <div class="min-w-0">
+                                  <div class="truncate text-xs font-medium text-slate-900 dark:text-slate-100">{member.name ?? t("org.members.unnamed")}</div>
+                                  <div class="truncate text-[11px] text-slate-500 dark:text-slate-400">{member.email}</div>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-                          <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse dark:bg-slate-900">
-                            <button
-                              type="submit"
-                              class="w-full inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
-                            >
-                              {t("org.invite.send")}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setShowInviteModal(false)}
-                              class="mt-3 inline-flex w-full justify-center rounded-md border border-slate-300 bg-white/60 px-4 py-2 text-base font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:mt-0 sm:w-auto sm:text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-gray-600"
-                            >
-                              {t("org.modal.cancel")}
-                            </button>
-                          </div>
-                        </form>
-                      </Motion.div>
-                    </div>
+                            </td>
+                            <td class="whitespace-nowrap"><span class={roleBadge(member.role)}>{member.role}</span></td>
+                            <td class="whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400">{formatDate(member.joinedAt)}</td>
+                            <Show when={canManageMembers()}>
+                              <td class="whitespace-nowrap !text-right">
+                                {/* Legacy renders these two buttons without handlers; v6 has no member endpoints either. */}
+                                <button type="button" class="mr-3 text-[11px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">{t("org.members.edit")}</button>
+                                <button type="button" class="text-[11px] font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">{t("org.members.remove")}</button>
+                              </td>
+                            </Show>
+                          </tr>}
+                        </For>
+                      </tbody>
+                    </table>
                   </div>
-                </Show>
-              </Presence>
-            </WorkspaceDetail>
-          )
-        }}
+                </section>
+              </Show>
+
+              <Show when={activeTab() === "projects"}>
+                <section class={`${PANEL} !p-3`}>
+                  <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.projects.title")}</h2>
+                    <button type="button" class={TOOLBAR_BUTTON} onClick={() => navigate(newProjectHref())}><Plus size={14} aria-hidden="true" />{t("org.detail.newProject")}</button>
+                  </div>
+                  {/* No organization-projects endpoint: the legacy empty state, always. */}
+                  <StageEmpty icon={<FolderOpen size={22} aria-hidden="true" />} title={t("org.projects.empty")} hint={t("org.projects.emptyBody")}>
+                    <button type="button" class={TOOLBAR_PRIMARY} onClick={() => navigate(newProjectHref())}>{t("org.projects.create")}</button>
+                  </StageEmpty>
+                </section>
+              </Show>
+
+              <Show when={activeTab() === "settings" && canManageSettings()}>
+                <section class={`${PANEL} !p-3`}>
+                  <div class="mb-3">
+                    <h2 class="text-[13px] font-semibold text-slate-900 dark:text-white">{t("org.settings.title")}</h2>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t("org.settings.body")}</p>
+                  </div>
+                  {/* Legacy submits this form to nothing (no handler): it is inert here too. */}
+                  <form class="space-y-3" onSubmit={(event) => event.preventDefault()}>
+                    <div>
+                      <label for="orgName" class={LABEL}>{t("org.settings.name")}</label>
+                      <input type="text" name="orgName" id="orgName" class={INPUT} value={org().name} readonly />
+                    </div>
+                    <div>
+                      <label for="description" class={LABEL}>{t("org.settings.description")}</label>
+                      <textarea id="description" name="description" rows={3} class={INPUT} value={org().description ?? ""} readonly />
+                    </div>
+                    <button type="submit" class={SUBMIT_BUTTON}>{t("org.settings.save")}</button>
+                  </form>
+
+                  <div class="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
+                    <h3 class="text-xs font-semibold text-red-600 dark:text-red-400">{t("org.settings.danger")}</h3>
+                    <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{t("org.settings.dangerBody")}</p>
+                    {/* Inert: legacy never wired a handler to this button. */}
+                    <button type="button" class={`${CANCEL_BUTTON} mt-2 !text-red-600 dark:!text-red-400`}>{t("org.settings.delete")}</button>
+                  </div>
+                </section>
+              </Show>
+
+              <Modal open={showInviteModal()} title={t("org.invite.title")} onClose={() => setShowInviteModal(false)}>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{t("org.invite.body")}</p>
+                <form onSubmit={submitInvite} class="space-y-3">
+                  <div>
+                    <label for="email" class={LABEL}>{t("org.invite.email")}</label>
+                    <input type="email" name="email" id="email" required placeholder={t("org.invite.emailPlaceholder")} value={inviteEmail()} onInput={(event) => setInviteEmail(event.currentTarget.value)} class={INPUT} />
+                  </div>
+                  <div>
+                    <label for="role" class={LABEL}>{t("org.invite.role")}</label>
+                    <select id="role" name="role" value={inviteRole()} onChange={(event) => setInviteRole(event.currentTarget.value as Role)} class={INPUT}>
+                      <option value="MEMBER">{t("org.invite.roleMember")}</option>
+                      <option value="MANAGER">{t("org.invite.roleManager")}</option>
+                      <Show when={userRole() === "ADMIN"}><option value="ADMIN">{t("org.invite.roleAdmin")}</option></Show>
+                    </select>
+                  </div>
+                  <div class="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+                    <button type="button" onClick={() => setShowInviteModal(false)} class={CANCEL_BUTTON}>{t("org.modal.cancel")}</button>
+                    <button type="submit" class={SUBMIT_BUTTON}>{t("org.invite.send")}</button>
+                  </div>
+                </form>
+              </Modal>
+            </>
+          }}
+        </Show>
       </Show>
-    </Show>
+    </WorkspaceDetail>
   )
 }

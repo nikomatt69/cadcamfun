@@ -412,11 +412,6 @@ export default function CamPage(): JSX.Element {
             {...rise}
             transition={{ duration: 0.8, delay: 1.2 }}
           >
-            <Show when={camStore.activeTab === "preview"}>
-              <div class="h-full">
-                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} playbackDuration={duration()} onPlayingChange={camStore.setPlaying} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} defaultToolModel={toolModel()} toolIssues={toolIssues()} operationTools={operationTools()} {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} gcode={camStore.gcode} />
-              </div>
-            </Show>
             <Show when={camStore.activeTab === "editor"}>
               <div class="h-full">
                 <GCodeEditor value={gcode()} onChange={setGcode} onProcess={processGCode} />

@@ -22,7 +22,8 @@ import { useSelectionStore } from "../../cad/store/selectorStore.ts"
 
 export type ControllerType = "gcode" | "grbl" | "fanuc"
 
-export type ActiveTab = "preview" | "editor" | "toolpath" | "post"
+/** The workspace tabs. The 3D view lives in the toolpath tab; there is no second "preview" of it. */
+export type ActiveTab = "editor" | "toolpath" | "post"
 export type SidebarTab = "workpiece" | "generator" | "operations"
 export type RightTab = "generator" | "cycles" | "verify" | "control"
 

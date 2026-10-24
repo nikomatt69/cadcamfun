@@ -10,13 +10,12 @@
 import { For, Show, createEffect, createMemo, createSignal, onMount, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import { Check, Cpu, ExternalLink, RefreshCw } from "lucide-solid"
-import { cam as coreCam } from "@cadcamfun/core"
 import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { useCADStore, type MachineConfig } from "../../cad/store/cadStore.ts"
 import { useCamStore } from "../store/camStore.ts"
-import { useGeneratorStore } from "../store/generatorStore.ts"
+import { pickMachine } from "../lib/machine-pick.ts"
 import {
   MACHINES_PATH,
   machineControllerOf,
@@ -25,8 +24,7 @@ import {
   machineResourceKind,
   machineSpindleOf,
   machineTypeLabel,
-  machinesFromResponse,
-  kernelMachineConfigOf
+  machinesFromResponse
 } from "../lib/machines.ts"
 
 const ROW = "sidebar-choice"
@@ -66,22 +64,8 @@ export default function MachineSelect(): JSX.Element {
     return [...defaults(), ...machines()].find((machine) => machine.id === pick.id) ?? pick
   })
 
-  /**
-   * Picking a machine is picking the preview's machine, the CAD workpiece's machine and the kernel's machine at once:
-   * a built-in preset names itself, a configuration of the library travels with the request.
-   */
-  const select = (machine: MachineConfig | undefined): void => {
-    cad.setSelectedMachine(machine ?? null)
-    cam.setMachineOverride(machine === undefined ? undefined : machineResourceKind(machine))
-    if (machine === undefined) return
-    const gen = useGeneratorStore.getState()
-    const builtin = coreCam.kernel.findMachine(machine.id)
-    if (builtin !== undefined) gen.patchKernelSettings({ machine: builtin.id, machineConfig: undefined })
-    else {
-      const row = kernelMachineConfigOf(machine)
-      if (row !== undefined) gen.patchKernelSettings({ machineConfig: row, machine: undefined })
-    }
-  }
+  /** The CAD workpiece panel's `<select>` calls the same action, so both panels and the preview stay on one machine. */
+  const select = (machine: MachineConfig | undefined): void => pickMachine(machine)
 
   // The CAD workpiece panel picks from this same list: adopting its machine keeps both panels and
   // the preview on one machine. "Auto" (no machine) leaves the preview's own pick alone.

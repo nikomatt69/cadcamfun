@@ -1,100 +1,146 @@
-.reference-shell {
-  --page-radius: 8px;
-  --page-border: rgba(226, 232, 240, 0.7);
-  --page-surface: #fff;
-  --page-tab: rgba(239, 246, 255, 0.85);
-  --page-accent: #2563eb;
-}
+/* ==========================================================================
+   Page consistency — the shell's page surface follows the workstation panel
+   language: flat 1 px borders, a 5 px radius scale, 12 px type and the single
+   blue accent. Kept separate from `reference-shell.css` because it also
+   normalizes the bespoke controls the ported pages still carry.
+   ========================================================================== */
 
-html.dark .reference-shell {
-  --page-border: rgba(51, 65, 85, 0.7);
-  --page-surface: rgba(15, 23, 42, 0.78);
-  --page-tab: rgba(30, 58, 138, 0.35);
-  --page-accent: #60a5fa;
+.reference-shell {
+  --page-radius: 5px;
+  --page-border: var(--shell-border);
+  --page-border-strong: var(--shell-border-strong);
+  --page-surface: var(--shell-chrome);
+  --page-subtle: var(--shell-page);
+  --page-tab: var(--shell-active);
+  --page-accent: var(--shell-active-text);
 }
 
 :is(.reference-page-container, .reference-standalone-container) {
   min-width: 0;
   --ui-radius-sm: 5px;
-  --ui-radius-md: 8px;
-  --ui-radius-lg: 8px;
-  --ui-radius-xl: 12px;
-  --ui-radius-2xl: 12px;
+  --ui-radius-md: 5px;
+  --ui-radius-lg: 5px;
+  --ui-radius-xl: 5px;
+  --ui-radius-2xl: 5px;
 }
 
 .reference-page-container {
   width: 100%;
   max-width: 1280px;
   margin-inline: auto;
-  padding: 20px 16px;
+  padding: 16px;
 }
 
 .reference-page-container :is(.form-input, .form-select, .btn) {
-  min-height: 34px;
-  padding: 6px 10px;
-  font-size: 13px;
-  line-height: 20px;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .reference-page-container .form-label {
   display: block;
   color: var(--shell-text);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .reference-page-container .form-label :is(input, select, textarea) {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
-.reference-page-container nav:has(> button[aria-pressed]) {
-  gap: 3px;
-  padding: 4px;
-  background: var(--page-surface);
-  border-bottom: 1px solid var(--page-border);
+/* Tabs: one segmented strip, the active tab underlined in the accent. */
+.reference-page-container nav:has(> button[aria-pressed]),
+.reference-page-container [role="tablist"] {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 3px;
+  overflow-x: auto;
+  border: 1px solid var(--page-border);
+  border-radius: 5px;
+  background: var(--page-subtle);
+  scrollbar-width: none;
 }
 
-.reference-page-container nav > button[aria-pressed] {
+.reference-page-container :is(nav:has(> button[aria-pressed]), [role="tablist"])::-webkit-scrollbar {
+  display: none;
+}
+
+.reference-page-container nav > button[aria-pressed],
+.reference-page-container [role="tab"],
+.reference-page-container .ui-tabs-list > button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
   border: 1px solid transparent;
   border-bottom: 2px solid transparent;
-  border-radius: 5px 5px 0 0;
+  border-radius: 4px;
   background: transparent;
   color: var(--shell-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  box-shadow: none;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.reference-page-container nav > button[aria-pressed="true"],
+.reference-page-container [role="tab"][aria-selected="true"],
+.reference-page-container .ui-tabs-list > button[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--page-accent) 20%, transparent);
+  border-bottom-color: var(--page-accent);
+  background: var(--page-tab);
+  color: var(--page-accent);
   box-shadow: none;
 }
 
-.reference-page-container nav > button[aria-pressed="true"] {
-  color: var(--page-accent);
-  background: var(--page-tab);
-  border-bottom-color: var(--page-accent);
-  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.18);
+.reference-page-container .ui-tabs-indicator {
+  display: none;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .reference-page-container nav > button[aria-pressed]:hover {
-    border-radius: 5px 5px 0 0;
-    border-color: var(--page-border);
-    background: rgba(148, 163, 184, 0.1);
-    backdrop-filter: blur(3px);
+  .reference-page-container nav > button[aria-pressed]:hover,
+  .reference-page-container [role="tab"]:hover,
+  .reference-page-container .ui-tabs-list > button:hover {
+    border-color: transparent;
+    border-bottom-color: var(--page-border-strong);
+    border-radius: 4px;
+    background: var(--shell-hover);
+    color: var(--shell-text);
+    backdrop-filter: none;
   }
-  .reference-page-container nav > button[aria-pressed="true"]:hover {
-    background: var(--page-tab);
+  .reference-page-container nav > button[aria-pressed="true"]:hover,
+  .reference-page-container [role="tab"][aria-selected="true"]:hover {
+    border-color: color-mix(in srgb, var(--page-accent) 20%, transparent);
     border-bottom-color: var(--page-accent);
+    background: var(--page-tab);
+    color: var(--page-accent);
   }
 }
 
 @media (max-width: 640px) {
-  .reference-page-container { padding: 12px 8px; }
+  .reference-page-container { padding: 10px; }
 }
 
 :is(.reference-page-container, .reference-standalone-container) :is(.ui-card, .card, .glass-panel) {
-  border-radius: var(--page-radius);
+  border-radius: 5px;
   border-color: var(--page-border);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 :is(.reference-page-container, .reference-standalone-container) :is(.ui-card-default, .ui-card-heavy, .ui-card-light) {
   background: var(--page-surface);
+}
+
+:is(.reference-page-container, .reference-standalone-container) :is(.ui-card-heavy, .ui-card-light) {
+  background: var(--page-subtle);
 }
 
 :is(.reference-page-container, .reference-standalone-container) :is(button, .btn, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea) {
@@ -111,52 +157,6 @@ html.dark .reference-shell {
 :is(.reference-page-container, .reference-standalone-container) :is(input, select, textarea) {
   min-width: 0;
   max-width: 100%;
-}
-
-:is(.reference-page-container, .reference-standalone-container) :is(.ui-tabs-list, [role="tablist"]) {
-  gap: 3px;
-  padding: 3px;
-  border-bottom: 1px solid var(--page-border);
-  background: var(--page-surface);
-}
-
-:is(.reference-page-container, .reference-standalone-container) .ui-tabs-indicator {
-  display: none;
-}
-
-:is(.reference-page-container, .reference-standalone-container) [role="tab"] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  border-bottom: 2px solid transparent;
-  border-radius: 5px 5px 0 0;
-  background: transparent;
-  box-shadow: none;
-  white-space: nowrap;
-  transition: background-color 120ms ease, color 120ms ease;
-}
-
-:is(.reference-page-container, .reference-standalone-container) [role="tab"][aria-selected="true"] {
-  color: var(--page-accent);
-  background: var(--page-tab);
-  border-bottom-color: var(--page-accent);
-  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.18);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  :is(.reference-page-container, .reference-standalone-container) [role="tab"]:hover {
-    border-radius: 5px 5px 0 0;
-    border-color: var(--page-border);
-    background: rgba(148, 163, 184, 0.1);
-    backdrop-filter: blur(3px);
-  }
-  :is(.reference-page-container, .reference-standalone-container) [role="tab"][aria-selected="true"]:hover {
-    background: var(--page-tab);
-    border-bottom-color: var(--page-accent);
-  }
 }
 
 :is(.reference-page-container, .reference-standalone-container) :is(button, a, input, select, textarea):focus-visible {

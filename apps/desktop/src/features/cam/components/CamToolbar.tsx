@@ -9,7 +9,7 @@ import { For, Show, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import {
-  Brain, Code, DollarSign, Eye, Folder, Grid3x3, History, Menu, Moon, Pause, PanelRight, PanelRightClose, Play, RotateCcw, RotateCw, Save, Settings, Sun, Upload, Wrench, Zap
+  Brain, Code, DollarSign, Folder, Grid3x3, History, Menu, Moon, Pause, PanelRight, PanelRightClose, Play, RotateCcw, RotateCw, Save, Settings, Sun, Upload, Wrench, Zap
 } from "lucide-solid"
 import { useCamStore, type ActiveTab } from "../store/camStore.ts"
 import { t } from "../../../i18n/index.ts"
@@ -39,8 +39,7 @@ const TOGGLE_ON = "bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-
 const TOGGLE_OFF = "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
 
 /** Labels are i18n keys so the tab strip follows the locale (resolved through `t()` at render). */
-const TABS: ReadonlyArray<{ readonly id: ActiveTab; readonly label: "cam.preview" | "cam.editor" | "cam.toolpath" | "cam.postTab"; readonly icon: (size: number) => JSX.Element }> = [
-  { id: "preview", label: "cam.preview", icon: (size) => <Eye size={size} class="mr-1" /> },
+const TABS: ReadonlyArray<{ readonly id: ActiveTab; readonly label: "cam.editor" | "cam.toolpath" | "cam.postTab"; readonly icon: (size: number) => JSX.Element }> = [
   { id: "editor", label: "cam.editor", icon: (size) => <Code size={size} class="mr-1" /> },
   { id: "toolpath", label: "cam.toolpath", icon: (size) => <Wrench size={size} class="mr-1" /> },
   { id: "post", label: "cam.postTab", icon: (size) => <Settings size={size} class="mr-1" /> }
