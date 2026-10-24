@@ -392,6 +392,24 @@ const toolHandlers = Effect.gen(function*() {
       if (drawingRevision(await load(projectId)) !== revision) return { ok: false, status: "stale", revision, mutated: false, error: "The drawing changed while the plan was checked. Validate again." }
       return { ok: passed, status: passed ? "pass" : "failed", revision, mutated: false, operations: results, note: "Schema, DFM and generation checks only. Generate, analyze and verify each saved operation before acceptance." }
     },
+    setupSheetOperation: async (projectId, operationId) => {
+      const loaded = await load(projectId)
+      const stored = await Effect.runPromise(toolpaths.find(acting().id, operationId))
+      if (!stored || stored.project.id !== loaded.projectId) return { ok: false, error: "Operation not found in the active drawing" }
+      const artifactData = record(stored.row.data)["kernelArtifact"]
+      if (artifactData === undefined) return { ok: false, error: "Only a program the CAM kernel generated has a setup sheet; this operation has none." }
+      try {
+        const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(artifactData)
+        const sheet = cam.kernel.setupSheetData(artifact, { title: stored.row.name })
+        if (typeof sheet === "string") return { ok: false, error: sheet }
+        return {
+          ok: true, operationId, release: sheet.release,
+          tools: sheet.tools.slice(0, 40), toolsTotal: sheet.tools.length, operations: sheet.operations.slice(0, 60), operationsTotal: sheet.operations.length,
+          totals: sheet.totals, setup: { ...sheet.setup, material: sheet.material, machine: sheet.machine },
+          claims: sheet.claims.map((c) => ({ id: c.id, status: c.status })), htmlBytes: cam.kernel.setupSheetHtml(sheet).length
+        }
+      } catch (error) { return { ok: false, error: `The stored program does not match the contract: ${error instanceof Error ? error.message : String(error)}` } }
+    },
     reviewOperation: async (projectId, operationId) => {
       const loaded = await load(projectId)
       const stored = await Effect.runPromise(toolpaths.find(acting().id, operationId))

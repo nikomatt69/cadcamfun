@@ -332,6 +332,10 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
 
   "cam.plan_check": read(planCheck),
   "cam.review": read(review),
+  "cam.setup_sheet": read(Schema.Union([
+    Schema.Struct({ ok: Schema.Literal(true), operationId: str, release: str, tools: Schema.Array(record), toolsTotal: int, operations: Schema.Array(record), operationsTotal: int, totals: record, setup: record, claims: Schema.Array(record), htmlBytes: int }),
+    Schema.Struct({ ok: Schema.Literal(false), error: str })
+  ])),
   "cam.machine": read(machine),
   "cam.operations": read(operations),
   "cam.suggest": read(cam.generator.SuggestResponseSchema),

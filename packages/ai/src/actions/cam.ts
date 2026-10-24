@@ -35,6 +35,10 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
     run: ({ operationId }, { handlers, projectId }) => handlers.reviewOperation?.(projectId, operationId) ?? { ok: false, error: "Saved review is unavailable in this host." }
   }),
   defineWireAction({
+    id: "cam.setup_sheet", kind: "read", parameters: CAM_ACTION_INPUTS["cam.setup_sheet"],
+    run: ({ operationId }, { handlers, projectId }) => handlers.setupSheetOperation?.(projectId, operationId) ?? { ok: false, error: "Setup sheets are unavailable in this host." }
+  }),
+  defineWireAction({
     id: "cam.machine", kind: "read", replaces: "cam_describe_machine",
     parameters: CAM_ACTION_INPUTS["cam.machine"],
     // The kinematics table; with a program, its run on the machine (an operation's program is read from the project).

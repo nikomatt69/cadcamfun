@@ -39,6 +39,7 @@ export interface ToolHandlersShape {
   /** The user's saved machine configurations, as machines the kernel can plan against (id, name, kind, post, limits). */
   machines?(projectId: string): Promise<unknown>
   reviewOperation?(projectId: string, operationId: string): Promise<unknown>
+  setupSheetOperation?(projectId: string, operationId: string): Promise<unknown>
   compareSetups?(projectId: string, candidates: ReadonlyArray<SetupCandidate>): Promise<unknown>
   stock?(projectId: string, input: CamStockInput): Promise<unknown>
   cadInspect?(projectId: string, input: CadInspectionInput): Promise<unknown>

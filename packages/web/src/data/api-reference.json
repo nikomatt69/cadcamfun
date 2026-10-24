@@ -47680,6 +47680,446 @@
         }
       }
     },
+    "/api/toolpaths/{id}/setup-sheet": {
+      "get": {
+        "tags": [
+          "toolpaths"
+        ],
+        "operationId": "toolpaths.setupSheet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "jobId": {
+                          "type": "string"
+                        },
+                        "release": {
+                          "type": "string",
+                          "enum": [
+                            "blocked",
+                            "preview",
+                            "verified-program"
+                          ]
+                        },
+                        "material": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "iso": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "iso"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "machine": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "post": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "post"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "setup": {
+                          "type": "object",
+                          "properties": {
+                            "orientation": {
+                              "type": "string"
+                            },
+                            "workOffset": {
+                              "type": "string"
+                            },
+                            "origin": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "stock": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "orientation",
+                            "workOffset",
+                            "origin",
+                            "stock"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "tools": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "number": {
+                                "type": "integer"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "diameter": {
+                                "type": "number"
+                              },
+                              "flutes": {
+                                "type": "integer"
+                              },
+                              "fluteLength": {
+                                "type": "number"
+                              },
+                              "shankDiameter": {
+                                "type": "number"
+                              },
+                              "stickout": {
+                                "type": "number"
+                              },
+                              "holder": {
+                                "type": "string"
+                              },
+                              "operations": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "seconds": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "number",
+                              "id",
+                              "name",
+                              "kind",
+                              "diameter",
+                              "flutes",
+                              "fluteLength",
+                              "shankDiameter",
+                              "stickout",
+                              "operations",
+                              "seconds"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "operations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "index": {
+                                "type": "integer"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "strategy": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "ok",
+                                  "failed"
+                                ]
+                              },
+                              "tool": {
+                                "type": "integer"
+                              },
+                              "seconds": {
+                                "type": "number"
+                              },
+                              "cutLength": {
+                                "type": "number"
+                              },
+                              "removedVolume": {
+                                "type": "number"
+                              },
+                              "rpm": {
+                                "type": "number"
+                              },
+                              "feed": {
+                                "type": "number"
+                              },
+                              "ap": {
+                                "type": "number"
+                              },
+                              "ae": {
+                                "type": "number"
+                              },
+                              "warnings": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "index",
+                              "id",
+                              "name",
+                              "strategy",
+                              "status",
+                              "seconds",
+                              "cutLength",
+                              "removedVolume",
+                              "warnings"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "totals": {
+                          "type": "object",
+                          "properties": {
+                            "tools": {
+                              "type": "integer"
+                            },
+                            "operations": {
+                              "type": "integer"
+                            },
+                            "cycleSeconds": {
+                              "type": "number"
+                            },
+                            "cuttingSeconds": {
+                              "type": "number"
+                            },
+                            "removedVolume": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "tools",
+                            "operations",
+                            "cycleSeconds",
+                            "cuttingSeconds",
+                            "removedVolume"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "claims": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "detail": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "status",
+                              "detail"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "notes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "severity": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "severity",
+                              "message"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "identity": {
+                          "type": "object",
+                          "properties": {
+                            "job": {
+                              "type": "string"
+                            },
+                            "part": {
+                              "type": "string"
+                            },
+                            "nc": {
+                              "type": "string"
+                            },
+                            "algorithm": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "job",
+                            "part",
+                            "nc",
+                            "algorithm"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "jobId",
+                        "release",
+                        "material",
+                        "machine",
+                        "setup",
+                        "tools",
+                        "operations",
+                        "totals",
+                        "claims",
+                        "notes",
+                        "issues",
+                        "identity"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "html": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "html"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/drawings/{id}/toolpaths": {
       "get": {
         "tags": [

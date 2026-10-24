@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
-import { CamKernelResult } from "@cadcamfun/api"
+import { CamKernelResult, CamSetupSheet } from "@cadcamfun/api"
 import { Schema } from "effect"
 import { makeApp } from "./helpers.ts"
 
@@ -204,4 +204,25 @@ test("a parametric part with an island in a pocket is machined from its exact mo
   expect(stored.body.gcode).toBe(artifact.value.nc)
   expect(artifact.value.claims.find((c) => c.id === "no-gouge")?.status).toBe("passed")
   expect(await handlers.reviewOperation!(project, saved.operationId)).toMatchObject({ status: artifact.value.release })
+  // The setup sheet of the stored program says what the stored artifact says.
+  const sheetResponse = await app.call(`/api/toolpaths/${saved.operationId}/setup-sheet`)
+  expect(sheetResponse.status).toBe(200)
+  const sheet = Schema.decodeUnknownSync(CamSetupSheet)(sheetResponse.body)
+  expect(sheet.data.tools).toHaveLength(artifact.value.tools.length)
+  expect(sheet.data.operations.map((o) => o.id)).toEqual(artifact.value.operations.map((o) => o.id))
+  expect(sheet.data.totals.cycleSeconds).toBe(artifact.value.cycleTimeSeconds)
+  expect(sheet.data.identity.nc).toBe(artifact.value.identity.nc)
+  expect(sheet.html).toContain(artifact.value.operations.find((o) => o.id === "finish-pocket-1-island1")!.name)
+  expect((await app.call(`/api/toolpaths/${saved.operationId}/setup-sheet`, { auth: false })).status).toBe(401)
+  // The assistant reads the same sheet from the stored artifact, without the page itself.
+  const readToken = (await app.call("/api/ai/bridge/tokens", { method: "POST", json: { name: "sheet", projectId: project, mode: "read" } })).body.token as string
+  const asked = await app.call("/api/ai/actions/invoke", { method: "POST", auth: false, headers: { authorization: `Bearer ${readToken}` }, json: { projectId: project, tool: "cam", input: { action: "setup_sheet", operationId: saved.operationId } } })
+  expect(asked.status).toBe(200)
+  expect(asked.body.result).toMatchObject({ ok: true, operationId: saved.operationId, toolsTotal: artifact.value.tools.length, operationsTotal: artifact.value.operations.length })
+  expect(asked.body.result.totals.cycleSeconds).toBe(artifact.value.cycleTimeSeconds)
+  expect(asked.body.result.htmlBytes).toBe(sheet.html.length)
+  // A plain toolpath with no kernel program has no sheet.
+  const plain = await app.call("/api/toolpaths", { method: "POST", json: { name: "Plain", projectId: project, data: { gcode: "G0 X0" }, gcode: "G0 X0" } })
+  expect(plain.status).toBe(201)
+  expect((await app.call(`/api/toolpaths/${plain.body.id}/setup-sheet`)).status).toBe(400)
 })

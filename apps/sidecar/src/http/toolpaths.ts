@@ -1,5 +1,6 @@
-import { Api, BadRequest, Conflict, CurrentUser, EnvBadRequest, EnvNotFound, Forbidden, InternalError, NotFound, envErr, okAuth } from "@cadcamfun/api"
-import { Effect } from "effect"
+import { Api, BadRequest, CamKernelArtifact, Conflict, CurrentUser, EnvBadRequest, EnvNotFound, Forbidden, InternalError, NotFound, envErr, okAuth } from "@cadcamfun/api"
+import { cam } from "@cadcamfun/core"
+import { Effect, Schema } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { ToolpathRepo, type ToolpathInput } from "../repos/toolpath-repo.ts"
@@ -49,6 +50,16 @@ export const ToolpathsHandlers = HttpApiBuilder.group(Api, "toolpaths", Effect.f
       load(params.id).pipe(
         Effect.map((f) => ({ ...f.row, project: { id: f.project.id, name: f.project.name, ownerId: f.project.ownerId } })),
         Effect.catchTag("DatabaseError", fail("Failed to fetch toolpath"))))
+    .handle("setupSheet", ({ params }) =>
+      Effect.gen(function*() {
+        const found = yield* load(params.id)
+        const stored = (found.row.data as { readonly kernelArtifact?: unknown } | null)?.kernelArtifact
+        if (stored === undefined || stored === null) return yield* new BadRequest({ message: "This toolpath has no kernel program: only a program the CAM kernel generated has a setup sheet" })
+        const artifact = yield* Effect.try({ try: () => Schema.decodeUnknownSync(CamKernelArtifact)(stored), catch: () => new BadRequest({ message: "The stored kernel program does not match the contract; regenerate it" }) })
+        const sheet = cam.kernel.setupSheetData(artifact, { title: found.row.name })
+        if (typeof sheet === "string") return yield* new BadRequest({ message: sheet })
+        return { data: sheet, html: cam.kernel.setupSheetHtml(sheet) }
+      }).pipe(Effect.catchTag("DatabaseError", fail("Failed to build the setup sheet"))))
     .handle("update", ({ params, payload }) =>
       Effect.gen(function*() {
         const found = yield* load(params.id)

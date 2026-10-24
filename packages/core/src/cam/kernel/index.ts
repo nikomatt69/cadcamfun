@@ -29,6 +29,7 @@ export { planJob, inscribedRadius, type Plan, type PlanInput } from "./planner.t
 export { prepareJob, executeJob, runJob, planOnly, KERNEL_ALGORITHM, type PreparedJob, type PrepareOptions, type RunOptions, type KernelProgress } from "./execute.ts"
 export * from "./compat.ts"
 export * from "./assembly.ts"
+export * from "./setup-sheet.ts"
 export { SETUP_ORIENTATIONS, setupTransform, type SetupOrientation } from "../setup.ts"
 export { CutterSchema, OperationSpecSchema, PrintRequirementSchema, SetupOrientationSchema } from "./schema.ts"
 export { runPrintJob, planPrintJob, printSettingsOf, PRINT_ALGORITHM } from "./print.ts"

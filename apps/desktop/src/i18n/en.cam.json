@@ -597,6 +597,7 @@
   "cam.move.dwell": "Dwell",
   "cam.kernel.setupOrientation": "CAD side facing the spindle",
   "cam.kernel.manualSetupHint": "Separate manual setup: refixture the part and touch off the work offset. Workholding and full-part coverage remain unverified. This does not generate a rotary cycle.",
+  "cam.kernel.setupSheet": "Setup sheet (HTML)",
   "cam.setups.title": "Setup planner",
   "cam.setups.run": "Plan setups from the exact model",
   "cam.setups.running": "Planning setups...",

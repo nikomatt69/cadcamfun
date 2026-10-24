@@ -421,6 +421,8 @@ import type {
   ToolpathsUpdateOutput,
   ToolpathsRemoveInput,
   ToolpathsRemoveOutput,
+  ToolpathsSetupSheetInput,
+  ToolpathsSetupSheetOutput,
   ToolpathsListForDrawingInput,
   ToolpathsListForDrawingOutput,
   ToolpathsCreateForDrawingInput,
@@ -3709,6 +3711,17 @@ export function make(options: ClientOptions) {
             path: `/api/toolpaths/${encodeURIComponent(input.id)}`,
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      setupSheet: (input: ToolpathsSetupSheetInput, requestOptions?: RequestOptions) =>
+        request<ToolpathsSetupSheetOutput>(
+          {
+            method: "GET",
+            path: `/api/toolpaths/${encodeURIComponent(input.id)}/setup-sheet`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
             empty: false,
           },
           requestOptions,

@@ -65053,6 +65053,446 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/toolpaths/{id}/setup-sheet": {
+      "get": {
+        "operationId": "toolpaths.setupSheet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "claims": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "detail": {
+                                "type": "string",
+                              },
+                              "id": {
+                                "type": "string",
+                              },
+                              "status": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "status",
+                              "detail",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "identity": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "algorithm": {
+                              "type": "string",
+                            },
+                            "job": {
+                              "type": "string",
+                            },
+                            "nc": {
+                              "type": "string",
+                            },
+                            "part": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "job",
+                            "part",
+                            "nc",
+                            "algorithm",
+                          ],
+                          "type": "object",
+                        },
+                        "issues": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "message": {
+                                "type": "string",
+                              },
+                              "severity": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "severity",
+                              "message",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "jobId": {
+                          "type": "string",
+                        },
+                        "machine": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                            },
+                            "post": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "name",
+                            "post",
+                          ],
+                          "type": "object",
+                        },
+                        "material": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "iso": {
+                              "type": "string",
+                            },
+                            "name": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "name",
+                            "iso",
+                          ],
+                          "type": "object",
+                        },
+                        "notes": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "operations": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "ae": {
+                                "type": "number",
+                              },
+                              "ap": {
+                                "type": "number",
+                              },
+                              "cutLength": {
+                                "type": "number",
+                              },
+                              "feed": {
+                                "type": "number",
+                              },
+                              "id": {
+                                "type": "string",
+                              },
+                              "index": {
+                                "type": "integer",
+                              },
+                              "name": {
+                                "type": "string",
+                              },
+                              "removedVolume": {
+                                "type": "number",
+                              },
+                              "rpm": {
+                                "type": "number",
+                              },
+                              "seconds": {
+                                "type": "number",
+                              },
+                              "status": {
+                                "enum": [
+                                  "ok",
+                                  "failed",
+                                ],
+                                "type": "string",
+                              },
+                              "strategy": {
+                                "type": "string",
+                              },
+                              "tool": {
+                                "type": "integer",
+                              },
+                              "warnings": {
+                                "items": {
+                                  "type": "string",
+                                },
+                                "type": "array",
+                              },
+                            },
+                            "required": [
+                              "index",
+                              "id",
+                              "name",
+                              "strategy",
+                              "status",
+                              "seconds",
+                              "cutLength",
+                              "removedVolume",
+                              "warnings",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "release": {
+                          "enum": [
+                            "blocked",
+                            "preview",
+                            "verified-program",
+                          ],
+                          "type": "string",
+                        },
+                        "setup": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "orientation": {
+                              "type": "string",
+                            },
+                            "origin": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "x": {
+                                  "type": "number",
+                                },
+                                "y": {
+                                  "type": "number",
+                                },
+                                "z": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z",
+                              ],
+                              "type": "object",
+                            },
+                            "stock": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "x": {
+                                  "type": "number",
+                                },
+                                "y": {
+                                  "type": "number",
+                                },
+                                "z": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z",
+                              ],
+                              "type": "object",
+                            },
+                            "workOffset": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "orientation",
+                            "workOffset",
+                            "origin",
+                            "stock",
+                          ],
+                          "type": "object",
+                        },
+                        "title": {
+                          "type": "string",
+                        },
+                        "tools": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "diameter": {
+                                "type": "number",
+                              },
+                              "fluteLength": {
+                                "type": "number",
+                              },
+                              "flutes": {
+                                "type": "integer",
+                              },
+                              "holder": {
+                                "type": "string",
+                              },
+                              "id": {
+                                "type": "string",
+                              },
+                              "kind": {
+                                "type": "string",
+                              },
+                              "name": {
+                                "type": "string",
+                              },
+                              "number": {
+                                "type": "integer",
+                              },
+                              "operations": {
+                                "items": {
+                                  "type": "string",
+                                },
+                                "type": "array",
+                              },
+                              "seconds": {
+                                "type": "number",
+                              },
+                              "shankDiameter": {
+                                "type": "number",
+                              },
+                              "stickout": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "number",
+                              "id",
+                              "name",
+                              "kind",
+                              "diameter",
+                              "flutes",
+                              "fluteLength",
+                              "shankDiameter",
+                              "stickout",
+                              "operations",
+                              "seconds",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "totals": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "cuttingSeconds": {
+                              "type": "number",
+                            },
+                            "cycleSeconds": {
+                              "type": "number",
+                            },
+                            "operations": {
+                              "type": "integer",
+                            },
+                            "removedVolume": {
+                              "type": "number",
+                            },
+                            "tools": {
+                              "type": "integer",
+                            },
+                          },
+                          "required": [
+                            "tools",
+                            "operations",
+                            "cycleSeconds",
+                            "cuttingSeconds",
+                            "removedVolume",
+                          ],
+                          "type": "object",
+                        },
+                      },
+                      "required": [
+                        "title",
+                        "jobId",
+                        "release",
+                        "material",
+                        "machine",
+                        "setup",
+                        "tools",
+                        "operations",
+                        "totals",
+                        "claims",
+                        "notes",
+                        "issues",
+                        "identity",
+                      ],
+                      "type": "object",
+                    },
+                    "html": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "data",
+                    "html",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "toolpaths",
+        ],
+      },
+    },
     "/api/toolpaths/{id}/versions": {
       "get": {
         "operationId": "toolpathExtras.listVersions",

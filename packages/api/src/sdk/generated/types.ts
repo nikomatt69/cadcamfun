@@ -5788,6 +5788,60 @@ export type ToolpathsRemoveInput = { readonly id: { readonly id: string }["id"] 
 
 export type ToolpathsRemoveOutput = { message: string }
 
+export type ToolpathsSetupSheetInput = { readonly id: { readonly id: string }["id"] }
+
+export type ToolpathsSetupSheetOutput = {
+  data: {
+    title: string
+    jobId: string
+    release: "blocked" | "preview" | "verified-program"
+    material: { name: string; iso: string }
+    machine: { name: string; post: string }
+    setup: {
+      orientation: string
+      workOffset: string
+      origin: { x: number; y: number; z: number }
+      stock: { x: number; y: number; z: number }
+    }
+    tools: Array<{
+      number: number
+      id: string
+      name: string
+      kind: string
+      diameter: number
+      flutes: number
+      fluteLength: number
+      shankDiameter: number
+      stickout: number
+      holder?: string
+      operations: Array<string>
+      seconds: number
+    }>
+    operations: Array<{
+      index: number
+      id: string
+      name: string
+      strategy: string
+      status: "ok" | "failed"
+      tool?: number
+      seconds: number
+      cutLength: number
+      removedVolume: number
+      rpm?: number
+      feed?: number
+      ap?: number
+      ae?: number
+      warnings: Array<string>
+    }>
+    totals: { tools: number; operations: number; cycleSeconds: number; cuttingSeconds: number; removedVolume: number }
+    claims: Array<{ id: string; status: string; detail: string }>
+    notes: Array<string>
+    issues: Array<{ severity: string; message: string }>
+    identity: { job: string; part: string; nc: string; algorithm: string }
+  }
+  html: string
+}
+
 export type ToolpathsListForDrawingInput = { readonly id: { readonly id: string }["id"] }
 
 export type ToolpathsListForDrawingOutput = Array<{

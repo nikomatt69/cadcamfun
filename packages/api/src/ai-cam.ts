@@ -132,6 +132,8 @@ export const CamStockSetInput = Schema.Struct({
 export const CAM_ACTION_INPUTS = {
   "cam.plan_check": CamMachiningPlan,
   "cam.review": Schema.Struct({ operationId: id }),
+  /** The shop sheet of a saved kernel program (tools, operations, times, evidence), read from its own artifact. */
+  "cam.setup_sheet": Schema.Struct({ operationId: id }),
   /**
    * The machine's kinematics; with a program (text or operation), how it runs there (spec 31): what turns and in which sense,
    * where the tool is at `at` seconds, the set-up findings (vise, chuck, bed), the turned part or the printed layers. `params`

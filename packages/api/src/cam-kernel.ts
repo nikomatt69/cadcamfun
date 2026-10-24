@@ -104,3 +104,29 @@ export const CamKernelResult: Schema.Codec<cam.kernel.CamResult<cam.kernel.CamAr
   Schema.Struct({ status: Schema.Literal("failed"), issues: Schema.Array(CamKernelIssue) })
 ])
 export type CamKernelResult = typeof CamKernelResult.Type
+
+const xyz = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
+
+/** The setup sheet of a stored program (`cam.kernel.setupSheetData`): everything on it comes from the program's own artifact. */
+export const CamSetupSheetData = Schema.Struct({
+  title: Schema.String, jobId: Schema.String, release: Schema.Literals(["blocked", "preview", "verified-program"]),
+  material: Schema.Struct({ name: Schema.String, iso: Schema.String }),
+  machine: Schema.Struct({ name: Schema.String, post: Schema.String }),
+  setup: Schema.Struct({ orientation: Schema.String, workOffset: Schema.String, origin: xyz, stock: xyz }),
+  tools: Schema.Array(Schema.Struct({
+    number: Schema.Int, id: Schema.String, name: Schema.String, kind: Schema.String, diameter: Schema.Finite, flutes: Schema.Int, fluteLength: Schema.Finite,
+    shankDiameter: Schema.Finite, stickout: Schema.Finite, holder: Schema.optionalKey(Schema.String), operations: strings, seconds: Schema.Finite
+  })),
+  operations: Schema.Array(Schema.Struct({
+    index: Schema.Int, id: Schema.String, name: Schema.String, strategy: Schema.String, status: Schema.Literals(["ok", "failed"]), tool: Schema.optionalKey(Schema.Int),
+    seconds: Schema.Finite, cutLength: Schema.Finite, removedVolume: Schema.Finite,
+    rpm: Schema.optionalKey(Schema.Finite), feed: Schema.optionalKey(Schema.Finite), ap: Schema.optionalKey(Schema.Finite), ae: Schema.optionalKey(Schema.Finite), warnings: strings
+  })),
+  totals: Schema.Struct({ tools: Schema.Int, operations: Schema.Int, cycleSeconds: Schema.Finite, cuttingSeconds: Schema.Finite, removedVolume: Schema.Finite }),
+  claims: Schema.Array(Schema.Struct({ id: Schema.String, status: Schema.String, detail: Schema.String })),
+  notes: strings,
+  issues: Schema.Array(Schema.Struct({ severity: Schema.String, message: Schema.String })),
+  identity: Schema.Struct({ job: Schema.String, part: Schema.String, nc: Schema.String, algorithm: Schema.String })
+})
+export const CamSetupSheet = Schema.Struct({ data: CamSetupSheetData, html: Schema.String })
+export type CamSetupSheet = typeof CamSetupSheet.Type

@@ -60,6 +60,7 @@ on [53](53-stock-simulation-verification.md) (proof) and [41](41-persistent-topo
 | ID | Item | Gate |
 |---|---|---|
 | H1 | **Setup sheets and shop documentation**: HTML/PDF: part & stock, WCS, tool list with thumbnails and stick-out, operation list with estimated times, thumbnails of toolpaths per operation, notes; template-based. | document generated from a job and matches the evidence (tool counts, times) |
+|  | **State (2026-10-24): built for kernel programs.** `cam/kernel/setup-sheet.ts` (`setupSheetData` / `setupSheetHtml`): part and stock, work offset and zero, tools by number with stick-out, flute length, the operations that use each and their cutting time (inline SVG silhouette per tool), operations in program order with cutting data, time, cut length and removal, the evidence claims, notes, issues, identity digests; every value read from the artifact and escaped; a printer artifact is refused. `GET /api/toolpaths/:id/setup-sheet`, assistant `cam.setup_sheet`, "Setup sheet (HTML)" button in the kernel panel. Gate met on the numbers (tool count, operation list, cycle time and per-tool times equal the artifact; `setup-sheet.test.ts`, sidecar and desktop live tests). **Not built:** toolpath thumbnails per operation, PDF output, user templates, legacy-generator programs (no artifact). | `bun test packages/core/src/cam/kernel/setup-sheet.test.ts apps/sidecar/test/cam-kernel.test.ts apps/desktop/test/cam-setup-sheet.test.ts` |
 
 ## 3. Other processes (decision D5)
 
