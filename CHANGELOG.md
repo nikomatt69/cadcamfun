@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.16 (October 2026)
+
+## Core
+
+- Open and non-level smooth walls and trimmed free-form faces are edited: chain offset over open chains and sloped planes, footprint-cut move/offset/draft with the deviation reported (spec 40 U2)
+
 ## v0.1.15 (October 2026)
 
 ## Core
