@@ -6,6 +6,7 @@
  * the reason.
  */
 import { brepFeatures, type ExactFeatures } from "../cam/brep-part.ts"
+import { planSetups, type SetupPlan, type SetupPlanOptions } from "../cam/setup-plan.ts"
 import { healBrep, massProperties, minimumDistance, recognizeHoles, offsetBrep, shellBrep, validateBrep, type Brep } from "./brep/index.ts"
 import { brepBox } from "./history-brep.ts"
 import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
@@ -128,6 +129,28 @@ export const analyzeScene = (elements: ReadonlyArray<Element>, options: { readon
   const parts = scene.parts.filter((p) => wanted === undefined || wanted.has(p.id)).map((p) => analyzeBrep(p.id, p.name, p.brep, options.machining === undefined ? {} : { machining: options.machining }))
   const skipped = wanted === undefined ? scene.skipped : scene.skipped.filter((s) => wanted.has(s.id))
   return { parts, skipped, totals: { parts: parts.length, volume: parts.reduce((v, p) => v + p.volume, 0), area: parts.reduce((v, p) => v + p.area, 0) } }
+}
+
+export interface SceneSetups {
+  readonly parts: ReadonlyArray<{ readonly id: string; readonly name: string; readonly plan: SetupPlan }>
+  readonly skipped: SceneParts["skipped"]
+}
+
+/**
+ * The manual setups every solid of the scene needs (`cam/setup-plan.ts`): which orientations, what each reaches, which faces no
+ * three-axis setup reaches. Same selection rule as `analyzeScene`.
+ */
+export const setupsForScene = (
+  elements: ReadonlyArray<Element>, options: { readonly ids?: ReadonlyArray<string> } & SetupPlanOptions = {}
+): SceneSetups => {
+  const { ids, ...plan } = options
+  const wanted = ids === undefined ? undefined : new Set(ids)
+  const top = new Set(elements.map((e) => String(e.id ?? "")))
+  const scene = sceneParts(ids !== undefined && ids.every((i) => top.has(i)) ? selectElements(elements, ids) : elements)
+  return {
+    parts: scene.parts.filter((p) => wanted === undefined || wanted.has(p.id)).map((p) => ({ id: p.id, name: p.name, plan: planSetups(p.brep, plan) })),
+    skipped: wanted === undefined ? scene.skipped : scene.skipped.filter((s) => wanted.has(s.id))
+  }
 }
 
 export interface AssemblyReport {

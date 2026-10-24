@@ -1669,6 +1669,14 @@ export type CadExactAssemblyPayload = {
   readonly washers?: boolean
 }
 
+export type CadExactSetupsPayload = {
+  readonly elements?: ReadonlyArray<{ readonly [x: string]: JsonValue }>
+  readonly drawingId?: string
+  readonly ids?: ReadonlyArray<string>
+  readonly fixture?: "bottom" | "none"
+  readonly allowed?: ReadonlyArray<"+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y">
+}
+
 export type LibraryCreatePayload = {
   readonly name?: string | undefined
   readonly description?: string | null | undefined
@@ -6614,6 +6622,51 @@ export type CadExactAssemblyOutput = {
     unfastened: Array<{ bodies: Array<string>; at: { x: number; y: number; z: number }; reason: string }>
     existing: number
   }
+  skipped: Array<{ id: string; name: string; reason: string }>
+}
+
+export type CadExactSetupsInput = {
+  readonly elements?: CadExactSetupsPayload["elements"]
+  readonly drawingId?: CadExactSetupsPayload["drawingId"]
+  readonly ids?: CadExactSetupsPayload["ids"]
+  readonly fixture?: CadExactSetupsPayload["fixture"]
+  readonly allowed?: CadExactSetupsPayload["allowed"]
+}
+
+export type CadExactSetupsOutput = {
+  parts: Array<{
+    id: string
+    name: string
+    plan: {
+      setups: Array<{
+        orientation: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
+        faces: Array<number>
+        area: number
+        share: number
+        holes: Array<{
+          entry: { x: number; y: number; z: number }
+          direction: { x: number; y: number; z: number }
+          diameter: number
+          depth: number
+          form: "simple" | "counterbore" | "countersink"
+        }>
+        prismatic: { ok: true; holes: number; pockets: number; outlines: number } | { ok: false; reason: string }
+      }>
+      uncovered: Array<{ face: number; kind: string; area: number; reason: string }>
+      held: Array<{ face: number; kind: string; area: number }>
+      indexed: Array<{
+        entry: { x: number; y: number; z: number }
+        direction: { x: number; y: number; z: number }
+        diameter: number
+        depth: number
+        form: "simple" | "counterbore" | "countersink"
+      }>
+      reach: Array<{ orientation: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"; faces: number; area: number; share: number }>
+      faces: number
+      area: number
+      notes: Array<string>
+    }
+  }>
   skipped: Array<{ id: string; name: string; reason: string }>
 }
 

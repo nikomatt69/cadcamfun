@@ -1,7 +1,7 @@
 import { expect, setDefaultTimeout, test } from "bun:test"
 import type { History } from "./history.ts"
 import { model } from "./script.ts"
-import { analyzeBrep, analyzeScene, assemblyReport } from "./scene-analysis.ts"
+import { analyzeBrep, analyzeScene, assemblyReport, setupsForScene } from "./scene-analysis.ts"
 import { makeBox } from "./brep/index.ts"
 
 setDefaultTimeout(90_000)
@@ -119,4 +119,17 @@ test("the exact analysis names the faces and says what healing would do for a so
   expect(bad.repair).toBeDefined()
   expect(bad.repair!.validAfter).toBe(false)
   expect(bad.repair!.issuesAfter.length).toBeGreaterThan(0)
+})
+
+test("setups are planned for the solids of the scene, a component's child included, and the selection narrows them", () => {
+  const all = setupsForScene(scene())
+  expect(all.parts.map((p) => p.id)).toEqual(["base", "plate"])
+  // Both blocks are drilled from the top only: one +Z setup with the two holes each, nothing unreachable.
+  for (const p of all.parts) {
+    expect(p.plan.setups.map((s) => s.orientation)).toEqual(["+Z"])
+    expect(p.plan.setups[0]!.holes).toHaveLength(2)
+    expect(p.plan.uncovered).toEqual([])
+  }
+  expect(setupsForScene(scene(), { ids: ["plate"] }).parts.map((p) => p.id)).toEqual(["plate"])
+  expect(setupsForScene(scene(), { fixture: "none" }).parts[0]!.plan.setups.map((s) => s.orientation).sort()).toEqual(["+Z", "-Z"])
 })

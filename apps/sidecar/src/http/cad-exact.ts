@@ -51,6 +51,14 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
           return { ...(out.step !== undefined ? { step: out.step } : {}), parts: out.parts.map((p) => ({ id: p.id, name: p.name, exact: p.exact, faces: p.faces, valid: p.valid, ...(p.note !== undefined ? { note: p.note } : {}) })), skipped: out.skipped }
         })
       }))
+    .handle("setups", ({ payload }) =>
+      Effect.gen(function*() {
+        const elements = yield* sceneOf(payload)
+        return yield* guarded("Failed to plan the setups", () => cad.setupsForScene(elements, {
+          ...(payload.ids !== undefined ? { ids: payload.ids } : {}), ...(payload.fixture !== undefined ? { fixture: payload.fixture } : {}),
+          ...(payload.allowed !== undefined ? { allowed: payload.allowed } : {})
+        }))
+      }))
     .handle("assembly", ({ payload }) =>
       Effect.gen(function*() {
         const elements = yield* sceneOf(payload)

@@ -118,6 +118,12 @@ const assembly = Schema.Struct({
   interference: Schema.StructWithRest(Schema.Struct({ clashes: Schema.Array(record), clashesTotal: int, checked: int }), [record]),
   bom: Schema.Array(record), bomTotal: int, jointsTotal: int, fasteners: record, ...drawingRef
 })
+const setups = Schema.Struct({
+  ok: Schema.Literal(true),
+  parts: Schema.Array(Schema.Struct({ id: str, name: str, plan: record })), partsTotal: int,
+  skipped: Schema.Array(Schema.Struct({ id: str, name: str, reason: str })),
+  ...drawingRef
+})
 const shell = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(true), id: str, name: str, wall: num, open: strings, volume: num, cavityVolume: num, originalVolume: num, faces: int, shells: int, pieces: int, valid: Schema.Boolean }),
   Schema.Struct({ ok: Schema.Literal(false), error: str })
@@ -290,6 +296,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.parametric_exact": read(parametricExact),
   "cad.exact": read(exact),
   "cad.assembly": read(assembly),
+  "cad.setups": read(setups),
   "cad.shell": read(shell),
   "cad.surface": read(Schema.Struct({ ok: Schema.Literal(true), kind: Schema.Literals(["surface", "solid"]), valid: Schema.Boolean, faces: int, boundaryEdges: int })),
   "cad.exchange": read(Schema.Struct({ ok: Schema.Literal(true), format: Schema.Literals(["step", "iges"]), content: str, parts: int, warnings: strings })),

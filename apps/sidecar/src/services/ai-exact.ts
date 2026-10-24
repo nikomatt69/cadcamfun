@@ -28,6 +28,29 @@ export const exactForModel = (analysis: cad.SceneAnalysis, drawing: Record<strin
   ...drawing
 })
 
+/** Setup plans for the assistant: face lists are summarised (counts), the long lists capped, the totals kept. */
+export const setupsForModel = (report: cad.SceneSetups, drawing: Record<string, unknown>) => {
+  const parts = capped(report.parts)
+  return {
+    ok: true,
+    ...(round({
+      parts: parts.items.map((p) => ({
+        id: p.id, name: p.name,
+        plan: {
+          faces: p.plan.faces, area: p.plan.area, notes: p.plan.notes,
+          setups: p.plan.setups.map((s) => ({ ...s, faces: s.faces.length, holes: capped(s.holes).items, holesTotal: s.holes.length })),
+          uncovered: capped(p.plan.uncovered).items, uncoveredTotal: p.plan.uncovered.length,
+          held: p.plan.held.length, indexed: capped(p.plan.indexed).items, indexedTotal: p.plan.indexed.length,
+          reach: p.plan.reach
+        }
+      })),
+      partsTotal: parts.total,
+      skipped: report.skipped
+    }) as object),
+    ...drawing
+  }
+}
+
 export const assemblyForModel = (report: cad.AssemblyReport, drawing: Record<string, unknown>) => {
   const clashes = capped(report.interference.clashes), plans = capped(report.fasteners.plans), bom = capped(report.bom)
   return {

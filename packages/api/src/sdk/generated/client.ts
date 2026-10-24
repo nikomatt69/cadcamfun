@@ -453,6 +453,8 @@ import type {
   CadExactStepOutput,
   CadExactAssemblyInput,
   CadExactAssemblyOutput,
+  CadExactSetupsInput,
+  CadExactSetupsOutput,
   LibraryListInput,
   LibraryListOutput,
   LibraryCreateInput,
@@ -3961,6 +3963,24 @@ export function make(options: ClientOptions) {
             method: "POST",
             path: `/api/cad/exact/assembly`,
             body: { elements: input?.["elements"], drawingId: input?.["drawingId"], washers: input?.["washers"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      setups: (input?: CadExactSetupsInput, requestOptions?: RequestOptions) =>
+        request<CadExactSetupsOutput>(
+          {
+            method: "POST",
+            path: `/api/cad/exact/setups`,
+            body: {
+              elements: input?.["elements"],
+              drawingId: input?.["drawingId"],
+              ids: input?.["ids"],
+              fixture: input?.["fixture"],
+              allowed: input?.["allowed"],
+            },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 500, 401],
             empty: false,

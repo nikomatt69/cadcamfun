@@ -44,7 +44,7 @@ const withDefaults = (value: Record<string, unknown>): Record<string, unknown> =
   }
 }
 
-export type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadShellInput, CadOffsetInput, CadMotionInput } from "@cadcamfun/api"
+export type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadSetupsInput, CadShellInput, CadOffsetInput, CadMotionInput } from "@cadcamfun/api"
 
 const inspect = (action: string) => (input: unknown, context: ActionContext) =>
   context.handlers.cadInspect === undefined
@@ -167,6 +167,12 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     parameters: INPUTS["cad.assembly"],
     run: (input, { handlers, projectId }) =>
       handlers.cadAssembly === undefined ? { ok: false, error: "Assembly analysis is unavailable in this host." } : handlers.cadAssembly(projectId, input)
+  }),
+  defineWireAction({
+    id: "cad.setups", kind: "read",
+    parameters: INPUTS["cad.setups"],
+    run: (input, { handlers, projectId }) =>
+      handlers.cadSetups === undefined ? { ok: false, error: "Setup planning is unavailable in this host." } : handlers.cadSetups(projectId, input)
   }),
   defineWireAction({
     id: "cad.shell", kind: "read",

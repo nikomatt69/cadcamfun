@@ -2876,10 +2876,30 @@ const Endpoint28_2 = (raw: RawClient["cadExact"]) => (input?: Endpoint28_2Input)
     payload: { elements: input?.["elements"], drawingId: input?.["drawingId"], washers: input?.["washers"] },
   }).pipe(Effect.mapError(mapClientError))
 
+type Endpoint28_3Request = Parameters<RawClient["cadExact"]["setups"]>[0]
+type Endpoint28_3Input = {
+  readonly elements?: Endpoint28_3Request["payload"]["elements"]
+  readonly drawingId?: Endpoint28_3Request["payload"]["drawingId"]
+  readonly ids?: Endpoint28_3Request["payload"]["ids"]
+  readonly fixture?: Endpoint28_3Request["payload"]["fixture"]
+  readonly allowed?: Endpoint28_3Request["payload"]["allowed"]
+}
+const Endpoint28_3 = (raw: RawClient["cadExact"]) => (input?: Endpoint28_3Input) =>
+  raw["setups"]({
+    payload: {
+      elements: input?.["elements"],
+      drawingId: input?.["drawingId"],
+      ids: input?.["ids"],
+      fixture: input?.["fixture"],
+      allowed: input?.["allowed"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
+
 const adaptGroup28 = (raw: RawClient["cadExact"]) => ({
   analyze: Endpoint28_0(raw),
   step: Endpoint28_1(raw),
   assembly: Endpoint28_2(raw),
+  setups: Endpoint28_3(raw),
 })
 
 type Endpoint29_0Request = Parameters<RawClient["library"]["list"]>[0]

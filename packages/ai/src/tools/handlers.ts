@@ -1,5 +1,5 @@
 import type { SetupCandidate, MachiningPlanInput, ManufactureInput } from "../actions/cam.ts"
-import type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadShellInput, CadOffsetInput, CadMotionInput } from "../actions/cad.ts"
+import type { CadAssemblyInput, CadDistanceInput, CadExactInput, CadGrepInput, CadSetupsInput, CadShellInput, CadOffsetInput, CadMotionInput } from "../actions/cad.ts"
 import type { CadComponentRelationsInput, CadInspectionInput } from "../actions/cad.ts"
 import type { ParametricHandlerInput } from "../actions/parametric.ts"
 export type { ParametricHandlerInput } from "../actions/parametric.ts"
@@ -45,6 +45,7 @@ export interface ToolHandlersShape {
   cadComponentRelations?(projectId: string, input: CadComponentRelationsInput): Promise<unknown>
   /** The exact B-rep kernel over the open drawing: per solid validity, mass properties, holes and how the CAM planner will machine it. */
   cadExact?(projectId: string, input: CadExactInput): Promise<unknown>
+  cadSetups?(projectId: string, input: CadSetupsInput): Promise<unknown>
   /** Exact interference, bill of materials, joints and the fasteners still missing of the open drawing. */
   cadAssembly?(projectId: string, input: CadAssemblyInput): Promise<unknown>
   /** What hollowing one solid would give (exact shell, volumes, open faces by name); nothing in the drawing changes. */

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
 import { buildRecipe } from "@cadcamfun/core"
-import { CadAssemblyReport, CadExactAnalysis, CadExactStep } from "@cadcamfun/api"
+import { CadAssemblyReport, CadExactAnalysis, CadExactStep, CadSetupsReport } from "@cadcamfun/api"
 import { Schema } from "effect"
 import { makeApp } from "./helpers.ts"
 
@@ -15,7 +15,7 @@ const cube = (id: string, x: number) => ({ id, type: "cube", name: id, x, y: 0, 
 const post = (path: string, json: unknown, auth = true) => app.call(`/api/cad/exact/${path}`, { method: "POST", json, auth })
 
 test("the exact kernel routes are authenticated and need a source", async () => {
-  for (const path of ["analyze", "step", "assembly"]) {
+  for (const path of ["analyze", "step", "assembly", "setups"]) {
     expect((await post(path, { elements: [plate] }, false)).status).toBe(401)
     expect((await post(path, {})).status).toBe(400)
     expect((await post(path, { elements: [] })).status).toBe(400)
@@ -68,4 +68,37 @@ test("assembly reports the clash of two overlapping parts with the exact overlap
   expect(result.interference.clashes).toHaveLength(1)
   expect(result.interference.clashes[0]!.volume).toBeCloseTo(500, 2)
   expect(result.bom.map((row) => row.name).sort()).toEqual(["a", "b"])
+})
+
+/** A 60 x 40 x 20 block with a Ø6 hole drilled into it from its +X face (a side hole, 12 deep). */
+const sideHole = {
+  id: "side", type: "parametric", name: "Side", x: 0, y: 0, z: 0, layerId: "default",
+  history: {
+    parameters: {},
+    features: [
+      { id: "s", type: "sketch", plane: "XY", sketch: { entities: [], constraints: [], shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: 60, height: 40 }] } },
+      { id: "block", type: "extrude", sketch: "s", depth: 20, operation: "new" },
+      { id: "h", type: "hole", plane: "YZ", offset: 60, at: [20, 10], diameter: 6, depth: 12 }
+    ]
+  }
+}
+
+test("setups plan the orientations a part needs: a top-drilled plate one, a side hole a second", async () => {
+  const flat = Schema.decodeUnknownSync(CadSetupsReport)((await post("setups", { elements: [plate] })).body)
+  expect(flat.parts).toHaveLength(1)
+  expect(flat.parts[0]!.plan.setups.map((s) => s.orientation)).toEqual(["+Z"])
+  expect(flat.parts[0]!.plan.setups[0]!.holes).toHaveLength(4)
+  expect(flat.parts[0]!.plan.uncovered).toHaveLength(0)
+
+  const side = Schema.decodeUnknownSync(CadSetupsReport)((await post("setups", { elements: [sideHole, cube("c", 200)], ids: ["side"] })).body)
+  expect(side.parts.map((p) => p.id)).toEqual(["side"])
+  const plan = side.parts[0]!.plan
+  expect(plan.setups.map((s) => s.orientation).sort()).toEqual(["+X", "+Z"])
+  expect(plan.setups.find((s) => s.orientation === "+X")!.holes).toEqual([expect.objectContaining({ diameter: expect.closeTo(6, 6), depth: expect.closeTo(12, 6) })])
+  expect(plan.uncovered).toHaveLength(0)
+
+  const only = Schema.decodeUnknownSync(CadSetupsReport)((await post("setups", { elements: [sideHole], allowed: ["+Z"] })).body)
+  expect(only.parts[0]!.plan.uncovered.length).toBeGreaterThan(0)
+  expect(only.parts[0]!.plan.indexed).toHaveLength(1)
+  expect((await post("setups", { elements: [sideHole], allowed: ["+W"] })).status).toBe(400)
 })

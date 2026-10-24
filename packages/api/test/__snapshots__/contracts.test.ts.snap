@@ -16675,6 +16675,531 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/cad/exact/setups": {
+      "post": {
+        "operationId": "cadExact.setups",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "allowed": {
+                    "items": {
+                      "enum": [
+                        "+Z",
+                        "-Z",
+                        "+X",
+                        "-X",
+                        "+Y",
+                        "-Y",
+                      ],
+                      "type": "string",
+                    },
+                    "maxItems": 6,
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                  "drawingId": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "elements": {
+                    "items": {
+                      "type": "object",
+                    },
+                    "maxItems": 2000,
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                  "fixture": {
+                    "enum": [
+                      "bottom",
+                      "none",
+                    ],
+                    "type": "string",
+                  },
+                  "ids": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "maxItems": 200,
+                    "type": "array",
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "parts": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "plan": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "area": {
+                                "type": "number",
+                              },
+                              "faces": {
+                                "type": "integer",
+                              },
+                              "held": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "area": {
+                                      "type": "number",
+                                    },
+                                    "face": {
+                                      "type": "integer",
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "face",
+                                    "kind",
+                                    "area",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
+                              },
+                              "indexed": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "depth": {
+                                      "type": "number",
+                                    },
+                                    "diameter": {
+                                      "type": "number",
+                                    },
+                                    "direction": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                        "z": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "entry": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                        "z": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "z",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "form": {
+                                      "enum": [
+                                        "simple",
+                                        "counterbore",
+                                        "countersink",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "entry",
+                                    "direction",
+                                    "diameter",
+                                    "depth",
+                                    "form",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
+                              },
+                              "notes": {
+                                "items": {
+                                  "type": "string",
+                                },
+                                "type": "array",
+                              },
+                              "reach": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "area": {
+                                      "type": "number",
+                                    },
+                                    "faces": {
+                                      "type": "integer",
+                                    },
+                                    "orientation": {
+                                      "enum": [
+                                        "+Z",
+                                        "-Z",
+                                        "+X",
+                                        "-X",
+                                        "+Y",
+                                        "-Y",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "share": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "orientation",
+                                    "faces",
+                                    "area",
+                                    "share",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
+                              },
+                              "setups": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "area": {
+                                      "type": "number",
+                                    },
+                                    "faces": {
+                                      "items": {
+                                        "type": "integer",
+                                      },
+                                      "type": "array",
+                                    },
+                                    "holes": {
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "depth": {
+                                            "type": "number",
+                                          },
+                                          "diameter": {
+                                            "type": "number",
+                                          },
+                                          "direction": {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "x": {
+                                                "type": "number",
+                                              },
+                                              "y": {
+                                                "type": "number",
+                                              },
+                                              "z": {
+                                                "type": "number",
+                                              },
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y",
+                                              "z",
+                                            ],
+                                            "type": "object",
+                                          },
+                                          "entry": {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "x": {
+                                                "type": "number",
+                                              },
+                                              "y": {
+                                                "type": "number",
+                                              },
+                                              "z": {
+                                                "type": "number",
+                                              },
+                                            },
+                                            "required": [
+                                              "x",
+                                              "y",
+                                              "z",
+                                            ],
+                                            "type": "object",
+                                          },
+                                          "form": {
+                                            "enum": [
+                                              "simple",
+                                              "counterbore",
+                                              "countersink",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        },
+                                        "required": [
+                                          "entry",
+                                          "direction",
+                                          "diameter",
+                                          "depth",
+                                          "form",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "type": "array",
+                                    },
+                                    "orientation": {
+                                      "enum": [
+                                        "+Z",
+                                        "-Z",
+                                        "+X",
+                                        "-X",
+                                        "+Y",
+                                        "-Y",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "prismatic": {
+                                      "anyOf": [
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "holes": {
+                                              "type": "integer",
+                                            },
+                                            "ok": {
+                                              "enum": [
+                                                true,
+                                              ],
+                                              "type": "boolean",
+                                            },
+                                            "outlines": {
+                                              "type": "integer",
+                                            },
+                                            "pockets": {
+                                              "type": "integer",
+                                            },
+                                          },
+                                          "required": [
+                                            "ok",
+                                            "holes",
+                                            "pockets",
+                                            "outlines",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "ok": {
+                                              "enum": [
+                                                false,
+                                              ],
+                                              "type": "boolean",
+                                            },
+                                            "reason": {
+                                              "type": "string",
+                                            },
+                                          },
+                                          "required": [
+                                            "ok",
+                                            "reason",
+                                          ],
+                                          "type": "object",
+                                        },
+                                      ],
+                                    },
+                                    "share": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "orientation",
+                                    "faces",
+                                    "area",
+                                    "share",
+                                    "holes",
+                                    "prismatic",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
+                              },
+                              "uncovered": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "area": {
+                                      "type": "number",
+                                    },
+                                    "face": {
+                                      "type": "integer",
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                    },
+                                    "reason": {
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "face",
+                                    "kind",
+                                    "area",
+                                    "reason",
+                                  ],
+                                  "type": "object",
+                                },
+                                "type": "array",
+                              },
+                            },
+                            "required": [
+                              "setups",
+                              "uncovered",
+                              "held",
+                              "indexed",
+                              "reach",
+                              "faces",
+                              "area",
+                              "notes",
+                            ],
+                            "type": "object",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "plan",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "skipped": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "reason": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "reason",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "parts",
+                    "skipped",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cadExact",
+        ],
+      },
+    },
     "/api/cad/exact/step": {
       "post": {
         "operationId": "cadExact.step",
@@ -54704,6 +55229,18 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "maximum": 100,
                         "minimum": 0,
                         "type": "number",
+                      },
+                      "filament": {
+                        "enum": [
+                          "pla",
+                          "petg",
+                          "abs",
+                          "asa",
+                          "tpu",
+                          "nylon",
+                          "pc",
+                        ],
+                        "type": "string",
                       },
                       "firstLayerHeight": {
                         "minimum": 0,

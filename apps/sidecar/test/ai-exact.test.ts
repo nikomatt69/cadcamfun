@@ -34,6 +34,15 @@ test("the assistant reads the exact kernel and the assembly of the open drawing"
   expect(assembly.body.result.interference.clashes[0].volume).toBeCloseTo(500, 2)
   expect(assembly.body.result.bomTotal).toBeGreaterThanOrEqual(3)
 
+  // The manual setups of the plate: one +Z setup with its four counterbored holes, nothing unreachable.
+  const setups = await invoke({ action: "setups", ids: ["plate"] })
+  expect(setups.status).toBe(200)
+  expect(setups.body.result.ok).toBe(true)
+  const plan = setups.body.result.parts[0].plan
+  expect(plan.setups.map((s: { orientation: string }) => s.orientation)).toEqual(["+Z"])
+  expect(plan.setups[0]).toMatchObject({ holesTotal: 4, prismatic: { ok: true, holes: 4 } })
+  expect(plan.uncoveredTotal).toBe(0)
+
   // The exact gap between two solids, and a shell on paper.
   const gap = await invoke({ action: "distance", firstId: "a", secondId: "b" })
   expect(gap.status).toBe(200)

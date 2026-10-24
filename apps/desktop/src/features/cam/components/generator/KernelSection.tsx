@@ -11,6 +11,7 @@ import { kernelRequestOf } from "../../lib/job.ts"
 import { kernelMachineConfigsOf, machinesFromResponse } from "../../lib/machines.ts"
 import { useCamStore } from "../../store/camStore.ts"
 import { ToolSilhouette } from "../ToolSilhouette.tsx"
+import KernelSetups from "./KernelSetups.tsx"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { useVerifyStore } from "../../store/verifyStore.ts"
 import { INPUT, LABEL, NumberField, Section } from "./ui.tsx"
@@ -239,6 +240,10 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
       <Show when={settings().setupOrientation !== undefined && settings().setupOrientation !== "+Z"}>
         <p class="text-xs text-amber-700 dark:text-amber-300" data-testid="kernel-manual-setup-hint">{t("cam.kernel.manualSetupHint")}</p>
       </Show>
+      <KernelSetups
+        elements={request()?.elements as ReadonlyArray<Record<string, unknown>> | undefined} current={settings().setupOrientation}
+        onUse={(orientation) => { gen.patchKernelSettings({ setupOrientation: orientation, operations: undefined }); gen.updateSettings("workholdingConfigured", false); setPlanNotes([]) }}
+      />
       <details class="border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="kernel-settings">
         <summary class="cursor-pointer text-sm font-medium">{t("cam.kernel.settings")}</summary>
         <div class="space-y-3 pt-3">

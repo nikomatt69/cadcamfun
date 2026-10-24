@@ -19,6 +19,7 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - parametric_exact: elementId or history, includeStep?, name?; exact body or reason it is mesh-only.
 - exact: ids?, machining?; exact validity, volume, bounds, faceNames, holes and CAM suitability.
 - assembly: washers?; exact clashes, gaps, BOM, joints, missing fasteners.
+- setups: ids?, fixture?, allowed?; setup orientations per solid.
 - distance: firstId, secondId; smallest exact gap and closest points.
 - shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]; preview. Get names from exact.
 - offset: id, distance; outward offset preview, rounded convex corners. Unsupported geometry returns a reason.

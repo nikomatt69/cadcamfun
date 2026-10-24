@@ -58,10 +58,13 @@ describe("the assistant's view of the exact model", () => {
   })
 
   test("a body built with a mesh-only feature says why it has no exact model", async () => {
-    const squashed = { ...(plate as object), features: [...(plate as { features: unknown[] }).features, { id: "s", type: "scale", factor: [1, 2, 1] }] } as never
-    const out = (await runParametricExact({ history: squashed } as never, context)) as { bodies: Array<Record<string, unknown>> }
+    // A non-uniform scale is exact now (spec 40 U4); an ellipsoid still has no rational surface in the kernel and is refused with a reason.
+    const m = model()
+    m.primitive({ element: "ellipsoid", params: { radiusX: 8, radiusY: 5, radiusZ: 4 } })
+    const ellipsoid = m.build() as never
+    const out = (await runParametricExact({ history: ellipsoid } as never, context)) as { bodies: Array<Record<string, unknown>> }
     expect(out.bodies[0]!["exact"]).toBe(false)
-    expect(String(out.bodies[0]!["reason"])).toContain("non-uniform scale")
+    expect(String(out.bodies[0]!["reason"]).toLowerCase()).toContain("ellipsoid")
   })
 
   test("a filleted body keeps its exact model (rolling-ball fillets of the exact solid)", async () => {

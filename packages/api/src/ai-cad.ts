@@ -39,6 +39,16 @@ export const CadExactInput = Schema.Struct({
 })
 export type CadExactInput = typeof CadExactInput.Type
 
+/** The manual three-axis setups each solid needs: `fixture` names the held face, `allowed` the orientations the shop can use. */
+export const CadSetupsInput = Schema.Struct({
+  ids: optional(Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))).check(Schema.isMinLength(1), Schema.isMaxLength(40))
+    .annotate({ description: "Element ids to plan (default: every solid of the drawing)." })),
+  fixture: optional(Schema.Literals(["bottom", "none"]).annotate({ description: "bottom (default): the planar underside is held and needs no setup; none: every face needs a setup." })),
+  allowed: optional(Schema.Array(Schema.Literals(["+Z", "-Z", "+X", "-X", "+Y", "-Y"])).check(Schema.isMinLength(1), Schema.isMaxLength(6))
+    .annotate({ description: "Orientations the shop can use (default all six)." }))
+})
+export type CadSetupsInput = typeof CadSetupsInput.Type
+
 export const CadAssemblyInput = Schema.Struct({
   washers: optional(Schema.Boolean.annotate({ description: "Count missing washers as missing fasteners; default true." }))
 })
@@ -162,6 +172,7 @@ export const CAD_ACTION_INPUTS = {
   "cad.vision": VisionInput,
   "cad.exact": CadExactInput,
   "cad.assembly": CadAssemblyInput,
+  "cad.setups": CadSetupsInput,
   "cad.shell": CadShellInput,
   "cad.offset": CadOffsetInput,
   "cad.motion": CadMotionInput,

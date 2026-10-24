@@ -47,6 +47,7 @@ Flanges on adjacent sheet edges and their corner treatment, general freeform nor
 
 ## Exact kernel actions
 
+- `cad.setups` plans the manual three-axis setups of each solid (`ids?`, `fixture?` bottom|none, `allowed?` orientations): per setup the orientation to pass as `setupOrientation` to `cam.manufacture`, the holes it drills, whether the 2.5D recogniser accepts it; faces no setup reaches and holes needing 3+2 indexing are listed, never dropped. Reach ignores the cutter.
 - `cad.shell` previews a shell; `cad_edit.shell` stores an exact copy. `wallByFace:[{face,thickness}]` overrides named face walls; get face names with `cad.exact`. `open` leaves selected faces open.
 - `cad.offset` / `cad_edit.offset`: outward distance, rounded convex corners; analytic sphere/torus and rounded rectangular boxes are supported, other solids use the checked boundary construction or report a reason.
 - A history `fillet` takes `radiusEnd` for a linearly varying straight-edge radius. Radii are assigned from the lexicographically smaller endpoint. Chamfers refuse `radiusEnd`.

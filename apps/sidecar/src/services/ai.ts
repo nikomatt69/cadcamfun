@@ -16,7 +16,7 @@ import { LiveEvents } from "./live-events.ts"
 import { z } from "zod"
 import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
-import { assemblyForModel, exactForModel } from "./ai-exact.ts"
+import { assemblyForModel, exactForModel, setupsForModel } from "./ai-exact.ts"
 import { changeParameters, historyRevision, inspectParametric, testParametric } from "./ai-parametric.ts"
 import { ActingUser } from "./acting-user.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
@@ -539,6 +539,15 @@ const toolHandlers = Effect.gen(function*() {
       try {
         return exactForModel(cad.analyzeScene(loaded.elements, { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.machining !== undefined ? { machining: input.machining } : {}) }), where(loaded))
       } catch (error) { return { ok: false, error: `The exact analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    cadSetups: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      try {
+        return setupsForModel(cad.setupsForScene(loaded.elements, {
+          ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.fixture !== undefined ? { fixture: input.fixture } : {}), ...(input.allowed !== undefined ? { allowed: input.allowed } : {})
+        }), where(loaded))
+      } catch (error) { return { ok: false, error: `The setup planning failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadAssembly: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }

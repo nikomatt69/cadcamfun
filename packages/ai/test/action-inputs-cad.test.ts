@@ -39,6 +39,7 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.grep": { accept: [{ query: "bolt" }, { query: "bolt", parametricOnly: true, limit: 50, offset: 3 }], refuse: [{ query: "" }, { query: "b", limit: 51 }, { query: "b", offset: -1 }] },
   "cad.vision": { accept: [{}, { focus: "the pocket" }], refuse: [{ focus: "" }, { focus: "   " }] },
   "cad.exact": { accept: [{}, { ids: ["a"], machining: false }], refuse: [{ ids: [] }, { machining: "no" }] },
+  "cad.setups": { accept: [{}, { ids: ["a"], fixture: "none", allowed: ["+Z", "-X"] }], refuse: [{ ids: [] }, { fixture: "top" }, { allowed: [] }, { allowed: ["+W"] }] },
   "cad.assembly": { accept: [{}, { washers: false }], refuse: [{ washers: 1 }] },
   "cad.shell": { accept: [{ id: "a", thickness: 2 }, { id: "a", thickness: 1.5, open: ["plate.top"] }], refuse: [{ id: "a" }, { id: "", thickness: 2 }, { id: "a", thickness: 0 }, { id: "a", thickness: 2, open: [""] }] },
   "cad.surface": { accept: [{ operation: "patch", patches: [{ data: { degreeU: 1, degreeV: 1, knotsU: [0, 0, 1, 1], knotsV: [0, 0, 1, 1], points: [[[0, 0, 0], [0, 1, 0]], [[1, 0, 0], [1, 1, 0]]] } }] }], refuse: [{ operation: "patch", patches: [] }] },

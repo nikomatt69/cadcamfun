@@ -62,7 +62,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // Raised to 25 000 when the exact-kernel actions (cad exact / assembly) and the kernel route of cam manufacture were added.
     // Raised to 31 000 when the mods and mods_edit tools joined (RM-11): every install carries them, not just some.
     // Raised to 31 500 when cad distance / shell (the exact gap between solids, a paper shell) joined the cad tool.
-    expect(total).toBeLessThan(31_500)
+    // Raised to 31 600 when cad setups (the manual three-axis setup plan, one line) joined the cad tool.
+    expect(total).toBeLessThan(31_600)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

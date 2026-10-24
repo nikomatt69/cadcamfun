@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { cad } from "@cadcamfun/core"
+import { cad, cam } from "@cadcamfun/core"
 
 const vec3 = cad.Vec3Schema
 const num = Schema.Finite
@@ -114,3 +114,42 @@ export const CadAssemblyReport = Schema.Struct({
   skipped
 })
 export type CadAssemblyReport = typeof CadAssemblyReport.Type
+
+const orientation = cam.kernel.SetupOrientationSchema
+
+export const CadSetupsRequest = Schema.Struct({
+  ...source,
+  ids: Schema.optionalKey(Schema.Array(id).check(Schema.isMaxLength(200))),
+  /** "bottom" (default): the planar bottom of the part is the fixturing face; "none": every face needs a setup. */
+  fixture: Schema.optionalKey(Schema.Literals(["bottom", "none"])),
+  /** Orientations the shop can use (default all six). */
+  allowed: Schema.optionalKey(Schema.Array(orientation).check(Schema.isMinLength(1), Schema.isMaxLength(6)))
+})
+export type CadSetupsRequest = typeof CadSetupsRequest.Type
+
+const setupFace = { face: int, kind: Schema.String, area: num }
+const setupHole = Schema.Struct({
+  entry: vec3, direction: vec3, diameter: num, depth: num, form: Schema.Literals(["simple", "counterbore", "countersink"])
+})
+
+export const CadSetupPlan = Schema.Struct({
+  /** In machining order; `orientation` is what the planner takes as `setupOrientation`. */
+  setups: Schema.Array(Schema.Struct({
+    orientation, faces: Schema.Array(int), area: num, share: num, holes: Schema.Array(setupHole),
+    prismatic: Schema.Union([
+      Schema.Struct({ ok: Schema.Literal(true), holes: int, pockets: int, outlines: int }),
+      Schema.Struct({ ok: Schema.Literal(false), reason: Schema.String })
+    ])
+  })),
+  uncovered: Schema.Array(Schema.Struct({ ...setupFace, reason: Schema.String })),
+  held: Schema.Array(Schema.Struct(setupFace)),
+  indexed: Schema.Array(setupHole),
+  reach: Schema.Array(Schema.Struct({ orientation, faces: int, area: num, share: num })),
+  faces: int, area: num, notes: Schema.Array(Schema.String)
+})
+
+export const CadSetupsReport = Schema.Struct({
+  parts: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, plan: CadSetupPlan })),
+  skipped
+})
+export type CadSetupsReport = typeof CadSetupsReport.Type
