@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.11 (October 2026)
+
+## Core
+
+- Update release process to unify macOS installers, enhance release documentation, and implement push/pull functionality for fillet edits in CAD models.
+
 ## v0.1.10 (October 2026)
 
 ## Core
