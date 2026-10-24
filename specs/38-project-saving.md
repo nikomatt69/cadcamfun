@@ -57,7 +57,8 @@ features/projects/lib/project-session.ts
 - **Components**: the library components are added to the project by a manual save and whenever the local library grew; an
   unattended save does not list or create them.
 - **Restore points**: the sidecar keeps the document a save replaced as a `DrawingVersion` when the newest one is older than
-  10 minutes (30 kept, oldest pruned); a restore (`POST /api/drawings/:id/versions/:versionId/restore`) first keeps the current
+  10 minutes (30 kept, oldest pruned; tune with `CADCAMFUN_VERSION_INTERVAL_MS` / `CADCAMFUN_VERSION_LIMIT`). `updatedAt` is
+  strictly increasing per drawing/toolpath, so two saves in one millisecond cannot be mistaken for one by the compare-and-swap; a restore (`POST /api/drawings/:id/versions/:versionId/restore`) first keeps the current
   document, so a restore can itself be undone. The CAD toolbar's history button opens the list.
 - **Scratch work** (no project): cannot be autosaved. It is written to a recovery draft (`draft.ts`, one localStorage slot,
   debounced 1.2 s; an empty drawing clears it) and offered back — restored with a toast — the next time the CAD page opens with
@@ -68,8 +69,9 @@ features/projects/lib/project-session.ts
 - Only a program that has a stored row (`savedProgram`) is autosaved: `updateSavedProgram` (also used by the dialog's "update"
   path, so there is one write path) snapshots the program, keeps the replaced one as a toolpath version (always for a manual
   save; at most every 10 minutes for autosave), then updates the row and records the written revision as the new baseline.
-- Autosave **never** overwrites a program that changed elsewhere (`ProgramConflict`, non-retryable; the manual save overwrites and
-  keeps the other version) and never replaces post-processed text the user saved from the Post tab (`savedProgram.postProcessed`).
+- The program write is a server-side compare-and-swap too: `PUT /api/toolpaths/:id` accepts `baseUpdatedAt` (409 `Conflict`), so a
+  save cannot overwrite a program stored after the editor read it. Autosave **never** overwrites a program that changed elsewhere
+  (`ProgramConflict`, non-retryable; the manual save overwrites and keeps the other version) and never replaces post-processed text the user saved from the Post tab (`savedProgram.postProcessed`).
 - Ctrl+S on the CAM page updates a saved program in place (and the drawing it belongs to); otherwise it opens the dialog.
 
 ### 2.4 Linking
@@ -83,7 +85,9 @@ line is the worst state of the two (`error` > `saving` > `dirty` > `clean`). The
 `session.start()` (called by the shell) flushes dirty work when the page is hidden (`visibilitychange`), on `pagehide`, and
 asks `beforeunload`; in the Tauri shell `onCloseRequested` writes first (8 s limit) and closes with `destroy()` (permission
 `core:window:allow-destroy`); a second close request within 20 s closes anyway, so the window is never trapped.
-`session.hasUnsavedWork()` is the value the updater's `unsavedWork` flag should be fed with (no UI caller exists yet).
+The close handler is `closeGuard` (`window-guard.ts`, unit-tested). Updates: `app/UpdatePrompt.tsx` listens to the shell's
+`update://status`, and `installPendingUpdate` (`app/updates.ts`) writes unsaved work, then calls `install_update` with
+`unsavedWork = session.hasUnsavedWork()`, so the shell refuses only what could not be written.
 
 ### 2.6 Settings
 
@@ -92,19 +96,19 @@ status line shows `Saved 14:32` / `Unsaved changes` / `Saving…` / `Save failed
 
 ## 3. API additions
 
-- `PUT /api/drawings/:id` accepts `baseUpdatedAt` (→ 409 `Conflict`) and `mergeData`.
+- `PUT /api/drawings/:id` accepts `baseUpdatedAt` (→ 409 `Conflict`) and `mergeData`; `PUT /api/toolpaths/:id` accepts `baseUpdatedAt` (→ 409).
 - `GET /api/drawings/:id/versions`, `POST /api/drawings/:id/versions/:versionId/restore`.
 
 ## 4. Tests
 
 `apps/desktop/test/autosave.test.ts` (engine, fake clock), `apps/desktop/test/project-session.test.ts` (real sidecar: merge on
 conflict, stock preserved, setup/layers round trip, restore points, draft, CAM conflict and manual overwrite, `saveAll`),
-`apps/sidecar/test/drawings.test.ts` (409, restore points, merge).
+`apps/sidecar/test/drawings.test.ts` (409, restore points and retention, merge, toolpath 409), `apps/desktop/test/window-guard.test.ts`
+(close guard, update install), and the status-line / settings test at the end of `project-session.test.ts`.
 
 ## 5. Open items
 
-- The restore-point retention (10 min / 30) is not configurable and the pruning is not covered by an HTTP test (time is not injectable).
-- Toolpaths have no compare-and-swap on the server; the program path detects a foreign change client-side by revision.
 - Components and materials are per-project rows written on demand; they have no dirty state of their own.
-- Wire `session.hasUnsavedWork()` into the update flow when an updater UI exists.
 - Assistant-driven writes (`pushLiveDrawing`) still use the plain `PUT`; they re-read first and keep server-owned fields.
+- The Tauri-only paths (`onCloseRequested`, the update banner's event wiring) are covered through their pure parts
+  (`closeGuard`, `installPendingUpdate`, `decodeUpdateEvent`); they have not been exercised in a packaged app window.

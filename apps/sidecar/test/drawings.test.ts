@@ -109,3 +109,34 @@ describe("editor saves merge into the stored document", () => {
     expect(replaced.body.data).toEqual({ elements: [] })
   })
 })
+
+describe("restore point retention", () => {
+  test("the interval and the number kept follow the policy (CADCAMFUN_VERSION_*): every save is kept when the interval is 0, only the newest N survive", async () => {
+    process.env["CADCAMFUN_VERSION_INTERVAL_MS"] = "0"
+    process.env["CADCAMFUN_VERSION_LIMIT"] = "3"
+    try {
+      const { body: d } = await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Retention", data: { elements: [{ id: "0" }] } } })
+      for (let n = 1; n <= 6; n++) await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: { elements: Array.from({ length: n + 1 }, (_, i) => ({ id: String(i) })) } } })
+      const versions = (await app.call(`/api/drawings/${d.id}/versions`)).body as Array<{ version: number; elements: number }>
+      // Six saves replaced documents of 1..6 elements; the three newest restore points remain, newest first.
+      expect(versions.map((v) => v.elements)).toEqual([6, 5, 4])
+      expect(versions.map((v) => v.version)).toEqual([6, 5, 4])
+    } finally {
+      delete process.env["CADCAMFUN_VERSION_INTERVAL_MS"]
+      delete process.env["CADCAMFUN_VERSION_LIMIT"]
+    }
+  })
+})
+
+describe("toolpath compare-and-swap", () => {
+  test("a toolpath update based on a stale copy is a 409 and writes nothing; a fresh base succeeds", async () => {
+    const { body: t } = await app.call("/api/toolpaths", { method: "POST", json: { name: "CAS", projectId, data: {}, gcode: "G0 X1" } })
+    const first = await app.call(`/api/toolpaths/${t.id}`, { method: "PUT", json: { gcode: "G0 X2", baseUpdatedAt: t.updatedAt } })
+    expect(first.status).toBe(200)
+    await Bun.sleep(5)
+    const stale = await app.call(`/api/toolpaths/${t.id}`, { method: "PUT", json: { gcode: "G0 X99", baseUpdatedAt: t.updatedAt } })
+    expect(stale.status).toBe(409)
+    expect((await app.call(`/api/toolpaths/${t.id}`)).body.gcode).toBe("G0 X2")
+    expect((await app.call(`/api/toolpaths/${t.id}`, { method: "PUT", json: { gcode: "G0 X3", baseUpdatedAt: first.body.updatedAt } })).status).toBe(200)
+  })
+})

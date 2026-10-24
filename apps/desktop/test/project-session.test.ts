@@ -226,3 +226,35 @@ describe("settings", () => {
     expect(decodeSettings({ autosave: "yes" })).toMatchObject({ autosave: true })
   })
 })
+
+describe("what the user sees", () => {
+  const tick = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+  test("the CAD status line shows the save state, turns to Saved after a click, and the settings page changes the interval", async () => {
+    const { drawingId } = await openProject()
+    const view = app.visit(`/cad?drawingId=${drawingId}`)
+    try {
+      const seg = () => document.querySelector<HTMLElement>("[data-testid='status-save']")
+      await app.wait(() => seg()?.textContent?.startsWith("Saved"), 30_000)
+      useElementsStore.setState({ elements: [box("a", 99)] })
+      await app.wait(() => seg()?.textContent === "Unsaved changes", 30_000)
+      seg()!.click()
+      await app.wait(() => seg()?.textContent?.startsWith("Saved"), 30_000)
+      expect((await stored(drawingId)).data["elements"][0].x).toBe(99)
+    } finally { view.dispose() }
+
+    const settings = app.visit("/settings")
+    try {
+      app.state.settings.update({ autosave: true })
+      await app.wait(() => [...document.querySelectorAll("button")].find((b) => b.textContent?.includes("Language")), 30_000).then((b) => (b as HTMLButtonElement).click())
+      const select = await app.wait(() => document.querySelector<HTMLSelectElement>("select[name='autosaveMinutes']"), 30_000)
+      select.value = "10"; select.dispatchEvent(new window.Event("change", { bubbles: true }))
+      expect(app.state.settings.settings().autosaveMinutes).toBe(10)
+      const box2 = document.querySelector<HTMLInputElement>("input[name='autosave']")!
+      box2.checked = false; box2.dispatchEvent(new window.Event("change", { bubbles: true }))
+      expect(app.state.settings.settings().autosave).toBe(false)
+      app.state.settings.reset()
+    } finally { settings.dispose() }
+    await tick(10)
+  })
+})

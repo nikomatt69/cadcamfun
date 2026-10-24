@@ -477,5 +477,12 @@
   "save.versions.item": "Version {version} · {elements} element(s)",
   "save.versions.restore": "Restore",
   "save.versions.restored": "Restored version {version}. The drawing it replaced is kept as a restore point.",
-  "save.versions.failed": "The version could not be restored"
+  "save.versions.failed": "The version could not be restored",
+  "update.available": "CADCAMFUN {version} is available. Unsaved work is saved before it installs.",
+  "update.downloading": "Downloading the update…",
+  "update.ready": "The update is installed. Restart CADCAMFUN to finish.",
+  "update.install": "Install",
+  "update.later": "Later",
+  "update.unsavedWork": "The update waits: some work could not be saved yet.",
+  "update.failed": "The update could not be installed."
 }

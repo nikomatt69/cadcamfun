@@ -1138,6 +1138,7 @@ export type ToolpathsCreatePayload = {
   readonly machineConfigId?: string | null | undefined
   readonly toolId?: string | null | undefined
   readonly simulation?: unknown | undefined
+  readonly baseUpdatedAt?: string | undefined
 }
 
 export type ToolpathsUpdatePayload = {
@@ -1154,6 +1155,7 @@ export type ToolpathsUpdatePayload = {
   readonly machineConfigId?: string | null | undefined
   readonly toolId?: string | null | undefined
   readonly simulation?: unknown | undefined
+  readonly baseUpdatedAt?: string | undefined
 }
 
 export type ToolpathsCreateForDrawingPayload = {
@@ -1170,6 +1172,7 @@ export type ToolpathsCreateForDrawingPayload = {
   readonly machineConfigId?: string | null | undefined
   readonly toolId?: string | null | undefined
   readonly simulation?: unknown | undefined
+  readonly baseUpdatedAt?: string | undefined
 }
 
 export type ToolpathExtrasCreateVersionPayload = {
@@ -5423,9 +5426,31 @@ export type DrawingsUpdateInput = {
   readonly description?: DrawingsUpdatePayload["description"]
   readonly data?: DrawingsUpdatePayload["data"]
   readonly thumbnail?: DrawingsUpdatePayload["thumbnail"]
+  readonly baseUpdatedAt?: DrawingsUpdatePayload["baseUpdatedAt"]
+  readonly mergeData?: DrawingsUpdatePayload["mergeData"]
 }
 
 export type DrawingsUpdateOutput = {
+  id: string
+  name: string
+  description: string | null
+  data: unknown
+  thumbnail: string | null
+  createdAt: string
+  updatedAt: string
+  projectId: string
+}
+
+export type DrawingsVersionsInput = { readonly id: { readonly id: string }["id"] }
+
+export type DrawingsVersionsOutput = Array<{ id: string; version: number; createdAt: string; elements: number }>
+
+export type DrawingsRestoreVersionInput = {
+  readonly id: { readonly id: string; readonly versionId: string }["id"]
+  readonly versionId: { readonly id: string; readonly versionId: string }["versionId"]
+}
+
+export type DrawingsRestoreVersionOutput = {
   id: string
   name: string
   description: string | null
@@ -5447,8 +5472,6 @@ export type DrawingsListForProjectOutput = Array<{
   name: string
   description: string | null
   data: unknown
-  readonly baseUpdatedAt?: DrawingsUpdatePayload["baseUpdatedAt"]
-  readonly mergeData?: DrawingsUpdatePayload["mergeData"]
   thumbnail: string | null
   createdAt: string
   updatedAt: string
@@ -5461,27 +5484,9 @@ export type DrawingsCreateForProjectInput = {
   readonly description?: DrawingsCreateForProjectPayload["description"]
   readonly data?: DrawingsCreateForProjectPayload["data"]
   readonly thumbnail?: DrawingsCreateForProjectPayload["thumbnail"]
+  readonly baseUpdatedAt?: DrawingsCreateForProjectPayload["baseUpdatedAt"]
+  readonly mergeData?: DrawingsCreateForProjectPayload["mergeData"]
 }
-export type DrawingsVersionsInput = { readonly id: { readonly id: string }["id"] }
-
-export type DrawingsVersionsOutput = Array<{ id: string; version: number; createdAt: string; elements: number }>
-
-export type DrawingsRestoreVersionInput = {
-  readonly id: { readonly id: string; readonly versionId: string }["id"]
-  readonly versionId: { readonly id: string; readonly versionId: string }["versionId"]
-}
-
-export type DrawingsRestoreVersionOutput = {
-  id: string
-  name: string
-  description: string | null
-  data: unknown
-  thumbnail: string | null
-  createdAt: string
-  updatedAt: string
-  projectId: string
-}
-
 
 export type DrawingsCreateForProjectOutput = {
   id: string
@@ -5505,8 +5510,6 @@ export type ComponentsGetOutput = {
   type: string | null
   isPublic: boolean
   createdAt: string
-  readonly baseUpdatedAt?: DrawingsCreateForProjectPayload["baseUpdatedAt"]
-  readonly mergeData?: DrawingsCreateForProjectPayload["mergeData"]
   updatedAt: string
   projectId: string
   project: { id: string; name: string; ownerId: string }
@@ -5650,6 +5653,7 @@ export type ToolpathsCreateInput = {
   readonly machineConfigId?: ToolpathsCreatePayload["machineConfigId"]
   readonly toolId?: ToolpathsCreatePayload["toolId"]
   readonly simulation?: ToolpathsCreatePayload["simulation"]
+  readonly baseUpdatedAt?: ToolpathsCreatePayload["baseUpdatedAt"]
 }
 
 export type ToolpathsCreateOutput = {
@@ -5710,6 +5714,7 @@ export type ToolpathsUpdateInput = {
   readonly machineConfigId?: ToolpathsUpdatePayload["machineConfigId"]
   readonly toolId?: ToolpathsUpdatePayload["toolId"]
   readonly simulation?: ToolpathsUpdatePayload["simulation"]
+  readonly baseUpdatedAt?: ToolpathsUpdatePayload["baseUpdatedAt"]
 }
 
 export type ToolpathsUpdateOutput = {
@@ -5777,6 +5782,7 @@ export type ToolpathsCreateForDrawingInput = {
   readonly machineConfigId?: ToolpathsCreateForDrawingPayload["machineConfigId"]
   readonly toolId?: ToolpathsCreateForDrawingPayload["toolId"]
   readonly simulation?: ToolpathsCreateForDrawingPayload["simulation"]
+  readonly baseUpdatedAt?: ToolpathsCreateForDrawingPayload["baseUpdatedAt"]
 }
 
 export type ToolpathsCreateForDrawingOutput = {

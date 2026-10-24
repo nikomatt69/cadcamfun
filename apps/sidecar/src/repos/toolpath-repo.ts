@@ -132,7 +132,7 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
             const row = toToolpathRow(current)
             const drawing = current.drawingId === null ? undefined : tx.select({ data: schema.drawingTable.data }).from(schema.drawingTable).where(eq(schema.drawingTable.id, current.drawingId)).get()
             if (!guard(row, drawing?.data)) return undefined
-            const [updated] = tx.update(T).set({ ...patch(row), updatedAt: new Date() }).where(eq(T.id, id)).returning().all()
+            const [updated] = tx.update(T).set({ ...patch(row), updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) }).where(eq(T.id, id)).returning().all()
             return updated === undefined ? undefined : toToolpathRow(updated)
           })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         remove: (id) => query("toolpaths.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId }))[0]).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid),

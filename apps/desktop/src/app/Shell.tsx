@@ -21,6 +21,7 @@ import { AssistantPanel } from "../features/ai/components/AssistantPanel.tsx"
 import { useApp } from "../shared/state/context.ts"
 import { projectSession } from "../features/projects/lib/project-session.ts"
 import { SaveSeg } from "../shared/components/workspace-strip.tsx"
+import { UpdatePrompt } from "./UpdatePrompt.tsx"
 import { activeActivity, routeOf, type ActivityId } from "./layout.ts"
 import { findShortcut, shortcuts } from "./shortcuts.ts"
 
@@ -223,6 +224,8 @@ export function Shell(props: ShellProps): JSX.Element {
           saveSlot={<SaveSeg light />}
         />
       </Show>
+
+      <UpdatePrompt />
 
       <Show when={app.paletteOpen()}>
         <CommandPalette commands={commands()} onClose={() => app.setPaletteOpen(false)} />

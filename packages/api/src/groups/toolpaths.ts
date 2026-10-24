@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { BadRequest, EnvBadRequest, EnvForbidden, EnvInternal, EnvMethodNotAllowed, EnvNotFound, EnvelopeOpt, Forbidden, InternalError, NotFound } from "../errors.ts"
+import { BadRequest, Conflict, EnvBadRequest, EnvForbidden, EnvInternal, EnvMethodNotAllowed, EnvNotFound, EnvelopeOpt, Forbidden, InternalError, NotFound } from "../errors.ts"
 
 const NullStr = Schema.NullOr(Schema.String)
 
@@ -52,7 +52,9 @@ export const ToolpathBody = Schema.Struct({
   materialId: opt(NullStr),
   machineConfigId: opt(NullStr),
   toolId: opt(NullStr),
-  simulation: opt(Schema.Unknown)
+  simulation: opt(Schema.Unknown),
+  /** `updatedAt` of the copy the caller read; on `PUT /api/toolpaths/:id` a toolpath saved by anyone else since is a 409 and nothing is written. */
+  baseUpdatedAt: opt(Schema.String)
 })
 
 export const ToolpathUpdated = Schema.Struct({ ...ToolpathRow.fields, message: Schema.String })
@@ -70,7 +72,7 @@ export class ToolpathsGroup extends HttpApiGroup.make("toolpaths")
     }),
     HttpApiEndpoint.get("get", "/api/toolpaths/:id", { params: id, success: ToolpathDetail, error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.put("update", "/api/toolpaths/:id", {
-      params: id, payload: ToolpathBody, success: ToolpathUpdated, error: [BadRequest, Forbidden, NotFound, InternalError]
+      params: id, payload: ToolpathBody, success: ToolpathUpdated, error: [BadRequest, Forbidden, NotFound, Conflict, InternalError]
     }),
     HttpApiEndpoint.delete("remove", "/api/toolpaths/:id", { params: id, success: Message, error: [BadRequest, Forbidden, NotFound, InternalError] }),
     HttpApiEndpoint.get("listForDrawing", "/api/drawings/:id/toolpaths", { params: id, success: Schema.Array(ToolpathWithRefs), error: [BadRequest, NotFound, InternalError] }),

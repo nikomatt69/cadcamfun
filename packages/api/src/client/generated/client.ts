@@ -2484,6 +2484,7 @@ type Endpoint25_1Input = {
   readonly machineConfigId?: Endpoint25_1Request["payload"]["machineConfigId"]
   readonly toolId?: Endpoint25_1Request["payload"]["toolId"]
   readonly simulation?: Endpoint25_1Request["payload"]["simulation"]
+  readonly baseUpdatedAt?: Endpoint25_1Request["payload"]["baseUpdatedAt"]
 }
 const Endpoint25_1 = (raw: RawClient["toolpaths"]) => (input?: Endpoint25_1Input) =>
   raw["create"]({
@@ -2501,6 +2502,7 @@ const Endpoint25_1 = (raw: RawClient["toolpaths"]) => (input?: Endpoint25_1Input
       machineConfigId: input?.["machineConfigId"],
       toolId: input?.["toolId"],
       simulation: input?.["simulation"],
+      baseUpdatedAt: input?.["baseUpdatedAt"],
     },
   }).pipe(Effect.mapError(mapClientError))
 
@@ -2525,6 +2527,7 @@ type Endpoint25_3Input = {
   readonly machineConfigId?: Endpoint25_3Request["payload"]["machineConfigId"]
   readonly toolId?: Endpoint25_3Request["payload"]["toolId"]
   readonly simulation?: Endpoint25_3Request["payload"]["simulation"]
+  readonly baseUpdatedAt?: Endpoint25_3Request["payload"]["baseUpdatedAt"]
 }
 const Endpoint25_3 = (raw: RawClient["toolpaths"]) => (input: Endpoint25_3Input) =>
   raw["update"]({
@@ -2543,6 +2546,7 @@ const Endpoint25_3 = (raw: RawClient["toolpaths"]) => (input: Endpoint25_3Input)
       machineConfigId: input["machineConfigId"],
       toolId: input["toolId"],
       simulation: input["simulation"],
+      baseUpdatedAt: input["baseUpdatedAt"],
     },
   }).pipe(Effect.mapError(mapClientError))
 
@@ -2572,6 +2576,7 @@ type Endpoint25_6Input = {
   readonly machineConfigId?: Endpoint25_6Request["payload"]["machineConfigId"]
   readonly toolId?: Endpoint25_6Request["payload"]["toolId"]
   readonly simulation?: Endpoint25_6Request["payload"]["simulation"]
+  readonly baseUpdatedAt?: Endpoint25_6Request["payload"]["baseUpdatedAt"]
 }
 const Endpoint25_6 = (raw: RawClient["toolpaths"]) => (input: Endpoint25_6Input) =>
   raw["createForDrawing"]({
@@ -2590,6 +2595,7 @@ const Endpoint25_6 = (raw: RawClient["toolpaths"]) => (input: Endpoint25_6Input)
       machineConfigId: input["machineConfigId"],
       toolId: input["toolId"],
       simulation: input["simulation"],
+      baseUpdatedAt: input["baseUpdatedAt"],
     },
   }).pipe(Effect.mapError(mapClientError))
 

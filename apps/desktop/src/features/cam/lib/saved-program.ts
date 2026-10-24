@@ -10,6 +10,7 @@ import { restoreKernelSettings, useGeneratorStore } from "../store/generatorStor
 import { useVerifyStore } from "../store/verifyStore.ts"
 import { makeToolpathGenerator } from "../api/generator.ts"
 import { t } from "../../../i18n/index.ts"
+import { isSaveConflict } from "../../cad/lib/stored-revision.ts"
 
 /** A portable program is also the JSON stored in the existing Toolpath.data column. */
 export const SavedCamProgram = CamProgramDocument
@@ -146,11 +147,13 @@ export const updateSavedProgram = async (
     lastVersionAt.set(saved.id, now)
   }
   const description = options.description !== undefined ? options.description : saved.description ?? null
+  // `baseUpdatedAt`: the sidecar refuses the write if the program was saved after `previous` was read, closing the window between the two.
   const row = await app.runtime.run(app.client.toolpaths.update({ params: { id: saved.id }, payload: {
+    baseUpdatedAt: previous.updatedAt,
     name: options.name ?? saved.name, description, isPublic: options.isPublic ?? saved.isPublic ?? false, gcode: snapshot.gcode, type: settings.machineType,
     operationType: snapshot.kernelArtifact ? "kernel" : (snapshot.operations?.length ?? 0) > 1 ? "multi-operation" : settings.operationType,
     data: savedProgramData(previous.data, snapshot)
-  } }))
+  } })).catch((cause: unknown) => { throw isSaveConflict(cause) ? new ProgramConflict(saved.id) : cause })
   // The revision of what was written, not of what the editor holds now: an edit made during the save stays unsaved.
   const current = useCamStore.getState().savedProgram
   if (current?.id === saved.id) {

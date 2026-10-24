@@ -19802,6 +19802,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "data": {
                     "anyOf": [
                       {},
@@ -47760,6 +47770,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "data": {
                     "anyOf": [
                       {},
@@ -54020,6 +54040,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "data": {
                     "anyOf": [
                       {},
@@ -54637,6 +54667,66 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "printer": {
                     "additionalProperties": false,
                     "properties": {
+                      "acceleration": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "adhesion": {
+                        "enum": [
+                          "none",
+                          "skirt",
+                          "brim",
+                          "raft",
+                        ],
+                        "type": "string",
+                      },
+                      "bottomLayers": {
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "bridgeSpeed": {
+                        "maximum": 200,
+                        "minimum": 10,
+                        "type": "number",
+                      },
+                      "brimWidth": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "endGcode": {
+                        "type": "string",
+                      },
+                      "fanFromLayer": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer",
+                      },
+                      "fanSpeed": {
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "firstLayerHeight": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "firstLayerSpeed": {
+                        "maximum": 200,
+                        "minimum": 10,
+                        "type": "number",
+                      },
+                      "flavor": {
+                        "enum": [
+                          "marlin",
+                          "klipper",
+                          "reprap",
+                        ],
+                        "type": "string",
+                      },
+                      "flow": {
+                        "maximum": 150,
+                        "minimum": 50,
+                        "type": "number",
+                      },
                       "infillDensity": {
                         "maximum": 100,
                         "minimum": 0,
@@ -54648,8 +54738,31 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "lines",
                           "triangles",
                           "honeycomb",
+                          "gyroid",
+                          "concentric",
                         ],
                         "type": "string",
+                      },
+                      "infillSpeed": {
+                        "maximum": 300,
+                        "minimum": 10,
+                        "type": "number",
+                      },
+                      "minLayerTime": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "outerWallFirst": {
+                        "type": "boolean",
+                      },
+                      "outerWallSpeed": {
+                        "maximum": 200,
+                        "minimum": 10,
+                        "type": "number",
+                      },
+                      "pressureAdvance": {
+                        "minimum": 0,
+                        "type": "number",
                       },
                       "printOrientation": {
                         "enum": [
@@ -54666,9 +54779,66 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         ],
                         "type": "string",
                       },
+                      "raftLayers": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer",
+                      },
+                      "relativeExtrusion": {
+                        "type": "boolean",
+                      },
+                      "retractMinTravel": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "retractionDistance": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "retractionSpeed": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "seam": {
+                        "enum": [
+                          "nearest",
+                          "aligned",
+                          "random",
+                        ],
+                        "type": "string",
+                      },
                       "shellCount": {
                         "exclusiveMinimum": 0,
                         "type": "integer",
+                      },
+                      "skirtDistance": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "skirtLoops": {
+                        "exclusiveMinimum": 0,
+                        "type": "integer",
+                      },
+                      "startGcode": {
+                        "type": "string",
+                      },
+                      "supportAngle": {
+                        "maximum": 80,
+                        "minimum": 10,
+                        "type": "number",
+                      },
+                      "supportDensity": {
+                        "maximum": 100,
+                        "minimum": 5,
+                        "type": "number",
+                      },
+                      "supportInterfaceLayers": {
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "supportSpeed": {
+                        "maximum": 300,
+                        "minimum": 10,
+                        "type": "number",
                       },
                       "supportType": {
                         "enum": [
@@ -54677,6 +54847,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "full",
                         ],
                         "type": "string",
+                      },
+                      "supportXYGap": {
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "supportZGap": {
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "topLayers": {
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "travelSpeed": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "zHop": {
+                        "minimum": 0,
+                        "type": "number",
                       },
                     },
                     "type": "object",
@@ -55243,6 +55433,13 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   "within-stock",
                                   "no-gouge",
                                   "nc-interpretation",
+                                  "bed-fit",
+                                  "heated-start",
+                                  "layers-rise",
+                                  "wall-coverage",
+                                  "skin-coverage",
+                                  "no-spill",
+                                  "filament",
                                 ],
                                 "type": "string",
                               },
@@ -55514,6 +55711,66 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     },
                     "gcode": {
                       "type": "string",
+                    },
+                    "print": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "filamentGrams": {
+                          "type": "number",
+                        },
+                        "filamentMm": {
+                          "type": "number",
+                        },
+                        "layers": {
+                          "type": "integer",
+                        },
+                        "lengthByKind": {
+                          "additionalProperties": {
+                            "type": "number",
+                          },
+                          "type": "object",
+                        },
+                        "retractions": {
+                          "type": "integer",
+                        },
+                        "size": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "x": {
+                              "type": "number",
+                            },
+                            "y": {
+                              "type": "number",
+                            },
+                            "z": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "z",
+                          ],
+                          "type": "object",
+                        },
+                        "timeSeconds": {
+                          "type": "number",
+                        },
+                        "travelMm": {
+                          "type": "number",
+                        },
+                      },
+                      "required": [
+                        "layers",
+                        "filamentMm",
+                        "filamentGrams",
+                        "timeSeconds",
+                        "travelMm",
+                        "retractions",
+                        "lengthByKind",
+                        "size",
+                      ],
+                      "type": "object",
                     },
                     "program": {
                       "additionalProperties": false,
@@ -62360,6 +62617,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "data": {
                     "anyOf": [
                       {},
@@ -62737,6 +63004,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
           },
           "500": {
             "content": {

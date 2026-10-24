@@ -1,4 +1,4 @@
-import { Api, BadRequest, CurrentUser, EnvBadRequest, EnvNotFound, Forbidden, InternalError, NotFound, envErr, okAuth } from "@cadcamfun/api"
+import { Api, BadRequest, Conflict, CurrentUser, EnvBadRequest, EnvNotFound, Forbidden, InternalError, NotFound, envErr, okAuth } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ProjectRepo } from "../repos/project-repo.ts"
@@ -63,7 +63,10 @@ export const ToolpathsHandlers = HttpApiBuilder.group(Api, "toolpaths", Effect.f
           const drawing = found.row.drawingId ? yield* drawings.find(user.id, found.row.drawingId) : undefined
           patch.data = yield* prepareCamProgramData({ data: payload.data !== undefined ? payload.data : found.row.data, gcode: payload.gcode !== undefined ? payload.gcode : found.row.gcode, previous: found.row.data, drawing })
         }
-        const updated = yield* repo.update(params.id, patch)
+        // An editor that holds a copy writes only if nobody saved since (check and write are one transaction).
+        const base = payload.baseUpdatedAt
+        const updated = base === undefined ? yield* repo.update(params.id, patch) : yield* repo.updateWhere(params.id, (row) => row.updatedAt === base, () => patch)
+        if (updated === undefined) return yield* new Conflict({ message: "The toolpath was saved elsewhere since it was read. Nothing was overwritten." })
         return { ...updated, message: "Toolpath updated successfully" }
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to update toolpath"))))
     .handle("remove", ({ params }) =>

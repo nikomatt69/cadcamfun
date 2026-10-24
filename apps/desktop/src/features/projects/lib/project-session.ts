@@ -31,6 +31,7 @@ import { useLocalComponentsLibraryStore } from "../../cad/store/localComponentsL
 import { useCamStore } from "../../cam/store/camStore.ts"
 import { useGeneratorStore } from "../../cam/store/generatorStore.ts"
 import { camEditorRevision, updateSavedProgram } from "../../cam/lib/saved-program.ts"
+import { closeGuard } from "./window-guard.ts"
 
 type Run = <A>(effect: unknown) => Promise<A>
 
@@ -315,20 +316,7 @@ const createProjectSession = (app: AppState): ProjectSession => {
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
       void import("@tauri-apps/api/window").then(async ({ getCurrentWindow }) => {
         const win = getCurrentWindow()
-        let refusedAt = 0
-        const off = await win.onCloseRequested(async (event) => {
-          if (!hasUnsavedWork()) return
-          event.preventDefault()
-          try {
-            await Promise.race([flush(), new Promise<never>((_, reject) => setTimeout(() => reject(new Error(t("save.closeTimeout"))), 8_000))])
-            await win.destroy()
-          } catch (cause) {
-            // The second close request within 20 s is the user insisting: never trap the window.
-            if (Date.now() - refusedAt < 20_000) { await win.destroy(); return }
-            refusedAt = Date.now()
-            toast.error(t("save.closeBlocked", { message: cause instanceof Error ? cause.message : String(cause) }))
-          }
-        })
+        const off = await win.onCloseRequested(closeGuard(session, win, (message) => toast.error(message)))
         if (disposed) off(); else stops.push(off)
       }).catch(() => undefined)
     }
