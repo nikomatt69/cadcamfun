@@ -57,6 +57,9 @@ export const CamManufactureInput = Schema.Struct({
   deburr: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(5))),
   /** Write toolpaths that repeat translated (hole patterns, copies of a pocket) once as an `M98` subprogram (Fanuc and Haas posts). */
   subprograms: Schema.optionalKey(Schema.Boolean),
+  /** A post definition (spec 54 C1) that writes the NC in place of the machine's post: inline, or the id of a library item (category "post"), or the `postDefinitionId` of the machine configuration. */
+  postDefinition: Schema.optionalKey(Schema.Json),
+  postDefinitionId: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))),
   /** How a printer job is sliced (walls, infill, supports, adhesion, speeds, temperatures); read only when the machine is a printer. */
   print: Schema.optionalKey(cam.kernel.PrintRequirementSchema)
 })

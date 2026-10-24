@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, expect, setDefaultTimeout, test } from "bun:test"
+import { cam } from "@cadcamfun/core"
 import { bootLiveApp } from "./helpers/live-app.ts"
 import { resetStores } from "./helpers/reset-stores.ts"
 import { useElementsStore } from "../src/features/cad/store/elementsStore.ts"
@@ -55,4 +56,46 @@ test("the post editor starts from a built-in, shows the place of a mistake, prev
     }, 30_000)
     expect(stored.options[1]!.textContent).toBe("Fanuc")
   } finally { view.dispose() }
+})
+
+test("a post linked to a saved machine comes with the machine: linked once, it is loaded when the machine is chosen and dropped when it is left", async () => {
+  const created = await app.sidecar.call("/api/machine-configs", { method: "POST", json: { name: "Shop VMC", type: "mill", config: { workVolume: { x: 800, y: 500, z: 500 }, maxSpindleSpeed: 9000, maxFeedRate: 8000, controller: "fanuc" } } })
+  const machineId = (created.body as { data: { id: string } }).data.id
+  useElementsStore.getState().addElements([plate])
+  useElementsStore.setState({ selectedElement: null })
+  const view = app.visit("/cam")
+  try {
+    const select = await app.wait(() => document.querySelector<HTMLSelectElement>("[data-testid='kernel-machine']"), 30_000)
+    await app.wait(() => [...select.options].some((o) => o.textContent === "Shop VMC") ? true : null, 10_000)
+    select.value = `config:${machineId}`
+    select.dispatchEvent(new window.Event("change", { bubbles: true }))
+    await app.wait(() => useGeneratorStore.getState().kernelSettings.machineConfig?.id === machineId ? true : null, 10_000)
+
+    // Write a post, keep it, link it to this machine.
+    await click("kernel-post-start-fanuc")
+    const text = await app.wait(() => document.querySelector<HTMLTextAreaElement>("[data-testid='kernel-post-text']"), 30_000)
+    const definition = { ...JSON.parse(text.value), name: "Shop post", toolChange: ["T{tool} M6", "G43 H{tool}", "(TOOL {tool} IN)"] }
+    typeInto(text, JSON.stringify(definition))
+    await click("kernel-post-check")
+    await app.wait(() => document.querySelector("[data-testid='kernel-post-sample']"), 30_000)
+    await click("kernel-post-save")
+    await app.wait(() => (document.querySelector<HTMLButtonElement>("[data-testid='kernel-post-link']")?.disabled === false ? true : null), 30_000)
+    await click("kernel-post-link")
+    await app.wait(() => typeof useGeneratorStore.getState().kernelSettings.machineConfig?.config["postDefinitionId"] === "string" ? true : null, 30_000)
+    const stored = await app.sidecar.call(`/api/machine-configs/${machineId}`)
+    expect(typeof (stored.body as { data: { config: Record<string, unknown> } }).data.config["postDefinitionId"]).toBe("string")
+
+    // Leave the machine and come back: the post is dropped, then brought back with the machine.
+    select.value = cam.kernel.DEFAULT_MACHINE.id
+    select.dispatchEvent(new window.Event("change", { bubbles: true }))
+    await app.wait(() => useGeneratorStore.getState().kernelSettings.machineConfig === undefined ? true : null, 10_000)
+    useGeneratorStore.getState().patchKernelSettings({ postDefinition: undefined })
+    select.value = `config:${machineId}`
+    select.dispatchEvent(new window.Event("change", { bubbles: true }))
+    const brought = await app.wait(() => (useGeneratorStore.getState().kernelSettings.postDefinition as { name?: string } | undefined)?.name === "Shop post" ? true : null, 30_000)
+    expect(brought).toBe(true)
+  } finally {
+    view.dispose()
+    useGeneratorStore.getState().patchKernelSettings({ machine: cam.kernel.DEFAULT_MACHINE.id, machineConfig: undefined, postDefinition: undefined })
+  }
 })

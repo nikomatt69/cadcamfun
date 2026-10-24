@@ -46,3 +46,31 @@ test("a saved program keeps its post: the stored request reproduces the stored N
   const forged = await app.call(`/api/drawings/${drawing}/toolpaths`, { method: "POST", json: { name: "Forged", data: { ...document, kernelRequest: request }, gcode: document.gcode, type: "mill", operationType: "kernel" } })
   expect(forged.status).toBe(400)
 })
+
+test("the assistant names a post by a library id or by the machine configuration; the stored request keeps the definition itself", async () => {
+  const project = (await app.call("/api/projects", { method: "POST", json: { name: "Assistant posts" } })).body.id
+  await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Plate", data: { elements: [plate] } } })
+  const handlers = await app.toolHandlers()
+  const item = await app.call("/api/library", { method: "POST", json: { name: "Shop post", category: "post", type: "definition", data: definition } })
+  expect(item.status).toBe(201)
+  const note = await app.call("/api/library", { method: "POST", json: { name: "Not a post", category: "note", type: "text", data: { text: "x" } } })
+
+  // By the id of the library item.
+  const byId = await handlers.manufactureOperation!(project, { material: "6061", postDefinitionId: item.body.id } as never) as { ok: boolean; operationId: string }
+  expect(byId.ok).toBe(true)
+  const stored = await app.call(`/api/toolpaths/${byId.operationId}`)
+  expect(stored.body.gcode).toMatch(/G43 H(\d+)\n\(TOOL \1 IN\)/)
+  expect(stored.body.data.kernelRequest.postDefinition.name).toBe("Shop")
+  expect(stored.body.data.kernelRequest.postDefinitionId).toBeUndefined()
+
+  // By the machine configuration that names it.
+  const machineConfig = { id: "m1", name: "Shop VMC", type: "mill", config: { axes: 3, controller: "Fanuc", workVolume: { x: 600, y: 400, z: 400 }, maxSpindleSpeed: 12000, maxFeedRate: 12000, postDefinitionId: item.body.id } }
+  const byMachine = await handlers.manufacture!(project, { material: "6061", machineConfig, planOnly: false } as never) as { ok: boolean; ncPreview?: string }
+  expect(byMachine.ok).toBe(true)
+  expect(byMachine.ncPreview).toMatch(/\(TOOL \d+ IN\)/)
+
+  // Something that is not a post definition is refused with the reason, nothing is stored.
+  const wrong = await handlers.manufactureOperation!(project, { material: "6061", postDefinitionId: note.body.id } as never) as { ok: boolean; error: string }
+  expect(wrong.ok).toBe(false)
+  expect(wrong.error).toContain("not a post definition")
+})

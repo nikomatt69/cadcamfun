@@ -9,7 +9,7 @@ import {
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel, type History } from "@cadcamfun/core"
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
-import { CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, type CamManufactureInput, type SessionUser } from "@cadcamfun/api"
+import { CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
 import { drawingRevision } from "./cam-program.ts"
 import { camProgressReporter } from "./cam-progress.ts"
 import { LiveEvents } from "./live-events.ts"
@@ -240,12 +240,34 @@ const toolHandlers = Effect.gen(function*() {
         part: { kind: "elements", elements: elements as never }, ...(stored !== undefined ? { stockFromPartBottom: { x: stored.x, y: stored.y, width: stored.width, height: stored.height, depth: stored.depth } } : {}),
         ...(machine !== undefined ? { machine } : {}), ...(input.origin !== undefined ? { origin: input.origin } : {}),
         ...(input.operations !== undefined ? { operations: input.operations } : {}), ...(input.tools !== undefined ? { tools: input.tools } : {}),
-        ...(input.subprograms === true ? { post: { options: { subprograms: true } } } : {}),
+        ...(input.subprograms === true || input.postDefinition !== undefined
+          ? { post: { ...(input.subprograms === true ? { options: { subprograms: true } } : {}), ...(input.postDefinition !== undefined ? { definition: input.postDefinition } : {}) } }
+          : {}),
         ...(input.print !== undefined ? { print: input.print } : {}),
         quality: { ...(input.finishAllowance !== undefined ? { finishAllowance: input.finishAllowance } : {}), ...(input.scallop !== undefined ? { scallop: input.scallop } : {}), ...(input.deburr !== undefined ? { deburr: input.deburr } : {}) }
       }
       const stockNote = machine?.kind === "printer" ? "Additive job: the part is placed on the printer's build plate; material usage is deposited filament, not removed stock." : stored === undefined ? "No stock configured: the kernel used the part bounds plus 2 mm on the sides and 1 mm on top." : "Configured stock, standing on the part's bottom."
       return { ok: true, job, stockNote }
+  }
+
+  /**
+   * The post definition a manufacture input means, inline: given as such, or by the id of a library item (category "post"), or by the
+   * `postDefinitionId` of the machine configuration. The stored request keeps the definition, not the id, so the program re-runs with the
+   * post it was made with whatever happens to the library afterwards. A definition the kernel would refuse is refused here with its path.
+   */
+  const resolvePost = async <I extends typeof CamManufactureInput.Type>(input: I): Promise<I | string> => {
+    const { postDefinitionId: given, ...rest } = input
+    const named = given ?? (typeof input.machineConfig?.config["postDefinitionId"] === "string" ? input.machineConfig.config["postDefinitionId"] : undefined)
+    let definition: unknown = input.postDefinition
+    if (definition === undefined && named !== undefined) {
+      const found = await Effect.runPromise(libraryItems.find(acting().id, named))
+      if (found === undefined || found.item.category !== "post" || found.item.type !== "definition") return `The post '${named}' is not a post definition of the library.`
+      definition = found.item.data
+    }
+    if (definition === undefined) return rest as unknown as I
+    const issues = cam.definitionIssues(definition)
+    if (issues.length > 0) return `The post definition is not valid: ${issues.slice(0, 5).map((i) => `${i.path === "" ? "(root)" : i.path}: ${i.message}`).join("; ")}`
+    return { ...rest, postDefinition: definition } as unknown as I
   }
 
   /** One row of the project's audit trail (`ActivityLog`) for a change the assistant made; a failure to log never fails the change. */
@@ -304,7 +326,10 @@ const toolHandlers = Effect.gen(function*() {
       }))
       return { ok: true, operationId: row.id, release: "preview", identity, ...where(loaded) }
     },
-    manufacture: async (projectId, input, signal) => {
+    manufacture: async (projectId, rawInput, signal) => {
+      const resolved = await resolvePost(rawInput)
+      if (typeof resolved === "string") return { ok: false, error: resolved }
+      const input = resolved
       const loaded = await load(projectId)
       const built = manufacturingJob(loaded, input)
       if (!built.ok) return { ...built, ...where(loaded) }
@@ -332,7 +357,10 @@ const toolHandlers = Effect.gen(function*() {
         ...where(loaded)
       }
     },
-    manufactureOperation: async (projectId, input, signal) => {
+    manufactureOperation: async (projectId, rawInput, signal) => {
+      const resolved = await resolvePost(rawInput)
+      if (typeof resolved === "string") return { ok: false, error: resolved }
+      const input = resolved
       const loaded = await load(projectId, true)
       const revision = drawingRevision(loaded)
       if (input.expectedRevision !== undefined && input.expectedRevision !== revision) return { ok: false, status: "stale", error: "The drawing changed. Inspect the current part before manufacturing." }

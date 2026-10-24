@@ -58,6 +58,15 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
     const config = settings().machineConfig
     return config !== undefined ? `config:${config.id}` : (settings().machine ?? cam.kernel.DEFAULT_MACHINE.id)
   }
+  /** Names a library post on the saved machine (or takes it off): the machine then brings that post to every program planned for it. */
+  const linkPost = async (postId: string | null): Promise<void> => {
+    const machine = settings().machineConfig
+    if (machine === undefined) return
+    await app.runtime.run(app.client.machineConfigs.update({ params: { id: machine.id }, payload: { name: machine.name, config: { postDefinitionId: postId } } }))
+    const next = { ...machine, config: { ...machine.config, postDefinitionId: postId } }
+    gen.patchKernelSettings({ machineConfig: next as never })
+    setSavedMachines((rows) => rows.map((row) => (row.id === machine.id ? next as never : row)))
+  }
   let controller: AbortController | undefined
   let runId = ""
   let disposed = false
@@ -246,7 +255,10 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
         elements={request()?.elements as ReadonlyArray<Record<string, unknown>> | undefined} current={settings().setupOrientation}
         onUse={(orientation) => { gen.patchKernelSettings({ setupOrientation: orientation, operations: undefined }); gen.updateSettings("workholdingConfigured", false); setPlanNotes([]) }}
       />
-      <KernelPost current={settings().postDefinition} onUse={(definition) => gen.patchKernelSettings({ postDefinition: definition as never })} />
+      <KernelPost
+        current={settings().postDefinition} onUse={(definition) => gen.patchKernelSettings({ postDefinition: definition as never })}
+        machine={settings().machineConfig} onLink={linkPost}
+      />
       <details class="border-t border-gray-200 dark:border-gray-700 pt-2" data-testid="kernel-settings">
         <summary class="cursor-pointer text-sm font-medium">{t("cam.kernel.settings")}</summary>
         <div class="space-y-3 pt-3">

@@ -1,4 +1,5 @@
-import { For, Show, createSignal, onMount, type JSX } from "solid-js"
+import { For, Show, createEffect, createSignal, onMount, type JSX } from "solid-js"
+import type { CamMachineConfig } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
 import { useApp } from "../../../../shared/state/context.ts"
 import { t } from "../../../../i18n/index.ts"
@@ -13,6 +14,9 @@ type Stored = { readonly id: string; readonly name: string; readonly data: unkno
 export default function KernelPost(props: {
   readonly current: unknown
   readonly onUse: (definition: unknown | undefined) => void
+  /** The saved machine the program is planned for, and what to do to name a post on it (null takes the name off). */
+  readonly machine?: CamMachineConfig | undefined
+  readonly onLink?: (postId: string | null) => Promise<void>
 }): JSX.Element {
   const app = useApp()
   const [text, setText] = createSignal(props.current === undefined ? "" : JSON.stringify(props.current, null, 2))
@@ -22,6 +26,33 @@ export default function KernelPost(props: {
   const [stored, setStored] = createSignal<ReadonlyArray<Stored>>([])
   const [error, setError] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
+  /** The stored post the text came from or went to: what a machine can be linked to. */
+  const [storedId, setStoredId] = createSignal<string>()
+  const linked = (): string | undefined => {
+    const id = props.machine?.config["postDefinitionId"]
+    return typeof id === "string" && id !== "" ? id : undefined
+  }
+  // A machine that names a post brings it: the program is written with the post of the machine it is planned for.
+  let loadedFor: string | undefined
+  let fromMachine = false
+  createEffect(() => {
+    const id = linked(), machine = props.machine?.id
+    const key = machine === undefined ? undefined : `${machine}:${id ?? ""}`
+    if (key === loadedFor) return
+    const hadAuto = fromMachine
+    loadedFor = key
+    if (id === undefined) {
+      if (hadAuto) { fromMachine = false; props.onUse(undefined) }
+      return
+    }
+    if (props.current !== undefined && !hadAuto) return
+    void app.runtime.run(app.client.library.get({ params: { id } })).then((row) => {
+      if (row.category !== "post" || row.type !== "definition") return
+      fromMachine = true
+      setText(JSON.stringify(row.data, null, 2)); setStoredId(row.id)
+      props.onUse(row.data)
+    }).catch(() => undefined)
+  })
 
   const refresh = async (): Promise<void> => {
     try {
@@ -53,7 +84,8 @@ export default function KernelPost(props: {
     if (value === undefined) return
     setBusy(true); setError(undefined)
     try {
-      await app.runtime.run(app.client.library.create({ payload: { name: value.name ?? "Post", category: "post", type: "definition", data: value as never } }))
+      const row = await app.runtime.run(app.client.library.create({ payload: { name: value.name ?? "Post", category: "post", type: "definition", data: value as never } }))
+      setStoredId(row.id)
       await refresh()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -76,7 +108,7 @@ export default function KernelPost(props: {
         <Show when={stored().length > 0}>
           <label class="block text-xs">{t("cam.post.stored")}
             <select class="w-full rounded border border-gray-300 px-1 py-0.5 text-xs" data-testid="kernel-post-stored"
-              onChange={(event) => { const row = stored().find((r) => r.id === event.currentTarget.value); if (row !== undefined) { setText(JSON.stringify(row.data, null, 2)); setIssues([]); setSample(undefined); setChecked(undefined) } event.currentTarget.value = "" }}>
+              onChange={(event) => { const row = stored().find((r) => r.id === event.currentTarget.value); if (row !== undefined) { setText(JSON.stringify(row.data, null, 2)); setStoredId(row.id); setIssues([]); setSample(undefined); setChecked(undefined) } event.currentTarget.value = "" }}>
               <option value="">{t("cam.post.choose")}</option>
               <For each={stored()}>{(row) => <option value={row.id}>{row.name}</option>}</For>
             </select>
@@ -87,8 +119,15 @@ export default function KernelPost(props: {
           <button type="button" class="ui-btn ui-btn-secondary" disabled={busy() || text().trim() === ""} onClick={() => void check()} data-testid="kernel-post-check">{t("cam.post.check")}</button>
           <button type="button" class="ui-btn ui-btn-secondary" disabled={checked() === undefined} onClick={() => props.onUse(checked())} data-testid="kernel-post-use">{t("cam.post.use")}</button>
           <button type="button" class="ui-btn ui-btn-secondary" disabled={checked() === undefined || busy()} onClick={() => void save()} data-testid="kernel-post-save">{t("cam.post.save")}</button>
-          <Show when={props.current !== undefined}><button type="button" class="ui-btn ui-btn-secondary" onClick={() => props.onUse(undefined)} data-testid="kernel-post-clear">{t("cam.post.clear")}</button></Show>
+          <Show when={props.current !== undefined}><button type="button" class="ui-btn ui-btn-secondary" onClick={() => { fromMachine = false; props.onUse(undefined) }} data-testid="kernel-post-clear">{t("cam.post.clear")}</button></Show>
         </div>
+        <Show when={props.machine !== undefined && props.onLink !== undefined}>
+          <div class="flex flex-wrap items-center gap-2 text-xs" data-testid="kernel-post-machine">
+            <span>{linked() !== undefined ? t("cam.post.linked", { machine: props.machine!.name }) : t("cam.post.notLinked", { machine: props.machine!.name })}</span>
+            <button type="button" class="ui-btn ui-btn-secondary" disabled={storedId() === undefined || storedId() === linked() || busy()} onClick={() => void props.onLink!(storedId()!).catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))} data-testid="kernel-post-link">{t("cam.post.link")}</button>
+            <Show when={linked() !== undefined}><button type="button" class="ui-btn ui-btn-secondary" onClick={() => void props.onLink!(null).catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))} data-testid="kernel-post-unlink">{t("cam.post.unlink")}</button></Show>
+          </div>
+        </Show>
         <Show when={error()}>{(message) => <p class="text-xs text-red-700 dark:text-red-300" role="alert" data-testid="kernel-post-error">{message()}</p>}</Show>
         <Show when={issues().length > 0}>
           <ul class="space-y-0.5 text-xs text-red-700 dark:text-red-300" data-testid="kernel-post-issues">

@@ -632,5 +632,9 @@
   "cam.post.check": "Check and preview",
   "cam.post.use": "Use for this program",
   "cam.post.save": "Save to the library",
-  "cam.post.clear": "Use the machine's post"
+  "cam.post.clear": "Use the machine's post",
+  "cam.post.linked": "{machine} brings its own post",
+  "cam.post.notLinked": "{machine} has no post of its own",
+  "cam.post.link": "Link to this machine",
+  "cam.post.unlink": "Unlink"
 }
