@@ -2725,6 +2725,7 @@ type Endpoint27_0Input = {
   readonly tools?: Endpoint27_0Request["payload"]["tools"]
   readonly deburr?: Endpoint27_0Request["payload"]["deburr"]
   readonly subprograms?: Endpoint27_0Request["payload"]["subprograms"]
+  readonly print?: Endpoint27_0Request["payload"]["print"]
   readonly progress?: Endpoint27_0Request["payload"]["progress"]
 }
 const Endpoint27_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_0Input) =>
@@ -2749,6 +2750,7 @@ const Endpoint27_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27
       tools: input["tools"],
       deburr: input["deburr"],
       subprograms: input["subprograms"],
+      print: input["print"],
       progress: input["progress"],
     },
   }).pipe(Effect.mapError(mapClientError))

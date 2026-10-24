@@ -2,7 +2,7 @@ import { Show, type JSX } from "solid-js"
 import { SlidersVertical } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
-import { INPUT, LABEL, NumberField, Section } from "./ui.tsx"
+import { Badge, CheckRow, Field, INPUT, NumberField, Section } from "./ui.tsx"
 
 const BLUE = "#4B83F0"
 
@@ -16,47 +16,38 @@ export function CuttingSection(): JSX.Element {
   const stats = () => cam.generator.calculateCuttingStatistics(s())
   const effectiveStepover = () => (s().stepover / 100) * s().toolDiameter
   return (
-    <Section id="cutting" delay={0.4} tone="orange" icon={SlidersVertical} title="Cutting Parameters" testId="cutting-section">
-      <div>
-        <label class={LABEL}>Pass Depth (mm)</label>
+    <Section id="cutting" icon={SlidersVertical} title="Cutting Parameters" testId="cutting-section">
+      <Field label="Pass Depth (mm)">
         <NumberField min="0.1" step="0.1" value={s().stepdown} onValue={(value) => gen.updateSettings("stepdown", value)} />
-        <div class="flex justify-between text-xs text-gray-500 mt-1"><span>Min: 0.1mm</span><span>Max recommended: 3mm</span></div>
-      </div>
+        <div class="panel-row"><span>Min: 0.1 mm</span><span class="panel-row__value">Max recommended: 3 mm</span></div>
+      </Field>
 
-      <div>
-        <label class={LABEL}>Feedrate (mm/min)</label>
+      <Field label="Feedrate (mm/min)">
         <NumberField min="1" int value={s().feedrate} onValue={(value) => gen.updateSettings("feedrate", value)} />
-        <div class="flex flex-col text-xs mt-1">
-          <span class="text-gray-500">Chip Load per flute: {chipLoad()} mm</span>
-          <Show when={feedback()}>
-            <span class={`${feedback().startsWith("✓") ? "text-green-600" : "text-yellow-600"} font-medium`}>{feedback()}</span>
-          </Show>
-        </div>
-      </div>
+        <div class="panel-row"><span>Chip load per flute: {chipLoad()} mm</span></div>
+        <Show when={feedback()}>
+          <Badge tone={feedback().startsWith("✓") ? "ok" : "warn"}>{feedback().replace(/^(?:✓|⚠️?)\s*/u, "")}</Badge>
+        </Show>
+      </Field>
 
-      <div>
-        <label class={LABEL}>Entry Speed (mm/min)</label>
+      <Field label="Entry Speed (mm/min)">
         <NumberField min="1" int value={s().plungerate} onValue={(value) => gen.updateSettings("plungerate", value)} />
-        <div class="text-xs text-gray-500 mt-1">
-          Recommended: {recommendedPlunge()} mm/min ({Math.round((recommendedPlunge() / s().feedrate) * 100)}% of feedrate)
-        </div>
-      </div>
+        <div class="panel-row"><span>Recommended: {recommendedPlunge()} mm/min ({Math.round((recommendedPlunge() / s().feedrate) * 100)}% of feedrate)</span></div>
+      </Field>
 
-      <div>
-        <label class={LABEL}>Stepover (% of diameter)</label>
+      <Field label="Stepover (% of diameter)">
         <NumberField min="10" max="90" int accept={(value) => value >= 10 && value <= 90} value={s().stepover} onValue={(value) => gen.updateSettings("stepover", value)} />
-        <div class="text-xs text-gray-500 mt-1">Effective width: {effectiveStepover().toFixed(2)} mm</div>
-      </div>
+        <div class="panel-row"><span>Effective width: {effectiveStepover().toFixed(2)} mm</span></div>
+      </Field>
 
-      <div>
-        <label class={LABEL}>Tool Offset</label>
-        <select class={INPUT} value={s().offset} onChange={(event) => gen.updateSettings("offset", event.currentTarget.value as ToolpathSettings["offset"])}>
+      <Field label="Tool Offset" for="toolOffset">
+        <select id="toolOffset" class={INPUT} value={s().offset} onChange={(event) => gen.updateSettings("offset", event.currentTarget.value as ToolpathSettings["offset"])}>
           <option value="outside">Outside</option>
           <option value="inside">Inside</option>
           <option value="center">Center</option>
         </select>
         <div class="mt-2 flex justify-center">
-          <div class="w-48 h-32 relative">
+          <div class="w-48 h-32 max-w-full relative">
             <svg width="100%" height="100%" viewBox="0 0 240 160" xmlns="http://www.w3.org/2000/svg">
               <Show when={s().offset === "center"}>
                 <rect x="70" y="40" width="100" height="80" stroke={BLUE} stroke-width="2" stroke-dasharray="5,5" fill="none" />
@@ -79,16 +70,15 @@ export function CuttingSection(): JSX.Element {
             </svg>
           </div>
         </div>
-      </div>
+      </Field>
 
-      <div>
-        <label class={LABEL}>Cutting Direction</label>
-        <select class={INPUT} value={s().direction} onChange={(event) => gen.updateSettings("direction", event.currentTarget.value as ToolpathSettings["direction"])}>
+      <Field label="Cutting Direction" for="cuttingDirection">
+        <select id="cuttingDirection" class={INPUT} value={s().direction} onChange={(event) => gen.updateSettings("direction", event.currentTarget.value as ToolpathSettings["direction"])}>
           <option value="climb">Concordant (Climb)</option>
           <option value="conventional">Discordant (Conventional)</option>
         </select>
         <div class="mt-2 flex justify-center">
-          <div class="w-48 h-32 relative">
+          <div class="w-48 h-32 max-w-full relative">
             <svg width="100%" height="100%" viewBox="0 0 240 160" xmlns="http://www.w3.org/2000/svg">
               <text x="120" y="30" text-anchor="middle" font-size="16" fill={BLUE}>{s().direction === "climb" ? "Concordant" : "Discordant"}</text>
               <circle cx="80" cy="80" r="40" fill="none" stroke="#aaa" stroke-width="1" />
@@ -106,28 +96,24 @@ export function CuttingSection(): JSX.Element {
             </svg>
           </div>
         </div>
-      </div>
+      </Field>
 
-      <div class="flex items-center">
-        <input type="checkbox" id="finishingPass" class="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" checked={s().finishingPass} onChange={(event) => gen.updateSettings("finishingPass", event.currentTarget.checked)} />
-        <label for="finishingPass" class="ml-2 block text-sm text-gray-700">Add Finishing Pass</label>
-      </div>
+      <CheckRow id="finishingPass" checked={s().finishingPass} onChange={(checked) => gen.updateSettings("finishingPass", checked)}>Add Finishing Pass</CheckRow>
 
       <Show when={s().finishingPass}>
-        <div>
-          <label class={LABEL}>Finishing Allowance (mm)</label>
+        <Field label="Finishing Allowance (mm)">
           <NumberField min="0.05" max="1" step="0.05" value={s().finishingAllowance} onValue={(value) => gen.updateSettings("finishingAllowance", value)} />
-        </div>
+        </Field>
       </Show>
 
-      <div class="mt-4 p-4 border border-gray-300 bg-gray-50 rounded-md">
-        <h4 class="text-xs font-medium text-gray-800 mb-2">Cutting Statistics</h4>
-        <div class="grid  gap-x-4 gap-y-2 text-sm">
-          <div class="flex justify-between"><span class="text-gray-600">Cutting Speed:</span><span class="font-medium">{stats().cuttingSpeed.toFixed(1)} m/min</span></div>
-          <div class="flex justify-between"><span class="text-gray-600">Chip Load per flute:</span><span class="font-medium">{chipLoad()} mm</span></div>
-          <div class="flex justify-between"><span class="text-gray-600">Material Removal Rate:</span><span class="font-medium">{stats().materialRemovalRate.toFixed(2)} cm³/min</span></div>
-          <div class="flex justify-between"><span class="text-gray-600">Effective Stepover:</span><span class="font-medium">{effectiveStepover().toFixed(2)} mm</span></div>
-        </div>
+      <div class="panel-group">
+        <h4 class="panel-group__title">Cutting statistics</h4>
+        <dl class="panel-kv">
+          <dt>Cutting speed</dt><dd>{stats().cuttingSpeed.toFixed(1)} m/min</dd>
+          <dt>Chip load per flute</dt><dd>{chipLoad()} mm</dd>
+          <dt>Material removal rate</dt><dd>{stats().materialRemovalRate.toFixed(2)} cm³/min</dd>
+          <dt>Effective stepover</dt><dd>{effectiveStepover().toFixed(2)} mm</dd>
+        </dl>
       </div>
     </Section>
   )

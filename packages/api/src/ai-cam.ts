@@ -56,7 +56,9 @@ export const CamManufactureInput = Schema.Struct({
   /** Break the top edges with a chamfer of this width, mm (2D chamfer operations). */
   deburr: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(5))),
   /** Write toolpaths that repeat translated (hole patterns, copies of a pocket) once as an `M98` subprogram (Fanuc and Haas posts). */
-  subprograms: Schema.optionalKey(Schema.Boolean)
+  subprograms: Schema.optionalKey(Schema.Boolean),
+  /** How a printer job is sliced (walls, infill, supports, adhesion, speeds, temperatures); read only when the machine is a printer. */
+  print: Schema.optionalKey(cam.kernel.PrintRequirementSchema)
 })
 /**
  * Turning in the kernel (spec 29 A1): a turned profile in the lathe's own coordinates — X is a diameter,
@@ -99,7 +101,7 @@ export const CamManufactureOperationInput = Schema.Struct({
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance,
   scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision),
   operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr,
-  subprograms: CamManufactureInput.fields.subprograms
+  subprograms: CamManufactureInput.fields.subprograms, print: CamManufactureInput.fields.print
 })
 
 export const CamCreateInput = Schema.Struct({ type: id, params: Schema.optionalKey(params), expectedRevision: Schema.optionalKey(revision) })

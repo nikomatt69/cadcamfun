@@ -8,7 +8,51 @@ WP2 derives drilling, contour, pocket, thread and external turning paths from WP
 
 Pure and I/O-free, same rules as WP1.
 
+## Additive height and coverage contract (2026-10-24)
+
+WP2's owner-requested printing increment deepens `cam/print` and the printer kernel adapter.
+Layer tops must end at the placed model's exact height; a non-integral last layer and a part
+thinner than the requested first layer must not be discarded. The layer's actual thickness
+drives slicing planes and extrusion volume. If the final remainder is below 0.04 mm,
+redistribute the last two layers rather than emitting a sub-resolution tail; keep the
+last layer at or below the requested layer height. The nominal profile remains the request.
+Wall coverage and spill checks must inspect every model layer, including isolated missing
+layers between previously sampled planes. Coverage evidence must state its raster resolution
+and checked layer count. These checks remain planar deposition evidence; they do not claim
+volumetric support, thermal or mechanical certification. No RM completion is implied.
+
+## Additive NC replay contract (2026-10-24)
+
+The print verification module must use the shared reference interpreter for machine motion
+and E semantics (modal/relative motion, coordinate resets and units), rather than a second
+motion parser. Its two adapters are the generator and the native printer kernel; the layer
+preview also consumes its bead replay. The interface accepts the authoritative layer tops
+and thicknesses separately from NC annotations. Comments may name a feature for display but
+cannot move a bead to another height or supply its extrusion volume. Unknown NC instructions
+must prevent a passed replay claim. Arc deposition is replayed with a stated chord bound.
+Plate/build-envelope checks include non-extruding travel, and startup evidence requires
+explicit homing plus nozzle/required-bed temperature waits before deposition. Custom opaque
+macros are not evidence of completed homing or heating. This is commanded-state evidence,
+not a temperature-sensor or physical machine qualification.
+
 ## Current-source kernel completion (2026-10-22)
+
+## Additive source-mesh contract (2026-10-24)
+
+WP2's print module validates every supplied mesh before numeric coercion, placement, union,
+orientation or slicing. Coordinates must form finite XYZ triples; indices must form complete
+triangles of non-negative in-range integers, including when a valid mesh is supplied beside
+an invalid one. Serialized mesh vertices/faces and element/container transforms must not
+silently default malformed data or discard malformed faces. Errors refuse the whole requested
+print in both plan and execution with `InvalidInput`; the generator returns its existing
+explicit error result. Validation never returns a program for only the valid subset.
+
+The source must be a closed orientable manifold of non-zero finite volume. Reuse WP1 topology
+and point welding for diagnostics at an explicit 1e-7 mm vertex coincidence tolerance, without
+changing the source coordinates or filling openings. A whole inside-out closed shell remains
+supported by the slicer's documented winding correction. This check does not certify absence
+of geometric self-intersections. WP1's topology interface accepts read-only array-like doubles
+without Float32 narrowing; existing CAD behavior and callers remain unchanged.
 
 The owner accepted spec 33's **Owner-authorized completion increment**. WP2 owns K0 final release consistency and K4–K6
 multiaxis execution, shared stock/quality evidence and turning/mill-turn in `cam/` and its tests. Collect machine-capacity
@@ -218,6 +262,22 @@ The `3d_surface` operation no longer follows each element's outline: the selecte
 - **Indexed (3+2)** (`indexing.ts`, `Orient` move in the IR, emitted as a rotary `G0 A.. B.. C..`): an operation is made on a tilted `WorkFrame`; `indexToolpath` turns the frame's z axis into trunnion-table angles (`table-AC`: C about Z then A tilt about X; `table-BC`: C then B about Y; each normal has two solutions, the smaller tilt inside the limits is taken) and carries every point from the work frame through the part to machine coordinates (`R (part - pivot) + pivot`). Because R lays the work plane horizontal, arcs stay arcs in G17, helices stay helices and a drilling cycle still runs down machine Z. Not covered: a head that tilts (the pivot then moves with the tool length), tilted-plane controller cycles (G68.2, CYCLE800), RTCP, and simultaneous 5-axis; `cam.verify` skips `Orient`, so a verification must be given the stock in machine coordinates.
 
 ## 9. Change log
+
+- 2026-10-24: additive NC replay increment implemented. Beads and travel now use the shared
+  interpreter; authoritative layer slabs replace NC HEIGHT/LAYER annotations as geometric
+  evidence. Added explicit print-dialect, heater-wait/homing, travel-envelope and bead-width
+  checks, bounded arc replay, physical deposition-speed claims, inch-E conversion and missing
+  geometry uncertainty. Fixed start-mode ordering, relative-E rounding drift, first positioning
+  without priming and the end lift at build height. Printing regressions pass 91 tests;
+  generator/HTTP/desktop integration passes 93 tests; numeric/view regressions pass 62 tests.
+  Core typecheck passes. Full enterprise qualification remains open in spec 33 §9.12.
+
+- 2026-10-24: printing correctness increment: final slabs and thin first layers retain the
+  model height, actual thickness drives extrusion, wall/spill evidence inspects every model
+  layer, diagonal clipping includes corner intersections, and model-bead volume evidence
+  excludes startup priming. Removed a conflicting namespace import in the existing generator
+  tests and made the default nozzle-to-layer calculation stable at 0.3 mm. Verification
+  results are recorded in spec 33 §9.11; this does not close the full additive evidence scope.
 
 - 2026-10-22: K5 first seed and K6 boring preview (the evidence is recorded in spec 33's ledger). A rotary replay seeds its voxel stock from the three-axis height field; the carry only tightens the bracket and a three-axis-only job still has no voxel bracket. `planBoring` opens a declared pilot to a finished internal profile with analytic volumes and stays `preview`; it is not a job operation. Verification: `packages/core/src/cam/kernel/{stock,rest-stock,turning,five-axis-job}.test.ts` (36 tests).
 

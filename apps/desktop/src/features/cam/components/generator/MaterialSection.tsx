@@ -6,7 +6,7 @@ import { CuttingReferenceView } from "./EvidenceSection.tsx"
 import { useRead } from "../../../../app/queries.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
-import { INPUT, LABEL, Section } from "./ui.tsx"
+import { Field, INPUT, LABEL, Note, Section } from "./ui.tsx"
 
 const MATERIAL_NAMES: Readonly<Record<string, string>> = {
   aluminum: "Aluminum", steel: "Steel", wood: "Wood", plastic: "Plastic", brass: "Brass", titanium: "Titanium", composite: "Composite", other: "Other"
@@ -64,8 +64,11 @@ export function MaterialSection(): JSX.Element {
     gen.flash(`Material "${found.name}" loaded from library`)
   }
 
+  const filament = () => cam.print.FILAMENTS.find((f) => f.id === gen.printer.filament) ?? cam.print.FILAMENTS[0]!
+
   return (
-    <Section id="material" delay={0.3} tone="green" icon={Package} title="Material" testId="material-section">
+    <Show when={gen.settings.machineType === "3dprinter"} fallback={(
+    <Section id="material" icon={Package} title="Material" summary={MATERIAL_NAMES[gen.settings.material]} testId="material-section">
       <div>
         <label class={LABEL}>Material Type</label>
         <select class={INPUT} value={gen.settings.material} onChange={(event) => gen.updateSettings("material", event.currentTarget.value as ToolpathSettings["material"])}>
@@ -108,7 +111,7 @@ export function MaterialSection(): JSX.Element {
               <div class="font-medium">Cutting data for {r().material.name} · Ø{gen.settings.toolDiameter} {gen.settings.flutes}F {toolMaterial() === "hss" ? "HSS" : "carbide"}</div>
               <div>{r().data.rpm} rpm · F {r().data.feed} mm/min · plunge {r().data.plungeFeed} · Vc {Math.round(r().data.vc)} m/min · fz {r().data.fz} mm</div>
               <div>ap {r().data.ap} mm · ae {r().data.ae} mm · {r().data.coolant} · {r().data.powerKw} kW · deflection {r().data.deflectionMm} mm</div>
-              <For each={[...r().data.exceeded, ...r().data.warnings].slice(0, 3)}>{(w) => <div class="text-amber-700">⚠ {w}</div>}</For>
+              <For each={[...r().data.exceeded, ...r().data.warnings].slice(0, 3)}>{(w) => <div class="text-amber-700">{w}</div>}</For>
               <CuttingReferenceView reference={r().data.reference} />
             </div>
           )}
@@ -158,5 +161,32 @@ export function MaterialSection(): JSX.Element {
         </select>
       </div>
     </Section>
+    )}>
+      <Section id="material" icon={Package} title="Filament" summary={filament().name} testId="material-section">
+        <Field label="Filament" for="filament-grade">
+          <select id="filament-grade" class={INPUT} value={gen.printer.filament} onChange={(event) => {
+            const grade = cam.print.FILAMENTS.find((f) => f.id === event.currentTarget.value)
+            gen.setPrinter({ filament: event.currentTarget.value as typeof gen.printer.filament, ...(grade ? { fanSpeed: grade.fan } : {}) })
+            // The grade brings the temperatures it prints at; they stay editable in the print profile.
+            if (grade) gen.patchSettings({ printTemperature: grade.nozzleTemperature, bedTemperature: grade.bedTemperature })
+          }}>
+            <For each={cam.print.FILAMENTS}>{(f) => <option value={f.id}>{f.name}</option>}</For>
+          </select>
+        </Field>
+        <dl class="panel-kv" data-testid="filament-properties">
+          <dt>Density</dt><dd>{filament().densityGcm3} g/cm3</dd>
+          <dt>Nozzle</dt><dd>{filament().nozzleTemperature} deg C</dd>
+          <dt>Bed</dt><dd>{filament().bedTemperature} deg C</dd>
+          <dt>Part cooling</dt><dd>{filament().fan} %</dd>
+          <dt>Melt rate</dt><dd>{filament().maxVolumetricFlow} mm3/s</dd>
+        </dl>
+        <Show when={filament().notes}><Note kind="warn">{filament().notes}</Note></Show>
+        <button type="button" class="panel-btn" onClick={() => {
+          gen.patchSettings({ printTemperature: filament().nozzleTemperature, bedTemperature: filament().bedTemperature })
+          gen.setPrinter({ fanSpeed: filament().fan })
+          gen.flash(`${filament().name}: nozzle ${filament().nozzleTemperature} deg C, bed ${filament().bedTemperature} deg C`)
+        }}>Apply the grade's temperatures</button>
+      </Section>
+    </Show>
   )
 }

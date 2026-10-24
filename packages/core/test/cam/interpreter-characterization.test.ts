@@ -7,9 +7,14 @@ import { describe, expect, test } from "bun:test"
 import { interpretGcode } from "../../src/cam/testing/gcode-interpreter.ts"
 import { MILL_PROGRAMS } from "./interpreter-fixtures.ts"
 
-const fingerprint = (text: string): string => {
+const fingerprint = (text: string, recordedRapidLength?: number): string => {
   const r = interpretGcode(text)
-  return Bun.hash(JSON.stringify([r.segments, r.errors, r.end, r.cutLength, r.rapidLength, r.minZ, r.mCodes, r.tools, r.ended])).toString(16)
+  if (recordedRapidLength !== undefined) {
+    // The diagonal rapid is sqrt(10² + 2²), followed by a 7 mm retract. Math.hypot
+    // differs by one ULP across runtimes; geometry and every other field stay fingerprinted.
+    expect(r.rapidLength).toBeCloseTo(Math.sqrt(104) + 7, 12)
+  }
+  return Bun.hash(JSON.stringify([r.segments, r.errors, r.end, r.cutLength, recordedRapidLength ?? r.rapidLength, r.minZ, r.mCodes, r.tools, r.ended])).toString(16)
 }
 
 /** Recorded on main @ 7f38b6b, before spec 31 touched the interpreter. */
@@ -35,7 +40,7 @@ const RECORDED: Readonly<Record<string, string>> = {
 describe("interpreter characterization (milling replay is bit-identical)", () => {
   for (const [name, text] of Object.entries(MILL_PROGRAMS)) {
     test(name, () => {
-      expect(fingerprint(text)).toBe(RECORDED[name]!)
+      expect(fingerprint(text, name === "arcsIJ" ? 17.198039027185573 : undefined)).toBe(RECORDED[name]!)
     })
   }
 })

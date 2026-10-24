@@ -30,10 +30,13 @@ import { generateLatheGCode } from "./lathe.ts"
 import { turnedProfileOf } from "./history-features.ts"
 import { generateMillGCode } from "./mill.ts"
 import { multiaxisProgram } from "./multiaxis.ts"
-import { generate3DPrinterGCodeForElement, type PrinterSettings } from "./printer.ts"
+import { generate3DPrinterProgram, type PrinterSettings } from "./printer.ts"
 import { adjustSettingsForElement, outsideStock, suggestMachiningParameters } from "./elements.ts"
 import { calculateCuttingStatistics, getCuttingFeedback, getOperationDescription, aiSuggestionsFor } from "./settings.ts"
 import type { GenerateRequest, GenerateResponse, GeometryInput, PrinterExtras, ToolpathSettings } from "./schema.ts"
+import type { PrintStats } from "../print/types.ts"
+import type { PrintCheck } from "../print/verify.ts"
+import type { PrintRequirement } from "../kernel/contracts.ts"
 import type { SuggestResponseSchema } from "./schema.ts"
 
 export * from "./schema.ts"
@@ -48,7 +51,7 @@ export { selectedToolpath, millToolpath, originShift, stockComment, stockInWork,
 export { generateMillGCode } from "./mill.ts"
 export { generateLatheGCode } from "./lathe.ts"
 export { elementToolpath } from "./element-paths.ts"
-export { generate3DPrinterGCodeForElement, generateCompositeElement3D, calculateExtrusion, printStartGCode, printEndGCode, type PrinterSettings } from "./printer.ts"
+export { generate3DPrinterGCodeForElement, generate3DPrinterProgram, calculateExtrusion, type PrinterProgram, type PrinterSettings } from "./printer.ts"
 export { adaptFeeds, convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
 export * from "./cycles.ts"
 export { programRecord, targetMeshesFor, reliefsFor, firstHorizontalRapidZ, type Relief } from "./evidence.ts"
@@ -72,37 +75,99 @@ export {
   type ZLevelIntersection
 } from "./unified-geometry.ts"
 
-export const printerSettingsOf = (settings: ToolpathSettings, extras: PrinterExtras): PrinterSettings => ({
-  layerHeight: settings.layerHeight,
-  printSpeed: settings.printSpeed,
-  travelSpeed: 150,
-  printTemperature: settings.printTemperature,
-  bedTemperature: settings.bedTemperature,
-  extrusionWidth: settings.extrusionWidth || settings.nozzleDiameter,
-  filamentDiameter: settings.filamentDiameter,
-  retractionDistance: 2,
-  retractionSpeed: 60,
-  infillDensity: extras.infillDensity,
-  infillPattern: extras.infillPattern,
-  shellCount: extras.shellCount,
-  supportType: extras.supportType,
-  supportOverhangAngle: 45,
-  supportDensity: 20,
-  raftLayers: 0,
-  brimWidth: 0,
-  material: settings.material,
-  nozzleDiameter: settings.nozzleDiameter,
-  bedWidth: settings.bedWidth,
-  bedDepth: settings.bedDepth,
-  centerOnBed: settings.centerOnBed,
-  bedOrigin: settings.bedOrigin
-})
+export const printerSettingsOf = (settings: ToolpathSettings, extras: PrinterExtras): PrinterSettings => {
+  const operation = settings.operationType
+  return {
+    layerHeight: settings.layerHeight,
+    printSpeed: settings.printSpeed,
+    travelSpeed: extras.travelSpeed,
+    printTemperature: settings.printTemperature,
+    bedTemperature: settings.bedTemperature,
+    extrusionWidth: settings.extrusionWidth || settings.nozzleDiameter,
+    filamentDiameter: settings.filamentDiameter,
+    retractionDistance: extras.retractionDistance,
+    retractionSpeed: extras.retractionSpeed,
+    retractMinTravel: extras.retractMinTravel,
+    zHop: extras.zHop,
+    // An infill operation prints the part solid.
+    infillDensity: operation === "infill" ? 100 : extras.infillDensity,
+    infillPattern: operation === "infill" ? "lines" : extras.infillPattern,
+    shellCount: extras.shellCount,
+    topLayers: extras.topLayers,
+    bottomLayers: extras.bottomLayers,
+    firstLayerHeight: extras.firstLayerHeight,
+    firstLayerSpeed: extras.firstLayerSpeed,
+    outerWallSpeed: extras.outerWallSpeed,
+    infillSpeed: extras.infillSpeed,
+    bridgeSpeed: extras.bridgeSpeed,
+    supportSpeed: extras.supportSpeed,
+    fanSpeed: extras.fanSpeed,
+    fanFromLayer: extras.fanFromLayer,
+    minLayerTime: extras.minLayerTime,
+    flow: extras.flow,
+    seam: extras.seam,
+    outerWallFirst: extras.outerWallFirst,
+    // A support operation prints with supports under every overhang, whatever the panel's choice was.
+    supportType: operation === "support" && extras.supportType === "none" ? "minimal" : extras.supportType,
+    supportOverhangAngle: extras.supportAngle,
+    supportDensity: extras.supportDensity,
+    supportXYGap: extras.supportXYGap,
+    supportZGap: extras.supportZGap,
+    supportInterfaceLayers: extras.supportInterfaceLayers,
+    // The operation can ask for the adhesion on its own (a raft or a brim operation), whatever the panel says.
+    adhesion: operation === "raft" ? "raft" : operation === "brim" && extras.adhesion === "none" ? "brim" : extras.adhesion,
+    raftLayers: extras.raftLayers,
+    brimWidth: extras.brimWidth,
+    skirtLoops: extras.skirtLoops,
+    skirtDistance: extras.skirtDistance,
+    vase: operation === "vase",
+    flavor: extras.flavor,
+    relativeExtrusion: extras.relativeExtrusion,
+    pressureAdvance: extras.pressureAdvance,
+    acceleration: extras.acceleration,
+    autoOrient: extras.printOrientation === "auto-optimal",
+    material: extras.filament,
+    nozzleDiameter: settings.nozzleDiameter,
+    bedWidth: settings.bedWidth,
+    bedDepth: settings.bedDepth,
+    buildHeight: settings.buildHeight,
+    centerOnBed: settings.centerOnBed,
+    bedOrigin: settings.bedOrigin,
+    ...(extras.startGcode !== undefined ? { startGcode: extras.startGcode } : {}),
+    ...(extras.endGcode !== undefined ? { endGcode: extras.endGcode } : {})
+  }
+}
+
+/**
+ * The panel's print profile as the kernel takes it (`PrintRequirement`): the same choices `printerSettingsOf` gives the generator,
+ * so the verified print and the quick one slice the same way. Speeds and temperatures are the panel's; the kernel limits them to
+ * what the chosen printer can do.
+ */
+export const printRequirementOf = (settings: ToolpathSettings, extras: PrinterExtras): PrintRequirement => {
+  const operation = settings.operationType
+  const adhesion = operation === "raft" ? "raft" : operation === "brim" && extras.adhesion === "none" ? "brim" : extras.adhesion
+  const supports = operation === "support" && extras.supportType === "none" ? "minimal" : extras.supportType
+  return {
+    layerHeight: settings.layerHeight,
+    ...(extras.firstLayerHeight > 0 ? { firstLayerHeight: extras.firstLayerHeight } : {}),
+    walls: extras.shellCount, topLayers: extras.topLayers, bottomLayers: extras.bottomLayers,
+    infillDensity: operation === "infill" ? 100 : extras.infillDensity,
+    infillPattern: operation === "infill" ? "lines" : extras.infillPattern,
+    supports: supports === "none" ? "none" : supports === "full" ? "everywhere" : "buildplate",
+    supportAngle: extras.supportAngle,
+    adhesion, brimWidth: extras.brimWidth,
+    printSpeed: settings.printSpeed, nozzleTemperature: settings.printTemperature, bedTemperature: settings.bedTemperature,
+    fan: extras.fanSpeed, vase: operation === "vase",
+    orientation: extras.printOrientation === "auto-optimal" ? "auto" : "as-designed",
+    seam: extras.seam, retractionDistance: extras.retractionDistance, zHop: extras.zHop, flow: extras.flow, relativeExtrusion: extras.relativeExtrusion
+  }
+}
 
 const warningsIn = (gcode: string): string[] =>
   gcode.split("\n").filter(line => line.startsWith("; Warning:")).map(line => line.slice("; Warning:".length).trim())
 
 /** Raw text for a request, before the post passes. `error` is set when nothing can be generated. */
-const text = (request: GenerateRequest): { gcode: string; error?: string; warnings?: ReadonlyArray<string> } => {
+const text = (request: GenerateRequest): { gcode: string; error?: string; warnings?: ReadonlyArray<string>; print?: PrintStats; checks?: ReadonlyArray<PrintCheck> } => {
   const { settings, geometry, printer } = request
   const options = request.stamp !== undefined ? { stamp: request.stamp } : {}
   switch (settings.machineType) {
@@ -122,9 +187,9 @@ const text = (request: GenerateRequest): { gcode: string; error?: string; warnin
       return { gcode: generateLatheGCode(settings, options) }
     }
     case "3dprinter": {
-      const element = geometry.selectedElements[0]
-      if (!element) return { gcode: "; Error: No element selected for 3D printing\n", error: "Please select a CAD element for 3D printing." }
-      return { gcode: generate3DPrinterGCodeForElement(element as Record<string, any>, printerSettingsOf(settings, printer)) }
+      if (geometry.selectedElements.length === 0) return { gcode: "; Error: No element selected for 3D printing\n", error: "Please select a CAD element for 3D printing." }
+      const program = generate3DPrinterProgram(geometry.selectedElements, printerSettingsOf(settings, printer))
+      return { gcode: program.gcode, ...(program.error !== undefined ? { error: program.error } : {}), ...(program.stats !== undefined ? { print: program.stats } : {}), ...(program.checks !== undefined ? { checks: program.checks } : {}) }
     }
   }
 }
@@ -141,8 +206,10 @@ export const generateToolpath = (request: GenerateRequest): GenerateOutcome => {
   let gcode = generated.gcode
   // Multi-axis text is written by a post (rotary words, TCP codes): the text passes below would not understand B and C.
   const multiaxis = settings.operationType === "multiaxis"
-  if (!multiaxis && settings.optimizePath) gcode = optimizeToolpath(gcode, settings.tolerance)
-  if (!multiaxis && settings.useArcFitting) gcode = convertLinesToArcs(gcode, settings.tolerance)
+  // The text passes know X Y Z and F, not the extruder: on a printer they would drop extruding moves and write arcs without E.
+  const printer = settings.machineType === "3dprinter"
+  if (!multiaxis && !printer && settings.optimizePath) gcode = optimizeToolpath(gcode, settings.tolerance)
+  if (!multiaxis && !printer && settings.useArcFitting) gcode = convertLinesToArcs(gcode, settings.tolerance)
   // Feed that follows the path is a mill's concern: a printer or a lathe has its own feed model.
   if (!multiaxis && settings.useAdaptiveFeeds && settings.machineType === "mill") gcode = adaptFeeds(gcode, settings.toolDiameter)
   const analysis = analyseGcode(gcode, `${settings.machineType}-${settings.operationType}`)
@@ -153,7 +220,8 @@ export const generateToolpath = (request: GenerateRequest): GenerateOutcome => {
       warnings: [...warningsIn(gcode), ...(generated.warnings ?? [])],
       stats: analysis.stats,
       program: analysis.program,
-      ...(request.evidence === false ? {} : { evidence: programRecord(request, gcode, analysis.stats, generated.error) })
+      ...(request.evidence === false ? {} : { evidence: programRecord(request, gcode, analysis.stats, generated.error, generated.checks) }),
+      ...(generated.print !== undefined ? { print: generated.print } : {})
     },
     ...(generated.error !== undefined ? { error: generated.error } : {})
   }

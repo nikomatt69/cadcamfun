@@ -7,7 +7,7 @@ import { SETUP_ORIENTATIONS } from "../setup.ts"
 import { Schema } from "effect"
 import { CoolantSchema } from "../ir.ts"
 import type { Cutter } from "./cutters.ts"
-import { SURFACE_MODES, type OperationSpec } from "./contracts.ts"
+import { SURFACE_MODES, type OperationSpec, type PrintRequirement } from "./contracts.ts"
 import { MultiaxisStrategySchema } from "../operations/multiaxis.ts"
 
 export const SetupOrientationSchema = Schema.Literals(SETUP_ORIENTATIONS)
@@ -70,3 +70,33 @@ const _cutter: Same<typeof CutterSchema.Type, Cutter> extends true ? true : neve
 const _operation: [typeof OperationSpecSchema.Type] extends [OperationSpec] ? true : never = true
 void _cutter
 void _operation
+
+const percent = Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 }))
+
+/** How a printer job is sliced (`PrintRequirement`): every field optional, bounded to what a printer can do. */
+export const PrintRequirementSchema = Schema.Struct({
+  layerHeight: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0.04, maximum: 1.2 }))),
+  firstLayerHeight: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0.04, maximum: 1.2 }))),
+  walls: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 20 }))),
+  topLayers: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 }))),
+  bottomLayers: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 }))),
+  infillDensity: Schema.optionalKey(percent),
+  infillPattern: Schema.optionalKey(Schema.Literals(["lines", "grid", "triangles", "honeycomb", "gyroid", "concentric"])),
+  supports: Schema.optionalKey(Schema.Literals(["none", "buildplate", "everywhere"])),
+  supportAngle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 10, maximum: 80 }))),
+  adhesion: Schema.optionalKey(Schema.Literals(["none", "skirt", "brim", "raft"])),
+  brimWidth: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 50 }))),
+  printSpeed: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 5, maximum: 600 }))),
+  nozzleTemperature: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 120, maximum: 450 }))),
+  bedTemperature: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 150 }))),
+  fan: Schema.optionalKey(percent),
+  vase: Schema.optionalKey(Schema.Boolean),
+  orientation: Schema.optionalKey(Schema.Literals(["as-designed", "auto"])),
+  seam: Schema.optionalKey(Schema.Literals(["nearest", "aligned", "random"])),
+  retractionDistance: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 15 }))),
+  zHop: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 5 }))),
+  flow: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 50, maximum: 150 }))),
+  relativeExtrusion: Schema.optionalKey(Schema.Boolean)
+})
+const _print: [typeof PrintRequirementSchema.Type] extends [PrintRequirement] ? true : never = true
+void _print

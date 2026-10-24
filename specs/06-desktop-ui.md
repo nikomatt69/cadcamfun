@@ -1,5 +1,37 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## CAD and CAM left sidebar refinement (2026-10-24)
+
+Status: in progress. Owner-requested WP6 refinement covers all CAD left tabs
+(Tools, Explorer, Layers) and CAM left tabs (Explorer, Settings, Machine).
+Reuse the generator's shared panel tokens, disclosure sections, numeric fields,
+compact controls, selection and focus states in both themes. Keep model browser
+commands, layer editing, machine selection, origin, stock, snapping, saved
+operations, quick navigation and collapse available. Shared sidebar chrome and
+styles live under `shared/components/panel` and `styles`; matching components,
+locale and desktop checks are WP6-owned. No state or API contracts change.
+
+Change log: 2026-10-24 — registered the owner-requested sidebar UI refinement.
+
+## Generator contextual examples (2026-10-24)
+
+Status: in progress. Owner-requested WP6 refinement owns the CAM generator components,
+preview helpers, generator stylesheet, CAM locale and desktop tests. Remove the static
+Production CAM Features catalogue and repeated explanatory/marketing panels. Show compact,
+theme-aware isometric examples for the current operation, parametric geometry and milling
+origin, beside their controls. Operation examples are explicitly illustrative, follow the
+active machine and effective settings, and never masquerade as generated toolpaths.
+Geometry preserves proportions and fits the panel at any supported dimension. Origin
+markers follow the selected reference. Render only mounted/open sections, without animation
+loops or GPU contexts; keep errors, setup warnings and generated evidence. Existing API,
+generation and persistence contracts stay unchanged. Verify reactive switching, geometry
+fitting, origin markers, generator flows, typecheck, build and rendered desktop/narrow views.
+
+Integration repair (2026-10-24): remove the unreachable milling `face` example branch;
+the generator's public operation schema has no such id. Preserve all supported examples
+and the separate lathe `facing` example. The printing continuation verifies that its
+shared bead-replay changes still compile and execute through the existing print panel.
+
 ## Animated exploded view (2026-10-23)
 
 Status: implemented and verified with automated geometry and DOM tests. Owner reference: https://x.com/10_X_eng/status/2113448035430908412,
@@ -115,6 +147,11 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 - Keyboard-only workflow for create project → draw → generate → export works.
 
 ## 5. Change log
+
+- 2026-10-24: printing integration repair removes an unreachable `face` example branch
+  unsupported by the operation schema. Desktop typecheck passes (1,171 files); the combined
+  generator/HTTP/live print-panel suite passes 93 tests. The bead preview consumes the shared
+  modal replay without a new UI parser. Contextual-example layout validation remains separate.
 
 - 2026-10-23: added Inspect → Exploded view with animated explode/assemble, a 0–300% separation slider, automatic radial layout (axial packing for concentric parts) and X/Y/Z packing. Nested component/group parts move in world space through rotated/nonuniform scaled parents; stock, hidden children and display-edge helpers stay out of the part list. Rendering offsets never enter document history or CAM; scene export adapters clone assembled poses. The existing demand-driven scheduler owns transitions, reversal, reduced motion and cleanup; 2D restores immediately and viewport transform handles are hidden during presentation. Evidence: 13 targeted tests, all 858 desktop tests, desktop typecheck (1,135 files), Vite production build and generated API-reference freshness pass. The full suite requires local HTTP listeners outside the restricted sandbox. Native visual verification was not performed.
 

@@ -7,7 +7,7 @@
  * "Visualizza" sends the combined program to the CAM viewport and "Scarica G-Code" downloads it.
  */
 import { Show, createSignal, onMount, type JSX } from "solid-js"
-import { Box, Download, Eye, EyeOff, Layers, Play, Zap } from "lucide-solid"
+import { Box, Download, Eye, EyeOff, Layers, Play, X, Zap } from "lucide-solid"
 import { toast } from "../../../../shared/ui/toast.tsx"
 import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import { useSelectionStore } from "../../../cad/store/selectorStore.ts"
@@ -248,7 +248,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
                     <span class="text-white">Configurazione toolpath per: {elementId()}</span>
                   </div>
 
-                  <button onClick={() => setConfiguringElementId(null)} class="text-gray-400 hover:text-white transition-colors">✕</button>
+                  <button onClick={() => setConfiguringElementId(null)} class="text-gray-400 hover:text-white transition-colors" aria-label="Close"><X size={14} /></button>
                 </div>
 
                 <ToolpathGenerator

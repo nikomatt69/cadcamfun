@@ -44585,6 +44585,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
           "500": {
             "description": "InternalError",
             "content": {
@@ -44653,6 +44663,26 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "mergeData": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "additionalProperties": false
@@ -44696,6 +44726,281 @@
                   },
                   "required": [
                     "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/drawings/{id}/versions": {
+      "get": {
+        "tags": [
+          "drawings"
+        ],
+        "operationId": "drawings.versions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN"
+                            ]
+                          }
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "elements": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "createdAt",
+                      "elements"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "BadRequest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFound",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/drawings/{id}/versions/{versionId}/restore": {
+      "post": {
+        "tags": [
+          "drawings"
+        ],
+        "operationId": "drawings.restoreVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "data": {},
+                    "thumbnail": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "data",
+                    "thumbnail",
+                    "createdAt",
+                    "updatedAt",
+                    "projectId"
                   ],
                   "additionalProperties": false
                 }
@@ -45054,6 +45359,26 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "mergeData": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
                       },
                       {
                         "type": "null"
@@ -46577,6 +46902,16 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "additionalProperties": false
@@ -47025,6 +47360,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded"
+                }
+              }
+            }
+          },
           "500": {
             "description": "InternalError",
             "content": {
@@ -47219,6 +47564,16 @@
                   "simulation": {
                     "anyOf": [
                       {},
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
                       {
                         "type": "null"
                       }
@@ -48031,6 +48386,16 @@
                   "simulation": {
                     "anyOf": [
                       {},
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
                       {
                         "type": "null"
                       }
@@ -49611,7 +49976,8 @@
                                       "engrave",
                                       "chamfer",
                                       "surface",
-                                      "multiaxis"
+                                      "multiaxis",
+                                      "print"
                                     ]
                                   },
                                   "toolId": {
@@ -49634,7 +50000,8 @@
                                       "engrave",
                                       "thread-mill",
                                       "tap",
-                                      "ream"
+                                      "ream",
+                                      "print"
                                     ]
                                   },
                                   "status": {
@@ -50402,6 +50769,13 @@
                                   "id": {
                                     "type": "string",
                                     "enum": [
+                                      "bed-fit",
+                                      "heated-start",
+                                      "layers-rise",
+                                      "wall-coverage",
+                                      "skin-coverage",
+                                      "no-spill",
+                                      "filament",
                                       "cutting-data",
                                       "machine-limits",
                                       "operations-complete",
@@ -50623,6 +50997,256 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "print": {
+                              "type": "object",
+                              "properties": {
+                                "dialect": {
+                                  "type": "string",
+                                  "enum": [
+                                    "marlin",
+                                    "klipper",
+                                    "reprap"
+                                  ]
+                                },
+                                "filament": {
+                                  "type": "object",
+                                  "properties": {
+                                    "material": {
+                                      "type": "string"
+                                    },
+                                    "densityGcm3": {
+                                      "type": "number"
+                                    },
+                                    "diameter": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "material",
+                                    "densityGcm3",
+                                    "diameter"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "nozzle": {
+                                  "type": "object",
+                                  "properties": {
+                                    "diameter": {
+                                      "type": "number"
+                                    },
+                                    "temperature": {
+                                      "type": "number"
+                                    },
+                                    "bedTemperature": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "diameter",
+                                    "temperature",
+                                    "bedTemperature"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "layers": {
+                                  "type": "integer"
+                                },
+                                "layerHeight": {
+                                  "type": "number"
+                                },
+                                "filamentMm": {
+                                  "type": "number"
+                                },
+                                "filamentGrams": {
+                                  "type": "number"
+                                },
+                                "timeSeconds": {
+                                  "type": "number"
+                                },
+                                "travelMm": {
+                                  "type": "number"
+                                },
+                                "retractions": {
+                                  "type": "integer"
+                                },
+                                "lengthByKind": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "number"
+                                  }
+                                },
+                                "size": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "orientation": {
+                                  "type": "string"
+                                },
+                                "settings": {
+                                  "type": "object",
+                                  "properties": {
+                                    "layerHeight": {
+                                      "type": "number",
+                                      "minimum": 0.04,
+                                      "maximum": 1.2
+                                    },
+                                    "firstLayerHeight": {
+                                      "type": "number",
+                                      "minimum": 0.04,
+                                      "maximum": 1.2
+                                    },
+                                    "walls": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 20
+                                    },
+                                    "topLayers": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "bottomLayers": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "infillDensity": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "infillPattern": {
+                                      "type": "string",
+                                      "enum": [
+                                        "lines",
+                                        "grid",
+                                        "triangles",
+                                        "honeycomb",
+                                        "gyroid",
+                                        "concentric"
+                                      ]
+                                    },
+                                    "supports": {
+                                      "type": "string",
+                                      "enum": [
+                                        "none",
+                                        "buildplate",
+                                        "everywhere"
+                                      ]
+                                    },
+                                    "supportAngle": {
+                                      "type": "number",
+                                      "minimum": 10,
+                                      "maximum": 80
+                                    },
+                                    "adhesion": {
+                                      "type": "string",
+                                      "enum": [
+                                        "none",
+                                        "skirt",
+                                        "brim",
+                                        "raft"
+                                      ]
+                                    },
+                                    "brimWidth": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 50
+                                    },
+                                    "printSpeed": {
+                                      "type": "number",
+                                      "minimum": 5,
+                                      "maximum": 600
+                                    },
+                                    "nozzleTemperature": {
+                                      "type": "number",
+                                      "minimum": 120,
+                                      "maximum": 450
+                                    },
+                                    "bedTemperature": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 150
+                                    },
+                                    "fan": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "vase": {
+                                      "type": "boolean"
+                                    },
+                                    "orientation": {
+                                      "type": "string",
+                                      "enum": [
+                                        "as-designed",
+                                        "auto"
+                                      ]
+                                    },
+                                    "seam": {
+                                      "type": "string",
+                                      "enum": [
+                                        "nearest",
+                                        "aligned",
+                                        "random"
+                                      ]
+                                    },
+                                    "retractionDistance": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 15
+                                    },
+                                    "zHop": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 5
+                                    },
+                                    "flow": {
+                                      "type": "number",
+                                      "minimum": 50,
+                                      "maximum": 150
+                                    },
+                                    "relativeExtrusion": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "dialect",
+                                "filament",
+                                "nozzle",
+                                "layers",
+                                "layerHeight",
+                                "filamentMm",
+                                "filamentGrams",
+                                "timeSeconds",
+                                "travelMm",
+                                "retractions",
+                                "lengthByKind",
+                                "size",
+                                "orientation",
+                                "settings"
+                              ],
+                              "additionalProperties": false
                             },
                             "tolerance": {
                               "type": "object",
@@ -52366,6 +52990,136 @@
                   "subprograms": {
                     "type": "boolean"
                   },
+                  "print": {
+                    "type": "object",
+                    "properties": {
+                      "layerHeight": {
+                        "type": "number",
+                        "minimum": 0.04,
+                        "maximum": 1.2
+                      },
+                      "firstLayerHeight": {
+                        "type": "number",
+                        "minimum": 0.04,
+                        "maximum": 1.2
+                      },
+                      "walls": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 20
+                      },
+                      "topLayers": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "bottomLayers": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "infillDensity": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "infillPattern": {
+                        "type": "string",
+                        "enum": [
+                          "lines",
+                          "grid",
+                          "triangles",
+                          "honeycomb",
+                          "gyroid",
+                          "concentric"
+                        ]
+                      },
+                      "supports": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "buildplate",
+                          "everywhere"
+                        ]
+                      },
+                      "supportAngle": {
+                        "type": "number",
+                        "minimum": 10,
+                        "maximum": 80
+                      },
+                      "adhesion": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "skirt",
+                          "brim",
+                          "raft"
+                        ]
+                      },
+                      "brimWidth": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 50
+                      },
+                      "printSpeed": {
+                        "type": "number",
+                        "minimum": 5,
+                        "maximum": 600
+                      },
+                      "nozzleTemperature": {
+                        "type": "number",
+                        "minimum": 120,
+                        "maximum": 450
+                      },
+                      "bedTemperature": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 150
+                      },
+                      "fan": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "vase": {
+                        "type": "boolean"
+                      },
+                      "orientation": {
+                        "type": "string",
+                        "enum": [
+                          "as-designed",
+                          "auto"
+                        ]
+                      },
+                      "seam": {
+                        "type": "string",
+                        "enum": [
+                          "nearest",
+                          "aligned",
+                          "random"
+                        ]
+                      },
+                      "retractionDistance": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 15
+                      },
+                      "zHop": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 5
+                      },
+                      "flow": {
+                        "type": "number",
+                        "minimum": 50,
+                        "maximum": 150
+                      },
+                      "relativeExtrusion": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "progress": {
                     "type": "object",
                     "properties": {
@@ -53159,7 +53913,14 @@
                                   "tool-clearance",
                                   "within-stock",
                                   "no-gouge",
-                                  "nc-interpretation"
+                                  "nc-interpretation",
+                                  "bed-fit",
+                                  "heated-start",
+                                  "layers-rise",
+                                  "wall-coverage",
+                                  "skin-coverage",
+                                  "no-spill",
+                                  "filament"
                                 ]
                               },
                               "status": {
@@ -53204,6 +53965,66 @@
                         "program",
                         "checks",
                         "result"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "print": {
+                      "type": "object",
+                      "properties": {
+                        "layers": {
+                          "type": "integer"
+                        },
+                        "filamentMm": {
+                          "type": "number"
+                        },
+                        "filamentGrams": {
+                          "type": "number"
+                        },
+                        "timeSeconds": {
+                          "type": "number"
+                        },
+                        "travelMm": {
+                          "type": "number"
+                        },
+                        "retractions": {
+                          "type": "integer"
+                        },
+                        "lengthByKind": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "number"
+                          }
+                        },
+                        "size": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            },
+                            "z": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "z"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "layers",
+                        "filamentMm",
+                        "filamentGrams",
+                        "timeSeconds",
+                        "travelMm",
+                        "retractions",
+                        "lengthByKind",
+                        "size"
                       ],
                       "additionalProperties": false
                     }
@@ -53885,7 +54706,9 @@
                           "grid",
                           "lines",
                           "triangles",
-                          "honeycomb"
+                          "honeycomb",
+                          "gyroid",
+                          "concentric"
                         ]
                       },
                       "supportType": {
@@ -53914,6 +54737,176 @@
                           "original",
                           "auto-optimal"
                         ]
+                      },
+                      "filament": {
+                        "type": "string",
+                        "enum": [
+                          "pla",
+                          "petg",
+                          "abs",
+                          "asa",
+                          "tpu",
+                          "nylon",
+                          "pc"
+                        ]
+                      },
+                      "topLayers": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "bottomLayers": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "firstLayerHeight": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "firstLayerSpeed": {
+                        "type": "number",
+                        "minimum": 10,
+                        "maximum": 200
+                      },
+                      "outerWallSpeed": {
+                        "type": "number",
+                        "minimum": 10,
+                        "maximum": 200
+                      },
+                      "infillSpeed": {
+                        "type": "number",
+                        "minimum": 10,
+                        "maximum": 300
+                      },
+                      "bridgeSpeed": {
+                        "type": "number",
+                        "minimum": 10,
+                        "maximum": 200
+                      },
+                      "supportSpeed": {
+                        "type": "number",
+                        "minimum": 10,
+                        "maximum": 300
+                      },
+                      "travelSpeed": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "retractionDistance": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "retractionSpeed": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "retractMinTravel": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "zHop": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "fanSpeed": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "fanFromLayer": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "minLayerTime": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "flow": {
+                        "type": "number",
+                        "minimum": 50,
+                        "maximum": 150
+                      },
+                      "seam": {
+                        "type": "string",
+                        "enum": [
+                          "nearest",
+                          "aligned",
+                          "random"
+                        ]
+                      },
+                      "outerWallFirst": {
+                        "type": "boolean"
+                      },
+                      "supportAngle": {
+                        "type": "number",
+                        "minimum": 10,
+                        "maximum": 80
+                      },
+                      "supportDensity": {
+                        "type": "number",
+                        "minimum": 5,
+                        "maximum": 100
+                      },
+                      "supportXYGap": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "supportZGap": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "supportInterfaceLayers": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "adhesion": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "skirt",
+                          "brim",
+                          "raft"
+                        ]
+                      },
+                      "brimWidth": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "skirtLoops": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "skirtDistance": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "raftLayers": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "flavor": {
+                        "type": "string",
+                        "enum": [
+                          "marlin",
+                          "klipper",
+                          "reprap"
+                        ]
+                      },
+                      "relativeExtrusion": {
+                        "type": "boolean"
+                      },
+                      "pressureAdvance": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "acceleration": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "startGcode": {
+                        "type": "string"
+                      },
+                      "endGcode": {
+                        "type": "string"
                       }
                     },
                     "additionalProperties": false
@@ -60452,6 +61445,16 @@
                   "simulation": {
                     "anyOf": [
                       {},
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "baseUpdatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
                       {
                         "type": "null"
                       }

@@ -37,6 +37,21 @@ describe("cam kernel actions", () => {
     expect(slow["cuttingData"].limitedBy).toContain("machine spindle speed")
     expect((await run("cam.cutting_data", { material: "nope", cut: "slot", tool }))["ok"]).toBe(false)
     expect((await run("cam.cutting_data", { material: "6061", cut: "slot", tool: { ...tool, kind: "bull" } }))["ok"]).toBe(false)
+    expect(await run("cam.cutting_data", { material: "6061", cut: "slot", tool, machine: "printer-desktop-220" })).toMatchObject({ ok: false, error: expect.stringContaining("deposition settings") })
+    expect(await run("cam.cutting_data", { material: "6061", cut: "slot", tool, machine: "invented" })).toMatchObject({ ok: false, error: expect.stringContaining("Unknown machine preset") })
+  })
+
+  test("filament discovery carries process data and real printer capabilities", async () => {
+    const answer = await run("cam.materials", { query: "PETG" })
+    expect(answer["ok"]).toBe(true)
+    expect(answer["materials"]).toHaveLength(1)
+    expect(answer["materials"][0]).toMatchObject({ id: "petg", iso: "filament", family: "FFF", densityGcm3: 1.27, nozzleTemperature: 235, bedTemperature: 80, maxVolumetricFlow: 11 })
+    expect(answer["materials"][0].basis).toContain("Typical grade data")
+    expect(answer["machines"].find((m: { id: string }) => m.id === "printer-desktop-220").printer).toMatchObject({ bed: { width: 220, depth: 220 }, nozzle: { diameter: 0.4 }, maxSpeed: 150 })
+    const all = await run("cam.materials", { query: "   " })
+    expect(all["ok"]).toBe(true)
+    expect(all["materials"].some((m: { id: string }) => m.id === "pla")).toBe(true)
+    expect(all["materials"].some((m: { iso: string }) => m.iso === "N")).toBe(true)
   })
 
   test("turn plans a stepped shaft on the lathe and refuses a profile wider than the bar", async () => {

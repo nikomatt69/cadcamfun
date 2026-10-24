@@ -8,16 +8,17 @@ Actions and Parameters (mm, mm/min, rpm)
 - suggest: params (operationType, toolDiameter, depth, stepdown, feedrate, rpm, material).
 - compare_setups: candidates (1-4 of {name, params, toolId?, materialId?}).
 - analyze: operationId (full stored NC) or gcode; machineType adds axis checks. Empty findings never mean safe.
-- vision: focus; the CAM as it is on screen: the viewport image with the rendered toolpath, and the program sheet (the G-code with its line numbers and the toolpaths it holds). The sheet is what arrives while the editor shows the G-code instead of the preview; the program's text is in the result.
+- vision: focus; the current viewport/toolpath image and program sheet (line-numbered G-code and toolpaths). When the editor shows code, the sheet arrives; program text is included.
 - chain_suggest: fromOperationId, materialHint, toolHint.
 - chain_status: operationId.
-- materials: query; grades, and the machines: the built-in catalogue (milling centres and turning centres, with kind, post, limits, fiveAxis and turning) plus the machine configurations of the library (id config:<id>). Pick the machine from that list, never invent one.
+- materials: query; cutting grades and FFF filaments (densityGcm3, nozzleTemperature, bedTemperature, fan, maxVolumetricFlow, qualification basis). Machines: kind, post, limits, fiveAxis/turning/printer profiles and saved config:<id> rows. Printers include bed, buildHeight, nozzle and thermal/speed limits. Choose from this list.
 - cutting_data: material, cut, tool, machine, depth/ae/ap/scallop; material-based feeds bounded by machine limits.
-- manufacture: material, machine, machineConfig, origin, setupOrientation (+Z|-Z|+X|-X|+Y|-Y), finishAllowance, scallop, deburr, operations, tools, subprograms, planOnly. Exact-B-rep whole-part plan, multi-tool NC and replay claims; planOnly omits NC. machineConfig (a row of the library: workVolume, maxSpindleSpeed, maxFeedRate, controller, axes, rotary) is the machine the person configured and wins over the preset id. Each manual setup has its own workOffset, never invented rotary motion.
-- turn: profile (2-200 of {diameter,z}), stock {diameter,length}, stepdown, allowance, feedMmRev, rpm, machine, machineConfig. Z0 at face, negative towards chuck, X diameter. External rough/finish passes, stock profiles and G18/G94/G97 NC. The turning centre (machine preset id or machineConfig) bounds the bar and the spindle: a bar it cannot hold is refused. Volumes: stock = part + unmachined tail + removed. Ideal point-tool preview, no insert/chuck/controller qualification. Save via cam_edit turn. Mill-turn uses a B head and positioned C spindle.
+- manufacture: material, machine, machineConfig, origin, setupOrientation (+Z|-Z|+X|-X|+Y|-Y), finishAllowance, scallop, deburr, operations, tools, subprograms, planOnly. Whole-part NC and replay claims; planOnly omits NC. Library machineConfig (workVolume, maxSpindleSpeed, maxFeedRate, controller, axes, rotary) wins over machine. Manual setups use workOffset, never invented rotary motion. Printers (printer-* or printer machineConfig): material=filament; print sets layerHeight, walls, infillDensity, infillPattern, supports, adhesion, vase, orientation (auto|as-designed).
+- turn: profile (2-200 of {diameter,z}), stock {diameter,length}, stepdown, allowance, feedMmRev, rpm, machine, machineConfig. Z0 at face, negative towards chuck, X diameter. External rough/finish, stock profiles, G18/G94/G97 NC; machine bounds bar and spindle. stock = part + unmachined tail + removed. Point-tool preview; save via cam_edit turn. Mill-turn uses B head and positioned C spindle.
 
 Result (JSON)
 - ok and data/findings. manufacture release/claims concern only modelled NC capabilities; turn always returns release preview. Neither qualifies a machine.
+- Printing: report actual print layers/size/filamentGrams/timeSeconds/orientation/settings, release and failed/unresolved claims. ok means analysis completed; retain blocked/preview verdicts. Macros, heater setpoints and comments do not prove homing, thermal readiness or deposition. Explain returned refusals; use filament data and never claim physical certification from replay.
 
 Do not use it
 - For writes or stored verification: use cam_edit. For geometry: use cad.

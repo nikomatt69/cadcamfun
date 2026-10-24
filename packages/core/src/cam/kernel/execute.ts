@@ -67,6 +67,7 @@ import { DEFAULT_MACHINE } from "./machines.ts"
 import { checkNcClearance, type TableGeometry } from "./machine-clearance.ts"
 import { findMaterial, type WorkpieceMaterial } from "./materials.ts"
 import { horizontalFaces, offsetRing, planJob, type Plan } from "./planner.ts"
+import { planPrintJob, runPrintJob } from "./print.ts"
 
 export const KERNEL_ALGORITHM = "cadcamfun-cam-kernel@1"
 
@@ -138,7 +139,9 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     for (const m of cutterIssues(t)) issues.push(issue("InvalidInput", "prepare", m))
   }
   const machine = job.machine ?? DEFAULT_MACHINE
-  if (!(machine.limits.maxRpm > 0) || !(machine.limits.maxFeed > 0)) issues.push(issue("InvalidInput", "prepare", `Machine ${machine.id}: spindle speed and feed limits must be positive`))
+  // A printer never reaches here through `runJob`; a caller that prepares a job itself is told why it cannot be cut.
+  if (machine.kind === "printer") issues.push(issue("UnsupportedCapability", "prepare", `Machine ${machine.id} is a printer: it is sliced (runJob), not cut, so there is no milling job to prepare`))
+  if ((machine.kind !== "printer" && !(machine.limits.maxRpm > 0)) || !(machine.limits.maxFeed > 0)) issues.push(issue("InvalidInput", "prepare", `Machine ${machine.id}: spindle speed and feed limits must be positive`))
   // The milling kernel mills: a turning centre (the part turns there) is refused with its reason, never run as a mill.
   if (machine.kind === "lathe") issues.push(issue("UnsupportedCapability", "prepare", `Machine ${machine.id} is a turning centre: the part turns there, so the milling kernel cannot machine it. Use the turning plan for it.`))
   // The work offset is the datum the part sits in: one the control does not have is a wrong datum, not a default to guess.
@@ -1074,12 +1077,18 @@ const subprogramNotes = (nc: string): ReadonlyArray<string> => {
 
 /** Prepares and runs a job. */
 export const runJob = (job: ManufacturingJob, options: RunOptions = {}): CamResult<CamArtifact> => {
+  // A printer is sliced, not cut: its own pipeline writes the program and the evidence for it.
+  if (job.machine?.kind === "printer") return runPrintJob(job, options)
   const prepared = prepareJob(job, options)
   return prepared.status === "ok" ? executeJob(prepared.value, options) : prepared
 }
 
 /** Only the plan: the operations the kernel would run, with their cutters, and what it cannot machine. */
 export const planOnly = (job: ManufacturingJob, options: PrepareOptions = {}): CamResult<{ readonly operations: ReadonlyArray<OperationSpec>; readonly notes: ReadonlyArray<string>; readonly unmachined: ReadonlyArray<string> }> => {
+  if (job.machine?.kind === "printer") {
+    const plan = planPrintJob(job)
+    return plan.status === "ok" ? { status: "ok", value: { operations: [], notes: plan.value.notes, unmachined: [] } } : plan
+  }
   const prepared = prepareJob(job, options)
   if (prepared.status === "failed") return prepared
   const p = prepared.value

@@ -1,3 +1,5 @@
+import { Wrench as SectionWrench } from "lucide-solid"
+import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
 /**
  * The "create" tool panel of the CAD editor: every element tool grouped by category, and the "Add element" form that
  * opens next to the clicked tool. Port of the legacy `ToolPanel`.
@@ -202,24 +204,18 @@ export default function ToolPanel(): JSX.Element {
   }
 
   return (
-    <div class="bg-[#F8FBFF] dark:bg-gray-800 dark:text-white shadow-md rounded-md p-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+    <div class="sidebar-toolbox">
       <Show when={!activeLayerInfo()}>
         <div class="bg-yellow-50 dark:bg-yellow-700 dark:text-yellow-100 text-yellow-800 p-3 rounded-md mb-3 text-xs">Please select a layer first to add elements.</div>
       </Show>
       <div class="space-y-3">
         <For each={CATEGORIZED_TOOLS}>{(category) =>
-          <div>
-            <h4 class="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wider">{category.name}</h4>
+          <SidebarSection id={`cad-tools-${category.name.toLowerCase().replaceAll(" ", "-")}`} title={category.name} icon={SectionWrench} summary={String(category.tools.length)}>
             <div class="grid grid-cols-4 gap-1">
               <For each={category.tools}>{(tool) =>
                 <Motion.button
-                  hover={{ scale: 1.05 }} press={{ scale: 0.95 }}
                   onClick={(e: MouseEvent) => click(tool.action, e)}
-                  class={`p-1 rounded-md flex flex-col items-center justify-center text-xs aspect-square ${
-                    selectedTool() === tool.action
-                      ? "bg-blue-500 text-white"
-                      : "bg-[#EFF3F7] dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
-                  } ${!activeLayerInfo() ? "opacity-50 cursor-not-allowed" : ""}`}
+                  class={`sidebar-tool ${selectedTool() === tool.action ? "sidebar-tool--selected" : ""}`}
                   disabled={!activeLayerInfo()}
                   title={tool.name}
                 >
@@ -227,7 +223,7 @@ export default function ToolPanel(): JSX.Element {
                   <span class="text-[10px] truncate w-full text-center">{tool.name}</span>
                 </Motion.button>}</For>
             </div>
-          </div>}</For>
+          </SidebarSection>}</For>
       </div>
       <Presence>
         <Show when={selectedTool() && activeLayerInfo() && formPosition()}>

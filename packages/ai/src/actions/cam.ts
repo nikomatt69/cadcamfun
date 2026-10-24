@@ -135,24 +135,34 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
     // Pure: the kernel's material table. The machines are the built-in catalogue plus the configurations of the
     // library, so the assistant can plan against the machine the person actually configured.
     run: async ({ query }, { handlers, projectId }) => {
-      const found = query !== undefined && query.trim() !== "" ? cam.kernel.findMaterial(query) : undefined
-      const rows = (found !== undefined ? [found] : cam.kernel.MATERIALS).map((m) => ({
+      const term = query?.trim() ?? ""
+      const found = term !== "" ? cam.kernel.findMaterial(term) : undefined
+      const filament = term !== "" ? cam.print.findFilament(term) : undefined
+      const cuttingRows = (term === "" ? cam.kernel.MATERIALS : found !== undefined ? [found] : []).map((m) => ({
         id: m.id, name: m.name, iso: m.iso, family: m.family, hardnessHB: m.hardnessHB, ...(m.hardnessHRC !== undefined ? { hardnessHRC: m.hardnessHRC } : {}),
         kc11: m.kc11, mc: m.mc, vcCarbide: m.vcCarbide, vcHss: m.vcHss ?? null, fz10: m.fz10, coolant: m.coolant, notes: m.notes
       }))
+      const filamentRows = (term === "" ? cam.print.FILAMENTS : filament !== undefined && found === undefined ? [filament] : []).map((f) => ({
+        ...f, iso: "filament", family: "FFF", process: "additive", basis: "Typical grade data; replace with the spool and hotend supplier's qualified process settings"
+      }))
+      const rows = [...cuttingRows, ...filamentRows]
       const built = cam.kernel.MACHINE_CATALOGUE.map((m) => ({
         id: m.id, name: m.name, kind: m.kind, post: m.post, limits: m.limits, builtin: true,
         ...(m.fiveAxis !== undefined ? { fiveAxis: m.fiveAxis } : {}),
-        ...(m.turning !== undefined ? { turning: m.turning } : {})
+        ...(m.turning !== undefined ? { turning: m.turning } : {}),
+        ...(m.printer !== undefined ? { printer: m.printer } : {})
       }))
       const configured = handlers.machines === undefined ? [] : await handlers.machines(projectId)
       const machines = [...built, ...(Array.isArray(configured) ? configured : [])]
-      return query !== undefined && found === undefined ? { ok: false, error: `No material matches '${query}'`, known: cam.kernel.MATERIALS.map((m) => m.id) } : { ok: true, materials: rows, machines }
+      return term !== "" && rows.length === 0 ? { ok: false, error: `No material matches '${query}'`, known: [...cam.kernel.MATERIALS, ...cam.print.FILAMENTS].map((m) => m.id) } : { ok: true, materials: rows, machines }
     }
   }),
   defineWireAction({
     id: "cam.cutting_data", kind: "read", parameters: CAM_ACTION_INPUTS["cam.cutting_data"],
     run: async (input, context) => {
+      const preset = input.machine === undefined ? undefined : cam.kernel.findMachine(input.machine)
+      if (input.machine !== undefined && preset === undefined) return { ok: false, error: `Unknown machine preset '${input.machine}': select one from cam materials` }
+      if (preset?.kind === "printer") return { ok: false, error: "A filament printer uses deposition settings, not cutting feeds and spindle RPM. Select a filament with cam materials and use cam manufacture with print settings." }
       const material = cam.kernel.findMaterial(input.material)
       if (material === undefined) return { ok: false, error: `Unknown material '${input.material}': use cam action materials` }
       const t = input.tool

@@ -1,4 +1,4 @@
-/** Shared pieces of the 3D-printer generator: settings, start/end blocks, extrusion maths, polygon layers. */
+/** Settings of the 3D-printer generator (read by the slicer in `../print`) and the bead's extrusion maths. */
 
 export interface PrinterSettings {
   layerHeight: number
@@ -26,68 +26,65 @@ export interface PrinterSettings {
   centerOnBed?: boolean
   /** `center`: X0 Y0 is the middle of the plate (delta printers); default the front-left corner. */
   bedOrigin?: "corner" | "center"
+  /** Maximum height of the build, mm; a taller part is reported, not cut. */
+  buildHeight?: number
+  /** Solid layers under and over the part. */
+  bottomLayers?: number
+  topLayers?: number
+  /** Height of the first layer, mm (default: the layer height). */
+  firstLayerHeight?: number
+  /** Speed of the first layer, % of the print speed. */
+  firstLayerSpeed?: number
+  /** Outer wall, infill, bridge and support speeds, % of the print speed. */
+  outerWallSpeed?: number
+  infillSpeed?: number
+  bridgeSpeed?: number
+  supportSpeed?: number
+  /** Travel moves shorter than this do not retract, mm; a z-hop lifts the nozzle on the retracted travel. */
+  retractMinTravel?: number
+  zHop?: number
+  /** Part cooling fan, % (0 = no fan), switched on from this layer (1 = the first). */
+  fanSpeed?: number
+  fanFromLayer?: number
+  /** A layer that would print faster than this many seconds is slowed down (down to 10 mm/s). */
+  minLayerTime?: number
+  /** Extrusion multiplier, %. */
+  flow?: number
+  /** Where each wall loop starts: next to where the nozzle is, aligned on one corner, or scattered. */
+  seam?: "nearest" | "aligned" | "random"
+  /** Print the outer wall before the inner ones (default after them). */
+  outerWallFirst?: boolean
+  /** `buildplate`: supports only where they can stand on the plate; `everywhere`: also on the part itself. */
+  supportPlacement?: "buildplate" | "everywhere"
+  /** Horizontal and vertical (layers) gap between a support and the part, and the dense layers under an overhang. */
+  supportXYGap?: number
+  supportZGap?: number
+  supportInterfaceLayers?: number
+  /** Adhesion to the plate: nothing, skirt, brim or raft. */
+  adhesion?: "none" | "skirt" | "brim" | "raft"
+  skirtLoops?: number
+  skirtDistance?: number
+  /** Spiral vase: one continuous outer wall, no infill. */
+  vase?: boolean
+  flavor?: "marlin" | "klipper" | "reprap"
+  /** `M83` relative extruder moves instead of absolute `M82`. */
+  relativeExtrusion?: boolean
+  /** Pressure / linear advance factor (0 = leave the firmware alone). */
+  pressureAdvance?: number
+  /** The most melt the hotend delivers, mm^3/s (default: the filament's); a bead that needs more is printed slower. */
+  maxVolumetricFlow?: number
+  /** Print acceleration, mm/s^2 (0 = leave the firmware alone). */
+  acceleration?: number
+  /** Lay the part flat on its best face before slicing. */
+  autoOrient?: boolean
+  /** Replace the start and end blocks; {nozzle}, {bed} and {layer} are filled in. */
+  startGcode?: string
+  endGcode?: string
 }
-
-export interface P3 { x: number; y: number; z: number }
-export interface P2 { x: number; y: number }
-export type Polygon = P2[]
-export type SliceGeometry = Polygon[]
-
-export const f3 = (n: number): string => n.toFixed(3)
-
-export const printStartGCode = (s: PrinterSettings): string =>
-  "; Print Start G-code\n" +
-  "M82 ; Set extruder to absolute mode\n" +
-  "G21 ; Set units to millimeters\n" +
-  "G90 ; Use absolute coordinates\n" +
-  `M104 S${s.printTemperature} ; Set extruder temperature (no wait)\n` +
-  `M140 S${s.bedTemperature} ; Set bed temperature (no wait)\n` +
-  "G28 ; Home all axes\n" +
-  `M109 S${s.printTemperature} ; Wait for extruder temperature\n` +
-  `M190 S${s.bedTemperature} ; Wait for bed temperature\n` +
-  "G1 Z5 F5000 ; Move Z up\n" +
-  "G1 X0 Y0 Z0.2 F3000 ; Move to prime position\n" +
-  "G92 E0 ; Reset extruder position\n" +
-  "G1 E5 F1800 ; Prime the extruder\n" +
-  "G92 E0 ; Reset extruder position again\n" +
-  "G1 Z0.3 F3000 ; Lift slightly before starting print\n\n"
-
-export const printEndGCode = (s: PrinterSettings): string =>
-  "\n; Print End G-code\n" +
-  `G1 E-${s.retractionDistance || 2} F${(s.retractionSpeed || 60) * 60} ; Retract filament\n` +
-  "G91 ; Relative positioning\n" +
-  "G1 Z5 F3000 ; Move Z up relative\n" +
-  "G90 ; Absolute positioning\n" +
-  "G1 X0 Y200 F3000 ; Present print (move Y forward)\n" +
-  "M104 S0 ; Turn off extruder temperature\n" +
-  "M140 S0 ; Turn off bed temperature\n" +
-  "M84 ; Disable motors\n"
 
 /** Filament length (mm) for `length` mm of bead. */
 export const calculateExtrusion = (length: number, layerHeight: number, extrusionWidth: number, filamentDiameter: number): number => {
   if (length <= 0 || layerHeight <= 0 || extrusionWidth <= 0 || filamentDiameter <= 0) return 0
   const filamentArea = Math.PI * (filamentDiameter / 2) ** 2
   return ((extrusionWidth * layerHeight) / filamentArea) * length
-}
-
-export const moveTo = (p: P3, speed: number, e: number, amount: number): { gcode: string; e: number } => {
-  const next = e + amount
-  let gcode = `G1 X${f3(p.x)} Y${f3(p.y)} Z${f3(p.z)}`
-  if (amount > 0) gcode += ` E${next.toFixed(5)}`
-  return { gcode: `${gcode} F${speed * 60}\n`, e: next }
-}
-
-/** Travel to the first point, then extrude along the polygon. */
-export const polygonLayer = (points: ReadonlyArray<P3>, s: PrinterSettings, e0: number): { gcode: string; e: number } => {
-  if (points.length < 2) return { gcode: "", e: e0 }
-  let e = e0
-  let gcode = moveTo(points[0]!, s.travelSpeed || 150, e, 0).gcode
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1]!
-    const b = points[i]!
-    const move = moveTo(b, s.printSpeed, e, calculateExtrusion(Math.hypot(b.x - a.x, b.y - a.y), s.layerHeight, s.extrusionWidth, s.filamentDiameter))
-    gcode += move.gcode
-    e = move.e
-  }
-  return { gcode, e }
 }

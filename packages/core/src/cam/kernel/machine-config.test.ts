@@ -42,7 +42,9 @@ describe("the machine library and the kernel are the same machines in two shapes
   })
 
   test("a configuration the kernel cannot machine is refused, never guessed", () => {
-    expect(kernelMachineOfConfig(config({}, { type: "printer" }))).toBeUndefined()
+    // A printer is a machine now (its work volume is its plate and build height); one without a plate is refused.
+    expect(kernelMachineOfConfig(config({}, { type: "printer" }))?.kind).toBe("printer")
+    expect(kernelMachineOfConfig(config({ workVolume: undefined }, { type: "printer" }))).toBeUndefined()
     expect(kernelMachineOfConfig(config({}, { type: "laser" }))).toBeUndefined()
     expect(kernelMachineOfConfig(config({ maxSpindleSpeed: undefined }))).toBeUndefined()
     expect(kernelMachineOfConfig(config({ maxFeedRate: 0 }))).toBeUndefined()

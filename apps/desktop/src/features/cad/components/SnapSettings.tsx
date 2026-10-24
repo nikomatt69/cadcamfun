@@ -7,7 +7,7 @@ export default function SnapSettings(): JSX.Element {
   const snap = createSnap()
   const settings = snap.snapSettings
   return (
-    <div class="bg-white dark:bg-gray-800 rounded-md shadow-sm p-4">
+    <div class="sidebar-snap bg-white dark:bg-gray-800 rounded-md shadow-sm p-4">
       <h3 class="text-sm font-medium mb-2">Snap Settings</h3>
       <div class="mb-3">
         <label class="flex items-center">

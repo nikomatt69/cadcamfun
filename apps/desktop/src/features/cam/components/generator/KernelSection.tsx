@@ -1,5 +1,5 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
-import { Cpu } from "lucide-solid"
+import { ChevronDown, ChevronUp, Cpu, X } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import type { CamKernelArtifact, CamKernelResult, CamMachineConfig } from "@cadcamfun/api"
 import { useApp } from "../../../../shared/state/context.ts"
@@ -98,7 +98,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
   // The library's machines: what the person configured is what the kernel plans against.
   onMount(() => {
     void app.runtime.run(app.client.machineConfigs.list({ query: {} }))
-      .then((value) => setSavedMachines(kernelMachineConfigsOf(machinesFromResponse(value))))
+      .then((value) => setSavedMachines(kernelMachineConfigsOf(machinesFromResponse(value)).filter((row) => cam.kernel.kernelMachineOfConfig(row)?.kind !== "printer")))
       .catch(() => setSavedMachines([]))
   })
   onCleanup(() => { disposed = true; controller?.abort(); if (controller) gen.setGenerating(false) })
@@ -198,7 +198,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
   }
 
   return (
-    <Section id="kernel" delay={0.22} tone="indigo" icon={Cpu} title={t("cam.kernel.title")} testId="cam-kernel-section">
+    <Section id="kernel" icon={Cpu} title={t("cam.kernel.title")} testId="cam-kernel-section">
       <p class="text-xs text-gray-500">{t("cam.kernel.description")}</p>
       <label class={LABEL}>{t("cam.kernel.material")}
         <select class={INPUT} value={settings().material} onChange={(event) => gen.patchKernelSettings({ material: event.currentTarget.value })} data-testid="kernel-material">
@@ -283,9 +283,9 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
                   <div class="flex items-center justify-between gap-1">
                     <span class="font-medium truncate" title={op.name ?? op.id}>{index() + 1}. {op.name ?? op.id}</span>
                     <span class="flex gap-0.5">
-                      <button type="button" class="px-1 rounded hover:bg-gray-100" aria-label="Move up" onClick={() => moveOperation(index(), -1)}>↑</button>
-                      <button type="button" class="px-1 rounded hover:bg-gray-100" aria-label="Move down" onClick={() => moveOperation(index(), 1)}>↓</button>
-                      <button type="button" class="px-1 rounded text-red-600 hover:bg-red-50" aria-label="Remove" data-testid="kernel-plan-remove" onClick={() => setOperations(operations().filter((_, i) => i !== index()))}>✕</button>
+                      <button type="button" class="px-1 rounded hover:bg-gray-100" aria-label="Move up" onClick={() => moveOperation(index(), -1)}><ChevronUp size={12} /></button>
+                      <button type="button" class="px-1 rounded hover:bg-gray-100" aria-label="Move down" onClick={() => moveOperation(index(), 1)}><ChevronDown size={12} /></button>
+                      <button type="button" class="px-1 rounded text-red-600 hover:bg-red-50" aria-label="Remove" data-testid="kernel-plan-remove" onClick={() => setOperations(operations().filter((_, i) => i !== index()))}><X size={12} /></button>
                     </span>
                   </div>
                   <div class="flex items-center gap-1">

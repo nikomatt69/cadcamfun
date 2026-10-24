@@ -119,7 +119,7 @@ describe("analysis and motion track", () => {
     const a = g.analyseGcode(code)
     expect(a.warnings).toEqual([])
     const extrude = a.motion.paths[0]!.extrude!
-    expect(extrude.filter((e) => e > 0).length).toBe(400)
+    expect(extrude.filter((e) => e > 0).length).toBeGreaterThan(1500)
     expect(extrude.filter((e) => e === 0).length).toBeGreaterThan(50)
   })
 

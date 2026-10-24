@@ -13,7 +13,7 @@
  * The data (categories, palette ids, mapping) lives in `StrategyPalette.data.ts` so a
  * pure-TS runner can test it without rendering Solid components.
  */
-import { For, Show, createSignal, type JSX } from "solid-js"
+import { For, createSignal, type JSX } from "solid-js"
 import { t } from "../../../../i18n/index.ts"
 import {
   STRATEGY_CATEGORIES,
@@ -322,14 +322,6 @@ export default function StrategyPalette(props: StrategyPaletteProps): JSX.Elemen
   const [active, setActive] = createSignal<string>(props.activeOperation)
   // Reflect prop changes when the generator switches family or operation upstream.
   if (props.activeOperation !== active()) setActive(props.activeOperation)
-  const selected = (): StrategyDefinition | undefined => {
-    for (const category of visible()) {
-      for (const strategy of category.strategies) {
-        if (strategy.id === active() || paletteToCoreOperation(props.family, strategy.id) === props.activeOperation) return strategy
-      }
-    }
-    return undefined
-  }
   const onCell = (cellId: string): void => {
     setActive(cellId)
     props.onSelect?.(cellId)
@@ -339,15 +331,6 @@ export default function StrategyPalette(props: StrategyPaletteProps): JSX.Elemen
 
   return (
     <div class="strategy-palette" data-testid="strategy-palette" data-family={props.family}>
-      <div class="strategy-palette__head">
-        <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          {t("cam.palette.title")}
-        </div>
-        <div class="text-sm font-semibold text-gray-900 dark:text-white">
-          {t("cam.palette.subtitle")}
-        </div>
-      </div>
-
       <div class="strategy-palette__body" classList={{ "strategy-palette__body--compact": props.compact === true }}>
         <For each={visible()}>
           {(category) => (
@@ -389,19 +372,7 @@ export default function StrategyPalette(props: StrategyPaletteProps): JSX.Elemen
         </For>
       </div>
 
-      <Show when={!props.compact && selected() !== undefined}>
-        {(() => {
-          const cell = selected()
-          if (cell === undefined) return null
-          return (
-            <div class="strategy-palette__detail" data-accent={cell.accent}>
-              <div class="strategy-palette__detail-title">{t(cell.label)}</div>
-              <p class="strategy-palette__detail-desc">{t(cell.description)}</p>
-              <p class="strategy-palette__detail-hint">{t("cam.palette.wireHint")}</p>
-            </div>
-          )
-        })()}
-      </Show>
+
     </div>
   )
 }

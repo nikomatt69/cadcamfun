@@ -1,0 +1,679 @@
+ ▐▛███▛█   Claude Code v2.1.310
+▝▜██████▀  Sonnet 5.5 · Claude Pro
+ ▝▝   ▝▝   /Volumes/SSD/Development/cadcamfun/packages/core
+
+
+⏺ Unknown command: /effe
+
+❯ /effort                                                                       
+  ⎿  Set effort level to high (saved as your default for new sessions):
+     Comprehensive implementation with extensive testing and documentation ·
+     burns fastest — medium handles most tasks
+
+❯ /goal voglio che analizzi il kernel cam per rendere la stampa 3d al livello   
+dapertutto , migliora a livello ui il toolpath generator che e nella sidebar    
+senza emoji ma con uno stile un pelo piu professionale                          
+  ⎿  Goal set: voglio che analizzi il kernel cam per rendere la stampa 3d al
+     livello dapertutto , migliora a livello ui il toolpath generator che e
+     nella sidebar senza emoji ma con uno stile un pelo piu professionale
+
+⏺ Obiettivo: analizzare il kernel CAM per portare la stampa 3D allo stesso
+  livello del resto e rifinire la UI del toolpath generator nella sidebar, senza
+  emoji e con uno stile più professionale. Parto dall'esplorazione del codice.
+
+  Searched for 1 pattern, listed 1 directory, ran 5 shell commands, recalled 2 memories (ctrl+o to expand)
+
+⏺ Lo stato attuale: la stampa 3D è solo un port legacy con primitive base,
+  infill e supporti ancora da implementare (segnati con TODO), e fuori dal
+  kernel. Ora esamino come il kernel modella le operazioni per capire dove
+  integrare uno slicer vero. · summary
+
+  Ran 7 shell commands (ctrl+o to expand)
+
+⏺ Sto cercando se nel repo c'è già una libreria di clipping/offset poligonale,
+  per decidere se riusarla o scrivere l'offset a mano.
+
+  Ran 6 shell commands (ctrl+o to expand)
+
+⏺ Ho finito l'analisi: il 3D printing attuale è solo un porting legacy con
+  primitive base, TODO per infill e supporti, niente slicer di mesh vero e fuori
+  dal kernel. Ora costruisco uno slicer reale in packages/core/src/cam/print/
+  basato su elementMesh, booleanElementMesh e offsetRings, partendo dalla
+  geometria 2D, per poi integrarlo nel generatore e nella UI. · summary
+
+⏺ Write(src/cam/print/geom.ts)
+  ⎿  Wrote 212 lines to src/cam/print/geom.ts
+      1 /**
+      2  * 2D geometry of a print layer: rings, islands (an outer boundar
+        y with its holes) and the few operations the slicer needs.
+      4  * Winding convention (the same the offsetter of `cad/offset.ts` 
+        uses): outer boundaries run counter-clockwise, holes
+      5  * clockwise, so the material is always on the left of the direct
+        ion of travel and a *negative* offset distance moves a
+      7  */
+      8 import { offsetRings } from "../../cad/offset.ts"
+      9 import type { Vec2 } from "../../cad/vec.ts"
+     … +250 lines (ctrl+o to expand)
+
+⏺ Update(src/cam/print/geom.ts)
+  ⎿  Added 2 lines, removed 2 lines
+      147    const out: Ring[] = []
+      148    for (const island of region) {
+      149      const rings = islandRings(island).map((points) => ({ point
+           s, closed: true }))
+      150 -    // The offsetter's positive side is the right of travel; t
+          -he material is on the left.                                   
+      151 -    const result = offsetRings(rings, -distance, { keep: dista
+          -nce < 0 ? "inside" : "outside", mitreLimit: 2, joinFallback: "
+          -round" })                                                     
+      150 +    // The offsetter's positive side is the right of travel an
+          +d the material is on the left: the signs agree.               
+      151 +    const result = offsetRings(rings, distance, { keep: distan
+          +ce < 0 ? "inside" : "outside", mitreLimit: 2, joinFallback: "r
+          +ound" })                                                      
+      152      for (const path of result) if (path.closed && path.points.
+           length >= 3) out.push(path.points)
+      153    }
+      154    return islandsOf(out)
+
+⏺ Write(src/cam/print/slice.ts)
+  ⎿  Wrote 157 lines to src/cam/print/slice.ts
+      1 /**
+        t crosses a layer's plane contributes one segment, the
+      3  * segments are chained into rings and the rings are nested into 
+        islands. The result is the material of each layer.
+      5  * The plane of a layer is its middle (a layer of 0.2 mm printed 
+        at Z0.2 holds the material between Z0 and Z0.2, and the
+        hat a vertex exactly on a plane never splits a segment.
+      7  */
+      8 import type { Vec2 } from "../../cad/vec.ts"
+        g } from "./geom.ts"
+     … +179 lines (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Write(src/cam/print/profile.ts)
+  ⎿  Wrote 153 lines to src/cam/print/profile.ts
+      1 /**
+      2  * The print profile: every setting of the slicer with its defaul
+      3  * (which carries only what the caller set). One place decides wh
+        at an absent value means.
+      4  */
+        s"
+      6 
+      7 export type InfillPattern = "lines" | "grid" | "triangles" | "hon
+      8 export type SupportMode = "none" | "buildplate" | "everywhere"
+      9 export type Adhesion = "none" | "skirt" | "brim" | "raft"
+     … +166 lines (ctrl+o to expand)
+
+⏺ Sto scrivendo lo slicer in cam/print/: geometria, slicing delle mesh e profilo
+  sono pronti. Ora i pattern di infill.
+
+⏺ Write(src/cam/print/infill.ts)
+  ⎿  Wrote 226 lines to src/cam/print/infill.ts
+       1 /**
+       2  * Infill patterns. A pattern is generated as raw polylines over
+       3  * a gyroid contour); the planner then clips them to the area to
+          fill. Spacing follows the density: the bead length per
+       4  * unit area times the line width is the fraction of the layer t
+       5  */
+       6 import type { Vec2 } from "../../cad/vec.ts"
+       7 import type { Box2 } from "./geom.ts"
+       9 
+      10 export type Polyline = Vec2[]
+     … +266 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Write(src/cam/print/types.ts)
+  ⎿  Wrote 47 lines to src/cam/print/types.ts
+       1 /** Shared records of the print slicer. */
+       2 import type { Vec2 } from "../../cad/vec.ts"
+       3 
+       4 export type PathKind =
+       5   | "wall-outer"
+       6   | "wall-inner"
+       7   | "skin"
+       8   | "infill"
+       9   | "bridge"
+      10   | "support"
+     … +42 lines (ctrl+o to expand)
+
+⏺ Write(src/cam/print/support.ts)
+  ⎿  Wrote 186 lines to src/cam/print/support.ts
+      1 /**
+         bead width: a cell of layer i is an overhang when it holds
+      3  * material but the layer below, grown by what the overhang angle
+         allows per layer, does not. Every overhang cell asks for
+        er k when an overhang above it needs it (leaving the vertical
+      5  * gap), the part itself is not in the way (leaving the horizonta
+      6  * of the part lies below it. The last layers under an overhang a
+        re the dense interface. The cells are printed as lines that
+      7  * alternate between X and Y with the layer.
+      9 import ty
+     … +215 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Write(src/cam/print/plan.ts)
+  ⎿  Wrote 397 lines to src/cam/print/plan.ts
+       1 /**
+         alls (inner ones first, the outer one last, starting at the
+       3  * seam), solid skin where the layer has no material above or be
+       4  * supports, and the adhesion (skirt, brim, raft).
+       5  *
+         the infill lines are cut at every crossing with the outlines of
+       7  * the layers around, and each piece is kept or dropped by askin
+       8  */
+       9 import type { Vec2 } from "../../cad/vec.ts"
+         m "./infill.ts"
+     … +488 lines (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Write(src/cam/print/gcode.ts)
+  ⎿  Wrote 268 lines to src/cam/print/gcode.ts
+      1 /**
+      2  * The planned layers as G-code: start and end blocks of the chos
+        en flavor, one block per layer, travel with retraction and
+        per-feature speeds, and the statistics (filament, time).
+      4  */
+      5 import type { Vec2 } from "../../cad/vec.ts"
+      6 import { filamentDensity, type PrintProfile } from "./profile.ts"
+        m "./types.ts"
+      8 
+      9 const f3 = (n: number): string => n.toFixed(3)
+     … +319 lines (ctrl+o to expand)
+
+⏺ Write(src/cam/print/orient.ts)
+  ⎿  Wrote 96 lines to src/cam/print/orient.ts
+       1 /**
+         d on the plate; an orientation is scored by the area that
+       3  * overhangs (it needs support and prints badly), the area resti
+       4  * (more layers, a less stable build). The best one is used only
+          if it clearly beats the part as designed.
+       6 import type { Mesh64 } from "../model/element-mesh.ts"
+       7 
+         er, number, number, number]
+       9 
+         and the identity. */
+     … +108 lines (ctrl+o to expand)
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Ora bodies.ts (da elementi CAD a mesh stampabili) e l'orchestratore index.ts.
+
+⏺ Write(src/cam/print/bodies.ts)
+  ⎿  Wrote 60 lines to src/cam/print/bodies.ts
+       1 /**
+          selected. A Boolean element is its real result (the operands it
+       3  * consumes are not printed on their own); containers are printe
+         d through their members; anything that has no volume (a line,
+       5  */
+       6 import { booleanAll } from "../../cad/csg.ts"
+       8 import type { CadElement } from "../generator/schema.ts"
+       9 import { booleanElementMesh, consumedOperands, isBooleanElement 
+         } from "../model/boolean-mesh.ts"
+         lement-mesh.ts"
+     … +66 lines (ctrl+o to expand)
+
+⏺ Write(src/cam/print/index.ts)
+  ⎿  Wrote 158 lines to src/cam/print/index.ts
+       1 /**
+         . The part is set on the plate, cut into layers
+       3  * (`slice.ts`), each layer is turned into walls, skin, bridges,
+       4  * added, and `gcode.ts` writes it for the printer with retracti
+         on, cooling and speeds. The statistics (time, filament, size)
+         mb.
+       6  */
+         ts"
+       8 import type { Mesh64 } from "../model/element-mesh.ts"
+      10 import { emitGcode } from "./gcode.ts"
+     … +201 lines (ctrl+o to expand)
+
+  Ran 4 shell commands (ctrl+o to expand)
+
+⏺ Il profilo rivela che crossings è il collo di bottiglia, confrontando ogni
+  segmento di infill con tutti i bordi: ora aggiungerò un indice a griglia per i
+  bordi e un test di inclusione con prefiltro sul bounding box. · summary
+
+  Ran 6 shell commands (ctrl+o to expand)
+
+⏺ Lo slicer produce già G-code. Ora scrivo i test che verificano la geometria
+  dai punti emessi, non dai commenti.
+
+⏺ Write(test/cam/print.test.ts)
+  ⎿  Wrote 473 lines to test/cam/print.test.ts
+       1 /**
+         kin, bridges, infill, supports, adhesion, and the program it
+       3  * writes. Geometry is checked on the points of the emitted prog
+         ram, not on its comments.
+       5 import { describe, expect, test } from "bun:test"
+       6 import { checkAxes } from "../../src/cam/machine.ts"
+       8 import {
+       9   bestOrientation, convexHull, EdgeIndex, infillPattern, offsetR
+         egion, printBodies, regionArea, resolveProfile, sliceMesh, slice
+      10   type Mesh64, type PrintResult
+     … +624 lines (ctrl+o to expand)
+
+  Searched for 3 patterns, listed 1 directory, ran 66 shell commands (ctrl+o to expand)
+
+⏺ API Error: Can't reach the API server — check your internet or DNS 
+  (ENOTFOUND)
+
+⏺ Goal still active · the API was unavailable or the connection dropped 
+  · retrying in 1 min (1/3) · send a message to retry now
+
+✻ Baked for 52m 39s · done 1:55 AM
+
+⏺ Goal check-in: continuing after the last turn ended early
+
+⏺ API Error: Can't reach the API server — check your internet or DNS 
+  (ENOTFOUND)
+
+⏺ Goal still active · the API was unavailable or the connection dropped 
+  · retrying in 5 min (2/3) · send a message to retry now
+
+✻ Worked for 3m 2s · done 1:59 AM
+
+❯ continua                                                                      
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ continua                                                                      
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ continua                                                                      
+
+❯ continua                                                                      
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Ora l'API (schemi della richiesta e dell'artefatto) e il sidecar.
+
+  Ran 11 shell commands (ctrl+o to expand)
+
+⏺ Sto aggiungendo un test HTTP che stampa un pezzo end-to-end attraverso la
+  rotta del kernel.
+
+  Searched for 2 patterns, listed 1 directory, ran 22 shell commands (ctrl+o to expand)
+
+⏺ Write(/Volumes/SSD/Development/cadcamfun/apps/desktop/src/styles/generator.css
+       )
+  ⎿  Wrote 159 lines to /Volumes/SSD/Development/cadcamfun/apps/desktop/src
+     /styles/generator.css
+       1 /* =============================================================
+       2    Toolpath generator panel. One quiet visual language for every
+          section: flat bordered blocks, small monochrome icons,
+         ate, no gradients, no emoji, no scale effects.
+       4    Tokens are local to the panel so it follows the light / dark 
+       5    =============================================================
+         ============= */
+       7 .gen {
+       8   --gen-bg: #ffffff;
+      10   --gen-bg-inset: #eef0f3;
+     … +244 lines (ctrl+o to expand)
+
+⏺ Write(/Volumes/SSD/Development/cadcamfun/apps/desktop/src/features/cam/compone
+       nts/generator/ui.tsx)
+  ⎿  Added 117 lines, removed 68 lines
+        1  /**
+        2 - * Building blocks shared by the generator sections: the colla
+          -psible card shell and the validated numeric field.            
+        3 - * Class names are the legacy ones, so the panel renders like 
+          -the original side by side.                                    
+        2 + * Building blocks of the generator panel: the collapsible sec
+          +tion, the labelled field, the validated number field, the segm
+          +ented                                                         
+        3 + * control and the notice. Styled by `styles/generator.css`; e
+          +very section of the panel is made of these, so the panel reads
+          + as one                                                       
+        4 + * instrument instead of a stack of different cards.          
+        5   */
+        5 -import { Show, type Component, type JSX } from "solid-js"     
+        6 -import { ChevronDown } from "lucide-solid"                    
+        7 -import { Motion, Presence } from "solid-motionone"            
+        6 +import { For, Show, type Component, type JSX } from "solid-js"
+        7 +import { AlertTriangle, Check, ChevronDown, CircleAlert, Info 
+          +} from "lucide-solid"                                         
+        8 +import { NumberField as DimensionField } from "../../../cad/co
+          +mponents/property-inputs/NumberField.tsx"                     
+        9  import { useGeneratorStore } from "../../store/generatorStore.
+           ts"
+       10 +import "../../../../styles/generator.css"                     
+       11  
+       10 -export const INPUT = "w-full p-2 border border-gray-300 rounde
+          -d-md focus:ring-blue-500 focus:border-blue-500"               
+       11 -export const LABEL = "block text-sm font-medium text-gray-700 
+          -mb-1"                                                         
+       12 -export const CHECKBOX = "h-4 w-4 text-blue-600 rounded border-
+          -gray-300 focus:ring-blue-500"                                 
+       12 +export const INPUT = "gen-input"                              
+       13 +export const LABEL = "gen-label"                              
+       14 +export const CHECKBOX = ""                                    
+       15  
+       14 -/** Tailwind needs whole class names in the source, so each to
+          -ne lists its classes literally. */                            
+       15 -const TONES = {                                               
+       16 -  blue: { box: "bg-blue-100 dark:bg-blue-900", icon: "text-blu
+          -e-600 dark:text-blue-400" },                                  
+       17 -  orange: { box: "bg-orange-100 dark:bg-orange-900", icon: "te
+          -xt-orange-600 dark:text-orange-400" },                        
+       18 -  purple: { box: "bg-purple-100 dark:bg-purple-900", icon: "te
+          -xt-purple-600 dark:text-purple-400" },                        
+       19 -  green: { box: "bg-green-100 dark:bg-green-900", icon: "text-
+          -green-600 dark:text-green-400" },                             
+       20 -  indigo: { box: "bg-indigo-100 dark:bg-indigo-900", icon: "te
+          -xt-indigo-600 dark:text-indigo-400" },                        
+       21 -  cyan: { box: "bg-cyan-100 dark:bg-cyan-900", icon: "text-cya
+          -n-600 dark:text-cyan-400" },                                  
+       22 -  red: { box: "bg-red-100 dark:bg-red-900", icon: "text-red-60
+          -0 dark:text-red-400" }                                        
+       23 -} as const                                                    
+       24 -export type Tone = keyof typeof TONES                         
+       16 +/** Kept for the call sites that still name a tone: the panel 
+          +has one visual language, a tone no longer colours the icon. */
+       17 +export type Tone = "blue" | "orange" | "purple" | "green" | "i
+          +ndigo" | "cyan" | "red"                                       
+       18  
+       19  interface SectionProps {
+       20    readonly id: string
+       28 -  readonly delay: number                                      
+       29 -  readonly tone: Tone                                         
+       21 +  /** Kept for the call sites; sections no longer animate in o
+          +ne after the other. */                                        
+       22 +  readonly delay?: number                                     
+       23 +  readonly tone?: Tone                                        
+       24    readonly icon: Component<{ size?: number; class?: string }>
+       25    readonly title: string
+       26 +  /** A short state line shown on the header while the section
+          + is closed (the machine, the operation, the material). */     
+       27 +  readonly summary?: string | undefined                       
+       28    readonly testId?: string
+       29    readonly children: JSX.Element
+       30  }
+       31  
+       36 -/** One collapsible card of the panel (legacy `renderXSection`
+          - wrapper). */                                                 
+       32 +/** One collapsible block of the panel. */                    
+       33  export function Section(props: SectionProps): JSX.Element {
+       34    const gen = useGeneratorStore()
+       35    const open = (): boolean => gen.expanded[props.id] === true
+       36    return (
+       41 -    <Motion.div initial={{ opacity: 0, y: 10 }} animate={{ opa
+          -city: 1, y: 0 }} transition={{ delay: props.delay }} class="wo
+          -rkstation-section" data-testid={props.testId}>                
+       42 -      <Motion.div                                             
+       43 -        class="workstation-section__header flex items-center j
+          -ustify-between cursor-pointer bg-white dark:bg-gray-800 border
+          - border-gray-200 dark:border-gray-700"                        
+       37 +    <section class="gen-section" data-open={open()} data-testi
+          +d={props.testId}>                                             
+       38 +      <div                                                    
+       39 +        class="gen-section__head"                             
+       40          role="button"
+       41          tabindex="0"
+       42          aria-expanded={open()}
+       43          onClick={() => gen.toggleSection(props.id)}
+       44          onKeyDown={(event: KeyboardEvent) => { if (event.key =
+           == "Enter" || event.key === " ") { event.preventDefault(); gen
+           .toggleSection(props.id) } }}
+       49 -        hover={{ scale: 1.01 }}                               
+       50 -        press={{ scale: 0.99 }}                               
+       45        >
+       52 -        <div class="flex items-center space-x-3">             
+       53 -          <div class={`p-2 rounded-lg ${TONES[props.tone].box}
+          -`}>                                                           
+       54 -            <props.icon size={20} class={TONES[props.tone].ico
+          -n} />                                                         
+       55 -          </div>                                              
+       56 -          <h3 class="text-lg font-semibold text-gray-900 dark:
+          -text-white">{props.title}</h3>                                
+       57 -        </div>                                                
+       58 -        <Motion.div animate={{ rotate: open() ? 180 : 0 }} tra
+          -nsition={{ duration: 0.2 }}>                                  
+       59 -          <ChevronDown size={20} class="text-gray-500" />     
+       60 -        </Motion.div>                                         
+       61 -      </Motion.div>                                           
+       62 -      <Presence>                                              
+       63 -        <Show when={open()}>                                  
+       64 -          <Motion.div                                         
+       65 -            initial={{ opacity: 0, height: 0 }}               
+       66 -            animate={{ opacity: 1, height: "auto" }}          
+       67 -            exit={{ opacity: 0, height: 0 }}                  
+       68 -            transition={{ duration: 0.3 }}                    
+       69 -            class="workstation-section__body bg-gray-50 dark:b
+          -g-gray-800 border border-gray-200 dark:border-gray-700"       
+       70 -          >                                                   
+       71 -            {props.children}                                  
+       72 -          </Motion.div>                                       
+       73 -        </Show>                                               
+       74 -      </Presence>                                             
+       75 -    </Motion.div>                                             
+       46 +        <props.icon size={14} class="gen-section__icon" />    
+       47 +        <h3 class="gen-section__title">{props.title}</h3>     
+       48 +        <Show when={!open() && props.summary}><span class="gen
+          +-section__summary">{props.summary}</span></Show>              
+       49 +        <ChevronDown size={14} class="gen-section__chevron" />
+       50 +      </div>                                                  
+       51 +      <Show when={open()}>                                    
+       52 +        <div class="gen-section__body">{props.children}</div> 
+       53 +      </Show>                                                 
+       54 +    </section>                                                
+       55    )
+       56  }
+       57  
+       58 +/** A labelled field: the label above, the unit on its right, 
+          +an optional hint below. */                                    
+       59 +export function Field(props: { readonly label: string; readonl
+          +y unit?: string; readonly hint?: string; readonly for?: string
+          +; readonly children: JSX.Element }): JSX.Element {            
+       60 +  return (                                                    
+       61 +    <div class="gen-field">                                   
+       62 +      <label class="gen-label" for={props.for}>               
+       63 +        <span>{props.label}</span>                            
+       64 +        <Show when={props.unit}><span class="gen-label__unit">
+          +{props.unit}</span></Show>                                    
+       65 +      </label>                                                
+       66 +      {props.children}                                        
+       67 +      <Show when={props.hint}><p class="gen-hint">{props.hint}
+          +</p></Show>                                                   
+       68 +    </div>                                                    
+       69 +  )                                                           
+       70 +}                                                             
+       71 +                                                              
+       72 +/** Fields side by side. */                                   
+       73 +export function Grid(props: { readonly cols?: 2 | 3 | 4; reado
+          +nly children: JSX.Element }): JSX.Element {                   
+       74 +  return <div class={`gen-grid gen-grid--${props.cols ?? 2}`}>
+          +{props.children}</div>                                        
+       75 +}                                                             
+       76 +                                                              
+       77 +/** A titled run of fields inside a section. */               
+       78 +export function Group(props: { readonly title?: string; readon
+          +ly children: JSX.Element }): JSX.Element {                    
+       79 +  return (                                                    
+       80 +    <div class="gen-group">                                   
+       81 +      <Show when={props.title}><h4 class="gen-group__title">{p
+          +rops.title}</h4></Show>                                       
+       82 +      {props.children}                                        
+       83 +    </div>                                                    
+       84 +  )                                                           
+       85 +}                                                             
+       86 +                                                              
+       87  interface NumberFieldProps {
+       88    readonly value: number
+       89    readonly onValue: (value: number) => void
+       90    readonly min?: string
+       91    readonly max?: string
+       92    readonly step?: string
+       85 -  /** `parseInt` instead of `parseFloat`. */                  
+       93 +  /** Whole numbers only. */                                  
+       94    readonly int?: boolean
+       87 -  /** Accept predicate; legacy handlers dropped NaN and, for m
+          -ost fields, anything not above zero. */                       
+       95 +  /** Accept predicate; the legacy handlers dropped anything t
+          +hat was not above zero. */                                    
+       96    readonly accept?: (value: number) => boolean
+       97    readonly class?: string
+       98    readonly id?: string
+       99 +  readonly label?: string                                     
+      100  }
+      101  
+       93 -/** `<input type=number>` with the legacy rule: ignore NaN and
+          - values the field does not accept. */                         
+      102 +/**                                                           
+      103 + * A number field that takes what people type: `0,2` and `0.2`
+          +, and expressions such as `40/2+3`. An entry that is not a num
+          +ber                                                           
+      104 + * (or that the field does not accept) keeps the last valid va
+          +lue; nothing is written until the text is a valid number.     
+      105 + */                                                           
+      106  export function NumberField(props: NumberFieldProps): JSX.Elem
+           ent {
+      107    return (
+       96 -    <input                                                    
+      108 +    <DimensionField                                           
+      109        id={props.id}
+       98 -      type="number"                                           
+       99 -      min={props.min}                                         
+      100 -      max={props.max}                                         
+      101 -      step={props.step}                                       
+      102 -      class={props.class ?? INPUT}                            
+      110 +      label={props.label}                                     
+      111        value={props.value}
+      104 -      onChange={(event) => {                                  
+      105 -        const value = props.int ? parseInt(event.currentTarget
+          -.value) : parseFloat(event.currentTarget.value)               
+      106 -        if (!Number.isNaN(value) && (props.accept ? props.acce
+          -pt(value) : value > 0)) props.onValue(value)                  
+      107 -      }}                                                      
+      112 +      integer={props.int}                                     
+      113 +      step={props.step === undefined ? undefined : Number(prop
+          +s.step)}                                                      
+      114 +      class={props.class ?? INPUT}                            
+      115 +      onChange={(value) => { if (props.accept ? props.accept(v
+          +alue) : value > 0) props.onValue(value) }}                    
+      116      />
+      117    )
+      118  }
+      119  
+      112 -/** Checkbox + label row of the advanced sections. */         
+      120 +/** Checkbox + label row. */                                  
+      121  export function CheckRow(props: { readonly id: string; readonl
+           y checked: boolean; readonly onChange: (checked: boolean) => v
+           oid; readonly children: JSX.Element }): JSX.Element {
+      122    return (
+      115 -    <div class="flex items-center">                           
+      116 -      <input type="checkbox" id={props.id} class={CHECKBOX} ch
+          -ecked={props.checked} onChange={(event) => props.onChange(even
+          -t.currentTarget.checked)} />                                  
+      117 -      <label for={props.id} class="ml-2 block text-sm text-gra
+          -y-700">{props.children}</label>                               
+      123 +    <div class="gen-check">                                   
+      124 +      <input type="checkbox" id={props.id} checked={props.chec
+          +ked} onChange={(event) => props.onChange(event.currentTarget.c
+          +hecked)} />                                                   
+      125 +      <label for={props.id}>{props.children}</label>          
+      126      </div>
+      127    )
+      128  }
+      129 +                                                              
+      130 +/** Two to five exclusive choices on one line. */             
+      131 +export function Segmented<T extends string>(props: { readonly 
+          +value: T; readonly options: ReadonlyArray<readonly [T, string]
+          +>; readonly onChange: (value: T) => void; readonly label: stri
+          +ng; readonly testId?: string }): JSX.Element {                
+      132 +  return (                                                    
+      133 +    <div class="gen-seg" role="group" aria-label={props.label}
+          + data-testid={props.testId}>                                  
+      134 +      <For each={props.options}>                              
+      135 +        {([value, text]) => (                                 
+      136 +          <button type="button" class="gen-seg__item" aria-pre
+          +ssed={props.value === value} onClick={() => props.onChange(val
+          +ue)}>{text}</button>                                          
+      137 +        )}                                                    
+      138 +      </For>                                                  
+      139 +    </div>                                                    
+      140 +  )                                                           
+      141 +}                                                             
+      142 +                                                              
+      143 +const NOTE_ICON = { info: Info, ok: Check, warn: AlertTriangle
+          +, bad: CircleAlert } as const                                 
+      144 +                                                              
+      145 +/** A plain notice: information, a confirmation, a caution or 
+          +an error. */                                                  
+      146 +export function Note(props: { readonly kind?: keyof typeof NOT
+          +E_ICON; readonly testId?: string; readonly role?: "alert" | "s
+          +tatus"; readonly children: JSX.Element }): JSX.Element {      
+      147 +  const kind = (): keyof typeof NOTE_ICON => props.kind ?? "in
+          +fo"                                                           
+      148 +  const Icon = (): Component<{ size?: number }> => NOTE_ICON[k
+          +ind()]                                                        
+      149 +  return (                                                    
+      150 +    <div class={`gen-note gen-note--${kind()}`} data-testid={p
+          +rops.testId} role={props.role}>                               
+      151 +      {Icon()({ size: 14 })}                                  
+      152 +      <div>{props.children}</div>                             
+      153 +    </div>                                                    
+      154 +  )                                                           
+      155 +}                                                             
+      156 +                                                              
+      157 +export function Badge(props: { readonly tone?: "ok" | "warn" |
+          + "bad"; readonly testId?: string; readonly children: JSX.Eleme
+          +nt }): JSX.Element {                                          
+      158 +  return <span class={`gen-badge${props.tone ? ` gen-badge--${
+          +props.tone}` : ""}`} data-testid={props.testId}>{props.childre
+          +n}</span>                                                     
+      159 +}                                                             
+      160 +                                                              
+      161 +export function Stat(props: { readonly label: string; readonly
+          + value: string; readonly sub?: string }): JSX.Element {       
+      162 +  return (                                                    
+      163 +    <div class="gen-stat">                                    
+      164 +      <span class="gen-stat__label">{props.label}</span>      
+      165 +      <span class="gen-stat__value">{props.value}</span>      
+      166 +      <Show when={props.sub}><span class="gen-stat__sub">{prop
+          +s.sub}</span></Show>                                          
+      167 +    </div>                                                    
+      168 +  )                                                           
+      169 +}                                                             
+
+  Ran 6 shell commands (ctrl+o to expand)
+
+⏺ Write(/Volumes/SSD/Development/cadcamfun/apps/desktop/src/features/cam/compone
+       nts/generator/PrintProfileSection.tsx)
+  ⎿  Wrote 238 lines to /Volumes/SSD/Development/cadcamfun/apps/desktop/src
+     /features/cam/components/generator/PrintProfileSection.tsx
+       1 /**
+         n, infill, supports and adhesion, speeds and cooling, temperatur
+         es,
+          generator settings or the printer extras the slicer reads
+       4  * (`packages/core/src/cam/print`); nothing here is decoration.
+       6 import { For, Show, type JSX } from "solid-js"
+       7 import { Layers } from "lucide-solid"
+       9 import { useGeneratorStore, type PrinterExtras, type ToolpathSet
+         tings } from "../../store/generatorStore.ts"
+         on, Segmented } from "./ui.tsx"
+     … +334 lines (ctrl+o to expand)
+
+  Searched for 1 pattern, read 1 file, listed 2 directories, ran 27 shell commands (ctrl+o to expand)
+⏺ Le immagini sono molto alte: le taglio a blocchi per guardarle.
+
+  Searched for 1 pattern, read 1 file, ran 13 shell commands (ctrl+o to expand)
+
+⏺ Ora le capture del pannello stampante dopo le modifiche, con un pezzo
+  selezionato e il G-code generato.
+
+  Read 1 file, ran 4 shell commands (ctrl+o to expand)
+
+⏺ Stats generate. Guardo la parte bassa (risultato, anteprima layer, evidenze).
+
+  Searched for 1 pattern, read 2 files, ran 17 shell commands (ctrl+o to expand)
+  ⎿  You've hit your session limit · resets 5:40am (Europe/Rome)
+
+⏺ Usage limit reached · continuing automatically at 5:40am · esc to 
+  cancel
+
+⏺ Goal paused · usage limit reached · continues automatically when it 
+  resets
+
+✻ Baked for 36m 7s · done 2:41 AM

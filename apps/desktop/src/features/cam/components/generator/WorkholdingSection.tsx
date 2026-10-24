@@ -20,7 +20,7 @@ export function WorkholdingSection(): JSX.Element {
     </div>
   )
   return (
-    <Section id="workholding" delay={0.17} tone="cyan" icon={Lock} title={t("cam.workholding.title")} testId="workholding-section">
+    <Section id="workholding" icon={Lock} title={t("cam.workholding.title")} testId="workholding-section">
       <div class="space-y-4">
         <Show when={gen.settings.machineType === "mill"}>
           <div>

@@ -8,10 +8,10 @@ import { meshBounds } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
 import type { SetupOrientation } from "../setup.ts"
 import type { WorkOffset } from "../ir.ts"
-import { KERNEL_SCHEMA_VERSION, type CamResult, type ManufacturingJob, type OperationSpec, type WorkOrigin } from "./contracts.ts"
+import { KERNEL_SCHEMA_VERSION, type CamResult, type ManufacturingJob, type OperationSpec, type PrintRequirement, type WorkOrigin } from "./contracts.ts"
 import type { Cutter } from "./cutters.ts"
 import { findMachine, MACHINE_CATALOGUE } from "./machines.ts"
-import { kernelMachineOfConfig, type MachineConfigRow } from "./machine-config.ts"
+import { kernelMachineOfConfig, machineRefusal, type MachineConfigRow } from "./machine-config.ts"
 
 export interface KernelSnapshot {
   readonly schemaVersion: typeof KERNEL_SCHEMA_VERSION
@@ -31,6 +31,8 @@ export interface KernelSnapshot {
   readonly deburr?: number
   /** Write toolpaths that repeat translated as `M98` subprograms (Fanuc and Haas posts). */
   readonly subprograms?: boolean
+  /** How a printer job is sliced (read only when the machine is a printer). */
+  readonly print?: PrintRequirement
   readonly elements: ReadonlyArray<Readonly<Record<string, unknown>>>
   /** The editor's stock: centre X/Y and size; its bottom is the part's lowest point. */
   readonly stock?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly depth: number }
@@ -46,7 +48,7 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
   // A saved machine configuration is the machine the user configured: it wins over the preset id.
   const configured = s.machineConfig !== undefined ? kernelMachineOfConfig(s.machineConfig) : undefined
   if (s.machineConfig !== undefined && configured === undefined) {
-    return { status: "failed", issues: [{ tag: "InvalidInput", severity: "error", stage: "prepare", message: `The machine configuration '${s.machineConfig.name}' is not a machine the kernel can machine: it needs a kind it machines (mill or lathe) and a spindle and feed ceiling.` }] }
+    return { status: "failed", issues: [{ tag: "InvalidInput", severity: "error", stage: "prepare", message: `The machine configuration '${s.machineConfig.name}' is not a machine the kernel can run: ${machineRefusal(s.machineConfig) ?? "it needs a kind it machines (mill, lathe or filament printer)"}.` }] }
   }
   const machine = configured ?? preset
   let stock: ManufacturingJob["stock"]
@@ -69,6 +71,7 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.workOffset !== undefined ? { workOffset: s.workOffset } : {}),
       ...(s.operations !== undefined ? { operations: s.operations } : {}), ...(s.tools !== undefined ? { tools: s.tools } : {}),
       ...(s.subprograms === true ? { post: { options: { subprograms: true } } } : {}),
+      ...(s.print !== undefined ? { print: s.print } : {}),
       quality
     }
   }

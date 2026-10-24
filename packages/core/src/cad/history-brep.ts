@@ -41,6 +41,7 @@ import {
   makeCone,
   makeSphere,
   makeTorus,
+  makeCapsule,
   draftPlanarFace,
   BudgetExceeded,
   checkBudget,
@@ -77,6 +78,7 @@ import {
   writeStepBreps,
   type StepWriteOptions,
   sewSolids,
+  scaleBrep,
   transformBrep,
   translation,
   uniformScale,
@@ -519,6 +521,12 @@ export const catalogueBrep = (
       const brep = revolveProfile({ loops: [loop] }, 2 * Math.PI, { origin: at })
       return { brep, centre: { x: at.x, y: at.y, z: at.z + (down ? -r / 2 : r / 2) } }
     }
+    case "capsule": {
+      // A cylinder with two hemispherical caps, laid along its direction field (the editor's convention).
+      const r = num("radius", 0.5), length = num("height", 2)
+      const direction = options["direction"] === "x" || options["direction"] === "z" ? options["direction"] : "y"
+      return { brep: makeCapsule(r, length, direction, W(at)), centre: at }
+    }
     case "prism": {
       const r = num("radius", 1), h = num("height", 1), sides = Math.max(3, Math.floor(typeof p["sides"] === "number" ? p["sides"]! : 6))
       // The catalogue's corner convention: the first corner at (0, −r), going counter-clockwise.
@@ -571,11 +579,18 @@ export const catalogueBrep = (
       const moved = transformBrep(b, translation(at))
       return { brep: moved, centre: at }
     }
+    case "ellipsoid":
+      // Refused, not approximated: an ellipsoid is the affine image of a sphere and the kernel has no rational
+      // ellipsoid surface; a NURBS patch would only be an approximation of it (spec 39 §2: refusal over approximation).
+      return "an ellipsoid has no exact model yet (the kernel has no rational ellipsoid surface; a sphere, or a revolve of an ellipse, is exact)"
+    case "gear":
+      // The involute flank is not one of the kernel's exact curves (line, arc, ellipse); a NURBS flank would only be
+      // an approximation of it, so the gear is refused rather than silently approximated.
+      return "an involute gear has no exact model yet (its flanks are involutes, which the kernel's exact curves cannot carry)"
     default:
       return `the catalogue element '${element}' has no exact model yet`
   }
 }
-
 /**
  * Replays `history` as exact B-reps alongside the mesh rebuild (computed when not given). Never throws: a body without
  * an exact model carries the reason. With `budgetMs` the exact work stops once that time is spent (`brep/budget.ts`), and
@@ -844,8 +859,20 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
         case "scale": {
           const factors = (Array.isArray(f.factor) ? f.factor : [f.factor, f.factor, f.factor]).map((d) => dim(d as Dimension))
           const about = f.about?.map(dim)
+          const centre = about === undefined ? { x: 0, y: 0, z: 0 } : { x: about[0]!, y: about[1]!, z: about[2]! }
           const uniform = factors.every((v) => Math.abs(v - factors[0]!) < 1e-12)
-          transformTargets(f, uniform ? uniformScale(factors[0]!, about === undefined ? { x: 0, y: 0, z: 0 } : { x: about[0]!, y: about[1]!, z: about[2]! }) : undefined, "a non-uniform scale has no exact model (it turns circles into ellipses)")
+          const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
+          for (const b of chosen) {
+            if (b.exact.brep === undefined) continue
+            if (uniform) {
+              bodies[bodies.indexOf(b)] = { ...b, exact: ok(transformBrep(b.exact.brep, uniformScale(factors[0]!, centre))) }
+              continue
+            }
+            // A scale with three different factors is an affine map: the kernel has an exact image for planes, NURBS
+            // surfaces and cylinders along a coordinate axis, and refuses the rest with a reason.
+            const scaled = scaleBrep(b.exact.brep, { x: factors[0]!, y: factors[1]!, z: factors[2]! }, centre)
+            bodies[bodies.indexOf(b)] = { ...b, exact: typeof scaled === "string" ? no(scaled) : ok(scaled) }
+          }
           break
         }
         case "split": {

@@ -15,6 +15,7 @@ import { NonNegative, Positive, withDefault } from "../params.ts"
 
 const Num = Schema.Finite
 const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0))
+const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 const Percent = Schema.Finite.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(100))
 
 export const MachineTypeSchema = Schema.Literals(["mill", "lathe", "3dprinter"])
@@ -241,11 +242,57 @@ export const DEFAULT_GEOMETRY: GeometryInput = Schema.decodeUnknownSync(Geometry
 
 export const PrinterExtrasSchema = Schema.Struct({
   infillDensity: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 })), 20),
-  infillPattern: withDefault(Schema.Literals(["grid", "lines", "triangles", "honeycomb"]), "grid"),
-  supportType: withDefault(Schema.Literals(["none", "minimal", "full"]), "minimal"),
+  infillPattern: withDefault(Schema.Literals(["grid", "lines", "triangles", "honeycomb", "gyroid", "concentric"]), "grid"),
+  supportType: withDefault(Schema.Literals(["none", "minimal", "full"]), "none"),
   shellCount: withDefault(PositiveInt, 2),
   printResolution: withDefault(Schema.Literals(["standard", "high", "low"]), "standard"),
-  printOrientation: withDefault(Schema.Literals(["original", "auto-optimal"]), "original")
+  printOrientation: withDefault(Schema.Literals(["original", "auto-optimal"]), "original"),
+  /** The filament on the spool: its density weighs the print and its melt rate limits the speed. */
+  filament: withDefault(Schema.Literals(["pla", "petg", "abs", "asa", "tpu", "nylon", "pc"]), "pla"),
+  /** Solid layers under and over the part. */
+  topLayers: withDefault(NonNegativeInt, 4),
+  bottomLayers: withDefault(NonNegativeInt, 4),
+  /** Height of the first layer, mm (0 = the layer height). */
+  firstLayerHeight: withDefault(NonNegative, 0),
+  /** Speeds as a percentage of the print speed; the first layer has its own. */
+  firstLayerSpeed: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 10, maximum: 200 })), 50),
+  outerWallSpeed: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 10, maximum: 200 })), 70),
+  infillSpeed: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 10, maximum: 300 })), 100),
+  bridgeSpeed: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 10, maximum: 200 })), 50),
+  supportSpeed: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 10, maximum: 300 })), 100),
+  travelSpeed: withDefault(Positive, 150),
+  /** Retraction (mm, mm/s), the shortest travel that retracts, and the lift on a retracted travel. */
+  retractionDistance: withDefault(NonNegative, 2),
+  retractionSpeed: withDefault(Positive, 40),
+  retractMinTravel: withDefault(NonNegative, 1.5),
+  zHop: withDefault(NonNegative, 0),
+  /** Part cooling fan, % and the layer it comes on at; the minimum layer time in seconds; extrusion multiplier in %. */
+  fanSpeed: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 100 })), 100),
+  fanFromLayer: withDefault(PositiveInt, 2),
+  minLayerTime: withDefault(NonNegative, 5),
+  flow: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 50, maximum: 150 })), 100),
+  seam: withDefault(Schema.Literals(["nearest", "aligned", "random"]), "nearest"),
+  outerWallFirst: withDefault(Schema.Boolean, false),
+  /** Supports: overhang angle from vertical (degrees), line density (%), horizontal gap (mm), vertical gap and dense layers (layers). */
+  supportAngle: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 10, maximum: 80 })), 45),
+  supportDensity: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 5, maximum: 100 })), 15),
+  supportXYGap: withDefault(NonNegative, 0.6),
+  supportZGap: withDefault(NonNegativeInt, 1),
+  supportInterfaceLayers: withDefault(NonNegativeInt, 2),
+  /** Adhesion to the plate; the brim width in mm, the skirt, the raft layers. */
+  adhesion: withDefault(Schema.Literals(["none", "skirt", "brim", "raft"]), "none"),
+  brimWidth: withDefault(NonNegative, 8),
+  skirtLoops: withDefault(PositiveInt, 2),
+  skirtDistance: withDefault(NonNegative, 3),
+  raftLayers: withDefault(PositiveInt, 3),
+  /** G-code dialect and the extruder mode; pressure advance and acceleration (0 = leave the firmware alone). */
+  flavor: withDefault(Schema.Literals(["marlin", "klipper", "reprap"]), "marlin"),
+  relativeExtrusion: withDefault(Schema.Boolean, false),
+  pressureAdvance: withDefault(NonNegative, 0),
+  acceleration: withDefault(NonNegative, 0),
+  /** Start and end blocks that replace the built-in ones; {nozzle}, {bed} and {layer} are filled in. */
+  startGcode: Schema.optionalKey(Schema.String),
+  endGcode: Schema.optionalKey(Schema.String)
 })
 export type PrinterExtras = typeof PrinterExtrasSchema.Type
 export const DEFAULT_PRINTER_EXTRAS: PrinterExtras = Schema.decodeUnknownSync(PrinterExtrasSchema)({})
@@ -320,7 +367,7 @@ export const CuttingReferenceSchema = Schema.Struct({
 })
 
 export const ProgramCheckSchema = Schema.Struct({
-  id: Schema.Literals(["generated", "cutting-data", "safe-height", "no-rapid-in-material", "tool-clearance", "within-stock", "no-gouge", "nc-interpretation"]),
+  id: Schema.Literals(["generated", "cutting-data", "safe-height", "no-rapid-in-material", "tool-clearance", "within-stock", "no-gouge", "nc-interpretation", "bed-fit", "heated-start", "layers-rise", "wall-coverage", "skin-coverage", "no-spill", "filament"]),
   /** `not-run`: the check does not apply to this machine / operation. `unresolved`: it applies but the inputs to decide it are missing. */
   status: Schema.Literals(["passed", "failed", "unresolved", "not-run"]),
   detail: Schema.String,
@@ -359,6 +406,22 @@ export const ProgramRecordSchema = Schema.Struct({
 })
 export type ProgramRecord = typeof ProgramRecordSchema.Type
 
+/** What the slicer measured on the program it wrote (3D printer only). */
+export const PrintStatsSchema = Schema.Struct({
+  layers: Schema.Int,
+  /** Filament pushed through the nozzle, mm of filament, and its mass in grams. */
+  filamentMm: Schema.Finite,
+  filamentGrams: Schema.Finite,
+  timeSeconds: Schema.Finite,
+  travelMm: Schema.Finite,
+  retractions: Schema.Int,
+  /** Bead length by feature, mm: wall-outer, wall-inner, skin, infill, bridge, support, ... */
+  lengthByKind: Schema.Record(Schema.String, Schema.Finite),
+  /** Size of the printed part, mm. */
+  size: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
+})
+export type PrintStatsRecord = typeof PrintStatsSchema.Type
+
 export const GenerateResponseSchema = Schema.Struct({
   gcode: Schema.String,
   /** Canned-cycle lines found in the program (legacy `detectedCycles`). */
@@ -368,7 +431,9 @@ export const GenerateResponseSchema = Schema.Struct({
   /** Machine-neutral IR rebuilt from the text, what the viewport draws. */
   program: ProgramSchema,
   /** Evidence about this exact NC (`evidence.ts`); absent only when the request turned it off. */
-  evidence: Schema.optionalKey(ProgramRecordSchema)
+  evidence: Schema.optionalKey(ProgramRecordSchema),
+  /** Time, filament and size measured on the printer program; only for a 3D printer. */
+  print: Schema.optionalKey(PrintStatsSchema)
 })
 export type GenerateResponse = typeof GenerateResponseSchema.Type
 

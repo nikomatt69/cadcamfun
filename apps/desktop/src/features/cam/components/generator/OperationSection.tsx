@@ -7,9 +7,8 @@ import { useCamStore } from "../../store/camStore.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { useGeneratorStore, type GeometryType } from "../../store/generatorStore.ts"
 import { CirclePreview, PolygonPreview, RectanglePreview } from "./GeometryPreview.tsx"
-import { PrinterPreview } from "./PrinterPreview.tsx"
-import { PrinterSettings } from "./PrinterSettings.tsx"
-import { INPUT, LABEL, NumberField, Section } from "./ui.tsx"
+import { OperationExample } from "./ExamplePreview.tsx"
+import { Field, INPUT, LABEL, Note, NumberField, Section, Segmented } from "./ui.tsx"
 import { t } from "../../../../i18n/index.ts"
 import { CadElementPicker } from "./CadElementPicker.tsx"
 import StrategyPalette, {
@@ -17,16 +16,17 @@ import StrategyPalette, {
   type MachineFamily
 } from "./StrategyPalette.tsx"
 
-const BTN_BLUE = "px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-const BTN_GREEN = "px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+const BTN_BLUE = "panel-btn"
+const BTN_GREEN = "panel-btn"
 
 /** "Machining Depth (mm)" box of the selected-element panels. */
 function DepthBox(): JSX.Element {
   const gen = useGeneratorStore()
   return (
-    <div class="mt-3 p-2 bg-blue-50 rounded-md">
-      <label class="block text-sm font-medium text-blue-700 mb-1">Machining Depth (mm)</label>
-      <NumberField min="0.1" step="0.1" class="w-full p-2 border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500" value={gen.settings.depth} onValue={(value) => gen.updateSettings("depth", value)} />
+    <div class="mt-3">
+      <Field label="Machining depth" unit="mm">
+        <NumberField label="Machining depth" step="0.1" value={gen.settings.depth} onValue={(value) => gen.updateSettings("depth", value)} />
+      </Field>
     </div>
   )
 }
@@ -37,7 +37,7 @@ function UseButtons(props: { readonly element: CadElement }): JSX.Element {
   const e = () => props.element
   const threeD = () => ["cube", "sphere", "cylinder", "cone"].includes(String(e()["type"]))
   return (
-    <div class="mt-3 flex justify-between">
+    <div class="mt-3 panel-grid panel-grid--2">
       <button
         type="button"
         class={BTN_BLUE}
@@ -70,44 +70,22 @@ function UseButtons(props: { readonly element: CadElement }): JSX.Element {
   )
 }
 
-/** The printer's "Element Selection": geometry source, selected element summary and the list of elements. */
+/** The printer's part: what is printed is the solid the CAD has selected (or every solid of the drawing when nothing is selected). */
 function PrinterElementSelection(): JSX.Element {
-  const gen = useGeneratorStore()
   const job = useJob()
   return (
-    <div class="p-4 bg-white rounded-md shadow-sm border border-gray-200">
-      <h3 class="text-sm font-medium text-gray-700 mb-3">Element Selection</h3>
-      <div class="space-y-3">
-        <div>
-          <label class={LABEL}>Geometry Source</label>
-          <select class={INPUT} value={gen.geometryType} onChange={(event) => gen.setGeometryType(event.currentTarget.value as GeometryType, job.element())}>
-            <option value="selected">From Selected Element</option>
-            <option value="rectangle">Rectangle</option>
-            <option value="circle">Circle</option>
-            <option value="polygon">Polygon</option>
-            <option value="cube">Cube</option>
-            <option value="sphere">Sphere</option>
-            <option value="cylinder">Cylinder</option>
-            <option value="cone">Cone</option>
-          </select>
-        </div>
-
-        <Show when={gen.geometryType === "selected"}>
-          <CadElementPicker />
-          <div class={`p-3 ${job.element() ? "bg-green-50" : "bg-yellow-50"} rounded-md`}>
-            <Show when={job.element()} fallback={<p class="text-sm text-yellow-700">{t("cam.generator.selectCadElementHint")}</p>}>
-              {(element) => (
-                <div>
-                  <p class="text-sm text-green-700 font-medium mb-1">Selected Element: {String(element()["type"])} (ID: {String(element()["id"]).substring(0, 6)}...)</p>
-                  <div class="mt-2 text-xs text-green-600"><span>{elementSummary(element())}</span></div>
-                  <DepthBox />
-                  <UseButtons element={element()} />
-                </div>
-              )}
-            </Show>
-          </div>
-        </Show>
-      </div>
+    <div class="panel-group">
+      <h4 class="panel-group__title">Part</h4>
+      <CadElementPicker />
+      <Show when={job.element()} fallback={<Note kind="warn">{t("cam.generator.selectCadElementHint")}</Note>}>
+        {(element) => (
+          <Note kind="ok">
+            <strong>{String(element()["type"])}</strong> {String(element()["name"] ?? "") || String(element()["id"]).substring(0, 6)}
+            <Show when={job.selection().length > 1}> and {job.selection().length - 1} more</Show>
+            <div class="panel-hint">{elementSummary(element())}</div>
+          </Note>
+        )}
+      </Show>
     </div>
   )
 }
@@ -356,9 +334,9 @@ export function OperationSection(): JSX.Element {
     gen.updateSettings("operationType", target as typeof gen.settings.operationType)
   }
   return (
-    <Section id="operation" delay={0.25} tone="purple" icon={Play} title="Operation" testId="operation-section">
-      <div>
-        <label class={LABEL}>Operation Type</label>
+    <Section id="operation" icon={Play} title="Operation" summary={info().title} testId="operation-section">
+      <div class="panel-field">
+        <label class={LABEL}>Operation type</label>
         <Switch>
           <Match when={gen.settings.machineType === "mill" || gen.settings.machineType === "lathe"}>
             <StrategyPalette
@@ -368,24 +346,19 @@ export function OperationSection(): JSX.Element {
             />
           </Match>
           <Match when={gen.settings.machineType === "3dprinter"}>
-            <div class="flex flex-col gap-4">
-              <div class="space-y-4">
-                <PrinterElementSelection />
-                <div class="bg-white rounded-md shadow-sm border border-gray-200">
-                  <PrinterPreview element={job.element()} settings={gen.settings} printer={gen.printer} />
-                </div>
-              </div>
-              <div class="bg-white p-4 rounded-md shadow-sm border border-gray-200">
-                <PrinterSettings element={job.element()} />
-              </div>
+            <div class="panel-group">
+              <Segmented
+                label="Print operation" testId="print-operations" value={gen.settings.operationType as string}
+                options={[["standard", "Standard"], ["vase", "Vase"], ["support", "Support"], ["infill", "Solid"], ["raft", "Raft"], ["brim", "Brim"]]}
+                onChange={(value) => gen.updateSettings("operationType", value as typeof gen.settings.operationType)}
+              />
+              <PrinterElementSelection />
             </div>
           </Match>
         </Switch>
       </div>
 
-      <div class="p-4 bg-blue-50 rounded-md">
-        <p class="text-blue-700 text-sm">{info().description}</p>
-      </div>
+      <OperationExample />
 
       <Show when={gen.settings.machineType === "mill" && gen.settings.operationType === "probing"}>
         <ProbeSettings />

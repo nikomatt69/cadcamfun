@@ -24,6 +24,7 @@ export const CamKernelRequest = Schema.Struct({
   tools: CamManufactureInput.fields.tools,
   deburr: CamManufactureInput.fields.deburr,
   subprograms: CamManufactureInput.fields.subprograms,
+  print: CamManufactureInput.fields.print,
   /** Where to announce progress (a `cam.progress` frame per operation and stage on the project's live stream); never stored with the program. */
   progress: Schema.optionalKey(Schema.Struct({ projectId: id, runId: id }))
 })
@@ -64,19 +65,31 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
   origin: cad.Vec3Schema,
   stockBounds: Schema.Struct({ min: cad.Vec3Schema, max: cad.Vec3Schema }),
   operations: Schema.Array(Schema.Struct({
-    id, name: Schema.String, strategy: Schema.Literals(["face", "adaptive", "pocket", "profile", "bore", "drill", "thread", "engrave", "chamfer", "surface", "multiaxis"]),
-    toolId: id, cut: cutting.fields.cut, status: Schema.Literals(["ok", "failed"]), cutting: Schema.optionalKey(cutting),
+    id, name: Schema.String, strategy: Schema.Literals(["face", "adaptive", "pocket", "profile", "bore", "drill", "thread", "engrave", "chamfer", "surface", "multiaxis", "print"]),
+    toolId: id, cut: Schema.Union([cutting.fields.cut, Schema.Literal("print")]), status: Schema.Literals(["ok", "failed"]), cutting: Schema.optionalKey(cutting),
     parameters: Schema.Record(Schema.String, Schema.Unknown), overridden: strings, warnings: strings, startZ: Schema.optionalKey(Schema.Finite),
     cutLength: Schema.Finite, timeSeconds: Schema.Finite, removedVolume: Schema.Finite
   })),
   program: cam.ProgramSchema, tools: Schema.Array(cutter), nc: Schema.String,
   claims: Schema.Array(Schema.Struct({
-    id: Schema.Literals(["cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel", "machine-clearance", "setup-workholding", "part-coverage"]),
+    id: Schema.Literals(["bed-fit", "heated-start", "layers-rise", "wall-coverage", "skin-coverage", "no-spill", "filament", "cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel", "machine-clearance", "setup-workholding", "part-coverage"]),
     status: Schema.Literals(["passed", "failed", "unsupported", "unresolved"]), detail: Schema.String
   })),
   issues: Schema.Array(CamKernelIssue), release: Schema.Literals(["blocked", "preview", "verified-program"]),
   stock: Schema.Struct({ initialVolume: Schema.Finite, finalVolume: Schema.Finite, partVolume: Schema.Finite, remainingVolume: Schema.Finite, maxRemaining: Schema.Finite, cellSize: Schema.Finite, fiveAxis: Schema.optionalKey(Schema.Struct({ voxelMm: Schema.Finite, removedLower: Schema.Finite, removedUpper: Schema.Finite, remainingLower: Schema.Finite, remainingUpper: Schema.Finite })) }),
   cycleTimeSeconds: Schema.Finite, identity: Schema.Struct({ job: id, part: id, nc: id, algorithm: id }), notes: strings,
+  /** Present when the machine is a printer: what was printed and how it was measured. */
+  print: Schema.optionalKey(Schema.Struct({
+    dialect: Schema.Literals(["marlin", "klipper", "reprap"]),
+    filament: Schema.Struct({ material: Schema.String, densityGcm3: Schema.Finite, diameter: Schema.Finite }),
+    nozzle: Schema.Struct({ diameter: Schema.Finite, temperature: Schema.Finite, bedTemperature: Schema.Finite }),
+    layers: Schema.Int, layerHeight: Schema.Finite, filamentMm: Schema.Finite, filamentGrams: Schema.Finite,
+    timeSeconds: Schema.Finite, travelMm: Schema.Finite, retractions: Schema.Int,
+    lengthByKind: Schema.Record(Schema.String, Schema.Finite),
+    size: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }),
+    orientation: Schema.String,
+    settings: cam.kernel.PrintRequirementSchema
+  })),
   /** The deviation the program can be promised, term by term; informational, it does not move the release level. */
   tolerance: Schema.optionalKey(Schema.Struct({
     requested: Schema.Finite,

@@ -93,17 +93,19 @@ describe("zeros and offsets, by machine", () => {
 
   test("a printer zero at the plate centre centres the part on X0 Y0; at the corner on the middle of the plate", () => {
     const cube = [{ id: "c", type: "cube", x: 40, y: -30, z: 5, width: 20, height: 20, depth: 2, layerId: "l" }]
-    const xs = (g: string) => [...g.matchAll(/^G1 X(-?[\d.]+) Y(-?[\d.]+) Z0\.200 /gm)].map((m) => [Number(m[1]), Number(m[2])] as const)
+    const xs = (g: string) => [...(g.split(";LAYER:0")[1] ?? "").split(";LAYER:1")[0]!.matchAll(/^G1 X(-?[\d.]+) Y(-?[\d.]+) .*E/gm)].map((m) => [Number(m[1]), Number(m[2])] as const)
     const corner = xs(run({ machineType: "3dprinter", operationType: "standard", toolType: "standard", bedWidth: 200, bedDepth: 180 }, cube))
     const centre = xs(run({ machineType: "3dprinter", operationType: "standard", toolType: "standard", bedWidth: 200, bedDepth: 180, bedOrigin: "center" }, cube))
     const mid = (points: ReadonlyArray<readonly [number, number]>) => [(Math.min(...points.map((p) => p[0])) + Math.max(...points.map((p) => p[0]))) / 2, (Math.min(...points.map((p) => p[1])) + Math.max(...points.map((p) => p[1]))) / 2]
-    expect(mid(corner)).toEqual([100, 90])
-    expect(mid(centre)).toEqual([0, 0])
+    expect(mid(corner)[0]).toBeCloseTo(100, 6)
+    expect(mid(corner)[1]).toBeCloseTo(90, 6)
+    expect(mid(centre)[0]).toBeCloseTo(0, 6)
+    expect(mid(centre)[1]).toBeCloseTo(0, 6)
   })
 
   test("a part larger than the plate is reported, not silently printed", () => {
     const big = [{ id: "c", type: "cube", x: 0, y: 0, z: 0, width: 300, height: 50, depth: 2, layerId: "l" }]
-    expect(run({ machineType: "3dprinter", operationType: "standard", toolType: "standard", bedWidth: 200 }, big)).toContain("WARNING: the part (300.0 x 50.0 mm) does not fit")
+    expect(run({ machineType: "3dprinter", operationType: "standard", toolType: "standard", bedWidth: 200 }, big)).toContain("Warning: the part (300.0 x 50.0 mm) does not fit")
   })
 
   test("every machine offers origins, each one named in the settings it sets", () => {

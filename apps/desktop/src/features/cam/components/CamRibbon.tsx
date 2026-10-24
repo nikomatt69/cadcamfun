@@ -34,6 +34,7 @@ import {
 } from "lucide-solid"
 import { useGeneratorStore } from "../store/generatorStore.ts"
 import { paletteToCoreOperation } from "./generator/StrategyPalette.data.ts"
+import { cam } from "@cadcamfun/core"
 import { t, type Key } from "../../../i18n/index.ts"
 
 export type RibbonTabId = "home" | "setup" | "machining" | "simulation" | "post" | "tools"
@@ -112,7 +113,10 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
   /** Switch operation types from the ribbon; same mapping as the strategy palette. */
   const pickOperation = (paletteId: string): void => {
     const family = gen.settings.machineType === "lathe" ? "lathe" : gen.settings.machineType === "3dprinter" ? "3dprinter" : "mill"
-    gen.updateSettings("operationType", paletteToCoreOperation(family, paletteId) as never)
+    const target = paletteToCoreOperation(family, paletteId)
+    // Only an operation this machine has: a contour on a printer is not an operation the program could be written for.
+    if (family !== "mill" && !(cam.generator.operationsFor(gen.settings.machineType) as ReadonlyArray<string>).includes(target)) return
+    gen.updateSettings("operationType", target as never)
     props.onSelectRightTab?.("generator")
   }
 
@@ -161,8 +165,22 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
             ]
           }
         ]
-      case "machining":
-        return [
+      case "machining": {
+        const machine = gen.settings.machineType
+        if (machine === "3dprinter") {
+          return [{
+            titleKey: "cam.ribbon.group.printing",
+            actions: [
+              { id: "print-standard", labelKey: "cam.strategy.printStandard", icon: (s, k) => <Layers size={s} class={k} />, accent: "red", onClick: () => pickOperation("standard") },
+              { id: "print-vase", labelKey: "cam.strategy.printVase", icon: (s, k) => <Box size={s} class={k} />, accent: "red", onClick: () => pickOperation("vase") },
+              { id: "print-support", labelKey: "cam.strategy.printSupport", icon: (s, k) => <Cog size={s} class={k} />, accent: "red", onClick: () => pickOperation("support") },
+              { id: "print-solid", labelKey: "cam.strategy.printInfill", icon: (s, k) => <Library size={s} class={k} />, accent: "red", onClick: () => pickOperation("infill") },
+              { id: "print-raft", labelKey: "cam.strategy.printRaft", icon: (s, k) => <Layers size={s} class={k} />, accent: "red", onClick: () => pickOperation("raft") },
+              { id: "print-brim", labelKey: "cam.strategy.printBrim", icon: (s, k) => <Wand2 size={s} class={k} />, accent: "red", onClick: () => pickOperation("brim") }
+            ]
+          }]
+        }
+        const all: ReadonlyArray<RibbonGroup> = [
           {
             titleKey: "cam.ribbon.group.profiling",
             actions: [
@@ -203,6 +221,8 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
             ]
           }
         ]
+        return machine === "lathe" ? all.slice(3) : all.slice(0, 3)
+      }
       case "simulation":
         return [
           {

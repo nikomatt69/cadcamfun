@@ -1,0 +1,227 @@
+/* ==========================================================================
+   The workstation panel design system. One quiet visual language for every narrow panel of the app: the CAM generator
+   inspector, the cycles panel and the CAD / CAM sidebars. Flat bordered blocks, small monochrome icons, 12 px type, a
+   single accent for the primary action and for state, no gradients, no emoji, no scale effects.
+   The tokens live on `.panel` so a panel follows the light / dark theme of the shell (`.dark` on the root), and every
+   rule below is written so that nothing inside a panel can push the panel wider than the panel.
+   ========================================================================== */
+
+.panel {
+  --panel-bg: #ffffff;
+  --panel-bg-subtle: #f6f7f9;
+  --panel-bg-inset: #eef0f3;
+  --panel-border: #dde1e7;
+  --panel-border-strong: #c3c9d2;
+  --panel-text: #1b2230;
+  --panel-text-muted: #5b6575;
+  --panel-text-faint: #8a93a1;
+  --panel-accent: #2557d6;
+  --panel-accent-hover: #1d47b3;
+  --panel-accent-soft: #e8eefc;
+  --panel-ok: #15803d;
+  --panel-ok-soft: #e7f5ec;
+  --panel-warn: #a15c07;
+  --panel-warn-soft: #fbf1df;
+  --panel-bad: #b42318;
+  --panel-bad-soft: #fbe9e7;
+  color: var(--panel-text);
+  font-size: 12px;
+  line-height: 18px;
+  /* The panel is a narrow column: nothing inside it may push the column wider than the column. */
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+.dark .panel {
+  --panel-bg: #171b22;
+  --panel-bg-subtle: #1c212a;
+  --panel-bg-inset: #12161c;
+  --panel-border: #2b323d;
+  --panel-border-strong: #3a4352;
+  --panel-text: #e6e9ef;
+  --panel-text-muted: #9aa4b2;
+  --panel-text-faint: #6f7886;
+  --panel-accent: #6b95f2;
+  --panel-accent-hover: #86a9f5;
+  --panel-accent-soft: #1c2a47;
+  --panel-ok: #4cc07a;
+  --panel-ok-soft: #14291d;
+  --panel-warn: #e0a24a;
+  --panel-warn-soft: #2e2413;
+  --panel-bad: #f08a80;
+  --panel-bad-soft: #321a18;
+}
+
+/* ---- header ------------------------------------------------------------ */
+.panel-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0 10px; margin-bottom: 10px; border-bottom: 1px solid var(--panel-border); }
+.panel-header__title { font-size: 13px; font-weight: 600; letter-spacing: 0.01em; color: var(--panel-text); margin: 0; }
+.panel-header__sub { margin: 1px 0 0; font-size: 11px; color: var(--panel-text-muted); }
+.panel-header__tools { display: flex; align-items: center; gap: 2px; }
+
+.panel-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 4px; border: 0; background: transparent; color: var(--panel-text-muted); cursor: pointer; }
+.panel-icon-btn:hover { background: var(--panel-bg-inset); color: var(--panel-text); }
+.panel-icon-btn:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 1px; }
+
+/* ---- section ----------------------------------------------------------- */
+.panel-section { margin-bottom: 8px; border: 1px solid var(--panel-border); border-radius: 6px; background: var(--panel-bg); overflow: hidden; }
+.panel-section__head { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 0 10px; cursor: pointer; user-select: none; background: var(--panel-bg-subtle); }
+.panel-section__head:hover { background: var(--panel-bg-inset); }
+.panel-section__head:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: -2px; }
+.panel-section__icon { flex: none; width: 14px; height: 14px; color: var(--panel-text-muted); }
+.panel-section__title { flex: 1; min-width: 0; margin: 0; font-size: 12px; font-weight: 600; color: var(--panel-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel-section__summary { flex: 0 1 auto; min-width: 0; max-width: 55%; font-size: 11px; color: var(--panel-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel-section__chevron { flex: none; width: 14px; height: 14px; color: var(--panel-text-faint); transition: transform 120ms ease; }
+.panel-section[data-open="true"] .panel-section__chevron { transform: rotate(180deg); }
+.panel-section__body { padding: 10px; border-top: 1px solid var(--panel-border); display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+/* Grid items default to `min-width: auto`, so one long word would stretch the single column past the panel. */
+.panel-section__body > * { min-width: 0; }
+
+/* ---- fields ------------------------------------------------------------ */
+.panel-field { display: grid; gap: 3px; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.panel-label { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 11px; font-weight: 500; color: var(--panel-text-muted); margin: 0; }
+.panel-label__unit { font-weight: 400; color: var(--panel-text-faint); }
+.panel-hint { margin: 0; font-size: 11px; color: var(--panel-text-faint); }
+/* A hint split in two: the minimum on the left, the recommendation on the right. It wraps rather than runs out of the panel. */
+.panel-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; min-width: 0; font-size: 11px; color: var(--panel-text-muted); }
+.panel-row > * { min-width: 0; }
+.panel-row__value { flex: none; font-variant-numeric: tabular-nums; }
+/* Flex rows written with utility classes: their items may shrink, so a long label wraps instead of pushing the column wider. */
+.panel :is(.flex) > * { min-width: 0; }
+.panel-grid { display: grid; gap: 8px 10px; }
+.panel-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.panel-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.panel-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.panel-group { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+.panel-group + .panel-group { padding-top: 10px; border-top: 1px solid var(--panel-border); }
+.panel-group__title { margin: 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--panel-text-faint); }
+
+.panel-input,
+.panel .panel-input { width: 100%; height: 28px; padding: 0 8px; border: 1px solid var(--panel-border-strong); border-radius: 4px; background: var(--panel-bg); color: var(--panel-text); font-size: 12px; box-shadow: none; }
+.panel-input:hover { border-color: var(--panel-text-faint); }
+.panel-input:focus { outline: none; border-color: var(--panel-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--panel-accent) 28%, transparent); }
+.panel-input:disabled { background: var(--panel-bg-inset); color: var(--panel-text-faint); }
+.panel-input[aria-invalid="true"] { border-color: var(--panel-bad); }
+select.panel-input { padding-right: 4px; }
+textarea.panel-input { height: auto; padding: 6px 8px; line-height: 16px; }
+
+.panel-check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--panel-text); }
+.panel-check input { width: 14px; height: 14px; margin: 0; accent-color: var(--panel-accent); }
+
+.panel-range { width: 100%; height: 4px; accent-color: var(--panel-accent); }
+
+/* ---- segmented control ------------------------------------------------- */
+.panel-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); padding: 2px; border: 1px solid var(--panel-border-strong); border-radius: 5px; background: var(--panel-bg-inset); gap: 2px; }
+.panel-seg__item { height: 24px; padding: 0 6px; border: 0; border-radius: 3px; background: transparent; color: var(--panel-text-muted); font-size: 11.5px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.panel-seg__item:hover { color: var(--panel-text); }
+.panel-seg__item[aria-pressed="true"] { background: var(--panel-bg); color: var(--panel-text); box-shadow: 0 0 0 1px var(--panel-border-strong); }
+.panel-seg__item:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 1px; }
+
+/* ---- buttons ----------------------------------------------------------- */
+.panel-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 12px; border: 1px solid var(--panel-border-strong); border-radius: 4px; background: var(--panel-bg); color: var(--panel-text); font-size: 12px; font-weight: 500; cursor: pointer; }
+.panel-btn:hover { background: var(--panel-bg-inset); }
+.panel-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.panel-btn:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 1px; }
+.panel-btn--primary { background: var(--panel-accent); border-color: var(--panel-accent); color: #fff; height: 32px; }
+.dark .panel-btn--primary { color: #0d1117; }
+.panel-btn--primary:hover { background: var(--panel-accent-hover); border-color: var(--panel-accent-hover); }
+.panel-btn--block { width: 100%; }
+.panel-btn svg { width: 14px; height: 14px; }
+.panel-actions { display: grid; gap: 6px; }
+
+/* ---- notices, badges, stats ------------------------------------------- */
+.panel-note { display: flex; gap: 8px; padding: 7px 9px; border: 1px solid var(--panel-border); border-left-width: 3px; border-radius: 4px; background: var(--panel-bg-subtle); color: var(--panel-text); font-size: 11.5px; line-height: 16px; }
+.panel-note svg { flex: none; width: 14px; height: 14px; margin-top: 1px; }
+.panel-note > div { min-width: 0; }
+.panel-note--info { border-left-color: var(--panel-accent); }
+.panel-note--info svg { color: var(--panel-accent); }
+.panel-note--ok { border-left-color: var(--panel-ok); background: var(--panel-ok-soft); }
+.panel-note--ok svg { color: var(--panel-ok); }
+.panel-note--warn { border-left-color: var(--panel-warn); background: var(--panel-warn-soft); }
+.panel-note--warn svg { color: var(--panel-warn); }
+.panel-note--bad { border-left-color: var(--panel-bad); background: var(--panel-bad-soft); }
+.panel-note--bad svg { color: var(--panel-bad); }
+
+/* A badge carries a sentence, so it wraps: the panel is a narrow column and a chip must not push it wider. */
+.panel-badge { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 18px; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--panel-border-strong); background: var(--panel-bg-inset); color: var(--panel-text-muted); font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; line-height: 14px; text-align: left; }
+.panel-badge--ok { color: var(--panel-ok); background: var(--panel-ok-soft); border-color: transparent; }
+.panel-badge--warn { color: var(--panel-warn); background: var(--panel-warn-soft); border-color: transparent; }
+.panel-badge--bad { color: var(--panel-bad); background: var(--panel-bad-soft); border-color: transparent; }
+
+.panel-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--panel-border); border-radius: 5px; background: var(--panel-border); overflow: hidden; }
+.panel-stat { display: grid; gap: 1px; padding: 6px 8px; background: var(--panel-bg); }
+.panel-stat__label { font-size: 10.5px; color: var(--panel-text-muted); }
+.panel-stat__value { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--panel-text); }
+.panel-stat__sub { font-size: 10.5px; color: var(--panel-text-faint); }
+
+.panel-bars { display: grid; gap: 4px; }
+.panel-bar { display: grid; grid-template-columns: 78px minmax(0, 1fr) 46px; align-items: center; gap: 6px; font-size: 11px; color: var(--panel-text-muted); }
+.panel-bar__track { height: 6px; border-radius: 3px; background: var(--panel-bg-inset); overflow: hidden; }
+.panel-bar__fill { height: 100%; background: var(--panel-accent); opacity: 0.8; }
+.panel-bar__value { text-align: right; font-variant-numeric: tabular-nums; }
+
+.panel-kv { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 2px 10px; font-size: 11.5px; }
+.panel-kv dt { min-width: 0; color: var(--panel-text-muted); overflow-wrap: anywhere; }
+.panel-kv dd { min-width: 0; margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
+.panel-checks { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.panel-checks li { display: grid; grid-template-columns: 14px 1fr; gap: 6px; font-size: 11.5px; line-height: 16px; }
+.panel-checks__mark { margin-top: 2px; width: 12px; height: 12px; }
+.panel-checks__mark--passed { color: var(--panel-ok); }
+.panel-checks__mark--failed { color: var(--panel-bad); }
+.panel-checks__mark--unresolved { color: var(--panel-warn); }
+.panel-checks__mark--not-run { color: var(--panel-text-faint); }
+.panel-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--panel-text-faint); word-break: break-all; }
+
+.panel-footer { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--panel-border); display: grid; gap: 8px; }
+
+/* ---- legacy markup inside the panel ------------------------------------
+   A few blocks of the panel (the selected-element summary, the surface and probe settings, the cycle editor) were written with
+   utility classes before this stylesheet. They are brought to the same tokens here, so nothing in the panel keeps its own
+   colours, gradients or shadows. */
+.panel :is(.text-gray-400, .text-gray-500, .text-gray-600, .dark\:text-gray-400) { color: var(--panel-text-muted) !important; }
+.panel :is(.text-gray-700, .text-gray-800, .text-gray-900, .text-gray-100, .dark\:text-white, .dark\:text-gray-100, .dark\:text-gray-200, .dark\:text-gray-300) { color: var(--panel-text) !important; }
+.panel :is(.text-blue-500, .text-blue-600, .text-blue-700, .text-blue-800, .dark\:text-blue-400) { color: var(--panel-accent) !important; }
+.panel :is(.text-green-700, .text-emerald-900, .text-emerald-700) { color: var(--panel-ok) !important; }
+.panel :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-yellow-700, .text-orange-600, .text-orange-700, .text-orange-800, .dark\:text-orange-200, .dark\:text-orange-300, .dark\:text-orange-400, .dark\:text-amber-300) { color: var(--panel-warn) !important; }
+.panel :is(.text-red-500, .text-red-600, .text-red-700) { color: var(--panel-bad) !important; }
+.panel :is(.bg-white, .bg-gray-50, .bg-gray-100, .bg-blue-50, .bg-blue-100, .bg-green-50, .bg-emerald-50, .bg-yellow-50, .bg-red-50, .bg-orange-100, .dark\:bg-gray-800, .dark\:bg-gray-700, .dark\:bg-orange-800) { background: var(--panel-bg-subtle) !important; background-image: none !important; }
+.panel :is(.border-gray-200, .border-gray-300, .border-green-200, .border-blue-200, .border-orange-200, .dark\:border-gray-700, .dark\:border-gray-600, .dark\:border-orange-800) { border-color: var(--panel-border) !important; }
+.panel :is(.bg-gradient-to-r, [class*="from-orange"], [class*="to-yellow"]) { background-image: none !important; }
+.panel :is(.shadow-md, .shadow-sm, .shadow-lg) { box-shadow: none !important; }
+.panel :is(.rounded-md, .rounded-lg, .rounded-sm) { border-radius: 5px; }
+.panel :is(.bg-blue-600) { background: var(--panel-accent) !important; color: #fff !important; }
+.panel :is(.hover\:bg-blue-700:hover, .hover\:bg-blue-200:hover, .hover\:bg-gray-100:hover, .hover\:bg-gray-300:hover, .hover\:bg-blue-50:hover, .hover\:bg-red-50:hover) { background: var(--panel-bg-inset) !important; }
+.panel details > summary { cursor: pointer; font-size: 12px; font-weight: 500; color: var(--panel-text); }
+.panel h3, .panel h4 { font-weight: 600; }
+
+/* Inputs written without the field classes follow the same look. */
+.panel :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.panel-input) {
+  border: 1px solid var(--panel-border-strong); border-radius: 4px; background: var(--panel-bg); color: var(--panel-text); box-shadow: none;
+}
+.panel :is(input, select, textarea):not(.panel-input):focus { outline: none; border-color: var(--panel-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--panel-accent) 28%, transparent); }
+.panel input[type="checkbox"] { accent-color: var(--panel-accent); }
+
+.panel-seg--wrap { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.panel-label span:first-child { min-width: 0; }
+.panel-label__unit { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+.panel-grid > .panel-field { min-width: 0; }
+
+/* Contextual isometric diagrams: one accent for the operation, quiet shaded stock. */
+.panel-preview { margin: 0; overflow: hidden; min-width: 0; border: 1px solid var(--panel-border); border-radius: 5px; background: var(--panel-bg-subtle); }
+.panel-preview__caption { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 8px; padding: 7px 9px 0; color: var(--panel-text-muted); font-size: 10.5px; line-height: 15px; }
+.panel-preview__detail { color: var(--panel-text-faint); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.panel-preview svg { display: block; width: 100%; height: 154px; }
+.panel-preview__face { stroke: var(--panel-border-strong); stroke-width: 0.65; }
+.panel-preview__face--top { fill: color-mix(in srgb, var(--panel-border) 48%, var(--panel-bg)); }
+.panel-preview__face--side { fill: var(--panel-border-strong); }
+.panel-preview__face--end { fill: var(--panel-border); }
+.panel-preview__line { stroke: var(--panel-accent); stroke-width: 1.4; }
+.panel-preview__line--guide { stroke-dasharray: 3 3; }
+.panel-preview__line--axis { stroke-width: 1; }
+.panel-preview__origin { fill: var(--panel-accent); }
+.panel-preview__halo { fill: var(--panel-bg); stroke: var(--panel-accent); stroke-width: 1; }
+.panel-preview__origin text, .panel-preview__axis { fill: var(--panel-accent); font-size: 10px; font-weight: 500; }
+.panel .strategy-palette__body { padding: 0; }
+.panel .strategy-palette__cat-head { margin-bottom: 5px; }
+.panel .strategy-cell--active { border-color: var(--panel-accent); background: var(--panel-accent-soft); box-shadow: none; }
+.panel .strategy-cell--active .strategy-cell__icon { color: var(--panel-accent); }

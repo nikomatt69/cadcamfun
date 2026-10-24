@@ -123,7 +123,7 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
   }
 
   return (
-    <Section id="fixedCycles" delay={0.42} tone="cyan" icon={RotateCw} title="Fixed Cycles" testId="fixed-cycles-section">
+    <Section id="fixedCycles" icon={RotateCw} title="Fixed Cycles" testId="fixed-cycles-section">
       <div class="toolpath-generator-integration">
         <div class="fixed-cycles-actions">
           <h3>Fixed Cycles</h3>

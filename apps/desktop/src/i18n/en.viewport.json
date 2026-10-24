@@ -3,6 +3,7 @@
   "cad.showGrid": "Show Grid",
   "cad.showAxis": "Show Axis",
   "cad.originOffset": "Origin Offset",
+  "cad.originPosition": "Origin Position",
   "cad.resetOrigin": "Reset Origin",
   "cad.workpieceSetup": "Workpiece Setup",
   "cad.showWorkpiece": "Show Workpiece",

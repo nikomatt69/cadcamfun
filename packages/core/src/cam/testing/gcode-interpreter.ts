@@ -662,7 +662,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     const x = get("X")
     const y = polar ? get("C") : get("Y")
     const z = get("Z")
-    const e = get("E")
+    const rawE = get("E")
+    const e = rawE === undefined ? undefined : rawE * unit
     // Fanuc lathe incremental addresses (G-code system A): U is an X distance, W a Z distance.
     const u = latheContext ? get("U") : undefined
     const wInc = latheContext ? get("W") : undefined
@@ -979,4 +980,4 @@ const compose = (outer: Frame, inner: Frame): Frame => {
 const ACCEPTED_G: ReadonlyArray<number> = [5, 5.1, 8, 9, 43, 43.4, 43.5, 49, 53.1, 54.1, 61, 61.1, 62, 63, 64, 103, 187, 234]
 
 /** Keyword statements that do not move the machine (Siemens settings, messages, TCP on / off). */
-const SILENT_STATEMENTS = new Set(["MSG", "TRAORI", "TRAFOOF", "SOFT", "BRISK", "FFWON", "FFWOF", "CFC", "CFTCP", "CFIN", "STOPRE", "WORKPIECE", "DIAMON", "DIAMOF", "DIAM90", "CYCLE832", "COMPCAD", "COMPCURV", "COMPOF", "SUPA", "TOFFON", "TOFFOF", "SETMS", "SPOS", "WAIT", "DEF", "PRINT_START", "PRINT_END", "START_PRINT", "END_PRINT"])
+const SILENT_STATEMENTS = new Set(["MSG", "TRAORI", "TRAFOOF", "SOFT", "BRISK", "FFWON", "FFWOF", "CFC", "CFTCP", "CFIN", "STOPRE", "WORKPIECE", "DIAMON", "DIAMOF", "DIAM90", "CYCLE832", "COMPCAD", "COMPCURV", "COMPOF", "SUPA", "TOFFON", "TOFFOF", "SETMS", "SPOS", "WAIT", "DEF", "PRINT_START", "PRINT_END", "START_PRINT", "END_PRINT", "SET_PRESSURE_ADVANCE"])

@@ -17,7 +17,7 @@ export type ToolpathSettings = cam.generator.ToolpathSettings
 export type GeometryType = cam.generator.GeometryType
 export type PrinterExtras = cam.generator.PrinterExtras
 /** The kernel job the panel builds: presets, quality, and the edited plan / cutter library (absent = the kernel decides). */
-export type KernelSettings = Pick<CamKernelRequest, "setupOrientation" | "material" | "machine" | "machineConfig" | "origin" | "finishAllowance" | "scallop" | "resolution" | "deburr" | "subprograms" | "operations" | "tools">
+export type KernelSettings = Pick<CamKernelRequest, "setupOrientation" | "material" | "machine" | "machineConfig" | "origin" | "finishAllowance" | "scallop" | "resolution" | "deburr" | "subprograms" | "operations" | "tools" | "print">
 const initialKernelSettings = (): KernelSettings => ({ material: "6061", machine: cam.kernel.DEFAULT_MACHINE.id, origin: "stock-center" })
 
 export interface LibraryTool {
@@ -69,6 +69,8 @@ interface GeneratorState {
   evidence: cam.generator.ProgramRecord | null
   /** The NC text was edited after generation: the record no longer describes these bytes. */
   evidenceStale: boolean
+  /** What the slicer measured on the last printer program (time, filament, size, bead length by feature). */
+  printStats: cam.generator.PrintStatsRecord | null
   /** The depth was typed by the user: element-driven suggestions must not overwrite it. */
   depthSetManually: boolean
 
@@ -94,7 +96,7 @@ interface GeneratorState {
   flashError: (message: string, ms?: number) => void
   setAiSuggestions: (suggestions: string[]) => void
   addAiSuggestion: (suggestion: string) => void
-  setResult: (gcode: string, cycles: ReadonlyArray<DetectedCycle>, evidence?: cam.generator.ProgramRecord) => void
+  setResult: (gcode: string, cycles: ReadonlyArray<DetectedCycle>, evidence?: cam.generator.ProgramRecord, print?: cam.generator.PrintStatsRecord) => void
   setCurrentGCode: (gcode: string) => void
   setSelectedCycle: (cycle: DetectedCycle | null) => void
   reset: () => void
@@ -129,7 +131,7 @@ let errorTimer: ReturnType<typeof setTimeout> | undefined
 const initial = (): Pick<GeneratorState,
   "settings" | "kernelSettings" | "expanded" | "geometryType" | "rectangleWidth" | "rectangleHeight" | "circleRadius" | "polygonSides" | "polygonRadius" | "customPath" |
   "printer" | "selectedLibraryTool" | "showFullscreen" | "isGenerating" | "isAIProcessing" | "error" | "success" | "aiSuggestions" | "currentGCode" |
-  "detectedCycles" | "selectedCycle" | "depthSetManually" | "evidence" | "evidenceStale"
+  "detectedCycles" | "selectedCycle" | "depthSetManually" | "evidence" | "evidenceStale" | "printStats"
 > => ({
   settings: initialSettings(),
   kernelSettings: initialKernelSettings(),
@@ -154,7 +156,8 @@ const initial = (): Pick<GeneratorState,
   selectedCycle: null,
   depthSetManually: false,
   evidence: null,
-  evidenceStale: false
+  evidenceStale: false,
+  printStats: null
 })
 
 export const useGeneratorStore = create<GeneratorState>((set, get) => ({
@@ -197,7 +200,12 @@ export const useGeneratorStore = create<GeneratorState>((set, get) => ({
     polygonRadius: radius !== undefined && radius > 0 ? radius : state.polygonRadius
   })),
   setCustomPath: path => set({ customPath: path }),
-  setPrinter: patch => set(state => ({ printer: { ...state.printer, ...patch } })),
+  // An `undefined` in the patch removes the key: the request schema takes absent keys, never undefined values.
+  setPrinter: patch => set(state => {
+    const next: Record<string, unknown> = { ...state.printer, ...patch }
+    for (const key of Object.keys(next)) if (next[key] === undefined) delete next[key]
+    return { printer: next as PrinterExtras }
+  }),
 
   selectLibraryTool: tool => {
     set({ selectedLibraryTool: tool })
@@ -236,7 +244,7 @@ export const useGeneratorStore = create<GeneratorState>((set, get) => ({
   setAiSuggestions: suggestions => set({ aiSuggestions: suggestions }),
   addAiSuggestion: suggestion => set(state => ({ aiSuggestions: [...state.aiSuggestions, suggestion] })),
 
-  setResult: (gcode, cycles, evidence) => set({ currentGCode: gcode, detectedCycles: [...cycles], evidence: evidence ?? null, evidenceStale: false }),
+  setResult: (gcode, cycles, evidence, print) => set({ currentGCode: gcode, detectedCycles: [...cycles], evidence: evidence ?? null, evidenceStale: false, printStats: print ?? null }),
   setCurrentGCode: gcode => set(state => ({ currentGCode: gcode, evidenceStale: state.evidence !== null && gcode !== state.currentGCode ? true : state.evidenceStale })),
   setSelectedCycle: cycle => set({ selectedCycle: cycle }),
 

@@ -110,6 +110,18 @@ const PROFILING_GROUPS: ReadonlyArray<RibbonGroupSpec> = [
       { id: "strategy-threading", labelKey: "cam.strategy.threadingOD", accent: "orange", route: "operation-change" },
       { id: "strategy-parting", labelKey: "cam.strategy.parting", accent: "orange", route: "operation-change" }
     ]
+  },
+  {
+    titleKey: "cam.ribbon.group.printing",
+    accent: "red",
+    actions: [
+      { id: "print-standard", labelKey: "cam.strategy.printStandard", accent: "red", route: "operation-change" },
+      { id: "print-vase", labelKey: "cam.strategy.printVase", accent: "red", route: "operation-change" },
+      { id: "print-support", labelKey: "cam.strategy.printSupport", accent: "red", route: "operation-change" },
+      { id: "print-solid", labelKey: "cam.strategy.printInfill", accent: "red", route: "operation-change" },
+      { id: "print-raft", labelKey: "cam.strategy.printRaft", accent: "red", route: "operation-change" },
+      { id: "print-brim", labelKey: "cam.strategy.printBrim", accent: "red", route: "operation-change" }
+    ]
   }
 ]
 

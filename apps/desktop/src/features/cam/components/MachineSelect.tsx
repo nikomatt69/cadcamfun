@@ -8,11 +8,10 @@
  * pages show; nothing here creates or edits a machine.
  */
 import { For, Show, createEffect, createMemo, createSignal, onMount, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
 import { A } from "@solidjs/router"
 import { Check, Cpu, ExternalLink, RefreshCw } from "lucide-solid"
 import { cam as coreCam } from "@cadcamfun/core"
-import { Card } from "../../../shared/ui/card.tsx"
+import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { useCADStore, type MachineConfig } from "../../cad/store/cadStore.ts"
@@ -30,11 +29,9 @@ import {
   kernelMachineConfigOf
 } from "../lib/machines.ts"
 
-const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
-
-const ROW = "w-full text-left px-3 py-2 rounded-xl border transition-all duration-200 flex items-start gap-2"
-const ROW_ON = "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700"
-const ROW_OFF = "bg-white/60 dark:bg-gray-800/60 border-white/40 dark:border-gray-600/40 hover:bg-white/80 dark:hover:bg-gray-700/80"
+const ROW = "sidebar-choice"
+const ROW_ON = "sidebar-choice--selected"
+const ROW_OFF = ""
 
 export default function MachineSelect(): JSX.Element {
   const app = useApp()
@@ -107,17 +104,13 @@ export default function MachineSelect(): JSX.Element {
   }
 
   return (
-    <Motion.div class="w-full" {...rise} transition={{ duration: 0.4 }}>
-      <Card variant="default" delay={0.05} class="w-full p-4" data-testid="cam-machine-select">
-        <div class="mb-3 flex items-center justify-between">
-          <h3 class="flex items-center text-sm font-semibold text-gray-800 dark:text-gray-100">
-            <Cpu size={16} class="mr-2 text-gray-500 dark:text-gray-400" aria-hidden="true" />
-            {t("cam.machine")}
-          </h3>
+    <SidebarSection id="cam-machine" title={t("cam.machine")} icon={Cpu} summary={selected()?.name ?? t("cam.machine.auto")} testId="cam-machine-select">
+        <div class="flex items-center justify-end">
+
           <div class="flex items-center gap-1">
             <button
               type="button"
-              class="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              class="panel-icon-btn"
               title={t("cam.machine.refresh")}
               aria-label={t("cam.machine.refresh")}
               disabled={loading()}
@@ -127,7 +120,7 @@ export default function MachineSelect(): JSX.Element {
             </button>
             <A
               href={MACHINES_PATH}
-              class="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              class="panel-icon-btn"
               title={t("cam.machine.library")}
               aria-label={t("cam.machine.library")}
             >
@@ -143,7 +136,7 @@ export default function MachineSelect(): JSX.Element {
           </div>
         }>
           <Show when={!loading()} fallback={<p class="text-xs text-gray-500 dark:text-gray-400" role="status">{t("cam.machine.loading")}</p>}>
-            <div class="space-y-2" role="listbox" aria-label={t("cam.machine.pick")}>
+            <div class="sidebar-machine-list" role="listbox" aria-label={t("cam.machine.pick")}>
               <button
                 type="button"
                 class={`${ROW} ${selected() === undefined ? ROW_ON : ROW_OFF}`}
@@ -175,8 +168,8 @@ export default function MachineSelect(): JSX.Element {
                       <Show when={selected()?.id === machine.id}><Check size={16} class="text-blue-600 dark:text-blue-400" aria-hidden="true" /></Show>
                     </span>
                     <span class="min-w-0">
-                      <span class="block truncate text-sm font-medium text-gray-800 dark:text-gray-100">{machine.name}</span>
-                      <span class="mt-0.5 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-300">{machineTypeLabel(machine)}</span>
+                      <span class="sidebar-choice__title">{machine.name}</span>
+                      <span class="panel-badge">{machineTypeLabel(machine)}</span>
                       <For each={facts(machine)}>{(line) => <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{line}</span>}</For>
                     </span>
                   </button>
@@ -196,8 +189,8 @@ export default function MachineSelect(): JSX.Element {
                     <Show when={selected()?.id === machine.id}><Check size={16} class="text-blue-600 dark:text-blue-400" aria-hidden="true" /></Show>
                   </span>
                   <span class="min-w-0">
-                    <span class="block truncate text-sm font-medium text-gray-800 dark:text-gray-100">{machine.name}</span>
-                    <span class="mt-0.5 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-300">{machineTypeLabel(machine)}</span>
+                    <span class="sidebar-choice__title">{machine.name}</span>
+                    <span class="panel-badge">{machineTypeLabel(machine)}</span>
                     <For each={facts(machine)}>{(line) => <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{line}</span>}</For>
                   </span>
                 </button>
@@ -214,7 +207,6 @@ export default function MachineSelect(): JSX.Element {
         </Show>
 
         <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{t("cam.machine.hint")}</p>
-      </Card>
-    </Motion.div>
+      </SidebarSection>
   )
 }

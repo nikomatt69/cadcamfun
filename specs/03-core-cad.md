@@ -2,6 +2,16 @@
 
 Status: done; targeted solid geometry/document preservation hardening and spec 33 C4 chamfer callouts implemented. Owner dir: `packages/core/src/cad` (+ `packages/core/package.json`, `tsconfig.json`, `src/index.ts` barrel for the `cad` exports).
 
+Integration repair (2026-10-24): the printing continuation may remove the unmatched closing
+brace after `catalogueBrep` in the shared worktree, which prevents all core consumers from
+loading. This is a syntax-only repair; catalogue geometry and exactness contracts are unchanged.
+
+Additive topology integration (2026-10-24): `meshTopology` and `describeTopology` accept a
+read-only array-like triangle-mesh input so WP2 can inspect Float64 geometry without narrowing
+it to Float32. Their topology algorithm and CAD call-site behavior stay unchanged. WP2 owns
+structural validation and explicitly toleranced virtual point welding before this shared
+topology seam; it does not request automatic hole filling or claim intersection certification.
+
 ### Kernel completion increment (2026-10-21, in progress)
 
 The approved spec 33 continuation owns `cad/` and its tests. Cross-WP integration owns only the corresponding schemas in `packages/api/src/ai-{cad,parametric,action-results}.ts`, CAD action bindings/prompts/tests in `packages/ai`, and CAD handlers/tests in `apps/sidecar`, and the existing desktop AI result adapter `apps/desktop/src/features/ai/lib/editor-sync.ts` plus its store test; `features/cad/lib/createThreeObject.ts` and `test/cad-brep.test.ts` only for double-sided rendering of open surfaces; `test/cad-iges.test.ts` independently checks IGES output with the installed OpenCascade reader. Existing CAM and licensing work in the shared tree is independent. Scope: seed 114 and the pole recovery window, per-face shell thickness, outward offset, variable fillets in history, loop/contact kinematics, edge flanges and flat development, open NURBS patch/trim/stitch/thicken, and IGES exchange. Parasolid may return an explicit unsupported-format diagnostic and must never be parsed as STEP. New capability claims require interface tests and AI action coverage. General offsets and freeform offsets remain open wherever exact construction cannot be validated; a refusal does not count as implementing that geometry.
@@ -297,6 +307,10 @@ Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 `bun --no-env-file test packages/core`, and `bun --no-env-file check -p packages/core/tsconfig.json`.
 
 ## 8. Change log
+
+- 2026-10-24: syntax-only integration repair removes an unmatched closing brace after
+  `catalogueBrep` in the shared worktree. Core, AI, sidecar and desktop consumers compile again;
+  no geometry construction or exactness verdict was changed by this repair.
 
 - 2026-10-22: a push/pull may name its face (`name`). The named face moves on the mesh rebuild and the exact
   replay even when `near` is stale; a missing name is an error and the body stays unchanged. The moved face

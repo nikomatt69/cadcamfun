@@ -209,7 +209,7 @@ const toolHandlers = Effect.gen(function*() {
   }
 
   /** The 3D-printer choices (infill, supports, walls) are stored beside the settings, not in them. */
-  const PRINTER_KEYS: ReadonlyArray<string> = ["infillDensity", "infillPattern", "supportType", "shellCount", "printResolution", "printOrientation"]
+  const PRINTER_KEYS: ReadonlyArray<string> = Object.keys(cam.generator.PrinterExtrasSchema.fields)
   const splitPrinter = (params: Record<string, unknown>): { readonly printer: Record<string, unknown>; readonly rest: Record<string, unknown> } => {
     const printer: Record<string, unknown> = {}
     const rest: Record<string, unknown> = {}
@@ -228,7 +228,7 @@ const toolHandlers = Effect.gen(function*() {
         ? cam.kernel.kernelMachineOfConfig(input.machineConfig)
         : (input.machine !== undefined ? cam.kernel.findMachine(input.machine) : undefined)
       if (input.machineConfig !== undefined && machine === undefined) {
-        return { ok: false, error: `The machine configuration '${input.machineConfig.name}' is not a machine the kernel can machine: it needs a kind it machines (mill or lathe) and a spindle and a feed ceiling.` }
+        return { ok: false, error: `The machine configuration '${input.machineConfig.name}' is not a machine the kernel can run: ${cam.kernel.machineRefusal(input.machineConfig) ?? "it needs a kind it machines (mill, lathe or filament printer)"}.` }
       }
       if (input.machine !== undefined && machine === undefined) return { ok: false, error: `Unknown machine preset '${input.machine}'. Known: ${cam.kernel.MACHINE_CATALOGUE.map((m) => m.id).join(", ")}` }
       const job: Parameters<typeof runKernelJob<"cam-manufacture">>[1] = {
@@ -239,9 +239,10 @@ const toolHandlers = Effect.gen(function*() {
         ...(machine !== undefined ? { machine } : {}), ...(input.origin !== undefined ? { origin: input.origin } : {}),
         ...(input.operations !== undefined ? { operations: input.operations } : {}), ...(input.tools !== undefined ? { tools: input.tools } : {}),
         ...(input.subprograms === true ? { post: { options: { subprograms: true } } } : {}),
+        ...(input.print !== undefined ? { print: input.print } : {}),
         quality: { ...(input.finishAllowance !== undefined ? { finishAllowance: input.finishAllowance } : {}), ...(input.scallop !== undefined ? { scallop: input.scallop } : {}), ...(input.deburr !== undefined ? { deburr: input.deburr } : {}) }
       }
-      const stockNote = stored === undefined ? "No stock configured: the kernel used the part bounds plus 2 mm on the sides and 1 mm on top." : "Configured stock, standing on the part's bottom."
+      const stockNote = machine?.kind === "printer" ? "Additive job: the part is placed on the printer's build plate; material usage is deposited filament, not removed stock." : stored === undefined ? "No stock configured: the kernel used the part bounds plus 2 mm on the sides and 1 mm on top." : "Configured stock, standing on the part's bottom."
       return { ok: true, job, stockNote }
   }
 
@@ -313,6 +314,7 @@ const toolHandlers = Effect.gen(function*() {
       return {
         ok: true, mutated: false, stockNote, setupOrientation: a.setupOrientation ?? "+Z", release: a.release, material: a.material, machine: a.machine, cycleTimeSeconds: a.cycleTimeSeconds,
         claims: a.claims, issues: a.issues.slice(0, 30), notes: a.notes, stock: a.stock, identity: a.identity,
+        ...(a.print !== undefined ? { print: a.print } : {}),
         tools: a.tools.map((t) => ({ number: t.number, id: t.id, name: t.name, kind: t.kind, diameter: t.diameter, flutes: t.flutes, coating: t.coating })),
         operations: a.operations.map((o) => ({
           id: o.id, name: o.name, strategy: o.strategy, tool: o.toolId, cut: o.cut, status: o.status, removedVolume: o.removedVolume,
@@ -1034,7 +1036,8 @@ const toolHandlers = Effect.gen(function*() {
         return [{
           id: machine.id, name: machine.name, kind: machine.kind, post: machine.post, limits: machine.limits, builtin: false,
           ...(machine.fiveAxis !== undefined ? { fiveAxis: machine.fiveAxis } : {}),
-          ...(machine.turning !== undefined ? { turning: machine.turning } : {})
+          ...(machine.turning !== undefined ? { turning: machine.turning } : {}),
+          ...(machine.printer !== undefined ? { printer: machine.printer } : {})
         }]
       })
     },

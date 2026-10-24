@@ -73,6 +73,26 @@ describe("cam.manufacture in the kernel worker", () => {
     const result = await handlers.manufacture!(projectId, { material: "6061" } as never) as { ok: boolean; release?: string }
     expect(result.ok).toBe(true)
     expect(result.release).toBeDefined()
-  })
+  }, 60_000)
+
+  test("the assistant receives filament discovery, printer capabilities and the actual print report", async () => {
+    const pid = (await app.call("/api/projects", { method: "POST", json: { name: "Printed part" } })).body.id
+    await handlers.addElements(pid, [{ type: "cube", width: 12, height: 10, depth: 2, z: 1, name: "Print coupon" }])
+    const tool = buildTools(handlers, pid).find((t) => t.id === "cam")!
+    const call = (input: unknown) => tool.execute(input, { ...ctx, projectId: pid }).then((value) => JSON.parse(value))
+    const discovered = await call({ action: "materials", query: "PLA" })
+    expect(discovered.ok).toBe(true)
+    expect(discovered.materials[0]).toMatchObject({ id: "pla", densityGcm3: 1.24, nozzleTemperature: 205 })
+    expect(discovered.machines.find((m: { id: string }) => m.id === "printer-desktop-220").printer.bed.width).toBe(220)
+    const result = await call({ action: "manufacture", machine: "printer-desktop-220", material: "PLA", print: { relativeExtrusion: true, infillDensity: 25 } })
+    expect(result).toMatchObject({ ok: true, mutated: false, release: "verified-program", print: { layers: 10, filament: { material: "PLA" }, settings: { relativeExtrusion: true, infillDensity: 25 } } })
+    expect(result.print.filamentGrams).toBeGreaterThan(0)
+    expect(result.stockNote).toContain("deposited filament")
+    expect(result.claims.find((c: { id: string }) => c.id === "nc-replay").status).toBe("passed")
+    const blocked = await call({ action: "manufacture", material: "PLA", machineConfig: { id: "tiny", name: "Tiny printer", type: "printer", config: { technology: "FDM", workVolume: { x: 10, y: 10, z: 20 }, nozzleDiameter: 0.4, filamentDiameter: 1.75, maxTemperature: 260, maxFeedRate: 150 } } })
+    expect(blocked.ok).toBe(true)
+    expect(blocked.release).toBe("blocked")
+    expect(blocked.claims.find((c: { id: string }) => c.id === "bed-fit").status).toBe("failed")
+  }, 60_000)
 })
 

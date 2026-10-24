@@ -8,7 +8,7 @@ export function AdvancedSection(): JSX.Element {
   const gen = useGeneratorStore()
   const s = () => gen.settings
   return (
-    <Section id="advanced" delay={0.45} tone="red" icon={Activity} title="Advanced Settings" testId="advanced-options-panel">
+    <Section id="advanced" icon={Activity} title="Advanced Settings" testId="advanced-options-panel">
       <div>
         <h4 class="text-sm font-medium text-gray-800 mb-2">Precision Settings</h4>
         <div class="space-y-3">

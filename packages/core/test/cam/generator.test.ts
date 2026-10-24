@@ -10,6 +10,7 @@ import {
   convertLinesToArcs,
   cutLevels,
   generateToolpath,
+  printRequirementOf,
   getCuttingFeedback,
   optimizeToolpath,
   withMachineDefaults,
@@ -308,7 +309,7 @@ describe("lathe program", () => {
 })
 
 describe("3D printer program", () => {
-  const printer = (element?: Record<string, any>) => run(settings({ machineType: "3dprinter", operationType: "standard", toolType: "standard" }), geometry({ geometryType: "selected", selectedElements: element ? [element] : [] }))
+  const printer = (element?: Record<string, any>, over: Partial<ToolpathSettings> = {}) => run(settings({ machineType: "3dprinter", operationType: "standard", toolType: "standard", ...over }), geometry({ geometryType: "selected", selectedElements: element ? [element] : [] }))
 
   test("requires a selected element", () => {
     const result = printer()
@@ -316,17 +317,32 @@ describe("3D printer program", () => {
     expect(result.gcode).toBe("; Error: No element selected for 3D printing\n")
   })
 
+  test("something without volume is refused with the reason", () => {
+    const result = printer({ type: "line", x1: 0, y1: 0, x2: 10, y2: 0, z: 1 })
+    expect(result.error).toContain("no volume")
+    expect(result.gcode).toStartWith("; Error: Nothing to print")
+  })
+
   test("prints a cube between start and end blocks with a growing E axis", () => {
     const { gcode } = printer({ type: "cube", x: 0, y: 0, z: 1, width: 10, height: 10, depth: 1 })
-    expect(gcode.startsWith("; Print Start G-code\nM82")).toBe(true)
+    expect(gcode).toContain("; Print Start G-code\nG21")
+    expect(gcode.indexOf("G90")).toBeLessThan(gcode.indexOf("M82"))
     expect(gcode).toContain("M104 S200")
     // The part is set down on the plate: its bottom is Z0, so the first layer is printed at one layer height (CAD Z is not the plate's).
     expect(gcode).toContain("; Layer 1 / 5 at Z=0.200")
     expect(gcode).toContain("; Part placed on the bed")
     expect(gcode.trimEnd().endsWith("M84 ; Disable motors")).toBe(true)
-    const e = [...gcode.matchAll(/ E(\d+\.\d+) F/g)].map(m => Number(m[1]))
-    expect(e.length).toBeGreaterThan(10)
-    for (let i = 1; i < e.length; i++) expect(e[i]!).toBeGreaterThanOrEqual(e[i - 1]!)
+    // E rises with every extruding move and falls only for a retraction.
+    let last = 0
+    for (const line of gcode.split("\n")) {
+      if (line.startsWith("G92 E0")) { last = 0; continue }
+      const m = line.match(/^G1 .*E(-?\d+\.\d+)/)
+      if (!m) continue
+      const e = Number(m[1])
+      if (!line.includes("X")) { last = e; continue }
+      expect(e).toBeGreaterThan(last)
+      last = e
+    }
   })
 
   test("sphere, cylinder, cone and torus", () => {
@@ -338,17 +354,92 @@ describe("3D printer program", () => {
     ]) {
       const { gcode, error } = printer(element)
       expect(error).toBeUndefined()
-      expect(gcode).toContain(`; 3D Print ${element.type[0]!.toUpperCase()}${element.type.slice(1)}`)
+      expect(gcode).toContain("; Layer 1 /")
       expect(gcode).not.toContain("NaN")
     }
   })
 
-  test("composites share one start and one end block", () => {
+  test("a composite is one job: one start block, one end block, every member printed", () => {
     const { gcode } = printer({ type: "composite", elements: [{ type: "cube", x: 0, y: 0, z: 1, width: 4, height: 4, depth: 1 }, { type: "cylinder", x: 10, y: 0, z: 1, radius: 2, height: 1 }] })
     expect(gcode.match(/; Print Start G-code/g)).toHaveLength(1)
     expect(gcode.match(/; Print End G-code/g)).toHaveLength(1)
-    expect(gcode).toContain("; Start Composite Element: composite")
-    expect(gcode).toContain("; End Composite Element: composite")
+    const xs = [...gcode.matchAll(/^G1 X([\d.]+) Y[\d.]+ .*E/gm)].map((m) => Number(m[1]))
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(10)
+  })
+
+  test("several selected solids print together", () => {
+    const result = run(settings({ machineType: "3dprinter", operationType: "standard", toolType: "standard" }), geometry({ geometryType: "selected", selectedElements: [
+      { id: "a", type: "cube", x: -10, y: 0, z: 1, width: 4, height: 4, depth: 2 },
+      { id: "b", type: "cube", x: 10, y: 0, z: 1, width: 4, height: 4, depth: 2 }
+    ] }))
+    expect(result.gcode.match(/; Print Start G-code/g)).toHaveLength(1)
+    const xs = [...result.gcode.matchAll(/^G1 X([\d.]+) Y[\d.]+ .*E/gm)].map((m) => Number(m[1]))
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(22)
+  })
+
+  test("the response carries what the slicer measured", () => {
+    const outcome = generateToolpath({
+      settings: settings({ machineType: "3dprinter", operationType: "standard", toolType: "standard" }),
+      geometry: geometry({ geometryType: "selected", selectedElements: [{ type: "cube", x: 0, y: 0, z: 5, width: 20, height: 20, depth: 10 }] }),
+      printer: DEFAULT_PRINTER_EXTRAS
+    })
+    const print = outcome.response.print!
+    expect(print.layers).toBe(50)
+    expect(print.timeSeconds).toBeGreaterThan(60)
+    expect(print.filamentGrams).toBeGreaterThan(1)
+    expect(print.size.z).toBeCloseTo(10, 6)
+    expect(print.lengthByKind["wall-outer"]).toBeGreaterThan(1000)
+  })
+
+  test("support and solid operations do what their names say", () => {
+    const run3 = (operationType: string, over: Record<string, unknown> = {}) => generateToolpath({
+      settings: settings({ machineType: "3dprinter", operationType: operationType as never, toolType: "standard" }),
+      geometry: geometry({ geometryType: "selected", selectedElements: [{ type: "sphere", x: 0, y: 0, z: 6, radius: 6 }] }),
+      printer: { ...DEFAULT_PRINTER_EXTRAS, ...over }, evidence: false
+    }).response
+    const standard = run3("standard")
+    expect(standard.print!.lengthByKind["support"] ?? 0).toBe(0)
+    expect((run3("support").print!.lengthByKind["support"] ?? 0) + (run3("support").print!.lengthByKind["support-interface"] ?? 0)).toBeGreaterThan(20)
+    const solid = run3("infill")
+    expect(solid.print!.filamentGrams).toBeGreaterThan(standard.print!.filamentGrams * 1.3)
+    expect(solid.print!.lengthByKind["infill"] ?? 0).toBeGreaterThan(standard.print!.lengthByKind["infill"] ?? 0)
+  })
+
+  test("the print requirement of the panel is what the kernel slices", () => {
+    const req = printRequirementOf(settings({ machineType: "3dprinter", operationType: "raft", layerHeight: 0.15, printSpeed: 45 }), { ...DEFAULT_PRINTER_EXTRAS, infillPattern: "gyroid", shellCount: 3, supportType: "full", printOrientation: "auto-optimal", firstLayerHeight: 0.3 })
+    expect(req).toMatchObject({ layerHeight: 0.15, firstLayerHeight: 0.3, walls: 3, infillPattern: "gyroid", supports: "everywhere", adhesion: "raft", printSpeed: 45, orientation: "auto", vase: false })
+    expect(printRequirementOf(settings({ operationType: "vase" }), DEFAULT_PRINTER_EXTRAS).vase).toBe(true)
+    expect(printRequirementOf(settings({ operationType: "infill" }), DEFAULT_PRINTER_EXTRAS)).toMatchObject({ infillDensity: 100, infillPattern: "lines" })
+  })
+
+  test("the filament weighs the print and limits its speed", () => {
+    const run4 = (filament: "pla" | "tpu" | "abs") => generateToolpath({
+      settings: settings({ machineType: "3dprinter", operationType: "standard", toolType: "standard", printSpeed: 100 }),
+      geometry: geometry({ geometryType: "selected", selectedElements: [{ type: "cube", x: 0, y: 0, z: 3, width: 60, height: 60, depth: 6 }] }),
+      printer: { ...DEFAULT_PRINTER_EXTRAS, filament }, evidence: false
+    }).response.print!
+    const pla = run4("pla"), abs = run4("abs"), tpu = run4("tpu")
+    expect(abs.filamentGrams / pla.filamentGrams).toBeCloseTo(1.04 / 1.24, 2)
+    // TPU melts 3.6 mm^3/s: a bead of 0.4 x 0.2 cannot go faster than 45 mm/s, however fast the profile asks.
+    expect(tpu.timeSeconds).toBeGreaterThan(pla.timeSeconds * 1.2)
+  })
+
+  test("the panel's settings reach the program: supports, brim, vase and the dialect", () => {
+    const settingsFor = (over: Partial<typeof DEFAULT_PRINTER_EXTRAS>, patch: Partial<ToolpathSettings> = {}) =>
+      generateToolpath({
+        settings: settings({ machineType: "3dprinter", operationType: "standard", toolType: "standard", ...patch }),
+        geometry: geometry({ geometryType: "selected", selectedElements: [{ type: "cylinder", x: 0, y: 0, z: 5, radius: 8, height: 10 }] }),
+        printer: { ...DEFAULT_PRINTER_EXTRAS, ...over },
+        evidence: false
+      }).response
+    expect(settingsFor({ adhesion: "brim", brimWidth: 4 }).print!.lengthByKind["brim"]).toBeGreaterThan(100)
+    expect(settingsFor({}, { operationType: "brim" }).print!.lengthByKind["brim"]).toBeGreaterThan(100)
+    expect(settingsFor({}, { operationType: "raft" }).print!.layers).toBe(53)
+    const vase = settingsFor({}, { operationType: "vase" })
+    expect(vase.print!.lengthByKind["infill"] ?? 0).toBe(0)
+    expect(settingsFor({ relativeExtrusion: true }).gcode).toContain("M83")
+    expect(settingsFor({ flavor: "klipper", pressureAdvance: 0.04 }).gcode).toContain("SET_PRESSURE_ADVANCE ADVANCE=0.04")
+    expect(settingsFor({ startGcode: "START_PRINT NOZZLE={nozzle}" }).gcode).toContain("START_PRINT NOZZLE=200")
   })
 })
 

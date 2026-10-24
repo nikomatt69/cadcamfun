@@ -7,7 +7,11 @@
  * to be reported as boundary. A closed orientable manifold has every edge used exactly twice, once each way; then each connected
  * shell has Euler characteristic 2 - 2 g, g its genus (number of through holes: a block 0, a washer 1, a plate with 4 holes 4).
  */
-import type { Mesh } from "./solid.ts"
+/** Read-only triangle geometry; topology diagnostics must not narrow authoritative doubles to Float32. */
+export interface TopologyMesh {
+  readonly positions: ArrayLike<number>
+  readonly indices: ArrayLike<number>
+}
 
 export interface MeshTopology {
   readonly vertices: number
@@ -36,7 +40,7 @@ export interface MeshTopology {
 }
 
 /** The topology and measures of a mesh (see the module comment). */
-export const meshTopology = (mesh: Mesh): MeshTopology => {
+export const meshTopology = (mesh: TopologyMesh): MeshTopology => {
   const idx = mesh.indices, pos = mesh.positions
   const triangles = Math.floor(idx.length / 3)
   const directed = new Map<number, number>()

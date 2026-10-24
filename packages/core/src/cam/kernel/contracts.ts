@@ -25,11 +25,33 @@ export interface StockBox {
 
 export type WorkOrigin = "stock-center" | "stock-corner"
 
+/**
+ * What a filament printer is (the fields a slicer needs): the plate, the build height, the nozzle and filament it takes, how hot
+ * and how fast it goes, and the dialect of its firmware. A printer has no spindle: its `limits` carry the speed ceiling as `maxFeed`
+ * (mm/min) and a spindle of 0 rpm.
+ */
+export interface KernelPrinter {
+  readonly bed: { readonly width: number; readonly depth: number; readonly origin: "corner" | "center" }
+  /** Tallest print, mm. */
+  readonly buildHeight: number
+  readonly nozzle: { readonly diameter: number; readonly maxTemperature: number }
+  readonly filamentDiameter: number
+  readonly maxBedTemperature: number
+  /** Highest print speed, mm/s. */
+  readonly maxSpeed: number
+  readonly kinematics: "cartesian" | "corexy" | "bed-slinger" | "delta"
+  readonly flavor: "marlin" | "klipper" | "reprap"
+  /** A bowden tube needs a longer retraction than a direct drive. */
+  readonly extruder: "direct" | "bowden"
+}
+
 export interface KernelMachine {
   readonly id: string
   readonly name: string
-  /** What the machine is: a milling centre (`mill`) or a turning / mill-turn centre (`lathe`). */
-  readonly kind: "mill" | "lathe"
+  /** What the machine is: a milling centre (`mill`), a turning / mill-turn centre (`lathe`) or a filament printer (`printer`). */
+  readonly kind: "mill" | "lathe" | "printer"
+  /** Present on a `printer`. */
+  readonly printer?: KernelPrinter
   readonly limits: MachineLimits
   readonly post: PostId
   /** Published catalogue data and explicit setup assumptions; a stroke is not a work-coordinate limit. */
@@ -165,6 +187,41 @@ export interface QualityRequirement {
   readonly deburr?: number
 }
 
+/**
+ * How a printer job is sliced; anything absent comes from the filament (temperatures, fan) and the printer (speed, nozzle, plate).
+ * Lengths in mm, speeds in mm/s, temperatures in degrees C.
+ */
+export interface PrintRequirement {
+  readonly layerHeight?: number
+  readonly firstLayerHeight?: number
+  readonly walls?: number
+  readonly topLayers?: number
+  readonly bottomLayers?: number
+  /** Share of the inside that is filled, %. */
+  readonly infillDensity?: number
+  readonly infillPattern?: "lines" | "grid" | "triangles" | "honeycomb" | "gyroid" | "concentric"
+  readonly supports?: "none" | "buildplate" | "everywhere"
+  /** Overhang angle from vertical beyond which a surface is supported, degrees. */
+  readonly supportAngle?: number
+  readonly adhesion?: "none" | "skirt" | "brim" | "raft"
+  readonly brimWidth?: number
+  readonly printSpeed?: number
+  readonly nozzleTemperature?: number
+  readonly bedTemperature?: number
+  /** Part cooling, % (0 = off). */
+  readonly fan?: number
+  /** One spiral wall, no infill. */
+  readonly vase?: boolean
+  /** `auto` lays the part on the face that needs the least support. */
+  readonly orientation?: "as-designed" | "auto"
+  readonly seam?: "nearest" | "aligned" | "random"
+  readonly retractionDistance?: number
+  readonly zHop?: number
+  /** Extrusion multiplier, %. */
+  readonly flow?: number
+  readonly relativeExtrusion?: boolean
+}
+
 export interface ManufacturingJob {
   readonly schemaVersion: typeof KERNEL_SCHEMA_VERSION
   readonly id: string
@@ -185,6 +242,8 @@ export interface ManufacturingJob {
   readonly operations?: ReadonlyArray<OperationSpec>
   readonly quality?: QualityRequirement
   readonly post?: { readonly options?: Partial<PostOptions> }
+  /** How a printer job is sliced (only read when the machine is a `printer`). */
+  readonly print?: PrintRequirement
 }
 
 // ---------------------------------------------------------------- results
@@ -219,7 +278,7 @@ export interface CamIssue {
 export type ClaimStatus = "passed" | "failed" | "unsupported" | "unresolved"
 
 export interface Claim {
-  readonly id: "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance" | "setup-workholding" | "part-coverage"
+  readonly id: "bed-fit" | "heated-start" | "layers-rise" | "wall-coverage" | "skin-coverage" | "no-spill" | "filament" | "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance" | "setup-workholding" | "part-coverage"
   readonly status: ClaimStatus
   readonly detail: string
 }
@@ -229,9 +288,9 @@ export type ReleaseLevel = "blocked" | "preview" | "verified-program"
 export interface OperationOutcome {
   readonly id: string
   readonly name: string
-  readonly strategy: Strategy
+  readonly strategy: Strategy | "print"
   readonly toolId: string
-  readonly cut: CutClass
+  readonly cut: CutClass | "print"
   readonly status: "ok" | "failed"
   readonly cutting?: CuttingData
   /** The parameters handed to the strategy, after cutting data and overrides. */
@@ -291,6 +350,28 @@ export interface ToleranceBudget {
   readonly met: boolean
 }
 
+/** What the slicer measured on a printer program and the checks of that program against the part. */
+export interface PrintReport {
+  readonly dialect: "marlin" | "klipper" | "reprap"
+  readonly filament: { readonly material: string; readonly densityGcm3: number; readonly diameter: number }
+  readonly nozzle: { readonly diameter: number; readonly temperature: number; readonly bedTemperature: number }
+  readonly layers: number
+  readonly layerHeight: number
+  /** Filament pushed through the nozzle, mm, and its mass, g. */
+  readonly filamentMm: number
+  readonly filamentGrams: number
+  readonly timeSeconds: number
+  readonly travelMm: number
+  readonly retractions: number
+  /** Bead length by feature (wall-outer, wall-inner, skin, infill, bridge, support, ...), mm. */
+  readonly lengthByKind: Readonly<Record<string, number>>
+  /** The size of the printed part, mm. */
+  readonly size: { readonly x: number; readonly y: number; readonly z: number }
+  /** How the part was turned on the plate. */
+  readonly orientation: string
+  readonly settings: PrintRequirement
+}
+
 export interface CamArtifact {
   readonly schemaVersion: typeof KERNEL_SCHEMA_VERSION
   readonly jobId: string
@@ -315,6 +396,8 @@ export interface CamArtifact {
   /** Notes of the planner (features it could not machine and why). */
   readonly notes: ReadonlyArray<string>
   readonly tolerance?: ToleranceBudget
+  /** Present when the machine is a printer: what was printed and how it was measured. */
+  readonly print?: PrintReport
 }
 
 export type CamResult<T> =

@@ -33,16 +33,69 @@ export interface MachineConfigRow {
 }
 
 /**
- * The kernel machine a saved configuration describes, or `undefined` when it cannot be one: the library's kinds the
- * kernel does not machine (`printer`, `laser`) and a configuration without a spindle ceiling are refused.
+ * The kernel machine a saved configuration describes, or `undefined` when it cannot be one: a laser, a resin printer, a printer
+ * whose plate is not given and a milling configuration without a spindle ceiling are refused; `machineRefusal` says which.
  */
 export const kernelMachineOfConfig = (row: MachineConfigRow): KernelMachine | undefined => {
   const profile = profileOfConfig(row.config, row.type)
   return kernelMachineOfProfile(profile, row.id, row.name)
 }
 
+const FILAMENT_PROCESS = /^(fdm|fff|fused|filament)/i
+
+/** Why a profile is not a printer the kernel can slice for, or `undefined` when it is one. */
+const printerRefusal = (profile: MachineProfile): string | undefined => {
+  const printer = profile.printer
+  if (printer?.technology !== undefined && !FILAMENT_PROCESS.test(printer.technology)) {
+    return `a ${printer.technology} printer is not sliced by this kernel: it slices for filament printers (FDM)`
+  }
+  if (printer?.bed === undefined) return "the printer configuration has no plate: give its work volume (x, y, z) so the part can be placed and checked"
+  if (printer.buildHeight === undefined) return "the printer configuration has no build height: give the z of its work volume"
+  return undefined
+}
+
+/** The kernel machine of a printer profile (`undefined`: see `machineRefusal`). */
+const kernelPrinterOfProfile = (profile: MachineProfile, id: string, name: string): KernelMachine | undefined => {
+  if (printerRefusal(profile) !== undefined) return undefined
+  const p = profile.printer!
+  const bed = p.bed!
+  const speed = p.maxSpeed ?? 150
+  return {
+    id: `config:${id}`, name, kind: "printer", post: "generic",
+    limits: { maxRpm: 0, minRpm: 0, maxFeed: speed * 60 },
+    printer: {
+      bed: { width: bed.width, depth: bed.depth, origin: bed.origin ?? (p.kinematics === "delta" ? "center" : "corner") },
+      buildHeight: p.buildHeight!,
+      nozzle: { diameter: p.nozzleDiameter ?? 0.4, maxTemperature: p.maxNozzleTemperature ?? 260 },
+      filamentDiameter: p.filamentDiameter ?? 1.75,
+      maxBedTemperature: p.maxBedTemperature ?? 100,
+      maxSpeed: speed,
+      kinematics: p.kinematics ?? (bed.origin === "center" ? "delta" : "cartesian"),
+      flavor: p.flavor ?? (profile.controller !== undefined && /klipper/i.test(profile.controller) ? "klipper" : "marlin"),
+      extruder: p.extruder ?? "direct"
+    },
+    ...(profile.feed?.rapid !== undefined ? { rapidFeed: profile.feed.rapid } : {}),
+    ...(profile.accuracy !== undefined ? { accuracy: profile.accuracy } : {})
+  }
+}
+
+/**
+ * Why a configuration is not a machine the kernel can run, in words the user can act on; `undefined` when it is one.
+ * `kernelMachineOfConfig` answers with the machine or nothing, this answers why.
+ */
+export const machineRefusal = (row: MachineConfigRow): string | undefined => {
+  const profile = profileOfConfig(row.config, row.type)
+  if (profile.kind === "laser") return "a laser is not machined by this kernel: it plans milling and slices for filament printers"
+  if (profile.kind === "printer") return printerRefusal(profile)
+  if (kernelMachineOfProfile(profile, row.id, row.name) !== undefined) return undefined
+  if (profile.spindle?.maxRpm === undefined || profile.spindle.maxRpm <= 0) return "the configuration has no spindle speed: give its maximum rpm"
+  if (profile.feed?.max === undefined || profile.feed.max <= 0) return "the configuration has no maximum feed: give it in mm/min"
+  return "the configuration is not a machine the kernel knows"
+}
+
 /** The kernel machine a machine profile describes. */
 export const kernelMachineOfProfile = (profile: MachineProfile, id: string, name: string): KernelMachine | undefined => {
+  if (profile.kind === "printer") return kernelPrinterOfProfile(profile, id, name)
   const kind = profile.kind === "lathe" ? "lathe" : profile.kind === "mill" ? "mill" : undefined
   if (kind === undefined) return undefined
   const maxRpm = profile.spindle?.maxRpm
@@ -130,6 +183,24 @@ export const kernelMachineOfProfile = (profile: MachineProfile, id: string, name
  * The built-in catalogue is shown in the library through this.
  */
 export const machineConfigOf = (machine: KernelMachine): MachineConfigRow => {
+  if (machine.kind === "printer" && machine.printer !== undefined) {
+    const p = machine.printer
+    const profile: MachineProfile = {
+      kind: "printer",
+      controller: machine.reference?.controller ?? (p.flavor === "klipper" ? "Klipper" : p.flavor === "reprap" ? "RepRapFirmware" : "Marlin"),
+      post: machine.post,
+      axes: 3,
+      feed: { max: machine.limits.maxFeed, ...(machine.rapidFeed !== undefined ? { rapid: machine.rapidFeed } : {}) },
+      workVolume: { x: p.bed.width, y: p.bed.depth, z: p.buildHeight },
+      printer: {
+        technology: "FDM", bed: p.bed, buildHeight: p.buildHeight, nozzleDiameter: p.nozzle.diameter, filamentDiameter: p.filamentDiameter,
+        maxNozzleTemperature: p.nozzle.maxTemperature, maxBedTemperature: p.maxBedTemperature, maxSpeed: p.maxSpeed, kinematics: p.kinematics, flavor: p.flavor, extruder: p.extruder
+      },
+      ...(machine.reference !== undefined ? { reference: { source: machine.reference.source, notes: machine.reference.assumptions.join("; ") } } : {}),
+      extra: {}
+    }
+    return { id: machine.id, name: machine.name, type: "printer", description: machine.reference !== undefined ? `${machine.reference.controller} — built-in preset` : "Built-in preset", config: configOfProfile(profile) }
+  }
   const rotary = machine.fiveAxis
   const stroke = machine.reference?.stroke
   const profile: MachineProfile = {

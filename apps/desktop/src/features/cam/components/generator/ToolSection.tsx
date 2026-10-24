@@ -79,7 +79,7 @@ export function ToolSection(): JSX.Element {
     gen.flash(t("cam.tool.applied"))
   }
   return (
-    <Section id="tool" delay={0.35} tone="indigo" icon={Wrench} title="Tool" testId="tool-section">
+    <Section id="tool" icon={Wrench} title="Tool" testId="tool-section">
       <div>
         <label class={LABEL}>Tool Type</label>
         <select class={INPUT} value={gen.settings.toolType} onChange={select} data-testid="tool-type">

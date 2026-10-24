@@ -1,5 +1,15 @@
 # WP3 + WP4 — Shared API contract and sidecar server
 
+## Additive assistant evidence (2026-10-24)
+
+WP4's owner-requested print integration preserves the existing kernel `print` report in
+`cam.manufacture` results and printer profiles in configured-machine discovery. Printer
+stock notes describe a build plate and deposited filament rather than inferred milling
+stock. WP8 owns the existing material/machine discovery action and its print guidance
+(spec 08). These are additive fields within existing record-valued tool results; HTTP
+request/response schemas and action identities stay unchanged. Verify through the real
+tool catalogue, project handlers and kernel worker, including blocked releases.
+
 ## Exact-replay diagnostic preservation (2026-10-22)
 
 Spec 33 K0 authorizes WP3 `packages/api/src/ai-action-results.ts` and its tests to add optional string-array warnings to
@@ -118,6 +128,12 @@ apps/sidecar/src/
 - `bunx tsc` clean for both packages; coverage of every endpoint by at least one in-process HTTP test.
 
 ## 5. Change log
+
+- 2026-10-24: additive assistant evidence implemented through existing handlers. Printer
+  discovery retains profiles, manufacturing returns the kernel print report, and stock notes
+  describe deposition. Real catalogue/handler/worker tests pass for verified and blocked print
+  releases (14 tests together with action discovery); typechecks and API-reference freshness
+  pass. No HTTP schema or action identity changed.
 
 - 2026-10-20: Web API reference freshness fix complete: regenerated `packages/web/src/data/api-reference.json` from the current contract (300 operations, 210 paths, 35 groups, 56 named schemas). Added the owner-requested mandatory regeneration rule to `AGENTS.md` while retaining the freshness gate. All 31 web tests pass (1,824 assertions); the full workspace typecheck passes all 15 package tasks plus the root check.
 

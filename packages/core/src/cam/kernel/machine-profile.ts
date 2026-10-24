@@ -199,6 +199,25 @@ export interface MachineReference {
   readonly notes?: string
 }
 
+/** What a filament printer is: the plate, the nozzle, the filament, the limits and the firmware. */
+export interface MachinePrinter {
+  /** `FDM` / `FFF` prints with filament; a resin printer (`MSLA`, `SLA`, `DLP`) is another process. */
+  readonly technology?: string
+  /** The plate, mm; `center` puts X0 Y0 in the middle (delta printers). */
+  readonly bed?: { readonly width: number; readonly depth: number; readonly origin?: "corner" | "center" }
+  /** The tallest print, mm. */
+  readonly buildHeight?: number
+  readonly nozzleDiameter?: number
+  readonly filamentDiameter?: number
+  readonly maxNozzleTemperature?: number
+  readonly maxBedTemperature?: number
+  /** The highest print speed, mm/s. */
+  readonly maxSpeed?: number
+  readonly kinematics?: "cartesian" | "corexy" | "bed-slinger" | "delta"
+  readonly flavor?: "marlin" | "klipper" | "reprap"
+  readonly extruder?: "direct" | "bowden"
+}
+
 /**
  * The fields a machine configuration may carry: the canonical ones and the legacy spellings that are still written.
  * Everything is optional, because a configuration says what the machine is and leaves the rest out.
@@ -242,6 +261,8 @@ export interface MachineProfile {
   readonly coolant?: MachineCoolant
   readonly accuracy?: MachineAccuracy
   readonly reference?: MachineReference
+  /** Present on a printer. */
+  readonly printer?: MachinePrinter
   /** What the configuration carried that this profile does not name, kept as it was written. */
   readonly extra: Readonly<Record<string, unknown>>
 }
@@ -326,6 +347,19 @@ export const MachineProfileSchema = Schema.Struct({
   reference: Schema.optionalKey(Schema.Struct({
     source: Schema.optionalKey(Schema.String),
     notes: Schema.optionalKey(Schema.String)
+  })),
+  printer: Schema.optionalKey(Schema.Struct({
+    technology: Schema.optionalKey(Schema.String),
+    bed: Schema.optionalKey(Schema.Struct({ width: positive, depth: positive, origin: Schema.optionalKey(Schema.Literals(["corner", "center"])) })),
+    buildHeight: Schema.optionalKey(positive),
+    nozzleDiameter: Schema.optionalKey(positive),
+    filamentDiameter: Schema.optionalKey(positive),
+    maxNozzleTemperature: Schema.optionalKey(positive),
+    maxBedTemperature: Schema.optionalKey(nonNegative),
+    maxSpeed: Schema.optionalKey(positive),
+    kinematics: Schema.optionalKey(Schema.Literals(["cartesian", "corexy", "bed-slinger", "delta"])),
+    flavor: Schema.optionalKey(Schema.Literals(["marlin", "klipper", "reprap"])),
+    extruder: Schema.optionalKey(Schema.Literals(["direct", "bowden"]))
   })),
   extra: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown))
 })
@@ -523,6 +557,47 @@ const coolantOf = (config: Record<string, unknown>): MachineCoolant | undefined 
   return modes !== undefined && modes.length > 0 ? { modes } : undefined
 }
 
+const printerOf = (config: Record<string, unknown>, extra: Record<string, unknown>): MachinePrinter | undefined => {
+  const block = record(config["printer"])
+  const pick = (key: string): unknown => block[key] ?? config[key] ?? extra[key]
+  const technology = typeof pick("technology") === "string" ? (pick("technology") as string).trim() : undefined
+  const bedSource = record(block["bed"])
+  const volume = pointOf(config["workVolume"])
+  const width = numberOf(bedSource["width"]) ?? numberOf(config["bedWidth"]) ?? volume?.x
+  const depth = numberOf(bedSource["depth"]) ?? numberOf(config["bedDepth"]) ?? volume?.y
+  const buildHeight = numberOf(block["buildHeight"]) ?? numberOf(config["buildHeight"]) ?? volume?.z
+  const originWord = bedSource["origin"] ?? config["bedOrigin"]
+  const kinematicsWord = typeof pick("kinematics") === "string" ? (pick("kinematics") as string).trim().toLowerCase() : undefined
+  const kinematics = kinematicsWord === "cartesian" || kinematicsWord === "corexy" || kinematicsWord === "bed-slinger" || kinematicsWord === "delta" ? kinematicsWord : undefined
+  const origin = originWord === "center" || originWord === "corner" ? originWord : kinematics === "delta" ? "center" : undefined
+  const controller = typeof config["controller"] === "string" ? config["controller"].toLowerCase() : ""
+  const flavorWord = typeof block["flavor"] === "string" ? block["flavor"].toLowerCase() : controller
+  const flavor = flavorWord.includes("klipper") ? "klipper" : flavorWord.includes("reprap") || flavorWord.includes("duet") ? "reprap" : flavorWord.includes("marlin") ? "marlin" : undefined
+  const extruderWord = pick("extruder")
+  const extruder = extruderWord === "direct" || extruderWord === "bowden" ? extruderWord : undefined
+  const nozzleDiameter = numberOf(pick("nozzleDiameter"))
+  const filamentDiameter = numberOf(pick("filamentDiameter"))
+  const maxNozzleTemperature = numberOf(block["maxNozzleTemperature"]) ?? numberOf(config["maxTemperature"]) ?? numberOf(extra["maxTemperature"])
+  const maxBedTemperature = numberOf(block["maxBedTemperature"]) ?? numberOf(config["maxBedTemperature"])
+  // The library's `maxFeedRate` is a print speed in mm/s (150 for a desktop printer); a figure over 1000 is mm/min.
+  const rate = numberOf(block["maxSpeed"]) ?? numberOf(config["maxFeedRate"])
+  const maxSpeed = rate === undefined ? undefined : rate > 1000 ? rate / 60 : rate
+  if (technology === undefined && width === undefined && buildHeight === undefined && nozzleDiameter === undefined && filamentDiameter === undefined && maxNozzleTemperature === undefined && maxSpeed === undefined && kinematics === undefined && flavor === undefined) return undefined
+  return {
+    ...(technology !== undefined ? { technology } : {}),
+    ...(width !== undefined && depth !== undefined ? { bed: { width, depth, ...(origin !== undefined ? { origin } : {}) } } : {}),
+    ...(buildHeight !== undefined ? { buildHeight } : {}),
+    ...(nozzleDiameter !== undefined ? { nozzleDiameter } : {}),
+    ...(filamentDiameter !== undefined ? { filamentDiameter } : {}),
+    ...(maxNozzleTemperature !== undefined ? { maxNozzleTemperature } : {}),
+    ...(maxBedTemperature !== undefined ? { maxBedTemperature } : {}),
+    ...(maxSpeed !== undefined ? { maxSpeed } : {}),
+    ...(kinematics !== undefined ? { kinematics } : {}),
+    ...(flavor !== undefined ? { flavor } : {}),
+    ...(extruder !== undefined ? { extruder } : {})
+  }
+}
+
 const accuracyOf = (config: Record<string, unknown>): MachineAccuracy | undefined => {
   const source = record(config["accuracy"])
   const positioningMm = numberOf(source["positioningMm"])
@@ -618,6 +693,7 @@ export const profileOfConfig = (config: unknown, type?: string): MachineProfile 
   const toolChanger = toolChangerOf(source, extra)
   const coolant = coolantOf(source)
   const accuracy = accuracyOf(source)
+  const printer = kind === "printer" ? printerOf(source, extra) : undefined
   // Where the figures come from: the canonical `reference` block, else the flat `source` / `notes` a row may carry.
   const referenceBlock = record(source["reference"])
   const referenceSource = typeof referenceBlock["source"] === "string" ? referenceBlock["source"] : typeof source["source"] === "string" ? source["source"] : undefined
@@ -645,6 +721,7 @@ export const profileOfConfig = (config: unknown, type?: string): MachineProfile 
     ...(coolant !== undefined ? { coolant } : {}),
     ...(accuracy !== undefined ? { accuracy } : {}),
     ...(reference !== undefined ? { reference } : {}),
+    ...(printer !== undefined ? { printer } : {}),
     extra
   }
 }
@@ -671,6 +748,7 @@ export const configOfProfile = (profile: MachineProfile): MachineConfigFields =>
     ...(profile.coolant !== undefined ? { coolant: profile.coolant } : {}),
     ...(profile.accuracy !== undefined ? { accuracy: profile.accuracy } : {}),
     ...(profile.reference !== undefined ? { reference: profile.reference } : {}),
+    ...(profile.printer !== undefined ? { printer: profile.printer } : {}),
     ...(Object.keys(profile.extra).length > 0 ? { additionalSettings: profile.extra } : {})
   }
   return config

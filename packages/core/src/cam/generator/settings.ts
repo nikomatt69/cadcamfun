@@ -136,7 +136,11 @@ const OPERATION_DESCRIPTIONS: Readonly<Record<string, OperationDescription>> = {
   facing: { title: "Facing", description: "Facing - Creates flat surfaces perpendicular to the axis of rotation." },
   boring: { title: "Boring", description: "Boring - Widens or precisely finishes holes or internal surfaces." },
   standard: { title: "Standard Printing", description: "Standard Printing - Prints with normal parameters for balanced quality and speed." },
-  vase: { title: "Vase (Spiral)", description: "Vase (Spiral) - Prints in continuous spiral mode without seams for hollow objects." }
+  vase: { title: "Vase (Spiral)", description: "Vase (Spiral) - Prints in continuous spiral mode without seams for hollow objects." },
+  support: { title: "Supported Printing", description: "Supported Printing - The standard print with supports under every overhang, whatever the support choice of the profile was." },
+  infill: { title: "Solid Printing", description: "Solid Printing - Prints the part solid: 100 % infill in lines, for strength or a watertight part." },
+  raft: { title: "Raft", description: "Raft - Prints the part on a raft of wide and dense layers, for a bed the part does not stick to or a base that warps." },
+  brim: { title: "Brim", description: "Brim - Adds loops around the first layer so the part holds to the plate; the width is set in the print profile." }
 }
 
 export const getOperationDescription = (operationType: string): OperationDescription =>

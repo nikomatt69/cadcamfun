@@ -123,12 +123,53 @@ export const MACHINES: ReadonlyArray<KernelMachine> = [
 /** Turning and mill-turn centres: the part turns here, so the milling kernel refuses them. */
 export const LATHES: ReadonlyArray<KernelMachine> = [latheStandard, mazakIntegrexI200, okumaMultusB300]
 
-/** Every machine of the catalogue, milling centres first. */
-export const MACHINE_CATALOGUE: ReadonlyArray<KernelMachine> = [...MACHINES, ...LATHES]
+/**
+ * Filament printers: the plate, the build height, the nozzle and filament, the speed and the firmware. A printer has no spindle,
+ * so `limits.maxRpm` is 0 and `limits.maxFeed` is the print speed in mm/min. `runJob` slices a part for these; the figures are
+ * those of each class of printer, and a named model carries the page its figures come from.
+ */
+const printer = (
+  id: string, name: string, bed: { width: number; depth: number; origin?: "corner" | "center" }, buildHeight: number,
+  fields: { kinematics: NonNullable<KernelMachine["printer"]>["kinematics"]; flavor: NonNullable<KernelMachine["printer"]>["flavor"]; extruder: NonNullable<KernelMachine["printer"]>["extruder"]; nozzle: number; maxNozzleTemperature: number; maxBedTemperature: number; maxSpeed: number; filament?: number },
+  reference?: KernelMachine["reference"]
+): KernelMachine => ({
+  id, name, kind: "printer", post: "generic",
+  limits: { maxRpm: 0, minRpm: 0, maxFeed: fields.maxSpeed * 60 },
+  printer: {
+    bed: { width: bed.width, depth: bed.depth, origin: bed.origin ?? "corner" }, buildHeight,
+    nozzle: { diameter: fields.nozzle, maxTemperature: fields.maxNozzleTemperature }, filamentDiameter: fields.filament ?? 1.75,
+    maxBedTemperature: fields.maxBedTemperature, maxSpeed: fields.maxSpeed, kinematics: fields.kinematics, flavor: fields.flavor, extruder: fields.extruder
+  },
+  rapidFeed: fields.maxSpeed * 60 * 2,
+  ...(reference !== undefined ? { reference } : {})
+})
+
+export const PRINTERS: ReadonlyArray<KernelMachine> = [
+  printer("printer-desktop-220", "Desktop FDM printer (220 x 220 x 250, bed-slinger, Marlin)", { width: 220, depth: 220 }, 250,
+    { kinematics: "bed-slinger", flavor: "marlin", extruder: "bowden", nozzle: 0.4, maxNozzleTemperature: 260, maxBedTemperature: 100, maxSpeed: 150 }),
+  printer("printer-prusa-mk4", "Prusa MK4 class (250 x 210 x 220, direct drive, Marlin)", { width: 250, depth: 210 }, 220,
+    { kinematics: "bed-slinger", flavor: "marlin", extruder: "direct", nozzle: 0.4, maxNozzleTemperature: 290, maxBedTemperature: 120, maxSpeed: 200 },
+    {
+      controller: "Prusa firmware (Marlin dialect)", source: "https://www.prusa3d.com/product/original-prusa-mk4-2/",
+      assumptions: ["Published build volume 250 x 210 x 220 mm; the print speed ceiling is a conservative planning figure, not the maker's peak", "The G-code dialect is Marlin's; the machine's own start and end sequences (bed levelling, purge) are not emitted"]
+    }),
+  printer("printer-corexy-300", "CoreXY 300 (300 x 300 x 300, direct drive, Klipper)", { width: 300, depth: 300 }, 300,
+    { kinematics: "corexy", flavor: "klipper", extruder: "direct", nozzle: 0.4, maxNozzleTemperature: 300, maxBedTemperature: 110, maxSpeed: 300 }),
+  printer("printer-delta-240", "Delta 240 (diameter 240, height 300, plate-centre origin, Marlin)", { width: 240, depth: 240, origin: "center" }, 300,
+    { kinematics: "delta", flavor: "marlin", extruder: "bowden", nozzle: 0.4, maxNozzleTemperature: 260, maxBedTemperature: 100, maxSpeed: 180 }),
+  printer("printer-large-400", "Large-format FDM (400 x 400 x 500, 0.6 nozzle, Marlin)", { width: 400, depth: 400 }, 500,
+    { kinematics: "cartesian", flavor: "marlin", extruder: "direct", nozzle: 0.6, maxNozzleTemperature: 280, maxBedTemperature: 110, maxSpeed: 120 })
+]
+
+/** Every machine of the catalogue: milling centres, turning centres, then printers. */
+export const MACHINE_CATALOGUE: ReadonlyArray<KernelMachine> = [...MACHINES, ...LATHES, ...PRINTERS]
 
 export const DEFAULT_MACHINE: KernelMachine = MACHINES[0]!
 
 export const findMachine = (id: string): KernelMachine | undefined => MACHINE_CATALOGUE.find((m) => m.id === id)
+
+/** The printers of the catalogue. */
+export const findPrinter = (id: string): KernelMachine | undefined => PRINTERS.find((m) => m.id === id)
 
 /** The turning centres of the catalogue, the ones a turning plan may bound the bar with. */
 export const findLathe = (id: string): KernelMachine | undefined => LATHES.find((m) => m.id === id)

@@ -1,48 +1,53 @@
 import { For, Match, Show, Switch, type JSX } from "solid-js"
 import { Target } from "lucide-solid"
-import { Motion } from "solid-motionone"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { cam } from "@cadcamfun/core"
 import { CheckRow, NumberField, Section } from "./ui.tsx"
 
-const FIELD = "w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-const BLUE = "#3B82F6"
+import { useJob } from "../../hooks/useJob.ts"
+import { originExample } from "../../lib/generator-preview.ts"
+import { ExamplePreview } from "./ExamplePreview.tsx"
+import { t } from "../../../../i18n/index.ts"
 
-/** "Origin Coordinates": where the machine zero sits relative to the stock, with the legacy schematic. */
+const FIELD = "panel-input"
+
+
+/** "Origin Coordinates": where the machine zero sits relative to the stock, with an isometric reference. */
 export function OriginSection(): JSX.Element {
   const gen = useGeneratorStore()
+  const job = useJob()
   const origin = () => gen.settings.originType
   const axis = (name: "originX" | "originY" | "originZ", label: string): JSX.Element => (
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label class="panel-label">{label}</label>
       <NumberField step="0.1" class={FIELD} value={gen.settings[name]} accept={() => true} onValue={(value) => gen.updateSettings(name, value)} />
     </div>
   )
   return (
-    <Section id="origin" delay={0.15} tone="orange" icon={Target} title="Origin Coordinates" testId="origin-section">
+    <Section id="origin" icon={Target} title="Origin" summary={gen.settings.machineType === "mill" ? gen.settings.workOffset : undefined} testId="origin-section">
       <Switch>
         <Match when={gen.settings.machineType === "lathe"}>
           <MachineZero setting="latheZero" machine="lathe" label="Z zero" />
         </Match>
         <Match when={gen.settings.machineType === "3dprinter"}>
           <MachineZero setting="bedOrigin" machine="3dprinter" label="Plate origin" />
-          <div class="grid grid-cols-2 gap-4">
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Plate width (mm)</label><NumberField min="10" class={FIELD} value={gen.settings.bedWidth} onValue={(value) => gen.updateSettings("bedWidth", value)} /></div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Plate depth (mm)</label><NumberField min="10" class={FIELD} value={gen.settings.bedDepth} onValue={(value) => gen.updateSettings("bedDepth", value)} /></div>
+          <div class="panel-grid panel-grid--2">
+            <div class="panel-field"><label class="panel-label">Plate width (mm)</label><NumberField min="10" class={FIELD} value={gen.settings.bedWidth} onValue={(value) => gen.updateSettings("bedWidth", value)} /></div>
+            <div class="panel-field"><label class="panel-label">Plate depth (mm)</label><NumberField min="10" class={FIELD} value={gen.settings.bedDepth} onValue={(value) => gen.updateSettings("bedDepth", value)} /></div>
           </div>
           <CheckRow id="center-on-bed" checked={gen.settings.centerOnBed} onChange={(checked) => gen.updateSettings("centerOnBed", checked)}>Centre the part on the plate</CheckRow>
           <p class="text-xs text-gray-500">The part is always set down on the plate: its bottom is Z0, so the first layer prints one layer height above it.</p>
         </Match>
         <Match when={gen.settings.machineType === "mill"}>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Work offset</label>
+        <label class="panel-label">Work offset</label>
         <select class={FIELD} aria-label="Work offset" data-testid="origin-work-offset" value={gen.settings.workOffset} onChange={(event) => gen.updateSettings("workOffset", event.currentTarget.value as typeof gen.settings.workOffset)}>
           <For each={cam.ORIGINS.mill.offsets ?? []}>{(offset) => <option value={offset}>{offset}{offset === "G54" ? " (default)" : ""}</option>}</For>
         </select>
         <p class="text-xs text-gray-500 mt-1">The zero of the part on the machine table. Probing and machining use the same one.</p>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Origin Type</label>
+        <label class="panel-label">Origin Type</label>
         <select class={FIELD} value={origin()} onChange={(event) => gen.updateSettings("originType", event.currentTarget.value as typeof gen.settings.originType)}>
           <option value="workpiece-center">Workpiece Center</option>
           <option value="workpiece-corner">Workpiece Corner (bottom left)</option>
@@ -60,68 +65,8 @@ export function OriginSection(): JSX.Element {
         </div>
       </Show>
 
-      <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
-        <h4 class="text-sm font-medium text-gray-700 mb-2">Visual Reference</h4>
-        <div class="w-full h-32 relative bg-white border border-gray-300 rounded">
-          <div class="absolute inset-0 flex items-center justify-center">
-            <svg width="100%" height="100%" viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
-              <rect x="50" y="20" width="100" height="60" fill="none" stroke="#9CA3AF" stroke-width="1" />
-              <Show when={origin() === "workpiece-center"}>
-                <circle cx="100" cy="50" r="4" fill={BLUE} />
-                <line x1="100" y1="10" x2="100" y2="90" stroke={BLUE} stroke-width="1" stroke-dasharray="4,2" />
-                <line x1="20" y1="50" x2="180" y2="50" stroke={BLUE} stroke-width="1" stroke-dasharray="4,2" />
-                <text x="110" y="40" font-size="12" fill={BLUE}>Origin</text>
-              </Show>
-              <Show when={origin() === "workpiece-corner"}>
-                <circle cx="50" cy="80" r="4" fill={BLUE} />
-                <line x1="50" y1="10" x2="50" y2="90" stroke={BLUE} stroke-width="1" stroke-dasharray="4,2" />
-                <line x1="20" y1="80" x2="180" y2="80" stroke={BLUE} stroke-width="1" stroke-dasharray="4,2" />
-                <text x="35" y="95" font-size="12" fill={BLUE}>Origin</text>
-              </Show>
-              <Show when={origin() === "workpiece-corner2"}>
-                <circle cx="50" cy="20" r="4" fill={BLUE} />
-                <line x1="50" y1="10" x2="50" y2="90" stroke={BLUE} stroke-width="1" stroke-dasharray="4,2" />
-                <line x1="20" y1="20" x2="180" y2="20" stroke={BLUE} stroke-width="1" stroke-dasharray="4,2" />
-                <text x="35" y="15" font-size="12" fill={BLUE}>Origin</text>
-              </Show>
-              <Show when={origin() === "machine-zero"}>
-                <circle cx="20" cy="10" r="4" fill={BLUE} />
-                <line x1="20" y1="10" x2="20" y2="90" stroke={BLUE} stroke-width="1" stroke-dasharray="4,2" />
-                <line x1="20" y1="10" x2="180" y2="10" stroke={BLUE} stroke-width="1" stroke-dasharray="4,2" />
-                <text x="10" y="25" font-size="12" fill={BLUE}>Zero</text>
-              </Show>
-              <Show when={origin() === "custom"}>
-                <circle cx={gen.settings.originX / 2 + 100} cy={50 - gen.settings.originY / 2} r="4" fill={BLUE} />
-                <text x={gen.settings.originX / 2 + 105} y={45 - gen.settings.originY / 2} font-size="12" fill={BLUE}>Custom</text>
-              </Show>
-              <text x="180" y="50" font-size="10" fill="#374151">X+</text>
-              <text x="100" y="10" font-size="10" fill="#374151">Y+</text>
-            </svg>
-          </div>
-        </div>
-      </div>
+      <ExamplePreview title={t("cam.generator.preview.origin")} example testId="origin-preview" model={originExample(gen.settings, job.stock())} />
 
-      <Motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        class="p-4 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg border border-orange-200 dark:border-orange-800"
-      >
-        <div class="flex items-start space-x-3">
-          <div class="p-2 bg-orange-100 dark:bg-orange-800 rounded-lg">
-            <Target size={18} class="text-orange-600 dark:text-orange-400" />
-          </div>
-          <div>
-            <h4 class="font-semibold text-orange-800 dark:text-orange-200 mb-1">Origin Reference</h4>
-            <p class="text-sm text-orange-700 dark:text-orange-300">
-              <Show when={origin() === "workpiece-center"}>The toolpath will be generated using the center of the workpiece as origin (X0, Y0, Z0).</Show>
-              <Show when={origin() === "workpiece-corner"}>The toolpath will be generated considering the bottom left corner of the workpiece as origin (X0, Y0), with Z0 on the top surface.</Show>
-              <Show when={origin() === "machine-zero"}>The toolpath will be generated using machine coordinates without offset.</Show>
-              <Show when={origin() === "custom"}>Set custom coordinates for the toolpath origin.</Show>
-            </p>
-          </div>
-        </div>
-      </Motion.div>
         </Match>
       </Switch>
     </Section>
@@ -135,7 +80,7 @@ function MachineZero(props: { readonly setting: "latheZero" | "bedOrigin"; reado
   const current = () => String(gen.settings[props.setting])
   return (
     <div data-testid={`origin-${props.setting}`}>
-      <label class="block text-sm font-medium text-gray-700 mb-1">{props.label}</label>
+      <label class="panel-label">{props.label}</label>
       <select class={FIELD} aria-label={props.label} value={current()} onChange={(event) => gen.updateSettings(props.setting, event.currentTarget.value as never)}>
         <For each={options().choices}>{(choice) => <option value={choice.value}>{choice.label}</option>}</For>
       </select>

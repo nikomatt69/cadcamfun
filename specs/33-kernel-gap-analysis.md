@@ -662,3 +662,96 @@ The order is the one the project's rules impose: **the owning design spec first*
 **Analysis only.** No implementation, no acceptance gate, no roadmap status change. The ledger above is the inventory the follow-up work is ordered from; the same rule as §1 applies: a refusal is evidence of an unsupported capability, not an implementation of it. The RM rows are untouched — this is a continuation of the owner's kernel request, not an RM acceptance claim.
 
 Measured against the working tree of 2026-10-22 (which carries uncommitted CAM/CAD work from a parallel session; the findings here are about the printer and are independent of it).
+
+### 9.11 Printing correctness increment (2026-10-24)
+
+The current source contains the print slicer, kernel adapter, catalogue, HTTP/assistant
+contracts and desktop print panels developed after the historical audit above. Their presence
+does not close every item in §9.2. This increment verifies and corrects these specific defects:
+
+- A 10 mm model at 0.3 mm layers ended at 9.9 mm; a 0.08 mm model with a 0.2 mm
+  first layer produced an empty slice. Layer tops now stop at the actual model top, slice
+  planes use each slab's real thickness, and a sub-0.04 mm tail is redistributed with its
+  preceding layer. Regression cases include a different first-layer thickness and a 0.03 mm tail.
+- A deleted intermediate layer (index 31 of 60) passed the sampled wall-coverage check.
+  Wall and spill evidence now inspect every model layer and report the raster resolution.
+  Vase spirals above their solid base no longer skip the spill check; a deliberately shifted
+  spiral fails the new regression while an unmodified vase passes.
+- Diagonal infill through a polygon corner could miss a boundary intersection and leave the
+  part. The edge index includes both endpoints with a numeric tolerance and deduplicates the
+  intersection parameters. Small-part end-to-end cases now pass the independent spill check.
+- Filament volume evidence incorrectly compared startup priming with a model bead's width
+  and default thickness. Priming still participates in plate-fit checks but is excluded from
+  the model-bead volume comparison, as are the separately modelled bridge and raft beads.
+
+Before correction, all five new height/missing-layer regressions failed. The focused post-fix
+run passed 14 tests, including all four height fixtures, isolated missing-layer detection,
+corner indexing and the existing NC-tampering checks. Core typecheck passed (443 files).
+The final slicer/kernel run passed 79 tests (23,270 assertions), including the vase regression.
+Sidecar/desktop integration passed 14 tests (98 assertions), including generation and kernel
+release through the live panel and HTTP route. API-reference regeneration and `--check` passed.
+
+The broad core run exposed a pre-existing `arcsIJ` characterization mismatch. Reconstructing
+the old fingerprint proved that only the rapid length differed, by one ULP
+(`17.19803902718557` versus `17.198039027185573`). The test now checks that value independently
+against `sqrt(104) + 7` to 12 decimal places and fingerprints every other field exactly using
+the recorded canonical rapid length. Its 12-test file then passed; the recorded fingerprint
+and interpreter implementation are unchanged. The broad core run is still in progress.
+
+Still open for enterprise qualification: physical deposition/support coverage beyond this
+planar raster model, full printer motion/thermal limits, and evidence that interprets every
+supported controller mode without trusting feature/layer comments. This increment makes no
+RM completion or machine-qualification claim.
+
+### 9.12 Component value and authoritative print replay (2026-10-24)
+
+The owner's follow-up asks for value in every component. This increment deepens the existing
+interfaces rather than adding duplicate print paths:
+
+- **Replay and layer preview:** `print/verify.ts` consumes the shared controller interpreter
+  for modal/relative XYZ/E, resets, units and arcs. Arc replay has a 0.01 mm chord bound and
+  includes cardinal extrema. Feature markers remain display annotations; layer geometry and
+  bead volume use independently supplied layer tops/thicknesses. Missing model geometry is
+  explicit unresolved evidence, not an empty list of passing checks.
+- **Startup and travel:** all replayed motion, including non-extruding travel, must fit the
+  build envelope. Deposited width participates in plate fit. Homed XYZ and explicit nozzle
+  and required-bed waits must precede deposition; zero targets, mere heater setpoints and
+  opaque macros do not prove readiness. Unsupported print-dialect G/M words, malformed
+  coordinates and unsupported axes/tools block replay. Explicit partial-axis homing is
+  accumulated until XYZ are all homed.
+- **Post:** G90 precedes M82/M83, so relative extrusion actually stays relative. Quantizing
+  cumulative E before differencing prevents per-bead rounding drift. A bed too small for a
+  prime line still gets explicit first-layer positioning. Default end lifts respect build
+  height, and the kernel checks actual depositing feeds instead of the requested speed alone.
+- **Assistant:** material discovery now includes filament density/temperatures/cooling/melt
+  flow with its qualification basis and full printer profiles. Saved printer profiles and
+  the actual kernel print report reach the tool result. Stock notes describe deposited
+  filament. A real action/worker regression preserves both verified and blocked releases.
+  Cutting-data calls refuse printer presets and unknown machine ids instead of deriving
+  milling feeds for them or silently falling back to another machine.
+- **Integration:** the shared worktree's unmatched CAD brace and unreachable desktop `face`
+  example prevented compilation; syntax/dead-branch repairs restore the consumer gates.
+
+Verification on the increment: 91 slicer/kernel tests pass (23,319 assertions), 62 interpreter/
+machine-view tests pass, 93 generator/HTTP/live desktop tests pass (10,474 assertions),
+14 AI action/worker tests pass (73 assertions), and 23 prompt/wire/budget checks pass (980
+assertions). Core (444 files), AI (531), sidecar (661) and desktop (1,171) typechecks pass.
+API-reference freshness and whitespace checks pass. No prompt budget was relaxed.
+
+A later combined vertical run passed its 23 backend/AI tests but encountered a transient
+desktop import failure while the shared generator stylesheet was replaced by the shared
+panel design system. The now-current desktop module imports `styles/panel.css`; a fresh
+live desktop run passes all five print-panel tests (22 assertions). The final targeted
+replay run also passes all 11 cases, including malformed NC and partial-axis homing.
+
+The earlier broad `packages/core` run remains live and is not an acceptance result for all
+current source changes. It has exposed CAD timeouts (nominal revolution/sweep, naming and
+ellipse/spline tests, plus the seeded Boolean fuzz gate) and a legacy expectation of unsupported non-uniform scaling despite
+the current implementation's exact result. The old arcsIJ numeric fingerprint failure was
+independently resolved as documented in §9.11. These findings need their own current-source
+verification before a full-suite or enterprise-completion claim.
+
+Remaining component gates include structural mesh validation before typed-array coercion,
+independent support/overhang and volumetric deposition evidence, stationary extrusion and
+all firmware-specific state changes, machine-geometry/thermal qualification, and complete
+rendered workflow acceptance. This ledger records progress without closing those gates.

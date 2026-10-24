@@ -9,9 +9,9 @@
  * The Generator itself lives in the right-hand panel, not here. The sidebar is collapsible; collapsed it shows
  * only icon buttons. The bottom row has the collapse toggle, matching the CAD editor.
  */
-import { For, Show, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
-import { Box, ChevronLeft, ChevronRight, Eye, EyeOff, Grid, List, Settings, Wrench } from "lucide-solid"
+import { Show, type JSX } from "solid-js"
+import { SidebarTabs, SidebarCollapse } from "../../../shared/components/panel/sidebar.tsx"
+import { Box, Eye, EyeOff, Grid, List, Settings, Wrench } from "lucide-solid"
 import { useCADStore } from "../../cad/store/cadStore.ts"
 import OriginControls from "../../cad/components/OriginControls.tsx"
 import { useCamStore } from "../store/camStore.ts"
@@ -31,13 +31,6 @@ const TABS: ReadonlyArray<{ readonly id: SidebarTab; readonly label: "cam.explor
   { id: "settings", label: "cam.settings", title: "cam.viewSettingsTitle", icon: (size) => <Settings size={size} /> },
   { id: "machine", label: "cam.machine", title: "cam.machineTitle", icon: (size) => <Wrench size={size} /> }
 ]
-
-const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
-const hover = { scale: 1.02 }
-const press = { scale: 0.98 }
-
-const tabClass = (active: boolean, shape: string): string =>
-  `${shape} text-sm font-medium transition-all duration-200 ${active ? "text-blue-600 dark:text-blue-400 bg-white/60 dark:bg-gray-700/60 shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-white/40 dark:hover:bg-gray-700/40"}`
 
 export interface CamSidebarProps {
   readonly activeTab: SidebarTab
@@ -59,57 +52,18 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
   const cad = useCADStore()
 
   return (
-    <Motion.div
-      class="cam-workspace__sidebar flex-shrink-0 dark:text-white mr-2 h-full flex flex-col"
+    <div
+      class="cam-workspace__sidebar panel workspace-sidebar flex-shrink-0 h-full flex flex-col"
       data-open={props.isOpen}
     >
-      <Motion.div
-        class="cam-workspace__tabs w-full flex justify-center"
-        {...rise}
-        transition={{ duration: 0.6, delay: 0.2 }}
-      >
-        <div class={props.isOpen ? "flex justify-center w-full text-center gap-1 p-2" : "flex flex-col w-full gap-1 p-2"}>
-          <For each={TABS}>
-            {(tab) => (
-              <Show
-                when={props.isOpen}
-                fallback={
-                  <Motion.button
-                    class={tabClass(props.activeTab === tab.id, "w-full py-4 flex flex-col items-center justify-center rounded-xl")}
-                    onClick={() => props.onSelectTab(tab.id)}
-                    title={t(tab.title)}
-                    aria-label={t(tab.title)}
-                    aria-pressed={props.activeTab === tab.id}
-                    hover={hover}
-                    press={press}
-                  >
-                    {tab.icon(20)}
-                  </Motion.button>
-                }
-              >
-                <Motion.button
-                  class={tabClass(props.activeTab === tab.id, "flex-1 py-3 px-3 rounded-xl")}
-                  onClick={() => props.onSelectTab(tab.id)}
-                  aria-pressed={props.activeTab === tab.id}
-                  hover={hover}
-                  press={press}
-                >
-                  <div class="flex items-center justify-center">
-                    {tab.icon(16)}
-                    <span class="ml-2">{t(tab.label)}</span>
-                  </div>
-                </Motion.button>
-              </Show>
-            )}
-          </For>
-        </div>
-      </Motion.div>
+      <SidebarTabs class="cam-workspace__tabs" open={props.isOpen} active={props.activeTab} onSelect={props.onSelectTab}
+        tabs={TABS.map((tab) => ({ ...tab, label: t(tab.label), title: t(tab.title) }))} />
 
-      <Motion.div class="min-h-0 flex-1 flex-col rounded-xl overflow-y-auto" {...rise} transition={{ duration: 0.6, delay: 0.4 }}>
+      <div class="sidebar-scroll min-h-0 flex-1 overflow-y-auto">
         <Show
           when={props.isOpen}
           fallback={
-            <div class="py-4 px-2 flex flex-col items-center rounded-xl bg-white/30 dark:bg-gray-800/50 backdrop-blur-sm">
+            <div class="sidebar-rail">
               <Show when={props.activeTab === "explorer"}>
                 <div class="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
                   <List size={20} class="mx-auto mb-2" />
@@ -119,7 +73,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
               <Show when={props.activeTab === "settings"}>
                 <div class="space-y-4 p-1">
                   <button
-                    class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30"
+                    class="panel-icon-btn"
                     title={t("cam.toggleGrid")}
                     aria-label={t("cam.toggleGrid")}
                     aria-pressed={cad.gridVisible}
@@ -128,7 +82,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                     <Grid size={20} class={cad.gridVisible ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
                   </button>
                   <button
-                    class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30"
+                    class="panel-icon-btn"
                     title={t("cam.toggleAxis")}
                     aria-label={t("cam.toggleAxis")}
                     aria-pressed={cad.axisVisible}
@@ -137,7 +91,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                     <Show when={cad.axisVisible} fallback={<EyeOff size={20} class="text-gray-600 dark:text-gray-400" />}><Eye size={20} class="text-blue-600 dark:text-blue-400" /></Show>
                   </button>
                   <button
-                    class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30"
+                    class="panel-icon-btn"
                     title={t("cam.toggleViewMode")}
                     aria-label={t("cam.toggleViewMode")}
                     aria-pressed={cad.viewMode === "3d"}
@@ -152,12 +106,12 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
         >
           <div class="workstation-panel-content flex flex-col">
             <Show when={props.activeTab === "explorer"}>
-              <Motion.div class="w-full" {...rise} transition={{ duration: 0.4, delay: 0.2 }}>
+              <div class="w-full">
                 <CamElementExplorer {...(props.onGCodeGenerated ? { onGCodeGenerated: props.onGCodeGenerated } : {})} />
-              </Motion.div>
+              </div>
             </Show>
             <Show when={props.activeTab === "machine"}>
-              <Motion.div class="w-full space-y-6" {...rise} transition={{ duration: 0.4, delay: 0.2 }}>
+              <div class="sidebar-sections">
                 <MachineSelect />
                 <OriginControls />
                 <WorkpieceSetup
@@ -172,42 +126,20 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                   onSelect={props.onSelectToolpath}
                   onDelete={props.onDeleteToolpath}
                 />
-              </Motion.div>
+              </div>
             </Show>
             <Show when={props.activeTab === "settings"}>
-              <Motion.div class="w-full" {...rise} transition={{ duration: 0.4, delay: 0.2 }}>
+              <div class="w-full">
                 <ViewSettings />
-              </Motion.div>
+              </div>
             </Show>
           </div>
         </Show>
-      </Motion.div>
+      </div>
 
       <WorkspaceNavigation isOpen={props.isOpen} />
 
-      <Motion.div
-        class="border-t border-white/30 dark:border-gray-600/30 p-3 flex justify-center"
-        {...rise}
-        transition={{ duration: 0.6, delay: 0.8 }}
-      >
-        <Motion.button
-          class="p-3 rounded-xl hover:bg-white/60 dark:hover:bg-gray-700/60 transition-all duration-200 backdrop-blur-sm border border-white/40 dark:border-gray-600/40 shadow-sm"
-          onClick={() => props.setIsOpen(!props.isOpen)}
-          title={t(props.isOpen ? "cam.collapse" : "cam.expand")}
-          aria-label={t(props.isOpen ? "cam.collapse" : "cam.expand")}
-          hover={hover}
-          press={press}
-        >
-          <Motion.div animate={{ rotate: props.isOpen ? 0 : 180 }} transition={{ duration: 0.3 }}>
-            <Show
-              when={props.isOpen}
-              fallback={<ChevronRight size={20} class="text-gray-600 dark:text-gray-300" />}
-            >
-              <ChevronLeft size={20} class="text-gray-600 dark:text-gray-300" />
-            </Show>
-          </Motion.div>
-        </Motion.button>
-      </Motion.div>
-    </Motion.div>
+      <SidebarCollapse open={props.isOpen} label={t(props.isOpen ? "cam.collapse" : "cam.expand")} onToggle={() => props.setIsOpen(!props.isOpen)} />
+    </div>
   )
 }

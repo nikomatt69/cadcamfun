@@ -19,8 +19,8 @@ import { useApp } from "../../../../shared/state/context.ts"
 import { DISPLAY_UNITS, UNIT_TABLE, formatLength, fromDisplay, isDisplayUnits, toDisplay } from "../../../../viewport/units.ts"
 import type { Browser } from "./browserState.ts"
 
-const ICON = "p-1.5 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-const MINI = "p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+const ICON = "panel-icon-btn sidebar-browser-action"
+const MINI = "panel-icon-btn sidebar-row-action"
 
 const MODES: ReadonlyArray<{ readonly id: GroupMode; readonly label: string }> = [
   { id: "kind", label: "By type" },

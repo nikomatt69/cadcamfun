@@ -44,7 +44,7 @@ export function AiSection(): JSX.Element {
       gen.setAIProcessing(true)
       void app.runtime
         .run(generator.suggest({ settings: gen.settings, geometry: geometryOf(gen, job.sources()) as never }))
-        .then((result) => gen.setAiSuggestions([...result.suggestions, ...result.warnings.map((warning) => `⚠ ${warning}`)]))
+        .then((result) => gen.setAiSuggestions([...result.suggestions, ...result.warnings.map((warning) => `Warning: ${warning}`)]))
         .catch((cause) => gen.flashError(cause instanceof Error ? cause.message : String(cause)))
         .finally(() => gen.setAIProcessing(false))
     }
@@ -58,7 +58,7 @@ export function AiSection(): JSX.Element {
   }
 
   return (
-    <Section id="ai" delay={0.5} tone="purple" icon={Cpu} title="AI Assistance" testId="ai-section">
+    <Section id="ai" icon={Cpu} title="AI Assistance" testId="ai-section">
       <CheckRow id="useAI" checked={gen.settings.useAI} onChange={(checked) => gen.updateSettings("useAI", checked)}>Enable AI suggestions</CheckRow>
 
       <Show when={gen.settings.useAI}>

@@ -57779,6 +57779,136 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     ],
                     "type": "string",
                   },
+                  "print": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "adhesion": {
+                        "enum": [
+                          "none",
+                          "skirt",
+                          "brim",
+                          "raft",
+                        ],
+                        "type": "string",
+                      },
+                      "bedTemperature": {
+                        "maximum": 150,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "bottomLayers": {
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "brimWidth": {
+                        "maximum": 50,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "fan": {
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "firstLayerHeight": {
+                        "maximum": 1.2,
+                        "minimum": 0.04,
+                        "type": "number",
+                      },
+                      "flow": {
+                        "maximum": 150,
+                        "minimum": 50,
+                        "type": "number",
+                      },
+                      "infillDensity": {
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "infillPattern": {
+                        "enum": [
+                          "lines",
+                          "grid",
+                          "triangles",
+                          "honeycomb",
+                          "gyroid",
+                          "concentric",
+                        ],
+                        "type": "string",
+                      },
+                      "layerHeight": {
+                        "maximum": 1.2,
+                        "minimum": 0.04,
+                        "type": "number",
+                      },
+                      "nozzleTemperature": {
+                        "maximum": 450,
+                        "minimum": 120,
+                        "type": "number",
+                      },
+                      "orientation": {
+                        "enum": [
+                          "as-designed",
+                          "auto",
+                        ],
+                        "type": "string",
+                      },
+                      "printSpeed": {
+                        "maximum": 600,
+                        "minimum": 5,
+                        "type": "number",
+                      },
+                      "relativeExtrusion": {
+                        "type": "boolean",
+                      },
+                      "retractionDistance": {
+                        "maximum": 15,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                      "seam": {
+                        "enum": [
+                          "nearest",
+                          "aligned",
+                          "random",
+                        ],
+                        "type": "string",
+                      },
+                      "supportAngle": {
+                        "maximum": 80,
+                        "minimum": 10,
+                        "type": "number",
+                      },
+                      "supports": {
+                        "enum": [
+                          "none",
+                          "buildplate",
+                          "everywhere",
+                        ],
+                        "type": "string",
+                      },
+                      "topLayers": {
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "vase": {
+                        "type": "boolean",
+                      },
+                      "walls": {
+                        "maximum": 20,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "zHop": {
+                        "maximum": 5,
+                        "minimum": 0,
+                        "type": "number",
+                      },
+                    },
+                    "type": "object",
+                  },
                   "progress": {
                     "additionalProperties": false,
                     "properties": {
@@ -58065,6 +58195,13 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   },
                                   "id": {
                                     "enum": [
+                                      "bed-fit",
+                                      "heated-start",
+                                      "layers-rise",
+                                      "wall-coverage",
+                                      "skin-coverage",
+                                      "no-spill",
+                                      "filament",
                                       "cutting-data",
                                       "machine-limits",
                                       "operations-complete",
@@ -58296,6 +58433,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "thread-mill",
                                       "tap",
                                       "ream",
+                                      "print",
                                     ],
                                     "type": "string",
                                   },
@@ -58532,6 +58670,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "chamfer",
                                       "surface",
                                       "multiaxis",
+                                      "print",
                                     ],
                                     "type": "string",
                                   },
@@ -58584,6 +58723,256 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "x",
                                 "y",
                                 "z",
+                              ],
+                              "type": "object",
+                            },
+                            "print": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "dialect": {
+                                  "enum": [
+                                    "marlin",
+                                    "klipper",
+                                    "reprap",
+                                  ],
+                                  "type": "string",
+                                },
+                                "filament": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "densityGcm3": {
+                                      "type": "number",
+                                    },
+                                    "diameter": {
+                                      "type": "number",
+                                    },
+                                    "material": {
+                                      "type": "string",
+                                    },
+                                  },
+                                  "required": [
+                                    "material",
+                                    "densityGcm3",
+                                    "diameter",
+                                  ],
+                                  "type": "object",
+                                },
+                                "filamentGrams": {
+                                  "type": "number",
+                                },
+                                "filamentMm": {
+                                  "type": "number",
+                                },
+                                "layerHeight": {
+                                  "type": "number",
+                                },
+                                "layers": {
+                                  "type": "integer",
+                                },
+                                "lengthByKind": {
+                                  "additionalProperties": {
+                                    "type": "number",
+                                  },
+                                  "type": "object",
+                                },
+                                "nozzle": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "bedTemperature": {
+                                      "type": "number",
+                                    },
+                                    "diameter": {
+                                      "type": "number",
+                                    },
+                                    "temperature": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "diameter",
+                                    "temperature",
+                                    "bedTemperature",
+                                  ],
+                                  "type": "object",
+                                },
+                                "orientation": {
+                                  "type": "string",
+                                },
+                                "retractions": {
+                                  "type": "integer",
+                                },
+                                "settings": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "adhesion": {
+                                      "enum": [
+                                        "none",
+                                        "skirt",
+                                        "brim",
+                                        "raft",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "bedTemperature": {
+                                      "maximum": 150,
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "bottomLayers": {
+                                      "maximum": 100,
+                                      "minimum": 0,
+                                      "type": "integer",
+                                    },
+                                    "brimWidth": {
+                                      "maximum": 50,
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "fan": {
+                                      "maximum": 100,
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "firstLayerHeight": {
+                                      "maximum": 1.2,
+                                      "minimum": 0.04,
+                                      "type": "number",
+                                    },
+                                    "flow": {
+                                      "maximum": 150,
+                                      "minimum": 50,
+                                      "type": "number",
+                                    },
+                                    "infillDensity": {
+                                      "maximum": 100,
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "infillPattern": {
+                                      "enum": [
+                                        "lines",
+                                        "grid",
+                                        "triangles",
+                                        "honeycomb",
+                                        "gyroid",
+                                        "concentric",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "layerHeight": {
+                                      "maximum": 1.2,
+                                      "minimum": 0.04,
+                                      "type": "number",
+                                    },
+                                    "nozzleTemperature": {
+                                      "maximum": 450,
+                                      "minimum": 120,
+                                      "type": "number",
+                                    },
+                                    "orientation": {
+                                      "enum": [
+                                        "as-designed",
+                                        "auto",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "printSpeed": {
+                                      "maximum": 600,
+                                      "minimum": 5,
+                                      "type": "number",
+                                    },
+                                    "relativeExtrusion": {
+                                      "type": "boolean",
+                                    },
+                                    "retractionDistance": {
+                                      "maximum": 15,
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                    "seam": {
+                                      "enum": [
+                                        "nearest",
+                                        "aligned",
+                                        "random",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "supportAngle": {
+                                      "maximum": 80,
+                                      "minimum": 10,
+                                      "type": "number",
+                                    },
+                                    "supports": {
+                                      "enum": [
+                                        "none",
+                                        "buildplate",
+                                        "everywhere",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "topLayers": {
+                                      "maximum": 100,
+                                      "minimum": 0,
+                                      "type": "integer",
+                                    },
+                                    "vase": {
+                                      "type": "boolean",
+                                    },
+                                    "walls": {
+                                      "maximum": 20,
+                                      "minimum": 0,
+                                      "type": "integer",
+                                    },
+                                    "zHop": {
+                                      "maximum": 5,
+                                      "minimum": 0,
+                                      "type": "number",
+                                    },
+                                  },
+                                  "type": "object",
+                                },
+                                "size": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "timeSeconds": {
+                                  "type": "number",
+                                },
+                                "travelMm": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "dialect",
+                                "filament",
+                                "nozzle",
+                                "layers",
+                                "layerHeight",
+                                "filamentMm",
+                                "filamentGrams",
+                                "timeSeconds",
+                                "travelMm",
+                                "retractions",
+                                "lengthByKind",
+                                "size",
+                                "orientation",
+                                "settings",
                               ],
                               "type": "object",
                             },

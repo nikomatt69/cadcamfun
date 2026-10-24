@@ -163,7 +163,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
     <div class="flex justify-between"><span class="text-gray-500">{rowProps.label}</span><span class="text-gray-900 dark:text-gray-100">{rowProps.children}</span></div>
 
   return (
-    <div class="flex flex-col h-full w-full bg-white/90 dark:bg-gray-800/90 dark:text-white">
+    <div class="sidebar-browser flex flex-col w-full">
       <div class="p-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
         <div class="flex items-center">
           <List size={18} class="text-gray-600 dark:text-gray-400 mr-2" />

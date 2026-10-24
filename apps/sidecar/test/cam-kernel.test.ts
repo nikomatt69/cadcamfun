@@ -134,3 +134,29 @@ test("manual side manufacturing survives HTTP, assistant persistence and later r
   expect(stored.body.data.kernelArtifact.setupOrientation).toBe("+X")
   expect(await handlers.reviewOperation!(project, saved.operationId)).toMatchObject({ status: "preview" })
 })
+
+test("a printer preset slices the part over HTTP and the artifact keeps its print report and claims", async () => {
+  const printed = { ...input, material: "PETG", machine: "printer-prusa-mk4", print: { infillDensity: 15, infillPattern: "gyroid", walls: 3, supports: "none", adhesion: "brim", brimWidth: 4 }, elements: [{ id: "block", type: "cube", width: 24, height: 16, depth: 6, x: 0, y: 0, z: 3 }] }
+  const response = await post(printed)
+  expect(response.status).toBe(200)
+  const result = Schema.decodeUnknownSync(CamKernelResult)(response.body)
+  expect(result.status).toBe("ok")
+  if (result.status !== "ok") throw new Error(result.issues.map((issue) => issue.message).join("; "))
+  const a = result.value
+  expect(a.machine.id).toBe("printer-prusa-mk4")
+  expect(a.operations[0]).toMatchObject({ strategy: "print", cut: "print" })
+  expect(a.nc).toContain("M104 S235")
+  expect(a.print).toMatchObject({ dialect: "marlin", layers: 30, settings: { infillPattern: "gyroid", adhesion: "brim" } })
+  expect(a.print!.lengthByKind["brim"]).toBeGreaterThan(50)
+  expect(a.claims.find((c) => c.id === "bed-fit")?.status).toBe("passed")
+  expect(a.claims.find((c) => c.id === "nc-replay")?.status).toBe("passed")
+  expect(a.release).toBe("verified-program")
+  expect(a.identity.nc).toBe(cam.kernel.sha256(a.nc))
+})
+
+test("a printer request is validated: a hotter nozzle than the printer has is a failed outcome with the reason", async () => {
+  expect((await post({ ...input, machine: "printer-desktop-220", print: { infillDensity: 120 } })).status).toBe(400)
+  const hot = await post({ ...input, material: "PLA", machine: "printer-desktop-220", print: { nozzleTemperature: 400 } })
+  expect(hot.status).toBe(200)
+  expect(hot.body).toMatchObject({ status: "failed", issues: expect.arrayContaining([expect.objectContaining({ tag: "MachineLimit" })]) })
+})

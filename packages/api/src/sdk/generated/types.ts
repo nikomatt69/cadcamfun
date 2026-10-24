@@ -1471,6 +1471,30 @@ export type ToolpathGeneratorManufacturePayload = {
   }>
   readonly deburr?: number
   readonly subprograms?: boolean
+  readonly print?: {
+    readonly layerHeight?: number
+    readonly firstLayerHeight?: number
+    readonly walls?: number
+    readonly topLayers?: number
+    readonly bottomLayers?: number
+    readonly infillDensity?: number
+    readonly infillPattern?: "lines" | "grid" | "triangles" | "honeycomb" | "gyroid" | "concentric"
+    readonly supports?: "none" | "buildplate" | "everywhere"
+    readonly supportAngle?: number
+    readonly adhesion?: "none" | "skirt" | "brim" | "raft"
+    readonly brimWidth?: number
+    readonly printSpeed?: number
+    readonly nozzleTemperature?: number
+    readonly bedTemperature?: number
+    readonly fan?: number
+    readonly vase?: boolean
+    readonly orientation?: "as-designed" | "auto"
+    readonly seam?: "nearest" | "aligned" | "random"
+    readonly retractionDistance?: number
+    readonly zHop?: number
+    readonly flow?: number
+    readonly relativeExtrusion?: boolean
+  }
   readonly progress?: { readonly projectId: string; readonly runId: string }
 }
 
@@ -5983,6 +6007,7 @@ export type ToolpathGeneratorManufactureInput = {
   readonly tools?: ToolpathGeneratorManufacturePayload["tools"]
   readonly deburr?: ToolpathGeneratorManufacturePayload["deburr"]
   readonly subprograms?: ToolpathGeneratorManufacturePayload["subprograms"]
+  readonly print?: ToolpathGeneratorManufacturePayload["print"]
   readonly progress?: ToolpathGeneratorManufacturePayload["progress"]
 }
 
@@ -6016,6 +6041,7 @@ export type ToolpathGeneratorManufactureOutput =
             | "chamfer"
             | "surface"
             | "multiaxis"
+            | "print"
           toolId: string
           cut:
             | "face"
@@ -6032,6 +6058,7 @@ export type ToolpathGeneratorManufactureOutput =
             | "thread-mill"
             | "tap"
             | "ream"
+            | "print"
           status: "ok" | "failed"
           cutting?: {
             cut:
@@ -6172,6 +6199,13 @@ export type ToolpathGeneratorManufactureOutput =
         nc: string
         claims: Array<{
           id:
+            | "bed-fit"
+            | "heated-start"
+            | "layers-rise"
+            | "wall-coverage"
+            | "skin-coverage"
+            | "no-spill"
+            | "filament"
             | "cutting-data"
             | "machine-limits"
             | "operations-complete"
@@ -6229,6 +6263,45 @@ export type ToolpathGeneratorManufactureOutput =
         cycleTimeSeconds: number
         identity: { job: string; part: string; nc: string; algorithm: string }
         notes: Array<string>
+        print?: {
+          dialect: "marlin" | "klipper" | "reprap"
+          filament: { material: string; densityGcm3: number; diameter: number }
+          nozzle: { diameter: number; temperature: number; bedTemperature: number }
+          layers: number
+          layerHeight: number
+          filamentMm: number
+          filamentGrams: number
+          timeSeconds: number
+          travelMm: number
+          retractions: number
+          lengthByKind: { [x: string]: number }
+          size: { x: number; y: number; z: number }
+          orientation: string
+          settings: {
+            layerHeight?: number
+            firstLayerHeight?: number
+            walls?: number
+            topLayers?: number
+            bottomLayers?: number
+            infillDensity?: number
+            infillPattern?: "lines" | "grid" | "triangles" | "honeycomb" | "gyroid" | "concentric"
+            supports?: "none" | "buildplate" | "everywhere"
+            supportAngle?: number
+            adhesion?: "none" | "skirt" | "brim" | "raft"
+            brimWidth?: number
+            printSpeed?: number
+            nozzleTemperature?: number
+            bedTemperature?: number
+            fan?: number
+            vase?: boolean
+            orientation?: "as-designed" | "auto"
+            seam?: "nearest" | "aligned" | "random"
+            retractionDistance?: number
+            zHop?: number
+            flow?: number
+            relativeExtrusion?: boolean
+          }
+        }
         tolerance?: {
           requested: number
           terms: Array<{

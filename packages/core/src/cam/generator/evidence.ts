@@ -130,19 +130,23 @@ const issueCheck = (id: ProgramCheck["id"], issues: ReadonlyArray<VerifyIssue>, 
 const REPLAY_CHECKS = ["no-rapid-in-material", "tool-clearance", "within-stock", "no-gouge", "nc-interpretation"] as const
 
 /** The evidence record of `gcode`, generated for `request`. */
-export const programRecord = (request: GenerateRequest, gcode: string, stats: GcodeStats, generatorError?: string): ProgramRecord => {
+export const programRecord = (request: GenerateRequest, gcode: string, stats: GcodeStats, generatorError?: string, printChecks?: ReadonlyArray<ProgramCheck>): ProgramRecord => {
   const { settings, geometry } = request
   const stock = geometry.stock
   const checks: ProgramCheck[] = []
   const motion = stats.cutLength > 0 || /^\s*G0*[0-3]\b.*[XYZ]/im.test(gcode)
+  const printer = settings.machineType === "3dprinter"
   checks.push(generatorError !== undefined
     ? { id: "generated", status: "failed", detail: generatorError }
     : motion ? { id: "generated", status: "passed", detail: `${stats.lines} lines, ${stats.cutLength.toFixed(1)} mm of feed moves` } : { id: "generated", status: "failed", detail: "The program has no motion" })
 
   // Cutting data against the kernel's table.
   let cuttingData: ProgramRecord["cuttingData"]
-  const rec = recommendForSettings(settings)
-  if (rec === undefined) {
+  const rec = printer ? undefined : recommendForSettings(settings)
+  if (printer) {
+    // A printer has no cutting data: the filament and its melt rate are the process, and the checks below read them off the program.
+    cuttingData = { status: "not-applicable", detail: "A printer has no cutting data: the filament sets the temperatures and the melt rate" }
+  } else if (rec === undefined) {
     cuttingData = { status: "not-applicable", detail: settings.machineType === "mill" ? `No kernel material for '${settings.material}'` : `The kernel's cutting data covers milling; the ${settings.machineType} uses its own process model` }
     checks.push({ id: "cutting-data", status: settings.machineType === "mill" ? "unresolved" : "not-run", detail: cuttingData.detail })
   } else {
@@ -162,7 +166,11 @@ export const programRecord = (request: GenerateRequest, gcode: string, stats: Gc
   }
 
   // Safe height and the replay of the NC on the stock.
-  if (settings.machineType !== "mill" || settings.operationType === "multiaxis") {
+  if (settings.machineType === "3dprinter") {
+    // A printer is not replayed on a stock: its program is read for the plate, the heating and the layers, and its beads are
+    // laid next to the material of each layer.
+    checks.push(...(printChecks ?? [{ id: "bed-fit" as const, status: "unresolved" as const, detail: "No solid was sliced: the program was not checked against a part" }]))
+  } else if (settings.machineType !== "mill" || settings.operationType === "multiaxis") {
     const detail = settings.machineType !== "mill" ? `The stock replay covers 3-axis milling, not the ${settings.machineType}` : "Multi-axis programs are checked by the multi-axis planner, not the 3-axis replay"
     for (const id of ["safe-height", ...REPLAY_CHECKS] as const) checks.push({ id, status: "not-run", detail })
   } else if (motion) {
@@ -203,7 +211,7 @@ export const programRecord = (request: GenerateRequest, gcode: string, stats: Gc
       digest: digestOf("cadcamfun/generate-request@1", inputs),
       machineType: settings.machineType,
       operationType: settings.operationType,
-      material: settings.material,
+      material: printer ? request.printer.filament : settings.material,
       elements: (geometry.selectedElements as ReadonlyArray<Element>).map((e) => String(e["id"] ?? e["type"] ?? "?")),
       ...(stock !== undefined ? { stock: { width: stock.width, height: stock.height, depth: stock.depth, topZ: stock.topZ } } : {})
     },
