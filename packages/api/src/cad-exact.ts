@@ -58,6 +58,10 @@ export const CadExactBoss = Schema.Struct({
   diameter: num, length: num, free: Schema.Literals(["near", "far", "both", "none"]), origin: vec3, axis: vec3
 })
 
+export const CadExactSwarfWall = Schema.Struct({
+  face: int, kind: Schema.Literals(["plane", "cone", "cylinder"]), near: vec3, height: num, lean: num, concaveRadius: Schema.optionalKey(num)
+})
+
 export const CadExactPart = Schema.Struct({
   id: Schema.String, name: Schema.String, valid: Schema.Boolean, issues: Schema.Array(Schema.String),
   volume: num, area: num, centroid: vec3, bounds: Schema.Struct({ min: vec3, max: vec3 }),
@@ -66,6 +70,8 @@ export const CadExactPart = Schema.Struct({
   holes: Schema.Array(CadExactHole), machining: CadExactMachining,
   /** Bosses, pins and shaft sections (convex cylinders all the way round); `boss` indexes of the hole / boss edit. */
   bosses: Schema.Array(CadExactBoss),
+  /** Walls a five-axis flank cut (swarf) can take, each with a point on it to name it by. */
+  swarfWalls: Schema.optionalKey(Schema.Array(CadExactSwarfWall)),
   /** Names of the faces (the first 40): the handles `cad.shell` takes for open faces. */
   faceNames: Schema.optionalKey(Schema.Array(Schema.String)),
   /** For a solid that does not validate: what healing it would do and whether the healed solid is valid. */

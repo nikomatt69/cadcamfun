@@ -6638,6 +6638,14 @@ export type CadExactAnalyzeOutput = {
       origin: { x: number; y: number; z: number }
       axis: { x: number; y: number; z: number }
     }>
+    swarfWalls?: Array<{
+      face: number
+      kind: "plane" | "cone" | "cylinder"
+      near: { x: number; y: number; z: number }
+      height: number
+      lean: number
+      concaveRadius?: number
+    }>
     faceNames?: Array<string>
     repair?: {
       verticesWelded: number

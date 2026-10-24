@@ -13,6 +13,7 @@ import { useCamStore } from "../../store/camStore.ts"
 import { ToolSilhouette } from "../ToolSilhouette.tsx"
 import KernelSetups from "./KernelSetups.tsx"
 import KernelPost from "./KernelPost.tsx"
+import KernelSwarf from "./KernelSwarf.tsx"
 import { downloadText, setupSheetFile } from "../../lib/setupSheet.ts"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { useVerifyStore } from "../../store/verifyStore.ts"
@@ -254,6 +255,13 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
       <KernelSetups
         elements={request()?.elements as ReadonlyArray<Record<string, unknown>> | undefined} current={settings().setupOrientation}
         onUse={(orientation) => { gen.patchKernelSettings({ setupOrientation: orientation, operations: undefined }); gen.updateSettings("workholdingConfigured", false); setPlanNotes([]) }}
+      />
+      <KernelSwarf
+        elements={request()?.elements as ReadonlyArray<Record<string, unknown>> | undefined}
+        fiveAxis={(settings().machineConfig !== undefined ? cam.kernel.kernelMachineOfConfig(settings().machineConfig!) : cam.kernel.findMachine(settings().machine ?? cam.kernel.DEFAULT_MACHINE.id))?.fiveAxis !== undefined}
+        planned={operations().length > 0} flatCutter={[...library()].filter((c) => c.kind === "flat" && c.diameter >= 8).sort((a, b) => b.stickout - a.stickout)[0]?.id ?? library().find((c) => c.kind === "flat")?.id}
+        top={artifact()?.stockBounds.max.z ?? request()?.stock?.depth ?? 0}
+        onAdd={(operation) => setOperations([...operations(), operation])}
       />
       <KernelPost
         current={settings().postDefinition} onUse={(definition) => gen.patchKernelSettings({ postDefinition: definition as never })}

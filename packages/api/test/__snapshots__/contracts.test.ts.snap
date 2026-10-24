@@ -15898,6 +15898,62 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             },
                             "type": "object",
                           },
+                          "swarfWalls": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "concaveRadius": {
+                                  "type": "number",
+                                },
+                                "face": {
+                                  "type": "integer",
+                                },
+                                "height": {
+                                  "type": "number",
+                                },
+                                "kind": {
+                                  "enum": [
+                                    "plane",
+                                    "cone",
+                                    "cylinder",
+                                  ],
+                                  "type": "string",
+                                },
+                                "lean": {
+                                  "type": "number",
+                                },
+                                "near": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                              },
+                              "required": [
+                                "face",
+                                "kind",
+                                "near",
+                                "height",
+                                "lean",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
                           "throughHoles": {
                             "type": "integer",
                           },

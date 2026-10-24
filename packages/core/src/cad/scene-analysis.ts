@@ -6,6 +6,7 @@
  * the reason.
  */
 import { brepFeatures, type ExactFeatures } from "../cam/brep-part.ts"
+import { swarfWalls } from "../cam/swarf-walls.ts"
 import { planSetups, type SetupPlan, type SetupPlanOptions } from "../cam/setup-plan.ts"
 import { healBrep, massProperties, minimumDistance, recognizeHoles, offsetBrep, shellBrep, validateBrep, type Brep } from "./brep/index.ts"
 import { editHole, type HoleEdit } from "./brep/hole-edit.ts"
@@ -44,6 +45,18 @@ export type SceneMachining =
   | { readonly prismatic: true; readonly holes: number; readonly pockets: number; readonly outlines: number; readonly top: number; readonly bottom: number; readonly islands?: number; readonly sideHoles?: number; readonly hiddenFaces?: number }
   | { readonly prismatic: false; readonly reason: string }
 
+/** A wall the swarf operation can cut with the side of the cutter, with a point on it to name it by (`near` of the operation). */
+export interface SceneSwarfWall {
+  readonly face: number
+  readonly kind: "plane" | "cone" | "cylinder"
+  readonly near: Vec3
+  /** Length of a ruling, mm. */
+  readonly height: number
+  /** How far the rulings lean from vertical, degrees: the table tilt the flank cut needs. */
+  readonly lean: number
+  readonly concaveRadius?: number
+}
+
 export interface ScenePartAnalysis {
   readonly id: string
   readonly name: string
@@ -63,6 +76,8 @@ export interface ScenePartAnalysis {
   /** The bosses and shaft sections, in the order `cad_edit` `hole` takes a `boss` index. */
   readonly bosses: ReadonlyArray<SceneBoss>
   readonly machining: SceneMachining
+  /** The cone, cylinder and flat walls a five-axis flank cut can take (absent when there are none or the machining was not evaluated). */
+  readonly swarfWalls?: ReadonlyArray<SceneSwarfWall>
   /** Names of the faces (the first 40), the handles `cad.shell` takes for open faces. */
   readonly faceNames?: ReadonlyArray<string>
   /** For a solid that does not validate: what healing it would do and whether the healed solid is valid. */
@@ -106,7 +121,18 @@ export const analyzeBrep = (id: string, name: string, b: Brep, options: { readon
       repair = { verticesWelded: h.report.verticesWelded, edgesWelded: h.report.edgesWelded, collapsedUses: h.report.degenerateUsesDropped, validAfter: h.report.after.valid, issuesAfter: h.report.after.issues.slice(0, 5).map((i) => i.message) }
     } catch { /* an unreadable body has nothing to heal */ }
   }
+  const walls = options.machining === false ? [] : swarfWalls(b).walls.map(({ face, wall }): SceneSwarfWall => {
+    const i = Math.floor(wall.bottom.length / 2), lo = wall.bottom[i]!, hi = wall.top[i]!
+    const height = Math.hypot(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z)
+    return {
+      face, kind: b.faces[face]!.surface.kind as SceneSwarfWall["kind"],
+      near: { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2, z: (lo.z + hi.z) / 2 },
+      height, lean: (Math.acos(Math.min(1, Math.max(-1, (hi.z - lo.z) / height))) * 180) / Math.PI,
+      ...(wall.concaveRadius !== undefined ? { concaveRadius: wall.concaveRadius } : {})
+    }
+  })
   return {
+    ...(walls.length > 0 ? { swarfWalls: walls } : {}),
     ...(names.length > 0 ? { faceNames: names.slice(0, 40) } : {}),
     ...(repair !== undefined ? { repair } : {}),
     id, name, valid: report.valid, issues: report.issues.slice(0, 8).map((i) => i.message),

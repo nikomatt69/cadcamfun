@@ -82,6 +82,8 @@ export interface MultiaxisResult {
     readonly leaned: number
     /** Points no lean within `gougeAngle` clears, or the table cannot reach: left out. */
     readonly skipped: number
+    /** Swarf only: the poses left out because the shank or the holder would be inside the part (included in `skipped`). */
+    readonly collided?: number
   }
 }
 

@@ -191,3 +191,22 @@ test("the machining summary counts the holes along other axes that the setup lea
   expect(part.holes).toHaveLength(2)
   expect(part.machining).toMatchObject({ prismatic: true, holes: 1, sideHoles: 1 })
 })
+
+test("a tapered boss lists its wall for a flank cut, with a point on it, its height and its lean", () => {
+  const m = model()
+  m.extrude(m.sketch("XY").circle([0, 0], 40), { depth: 30, taper: 5 })
+  const out = analyzeScene([{ id: "cone", type: "parametric", name: "Cone", history: m.build(), x: 0, y: 0, z: 0, layerId: "default" }])
+  const walls = out.parts[0]!.swarfWalls!
+  const cone = walls.find((w) => w.kind === "cone")!
+  const lean = (5 * Math.PI) / 180
+  expect(cone.lean).toBeCloseTo(5, 6)
+  expect(cone.height).toBeCloseTo(30 / Math.cos(lean), 6)
+  // The point is on the cone: radius 20 at the foot, narrowing 5 degrees.
+  expect(Math.hypot(cone.near.x, cone.near.y)).toBeCloseTo(20 - cone.near.z * Math.tan(lean), 6)
+  expect(cone.concaveRadius).toBeUndefined()
+  // A plain block has four flat walls and the end faces are floors, not walls.
+  const plain = analyzeBrep("b", "Block", makeBox(40, 30, 10))
+  expect(plain.swarfWalls!.map((w) => w.kind)).toEqual(["plane", "plane", "plane", "plane"])
+  expect(plain.swarfWalls!.every((w) => Math.abs(w.lean) < 1e-6 && Math.abs(w.height - 10) < 1e-6)).toBe(true)
+  expect(analyzeBrep("b", "Block", makeBox(40, 30, 10), { machining: false }).swarfWalls).toBeUndefined()
+})
