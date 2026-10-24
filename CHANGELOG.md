@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.15 (October 2026)
+
+## Core
+
+- Enhance CI pipeline for release management by introducing reusable jobs for validation, desktop builds, and release publication. Update README to reflect changes in workflow structure and clarify release process. Modify scripts to trigger the new CI pipeline and ensure proper versioning and asset verification before publishing. Add tests for CI publication dependencies.
+
 ## v0.1.14 (October 2026)
 
 ## Core
