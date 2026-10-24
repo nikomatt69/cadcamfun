@@ -5,6 +5,16 @@ import { BadRequest, Conflict, EnvBadRequest, EnvForbidden, EnvInternal, EnvMeth
 
 const NullStr = Schema.NullOr(Schema.String)
 
+/** A post definition to try (spec 54 C1): the value is checked in the core, so any shape is accepted here and the answer names the places. */
+export const PostCheckBody = Schema.Struct({ definition: Schema.Unknown, sample: Schema.optionalKey(Schema.Boolean) })
+export const PostCheck = Schema.Struct({
+  valid: Schema.Boolean,
+  issues: Schema.Array(Schema.Struct({ path: Schema.String, message: Schema.String })),
+  /** The standard sample program written by the post, when the definition is valid. */
+  sample: Schema.optionalKey(Schema.String)
+})
+export type PostCheck = typeof PostCheck.Type
+
 export const ToolpathRow = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -77,6 +87,7 @@ export class ToolpathsGroup extends HttpApiGroup.make("toolpaths")
     }),
     HttpApiEndpoint.delete("remove", "/api/toolpaths/:id", { params: id, success: Message, error: [BadRequest, Forbidden, NotFound, InternalError] }),
     HttpApiEndpoint.get("setupSheet", "/api/toolpaths/:id/setup-sheet", { params: id, success: CamSetupSheet, error: [BadRequest, NotFound, InternalError] }),
+    HttpApiEndpoint.post("postCheck", "/api/toolpaths/post-check", { payload: PostCheckBody, success: PostCheck, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("listForDrawing", "/api/drawings/:id/toolpaths", { params: id, success: Schema.Array(ToolpathWithRefs), error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.post("createForDrawing", "/api/drawings/:id/toolpaths", {
       params: id, payload: ToolpathBody, success: ToolpathRow.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, Forbidden, NotFound, InternalError]

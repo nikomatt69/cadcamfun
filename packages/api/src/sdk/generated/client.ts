@@ -423,6 +423,8 @@ import type {
   ToolpathsRemoveOutput,
   ToolpathsSetupSheetInput,
   ToolpathsSetupSheetOutput,
+  ToolpathsPostCheckInput,
+  ToolpathsPostCheckOutput,
   ToolpathsListForDrawingInput,
   ToolpathsListForDrawingOutput,
   ToolpathsCreateForDrawingInput,
@@ -3722,6 +3724,18 @@ export function make(options: ClientOptions) {
             path: `/api/toolpaths/${encodeURIComponent(input.id)}/setup-sheet`,
             successStatus: 200,
             declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      postCheck: (input: ToolpathsPostCheckInput, requestOptions?: RequestOptions) =>
+        request<ToolpathsPostCheckOutput>(
+          {
+            method: "POST",
+            path: `/api/toolpaths/post-check`,
+            body: { definition: input["definition"], sample: input["sample"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
             empty: false,
           },
           requestOptions,

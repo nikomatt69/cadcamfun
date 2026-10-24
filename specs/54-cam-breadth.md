@@ -7,7 +7,7 @@ on [53](53-stock-simulation-verification.md) (proof) and [41](41-persistent-topo
 ## 1. Where it stands (verified)
 
 - Posts: `generic` (LinuxCNC), `fanuc`, `haas`, `grbl`, `heidenhain` (with `advanced/`), `siemens`; subprograms; a post is a
-  function with options, not a user-editable definition.
+  function with options; since 2026-10-24 a definition (C1) can also describe one.
 - Feature planning from history or B-rep: hole recognition (`brep/features.ts` `recognizeHoles`), hole making in the kernel
   (drill, spot, peck, tap, ream, thread mill), stay-down links in adaptive clearing, `optimizedOrder` (2-opt over nearest
   neighbour) used by drill; pencil as rest finishing after a larger ball.
@@ -24,6 +24,7 @@ on [53](53-stock-simulation-verification.md) (proof) and [41](41-persistent-topo
 | ID | Item | Gate |
 |---|---|---|
 | C1 | **Post definition format.** A declarative post (TypeScript object / JSON validated by an Effect Schema): word formats, line numbering, modal rules, arcs (IJK vs R, plane), tool change, coolant codes, work offsets, canned-cycle map, spindle & feed modes, rotary conventions, TCP codes, program header/footer, comments & character set, decimal rules. Existing posts are re-expressed as definitions **with their goldens unchanged byte for byte**. | all existing golden NC files identical; a definition with an error yields a path-located message |
+| | *Built 2026-10-24 (first slice):* `cam/post/definition.ts` (Effect Schema `PostDefinitionSchema`, `definitionIssues`, `compileDefinition`), `builtin-definitions.ts` (generic, fanuc, haas, grbl as data: `post-definition.test.ts` compares their NC byte for byte with the posts over 6 programs x 5 option sets), `sample.ts` (standard sample program), `POST /api/toolpaths/post-check` (validate + write the sample). Siemens and Heidenhain can be a `base` but their program-name rules and Klartext translation are code, not data. Not yet: storing definitions as library items, using one as a machine's post, a desktop editor, word formats / line numbering / modal rules as fields. | |
 | C2 | **New controller dialects**: Mazak ISO/EIA (and Mazatrol export note), Okuma OSP, Mitsubishi M8x, Mori/DMG (Siemens/Fanuc variants), Siemens ShopMill/840D cycles (`CYCLE81…`), Fanuc with macro B probing, Brother, Tormach (LinuxCNC), Marlin/Klipper for printers (already in `cam/print`). Each dialect = a definition + golden fixtures + replay by the interpreter (spec 32 P1). | per dialect: golden NC for drilling, pocket, arc, tool change, rotary 3+2; the interpreter replays each golden and reproduces the toolpath bounds |
 | C3 | **Post tester in the UI/CLI**: run a post on a standard test part set and diff against a user's expected output; report unsupported words. | CLI run on the set outputs a pass / diff table |
 

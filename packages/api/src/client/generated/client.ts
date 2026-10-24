@@ -2560,30 +2560,40 @@ type Endpoint25_5Input = { readonly id: Endpoint25_5Request["params"]["id"] }
 const Endpoint25_5 = (raw: RawClient["toolpaths"]) => (input: Endpoint25_5Input) =>
   raw["setupSheet"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint25_6Request = Parameters<RawClient["toolpaths"]["listForDrawing"]>[0]
-type Endpoint25_6Input = { readonly id: Endpoint25_6Request["params"]["id"] }
+type Endpoint25_6Request = Parameters<RawClient["toolpaths"]["postCheck"]>[0]
+type Endpoint25_6Input = {
+  readonly definition: Endpoint25_6Request["payload"]["definition"]
+  readonly sample?: Endpoint25_6Request["payload"]["sample"]
+}
 const Endpoint25_6 = (raw: RawClient["toolpaths"]) => (input: Endpoint25_6Input) =>
+  raw["postCheck"]({ payload: { definition: input["definition"], sample: input["sample"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
+
+type Endpoint25_7Request = Parameters<RawClient["toolpaths"]["listForDrawing"]>[0]
+type Endpoint25_7Input = { readonly id: Endpoint25_7Request["params"]["id"] }
+const Endpoint25_7 = (raw: RawClient["toolpaths"]) => (input: Endpoint25_7Input) =>
   raw["listForDrawing"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint25_7Request = Parameters<RawClient["toolpaths"]["createForDrawing"]>[0]
-type Endpoint25_7Input = {
-  readonly id: Endpoint25_7Request["params"]["id"]
-  readonly name?: Endpoint25_7Request["payload"]["name"]
-  readonly description?: Endpoint25_7Request["payload"]["description"]
-  readonly data?: Endpoint25_7Request["payload"]["data"]
-  readonly gcode?: Endpoint25_7Request["payload"]["gcode"]
-  readonly projectId?: Endpoint25_7Request["payload"]["projectId"]
-  readonly type?: Endpoint25_7Request["payload"]["type"]
-  readonly operationType?: Endpoint25_7Request["payload"]["operationType"]
-  readonly isPublic?: Endpoint25_7Request["payload"]["isPublic"]
-  readonly thumbnail?: Endpoint25_7Request["payload"]["thumbnail"]
-  readonly materialId?: Endpoint25_7Request["payload"]["materialId"]
-  readonly machineConfigId?: Endpoint25_7Request["payload"]["machineConfigId"]
-  readonly toolId?: Endpoint25_7Request["payload"]["toolId"]
-  readonly simulation?: Endpoint25_7Request["payload"]["simulation"]
-  readonly baseUpdatedAt?: Endpoint25_7Request["payload"]["baseUpdatedAt"]
+type Endpoint25_8Request = Parameters<RawClient["toolpaths"]["createForDrawing"]>[0]
+type Endpoint25_8Input = {
+  readonly id: Endpoint25_8Request["params"]["id"]
+  readonly name?: Endpoint25_8Request["payload"]["name"]
+  readonly description?: Endpoint25_8Request["payload"]["description"]
+  readonly data?: Endpoint25_8Request["payload"]["data"]
+  readonly gcode?: Endpoint25_8Request["payload"]["gcode"]
+  readonly projectId?: Endpoint25_8Request["payload"]["projectId"]
+  readonly type?: Endpoint25_8Request["payload"]["type"]
+  readonly operationType?: Endpoint25_8Request["payload"]["operationType"]
+  readonly isPublic?: Endpoint25_8Request["payload"]["isPublic"]
+  readonly thumbnail?: Endpoint25_8Request["payload"]["thumbnail"]
+  readonly materialId?: Endpoint25_8Request["payload"]["materialId"]
+  readonly machineConfigId?: Endpoint25_8Request["payload"]["machineConfigId"]
+  readonly toolId?: Endpoint25_8Request["payload"]["toolId"]
+  readonly simulation?: Endpoint25_8Request["payload"]["simulation"]
+  readonly baseUpdatedAt?: Endpoint25_8Request["payload"]["baseUpdatedAt"]
 }
-const Endpoint25_7 = (raw: RawClient["toolpaths"]) => (input: Endpoint25_7Input) =>
+const Endpoint25_8 = (raw: RawClient["toolpaths"]) => (input: Endpoint25_8Input) =>
   raw["createForDrawing"]({
     params: { id: input["id"] },
     payload: {
@@ -2611,8 +2621,9 @@ const adaptGroup25 = (raw: RawClient["toolpaths"]) => ({
   update: Endpoint25_3(raw),
   remove: Endpoint25_4(raw),
   setupSheet: Endpoint25_5(raw),
-  listForDrawing: Endpoint25_6(raw),
-  createForDrawing: Endpoint25_7(raw),
+  postCheck: Endpoint25_6(raw),
+  listForDrawing: Endpoint25_7(raw),
+  createForDrawing: Endpoint25_8(raw),
 })
 
 type Endpoint26_0Request = Parameters<RawClient["toolpathExtras"]["library"]>[0]

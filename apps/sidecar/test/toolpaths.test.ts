@@ -11,6 +11,45 @@ beforeAll(async () => {
 })
 afterAll(async () => { await app.dispose() })
 
+describe("/api/toolpaths/post-check (spec 54 C1)", () => {
+  const generic = {
+    schemaVersion: 1, name: "Shop", base: "generic", canned: true, rigidTap: {}, arcModes: ["ijk", "radius"], dwell: "seconds", uppercaseComments: false, rotary: true, tcp: false,
+    begin: [], setup: ["G90", "G17", "G94", "G49"], toolChange: ["T{tool} M6", "G43 H{tool}"], end: "M30", finish: []
+  }
+  const check = (definition: unknown, sample?: boolean) => app.call("/api/toolpaths/post-check", { method: "POST", json: { definition, ...(sample === undefined ? {} : { sample }) } })
+
+  test("a valid definition writes the standard sample program with its own words", async () => {
+    expect((await app.call("/api/toolpaths/post-check", { method: "POST", auth: false, json: { definition: generic } })).status).toBe(401)
+    const ok = await check(generic)
+    expect(ok.status).toBe(200)
+    expect(ok.body).toMatchObject({ valid: true, issues: [] })
+    const lines = (ok.body.sample as string).split("\n")
+    expect(lines).toContain("G43 H1")
+    expect(lines).toContain("G43 H2")
+    expect(lines.filter((l) => l.startsWith("G83"))).toHaveLength(1)
+    expect(lines.at(-1) === "" ? lines.at(-2) : lines.at(-1)).toBe("M30")
+    expect((await check(generic, false)).body).toEqual({ valid: true, issues: [] })
+  })
+
+  test("a mistake is answered with its place, not a failure", async () => {
+    const bad = await check({ ...generic, toolChange: ["T{toool} M6"] })
+    expect(bad.status).toBe(200)
+    expect(bad.body.valid).toBe(false)
+    expect(bad.body.sample).toBeUndefined()
+    expect((bad.body.issues as Array<{ path: string }>).map((i) => i.path)).toEqual(["toolChange[0]"])
+    const control = await check({ ...generic, end: "M30\u0007" })
+    expect(control.body.valid).toBe(false)
+    expect((control.body.issues as Array<{ path: string }>).map((i) => i.path)).toEqual(["end"])
+    expect((await check("not a definition")).body.valid).toBe(false)
+  })
+
+  test("a definition without canned cycles writes the hole as plain moves", async () => {
+    const flat = await check({ ...generic, canned: false, rotary: false })
+    expect(flat.body.valid).toBe(true)
+    expect(flat.body.sample as string).not.toContain("G83")
+  })
+})
+
 describe("/api/toolpaths", () => {
   test("auth, validation, project access", async () => {
     expect((await app.call("/api/toolpaths", { auth: false })).status).toBe(401)

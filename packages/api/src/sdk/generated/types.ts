@@ -1158,6 +1158,8 @@ export type ToolpathsUpdatePayload = {
   readonly baseUpdatedAt?: string | undefined
 }
 
+export type ToolpathsPostCheckPayload = { readonly definition: unknown; readonly sample?: boolean }
+
 export type ToolpathsCreateForDrawingPayload = {
   readonly name?: string | undefined
   readonly description?: string | null | undefined
@@ -5841,6 +5843,17 @@ export type ToolpathsSetupSheetOutput = {
     identity: { job: string; part: string; nc: string; algorithm: string }
   }
   html: string
+}
+
+export type ToolpathsPostCheckInput = {
+  readonly definition: ToolpathsPostCheckPayload["definition"]
+  readonly sample?: ToolpathsPostCheckPayload["sample"]
+}
+
+export type ToolpathsPostCheckOutput = {
+  valid: boolean
+  issues: Array<{ path: string; message: string }>
+  sample?: string
 }
 
 export type ToolpathsListForDrawingInput = { readonly id: { readonly id: string }["id"] }

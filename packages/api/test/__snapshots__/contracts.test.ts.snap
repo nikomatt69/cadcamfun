@@ -61593,6 +61593,114 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/toolpaths/post-check": {
+      "post": {
+        "operationId": "toolpaths.postCheck",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "definition": {},
+                  "sample": {
+                    "type": "boolean",
+                  },
+                },
+                "required": [
+                  "definition",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "issues": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "message": {
+                            "type": "string",
+                          },
+                          "path": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "path",
+                          "message",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "sample": {
+                      "type": "string",
+                    },
+                    "valid": {
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "valid",
+                    "issues",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "toolpaths",
+        ],
+      },
+    },
     "/api/toolpaths/suggest": {
       "post": {
         "operationId": "toolpathGenerator.suggest",

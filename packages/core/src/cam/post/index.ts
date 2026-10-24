@@ -16,6 +16,9 @@ export { grblDialect, grblPost } from "./grbl.ts"
 export { haasDialect, haasPost } from "./haas.ts"
 export { siemensDialect, siemensPost } from "./siemens.ts"
 export { heidenhainDialect, heidenhainPost } from "./heidenhain.ts"
+export { PostDefinitionSchema, BASE_POSTS, compileDefinition, definitionIssues, type PostDefinition, type DefinitionIssue } from "./definition.ts"
+export { samplePostProgram } from "./sample.ts"
+export { BUILTIN_DEFINITIONS, GENERIC_DEFINITION, FANUC_DEFINITION, HAAS_DEFINITION, GRBL_DEFINITION } from "./builtin-definitions.ts"
 
 /** Implemented posts by id (`linuxcnc` is a reserved id, not implemented yet). */
 export const posts: Readonly<Partial<Record<PostId, Post>>> = {

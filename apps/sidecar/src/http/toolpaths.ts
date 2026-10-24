@@ -60,6 +60,18 @@ export const ToolpathsHandlers = HttpApiBuilder.group(Api, "toolpaths", Effect.f
         if (typeof sheet === "string") return yield* new BadRequest({ message: sheet })
         return { data: sheet, html: cam.kernel.setupSheetHtml(sheet) }
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to build the setup sheet"))))
+    .handle("postCheck", ({ payload }) =>
+      Effect.sync(() => {
+        const compiled = cam.compileDefinition(payload.definition)
+        if (!compiled.ok) return { valid: false, issues: compiled.issues }
+        if (payload.sample === false) return { valid: true, issues: [] }
+        try {
+          return { valid: true, issues: [], sample: compiled.post.emit(cam.samplePostProgram(), {}) }
+        } catch (cause) {
+          // A definition can be well formed and still write a program the control cannot take: that is its answer, not a failure.
+          return { valid: false, issues: [{ path: "", message: cause instanceof Error ? cause.message : String(cause) }] }
+        }
+      }))
     .handle("update", ({ params, payload }) =>
       Effect.gen(function*() {
         const found = yield* load(params.id)
