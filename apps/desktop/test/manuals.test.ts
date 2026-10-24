@@ -66,7 +66,7 @@ test("manuals work without a sidecar or fetching documents, and only open a sour
   try {
     expect(app.root.querySelector("h1")?.textContent).toBe("Manuals")
     expect(app.root.querySelector(".workstation-toolbar h1")?.textContent).toBe("Manuals")
-    expect(app.root.querySelector(".cam-workspace__sidebar .ui-card-light")).not.toBeNull()
+    expect(app.root.querySelector(".cam-workspace__sidebar .workspace-page__rail-card")).not.toBeNull()
     expect(app.root.querySelector(".cam-workspace__stage .manual-card.ui-card-default")).not.toBeNull()
     expect(app.root.querySelectorAll(".manual-card").length).toBe(24)
     expect(requests).toBe(0)

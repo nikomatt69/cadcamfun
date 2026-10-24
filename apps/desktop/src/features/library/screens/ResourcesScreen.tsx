@@ -25,7 +25,7 @@ import { GENERATION_WRITE_ACTIONS, type ResourceKind } from "../lib/resource-gen
 import { useAiStore } from "../../ai/store/context.tsx"
 import { cam } from "@cadcamfun/core"
 import { actionKey } from "../../ai/lib/editor-sync.ts"
-import { CARD as GLASS_CARD, FIELD, ICON_BUTTON, INPUT, LABEL, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
+import { CARD, CardBanner, FIELD, ICON_BUTTON, INPUT, LABEL, StageEmpty, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 
 export type { ResourceKind }
 type Row = Readonly<Record<string, unknown>>
@@ -285,6 +285,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
   return (
     <WorkspacePage
       title={`${meta.plural} Library`}
+      description={t("library.description", { type: lower })}
       actions={<>
             <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />Generate</button>
             <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}><Plus size={16} aria-hidden="true" />New {meta.singular}</button>
@@ -327,13 +328,13 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                 </label>
               </Show>
 
-              <div class="flex items-center justify-between pt-1">
-                <button type="button" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-gray-200" onClick={clearFilters} disabled={!hasFilters()}>
-                  <X size={14} aria-hidden="true" />Clear Filters
+              <div class="workspace-filter-actions">
+                <button type="button" class="workspace-filter-reset" onClick={clearFilters} disabled={!hasFilters()}>
+                  <X size={14} aria-hidden="true" />{t("library.reset")}
                 </button>
-                <div class="flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-700" role="group" aria-label="View">
-                  <button type="button" class={`p-1.5 ${view() === "grid" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300" : "bg-white text-slate-600 dark:bg-slate-900 dark:text-slate-400"}`} title="Grid View" aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={16} aria-hidden="true" /></button>
-                  <button type="button" class={`p-1.5 ${view() === "list" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300" : "bg-white text-slate-600 dark:bg-slate-900 dark:text-slate-400"}`} title="List View" aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={16} aria-hidden="true" /></button>
+                <div class="workspace-view-toggle" role="group" aria-label={t("library.view")}>
+                  <button type="button" class="workspace-view-toggle__btn" title={t("library.grid")} aria-label={t("library.grid")} aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={15} aria-hidden="true" /></button>
+                  <button type="button" class="workspace-view-toggle__btn" title={t("library.list")} aria-label={t("library.list")} aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={15} aria-hidden="true" /></button>
                 </div>
               </div>
               <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {rows().length} {lower}</p>
@@ -415,25 +416,24 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                 <Show
                   when={filtered().length > 0}
                   fallback={
-                    <div class="mx-auto mt-10 max-w-md rounded-2xl border border-slate-200/60 bg-white/70 p-10 text-center shadow-xl dark:border-slate-700/50 dark:bg-slate-900/70">
-                      <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-900"><Icon size={24} class="text-slate-400 dark:text-slate-500" aria-hidden="true" /></div>
-                      <h3 class="mb-2 text-lg font-medium text-slate-900 dark:text-white">No {lower} found</h3>
-                      <p class="mb-4 text-sm text-slate-600 dark:text-slate-400">{hasFilters() ? `No ${lower} match your search criteria.` : `Create your first ${meta.singular.toLowerCase()} to get started.`}</p>
-                      <div class="flex flex-wrap justify-center gap-2">
+                    <StageEmpty
+                      icon={<Icon size={22} />}
+                      title={t("library.emptyKind", { type: lower })}
+                      hint={hasFilters() ? `No ${lower} match your search criteria.` : `Create your first ${meta.singular.toLowerCase()} to get started.`}
+                    >
                         <Show when={hasFilters()} fallback={<>
                           <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}>Create {meta.singular}</button>
                           <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />Generate with AI</button>
                         </>}>
                           <button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>Clear filters</button>
                         </Show>
-                      </div>
-                    </div>
+                    </StageEmpty>
                   }
                 >
                   <Show
                     when={view() === "grid"}
                     fallback={
-                      <div class="overflow-hidden rounded-xl border border-slate-200/60 bg-white/70 shadow-lg dark:border-slate-700/50 dark:bg-slate-900/70">
+                      <div class="workspace-table overflow-x-auto">
                         <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                           <thead class="bg-slate-50 dark:bg-slate-900">
                             <tr>
@@ -478,21 +478,16 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                       </div>
                     }
                   >
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div class="workspace-resource-grid">
                       <For each={filtered()}>{(row) => (
-                        <div class={`${GLASS_CARD} cursor-pointer`} onClick={() => { if (row["builtin"] !== true) navigate(detailPath(row)) }} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" && row["builtin"] !== true) navigate(detailPath(row)) }}>
-                          <div class="relative flex h-20 items-center justify-center bg-gradient-to-r from-blue-500/20 to-cyan-500/20 dark:from-blue-600/30 dark:to-cyan-600/30">
-                            <div class="rounded-xl bg-white/30 p-2.5 backdrop-blur-sm dark:bg-white/10"><Icon size={28} class="text-blue-600 dark:text-blue-300" aria-hidden="true" /></div>
-                            <span class="absolute right-2 top-2 rounded-full bg-blue-100/80 px-2 py-0.5 text-xs font-semibold text-blue-800 backdrop-blur-sm dark:bg-blue-900/50 dark:text-blue-300">{meta.badge(row)}</span>
-                            <Show when={row["isPublic"] === true}><span class="absolute left-2 top-2 rounded-full bg-green-100/80 px-2 py-0.5 text-xs font-semibold text-green-800 backdrop-blur-sm dark:bg-green-900/50 dark:text-green-300">Public</span></Show>
-                            <Show when={row["builtin"] === true}><span class="absolute left-2 top-2 rounded-full bg-slate-100/80 px-2 py-0.5 text-xs font-semibold text-slate-700 backdrop-blur-sm dark:bg-slate-800/60 dark:text-slate-200">Built-in</span></Show>
-                          </div>
+                        <div class={`${CARD} cursor-pointer`} onClick={() => { if (row["builtin"] !== true) navigate(detailPath(row)) }} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" && row["builtin"] !== true) navigate(detailPath(row)) }}>
+                          <CardBanner icon={<Icon size={22} />} badge={meta.badge(row)} leftBadge={row["builtin"] === true ? "Built-in" : row["isPublic"] === true ? "Public" : undefined} />
                           <div class="flex flex-1 flex-col gap-2 p-4">
                             <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{str(row["name"])}</h3>
                             <Show when={str(row["description"] ?? row["notes"])}><p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{str(row["description"] ?? row["notes"])}</p></Show>
                             <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
                               <For each={meta.facts(row)}>{(fact) => (
-                                <div class="flex justify-between"><span>{fact.label}:</span><span class="rounded-full bg-purple-100/80 px-2 py-0.5 font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">{fact.value}</span></div>
+                                <div class="workspace-resource-fact"><span>{fact.label}</span><span>{fact.value}</span></div>
                               )}</For>
                               <Show when={props.kind === "components" && str(row["projectId"]) !== ""}>
                                 <div class="flex justify-between"><span>Project:</span><span class="truncate font-medium text-slate-700 dark:text-slate-300">{projectName(str(row["projectId"]))}</span></div>

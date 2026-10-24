@@ -12,7 +12,7 @@ import { healBrep, massProperties, minimumDistance, recognizeHoles, offsetBrep, 
 import { editHole, type HoleEdit } from "./brep/hole-edit.ts"
 import { recognizeBosses, resizeBoss } from "./brep/boss-edit.ts"
 import { recognizeFillets, setFilletRadius } from "./brep/fillet-edit.ts"
-import { pushPullNurbsFace, recognizeNurbsFaces, tessellatedVolume } from "./brep/nurbs-edit.ts"
+import { moveNurbsFace, recognizeNurbsFaces, tessellatedVolume } from "./brep/nurbs-edit.ts"
 import { draftNurbsFace, offsetNurbsFace } from "./brep/nurbs-offset.ts"
 import { brepBox } from "./history-brep.ts"
 import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
@@ -76,6 +76,8 @@ export interface SceneNurbsFace {
   readonly normal: Vec3
   /** Largest angle between a normal of the face and the mean one, degrees. */
   readonly spread: number
+  /** Trimmed by anything but four isoparametric curves: an edit follows a polyline footprint of the trim (deviation reported). */
+  readonly trimmed: boolean
 }
 
 export interface ScenePartAnalysis {
@@ -159,7 +161,7 @@ export const analyzeBrep = (id: string, name: string, b: Brep, options: { readon
   const fillets = recognizeFillets(b)
   const free = recognizeNurbsFaces(b)
   return {
-    ...(free.length > 0 ? { nurbsFaces: free.map((x): SceneNurbsFace => ({ face: x.face, normal: x.normal, spread: x.spread })) } : {}),
+    ...(free.length > 0 ? { nurbsFaces: free.map((x): SceneNurbsFace => ({ face: x.face, normal: x.normal, spread: x.spread, trimmed: x.trimmed })) } : {}),
     ...(fillets.length > 0 ? { fillets: fillets.map((x): SceneFillet => ({ face: x.face, kind: x.kind, radius: x.radius, convex: x.convex, length: x.length })) } : {}),
     ...(walls.length > 0 ? { swarfWalls: walls } : {}),
     ...(names.length > 0 ? { faceNames: names.slice(0, 40) } : {}),
@@ -481,9 +483,10 @@ export const sceneNurbsEditBody = (
   if (target === undefined) return { ok: false, error: faces.length === 0 ? `'${id}' has no free-form patch face` : `'${id}' has ${faces.length} free-form patch faces (0..${faces.length - 1}), not a face ${nurbs}` }
   let brepOut: Brep, approximate: { readonly deviation: number } | undefined
   if (edit.mode === "move") {
-    const r = pushPullNurbsFace(part.brep, target.face, edit.distance, edit.direction)
+    const r = moveNurbsFace(part.brep, target.face, edit.distance, edit.direction)
     if (typeof r === "string") return { ok: false, error: r }
-    brepOut = r
+    brepOut = r.brep
+    if (r.deviation !== undefined) approximate = { deviation: r.deviation }
   } else {
     const r = edit.mode === "offset"
       ? offsetNurbsFace(part.brep, target.face, edit.distance, edit.tolerance)

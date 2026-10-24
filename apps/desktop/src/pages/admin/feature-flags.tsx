@@ -6,13 +6,16 @@
  */
 import type { JSX } from "solid-js"
 import { AdminFeatureFlagsPanel } from "../../features/admin/components/feature-flags-panel.tsx"
+import { WorkspacePage } from "../../shared/components/WorkspacePage.tsx"
 import { t } from "../../i18n/index.ts"
 
 export default function Page(): JSX.Element {
   return (
-    <section class="container mx-auto px-4 py-8">
-      <h1 class="mb-8 text-3xl font-bold text-gray-900 dark:text-white">{t("admin.ff.heading")}</h1>
+    <WorkspacePage
+      title={t("admin.ff.heading")}
+      description={t("admin.ff.headingBody")}
+    >
       <AdminFeatureFlagsPanel />
-    </section>
+    </WorkspacePage>
   )
 }

@@ -58919,6 +58919,50 @@
                               "additionalProperties": false
                             }
                           },
+                          "nurbsFaces": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "face": {
+                                  "type": "integer"
+                                },
+                                "normal": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "spread": {
+                                  "type": "number"
+                                },
+                                "trimmed": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "face",
+                                "normal",
+                                "spread",
+                                "trimmed"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
                           "fillets": {
                             "type": "array",
                             "items": {
@@ -60917,6 +60961,138 @@
                         "ok": {
                           "type": "boolean",
                           "enum": [
+                            true
+                          ]
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "nurbs": {
+                          "type": "integer"
+                        },
+                        "nurbsFaces": {
+                          "type": "integer"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "move",
+                            "offset",
+                            "draft"
+                          ]
+                        },
+                        "before": {
+                          "type": "object",
+                          "properties": {
+                            "normal": {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "z": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "z"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "spread": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "normal",
+                            "spread"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "distance": {
+                          "type": "number"
+                        },
+                        "direction": {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            },
+                            "z": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "z"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "angle": {
+                          "type": "number"
+                        },
+                        "approximate": {
+                          "type": "object",
+                          "properties": {
+                            "deviation": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "deviation"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "volume": {
+                          "type": "number"
+                        },
+                        "originalVolume": {
+                          "type": "number"
+                        },
+                        "volumeChange": {
+                          "type": "number"
+                        },
+                        "faces": {
+                          "type": "integer"
+                        },
+                        "valid": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "id",
+                        "name",
+                        "nurbs",
+                        "nurbsFaces",
+                        "mode",
+                        "before",
+                        "volume",
+                        "originalVolume",
+                        "volumeChange",
+                        "faces",
+                        "valid"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
                             false
                           ]
                         },
@@ -61022,6 +61198,74 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 9999
+                  },
+                  "nurbs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9999
+                  },
+                  "distance": {
+                    "type": "number"
+                  },
+                  "direction": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      },
+                      "z": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "z"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "move",
+                      "offset",
+                      "draft"
+                    ]
+                  },
+                  "angle": {
+                    "type": "number",
+                    "minimum": -45,
+                    "maximum": 45
+                  },
+                  "neutral": {
+                    "type": "number"
+                  },
+                  "pull": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      },
+                      "z": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "z"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tolerance": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
                   },
                   "radius": {
                     "type": "number",

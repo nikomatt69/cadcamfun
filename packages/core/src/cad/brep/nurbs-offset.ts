@@ -7,6 +7,10 @@
  * 48 points a side) until the fitted surface is within `tolerance` of the displaced one at the midpoints of a 17 x 17 grid, or the edit is refused.
  * The deviation reached is returned with the solid, so a caller can say how approximate it is: the edit is never presented as exact.
  *
+ * A face trimmed by anything but four isoparametric curves is fitted over the bounding rectangle of its trim, and every slab is cut to the
+ * footprint of the trim along the mean normal (the prism of its polyline: `trimPrism`); the deviation then adds the polyline's chord and the sideways
+ * shift the displacement gives the boundary, which the footprint does not follow.
+ *
  * The new face replaces the old one: the layer between a surface a little inside the solid (0.5 mm) and one further out than both faces is cut away,
  * and the layer between a surface deeper inside (1 mm) and the new face is put back. Both tools are slabs bounded by two fitted surfaces and four
  * exact ruled walls (the boundary rows and columns of the two nets), so no face of a tool is identical to the face being replaced; the walls
@@ -17,7 +21,7 @@ import { booleanBrep } from "./boolean.ts"
 import { surfaceNormal, surfacePoint, surfaceProject } from "./geom.ts"
 import type { Vec3 } from "./math.ts"
 import { basisFuns, clampedUniformKnots, findSpan, nurbsSurfaceDerivs, type NurbsSurfaceData } from "./nurbs.ts"
-import { readPatch, tessellatedVolume, type Patch } from "./nurbs-edit.ts"
+import { extentAlong, FOOTPRINT_CHORD, readPatch, tessellatedVolume, trimPrism, type Patch } from "./nurbs-edit.ts"
 import { BrepBuilder, type Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
 
@@ -197,22 +201,43 @@ const replaceFace = (b: Brep, face: number, displace: Displace, tolerance: numbe
       if (fillTop.deviation <= tolerance && plain.deviation <= tolerance) break
     }
     if (chosen === undefined) return "the fit failed"
+    // A trimmed face: every slab is cut to the footprint of the trim along the mean normal. The footprint does not follow the sideways shift the
+    // displacement gives the boundary (up to the displacement times the sine of the angle between a normal and the mean one) and is a polyline within
+    // `FOOTPRINT_CHORD` of the trim: both go into the deviation reported.
+    let trimSlack = 0
+    let cutTo: (s: Brep) => Brep = (s) => s
+    // The slab that subtracts is cut to a footprint a little wider than the trim: a prism whose walls graze the solid's own wall along the
+    // vertices of the polyline gives a Boolean that cannot decide (see `trimPrism`).
+    let cutWide: (s: Brep) => Brep = (s) => s
+    if (patch.trimmed) {
+      const w = patch.mean
+      const [lo, hi] = extentAlong(b, face, patch, w)
+      const spread = Math.max(...patch.normals.map((n) => Math.acos(Math.min(1, Math.max(-1, dot3(n, w))))))
+      trimSlack = 3 * FOOTPRINT_CHORD + Math.max(cutDepth, fillDepth, cutHeight) * Math.sin(spread)
+      const wide = trimPrism(patch, w, lo - fillDepth - cutDepth - 1, hi + cutHeight + 1, 2 * FOOTPRINT_CHORD)
+      const narrow = trimPrism(patch, w, lo - fillDepth - cutDepth - 1, hi + cutHeight + 1, -2 * FOOTPRINT_CHORD)
+      cutTo = (s) => booleanBrep(s, narrow, "intersect").brep
+      cutWide = (s) => booleanBrep(s, wide, "intersect").brep
+    }
     if (chosen.deviation > tolerance * 4) return `the displaced surface cannot be fitted to ${tolerance} mm with a 48 x 48 net (it reaches ${chosen.deviation.toFixed(4)} mm): the face is too strongly curved or too large for this edit`
     const before = tessellatedVolume(b)
-    const cut = booleanBrep(b, slab(chosen.cutLow, chosen.cutHigh), "subtract").brep
-    const solid = booleanBrep(cut, slab(chosen.fillLow, chosen.fillTop), "union").brep
+    const cut = booleanBrep(b, cutWide(slab(chosen.cutLow, chosen.cutHigh)), "subtract").brep
+    const solid = booleanBrep(cut, cutTo(slab(chosen.fillLow, chosen.fillTop)), "union").brep
     const report = validateBrep(solid)
     if (!report.valid) return `the edited solid is not valid (${report.issues.slice(0, 2).map((i) => i.message).join("; ")})`
-    const plainSlab = Math.abs(tessellatedVolume(slab(chosen.fillLow, chosen.plain)))
-    const expected = Math.abs(tessellatedVolume(slab(chosen.fillLow, chosen.fillTop))) - plainSlab
+    const plainSlab = Math.abs(tessellatedVolume(cutTo(slab(chosen.fillLow, chosen.plain))))
+    const expected = Math.abs(tessellatedVolume(cutTo(slab(chosen.fillLow, chosen.fillTop)))) - plainSlab
     const after = tessellatedVolume(solid)
     // The volume must follow the slabs to within what the fit's deviation allows over the face's area.
     const area = plainSlab / fillDepth
-    const allowed = 2 * chosen.deviation * area + 1e-4 * Math.max(before, 1)
+    // A trimmed face adds the ring the footprint's widened and narrowed prisms leave (their width is 2 chords each), over the height of the layers.
+    const perimeter = patch.trimmed ? patch.loops.reduce((sum, l) => sum + l.slice(1).reduce((acc, p, i) => acc + length3(sub3(p, l[i]!)), 0), 0) : 0
+    const ring = perimeter * 4 * FOOTPRINT_CHORD * (fillDepth + outReach + inReach)
+    const allowed = 2 * chosen.deviation * area + 1e-4 * Math.max(before, 1) + ring
     if (Math.abs(after - before - expected) > allowed) {
       return `the edit changed the volume by ${(after - before).toFixed(5)} mm³ where the fitted layers account for ${expected.toFixed(5)} mm³ (within ${allowed.toFixed(5)}): it ran into a neighbouring feature or the solid is thinner than the 1 mm the new layer sits in`
     }
-    return { brep: solid, deviation: chosen.deviation }
+    return { brep: solid, deviation: chosen.deviation + trimSlack }
   } catch (cause) {
     return `the fitted edit failed (${cause instanceof Error ? cause.message : String(cause)})`
   }

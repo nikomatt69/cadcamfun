@@ -20,7 +20,6 @@
  */
 import { For, Show, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
-import "../../styles/enterprise.css"
 
 /* ---- page title band ---------------------------------------------------- */
 
@@ -212,26 +211,36 @@ export function Field(props: {
   )
 }
 
-/** A text input in the shared field style. */
+/**
+ * A text input in the shared field style.
+ *
+ * The field is uncontrolled by default: it carries a `name` and the form reads
+ * it through `FormData`. A controlled field would fight the browser's own
+ * value semantics — the caret position, and any code that sets the value
+ * directly — so a form that only needs its values on submit stays uncontrolled.
+ */
 export function TextField(props: {
   readonly id?: string
+  readonly name?: string
   readonly type?: string
-  readonly value: string
+  /** Omit for an uncontrolled field. */
+  readonly value?: string
   readonly placeholder?: string
   readonly required?: boolean
   readonly disabled?: boolean
-  readonly onInput: (value: string) => void
+  readonly onInput?: (value: string) => void
 }): JSX.Element {
   return (
     <input
       id={props.id}
+      name={props.name}
       type={props.type ?? "text"}
       class="ent-field__input"
       value={props.value}
       placeholder={props.placeholder}
       required={props.required === true}
       disabled={props.disabled === true}
-      onInput={(event) => props.onInput(event.currentTarget.value)}
+      onInput={(event) => props.onInput?.(event.currentTarget.value)}
     />
   )
 }

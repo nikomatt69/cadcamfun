@@ -66,7 +66,7 @@ export const CadExactFillet = Schema.Struct({
   face: int, kind: Schema.Literals(["cylinder", "torus"]), radius: num, convex: Schema.Boolean, length: num
 })
 
-export const CadExactNurbsFace = Schema.Struct({ face: int, normal: vec3, spread: num })
+export const CadExactNurbsFace = Schema.Struct({ face: int, normal: vec3, spread: num, trimmed: Schema.Boolean })
 
 export const CadExactPart = Schema.Struct({
   id: Schema.String, name: Schema.String, valid: Schema.Boolean, issues: Schema.Array(Schema.String),

@@ -1,4 +1,6 @@
 {
+  "workspace.filters": "Filters",
+  "workspace.parameters": "Parameters",
   "shell.brand": "CAD/CAM FUN",
   "shell.workstation": "Workstation",
   "shell.menu": "MENU",

@@ -5,10 +5,14 @@
    headings, stat tiles, data tables and key/value lists. The CAD and CAM
    editors keep their own panel language; every other screen composes these.
 
-   The language is the quiet workstation one: flat 1 px surfaces, a 5 px radius
+   The language is the quiet workstation one: flat 1 px surfaces, an 8 px radius
    scale, 12.5 px base type, one blue accent, no gradients and no elevation.
    Type is set as a set — size, weight, leading and tracking move together —
    so a heading reads as a heading and a label reads as a label.
+
+   The `--ent-*` tokens below are the app-wide source of truth: `workspace-page.css`
+   aliases its own `--wp-*` names onto them, so the workspace pages and the
+   document pages cannot drift apart.
 
    Motion is restrained on purpose: a colour or border change settles in
    120–140 ms on a strong ease-out, and a pressed control answers immediately
@@ -28,13 +32,16 @@
   --ent-accent: #2557d6;
   --ent-accent-hover: #1d47b3;
   --ent-accent-soft: #e8eefc;
+  --ent-action: #2557d6;
+  --ent-action-hover: #1d47b3;
+  --ent-action-text: #ffffff;
   --ent-ok: #15803d;
   --ent-ok-soft: #e7f5ec;
   --ent-warn: #a15c07;
   --ent-warn-soft: #fbf1df;
   --ent-bad: #b42318;
   --ent-bad-soft: #fbe9e7;
-  --ent-radius: 5px;
+  --ent-radius: 8px;
   --ent-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* One curve for the whole shell: fast out of the gate, settled at the end. */
   --ent-ease: cubic-bezier(0.2, 0, 0, 1);
@@ -78,7 +85,7 @@
   flex: 1 1 20rem;
 }
 
-.ent-header__eyebrow {
+.reference-shell .ent-header__eyebrow {
   margin: 0 0 3px;
   color: var(--ent-text-faint);
   font-size: 10px;
@@ -88,7 +95,7 @@
   text-transform: uppercase;
 }
 
-.ent-header__title {
+.reference-shell .ent-header__title {
   margin: 0;
   color: var(--ent-text);
   font-size: 15px;
@@ -98,7 +105,7 @@
   overflow-wrap: anywhere;
 }
 
-.ent-header__description {
+.reference-shell .ent-header__description {
   margin: 3px 0 0;
   max-width: 72ch;
   color: var(--ent-text-muted);
@@ -108,13 +115,13 @@
 }
 
 /* A document page leads with a larger title than a list page. */
-.ent-header--document .ent-header__title {
+.reference-shell .ent-header--document .ent-header__title {
   font-size: 19px;
   letter-spacing: -0.012em;
   line-height: 25px;
 }
 
-.ent-header--document .ent-header__description {
+.reference-shell .ent-header--document .ent-header__description {
   font-size: 12.5px;
   line-height: 18px;
 }
@@ -139,7 +146,7 @@
   min-width: 0;
 }
 
-.ent-section__index {
+.reference-shell .ent-section__index {
   flex: none;
   color: var(--ent-text-faint);
   font-family: var(--ent-mono);
@@ -148,7 +155,7 @@
   line-height: 16px;
 }
 
-.ent-section__title {
+.reference-shell .ent-section__title {
   margin: 0;
   flex: none;
   color: var(--ent-text-muted);
@@ -521,6 +528,37 @@
 .ent-notice__icon {
   flex: none;
   margin-top: 1px;
+}
+
+/* ---- one source of truth -------------------------------------------------
+   `workspace-page.css` declares its own `--wp-*` names for the workspace
+   chrome. These aliases point them at the enterprise tokens, so a change to a
+   colour or a radius lands on the workspace pages and the document pages at
+   the same time. The selector is deliberately more specific than the
+   `.workspace-page` block that declares the originals, so the alias wins
+   whatever order the two stylesheets are bundled in. */
+.reference-shell .workspace-page {
+  --wp-bg: var(--ent-surface);
+  --wp-bg-subtle: var(--ent-surface-subtle);
+  --wp-bg-inset: var(--ent-surface-inset);
+  --wp-border: var(--ent-line);
+  --wp-border-strong: var(--ent-line-strong);
+  --wp-text: var(--ent-text);
+  --wp-text-muted: var(--ent-text-muted);
+  --wp-text-faint: var(--ent-text-faint);
+  --wp-accent: var(--ent-accent);
+  --wp-accent-hover: var(--ent-accent-hover);
+  --wp-accent-soft: var(--ent-accent-soft);
+  --wp-action: var(--ent-action);
+  --wp-action-hover: var(--ent-action-hover);
+  --wp-action-text: var(--ent-action-text);
+  --wp-ok: var(--ent-ok);
+  --wp-ok-soft: var(--ent-ok-soft);
+  --wp-warn: var(--ent-warn);
+  --wp-warn-soft: var(--ent-warn-soft);
+  --wp-bad: var(--ent-bad);
+  --wp-bad-soft: var(--ent-bad-soft);
+  --wp-radius: var(--ent-radius);
 }
 
 /* ---- press feedback -----------------------------------------------------

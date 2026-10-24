@@ -110,7 +110,7 @@ describe("project details page", () => {
   test("an unknown project says so instead of failing silently", async () => {
     const { dispose } = app.visit("/projects/nope")
     try {
-      await app.wait(() => document.body.textContent?.includes("Project Not Found"), 60000)
+      await app.wait(() => document.body.textContent?.includes("Project not found"), 60000)
       expect(byText("button", "Back to Projects")).toBeDefined()
     } finally { dispose() }
   }, 120000)

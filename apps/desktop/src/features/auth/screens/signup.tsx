@@ -24,9 +24,6 @@ export function SignUpScreen(): JSX.Element {
   const [error, setError] = createSignal<string | undefined>(undefined)
   const [magicLinkSent, setMagicLinkSent] = createSignal(false)
   const [magicLinkEmail, setMagicLinkEmail] = createSignal("")
-  const [name, setName] = createSignal("")
-  const [email, setEmail] = createSignal("")
-  const [password, setPassword] = createSignal("")
 
   const busy = (type: LoadingType): boolean => isLoading() && loadingType() === type
 
@@ -46,11 +43,16 @@ export function SignUpScreen(): JSX.Element {
 
   const handleSubmit = (event: Event): void => {
     event.preventDefault()
+    const form = event.currentTarget as HTMLFormElement
+    const data = new FormData(form)
+    const name = String(data.get("name") ?? "")
+    const email = String(data.get("email") ?? "")
+    const password = String(data.get("password") ?? "")
     void run("email", async () => {
       await app.runtime.run(app.client.auth.signup({
-        payload: { name: name().trim(), email: email().trim(), password: password(), confirmPassword: password() }
+        payload: { name, email, password, confirmPassword: password }
       }))
-      const session = await app.runtime.run(app.client.auth.signinDirect({ payload: { email: email().trim(), password: password() } }))
+      const session = await app.runtime.run(app.client.auth.signinDirect({ payload: { email, password } }))
       startSession(app.cache, session.body.token)
       navigate("/")
     })
@@ -103,13 +105,13 @@ export function SignUpScreen(): JSX.Element {
 
           <form style={{ display: "flex", "flex-direction": "column", gap: "12px" }} onSubmit={handleSubmit}>
             <Field label={t("signup.nameLabel")} id="name">
-              <TextField id="name" value={name()} required placeholder="Enter your name" onInput={setName} />
+              <TextField id="name" name="name" required placeholder="Enter your name" />
             </Field>
             <Field label={t("signup.emailLabel")} id="email">
-              <TextField id="email" type="email" value={email()} required placeholder="Enter your email" onInput={setEmail} />
+              <TextField id="email" name="email" type="email" required placeholder="Enter your email" />
             </Field>
             <Field label={t("signup.passwordLabel")} id="password" hint="Password must be at least 8 characters long">
-              <TextField id="password" type="password" value={password()} required placeholder="Enter your password" onInput={setPassword} />
+              <TextField id="password" name="password" type="password" required placeholder="Enter your password" />
             </Field>
 
             <Button tone="primary" type="submit" block disabled={busy("email")}>

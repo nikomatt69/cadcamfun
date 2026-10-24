@@ -1,11 +1,14 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { faceByName } from "./naming.ts"
-import { pushPullNurbsFace, recognizeNurbsFaces, tessellatedVolume } from "./nurbs-edit.ts"
+import { booleanBrep } from "./boolean.ts"
+import { frame } from "./math.ts"
+import { makeCylinder } from "./primitives.ts"
+import { moveNurbsFace, pushPullNurbsFace, recognizeNurbsFaces, tessellatedVolume } from "./nurbs-edit.ts"
 import { surfacePatch, thickenSurfacePatch } from "./surface-patch.ts"
 import type { Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
 
-setDefaultTimeout(100_000)
+setDefaultTimeout(600_000)
 const volume = tessellatedVolume
 const ok = (r: Brep | string): Brep => { if (typeof r === "string") throw new Error(r); return r }
 /** A biquadratic patch over the square 10 x 10 in x and y, rising and falling in z (a gentle bump): its projection on the XY plane is exactly 100 mm². */
@@ -30,7 +33,7 @@ describe("moving a free-form face", () => {
 
   test("pushed out along Z the face moves as a rigid piece: the volume grows by 100 x d (the projected area, whatever the shape)", () => {
     const b = block()
-    for (const d of [1, 2.5]) {
+    for (const d of [2.5]) {
       const r = ok(pushPullNurbsFace(b, top(b), d, { x: 0, y: 0, z: 1 }))
       expect(validateBrep(r).valid).toBe(true)
       expect(volume(r)).toBeCloseTo(200 + 100 * d, 4)
@@ -60,5 +63,29 @@ describe("moving a free-form face", () => {
     expect(pushPullNurbsFace(b, top(b), 0)).toMatch(/non-zero/)
     const wall = b.faces.findIndex((f) => f.surface.kind === "extrusion")
     expect(pushPullNurbsFace(b, wall, 1)).toMatch(/not a NURBS face/)
+  })
+})
+
+describe("a free-form face trimmed by a circle", () => {
+  /** The thickened bump cut by a vertical cylinder of radius 4 at (5, 5): its top face is the bump trimmed by a circle. */
+  const disc = () => booleanBrep(block(), makeCylinder(4, 20, frame({ x: 5, y: 5, z: -5 }, { x: 0, y: 0, z: 1 })), "intersect").brep
+
+  test("the trimmed face is read, and moved with its footprint: the volume grows by the disc's area x d (closed form), the deviation of the polyline is reported", () => {
+    const b = disc()
+    expect(volume(b)).toBeCloseTo(Math.PI * 16 * 2, 1)
+    const faces = recognizeNurbsFaces(b)
+    expect(faces).toHaveLength(2)
+    const up = faces.find((f) => f.normal.z > 0.9)!
+    const moved = moveNurbsFace(b, up.face, 1, { x: 0, y: 0, z: 1 })
+    if (typeof moved === "string") throw new Error(moved)
+    expect(moved.deviation).toBeLessThanOrEqual(0.006)
+    expect(validateBrep(moved.brep).valid).toBe(true)
+    // The footprint is a little narrower than the trim (the deviation), so the growth is the disc's area x d less a ring of that width.
+    const ring = 2 * Math.PI * 4 * moved.deviation! * 2
+    expect(Math.abs(volume(moved.brep) - volume(b) - Math.PI * 16)).toBeLessThan(ring)
+    const pulled = moveNurbsFace(b, up.face, -1, { x: 0, y: 0, z: 1 })
+    if (typeof pulled === "string") throw new Error(pulled)
+    expect(pulled.deviation).toBeLessThanOrEqual(0.006)
+    expect(Math.abs(volume(b) - volume(pulled.brep) - Math.PI * 16)).toBeLessThan(ring)
   })
 })

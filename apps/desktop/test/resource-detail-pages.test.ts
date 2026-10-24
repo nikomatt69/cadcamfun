@@ -50,7 +50,9 @@ describe("resource detail pages", () => {
     try {
       await find(".cam-workspace")
       expect(await app.wait(() => byText("h1", "Endmill 6"), 30000)).toBeDefined()
-      expect(await app.wait(() => [...document.querySelectorAll("h3")].find((el) => el.textContent?.trim() === "Diameter") ?? undefined, 30000)).toBeDefined()
+      const diameter = await app.wait(() => byText("dt", "Diameter"), 30000)
+      expect(diameter.nextElementSibling?.textContent?.trim()).toBe("6 mm")
+      expect(byText("dt", "Flutes")?.nextElementSibling?.textContent?.trim()).toBe("3")
     } finally { dispose() }
   }, PAGE_TIMEOUT)
 
@@ -60,7 +62,8 @@ describe("resource detail pages", () => {
     try {
       await find(".cam-workspace")
       expect(await app.wait(() => byText("h1", "Haas VF2"), 30000)).toBeDefined()
-      expect(await app.wait(() => [...document.querySelectorAll("p")].find((el) => el.textContent?.trim() === "fanuc") ?? undefined, 30000)).toBeDefined()
+      const controller = await app.wait(() => byText("dt", "Controller"), 30000)
+      expect(controller.nextElementSibling?.textContent?.trim()).toBe("fanuc")
     } finally { dispose() }
   }, PAGE_TIMEOUT)
 

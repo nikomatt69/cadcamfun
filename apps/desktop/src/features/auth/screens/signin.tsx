@@ -24,8 +24,6 @@ export function SignInScreen(): JSX.Element {
   const [error, setError] = createSignal<string | undefined>(undefined)
   const [magicLinkSent, setMagicLinkSent] = createSignal(false)
   const [magicLinkEmail, setMagicLinkEmail] = createSignal("")
-  const [email, setEmail] = createSignal("")
-  const [password, setPassword] = createSignal("")
 
   const busy = (type: LoadingType): boolean => isLoading() && loadingType() === type
 
@@ -45,9 +43,11 @@ export function SignInScreen(): JSX.Element {
 
   const handleEmailSignIn = (event: Event): void => {
     event.preventDefault()
+    const form = event.currentTarget as HTMLFormElement
+    const data = new FormData(form)
     void run("email", async () => {
       const result = await app.runtime.run(app.client.auth.signinDirect({
-        payload: { email: email().trim(), password: password() }
+        payload: { email: String(data.get("email") ?? ""), password: String(data.get("password") ?? "") }
       }))
       startSession(app.cache, result.body.token)
       navigate("/")
@@ -107,10 +107,10 @@ export function SignInScreen(): JSX.Element {
 
           <form style={{ display: "flex", "flex-direction": "column", gap: "12px" }} onSubmit={handleEmailSignIn}>
             <Field label={t("signin.emailLabel")} id="email">
-              <TextField id="email" type="email" value={email()} required placeholder="Enter your email" onInput={setEmail} />
+              <TextField id="email" name="email" type="email" required placeholder="Enter your email" />
             </Field>
             <Field label={t("signin.passwordLabel")} id="password">
-              <TextField id="password" type="password" value={password()} required placeholder="Enter your password" onInput={setPassword} />
+              <TextField id="password" name="password" type="password" required placeholder="Enter your password" />
             </Field>
 
             <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "8px" }}>

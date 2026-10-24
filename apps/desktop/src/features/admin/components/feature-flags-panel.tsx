@@ -1,19 +1,23 @@
 /**
  * `AdminFeatureFlagsPanel` — `.reference/src/components/admin/AdminFeatureFlagsPanel.tsx`.
  *
- * The floating Shield button opens the admin modal: admin banner, feature counts, the
- * per-user override grid and the documentation lists. The desktop build has a single local
- * profile and no session, so that profile is the sidecar's administrator
- * (`local@cadcamfun.local`) rather than the legacy hosted-site session check.
+ * The legacy component floated a Shield button over the app and opened the admin
+ * modal. On a page that exists only to show the flags, that indirection is noise:
+ * the panel is rendered inline, in the shared enterprise vocabulary, so the page
+ * reads like the rest of the console.
+ *
+ * The desktop build has a single local profile and no session, so that profile
+ * is the sidecar's administrator (`local@cadcamfun.local`) rather than the
+ * legacy hosted-site session check.
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { Check, Settings, Shield, X } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { ADMIN_EMAILS, LOCAL_ADMIN_EMAIL, featureFlagService, isAdminUser } from "./feature-flags.ts"
+import { Button, Field, Notice, SectionHeader, TextField } from "../../../shared/components/enterprise.tsx"
 
 export function AdminFeatureFlagsPanel(): JSX.Element | null {
   const [selectedUser, setSelectedUser] = createSignal("")
-  const [showPanel, setShowPanel] = createSignal(false)
 
   if (!isAdminUser(LOCAL_ADMIN_EMAIL)) return null
 
@@ -30,134 +34,120 @@ export function AdminFeatureFlagsPanel(): JSX.Element | null {
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setShowPanel((open) => !open)}
-        class="fixed bottom-4 right-4 z-50 rounded-full bg-red-600 p-3 text-white shadow-lg transition-colors hover:bg-red-700"
-        title={t("admin.ff.title")}
-      >
-        <Shield class="h-6 w-6" />
-      </button>
+    <div style={{ display: "flex", "flex-direction": "column", gap: "16px" }}>
+      <section>
+        <SectionHeader index="01" title={t("admin.ff.adminActive")} />
+        <Notice tone="ok" icon={<Shield size={14} aria-hidden="true" />}>
+          <span style={{ display: "flex", "flex-direction": "column", gap: "2px" }}>
+            <strong>{t("admin.ff.adminActiveBody")}</strong>
+            <span style={{ "font-family": "var(--ent-mono)", "font-size": "11px" }}>
+              {t("admin.ff.adminEmails", { emails: [...ADMIN_EMAILS, LOCAL_ADMIN_EMAIL].join(", ") })}
+            </span>
+          </span>
+        </Notice>
+      </section>
 
-      <Show when={showPanel()}>
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div class="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-gray-800">
-            <div class="flex items-center justify-between border-b p-6 border-gray-200 dark:border-gray-700">
-              <div class="flex items-center space-x-3">
-                <Shield class="h-6 w-6 text-red-600" />
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{t("admin.ff.title")}</h2>
+      <section>
+        <SectionHeader index="02" title={t("admin.ff.overview")} />
+        <div class="ent-stats">
+          <div class="ent-stat">
+            <span class="ent-stat__value">{allFeatures.length}</span>
+            <span class="ent-stat__label">{t("admin.ff.label.total")}</span>
+          </div>
+          <div class="ent-stat">
+            <span class="ent-stat__value">{countWith("ai_")}</span>
+            <span class="ent-stat__label">{t("admin.ff.label.ai")}</span>
+          </div>
+          <div class="ent-stat">
+            <span class="ent-stat__value">{countWith("cad_")}</span>
+            <span class="ent-stat__label">{t("admin.ff.label.cad")}</span>
+          </div>
+          <div class="ent-stat">
+            <span class="ent-stat__value">{countWith("cam_")}</span>
+            <span class="ent-stat__label">{t("admin.ff.label.cam")}</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <SectionHeader index="03" title={t("admin.ff.overrides")} />
+        <div style={{ display: "flex", "flex-direction": "column", gap: "12px" }}>
+          <Field label={t("admin.ff.userId")} id="admin-ff-user">
+            <TextField
+              id="admin-ff-user"
+              name="userId"
+              value={selectedUser()}
+              placeholder={t("admin.ff.userIdPlaceholder")}
+              onInput={setSelectedUser}
+            />
+          </Field>
+
+          <Show when={selectedUser()}>
+            <div class="ent-card">
+              <div class="ent-card__head">
+                <h3 class="ent-section__title">{t("admin.ff.available")}</h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowPanel(false)}
-                class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <X class="h-6 w-6" />
-              </button>
-            </div>
-
-            <div class="max-h-[70vh] overflow-y-auto p-6">
-              <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <div class="rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
-                  <div class="mb-3 flex items-center space-x-2">
-                    <Check class="h-5 w-5 text-green-600" />
-                    <h3 class="font-medium text-green-800 dark:text-green-200">{t("admin.ff.adminActive")}</h3>
-                  </div>
-                  <p class="text-sm text-green-700 dark:text-green-300">{t("admin.ff.adminActiveBody")}</p>
-                  <div class="mt-2 text-xs text-green-600 dark:text-green-400">
-                    {t("admin.ff.adminEmails", { emails: [...ADMIN_EMAILS, LOCAL_ADMIN_EMAIL].join(", ") })}
-                  </div>
-                </div>
-
-                <div class="rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
-                  <div class="mb-3 flex items-center space-x-2">
-                    <Settings class="h-5 w-5 text-blue-600" />
-                    <h3 class="font-medium text-blue-800 dark:text-blue-200">{t("admin.ff.overview")}</h3>
-                  </div>
-                  <div class="text-sm text-blue-700 dark:text-blue-300">
-                    <div>{t("admin.ff.total", { count: allFeatures.length })}</div>
-                    <div>{t("admin.ff.aiCount", { count: countWith("ai_") })}</div>
-                    <div>{t("admin.ff.cadCount", { count: countWith("cad_") })}</div>
-                    <div>{t("admin.ff.camCount", { count: countWith("cam_") })}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="mt-6">
-                <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-white">{t("admin.ff.overrides")}</h3>
-                <div class="space-y-4">
-                  <div>
-                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{t("admin.ff.userId")}</label>
-                    <input
-                      type="text"
-                      value={selectedUser()}
-                      placeholder={t("admin.ff.userIdPlaceholder")}
-                      onInput={(event) => setSelectedUser(event.currentTarget.value)}
-                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    />
-                  </div>
-
-                  <Show when={selectedUser()}>
-                    <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-                      <h4 class="mb-3 font-medium text-gray-900 dark:text-white">{t("admin.ff.available")}</h4>
-                      <div class="grid max-h-60 grid-cols-1 gap-2 overflow-y-auto md:grid-cols-2 lg:grid-cols-3">
-                        <For each={[...allFeatures]}>
-                          {(feature) => (
-                            <div class="flex items-center justify-between rounded bg-white p-2 dark:bg-gray-600">
-                              <span class="truncate text-xs text-gray-700 dark:text-gray-300">{feature.replace(/_/g, " ")}</span>
-                              <div class="flex space-x-1">
-                                <button
-                                  type="button"
-                                  class="rounded bg-green-500 px-2 py-1 text-xs text-white hover:bg-green-600"
-                                  onClick={() => addUserOverride(selectedUser(), feature, true)}
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  type="button"
-                                  class="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
-                                  onClick={() => addUserOverride(selectedUser(), feature, false)}
-                                >
-                                  ✗
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </For>
-                      </div>
+              <div class="ent-card__body" style={{ display: "grid", "grid-template-columns": "repeat(auto-fill, minmax(min(100%, 13rem), 1fr))", gap: "4px", "max-height": "15rem", "overflow-y": "auto" }}>
+                <For each={[...allFeatures]}>
+                  {(feature) => (
+                    <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "6px", padding: "4px 6px", "border-radius": "var(--ent-radius)", background: "var(--ent-surface-subtle)" }}>
+                      <span style={{ overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap", "font-size": "11px", color: "var(--ent-text-muted)" }}>
+                        {feature.replace(/_/g, " ")}
+                      </span>
+                      <span style={{ display: "flex", gap: "2px", "flex-shrink": "0" }}>
+                        <button
+                          type="button"
+                          class="ent-btn ent-btn--ghost"
+                          style={{ "min-height": "20px", padding: "0 6px", "font-size": "11px", color: "var(--ent-ok)" }}
+                          title={feature}
+                          onClick={() => addUserOverride(selectedUser(), feature, true)}
+                        >
+                          <Check size={12} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          class="ent-btn ent-btn--ghost"
+                          style={{ "min-height": "20px", padding: "0 6px", "font-size": "11px", color: "var(--ent-bad)" }}
+                          title={feature}
+                          onClick={() => addUserOverride(selectedUser(), feature, false)}
+                        >
+                          <X size={12} aria-hidden="true" />
+                        </button>
+                      </span>
                     </div>
-                  </Show>
-                </div>
+                  )}
+                </For>
               </div>
+            </div>
+          </Show>
+        </div>
+      </section>
 
-              <div class="mt-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-                <h3 class="mb-2 font-medium text-gray-800 dark:text-gray-200">{t("admin.ff.categories")}</h3>
-                <div class="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-                  <div>
-                    <h4 class="font-medium text-gray-800 dark:text-gray-200">{t("admin.ff.aiCat")}</h4>
-                    <ul class="space-y-1 text-gray-600 dark:text-gray-400">
-                      <li>{t("admin.ff.aiAssistant")}</li>
-                      <li>{t("admin.ff.aiVision")}</li>
-                      <li>{t("admin.ff.aiAutonomous")}</li>
-                      <li>{t("admin.ff.aiCodeInterpreter")}</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 class="font-medium text-gray-800 dark:text-gray-200">{t("admin.ff.cadcamCat")}</h4>
-                    <ul class="space-y-1 text-gray-600 dark:text-gray-400">
-                      <li>{t("admin.ff.advancedCad")}</li>
-                      <li>{t("admin.ff.modeling")}</li>
-                      <li>{t("admin.ff.camOperations")}</li>
-                      <li>{t("admin.ff.exportFormats")}</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+      <section>
+        <SectionHeader index="04" title={t("admin.ff.categories")} />
+        <div class="ent-card">
+          <div class="ent-card__body" style={{ display: "grid", "grid-template-columns": "repeat(auto-fit, minmax(min(100%, 18rem), 1fr))", gap: "16px" }}>
+            <div>
+              <h4 class="ent-section__title">{t("admin.ff.aiCat")}</h4>
+              <ul style={{ margin: "6px 0 0", "padding-left": "16px", display: "grid", gap: "2px", "font-size": "12px", color: "var(--ent-text-muted)" }}>
+                <li>{t("admin.ff.aiAssistant")}</li>
+                <li>{t("admin.ff.aiVision")}</li>
+                <li>{t("admin.ff.aiAutonomous")}</li>
+                <li>{t("admin.ff.aiCodeInterpreter")}</li>
+              </ul>
+            </div>
+            <div>
+              <h4 class="ent-section__title">{t("admin.ff.cadcamCat")}</h4>
+              <ul style={{ margin: "6px 0 0", "padding-left": "16px", display: "grid", gap: "2px", "font-size": "12px", color: "var(--ent-text-muted)" }}>
+                <li>{t("admin.ff.advancedCad")}</li>
+                <li>{t("admin.ff.modeling")}</li>
+                <li>{t("admin.ff.camOperations")}</li>
+                <li>{t("admin.ff.exportFormats")}</li>
+              </ul>
             </div>
           </div>
         </div>
-      </Show>
-    </>
+      </section>
+    </div>
   )
 }

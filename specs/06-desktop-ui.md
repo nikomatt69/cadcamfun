@@ -1,5 +1,32 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Workspace page panels and headers (2026-10-24)
+
+Status: implemented; desktop typecheck and all 32 targeted UI regressions pass.
+Visual review remains pending because no browser surface is available and native
+computer-use access was denied. Owner-requested WP6 refinement covers the shared page toolbar,
+panel headers, filter rails, resource cards and empty states, including tools,
+materials, configurations and components. Use opaque theme-aware surfaces, aligned
+actions, clear title/description hierarchy and consistent field spacing. Filter
+panels fit their contents, scroll independently on desktop and stack above results
+when the available page column is narrow. Reuse shared empty states, card banners
+and view controls. Keep navigation, filtering, creation and assistant actions intact.
+This increment owns `shared/components/WorkspacePage.tsx`, `styles/workspace-page.css`,
+resource, costs and activity screens, shell locale and corresponding desktop checks. API, persistence,
+geometry and CAD/CAM viewport behavior stay unchanged.
+
+Change log: 2026-10-25 — aligned list/detail toolbars, panel headings, controls and
+resource surfaces with shared theme tokens. Filter panels fit their contents and
+stack above results in narrow page columns; resource grids follow available space.
+Resources reuse shared empty states, card banners, view controls and aligned data
+rows. Costs and activity rails retain meaningful, nonduplicated headings. Updated
+existing DOM checks for the filter surface and semantic resource statistics.
+The API reference was regenerated and its freshness check passes. The two toolpath
+checks that exceeded the default five-second limit during the combined run pass
+when rerun separately with a 30-second timeout. An earlier production build passed;
+the final full build was interrupted after prolonged dependency transformation
+without further progress, so final production bundle verification remains pending.
+
 ## Print deposition evidence (2026-10-24)
 
 The printing continuation owns only the existing print result/kernel/evidence panels and CAM

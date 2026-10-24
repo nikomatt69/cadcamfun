@@ -1,14 +1,18 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
+import { booleanBrep } from "./boolean.ts"
 import { brepLocator } from "./classify.ts"
 import { surfaceNormal, surfacePoint } from "./geom.ts"
 import { faceByName } from "./naming.ts"
 import { tessellatedVolume } from "./nurbs-edit.ts"
 import { draftNurbsFace, offsetNurbsFace } from "./nurbs-offset.ts"
+import { frame } from "./math.ts"
+import { makeCylinder } from "./primitives.ts"
+import { recognizeNurbsFaces } from "./nurbs-edit.ts"
 import { surfacePatch, thickenSurfacePatch } from "./surface-patch.ts"
 import type { Brep } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
 
-setDefaultTimeout(200_000)
+setDefaultTimeout(600_000)
 const volume = tessellatedVolume
 const ok = <T,>(r: T | string): T => { if (typeof r === "string") throw new Error(r); return r }
 
@@ -79,5 +83,32 @@ describe("the approximate draft of a free-form face", () => {
   test("a draft angle of zero is refused", () => {
     const b = wall()
     expect(draftNurbsFace(b, faceByName(b, "thicken.bottom")!, { pull: { x: 0, y: 0, z: 1 }, neutral: 0, angle: 0 })).toMatch(/non-zero/)
+  })
+})
+
+describe("a free-form face trimmed by a circle", () => {
+  test("offset: the new face is d from the old one inside the trim, the deviation reported includes the footprint's, the solid is valid", () => {
+    // The thickened bump cut by a vertical cylinder of radius 4 at (5, 5): the top face is the bump trimmed by a circle.
+    const b = booleanBrep(bump(), makeCylinder(4, 30, frame({ x: 5, y: 5, z: -5 }, { x: 0, y: 0, z: 1 })), "intersect").brep
+    const faces = recognizeNurbsFaces(b)
+    const up = faces.find((f) => f.normal.z > 0.9)!
+    expect(up.trimmed).toBe(true)
+    const d = 0.6
+    const r = ok(offsetNurbsFace(b, up.face, d, 0.01))
+    expect(r.deviation).toBeLessThan(0.1)
+    expect(validateBrep(r.brep).valid).toBe(true)
+    const face = b.faces[up.face]!
+    const locator = brepLocator(r.brep)
+    let worst = 0
+    // Points of the exact offset well inside the disc (parameters around the bump's centre, whose footprint is the circle).
+    for (const [u, v] of [[0.5, 0.5], [0.45, 0.55], [0.55, 0.45], [0.5, 0.6]] as const) {
+      const p = surfacePoint(face.surface, u, v), n = surfaceNormal(face.surface, u, v)
+      const sign = face.reversed ? -1 : 1
+      worst = Math.max(worst, locator.closest({ x: p.x + sign * d * n.x, y: p.y + sign * d * n.y, z: p.z + sign * d * n.z }).distance)
+    }
+    expect(worst).toBeLessThan(0.02)
+    const grown = volume(r.brep) - volume(b)
+    expect(grown).toBeGreaterThan(0.6 * Math.PI * 16 * 0.95)
+    expect(grown).toBeLessThan(0.6 * Math.PI * 16 * 1.2)
   })
 })

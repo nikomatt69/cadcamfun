@@ -55,6 +55,7 @@ export function CostsScreen(): JSX.Element {
 
   return <WorkspacePage
     title={t("costs.title")}
+    railTitle={t("workspace.parameters")}
     rail={<form class="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); void onCalculate() }}>
       <p class="text-xs text-slate-500 dark:text-slate-400">{t("costs.subtitle")}</p>
       <label class="block"><span class={RAIL_LABEL}>{t("costs.toolpath")}</span>

@@ -15926,11 +15926,15 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "spread": {
                                   "type": "number",
                                 },
+                                "trimmed": {
+                                  "type": "boolean",
+                                },
                               },
                               "required": [
                                 "face",
                                 "normal",
                                 "spread",
+                                "trimmed",
                               ],
                               "type": "object",
                             },

@@ -6648,7 +6648,7 @@ export type CadExactAnalyzeOutput = {
       origin: { x: number; y: number; z: number }
       axis: { x: number; y: number; z: number }
     }>
-    nurbsFaces?: Array<{ face: number; normal: { x: number; y: number; z: number }; spread: number }>
+    nurbsFaces?: Array<{ face: number; normal: { x: number; y: number; z: number }; spread: number; trimmed: boolean }>
     fillets?: Array<{ face: number; kind: "cylinder" | "torus"; radius: number; convex: boolean; length: number }>
     swarfWalls?: Array<{
       face: number

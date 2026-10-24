@@ -9,7 +9,7 @@
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
-import { Activity, ArrowLeft, BarChart2, Calendar, Cpu, FileText, Filter, TrendingUp, Users } from "lucide-solid"
+import { Activity, ArrowLeft, BarChart2, Calendar, Cpu, FileText, TrendingUp, Users } from "lucide-solid"
 import { PANEL, TOOLBAR_BUTTON, WorkspacePage } from "../../../shared/components/WorkspacePage.tsx"
 import { t } from "../../../i18n/index.ts"
 import { useRead } from "../../../app/queries.ts"
@@ -73,10 +73,10 @@ export function AnalyticsHistoryScreen(): JSX.Element {
   return (
     <WorkspacePage
       title={t("history.title")}
+      railTitle={t("history.filterTitle")}
       actions={<A href="/analytics" class={TOOLBAR_BUTTON}><ArrowLeft size={16} aria-hidden="true" />{t("history.back")}</A>}
       rail={<>
         <p class="text-xs text-slate-500 dark:text-slate-400">{t("history.subtitle")}</p>
-        <h2 class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"><Filter size={14} aria-hidden="true" />{t("history.filterTitle")}</h2>
         <div class="flex flex-col gap-1">
           <For each={filterOptions()}>
             {(option) => (

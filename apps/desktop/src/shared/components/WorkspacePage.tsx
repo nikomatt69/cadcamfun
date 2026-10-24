@@ -9,7 +9,8 @@
  */
 import { For, Show, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
-import { ArrowLeft } from "lucide-solid"
+import { ArrowLeft, SlidersHorizontal } from "lucide-solid"
+import { t } from "../../i18n/index.ts"
 import { Motion } from "solid-motionone"
 import { prefersReducedMotion } from "../ui/animated-section.tsx"
 import "../../styles/workstation.css"
@@ -32,21 +33,21 @@ const enter = (y: number, delay: number) =>
  * The shared control set. Every page composes these instead of declaring its own
  * button / field / card strings, so a correction lands everywhere at once.
  */
-export const TOOLBAR_BUTTON = "workstation-toolbar-button inline-flex h-[30px] items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
-export const TOOLBAR_PRIMARY = "inline-flex h-[30px] items-center gap-1.5 rounded-[5px] border border-transparent bg-blue-600 px-2.5 text-xs font-medium text-white transition-colors duration-150 hover:bg-blue-700 disabled:opacity-45"
+export const TOOLBAR_BUTTON = "workspace-button--secondary workstation-toolbar-button inline-flex h-[30px] items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
+export const TOOLBAR_PRIMARY = "workspace-button--primary inline-flex h-[30px] items-center gap-1.5 rounded-[5px] border border-transparent bg-blue-600 px-2.5 text-xs font-medium text-white transition-colors duration-150 hover:bg-blue-700 disabled:opacity-45"
 export const FIELD = "w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-900"
 export const INPUT = "w-full rounded-[5px] border border-slate-300 bg-white px-3 py-2 text-[13px] leading-5 text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:disabled:bg-slate-900"
 export const LABEL = "mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300"
 export const ICON_BUTTON = "inline-flex h-7 w-7 items-center justify-center rounded-[5px] text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-/** Card surface — flat, bordered and 5 px, like the CAM resource cards. */
+/** Card surface — flat and bordered; workspace tokens own the radius. */
 export const CARD = "workspace-card ui-card ui-card-default group flex flex-col overflow-hidden !p-0 transition-colors duration-150"
-/** Panel surface — flat, bordered and 5 px, like the CAD/CAM inspector blocks. */
+/** Panel surface — uses the same workspace tokens as the toolbar and cards. */
 export const PANEL = "workspace-panel ui-card ui-card-default"
 export const RAIL_LABEL = "mb-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400"
 export const BADGE = "workspace-badge"
 export const DANGER_BUTTON = "inline-flex h-[30px] items-center justify-center rounded-[5px] border border-transparent bg-red-600 px-3 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-45"
-export const CANCEL_BUTTON = "inline-flex h-[30px] items-center justify-center rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-export const SUBMIT_BUTTON = "inline-flex h-[30px] items-center justify-center rounded-[5px] border border-transparent bg-blue-600 px-3 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-45"
+export const CANCEL_BUTTON = "workspace-button--secondary inline-flex h-[30px] items-center justify-center rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+export const SUBMIT_BUTTON = "workspace-button--primary inline-flex h-[30px] items-center justify-center rounded-[5px] border border-transparent bg-blue-600 px-3 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-45"
 
 export interface WorkspaceTabItem<T extends string = string> {
   readonly id: T
@@ -99,6 +100,8 @@ export interface WorkspacePageProps {
   readonly actions?: JSX.Element
   /** The left filter rail; omitted for pages without filters. */
   readonly rail?: JSX.Element
+  /** Names the rail when it contains parameters or navigation instead of filters. */
+  readonly railTitle?: string
   readonly children: JSX.Element
   /** Modals and dialogs; rendered at the page root (outside the animated stage) so `fixed` overlays cover the page. */
   readonly overlays?: JSX.Element
@@ -115,7 +118,7 @@ export function WorkspacePage(props: WorkspacePageProps): JSX.Element {
           class="workspace-page__toolbar workstation-toolbar w-full flex flex-wrap items-center justify-between gap-2"
           {...enter(-20, 0)}
         >
-          <div class="workspace-page__title ent-header__text flex min-w-0 items-center">
+          <div class="workspace-page__title workspace-page__heading ent-header__text">
             <Show when={props.eyebrow !== undefined}>
               <p class="ent-header__eyebrow">{props.eyebrow}</p>
             </Show>
@@ -124,17 +127,20 @@ export function WorkspacePage(props: WorkspacePageProps): JSX.Element {
               <p class="ent-header__description truncate">{props.description}</p>
             </Show>
           </div>
-          <Show when={props.actions !== undefined}><div class="ent-header__actions">{props.actions}</div></Show>
+          <Show when={props.actions !== undefined}><div class="workspace-page__actions ent-header__actions">{props.actions}</div></Show>
         </Motion.div>
 
         <div class="workspace-page__body cam-workspace__body flex flex-1 overflow-hidden w-full">
           <Show when={props.rail !== undefined}>
-            <aside class="workspace-page__rail cam-workspace__sidebar flex-shrink-0 h-full flex flex-col" data-open="true" aria-label="Filters">
-              <div class="workspace-page__rail-card ui-card ui-card-light flex flex-col gap-3 overflow-y-auto">{props.rail}</div>
+            <aside class="workspace-page__rail cam-workspace__sidebar flex-shrink-0 h-full flex flex-col" data-open="true" aria-label={props.railTitle ?? t("workspace.filters")}>
+              <div class="workspace-page__rail-card">
+                <div class="workspace-page__rail-heading"><SlidersHorizontal size={14} aria-hidden="true" /><span>{props.railTitle ?? t("workspace.filters")}</span></div>
+                {props.rail}
+              </div>
             </aside>
           </Show>
           <Motion.div
-            class="workspace-page__stage workspace-stage cam-workspace__stage ui-card ui-card-default flex-1 min-w-0 overflow-y-auto"
+            class="workspace-page__stage workspace-stage cam-workspace__stage flex-1 min-w-0 overflow-y-auto"
             initial={prefersReducedMotion() ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: prefersReducedMotion() ? ENTER_DURATION_REDUCED : ENTER_DURATION, delay: prefersReducedMotion() ? 0 : 0.04 }}
@@ -169,10 +175,10 @@ export function StageError(props: { readonly message: string; readonly onRetry?:
 export function StageEmpty(props: { readonly icon: JSX.Element; readonly title: string; readonly hint: string; readonly children?: JSX.Element }): JSX.Element {
   return (
     <div class="workspace-empty">
-      <div class="workspace-empty__icon">{props.icon}</div>
+      <div class="workspace-empty__icon" aria-hidden="true">{props.icon}</div>
       <h3 class="mb-1 text-[13px] font-semibold text-slate-900 dark:text-white">{props.title}</h3>
       <p class="mb-4 text-xs text-slate-500 dark:text-slate-400">{props.hint}</p>
-      <Show when={props.children !== undefined}><div class="flex flex-wrap justify-center gap-2">{props.children}</div></Show>
+      <Show when={props.children !== undefined}><div class="workspace-empty__actions">{props.children}</div></Show>
     </div>
   )
 }
@@ -217,10 +223,10 @@ export function WorkspaceDetail(props: WorkspaceDetailProps): JSX.Element {
               <Show when={props.subtitle}><p class="text-[11px] text-slate-500 dark:text-slate-400">{props.subtitle}</p></Show>
             </div>
           </div>
-          <Show when={props.actions !== undefined}><div class="flex flex-wrap items-center gap-1.5">{props.actions}</div></Show>
+          <Show when={props.actions !== undefined}><div class="workspace-page__actions">{props.actions}</div></Show>
         </Motion.div>
         <div class="workspace-page__body cam-workspace__body flex flex-1 overflow-hidden w-full">
-          <div class="workspace-page__stage workspace-stage cam-workspace__stage ui-card ui-card-default flex-1 min-w-0 overflow-y-auto">
+          <div class="workspace-page__stage workspace-stage cam-workspace__stage flex-1 min-w-0 overflow-y-auto">
             {props.children}
           </div>
         </div>

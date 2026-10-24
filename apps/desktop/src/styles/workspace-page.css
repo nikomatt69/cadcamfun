@@ -1,6 +1,6 @@
 /* ==========================================================================
    Workspace pages — the quiet workstation language of the CAD/CAM chrome,
-   applied to every non-CAD/CAM screen: flat 1 px surfaces, a 5 px radius
+   applied to every non-CAD/CAM screen: flat 1 px surfaces, an 8 px radius
    scale, 12 px base type, one blue accent, no gradients and no elevation.
    Scoped to `.workspace-page` (rendered by `WorkspacePage` / `WorkspaceDetail`)
    so the CAD and CAM pages keep their own panel / ribbon styling.
@@ -18,15 +18,22 @@
   --wp-accent: #2557d6;
   --wp-accent-hover: #1d47b3;
   --wp-accent-soft: #e8eefc;
+  --wp-action: #2557d6;
+  --wp-action-hover: #1d47b3;
+  --wp-action-text: #ffffff;
   --wp-ok: #15803d;
   --wp-ok-soft: #e7f5ec;
   --wp-warn: #a15c07;
   --wp-warn-soft: #fbf1df;
   --wp-bad: #b42318;
   --wp-bad-soft: #fbe9e7;
-  --wp-radius: 5px;
+  --wp-radius: 8px;
+  container-type: inline-size;
+  min-height: 0;
+  min-width: 0;
   color: var(--wp-text);
   font-size: 12.5px;
+  font-weight: 400;
   line-height: 1.5;
 }
 
@@ -55,12 +62,19 @@ html.dark .workspace-page {
   min-height: 0;
 }
 
-.workspace-page__toolbar {
-  min-height: 44px;
+.workspace-page .workspace-page__toolbar {
+  min-height: 68px;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius);
+  background: var(--wp-bg);
 }
 
 .workspace-page__body {
-  gap: 10px;
+  min-height: 0;
+  gap: 16px;
   padding: 0;
   background: transparent;
 }
@@ -70,14 +84,32 @@ html.dark .workspace-page {
   max-width: 100%;
 }
 
+.workspace-page .workspace-page__heading {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  overflow: hidden;
+}
+
+.workspace-page .workspace-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  overflow: visible;
+}
+
 .workspace-page__title h1 {
   margin: 0;
   overflow: hidden;
   color: var(--wp-text);
-  font-size: 15px;
+  max-width: 100%;
+  font-size: 18px;
   font-weight: 600;
-  line-height: 21px;
-  letter-spacing: -0.008em;
+  line-height: 25px;
+  letter-spacing: -0.025em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -85,8 +117,9 @@ html.dark .workspace-page {
 .workspace-page__title p {
   margin: 0;
   color: var(--wp-text-muted);
-  font-size: 11px;
-  line-height: 15px;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .workspace-page__back {
@@ -108,7 +141,9 @@ html.dark .workspace-page {
 }
 
 .workspace-page .workspace-page__rail[data-open="true"] {
-  width: clamp(224px, 17vw, 252px);
+  width: clamp(216px, 19cqw, 248px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .workspace-page .workspace-page__rail[data-open="false"] {
@@ -117,22 +152,52 @@ html.dark .workspace-page {
   border: 0;
 }
 
-.workspace-page__rail-card {
-  flex: 1;
+.workspace-page .workspace-page__rail-card {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
   min-height: 0;
-  gap: 11px;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
-  padding: 14px !important;
+  gap: 16px;
+  padding: 16px;
   border: 1px solid var(--wp-border);
   border-radius: var(--wp-radius);
-  background: var(--wp-bg-subtle);
+  background: var(--wp-bg);
   box-shadow: none;
   backdrop-filter: none;
 }
 
-.workspace-page__stage {
-  padding: 16px !important;
+.workspace-page__rail-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--wp-border);
+  color: var(--wp-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.workspace-page__rail-card > label > span {
+  margin-bottom: 6px;
+  color: var(--wp-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.workspace-page__rail-card > [role="status"] {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--wp-border);
+  color: var(--wp-text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-page .workspace-page__stage {
+  min-width: 0;
+  padding: 20px;
   border: 1px solid var(--wp-border);
   border-radius: var(--wp-radius);
   background: var(--wp-bg);
@@ -142,8 +207,16 @@ html.dark .workspace-page {
   overscroll-behavior: contain;
 }
 
+.workspace-page .workspace-page__stage:has(> .workspace-empty:only-child) {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  padding-top: clamp(32px, 12vh, 112px);
+}
+
 /* ---- surfaces ---------------------------------------------------------- */
-.workspace-page :is(.ui-card, .card, .glass-panel) {
+.workspace-page :is(.ui-card, .card, .glass-panel),
+.workspace-page :is(.workspace-card, .workspace-panel).ui-card {
   border: 1px solid var(--wp-border);
   border-radius: var(--wp-radius);
   background: var(--wp-bg);
@@ -153,6 +226,18 @@ html.dark .workspace-page {
 
 .workspace-page :is(.ui-card-light, .ui-card-heavy) {
   background: var(--wp-bg-subtle);
+}
+
+.workspace-page .ui-card::before {
+  display: none;
+}
+
+.workspace-page .workspace-panel { padding: 16px; }
+
+.workspace-panel > :is(h2, h3):first-child {
+  margin: 0 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--wp-border);
 }
 
 .workspace-page__stage :is(.rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl) {
@@ -173,6 +258,30 @@ html.dark .workspace-page {
 
 .workspace-card {
   color: var(--wp-text);
+}
+
+.workspace-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 14px;
+}
+
+.workspace-resource-fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 3px;
+  border-bottom: 1px solid var(--wp-border);
+}
+
+.workspace-resource-fact > :last-child {
+  min-width: 0;
+  color: var(--wp-text);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .workspace-card:hover {
@@ -226,21 +335,57 @@ html.dark .workspace-page {
 
 /* ---- controls ---------------------------------------------------------- */
 .workspace-page :is(button, .btn, input, select, textarea) {
-  border-radius: var(--wp-radius);
+  border-radius: 5px;
 }
 
 .workspace-page :is(button, .btn) {
   box-shadow: none;
 }
 
+.workspace-page button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.workspace-page :is(.workspace-button--secondary, .workspace-button--primary) {
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  height: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.workspace-page .workspace-button--secondary {
+  border-color: var(--wp-border-strong);
+  background: var(--wp-bg);
+  color: var(--wp-text-muted);
+}
+
+.workspace-page .workspace-button--secondary:hover:not(:disabled) {
+  border-color: var(--wp-border-strong);
+  background: var(--wp-bg-subtle);
+  color: var(--wp-text);
+}
+
+.workspace-page .workspace-button--primary {
+  border-color: transparent;
+  background: var(--wp-action);
+  color: var(--wp-action-text);
+}
+
+.workspace-page .workspace-button--primary:hover:not(:disabled) { background: var(--wp-action-hover); }
+
 .workspace-page :is(
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
   select,
   textarea
 ) {
-  min-height: 31px;
+  min-height: 34px;
   max-width: 100%;
-  padding: 5px 9px;
+  padding: 6px 9px;
   border: 1px solid var(--wp-border-strong);
   background: var(--wp-bg);
   color: var(--wp-text);
@@ -259,6 +404,30 @@ html.dark .workspace-page {
   min-height: 64px;
   padding: 6px 8px;
 }
+
+.workspace-page select { color-scheme: light; }
+html.dark .workspace-page select { color-scheme: dark; }
+
+.workspace-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.workspace-filter-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 2px;
+  background: transparent;
+  color: var(--wp-text-muted);
+  font-size: 11px;
+}
+
+.workspace-filter-reset:hover:not(:disabled) { color: var(--wp-accent); }
 
 .workspace-page :is(input, select, textarea)::placeholder {
   color: var(--wp-text-faint);
@@ -343,6 +512,8 @@ html.dark .workspace-page {
   background: var(--wp-bg);
 }
 
+.workspace-page .workspace-table { overflow-x: auto; }
+
 .workspace-table table {
   width: 100%;
   border-collapse: collapse;
@@ -415,10 +586,11 @@ html.dark .workspace-page {
 
 /* ---- empty / status --------------------------------------------------- */
 .workspace-empty {
-  max-width: 28rem;
-  margin: 28px auto 0;
-  padding: 30px 26px;
-  border: 1px dashed var(--wp-border-strong);
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 36px 28px;
+  border: 1px solid var(--wp-border);
   border-radius: var(--wp-radius);
   background: var(--wp-bg-subtle);
   text-align: center;
@@ -428,13 +600,34 @@ html.dark .workspace-page {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  margin: 0 auto 12px;
-  border: 1px solid var(--wp-border);
-  border-radius: var(--wp-radius);
-  background: var(--wp-bg);
-  color: var(--wp-text-faint);
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 18px;
+  border: 1px solid color-mix(in srgb, var(--wp-accent) 18%, var(--wp-border));
+  border-radius: 12px;
+  background: var(--wp-accent-soft);
+  color: var(--wp-accent);
+}
+
+.workspace-empty__icon svg { width: 22px; height: 22px; }
+
+.workspace-page__stage .workspace-empty h3 {
+  margin-bottom: 6px;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.workspace-empty p {
+  max-width: 34ch;
+  margin: 0 auto 22px;
+  color: var(--wp-text-muted);
+}
+
+.workspace-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
 }
 
 .workspace-alert {
@@ -489,16 +682,44 @@ html.dark .workspace-page {
   margin-top: 12px;
 }
 
-@media (max-width: 1100px) {
-  .workspace-page .workspace-page__rail[data-open="true"] {
-    width: 224px;
+/* Available page width includes the navigation and assistant docks. */
+@container (max-width: 680px) {
+  .workspace-page__body {
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
-}
 
-@media (max-width: 720px) {
-  .workspace-page__stage {
-    padding: 12px !important;
+  .workspace-page .workspace-page__rail[data-open="true"] {
+    width: 100%;
+    height: auto;
+    overflow: visible;
   }
+
+  .workspace-page .workspace-page__rail-card {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .workspace-page__rail-heading { grid-column: 1 / -1; }
+  .workspace-page__rail-card > * { min-width: 0; }
+
+  .workspace-page .workspace-page__stage {
+    flex: 1 0 auto;
+    min-height: 300px;
+    padding: 14px;
+    overflow: visible !important;
+  }
+
+  .workspace-page .workspace-page__stage:has(> .workspace-empty:only-child) {
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+
+  .workspace-empty { padding: 28px 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

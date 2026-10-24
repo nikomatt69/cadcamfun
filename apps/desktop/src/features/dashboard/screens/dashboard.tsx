@@ -5,6 +5,11 @@
  *
  * No hero card, no animations, no gradients — the toolbar already carries
  * the title and the primary actions.
+ *
+ * The section headings, the KPI tiles and the spec lists are the shared
+ * enterprise vocabulary (`SectionHeader`, `StatTile`, `KeyValueList`), not
+ * dashboard-private markup, so a page that needs the same pattern later
+ * reaches for the same component.
  */
 import { For, Show, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
@@ -26,6 +31,7 @@ import {
   TOOLBAR_PRIMARY,
   WorkspacePage
 } from "../../../shared/components/WorkspacePage.tsx"
+import { KeyValueList, SectionHeader, StatGrid, StatTile } from "../../../shared/components/enterprise.tsx"
 import { t } from "../../../i18n/index.ts"
 
 interface DashboardData {
@@ -151,7 +157,13 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
   return (
     <WorkspacePage
       title={t("shell.dashboard")}
+      eyebrow={t("dashboard.hero.eyebrow")}
+      description={t("dashboard.hero.tagline")}
       actions={<>
+        <span class={`${BADGE} workspace-badge--ok`}>
+          <span class="dash-dot" aria-hidden="true" />
+          {t("dashboard.status.nominal")}
+        </span>
         <A href="/projects" class={TOOLBAR_BUTTON}>
           <FolderOpen size={14} aria-hidden="true" />
           {t("dashboard.hero.cta.browse")}
@@ -167,48 +179,22 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
           <StageLoading label={t("dashboard.loading")} />
         </Show>
 
-        <section class="dash-open" aria-label={t("dashboard.hero.eyebrow")}>
-          <div class="dash-open-top">
-            <span class="dash-dot" aria-hidden="true" />
-            <span class="dash-open-eyebrow">{t("dashboard.hero.eyebrow")}</span>
-            <span class="dash-statusline-sep" aria-hidden="true">·</span>
-            <span class="dash-statusline-dim">{t("dashboard.hero.env")}</span>
-            <span class="dash-statusline-spacer" aria-hidden="true" />
-            <span class={BADGE}>{t("dashboard.status.nominal")}</span>
-          </div>
-          <div class="dash-open-main">
-            <p class="dash-lede">{t("dashboard.hero.tagline")}</p>
-          </div>
-        </section>
-
         <section aria-label={t("dashboard.kpi.label")}>
-          <div class="dash-sect">
-            <span class="dash-code">01</span>
-            <h2 class="dash-h2">{t("dashboard.kpi.label")}</h2>
-            <span class="dash-rule" aria-hidden="true" />
-          </div>
-          <div class="dash-kpi-grid" role="list">
+          <SectionHeader index="01" title={t("dashboard.kpi.label")} />
+          <StatGrid>
             <For each={metrics()}>{(m) => <MetricCell {...m} />}</For>
-          </div>
+          </StatGrid>
         </section>
 
         <section aria-label={t("dashboard.modules.label")}>
-          <div class="dash-sect">
-            <span class="dash-code">02</span>
-            <h2 class="dash-h2">{t("dashboard.modules.label")}</h2>
-            <span class="dash-rule" aria-hidden="true" />
-          </div>
+          <SectionHeader index="02" title={t("dashboard.modules.label")} />
           <div class="dash-mod-grid">
             <For each={modules()}>{(m) => <ModuleCard {...m} />}</For>
           </div>
         </section>
 
         <section aria-label={t("dashboard.system.title")}>
-          <div class="dash-sect">
-            <span class="dash-code">03</span>
-            <h2 class="dash-h2">{t("dashboard.detail.label")}</h2>
-            <span class="dash-rule" aria-hidden="true" />
-          </div>
+          <SectionHeader index="03" title={t("dashboard.detail.label")} />
           <div class="dash-split">
             <SystemCard data={props.data} />
             <QuickCard />
@@ -222,20 +208,15 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
 function MetricCell(props: MetricData): JSX.Element {
   const Icon = props.icon
   return (
-    <A
+    <StatTile
+      index={props.code}
+      icon={<Icon size={14} aria-hidden="true" />}
+      label={props.label}
+      value={props.value ?? t("dashboard.metric.unavailable")}
+      meta={props.meta}
+      alert={props.metaAlert}
       href={props.href}
-      class="dash-kpi"
-      role="listitem"
-      aria-label={`${props.label}: ${props.value ?? t("dashboard.metric.unavailable")}`}
-    >
-      <span class="dash-kpi-top">
-        <span class="dash-code">{props.code}</span>
-        <Icon size={14} aria-hidden="true" class="dash-kpi-icon" />
-      </span>
-      <strong class="dash-kpi-value">{props.value ?? t("dashboard.metric.unavailable")}</strong>
-      <span class="dash-kpi-label">{props.label}</span>
-      <span class={`dash-kpi-meta${props.metaAlert ? " dash-kpi-meta-alert" : ""}`}>{props.meta}</span>
-    </A>
+    />
   )
 }
 
@@ -250,16 +231,9 @@ function ModuleCard(props: ModuleData): JSX.Element {
             <h3 class="dash-mod-title">{props.title}</h3>
             <p class="dash-mod-sub">{props.subtitle}</p>
           </div>
-          <span class="dash-code dash-mod-idx">{props.index}</span>
+          <span class="ent-section__index dash-mod-idx">{props.index}</span>
         </div>
-        <dl class="dash-spec">
-          <For each={props.specs}>{(s) => (
-            <div class="dash-spec-row">
-              <dt>{s.k}</dt>
-              <dd>{s.v}</dd>
-            </div>
-          )}</For>
-        </dl>
+        <KeyValueList rows={props.specs.map((spec) => ({ label: spec.k, value: spec.v }))} />
       </div>
       <div class="dash-card-foot">
         <span class="dash-stat">{props.stat}</span>
@@ -273,7 +247,7 @@ function ModuleCard(props: ModuleData): JSX.Element {
 }
 
 function SystemCard(props: { readonly data: DashboardData }): JSX.Element {
-  const rows: ReadonlyArray<{ readonly label: string; readonly value: string }> = [
+  const rows = (): ReadonlyArray<{ readonly label: string; readonly value: string }> => [
     { label: t("dashboard.system.latency"), value: "14 ms" },
     { label: t("dashboard.system.cache"), value: "97%" },
     { label: t("dashboard.system.errors"), value: "0.1%" },
@@ -283,17 +257,10 @@ function SystemCard(props: { readonly data: DashboardData }): JSX.Element {
   return (
     <section class="dash-panel" aria-label={t("dashboard.system.title")}>
       <div class="dash-panel-head">
-        <h2 class="dash-h2">{t("dashboard.system.title")}</h2>
+        <h2 class="ent-section__title">{t("dashboard.system.title")}</h2>
         <span class={BADGE}>{t("dashboard.status.nominal")}</span>
       </div>
-      <dl class="dash-table">
-        <For each={rows}>{(r) => (
-          <div class="dash-table-row">
-            <dt>{r.label}</dt>
-            <dd class="dash-mono">{r.value}</dd>
-          </div>
-        )}</For>
-      </dl>
+      <KeyValueList rows={rows().map((row) => ({ label: row.label, value: row.value }))} />
     </section>
   )
 }
@@ -308,7 +275,7 @@ function QuickCard(): JSX.Element {
   return (
     <section class="dash-panel" aria-label={t("dashboard.quick.title")}>
       <div class="dash-panel-head">
-        <h2 class="dash-h2">{t("dashboard.quick.title")}</h2>
+        <h2 class="ent-section__title">{t("dashboard.quick.title")}</h2>
       </div>
       <nav class="dash-rows">
         <For each={tiles()}>{(tile) => (
