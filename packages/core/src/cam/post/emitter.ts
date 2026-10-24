@@ -272,12 +272,14 @@ class Writer {
    */
   private ensureTcp(want: boolean): void {
     const code = this.dialect.tcp
-    if (code === undefined || want === this.tcpOn) return
+    if (code === undefined || this.options.tcp === false || want === this.tcpOn) return
     if (want) {
-      this.block(code, `H${this.tool}`)
+      if (typeof code === "string") this.block(code, `H${this.tool}`)
+      else this.block(code.on(this.tool))
       this.tcpOn = true
     } else {
-      this.block("G43", `H${this.tool}`)
+      if (typeof code === "string") this.block("G43", `H${this.tool}`)
+      else this.block(code.off(this.tool))
       this.tcpOn = false
     }
   }
@@ -524,7 +526,8 @@ class Writer {
    */
   endTcp(): void {
     if (!this.tcpOn) return
-    this.block("G49")
+    const code = this.dialect.tcp
+    this.block(typeof code === "object" ? (code.end ?? code.off)(this.tool) : "G49")
     this.tcpOn = false
   }
 }

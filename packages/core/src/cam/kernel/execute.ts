@@ -679,7 +679,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const post = getPost(machine.post) ?? genericPost
   let nc = ""
   try {
-    nc = toolpaths.length === 0 ? "" : post.emit(program, { ...job.post?.options, toolNumbers: numbers, retractBeforeToolChange: true })
+    // The kernel writes machine coordinates (indexed setups): no tip-control word unless the caller asks for one.
+    nc = toolpaths.length === 0 ? "" : post.emit(program, { tcp: false, ...job.post?.options, toolNumbers: numbers, retractBeforeToolChange: true })
   } catch (error) {
     issues.push(issue("GenerationFailed", "post", `Post ${post.id}: ${error instanceof Error ? error.message : String(error)}`))
   }

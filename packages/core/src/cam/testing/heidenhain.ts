@@ -12,7 +12,7 @@ export const decodeKlartext = (text: string): { readonly text: string; readonly 
     if (end) return end[1] === name ? "M30" : bad()
     const tool = /^TOOL CALL (\d+) Z S(\d+(?:\.\d+)?)$/.exec(line)
     if (tool) return `T${tool[1]} M6 S${tool[2]}`
-    if (/^M(?:0|1|2|3|4|5|7|8|9|30)$/.test(line)) return line
+    if (/^M(?:0|1|2|3|4|5|7|8|9|30|128|129)$/.test(line)) return line
     if (line === "CYCL DEF 9.0 DWELL TIME") { dwell = true; return "" }
     const time = /^CYCL DEF 9.1 DWELL (\d+(?:\.\d+)?)$/.exec(line)
     if (time && dwell) { dwell = false; return `G4 P${time[1]}` }

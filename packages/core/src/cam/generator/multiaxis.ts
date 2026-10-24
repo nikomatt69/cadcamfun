@@ -122,7 +122,8 @@ export const multiaxisProgram = (
     }
   })
   try {
-    const gcode = post.emit(program, options.stamp !== undefined ? { stamp: options.stamp } : {})
+    // A machine whose control has no tool-centre-point control gets machine coordinates and none of its words.
+    const gcode = post.emit(program, { ...(options.stamp !== undefined ? { stamp: options.stamp } : {}), tcp: kinematic.tcp === "control" })
     return { gcode, warnings }
   } catch (cause) {
     return { ...fail(cause instanceof Error ? cause.message : String(cause)), warnings }

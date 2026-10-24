@@ -3,9 +3,13 @@ import { emitProgram } from "./emitter.ts"
 import { genericDialect } from "./generic.ts"
 import type { Dialect, Post, PostOptions } from "./types.ts"
 
-/** Native Klartext subset: explicit linear XYZABC, expanded drilling, tool calls and dwell. No TCP or tilted planes. */
+/**
+ * Native Klartext subset: explicit linear XYZABC, expanded drilling, tool calls and dwell. A simultaneous five-axis section is
+ * bracketed by `M128` (tool tip positioning kept by the control) and `M129`. No tilted planes.
+ */
 export const heidenhainDialect: Dialect = {
-  ...genericDialect, id: "heidenhain", canned: false, rigidTap: undefined, arcModes: ["linearize"], commentStyle: "semicolon"
+  ...genericDialect, id: "heidenhain", canned: false, rigidTap: undefined, arcModes: ["linearize"], commentStyle: "semicolon",
+  tcp: { on: () => "M128", off: () => "M129" }
 }
 
 export const heidenhainPost: Post = {
@@ -33,7 +37,7 @@ export const heidenhainPost: Post = {
       if (/^(?:G21|G90|G17|G94|G54)(?:\s+(?:G90|G17|G94))*$/.test(line)) continue
       const dwell = /^G4 P([\d.]+)$/.exec(line)
       if (dwell) { lines.push("CYCL DEF 9.0 DWELL TIME", `CYCL DEF 9.1 DWELL ${dwell[1]}`); continue }
-      if (/^M(?:0|1|2|5|7|8|9|30)$/.test(line)) { lines.push(line); continue }
+      if (/^M(?:0|1|2|5|7|8|9|30|128|129)$/.test(line)) { lines.push(line); continue }
       if (/^G[01](?:\s|$)/.test(line)) { rapid = /^G0(?:\s|$)/.test(line); line = line.replace(/^G[01]\s*/, "") }
       // Every remaining token must be a supported axis or feed, never a silently dropped controller command.
       const words = line.match(/[XYZABCF][+-]?(?:\d+(?:\.\d*)?|\.\d+)/g) ?? []

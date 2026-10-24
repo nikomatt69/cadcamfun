@@ -9,9 +9,9 @@ import type { Dialect, Post } from "./types.ts"
  *
  * What it deliberately leaves out: no canned cycle (`CYCLE81..` take parameter lists of their own, so drilling is written as
  * moves, with pecking), no rigid tapping (`G331` / `G332` need `SPOS` and a thread-specific block: the planner mills the thread),
- * no subprograms (a Siemens subprogram is a separate `_SPF` file), no tool-centre-point command (`TRAORI` needs the machine's
- * kinematic transformation number; the kernel writes machine coordinates, like its other five-axis posts). A shop that needs those
- * enters its own post; none of this is qualified on a real control.
+ * no subprograms (a Siemens subprogram is a separate `_SPF` file). A simultaneous five-axis section is opened with `TRAORI` (the
+ * machine's first kinematic transformation; a machine with several needs its own `TRAORI(n)`) and closed with `TRAFOOF`. A shop
+ * that needs the rest enters its own post; none of this is qualified on a real control.
  */
 export const siemensProgramName = (program: Program): string => {
   const clean = program.name.toUpperCase().replace(/[^A-Z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24)
@@ -28,6 +28,7 @@ export const siemensDialect: Dialect = {
   commentStyle: "semicolon",
   unitCodes: { mm: "G71", inch: "G70" },
   rotary: true,
+  tcp: { on: () => "TRAORI", off: () => "TRAFOOF" },
   begin: (program) => [`%_N_${siemensProgramName(program)}_MPF`, ";$PATH=/_N_MPF_DIR"],
   setup: ["G90", "G17", "G94", "G40", "G64"],
   toolChange: (n) => [`T${n} M6`, "D1"],

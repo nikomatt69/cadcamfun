@@ -29,6 +29,11 @@ export interface PostOptions {
    */
   readonly toolNumbers?: Readonly<Record<string, number>>
   /**
+   * `false` when the program is written in machine coordinates (the control has no tool-centre-point control, or it is not to be
+   * used): no tip-control word is written even if the dialect has one. Default: written whenever rotary moves are simultaneous.
+   */
+  readonly tcp?: boolean
+  /**
    * Raise Z to the highest point the program has reached before a tool change
    * (`M5` / `M9` / `T… M6`). A real changer cannot pull the tool out of the
    * material; off by default so existing output stays byte-identical.
@@ -58,6 +63,14 @@ export interface Post {
   emit(program: Program, options?: Partial<PostOptions>): string
 }
 
+/** The blocks that switch tool-centre-point control on and off, for a control that has no tool-length-offset form of it. */
+export interface TcpCodes {
+  readonly on: (tool: number) => string
+  readonly off: (tool: number) => string
+  /** Written at the end of the program when the section is still open (default: `off`). */
+  readonly end?: (tool: number) => string
+}
+
 /** What differs between G-code dialects; the emitter is shared. */
 export interface Dialect {
   readonly id: PostId
@@ -74,11 +87,12 @@ export interface Dialect {
    */
   readonly rotary: boolean
   /**
-   * Code that hands the tool centre point to the control (Haas `G234`), written
-   * once before a simultaneous 5-axis section and cancelled with `G43` after it.
-   * Absent on controls that must be given machine coordinates instead.
+   * How the tool centre point is handed to the control, written once before a simultaneous 5-axis section and cancelled
+   * after it. A string is a tool-length-offset code (Haas `G234`, Fanuc `G43.4`): `<code> H<n>` on, `G43 H<n>` off, `G49` if
+   * the program ends with it on. `TcpCodes` writes the blocks a control has instead (Siemens `TRAORI` / `TRAFOOF`,
+   * Heidenhain `M128` / `M129`). Absent on controls that must be given machine coordinates instead.
    */
-  readonly tcp?: string
+  readonly tcp?: string | TcpCodes
   /**
    * Rigid tapping (`G84` with the feed = pitch x speed). Absent on controls without it: a tapping cycle is then refused, since no
    * expansion into plain moves reverses the spindle. `prefix` is the block the control needs before the cycle (Fanuc `M29 S<rpm>`).

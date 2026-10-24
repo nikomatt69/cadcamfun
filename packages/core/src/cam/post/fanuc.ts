@@ -7,6 +7,9 @@ import type { Dialect, Post } from "./types.ts"
  * start block (cancel cutter compensation, length offset and canned cycles),
  * tool length offset `G43` after each tool change, millisecond dwells.
  * The program number comes from `metadata.programNumber` (default 1000).
+ *
+ * A simultaneous five-axis section is opened with `G43.4 H<n>` (tool tip control, a Fanuc option the machine builder enables) and closed
+ * with `G43 H<n>`, like Haas does with `G234`; the program is then in the work offset, the control keeps the tool tip on the path.
  */
 /** The program number of the main program (`metadata.programNumber`, default 1000). */
 export const fanucProgramNumber = (program: Program): number => {
@@ -32,6 +35,7 @@ export const fanucDialect: Dialect = {
   dwell: "milliseconds",
   uppercaseComments: true,
   rotary: true,
+  tcp: "G43.4",
   begin: (program) => ["%", `O${String(fanucProgramNumber(program)).padStart(4, "0")}`],
   subprograms: fanucSubprograms,
   setup: ["G90", "G17", "G94", "G40", "G49", "G80"],

@@ -7623,7 +7623,8 @@ var heidenhainDialect = {
   canned: false,
   rigidTap: undefined,
   arcModes: ["linearize"],
-  commentStyle: "semicolon"
+  commentStyle: "semicolon",
+  tcp: { on: () => "M128", off: () => "M129" }
 };
 // ../../../packages/core/src/cam/testing/gcode-interpreter.ts
 var SILENT_STATEMENTS = new Set(["MSG", "TRAORI", "TRAFOOF", "SOFT", "BRISK", "FFWON", "FFWOF", "CFC", "CFTCP", "CFIN", "STOPRE", "WORKPIECE", "DIAMON", "DIAMOF", "DIAM90", "CYCLE832", "COMPCAD", "COMPCURV", "COMPOF", "SUPA", "TOFFON", "TOFFOF", "SETMS", "SPOS", "WAIT", "DEF", "PRINT_START", "PRINT_END", "START_PRINT", "END_PRINT", "SET_PRESSURE_ADVANCE"]);

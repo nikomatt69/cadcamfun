@@ -58,6 +58,18 @@ describe("5-axis program from the generator", () => {
     expect(linear).toBeDefined()
   })
 
+  test("each control writes its own tip-control words when the machine declares them, and none for machine coordinates", () => {
+    const rotary = (tcp: "control" | "program") => ({ ...umcConfig.rotary, tcp })
+    const word = (controller: string, tcp: "control" | "program") => request({ ...umcConfig, controller, rotary: rotary(tcp) })
+    for (const [controller, on, off] of [["Fanuc", "G43.4 H1", "G43 H1"], ["Haas", "G234 H1", "G43 H1"], ["Siemens", "TRAORI", "TRAFOOF"]] as const) {
+      const text = generateToolpath(word(controller, "control")).response.gcode
+      expect(text, controller).toContain(on)
+      expect(text.indexOf(off, text.indexOf(on)), controller).toBeGreaterThan(text.indexOf(on))
+      // The control has no tip control: the angles are machine coordinates, and no word asks the control to apply it.
+      expect(generateToolpath(word(controller, "program")).response.gcode, controller).not.toMatch(/G43\.4|G234|TRAORI|TRAFOOF/)
+    }
+  })
+
   test("a 5-axis operation on a 3-axis machine is refused with the reason", () => {
     const outcome = generateToolpath(request({ axes: 3, controller: "grbl", workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000 }))
     expect(outcome.error).toContain("5-axis machine")
