@@ -1,8 +1,8 @@
 name: Release
 
-# The six platform releases of one version. It is called by `publish.yml`, which owns the
-# index release (`v6.0.1`) and the updater manifest that points at these releases; it can
-# also be dispatched by hand to rebuild an existing tag.
+# Build all six targets as Actions artifacts. `publish.yml` verifies and uploads them
+# together to the single version release, then publishes it. Manual dispatch rebuilds
+# an existing tag as downloadable artifacts without modifying published releases.
 on:
   workflow_call:
     inputs:
@@ -219,7 +219,7 @@ jobs:
       - name: Build architecture-specific updater manifest
         if: ${{ !contains(matrix.target, 'linux') }}
         env:
-          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ needs.trusted.outputs.tag }}-${{ matrix.slug }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ needs.trusted.outputs.tag }}
           RELEASE_VERSION: ${{ needs.trusted.outputs.version }}
           RELEASE_DATE: ${{ needs.trusted.outputs.pub_date }}
           RELEASE_TARGET: ${{ matrix.target }}
@@ -265,73 +265,4 @@ jobs:
           name: latest-json
           path: latest.json
           if-no-files-found: error
-
-  publish-platform:
-    name: release ${{ matrix.slug }}
-    needs: [trusted, build, manifest]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { target: aarch64-apple-darwin, slug: macos-arm64, label: macOS (Apple Silicon) }
-          - { target: x86_64-apple-darwin, slug: macos-x64, label: macOS (Intel) }
-          - { target: x86_64-pc-windows-msvc, slug: windows-x64, label: Windows (x64) }
-          - { target: aarch64-pc-windows-msvc, slug: windows-arm64, label: Windows (ARM64) }
-          - { target: x86_64-unknown-linux-gnu, slug: linux-x64, label: Linux (x64) }
-          - { target: aarch64-unknown-linux-gnu, slug: linux-arm64, label: Linux (ARM64) }
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      PLATFORM_TAG: ${{ needs.trusted.outputs.tag }}-${{ matrix.slug }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.trusted.outputs.sha }}
-      - uses: ./.github/actions/setup-bun
-        with:
-          install: "false"
-      - uses: actions/download-artifact@v4
-        with:
-          name: installers-${{ matrix.target }}
-          path: installers
-      - uses: actions/download-artifact@v4
-        if: ${{ !contains(matrix.target, 'linux') }}
-        with:
-          name: manifest-${{ matrix.target }}
-          path: manifest
-      - name: Verify checksums, signatures and manifest links; stage this platform's release
-        env:
-          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ needs.trusted.outputs.tag }}-${{ matrix.slug }}
-        shell: bash
-        run: |
-          if [ -f manifest/latest.json ]; then
-            bun --no-env-file scripts/stage-release.ts --mode=platform --installers=installers --manifest=manifest/latest.json --out=dist --release-url="$RELEASE_URL"
-          else
-            bun --no-env-file scripts/stage-release.ts --mode=installers --installers=installers --out=dist
-          fi
-      - name: Refuse to modify an already published release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$PLATFORM_TAG" --json isDraft > existing-release.json 2> /dev/null; then
-            jq -e '.isDraft == true' existing-release.json > /dev/null || { echo "Release $PLATFORM_TAG is already published" >&2; exit 1; }
-          fi
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.PLATFORM_TAG }}
-          target_commitish: ${{ needs.trusted.outputs.sha }}
-          name: CADCAM FUN ${{ needs.trusted.outputs.tag }} for ${{ matrix.label }}
-          draft: false
-          prerelease: ${{ contains(needs.trusted.outputs.version, '-') }}
-          # Only the index release may be "latest": the updater reads latest.json from it.
-          make_latest: "false"
-          body_path: dist/RELEASE_NOTES.md
-          files: dist/*
-          fail_on_unmatched_files: true
-
-  # The index release (`v6.0.1`) and the npm package are published by `publish.yml`, which
-  # owns the release as a whole: it creates the index release as a draft, calls this
-  # workflow for the six platform releases, and only makes the index release public once
-  # the updater manifest is attached to it.
 

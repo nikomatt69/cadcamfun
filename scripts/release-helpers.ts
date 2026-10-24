@@ -30,7 +30,7 @@ export async function captureCommand(
 /**
  * The repository the releases are published to.
  *
- * The index release, the six platform releases and the updater feed all live here, so
+ * Installers for all six targets and the updater feed live on one release here, so
  * the name is written once and checked against the publish workflow and the Tauri
  * configuration: a feed that points at another repository resolves to nothing.
  */
@@ -98,23 +98,8 @@ export const RELEASE_PLATFORM_KEYS = Object.freeze(Object.keys(RELEASE_PLATFORM_
  */
 export const UPDATER_PLATFORM_KEYS = Object.freeze(RELEASE_PLATFORM_KEYS.filter((key) => !key.startsWith("linux-")));
 
-/** Suffix of a platform's own GitHub release: `v6.0.0` is shipped as `v6.0.0-macos-arm64`, `v6.0.0-windows-x64`, ... */
-export const RELEASE_PLATFORM_SLUGS: Readonly<Record<string, string>> = {
-  "aarch64-apple-darwin": "macos-arm64",
-  "x86_64-apple-darwin": "macos-x64",
-  "aarch64-pc-windows-msvc": "windows-arm64",
-  "x86_64-pc-windows-msvc": "windows-x64",
-  "aarch64-unknown-linux-gnu": "linux-arm64",
-  "x86_64-unknown-linux-gnu": "linux-x64",
-};
-
+// Ignore historical per-platform tags when discovering application versions.
 const PLATFORM_TAG = /-(?:macos|windows|linux)-(?:arm64|x64)$/;
-
-export function platformReleaseTag(tag: string, triple: string): string {
-  const slug = RELEASE_PLATFORM_SLUGS[triple];
-  if (!slug) throw new Error(`Unsupported target: ${triple}`);
-  return `${tag}-${slug}`;
-}
 
 export function targetInfo(triple: string): { platform: "darwin" | "linux" | "windows"; arch: "aarch64" | "x86_64"; bunTarget: string } {
   const arch = triple.split("-")[0];

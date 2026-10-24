@@ -13,7 +13,7 @@ test("the updater feed points at the repository the releases are published to", 
     plugins: { updater: { endpoints: string[] } };
   };
   expect(config.plugins.updater.endpoints).toContain(RELEASE_UPDATER_ENDPOINT);
-  // The endpoint is the feed of the *latest* release: the index release carries the
+  // The endpoint is the feed of the *latest* release: the version release carries the
   // merged manifest and is the one GitHub marks as the latest.
   expect(RELEASE_UPDATER_ENDPOINT).toBe(`https://github.com/${RELEASE_REPOSITORY}/releases/latest/download/latest.json`);
 });

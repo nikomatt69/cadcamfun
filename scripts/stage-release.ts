@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { assertManifestAssets, mergeManifestValues, parseChecksums, platformReleaseTag, RELEASE_PLATFORM_SLUGS, RELEASE_PLATFORM_TRIPLES, UPDATER_PLATFORM_KEYS, validateManifest } from "./release-helpers.ts";
+import { assertManifestAssets, mergeManifestValues, parseChecksums, RELEASE_PLATFORM_TRIPLES, releaseVersion, UPDATER_PLATFORM_KEYS, validateManifest } from "./release-helpers.ts";
 
 function assetName(url: string): string {
   return decodeURIComponent(new URL(url).pathname.split("/").at(-1) ?? "");
@@ -40,51 +40,42 @@ async function writeStaged(out: string, notes: string, assets: Map<string, { pat
   await writeFile(join(out, "RELEASE_NOTES.md"), notes);
 }
 
-/**
- * One platform's release: its installers and signatures, checked against the SHA256SUMS the build wrote and against the
- * platform's own updater manifest. `installers` is the artifact directory of a single target.
- */
-export async function stagePlatformRelease(installers: string, manifestPath: string, out: string, releaseUrl: string): Promise<void> {
-  const manifest = validateManifest(JSON.parse(await readFile(manifestPath, "utf8")));
-  const { notes, assets } = await indexedInstallers(installers);
-  if (notes !== manifest.notes) throw new Error("Manifest and release notes disagree");
-  assertManifestAssets(manifest, [...assets.keys()], releaseUrl);
+/** Verify all six build artifacts and stage one release with a combined checksum index. */
+export async function stageRelease(installers: string, manifestPath: string, out: string, downloadUrl: string, tag: string): Promise<void> {
+  const validated = validateManifest(JSON.parse(await readFile(manifestPath, "utf8")));
+  const manifest = mergeManifestValues([validated], releaseVersion(tag), UPDATER_PLATFORM_KEYS);
+  const triples = Object.values(RELEASE_PLATFORM_TRIPLES);
+  const expected = triples.map((triple) => `installers-${triple}`).sort();
+  if (JSON.stringify((await readdir(installers)).sort()) !== JSON.stringify(expected)) {
+    throw new Error("Incomplete or unexpected release target set");
+  }
+  const assets = new Map<string, { path: string; digest: string }>();
+  for (const triple of triples) {
+    const platform = await indexedInstallers(join(installers, `installers-${triple}`));
+    if (platform.notes !== manifest.notes) throw new Error(`Manifest and release notes disagree: ${triple}`);
+    const suffixes = triple.includes("darwin") ? [".app.tar.gz", ".dmg"]
+      : triple.includes("windows") ? [".exe", ".msi"] : [".deb", ".rpm"];
+    for (const suffix of suffixes) {
+      if (![...platform.assets.keys()].some((name) => name.endsWith(suffix))) {
+        throw new Error(`Missing ${suffix} installer: ${triple}`);
+      }
+    }
+    for (const [name, asset] of platform.assets) {
+      if (!name.startsWith(`${triple}--`) || !suffixes.some((suffix) => name.endsWith(suffix) || name.endsWith(`${suffix}.sig`))) {
+        throw new Error(`Unexpected release asset for ${triple}: ${name}`);
+      }
+      if (name.endsWith(".sig") && !platform.assets.has(name.slice(0, -4))) throw new Error(`Orphan signature: ${name}`);
+      if (assets.has(name)) throw new Error(`Duplicate release asset: ${name}`);
+      assets.set(name, asset);
+    }
+  }
+  assertManifestAssets(manifest, [...assets.keys()], `${downloadUrl.replace(/\/$/, "")}/${tag}`);
   for (const entry of Object.values(manifest.platforms)) {
     const name = assetName(entry.url);
     const signature = assets.get(`${name}.sig`);
     if (!signature || (await readFile(signature.path, "utf8")).trim() !== entry.signature) throw new Error(`Manifest signature mismatch: ${name}`);
   }
-  await writeStaged(out, notes, assets);
-}
-
-/** A platform release that has installers and checksums but no in-app updater artifact. Linux deb and rpm use this. */
-export async function stagePlatformInstallers(installers: string, out: string): Promise<void> {
-  const { notes, assets } = await indexedInstallers(installers);
-  if (assets.size === 0) throw new Error("Platform release has no installers");
-  await writeStaged(out, notes, assets);
-}
-
-/**
- * The index release (`v6.0.0`): only the merged `latest.json` the in-app updater reads, plus notes that link the six platform
- * releases. Every manifest URL must point into that platform's own release, so the updater never resolves to a missing asset.
- */
-export async function stageIndexRelease(manifestPath: string, out: string, downloadUrl: string, tag: string): Promise<void> {
-  const validated = validateManifest(JSON.parse(await readFile(manifestPath, "utf8")));
-  const manifest = mergeManifestValues([validated], validated.version, UPDATER_PLATFORM_KEYS);
-  const base = downloadUrl.replace(/\/$/, "");
-  const rows: string[] = [];
-  for (const [key, triple] of Object.entries(RELEASE_PLATFORM_TRIPLES)) {
-    const entry = manifest.platforms[key];
-    const platformTag = platformReleaseTag(tag, triple);
-    if (entry) {
-      const name = assetName(entry.url);
-      assertManifestAssets({ ...manifest, platforms: { [key]: entry } }, [name, `${name}.sig`], `${base}/${platformTag}`);
-    }
-    rows.push(`| ${RELEASE_PLATFORM_SLUGS[triple]} | [${platformTag}](${base.replace(/\/download$/, "")}/tag/${platformTag}) |`);
-  }
-  await emptyDirectory(out);
-  const notes = `${manifest.notes ?? ""}\n\n## Downloads\n\nEach platform has its own release.\n\n| Platform | Release |\n| --- | --- |\n${rows.join("\n")}\n`;
-  await writeFile(join(out, "RELEASE_NOTES.md"), notes);
+  await writeStaged(out, manifest.notes ?? "", assets);
   await writeFile(join(out, "latest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
@@ -92,7 +83,7 @@ if (import.meta.main) {
   try {
     const options = new Map<string, string>();
     for (const arg of process.argv.slice(2)) {
-      const match = /^--(mode|installers|manifest|out|release-url|download-url|tag)=(.+)$/.exec(arg);
+      const match = /^--(installers|manifest|out|download-url|tag)=(.+)$/.exec(arg);
       if (!match?.[1] || !match[2]) throw new Error(`Invalid argument: ${arg}`);
       options.set(match[1], match[2]);
     }
@@ -101,11 +92,7 @@ if (import.meta.main) {
       if (!value) throw new Error(`--${name} is required`);
       return value;
     };
-    const mode = required("mode");
-    if (mode === "platform") await stagePlatformRelease(resolve(required("installers")), resolve(required("manifest")), resolve(required("out")), required("release-url"));
-    else if (mode === "installers") await stagePlatformInstallers(resolve(required("installers")), resolve(required("out")));
-    else if (mode === "index") await stageIndexRelease(resolve(required("manifest")), resolve(required("out")), required("download-url"), required("tag"));
-    else throw new Error("--mode must be platform, installers or index");
+    await stageRelease(resolve(required("installers")), resolve(required("manifest")), resolve(required("out")), required("download-url"), required("tag"));
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;

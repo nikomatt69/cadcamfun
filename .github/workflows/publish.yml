@@ -6,8 +6,8 @@ run-name: "${{ format('release {0}', inputs.version || inputs.bump) }}"
 #   publish          resolve the version, stamp it across the workspace, write the
 #                    changelog, publish npm, commit and push the release, tag it and
 #                    create the *draft* GitHub release.
-#   desktop          build, sign and publish the six platform releases.
-#   publish-release  attach the updater manifest, make the release public and publish
+#   desktop          build and sign all six targets as Actions artifacts.
+#   publish-release  verify and upload all assets, make the release public and publish
 #                    the optional Homebrew cask.
 #
 # The release stays a draft until the last job, so a release that fails halfway is never
@@ -116,7 +116,7 @@ jobs:
           NPM_CONFIG_PROVENANCE: "false"
 
   desktop:
-    name: build and publish the platform releases
+    name: build all six desktop targets
     needs: publish
     uses: ./.github/workflows/release.yml
     with:
@@ -145,8 +145,14 @@ jobs:
           name: latest-json
           path: manifest
 
-      - name: Attach the updater manifest, make the release public and publish the cask
-        run: bun --no-env-file scripts/release-publish.ts --phase=complete --tag="$RELEASE_TAG" --manifest=manifest/latest.json
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          path: installers
+          merge-multiple: false
+
+      - name: Verify and upload all platforms, publish the release and the cask
+        run: bun --no-env-file scripts/release-publish.ts --phase=complete --tag="$RELEASE_TAG" --manifest=manifest/latest.json --installers=installers
         env:
           RELEASE_TAG: ${{ needs.publish.outputs.tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

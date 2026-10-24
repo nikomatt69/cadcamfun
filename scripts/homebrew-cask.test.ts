@@ -4,12 +4,12 @@ import { caskPath, renderCask, selectDmg } from "./homebrew-cask.ts";
 const ENTRIES = [
   {
     arch: "arm64" as const,
-    url: "https://github.com/nikomatt69/cadcamfun/releases/download/v6.0.1-macos-arm64/aarch64-apple-darwin--CADCAM%20FUN%206.0.1.dmg",
+    url: "https://github.com/nikomatt69/cadcamfun/releases/download/v6.0.1/aarch64-apple-darwin--CADCAM%20FUN%206.0.1.dmg",
     sha256: "a".repeat(64),
   },
   {
     arch: "x64" as const,
-    url: "https://github.com/nikomatt69/cadcamfun/releases/download/v6.0.1-macos-x64/x86_64-apple-darwin--CADCAM%20FUN%206.0.1.dmg",
+    url: "https://github.com/nikomatt69/cadcamfun/releases/download/v6.0.1/x86_64-apple-darwin--CADCAM%20FUN%206.0.1.dmg",
     sha256: "b".repeat(64),
   },
 ];
@@ -41,16 +41,18 @@ test("a cask without a macOS build is refused", () => {
   expect(() => renderCask({ version: "6.0.1", repository: "nikomatt69/cadcamfun", entries: [] })).toThrow("at least one macOS build");
 });
 
-test("the .dmg of a platform release is taken from its checksums", () => {
+test("each macOS .dmg is selected from the combined release checksums", () => {
   const digest = "c".repeat(64);
   const checksums = [
     `${digest}  aarch64-apple-darwin--CADCAM FUN 6.0.1.dmg`,
     `${"d".repeat(64)}  aarch64-apple-darwin--CADCAM FUN 6.0.1.dmg.sig`,
+    `${"e".repeat(64)}  x86_64-apple-darwin--CADCAM FUN 6.0.1.dmg`,
   ].join("\n");
   expect(selectDmg(checksums, "aarch64-apple-darwin")).toEqual({
     name: "aarch64-apple-darwin--CADCAM FUN 6.0.1.dmg",
     digest,
   });
+  expect(selectDmg(checksums, "x86_64-apple-darwin").digest).toBe("e".repeat(64));
   // A platform without a .dmg is an error, not a silently skipped build.
   expect(() => selectDmg(checksums, "x86_64-pc-windows-msvc")).toThrow("found 0");
 });

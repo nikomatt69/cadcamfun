@@ -52,8 +52,8 @@ export function caskPath(token = "cadcamfun"): string {
 /**
  * Render the cask.
  *
- * The two macOS architectures are published as separate platform releases, so the cask
- * picks the right one per machine with Homebrew's architecture blocks.
+ * Both macOS installers belong to the same release. Homebrew architecture blocks
+ * select the appropriate target-prefixed asset.
  */
 export function renderCask(input: CaskInput): string {
   if (input.entries.length === 0) throw new Error("The cask needs at least one macOS build");
@@ -107,7 +107,7 @@ export function renderCask(input: CaskInput): string {
 }
 
 /**
- * The `.dmg` of a platform release, with its digest.
+ * The `.dmg` for one target in the unified release, with its digest.
  *
  * The checksums come from the `SHA256SUMS` the build wrote and the release staging
  * verified, so the cask can never advertise a digest that was not checked.
@@ -126,30 +126,28 @@ export function selectDmg(
   return { name: entry.name, digest: entry.digest };
 }
 
-/** The cask entries of a release, read from the platform releases' checksum files. */
+/** The cask entries of a release, read from its combined checksum file. */
 export async function collectCaskEntries(options: {
   tag: string;
   repository: string;
-  platforms: readonly { triple: string; arch: "arm64" | "x64"; slug: string }[];
+  platforms: readonly { triple: string; arch: "arm64" | "x64" }[];
 }): Promise<CaskEntry[]> {
-  const entries: CaskEntry[] = [];
-  for (const platform of options.platforms) {
-    const directory = await mkdtemp(join(tmpdir(), "cadcam-cask-"));
-    try {
-      const download = await captureCommand(["gh", "release", "download", `${options.tag}-${platform.slug}`, "--pattern", "SHA256SUMS", "--repo", options.repository, "--dir", directory]);
-      if (download.code !== 0) throw new Error(`Cannot read the checksums of ${options.tag}-${platform.slug}: ${download.stderr.trim()}`);
-      const checksums = await readFile(join(directory, "SHA256SUMS"), "utf8");
+  const directory = await mkdtemp(join(tmpdir(), "cadcam-cask-"));
+  try {
+    const download = await captureCommand(["gh", "release", "download", options.tag, "--pattern", "SHA256SUMS", "--repo", options.repository, "--dir", directory]);
+    if (download.code !== 0) throw new Error(`Cannot read the checksums of ${options.tag}: ${download.stderr.trim()}`);
+    const checksums = await readFile(join(directory, "SHA256SUMS"), "utf8");
+    return options.platforms.map((platform) => {
       const dmg = selectDmg(checksums, platform.triple);
-      entries.push({
+      return {
         arch: platform.arch,
         sha256: dmg.digest,
-        url: `https://github.com/${options.repository}/releases/download/${options.tag}-${platform.slug}/${encodeURIComponent(dmg.name)}`,
-      });
-    } finally {
-      await rm(directory, { recursive: true, force: true });
-    }
+        url: `https://github.com/${options.repository}/releases/download/${options.tag}/${encodeURIComponent(dmg.name)}`,
+      };
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
-  return entries;
 }
 
 export interface PublishCaskOptions {

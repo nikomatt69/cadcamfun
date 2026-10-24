@@ -9,8 +9,8 @@
  *   --phase=start     resolve the version, stamp it across the workspace, write the
  *                     changelog, publish the npm package, commit and push the release,
  *                     tag it, and create the *draft* GitHub release.
- *   --phase=complete  attach the updater manifest to the release, make the release
- *                     public and publish the Homebrew cask.
+ *   --phase=complete  verify and attach all six targets and the updater manifest,
+ *                     make the release public and publish the Homebrew cask.
  *
  * The release stays a draft until the complete phase, so a release that fails halfway is
  * never visible to a user and the updater feed never points at a missing installer.
@@ -25,15 +25,15 @@ import { gitCommits, renderChangelogSection, renderNotes, writeChangelog } from 
 import { collectCaskEntries, publishCask } from "./homebrew-cask.ts";
 import { lastReleaseTag, readWorkspaceVersions, resolveReleaseVersion, stampVersions } from "./release-version.ts";
 import { assertBunVersion, captureCommand } from "./release-helpers.ts";
-import { stageIndexRelease } from "./stage-release.ts";
+import { stageRelease } from "./stage-release.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const APP_VERSION_PATH = "apps/desktop/src-tauri/tauri.conf.json";
 
-/** The macOS platform releases the Homebrew cask is built from. */
+/** The macOS installers on the unified release used by the Homebrew cask. */
 const CASK_PLATFORMS = [
-  { triple: "aarch64-apple-darwin", arch: "arm64", slug: "macos-arm64" },
-  { triple: "x86_64-apple-darwin", arch: "x64", slug: "macos-x64" },
+  { triple: "aarch64-apple-darwin", arch: "arm64" },
+  { triple: "x86_64-apple-darwin", arch: "x64" },
 ] as const;
 
 /** The identity the release commit is made with when the checkout has none. */
@@ -410,7 +410,7 @@ async function pushBranch(section: string): Promise<void> {
 
 // ───────────────────────────── phase: complete ─────────────────────────────
 
-async function phaseComplete(options: { tag: string; manifest: string }): Promise<void> {
+async function phaseComplete(options: { tag: string; manifest: string; installers: string }): Promise<void> {
   say("=== release: complete ===\n");
   assertBunVersion(ROOT);
   const repo = repository();
@@ -418,16 +418,17 @@ async function phaseComplete(options: { tag: string; manifest: string }): Promis
   const server = env("GITHUB_SERVER_URL") ?? "https://github.com";
   const downloadUrl = `${server}/${repo}/releases/download`;
 
-  const directory = await mkdtemp(join(tmpdir(), "cadcam-index-"));
+  const directory = await mkdtemp(join(tmpdir(), "cadcam-release-"));
   try {
     const existing = await captureCommand(["gh", "release", "view", tag, "--json", "isDraft", "--repo", repo]);
     if (existing.code !== 0) throw new Error(`The release ${tag} does not exist`);
     const isDraft = (JSON.parse(existing.stdout) as { isDraft?: boolean }).isDraft;
     if (isDraft !== true) throw new Error(`The release ${tag} is already published and is not modified`);
-    await stageIndexRelease(options.manifest, directory, downloadUrl, tag);
-    await $`gh release upload ${tag} ${join(directory, "latest.json")} ${join(directory, "RELEASE_NOTES.md")} --clobber --repo ${repo}`.cwd(ROOT);
+    await stageRelease(options.installers, options.manifest, directory, downloadUrl, tag);
+    const files = (await readdir(directory)).sort().map((name) => join(directory, name));
+    await $`gh release upload ${tag} ${files} --clobber --repo ${repo}`.cwd(ROOT);
     await $`gh release edit ${tag} --notes-file ${join(directory, "RELEASE_NOTES.md")} --repo ${repo}`.cwd(ROOT);
-    say(`attached the updater manifest and the release notes to ${tag}`);
+    say(`attached all six targets, checksums, updater manifest and release notes to ${tag}`);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -488,7 +489,9 @@ if (import.meta.main) {
       const manifest = options.get("manifest");
       if (tag === undefined) throw new Error("--tag is required for the complete phase");
       if (manifest === undefined) throw new Error("--manifest is required for the complete phase");
-      await phaseComplete({ tag, manifest });
+      const installers = options.get("installers");
+      if (installers === undefined) throw new Error("--installers is required for the complete phase");
+      await phaseComplete({ tag, manifest, installers });
     } else {
       throw new Error("--phase must be start or complete");
     }

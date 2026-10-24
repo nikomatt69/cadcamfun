@@ -9,7 +9,7 @@
 #
 # It only triggers the `publish` workflow; the workflow does the rest: it stamps the
 # version across the workspace, writes the changelog, publishes npm, builds and signs the
-# six platform releases, attaches the updater manifest and publishes the Homebrew cask.
+# six targets into one release, attaches the updater manifest and publishes the Homebrew cask.
 set -euo pipefail
 
 BUMP="patch"
