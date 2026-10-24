@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.13 (October 2026)
+
+## Core
+
+- Move a free-form patch face along a direction exactly, from the edit, the assistant and the panel (spec 40 U2)
+
 ## v0.1.12 (October 2026)
 
 ## Core
