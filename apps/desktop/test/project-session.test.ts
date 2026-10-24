@@ -4,6 +4,7 @@
  */
 import { afterAll, afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { createRoot } from "solid-js"
+import { Effect } from "effect"
 import { bootLiveApp } from "./helpers/live-app.ts"
 import { resetStores } from "./helpers/reset-stores.ts"
 import type { ProjectSession } from "../src/features/projects/lib/project-session.ts"
@@ -132,6 +133,27 @@ describe("the drawing", () => {
   })
 })
 
+describe("the interval", () => {
+  test("with real timers an edit reaches the stored drawing on its own, and turning autosave off stops it", async () => {
+    const { drawingId } = await openProject()
+    // 0.02 min = 1.2 s: the setting is minutes, the engine enforces a one-second floor.
+    app.state.settings.update({ autosave: true, autosaveMinutes: 0.02 })
+    try {
+      useElementsStore.setState({ elements: [box("a", 61)] })
+      const until = Date.now() + 15_000
+      let x: number | undefined
+      while (Date.now() < until && x !== 61) { await new Promise((r) => setTimeout(r, 200)); x = (await stored(drawingId)).data["elements"][0].x }
+      expect(x).toBe(61)
+      expect(session.document.state()).toBe("clean")
+      app.state.settings.update({ autosave: false })
+      useElementsStore.setState({ elements: [box("a", 62)] })
+      await new Promise((r) => setTimeout(r, 3_500))
+      expect((await stored(drawingId)).data["elements"][0].x).toBe(61)
+      expect(session.document.state()).toBe("dirty")
+    } finally { app.state.settings.reset() }
+  })
+})
+
 describe("work that is not in a project yet", () => {
   test("it is dirty and cannot be autosaved; it is kept as a recovery draft; saveAll asks for a destination", async () => {
     begin()
@@ -232,16 +254,23 @@ describe("what the user sees", () => {
 
   test("the CAD status line shows the save state, turns to Saved after a click, and the settings page changes the interval", async () => {
     const { drawingId } = await openProject()
+    let loads = 0
+    const drawings = app.client.drawings as { get: (input: never) => unknown }
+    const originalGet = drawings.get
+    drawings.get = ((input: never) => { loads++; return originalGet(input) }) as never
     const view = app.visit(`/cad?drawingId=${drawingId}`)
     try {
       const seg = () => document.querySelector<HTMLElement>("[data-testid='status-save']")
+      // The page loads the drawing asynchronously and replaces the canvas when it arrives: edit only after that.
+      await app.wait(() => loads > 0, 30_000)
+      await tick(300)
       await app.wait(() => seg()?.textContent?.startsWith("Saved"), 30_000)
       useElementsStore.setState({ elements: [box("a", 99)] })
       await app.wait(() => seg()?.textContent === "Unsaved changes", 30_000)
       seg()!.click()
       await app.wait(() => seg()?.textContent?.startsWith("Saved"), 30_000)
       expect((await stored(drawingId)).data["elements"][0].x).toBe(99)
-    } finally { view.dispose() }
+    } finally { view.dispose(); drawings.get = originalGet }
 
     const settings = app.visit("/settings")
     try {
@@ -256,5 +285,32 @@ describe("what the user sees", () => {
       app.state.settings.reset()
     } finally { settings.dispose() }
     await tick(10)
+  })
+})
+
+describe("assistant writes", () => {
+  test("pushLiveDrawing reads again and retries when the drawing was saved between its read and its write", async () => {
+    const { drawingId } = await openProject()
+    const { pushLiveDrawing } = await import("../src/features/ai/lib/drawing-context.ts")
+    const drawings = app.client.drawings as { update: (input: never) => unknown }
+    const original = drawings.update
+    let writes = 0
+    // The first write is preceded by another save (the phone's): it is based on a stale copy and must be refused, not applied.
+    drawings.update = ((input: never) => {
+      writes++
+      if (writes > 1) return original(input)
+      return Effect.flatMap(
+        Effect.promise(async () => { const current = await stored(drawingId); await run((original as (i: unknown) => unknown)({ params: { id: drawingId }, payload: { data: { ...current.data, phone: true } } })) }),
+        () => original(input) as never
+      )
+    }) as never
+    try {
+      useElementsStore.setState({ elements: [box("a", 5)] })
+      await pushLiveDrawing(app.state, drawingId)
+      expect(writes).toBe(2)
+      const after = await stored(drawingId)
+      expect(after.data["elements"][0].x).toBe(5)
+      expect(after.data["phone"]).toBe(true)
+    } finally { drawings.update = original }
   })
 })

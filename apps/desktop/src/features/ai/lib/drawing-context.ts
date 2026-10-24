@@ -20,7 +20,7 @@ import { useGeneratorStore } from "../../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../../cam/store/verifyStore.ts"
 import { previewSummary } from "../../cam/lib/machine-view.ts"
 import { drawingPayload } from "../../cad/lib/projectSnapshot.ts"
-import { noteStoredRevision } from "../../cad/lib/stored-revision.ts"
+import { isSaveConflict, noteStoredRevision } from "../../cad/lib/stored-revision.ts"
 import { toJsonSafe } from "../../../shared/state/json-safe.ts"
 
 const { estimateTime } = cam
@@ -165,14 +165,22 @@ export async function ensureDocument(app: AppState, adopt?: (document: { project
 export async function pushLiveDrawing(app: AppState, drawingId: string): Promise<void> {
   const payload = drawingPayload(app)
   const elements = payload["elements"] as ReadonlyArray<Record<string, unknown>>
-  const row = await run(app)<{ readonly data?: unknown }>(app.client.drawings.get({ params: { id: drawingId } }))
-  const stored = row.data !== null && typeof row.data === "object" ? row.data as Record<string, unknown> : {}
-  const written = await run(app)<{ readonly updatedAt?: string } | undefined>(app.client.drawings.update({
-    params: { id: drawingId },
-    // Keep server-owned drawing fields (most importantly an AI-set stock) when this page has not loaded them yet.
-    payload: { data: { ...stored, ...payload } }
-  }))
-  noteStoredRevision(drawingId, written?.updatedAt)
+  // Read-modify-write against the copy that was read: if anyone saved in between (409) read again and retry, never write blind.
+  for (let attempt = 1; ; attempt++) {
+    const row = await run(app)<{ readonly data?: unknown; readonly updatedAt?: string }>(app.client.drawings.get({ params: { id: drawingId } }))
+    const stored = row.data !== null && typeof row.data === "object" ? row.data as Record<string, unknown> : {}
+    try {
+      const written = await run(app)<{ readonly updatedAt?: string } | undefined>(app.client.drawings.update({
+        params: { id: drawingId },
+        // Keep server-owned drawing fields (most importantly an AI-set stock) when this page has not loaded them yet.
+        payload: { data: { ...stored, ...payload }, ...(row.updatedAt !== undefined ? { baseUpdatedAt: row.updatedAt } : {}) }
+      }))
+      noteStoredRevision(drawingId, written?.updatedAt)
+      break
+    } catch (cause) {
+      if (!isSaveConflict(cause) || attempt >= 3) throw cause
+    }
+  }
   rememberPushed(elements, drawingId)
 }
 

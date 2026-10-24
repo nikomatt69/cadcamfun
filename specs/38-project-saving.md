@@ -103,12 +103,12 @@ status line shows `Saved 14:32` / `Unsaved changes` / `Saving…` / `Save failed
 
 `apps/desktop/test/autosave.test.ts` (engine, fake clock), `apps/desktop/test/project-session.test.ts` (real sidecar: merge on
 conflict, stock preserved, setup/layers round trip, restore points, draft, CAM conflict and manual overwrite, `saveAll`),
-`apps/sidecar/test/drawings.test.ts` (409, restore points and retention, merge, toolpath 409), `apps/desktop/test/window-guard.test.ts`
+`pushLiveDrawing` (the assistant's write) is a read-modify-write on `baseUpdatedAt` with up to 3 retries. The suite also proves the interval end to end
+with real timers. Tests: `apps/sidecar/test/drawings.test.ts` (409, restore points and retention, merge, toolpath 409), `apps/desktop/test/window-guard.test.ts`
 (close guard, update install), and the status-line / settings test at the end of `project-session.test.ts`.
 
 ## 5. Open items
 
 - Components and materials are per-project rows written on demand; they have no dirty state of their own.
-- Assistant-driven writes (`pushLiveDrawing`) still use the plain `PUT`; they re-read first and keep server-owned fields.
 - The Tauri-only paths (`onCloseRequested`, the update banner's event wiring) are covered through their pure parts
   (`closeGuard`, `installPendingUpdate`, `decodeUpdateEvent`); they have not been exercised in a packaged app window.
