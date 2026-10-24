@@ -2900,7 +2900,8 @@ type Endpoint28_4Input = {
   readonly elements?: Endpoint28_4Request["payload"]["elements"]
   readonly drawingId?: Endpoint28_4Request["payload"]["drawingId"]
   readonly id: Endpoint28_4Request["payload"]["id"]
-  readonly hole: Endpoint28_4Request["payload"]["hole"]
+  readonly hole?: Endpoint28_4Request["payload"]["hole"]
+  readonly boss?: Endpoint28_4Request["payload"]["boss"]
   readonly diameter?: Endpoint28_4Request["payload"]["diameter"]
   readonly fill?: Endpoint28_4Request["payload"]["fill"]
 }
@@ -2911,6 +2912,7 @@ const Endpoint28_4 = (raw: RawClient["cadExact"]) => (input: Endpoint28_4Input) 
       drawingId: input["drawingId"],
       id: input["id"],
       hole: input["hole"],
+      boss: input["boss"],
       diameter: input["diameter"],
       fill: input["fill"],
     },

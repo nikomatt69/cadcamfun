@@ -61,9 +61,13 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
       }))
     .handle("hole", ({ payload }) =>
       Effect.gen(function*() {
-        if ((payload.diameter !== undefined) === (payload.fill === true)) return yield* new BadRequest({ message: "Give exactly one of diameter (resize the drill) or fill: true" })
+        if ((payload.hole !== undefined) === (payload.boss !== undefined)) return yield* new BadRequest({ message: "Give exactly one of hole or boss" })
+        if (payload.boss !== undefined && (payload.diameter === undefined || payload.fill === true)) return yield* new BadRequest({ message: "A boss takes a diameter (fill applies to holes only)" })
+        if (payload.hole !== undefined && (payload.diameter !== undefined) === (payload.fill === true)) return yield* new BadRequest({ message: "Give exactly one of diameter (resize the drill) or fill: true" })
         const elements = yield* sceneOf(payload)
-        return yield* guarded("Failed to edit the hole", () => cad.sceneHoleEdit(elements, payload.id, payload.hole, payload.diameter !== undefined ? { kind: "resize", diameter: payload.diameter } : { kind: "fill" }))
+        return yield* guarded("Failed to edit the feature", () => payload.boss !== undefined
+          ? cad.sceneBossEdit(elements, payload.id, payload.boss, payload.diameter!)
+          : cad.sceneHoleEdit(elements, payload.id, payload.hole!, payload.diameter !== undefined ? { kind: "resize", diameter: payload.diameter } : { kind: "fill" }))
       }))
     .handle("assembly", ({ payload }) =>
       Effect.gen(function*() {

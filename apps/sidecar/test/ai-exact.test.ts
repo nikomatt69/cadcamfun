@@ -125,6 +125,37 @@ test("a recognised hole is previewed read-only and stored as a checked copy, wit
   expect(copy.volume - source.volume).toBeCloseTo(disc(5.5, 6.3) + disc(10, 5.7), 3)
 })
 
+test("a boss is previewed read-only and stored as a checked copy with the analytic volume", async () => {
+  const bossed = {
+    id: "bossed", type: "parametric", name: "Bossed", x: 0, y: 0, z: 0, layerId: "default",
+    history: { parameters: {}, features: [
+      { id: "s", type: "sketch", plane: "XY", sketch: { entities: [], constraints: [], shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: 40, height: 30 }] } },
+      { id: "plate", type: "extrude", sketch: "s", depth: 10, operation: "new" },
+      { id: "c", type: "sketch", plane: "XY", offset: 10, sketch: { entities: [], constraints: [], shapes: [{ id: "k", kind: "circle", at: [20, 15], diameter: 10 }] } },
+      { id: "boss", type: "extrude", sketch: "c", depth: 12, operation: "union" }
+    ] }
+  }
+  const project = (await app.call("/api/projects", { method: "POST", json: { name: "Boss edit" } })).body.id
+  await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Bossed", data: { elements: [bossed] } } })
+  const issue = async (mode: "read" | "write") => (await app.call("/api/ai/bridge/tokens", { method: "POST", json: { name: mode, projectId: project, mode } })).body.token as string
+  const read = await issue("read"), write = await issue("write")
+  const invoke = (token: string, tool: string, input: Record<string, unknown>) => app.call("/api/ai/actions/invoke", { method: "POST", auth: false, headers: { authorization: `Bearer ${token}` }, json: { projectId: project, tool, input } })
+  const exact = await invoke(read, "cad", { action: "exact", ids: ["bossed"] })
+  expect(exact.body.result.parts[0]).toMatchObject({ bossesTotal: 1, bosses: [{ free: "far" }] })
+  const disc = (d: number, h: number) => Math.PI * (d / 2) ** 2 * h
+  const preview = await invoke(read, "cad", { action: "hole", id: "bossed", boss: 0, diameter: 6 })
+  expect(preview.body.result).toMatchObject({ ok: true, valid: true, boss: 0, bosses: 1 })
+  expect(preview.body.result.volumeChange).toBeCloseTo(-(disc(10, 12) - disc(6, 12)), 3)
+  expect((await invoke(read, "cad", { action: "hole", id: "bossed", boss: 0 })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("takes a diameter") })
+  expect((await invoke(read, "cad", { action: "hole", id: "bossed", boss: 0, hole: 0, diameter: 6 })).body.result).toMatchObject({ ok: false, error: expect.stringContaining("exactly one of hole") })
+  const stored = await invoke(write, "cad_edit", { action: "hole", id: "bossed", boss: 0, diameter: 6 })
+  expect(stored.body.result).toMatchObject({ ok: true })
+  const both = await invoke(read, "cad", { action: "exact", ids: [stored.body.result.ids[0], "bossed"] })
+  const parts = both.body.result.parts as Array<{ id: string; volume: number }>
+  const copy = parts.find((p) => p.id === stored.body.result.ids[0])!, source = parts.find((p) => p.id === "bossed")!
+  expect(source.volume - copy.volume).toBeCloseTo(disc(10, 12) - disc(6, 12), 3)
+})
+
 test("the AI stores open NURBS surfaces separately from solids and exchanges IGES without losing topology", async () => {
   const projectId = (await app.call("/api/projects", { method: "POST", json: { name: "Surface and exchange" } })).body.id
   const token = (await app.call("/api/ai/bridge/tokens", { method: "POST", json: { name: "surfaces", projectId, mode: "write" } })).body.token as string

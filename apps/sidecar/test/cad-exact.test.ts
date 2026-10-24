@@ -115,3 +115,32 @@ test("hole previews the resize or fill of one recognised hole, exactly one chang
   expect((await post("hole", { elements: [plate], id: "plate", hole: 0, diameter: 7, fill: true })).status).toBe(400)
   expect((await post("hole", { elements: [plate], id: "plate", hole: 0, diameter: -3 })).status).toBe(400)
 })
+
+/** A 40 x 30 x 10 plate with a Ø10 boss 12 high standing on it. */
+const bossed = {
+  id: "bossed", type: "parametric", name: "Bossed", x: 0, y: 0, z: 0, layerId: "default",
+  history: {
+    parameters: {},
+    features: [
+      { id: "s", type: "sketch", plane: "XY", sketch: { entities: [], constraints: [], shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: 40, height: 30 }] } },
+      { id: "plate", type: "extrude", sketch: "s", depth: 10, operation: "new" },
+      { id: "c", type: "sketch", plane: "XY", offset: 10, sketch: { entities: [], constraints: [], shapes: [{ id: "k", kind: "circle", at: [20, 15], diameter: 10 }] } },
+      { id: "boss", type: "extrude", sketch: "c", depth: 12, operation: "union" }
+    ]
+  }
+}
+
+test("analyze lists the bosses and hole previews the resize of one, a boss takes a diameter only", async () => {
+  const analysis = Schema.decodeUnknownSync(CadExactAnalysis)((await post("analyze", { elements: [bossed] })).body)
+  expect(analysis.parts[0]!.bosses).toEqual([expect.objectContaining({ free: "far", diameter: expect.closeTo(10, 6), length: expect.closeTo(12, 6) })])
+  const grown = Schema.decodeUnknownSync(CadHoleReport)((await post("hole", { elements: [bossed], id: "bossed", boss: 0, diameter: 16 })).body)
+  expect(grown).toMatchObject({ ok: true, valid: true, boss: 0, bosses: 1 })
+  const disc = (d: number, h: number) => Math.PI * (d / 2) ** 2 * h
+  if (!("boss" in grown)) throw new Error("expected a boss report")
+  expect(grown.volumeChange).toBeCloseTo(disc(16, 12) - disc(10, 12), 3)
+  expect(Schema.decodeUnknownSync(CadHoleReport)((await post("hole", { elements: [bossed], id: "bossed", boss: 4, diameter: 8 })).body)).toMatchObject({ ok: false, error: expect.stringContaining("1 recognised bosses") })
+  expect((await post("hole", { elements: [bossed], id: "bossed", boss: 0 })).status).toBe(400)
+  expect((await post("hole", { elements: [bossed], id: "bossed", boss: 0, fill: true })).status).toBe(400)
+  expect((await post("hole", { elements: [bossed], id: "bossed", hole: 0, boss: 0, diameter: 8 })).status).toBe(400)
+  expect((await post("hole", { elements: [bossed], id: "bossed", diameter: 8 })).status).toBe(400)
+})

@@ -71,9 +71,12 @@ export const vision = (mode: "cad" | "cam", filename: string, sheetName = filena
   return new ToolMediaResult(result.evidence, files)
 }
 
-/** A hole edit names exactly one change: a new diameter, or fill. */
-export const holeInputProblem = (input: CadHoleInput): string | undefined =>
-  (input.diameter !== undefined) === (input.fill === true) ? "Give exactly one of diameter (resize the drill) or fill: true." : undefined
+/** A hole or boss edit names one target and one change: a new diameter, or (holes) fill. */
+export const holeInputProblem = (input: CadHoleInput): string | undefined => {
+  if ((input.hole !== undefined) === (input.boss !== undefined)) return "Give exactly one of hole (a recognised hole) or boss (a recognised boss)."
+  if (input.boss !== undefined) return input.diameter === undefined || input.fill === true ? "A boss takes a diameter (fill applies to holes only)." : undefined
+  return (input.diameter !== undefined) === (input.fill === true) ? "Give exactly one of diameter (resize the drill) or fill: true." : undefined
+}
 
 export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({

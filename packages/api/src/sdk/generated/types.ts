@@ -1685,7 +1685,8 @@ export type CadExactHolePayload = {
   readonly elements?: ReadonlyArray<{ readonly [x: string]: JsonValue }>
   readonly drawingId?: string
   readonly id: string
-  readonly hole: number
+  readonly hole?: number
+  readonly boss?: number
   readonly diameter?: number
   readonly fill?: boolean
 }
@@ -6551,6 +6552,13 @@ export type CadExactAnalyzeOutput = {
           islands?: number
         }
       | { prismatic: false; reason: string }
+    bosses: Array<{
+      diameter: number
+      length: number
+      free: "near" | "far" | "both" | "none"
+      origin: { x: number; y: number; z: number }
+      axis: { x: number; y: number; z: number }
+    }>
     faceNames?: Array<string>
     repair?: {
       verticesWelded: number
@@ -6695,7 +6703,8 @@ export type CadExactHoleInput = {
   readonly elements?: CadExactHolePayload["elements"]
   readonly drawingId?: CadExactHolePayload["drawingId"]
   readonly id: CadExactHolePayload["id"]
-  readonly hole: CadExactHolePayload["hole"]
+  readonly hole?: CadExactHolePayload["hole"]
+  readonly boss?: CadExactHolePayload["boss"]
   readonly diameter?: CadExactHolePayload["diameter"]
   readonly fill?: CadExactHolePayload["fill"]
 }
@@ -6709,6 +6718,20 @@ export type CadExactHoleOutput =
       holes: number
       before: { diameter: number; depth: number; form: "simple" | "counterbore" | "countersink" }
       edit: { kind: "resize"; diameter: number } | { kind: "fill" }
+      volume: number
+      originalVolume: number
+      volumeChange: number
+      faces: number
+      valid: boolean
+    }
+  | {
+      ok: true
+      id: string
+      name: string
+      boss: number
+      bosses: number
+      before: { diameter: number; length: number }
+      diameter: number
       volume: number
       originalVolume: number
       volumeChange: number

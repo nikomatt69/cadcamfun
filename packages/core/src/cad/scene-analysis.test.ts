@@ -1,7 +1,7 @@
 import { expect, setDefaultTimeout, test } from "bun:test"
 import type { History } from "./history.ts"
 import { model } from "./script.ts"
-import { analyzeBrep, analyzeScene, assemblyReport, sceneHoleEdit, sceneHoleEditBody, setupsForScene } from "./scene-analysis.ts"
+import { analyzeBrep, analyzeScene, assemblyReport, sceneBossEdit, sceneHoleEdit, sceneHoleEditBody, setupsForScene } from "./scene-analysis.ts"
 import { makeBox } from "./brep/index.ts"
 
 setDefaultTimeout(90_000)
@@ -163,4 +163,21 @@ test("a recognised hole of a solid of the scene is resized or filled, the other 
   expect(sceneHoleEdit(elements, "base", 5, { kind: "fill" })).toMatchObject({ ok: false, error: expect.stringContaining("2 recognised holes") })
   expect(sceneHoleEdit(elements, "nope", 0, { kind: "fill" })).toMatchObject({ ok: false })
   expect(sceneHoleEdit(elements, "note", 0, { kind: "fill" })).toMatchObject({ ok: false })
+})
+
+test("a boss of a solid of the scene is listed in the analysis and resized, the plate under it untouched", () => {
+  const m = model()
+  m.extrude(m.sketch("XY").rectangle([0, 0], 40, 30), { depth: 10, id: "plate" })
+  m.extrude(m.sketch("XY", 10).circle([20, 15], 10), { depth: 12, operation: "union", id: "boss" })
+  const elements = [{ id: "p", type: "parametric", name: "P", history: m.build(), x: 0, y: 0, z: 0, layerId: "default" }]
+  const part = analyzeScene(elements).parts[0]!
+  expect(part.bosses).toHaveLength(1)
+  expect(part.bosses[0]).toMatchObject({ free: "far" })
+  expect(part.bosses[0]!.diameter).toBeCloseTo(10, 6)
+  const disc = (d: number, h: number) => Math.PI * (d / 2) ** 2 * h
+  const grown = sceneBossEdit(elements, "p", 0, 14)
+  expect(grown).toMatchObject({ ok: true, valid: true, bosses: 1 })
+  if (grown.ok) expect(grown.volumeChange).toBeCloseTo(disc(14, 12) - disc(10, 12), 4)
+  expect(sceneBossEdit(elements, "p", 3, 14)).toMatchObject({ ok: false, error: expect.stringContaining("1 recognised bosses") })
+  expect(sceneBossEdit([{ id: "n", type: "text", text: "x", x: 0, y: 0 }], "n", 0, 5)).toMatchObject({ ok: false })
 })

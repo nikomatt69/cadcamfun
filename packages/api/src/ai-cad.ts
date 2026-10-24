@@ -68,11 +68,12 @@ export type CadShellInput = typeof CadShellInput.Type
 export const CadOffsetInput = Schema.Struct({ id: nonEmpty, distance: positive.annotate({ description: "Outward offset distance in mm. Convex corners round. Unsupported geometry returns a reason." }) })
 export type CadOffsetInput = typeof CadOffsetInput.Type
 
-/** Edit one recognised hole of an exact solid: a new drill diameter, or fill it. The hole is its index in the holes `cad` `exact` lists. */
+/** Edit one recognised hole of an exact solid (a new drill diameter, or fill it) or one boss (a new diameter), by its index in the lists `cad` `exact` gives. */
 export const CadHoleInput = Schema.Struct({
   id: nonEmpty,
-  hole: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })).annotate({ description: "Index in the solid's recognised holes (the order `exact` lists them in)." }),
-  diameter: optional(positive.annotate({ description: "New drill diameter in mm; a counterbore or countersink above keeps its size and must stay wider." })),
+  hole: optional(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })).annotate({ description: "Index in the solid's recognised holes (the order `exact` lists them in)." })),
+  boss: optional(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })).annotate({ description: "Index in the solid's recognised bosses or shaft sections (`exact` lists them); takes diameter only." })),
+  diameter: optional(positive.annotate({ description: "New diameter in mm: the drill of a hole (a counterbore or countersink above keeps its size and must stay wider) or a boss." })),
   fill: optional(Schema.Boolean.annotate({ description: "true fills the hole instead." }))
 })
 export type CadHoleInput = typeof CadHoleInput.Type

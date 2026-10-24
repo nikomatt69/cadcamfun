@@ -2,7 +2,7 @@ import { PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { For, Show, createEffect, createSignal, on, type JSX } from "solid-js"
 import { NumberField } from "../../../shared/components/panel/ui.tsx"
-import { analyzeExact, editElementHole, elementStep, type ExactAnalysis, type HoleChange } from "../lib/exactModel.ts"
+import { analyzeExact, editElementBoss, editElementHole, elementStep, type ExactAnalysis, type HoleChange } from "../lib/exactModel.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 
 interface Props {
@@ -41,7 +41,14 @@ export default function ExactModelPanel(props: Props): JSX.Element {
     useElementsStore.getState().addElements([r.element])
     setNote({ ok: true, text: `Added "${String(r.element["name"])}": volume ${fmt(r.volume)} mm³ (${r.volumeChange > 0 ? "+" : ""}${fmt(r.volumeChange)}).` })
   }
-  createEffect(on(() => props.element, () => { setSizes({}); setNote(undefined) }))
+  const [bossSizes, setBossSizes] = createSignal<Readonly<Record<number, number>>>({})
+  const changeBoss = (index: number, diameter: number) => {
+    const r = editElementBoss(props.element, props.all, index, diameter)
+    if (!r.ok) { setNote({ ok: false, text: r.error }); return }
+    useElementsStore.getState().addElements([r.element])
+    setNote({ ok: true, text: `Added "${String(r.element["name"])}": volume ${fmt(r.volume)} mm³ (${r.volumeChange > 0 ? "+" : ""}${fmt(r.volumeChange)}).` })
+  }
+  createEffect(on(() => props.element, () => { setSizes({}); setBossSizes({}); setNote(undefined) }))
   const exportStep = () => {
     const out = elementStep(props.element, props.all)
     if (!("step" in out)) { alert(`No exact model: ${out.reason}`); return }
@@ -86,15 +93,22 @@ export default function ExactModelPanel(props: Props): JSX.Element {
         {(a) => (
           <Show when={a().ok ? (a() as Extract<ExactAnalysis, { ok: true }>) : undefined}>
             {(ok) => (
-              <Show when={ok().drilled.length > 0}>
+              <Show when={ok().drilled.length > 0 || ok().bosses.length > 0}>
                 <div class="mt-2 space-y-1 text-xs" data-testid="exact-hole-edit">
-                  <p class="font-medium">Edit a hole (adds a new solid)</p>
+                  <p class="font-medium">Edit a hole or a boss (adds a new solid)</p>
                   <For each={ok().drilled}>{(h, i) => (
                     <div class="flex items-center gap-1" data-hole={i()}>
                       <span class="flex-1">#{i() + 1} Ø{fmt(h.diameter)} × {fmt(h.depth)}</span>
                       <NumberField id={`exact-hole-${i()}`} value={sizes()[i()] ?? h.diameter} onValue={(x) => setSizes({ ...sizes(), [i()]: x })} />
                       <button type="button" class="panel-btn" data-testid="exact-hole-resize" onClick={() => changeHole(i(), { kind: "resize", diameter: sizes()[i()] ?? h.diameter })}>Resize</button>
                       <button type="button" class="panel-btn" data-testid="exact-hole-fill" onClick={() => changeHole(i(), { kind: "fill" })}>Fill</button>
+                    </div>
+                  )}</For>
+                  <For each={ok().bosses}>{(x, i) => (
+                    <div class="flex items-center gap-1" data-boss={i()}>
+                      <span class="flex-1">Boss #{i() + 1} Ø{fmt(x.diameter)} × {fmt(x.length)}</span>
+                      <NumberField id={`exact-boss-${i()}`} value={bossSizes()[i()] ?? x.diameter} onValue={(d) => setBossSizes({ ...bossSizes(), [i()]: d })} />
+                      <button type="button" class="panel-btn" data-testid="exact-boss-resize" onClick={() => changeBoss(i(), bossSizes()[i()] ?? x.diameter)}>Resize</button>
                     </div>
                   )}</For>
                   <Show when={note()}>{(n) => <p class={n().ok ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"} role={n().ok ? "status" : "alert"} data-testid="exact-hole-message">{n().text}</p>}</Show>

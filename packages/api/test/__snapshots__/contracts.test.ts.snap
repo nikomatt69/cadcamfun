@@ -15544,6 +15544,77 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "area": {
                             "type": "number",
                           },
+                          "bosses": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "axis": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "diameter": {
+                                  "type": "number",
+                                },
+                                "free": {
+                                  "enum": [
+                                    "near",
+                                    "far",
+                                    "both",
+                                    "none",
+                                  ],
+                                  "type": "string",
+                                },
+                                "length": {
+                                  "type": "number",
+                                },
+                                "origin": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                              },
+                              "required": [
+                                "diameter",
+                                "length",
+                                "free",
+                                "origin",
+                                "axis",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
                           "bounds": {
                             "additionalProperties": false,
                             "properties": {
@@ -15849,6 +15920,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "surfaces",
                           "holes",
                           "machining",
+                          "bosses",
                         ],
                         "type": "object",
                       },
@@ -16688,6 +16760,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "boss": {
+                    "maximum": 9999,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
                   "diameter": {
                     "exclusiveMinimum": 0,
                     "type": "number",
@@ -16719,7 +16796,6 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                 },
                 "required": [
                   "id",
-                  "hole",
                 ],
                 "type": "object",
               },
@@ -16841,6 +16917,78 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "holes",
                         "before",
                         "edit",
+                        "volume",
+                        "originalVolume",
+                        "volumeChange",
+                        "faces",
+                        "valid",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "before": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "diameter": {
+                              "type": "number",
+                            },
+                            "length": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "diameter",
+                            "length",
+                          ],
+                          "type": "object",
+                        },
+                        "boss": {
+                          "type": "integer",
+                        },
+                        "bosses": {
+                          "type": "integer",
+                        },
+                        "diameter": {
+                          "type": "number",
+                        },
+                        "faces": {
+                          "type": "integer",
+                        },
+                        "id": {
+                          "type": "string",
+                        },
+                        "name": {
+                          "type": "string",
+                        },
+                        "ok": {
+                          "enum": [
+                            true,
+                          ],
+                          "type": "boolean",
+                        },
+                        "originalVolume": {
+                          "type": "number",
+                        },
+                        "valid": {
+                          "type": "boolean",
+                        },
+                        "volume": {
+                          "type": "number",
+                        },
+                        "volumeChange": {
+                          "type": "number",
+                        },
+                      },
+                      "required": [
+                        "ok",
+                        "id",
+                        "name",
+                        "boss",
+                        "bosses",
+                        "before",
+                        "diameter",
                         "volume",
                         "originalVolume",
                         "volumeChange",

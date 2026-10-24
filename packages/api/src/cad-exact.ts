@@ -54,12 +54,18 @@ export const CadExactMachining = Schema.Union([
   Schema.Struct({ prismatic: Schema.Literal(false), reason: Schema.String })
 ])
 
+export const CadExactBoss = Schema.Struct({
+  diameter: num, length: num, free: Schema.Literals(["near", "far", "both", "none"]), origin: vec3, axis: vec3
+})
+
 export const CadExactPart = Schema.Struct({
   id: Schema.String, name: Schema.String, valid: Schema.Boolean, issues: Schema.Array(Schema.String),
   volume: num, area: num, centroid: vec3, bounds: Schema.Struct({ min: vec3, max: vec3 }),
   faces: int, edges: int, vertices: int, surfaces: Schema.Record(Schema.String, int),
   throughHoles: Schema.optionalKey(int),
   holes: Schema.Array(CadExactHole), machining: CadExactMachining,
+  /** Bosses, pins and shaft sections (convex cylinders all the way round); `boss` indexes of the hole / boss edit. */
+  bosses: Schema.Array(CadExactBoss),
   /** Names of the faces (the first 40): the handles `cad.shell` takes for open faces. */
   faceNames: Schema.optionalKey(Schema.Array(Schema.String)),
   /** For a solid that does not validate: what healing it would do and whether the healed solid is valid. */
@@ -157,20 +163,27 @@ export type CadSetupsReport = typeof CadSetupsReport.Type
 export const CadHoleRequest = Schema.Struct({
   ...source,
   id,
-  /** Index in the solid's recognised holes, in the order `analyze` lists them. */
-  hole: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 })),
-  /** New drill diameter, mm; exactly one of `diameter` and `fill`. */
+  /** Index in the solid's recognised holes, in the order `analyze` lists them; exactly one of `hole` and `boss`. */
+  hole: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 }))),
+  /** Index in the solid's recognised bosses (`analyze` lists them); a boss takes a `diameter` only. */
+  boss: Schema.optionalKey(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 9999 }))),
+  /** New diameter, mm: of the drill of a hole (exactly one of `diameter` and `fill`) or of a boss. */
   diameter: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
   fill: Schema.optionalKey(Schema.Boolean)
 })
 export type CadHoleRequest = typeof CadHoleRequest.Type
 
-/** What the edit would do, on paper: nothing in the drawing changes. A refusal is an `ok: false` answer with its reason. */
+/** What the edit of a hole or a boss would do, on paper: nothing in the drawing changes. A refusal is an `ok: false` answer with its reason. */
 export const CadHoleReport = Schema.Union([
   Schema.Struct({
     ok: Schema.Literal(true), id: Schema.String, name: Schema.String, hole: int, holes: int,
     before: Schema.Struct({ diameter: num, depth: num, form: Schema.Literals(["simple", "counterbore", "countersink"]) }),
     edit: Schema.Union([Schema.Struct({ kind: Schema.Literal("resize"), diameter: num }), Schema.Struct({ kind: Schema.Literal("fill") })]),
+    volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
+  }),
+  Schema.Struct({
+    ok: Schema.Literal(true), id: Schema.String, name: Schema.String, boss: int, bosses: int,
+    before: Schema.Struct({ diameter: num, length: num }), diameter: num,
     volume: num, originalVolume: num, volumeChange: num, faces: int, valid: Schema.Boolean
   }),
   Schema.Struct({ ok: Schema.Literal(false), error: Schema.String })

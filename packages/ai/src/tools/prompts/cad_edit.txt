@@ -14,7 +14,7 @@ Actions and Parameters (mm; rotation/history angles degrees)
 - parametric_recipe_create: recipe, params?, name?, x?, y?, z?, layer?. Build and store a standard part.
 - parametric_convert: elementId, depth? (flat shapes), name?. Store a parametric twin preserving shape, placement and properties; original remains.
 - shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]. Store a checked exact copy. Preview cad.shell; names cad.exact.
-- hole: id, hole, diameter?|fill?. Stores a checked copy. Preview cad.hole.
+- hole: id, hole|boss, diameter?|fill?. Stores a checked copy. Preview cad.hole.
 - offset: id, distance (outward). Store a checked exact copy; source remains. Preview cad.offset.
 - surface: operation patch|stitch|thicken, patches [{data:{degreeU,degreeV,knotsU,knotsV,points,weights?},trim?:{u0,u1,v0,v1}}], thickness?, direction?, tolerance?, name?. Same checked input as cad.surface. Open surface bodies are excluded from solid analysis and CAM. Curved thicken is axial and requires direction; normal freeform offsets are unsupported.
 

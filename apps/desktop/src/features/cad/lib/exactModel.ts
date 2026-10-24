@@ -6,7 +6,7 @@
  * The analysis is the one the sidecar (`/api/cad/exact/analyze`) and the assistant (`cad.exact`) run, `analyzeBrep` of
  * `@cadcamfun/core`, so the panel, the API and the CAM planner agree on holes and on how the part will be machined.
  */
-import { analyzeBrep, brep, elementBrep, sceneHoleEditBody, type SceneHole, type SceneMachining } from "@cadcamfun/core"
+import { analyzeBrep, brep, elementBrep, sceneBossEditBody, sceneHoleEditBody, type SceneBoss, type SceneHole, type SceneMachining } from "@cadcamfun/core"
 
 export type ExactAnalysis =
   | {
@@ -24,6 +24,8 @@ export type ExactAnalysis =
       readonly issues: ReadonlyArray<string>
       /** The holes the kernel recognises on the faces (drilled, counterbored, countersunk), as the CAM planner will drill them. */
       readonly drilled: ReadonlyArray<SceneHole>
+      /** The bosses, pins and shaft sections (convex cylinders all the way round), in the order the boss edit indexes them. */
+      readonly bosses: ReadonlyArray<SceneBoss>
       /** Whether the CAM planner machines the solid by its features (holes, pockets, outlines) or as a 3D surface job, and why. */
       readonly machining: SceneMachining
     }
@@ -47,7 +49,7 @@ export const analyzeExact = (element: Record<string, unknown>, all: ReadonlyArra
   return {
     ok: true, faces: a.faces, edges: a.edges, vertices: a.vertices, surfaces: a.surfaces,
     volume: a.volume, area: a.area, centroid: a.centroid, holes: a.throughHoles, valid: a.valid, issues: a.issues.slice(0, 5),
-    drilled: a.holes, machining: a.machining
+    drilled: a.holes, bosses: a.bosses, machining: a.machining
   }
 }
 
@@ -77,5 +79,19 @@ export const editElementHole = (
   return {
     ok: true, volume: built.report.volume, volumeChange: built.report.volumeChange,
     element: { type: "brep", name: `${base} hole ${hole + 1} ${what}`, brep: built.brep, x: 0, y: 0, z: 0 }
+  }
+}
+
+/** Resize the `boss`-th recognised boss of an element (the order `ExactAnalysis.bosses` lists them in) into a new solid. */
+export const editElementBoss = (
+  element: Record<string, unknown>, all: ReadonlyArray<Record<string, unknown>>, boss: number, diameter: number
+): { readonly ok: true; readonly element: Record<string, unknown>; readonly volume: number; readonly volumeChange: number } | { readonly ok: false; readonly error: string } => {
+  let built: ReturnType<typeof sceneBossEditBody>
+  try { built = sceneBossEditBody(all, String(element["id"] ?? ""), boss, diameter) } catch (cause) { return { ok: false, error: cause instanceof Error ? cause.message : String(cause) } }
+  if (!built.ok) return built
+  const base = typeof element["name"] === "string" && element["name"] !== "" ? (element["name"] as string) : String(element["type"] ?? "part")
+  return {
+    ok: true, volume: built.report.volume, volumeChange: built.report.volumeChange,
+    element: { type: "brep", name: `${base} boss ${boss + 1} Ø${Math.round(diameter * 1000) / 1000}`, brep: built.brep, x: 0, y: 0, z: 0 }
   }
 }

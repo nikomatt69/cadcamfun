@@ -20,8 +20,8 @@ export const exactForModel = (analysis: cad.SceneAnalysis, drawing: Record<strin
   ...(round({
     totals: analysis.totals,
     parts: analysis.parts.map((p) => {
-      const holes = capped(p.holes)
-      return { ...p, holes: holes.items, holesTotal: holes.total, ...(holes.total > holes.items.length ? { holesOmitted: holes.total - holes.items.length } : {}) }
+      const holes = capped(p.holes), bosses = capped(p.bosses)
+      return { ...p, holes: holes.items, holesTotal: holes.total, ...(holes.total > holes.items.length ? { holesOmitted: holes.total - holes.items.length } : {}), bosses: bosses.items, bossesTotal: bosses.total }
     }),
     skipped: analysis.skipped
   }) as object),

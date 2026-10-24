@@ -3999,6 +3999,7 @@ export function make(options: ClientOptions) {
               drawingId: input["drawingId"],
               id: input["id"],
               hole: input["hole"],
+              boss: input["boss"],
               diameter: input["diameter"],
               fill: input["fill"],
             },

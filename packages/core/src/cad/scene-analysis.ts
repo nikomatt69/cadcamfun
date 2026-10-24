@@ -9,6 +9,7 @@ import { brepFeatures, type ExactFeatures } from "../cam/brep-part.ts"
 import { planSetups, type SetupPlan, type SetupPlanOptions } from "../cam/setup-plan.ts"
 import { healBrep, massProperties, minimumDistance, recognizeHoles, offsetBrep, shellBrep, validateBrep, type Brep } from "./brep/index.ts"
 import { editHole, type HoleEdit } from "./brep/hole-edit.ts"
+import { recognizeBosses, resizeBoss } from "./brep/boss-edit.ts"
 import { brepBox } from "./history-brep.ts"
 import { planSceneFasteners, sceneBom, sceneClearance, sceneInterference, sceneJoints, sceneParts, type SceneParts } from "./scene-automation.ts"
 import type { BomRow, InferredJoint } from "./assembly-analysis.ts"
@@ -27,6 +28,15 @@ export interface SceneHole {
   readonly bottom: "through" | "flat" | "drill-point"
   readonly headDiameter?: number
   readonly headDepth?: number
+}
+
+/** A convex cylinder that goes all the way round (a boss, a pin, a shaft section), as `brep/boss-edit.ts` reads it. */
+export interface SceneBoss {
+  readonly diameter: number
+  readonly length: number
+  readonly free: "near" | "far" | "both" | "none"
+  readonly origin: Vec3
+  readonly axis: Vec3
 }
 
 /** How the CAM planner treats the solid: a 2.5D part machined by its features, or a surface job and why. */
@@ -50,6 +60,8 @@ export interface ScenePartAnalysis {
   /** Through holes of a closed manifold (genus). */
   readonly throughHoles?: number
   readonly holes: ReadonlyArray<SceneHole>
+  /** The bosses and shaft sections, in the order `cad_edit` `hole` takes a `boss` index. */
+  readonly bosses: ReadonlyArray<SceneBoss>
   readonly machining: SceneMachining
   /** Names of the faces (the first 40), the handles `cad.shell` takes for open faces. */
   readonly faceNames?: ReadonlyArray<string>
@@ -100,6 +112,7 @@ export const analyzeBrep = (id: string, name: string, b: Brep, options: { readon
     faces: b.faces.length, edges: b.edges.length, vertices: b.vertices.length, surfaces,
     ...(report.genus !== undefined ? { throughHoles: report.genus } : {}),
     holes,
+    bosses: recognizeBosses(b).map((x): SceneBoss => ({ diameter: x.diameter, length: x.length, free: x.free, origin: x.origin, axis: x.axis })),
     machining: options.machining === false ? { prismatic: false, reason: "not evaluated" } : machiningOf(brepFeatures(b, name))
   }
 }
@@ -287,6 +300,41 @@ export const sceneHoleEditBody = (
 
 export const sceneHoleEdit = (elements: ReadonlyArray<Element>, id: string, hole: number, edit: HoleEdit): SceneHoleEdit => {
   const built = sceneHoleEditBody(elements, id, hole, edit)
+  return built.ok ? built.report : built
+}
+
+export type SceneBossEdit =
+  | {
+    readonly ok: true; readonly id: string; readonly name: string; readonly boss: number; readonly bosses: number
+    readonly before: { readonly diameter: number; readonly length: number }; readonly diameter: number
+    readonly volume: number; readonly originalVolume: number; readonly volumeChange: number; readonly faces: number; readonly valid: boolean
+  }
+  | { readonly ok: false; readonly error: string }
+
+/** Resizes the `boss`-th recognised boss of a solid of the drawing (`brep/boss-edit.ts`); the order is `ScenePartAnalysis.bosses`. */
+export const sceneBossEditBody = (
+  elements: ReadonlyArray<Element>, id: string, boss: number, diameter: number
+): { readonly ok: true; readonly brep: Brep; readonly report: Extract<SceneBossEdit, { ok: true }> } | { readonly ok: false; readonly error: string } => {
+  const scene = sceneParts(elements)
+  const part = scene.parts.find((p) => p.id === id)
+  if (part === undefined) {
+    const skipped = scene.skipped.find((s) => s.id === id)
+    return { ok: false, error: skipped !== undefined ? `'${id}' has no exact model: ${skipped.reason}` : `no solid '${id}' in the drawing` }
+  }
+  const bosses = recognizeBosses(part.brep)
+  const target = bosses[boss]
+  if (target === undefined) return { ok: false, error: bosses.length === 0 ? `'${id}' has no recognised boss` : `'${id}' has ${bosses.length} recognised bosses (0..${bosses.length - 1}), not a boss ${boss}` }
+  const r = resizeBoss(part.brep, target, diameter)
+  if (typeof r === "string") return { ok: false, error: r }
+  const originalVolume = massProperties(part.brep).volume
+  return { ok: true, brep: r.brep, report: {
+    ok: true, id, name: part.name, boss, bosses: bosses.length, before: { diameter: target.diameter, length: target.length }, diameter,
+    volume: originalVolume + r.volumeChange, originalVolume, volumeChange: r.volumeChange, faces: r.brep.faces.length, valid: validateBrep(r.brep).valid
+  } }
+}
+
+export const sceneBossEdit = (elements: ReadonlyArray<Element>, id: string, boss: number, diameter: number): SceneBossEdit => {
+  const built = sceneBossEditBody(elements, id, boss, diameter)
   return built.ok ? built.report : built
 }
 

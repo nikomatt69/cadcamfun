@@ -611,14 +611,23 @@ const toolHandlers = Effect.gen(function*() {
     cadHole: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
-      try { return { ...cad.sceneHoleEdit(loaded.elements, input.id, input.hole, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter } : { kind: "fill" }), ...where(loaded) } }
+      try {
+        const report = input.boss !== undefined ? cad.sceneBossEdit(loaded.elements, input.id, input.boss, input.diameter!)
+          : cad.sceneHoleEdit(loaded.elements, input.id, input.hole!, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter } : { kind: "fill" })
+        return { ...report, ...where(loaded) }
+      }
       catch (error) { return { ok: false, error: `The hole edit failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadBuildHole: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
       try {
-        const r = cad.sceneHoleEditBody(loaded.elements, input.id, input.hole, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter } : { kind: "fill" })
+        if (input.boss !== undefined) {
+          const b = cad.sceneBossEditBody(loaded.elements, input.id, input.boss, input.diameter!)
+          if (!b.ok) return b
+          return storeKernelBody(loaded, b.brep, `${b.report.name} boss ${input.boss} Ø${input.diameter}`)
+        }
+        const r = cad.sceneHoleEditBody(loaded.elements, input.id, input.hole!, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter } : { kind: "fill" })
         if (!r.ok) return r
         return storeKernelBody(loaded, r.brep, `${r.report.name} hole ${input.hole} ${input.diameter !== undefined ? `Ø${input.diameter}` : "filled"}`)
       } catch (error) { return { ok: false, error: `The hole edit failed: ${error instanceof Error ? error.message : String(error)}` } }

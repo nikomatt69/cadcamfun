@@ -58173,6 +58173,77 @@
                               }
                             ]
                           },
+                          "bosses": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "diameter": {
+                                  "type": "number"
+                                },
+                                "length": {
+                                  "type": "number"
+                                },
+                                "free": {
+                                  "type": "string",
+                                  "enum": [
+                                    "near",
+                                    "far",
+                                    "both",
+                                    "none"
+                                  ]
+                                },
+                                "origin": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "axis": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "z": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "diameter",
+                                "length",
+                                "free",
+                                "origin",
+                                "axis"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
                           "faceNames": {
                             "type": "array",
                             "items": {
@@ -58225,7 +58296,8 @@
                           "vertices",
                           "surfaces",
                           "holes",
-                          "machining"
+                          "machining",
+                          "bosses"
                         ],
                         "additionalProperties": false
                       }
@@ -59929,6 +60001,78 @@
                         "ok": {
                           "type": "boolean",
                           "enum": [
+                            true
+                          ]
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "boss": {
+                          "type": "integer"
+                        },
+                        "bosses": {
+                          "type": "integer"
+                        },
+                        "before": {
+                          "type": "object",
+                          "properties": {
+                            "diameter": {
+                              "type": "number"
+                            },
+                            "length": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "diameter",
+                            "length"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "diameter": {
+                          "type": "number"
+                        },
+                        "volume": {
+                          "type": "number"
+                        },
+                        "originalVolume": {
+                          "type": "number"
+                        },
+                        "volumeChange": {
+                          "type": "number"
+                        },
+                        "faces": {
+                          "type": "integer"
+                        },
+                        "valid": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "id",
+                        "name",
+                        "boss",
+                        "bosses",
+                        "before",
+                        "diameter",
+                        "volume",
+                        "originalVolume",
+                        "volumeChange",
+                        "faces",
+                        "valid"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
                             false
                           ]
                         },
@@ -60025,6 +60169,11 @@
                     "minimum": 0,
                     "maximum": 9999
                   },
+                  "boss": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9999
+                  },
                   "diameter": {
                     "type": "number",
                     "exclusiveMinimum": 0
@@ -60034,8 +60183,7 @@
                   }
                 },
                 "required": [
-                  "id",
-                  "hole"
+                  "id"
                 ],
                 "additionalProperties": false
               }
