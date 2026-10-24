@@ -110,5 +110,6 @@ with real timers. Tests: `apps/sidecar/test/drawings.test.ts` (409, restore poin
 ## 5. Open items
 
 - Components and materials are per-project rows written on demand; they have no dirty state of their own.
-- The Tauri-only paths (`onCloseRequested`, the update banner's event wiring) are covered through their pure parts
-  (`closeGuard`, `installPendingUpdate`, `decodeUpdateEvent`); they have not been exercised in a packaged app window.
+- The Tauri paths (`onCloseRequested` → save → `destroy`, the `update://status` banner, `install_update` with `unsavedWork`) are
+  tested through Tauri's real JS API over a mocked IPC (`apps/desktop/test/tauri-wiring.test.ts`); they have not been run in a
+  packaged native window, which needs a manual check: edit a stored drawing and close the window at once.
