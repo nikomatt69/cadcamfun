@@ -1,12 +1,13 @@
 /**
  * The push/pull of a cylindrical wall on the exact model (spec 40 U2): moving the side of a boss or the wall of a hole along its
  * normal is a change of radius, which is what the boss and hole edits do exactly. A positive distance goes out of the solid: a boss
- * grows by it, a hole shrinks by it (the material comes into the bore). The side of a conical boss is the same change on its frustum (`cone-edit.ts`). Any other curved face (a sphere or a torus that is not the whole solid, NURBS, a countersink); a ball and a ring alone are the same surface with the radius moved and the
+ * grows by it, a hole shrinks by it (the material comes into the bore). The side of a conical boss is the same change on its frustum (`cone-edit.ts`). Any other curved face (the sphere of a socket, a torus that is not the whole solid, NURBS, a countersink); the dome that ends a round boss is `dome-edit.ts`; a ball and a ring alone are the same surface with the radius moved and the
  * counterbore wall of a hole have no exact push/pull here and are refused with the reason.
  */
 import { recognizeBosses, resizeBoss } from "./boss-edit.ts"
 import { recognizeHoles } from "./features.ts"
 import { pushPullCone } from "./cone-edit.ts"
+import { pushPullDome } from "./dome-edit.ts"
 import { editHole } from "./hole-edit.ts"
 import { makeSphere, makeTorus } from "./primitives.ts"
 import type { Brep } from "./topology.ts"
@@ -16,6 +17,7 @@ export const pushPullCylinder = (b: Brep, face: number, distance: number): Brep 
   const f = b.faces[face]
   if (f === undefined) return "the pushed face could not be found on the exact model"
   if (f.surface.kind === "cone") return pushPullCone(b, face, distance)
+  if (f.surface.kind === "sphere" && b.faces.length > 1) return pushPullDome(b, face, distance)
   // A ball and a ring are one face each: their offset is the same surface with the radius moved by the distance.
   if (b.faces.length === 1 && !f.reversed) {
     const s = f.surface
