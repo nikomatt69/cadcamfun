@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.12 (October 2026)
+
+## Core
+
+- Give a fillet band a new radius from the exact edit, the assistant and the panel (spec 40 U2)
+
 ## v0.1.11 (October 2026)
 
 ## Core
