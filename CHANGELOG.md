@@ -3,6 +3,13 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.14 (October 2026)
+
+## Core
+
+- Offset, draft and chain-offset free-form and smooth walls; the last caps and corners are decided (spec 40 U2)
+- Push and pull a ball on a neck and the round cavity behind a bore exactly; read the ball in the shadow (spec 40 U2)
+
 ## v0.1.13 (October 2026)
 
 ## Core
