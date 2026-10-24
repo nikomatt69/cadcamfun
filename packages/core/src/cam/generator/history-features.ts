@@ -233,6 +233,12 @@ const derive = (history: History): HistoryFeatures => {
   const pockets: MachiningPocket[] = []
   const outlines: MachiningOutline[] = []
   const turned: TurnedProfile[] = []
+  /** Boxes of the cuts made so far: material added later inside one of them is a boss standing in a pocket. */
+  const cuts: Array<{ minX: number; minY: number; maxX: number; maxY: number; bottom: number; top: number }> = []
+  const box = (loops: ReadonlyArray<ReadonlyArray<Vec2>>) => {
+    const xs = loops.flat().map((p) => p.x), ys = loops.flat().map((p) => p.y)
+    return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) }
+  }
   for (const f of history.features) {
     if (f.type === "extrude") {
       const sketch = built.sketches[f.sketch]
@@ -246,6 +252,13 @@ const derive = (history: History): HistoryFeatures => {
       const loops = sketchProfiles(sketch.solve.sketch).loops.map((loop) => (f.corner !== undefined && cornerSize !== undefined && cornerSize > 0 ? treatCorners(loop, f.corner.style, cornerSize) : loop))
       const [bottom, top] = extent(sketch.offset, depth, f.direction)
       if (f.taper !== undefined || f.edge !== undefined) notes.push(`${f.id}: draft and edge breaks are not followed by the 2.5D paths (the surface path machines them)`)
+      // This walk reads every extrusion as a tool of its own, in no order: material that stands in a pocket cut earlier (an island on
+      // the pocket floor) is not an outline over the stock. The exact recognition of the planner (`exactFeatures`) reads that part.
+      if ((f.operation === "new" || f.operation === "union") && loops.length > 0) {
+        const b = box(loops)
+        if (cuts.some((c) => Math.min(top, c.top) - Math.max(bottom, c.bottom) > 1e-6 && b.minX < c.maxX - 1e-6 && b.maxX > c.minX + 1e-6 && b.minY < c.maxY - 1e-6 && b.maxY > c.minY + 1e-6)) throw new Error("material added inside a pocket")
+      }
+      if (f.operation === "subtract" && loops.length > 0) cuts.push({ ...box(loops), bottom, top })
       if (f.operation === "subtract") {
         loops.forEach((loop, i) => pockets.push({ id: loops.length > 1 ? `${f.id}#${i}` : f.id, feature: f.id, loop: ccw(loop), top, floor: bottom }))
       } else if (f.operation === "new" || f.operation === "union") {

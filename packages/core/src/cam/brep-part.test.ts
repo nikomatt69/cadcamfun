@@ -232,6 +232,14 @@ describe("islands standing in a pocket", () => {
     expect(volume(f)).toBeCloseTo(massProperties(b).volume, 0)
   })
 
+  test("the history walk declines a boss standing in a pocket, the exact model gives its island; a boss on top of the plate is still derived from the history", () => {
+    const element = (h: History) => ({ id: "p", type: "parametric", name: "P", x: 0, y: 0, z: 0, history: h })
+    expect(historyFeatures(element(islandPart(6)))).toBeUndefined()
+    expect(exactFeatures(element(islandPart(6)))!.features!.pockets[0]!.islands).toHaveLength(1)
+    // `stepped` adds its boss on top of the plate before cutting a pocket elsewhere: nothing stands inside a pocket.
+    expect(historyFeatures(element(stepped))).toBeDefined()
+  })
+
   test("a part without islands is reported exactly as before: no islands key at all", () => {
     const f = brepFeatures(brepOf(stepped), "stepped").features!
     expect(f.pockets.every((p) => !("islands" in p))).toBe(true)

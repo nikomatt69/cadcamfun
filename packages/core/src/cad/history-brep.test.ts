@@ -115,9 +115,13 @@ describe("exact replay of a parametric history", () => {
   })
 
   test("a feature without an exact counterpart is reported per body, the mesh stays", () => {
-    const r = rebuildExact(plate([{ id: "squash", type: "scale", factor: [1, 2, 1] }]))
+    // A non-uniform scale of a box is exact (spec 40 U4); that of a sphere is an ellipsoid, which the kernel has no surface for.
+    const r = rebuildExact({
+      parameters: {},
+      features: [{ id: "ball", type: "primitive", operation: "new", element: "sphere", params: { radius: 6 } } as never, { id: "squash", type: "scale", factor: [1, 2, 1] }]
+    })
     expect(r.bodies[0]!.brep).toBeUndefined()
-    expect(r.bodies[0]!.reason).toContain("non-uniform scale")
+    expect(r.bodies[0]!.reason).toMatch(/sphere scaled unevenly/)
     expect(r.result.bodies[0]!.mesh.indices.length).toBeGreaterThan(0)
   })
 

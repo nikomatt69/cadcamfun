@@ -171,3 +171,37 @@ test("a malformed print mesh beside a valid solid returns InvalidInput without a
   expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({ tag: "InvalidInput", stage: "prepare", message: expect.stringContaining("mesh face 4") })]))
   expect(response.body.value).toBeUndefined()
 })
+
+/** A 100 x 60 x 10 plate with a 60 x 40 pocket 6 deep and a 20 x 20 island standing on the pocket floor. */
+const islandPart = {
+  id: "island", type: "parametric", name: "Island", x: 0, y: 0, z: 0, layerId: "default",
+  history: {
+    parameters: {},
+    features: [
+      { id: "b", type: "sketch", plane: "XY", sketch: { entities: [], constraints: [], shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: 100, height: 60 }] } },
+      { id: "plate", type: "extrude", sketch: "b", depth: 10, operation: "new" },
+      { id: "p", type: "sketch", plane: "XY", offset: 10, sketch: { entities: [], constraints: [], shapes: [{ id: "r", kind: "rectangle", at: [20, 10], width: 60, height: 40 }] } },
+      { id: "pocket", type: "extrude", sketch: "p", depth: 6, direction: "down", operation: "subtract" },
+      { id: "i", type: "sketch", plane: "XY", offset: 4, sketch: { entities: [], constraints: [], shapes: [{ id: "r", kind: "rectangle", at: [40, 20], width: 20, height: 20 }] } },
+      { id: "island", type: "extrude", sketch: "i", depth: 6, operation: "union" }
+    ]
+  }
+}
+
+test("a parametric part with an island in a pocket is machined from its exact model, stored, read back from the database and reviewed", async () => {
+  const project = (await app.call("/api/projects", { method: "POST", json: { name: "Island program" } })).body.id
+  await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Island", data: { elements: [islandPart] } } })
+  const handlers = await app.toolHandlers()
+  const saved = await handlers.manufactureOperation!(project, { material: "6061" }) as { ok: boolean; operationId: string }
+  expect(saved.ok).toBe(true)
+  const stored = await app.call(`/api/toolpaths/${saved.operationId}`)
+  const artifact = Schema.decodeUnknownSync(CamKernelResult)({ status: "ok", value: stored.body.data.kernelArtifact })
+  if (artifact.status !== "ok") throw new Error("Expected a stored artifact")
+  // The stored outcomes name the operations the island needed: rough around it, its own wall pass, the pocket wall pass.
+  const outcome = (id: string) => artifact.value.operations.find((o) => o.id === id)
+  for (const id of ["rough-pocket-1", "finish-pocket-1", "finish-pocket-1-island1"]) expect(outcome(id), id).toMatchObject({ status: "ok" })
+  expect(artifact.value.operations.some((o) => o.id === "rough-island")).toBe(false)
+  expect(stored.body.gcode).toBe(artifact.value.nc)
+  expect(artifact.value.claims.find((c) => c.id === "no-gouge")?.status).toBe("passed")
+  expect(await handlers.reviewOperation!(project, saved.operationId)).toMatchObject({ status: artifact.value.release })
+})
