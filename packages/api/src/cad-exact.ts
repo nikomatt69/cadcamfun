@@ -50,7 +50,7 @@ export const CadExactHole = Schema.Struct({
 })
 
 export const CadExactMachining = Schema.Union([
-  Schema.Struct({ prismatic: Schema.Literal(true), holes: int, pockets: int, outlines: int, top: num, bottom: num, islands: Schema.optionalKey(int) }),
+  Schema.Struct({ prismatic: Schema.Literal(true), holes: int, pockets: int, outlines: int, top: num, bottom: num, islands: Schema.optionalKey(int), sideHoles: Schema.optionalKey(int) }),
   Schema.Struct({ prismatic: Schema.Literal(false), reason: Schema.String })
 ])
 

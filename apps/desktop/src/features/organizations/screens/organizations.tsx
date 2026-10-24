@@ -27,6 +27,7 @@ import {
   BADGE, CANCEL_BUTTON, DANGER_BUTTON, FIELD, INPUT, LABEL, PANEL, RAIL_LABEL, StageEmpty, StageError, StageLoading,
   SUBMIT_BUTTON, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage, WorkspaceTabs, type WorkspaceTabItem
 } from "../../../shared/components/WorkspacePage.tsx"
+import { DataTable, KeyValueList } from "../../../shared/components/enterprise.tsx"
 import { Modal } from "../../toolpaths/components/shared.tsx"
 import { OrganizationCard } from "../components/organization-card.tsx"
 
@@ -275,12 +276,12 @@ export function OrganizationDetailScreen(): JSX.Element {
                       <Show when={(org().description ?? "").length > 0} fallback={t("org.overview.noDescription")}>{org().description}</Show>
                     </p>
                     <h3 class="mb-1.5 mt-3 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{t("org.overview.details")}</h3>
-                    <dl class="panel-kv">
-                      <dt>{t("org.overview.created")}</dt><dd>{formatDate(org().createdAt)}</dd>
-                      <dt>{t("org.overview.updated")}</dt><dd>{formatDate(org().updatedAt)}</dd>
-                      <dt>{t("org.overview.members")}</dt><dd>{org().members.length}</dd>
-                      <dt>{t("org.overview.projects")}</dt><dd>{org().projectCount}</dd>
-                    </dl>
+                    <KeyValueList rows={[
+                      { label: t("org.overview.created"), value: formatDate(org().createdAt) },
+                      { label: t("org.overview.updated"), value: formatDate(org().updatedAt) },
+                      { label: t("org.overview.members"), value: String(org().members.length) },
+                      { label: t("org.overview.projects"), value: String(org().projectCount) }
+                    ]} />
                   </section>
 
                   <section class={`${PANEL} !p-3`}>
@@ -301,7 +302,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                       <button type="button" class={TOOLBAR_BUTTON} onClick={() => setShowInviteModal(true)}><UserPlus size={14} aria-hidden="true" />{t("org.members.invite")}</button>
                     </Show>
                   </div>
-                  <div class="workspace-table overflow-x-auto">
+                  <DataTable>
                     <table>
                       <thead>
                         <tr>
@@ -341,7 +342,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                         </For>
                       </tbody>
                     </table>
-                  </div>
+                  </DataTable>
                 </section>
               </Show>
 

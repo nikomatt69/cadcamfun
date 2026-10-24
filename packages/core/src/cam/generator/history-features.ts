@@ -95,6 +95,8 @@ export interface HistoryFeatures {
   readonly outlines: ReadonlyArray<MachiningOutline>
   readonly turned: ReadonlyArray<TurnedProfile>
   readonly bounds: { readonly min: V3; readonly max: V3 } | undefined
+  /** Holes along other axes than Z that the exact recognition left to their own setup (it plugged them to read this one). */
+  readonly sideHoles?: number
   /** What the derivation left out and why (a feature it does not machine, a hole that is not reachable from above). */
   readonly notes: ReadonlyArray<string>
 }

@@ -9,7 +9,7 @@
  */
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
-import { Cpu, Layers, Package, Save, Trash2, Wrench, Box, Edit } from "lucide-solid"
+import { Copy, Cpu, Layers, Package, Save, Trash2, Wrench, Box, Edit } from "lucide-solid"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
@@ -20,6 +20,9 @@ import {
 } from "../../../shared/components/WorkspacePage.tsx"
 import { ResourceGeometryPreview, resourceElements } from "../components/ResourceGeometryPreview.tsx"
 import { ToolPreview3D, toolResourceOf } from "../components/ToolPreview3D.tsx"
+import { MaterialPreview3D, densityKgM3 } from "../components/MaterialPreview3D.tsx"
+import { PropertyBar, StatGrid } from "../components/ResourceStats.tsx"
+import { hexColor } from "../lib/preview-scene.ts"
 import { NumberField } from "../../cad/components/property-inputs/NumberField.tsx"
 import { cam } from "@cadcamfun/core"
 import { componentEntries } from "../../cad/lib/component-assembly.ts"
@@ -46,6 +49,8 @@ const asRecord = (value: unknown): Record<string, unknown> => (typeof value === 
 const payloadOf = (kind: Kind, form: Row): Record<string, unknown> => {
   if (kind === "materials") {
     return { name: str(form["name"]).trim(), description: str(form["description"]) === "" ? null : str(form["description"]), properties: {
+      // Properties the form does not edit (machinability, stability, ...) are kept as stored.
+      ...asRecord(form["extraProperties"]),
       density: num(form["density"]), hardness: num(form["hardness"]), thermalConductivity: num(form["thermalConductivity"]),
       elasticModulus: num(form["elasticModulus"]), poissonRatio: num(form["poissonRatio"]), yieldStrength: num(form["yieldStrength"]),
       ultimateStrength: num(form["ultimateStrength"]), color: str(form["color"]) || "#cccccc"
@@ -79,7 +84,7 @@ const formOf = (kind: Kind, row: Row): Row => {
   if (kind === "materials") {
     const p = asRecord(row["properties"])
     return { name: row["name"], description: row["description"] ?? "", density: p["density"] ?? 0, hardness: p["hardness"] ?? 0, thermalConductivity: p["thermalConductivity"] ?? 0,
-      elasticModulus: p["elasticModulus"] ?? 0, poissonRatio: p["poissonRatio"] ?? 0, yieldStrength: p["yieldStrength"] ?? 0, ultimateStrength: p["ultimateStrength"] ?? 0, color: p["color"] ?? "#cccccc" }
+      elasticModulus: p["elasticModulus"] ?? 0, poissonRatio: p["poissonRatio"] ?? 0, yieldStrength: p["yieldStrength"] ?? 0, ultimateStrength: p["ultimateStrength"] ?? 0, color: p["color"] ?? "#cccccc", extraProperties: p }
   }
   if (kind === "machines") return { name: row["name"], type: row["type"], description: row["description"] ?? "", config: asRecord(row["config"]), isPublic: row["isPublic"] === true }
   return { ...row, description: row["description"] ?? row["notes"] ?? "" }
@@ -195,7 +200,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
       backLabel={`Back to ${meta.plural}`}
       actions={
         <Show when={!editing()} fallback={<>
-          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => void save()} disabled={busy()}><Save size={14} aria-hidden="true" />Save</button>
+          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => void save()} disabled={busy() || str(form()["name"]).trim() === ""}><Save size={14} aria-hidden="true" />Save</button>
           <button type="button" class={TOOLBAR_BUTTON} onClick={cancel} disabled={busy()}>Cancel</button>
         </>}>
           <button type="button" class={TOOLBAR_PRIMARY} onClick={() => { setEditing(true); setTab("details") }} disabled={busy() || row() === undefined}><Edit size={14} aria-hidden="true" />Edit</button>
@@ -232,14 +237,9 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                   </Show>
                   <Show when={props.kind === "components"}><div class="mt-3"><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div></Show>
                   <Show when={props.kind === "tools"}><div class="mt-3"><ToolPreview3D tool={current()} /></div></Show>
-                  <div class="mt-3 grid grid-cols-2 gap-2">
-                    <For each={summaryFields(props.kind, current())}>{(field) => (
-                      <div class="rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40">
-                        <h3 class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{field.label}</h3>
-                        <p class="mt-0.5 text-xs font-medium text-slate-900 dark:text-white">{field.value}</p>
-                      </div>
-                    )}</For>
-                  </div>
+                  <Show when={props.kind === "materials"}><div class="mt-3"><MaterialPreview3D properties={asRecord(current()["properties"])} /></div></Show>
+                  <div class="mt-3"><StatGrid items={summaryFields(props.kind, current())} /></div>
+                  <Show when={props.kind === "materials"}><div class="mt-3"><MaterialBars properties={asRecord(current()["properties"])} /></div></Show>
                 </div>
                 <aside class={`${PANEL} !p-3`}>
                   <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">Information</h3>
@@ -269,11 +269,15 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
             <Show when={tab() === "details"}>
               <div class={`${PANEL} !p-3`}>
                 <Show when={editing()} fallback={<DetailsView kind={props.kind} row={current()} />}>
-                  <Show when={props.kind === "tools"} fallback={<DetailsForm kind={props.kind} form={form()} onPatch={patch} onPatchConfig={patchConfig} />}>
-                    {/* The tool redraws as it is edited: what is saved is what the CAM preview will draw. */}
+                  <Show when={props.kind === "tools" || props.kind === "materials"} fallback={<DetailsForm kind={props.kind} form={form()} onPatch={patch} onPatchConfig={patchConfig} />}>
+                    {/* The 3D model redraws as it is edited: what is saved is what the CAM preview will draw. */}
                     <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
                       <div class="lg:col-span-2"><DetailsForm kind={props.kind} form={form()} onPatch={patch} onPatchConfig={patchConfig} /></div>
-                      <ToolPreview3D tool={form()} />
+                      <div class="lg:sticky lg:top-0 lg:self-start">
+                        <Show when={props.kind === "tools"} fallback={<MaterialPreview3D properties={{ ...asRecord(form()["extraProperties"]), density: form()["density"], color: form()["color"] }} />}>
+                          <ToolPreview3D tool={form()} />
+                        </Show>
+                      </div>
                     </div>
                   </Show>
                 </Show>
@@ -282,6 +286,9 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
 
             <Show when={tab() === "raw"}>
               <div class={`${PANEL} !p-3`}>
+                <div class="mb-2 flex justify-end">
+                  <button type="button" class={TOOLBAR_BUTTON} onClick={() => { void navigator.clipboard?.writeText(JSON.stringify(current(), null, 2)); toast.success("Copied to clipboard") }}><Copy size={14} aria-hidden="true" />Copy JSON</button>
+                </div>
                 <pre class="max-h-[60vh] overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{JSON.stringify(current(), null, 2)}</pre>
               </div>
             </Show>
@@ -303,7 +310,8 @@ const fetchEffect = (app: ReturnType<typeof useApp>, kind: Kind, id: string | un
 const summaryFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: string; readonly value: string }> => {
   if (kind === "materials") {
     const p = asRecord(row["properties"])
-    return [{ label: "Density", value: `${str(p["density"]) || "-"} kg/m³` }, { label: "Hardness", value: str(p["hardness"]) || "-" }, { label: "Yield strength", value: str(p["yieldStrength"]) || "-" }, { label: "Color", value: str(p["color"]) || "-" }]
+    const density = densityKgM3(num(p["density"]))
+    return [{ label: "Density", value: density > 0 ? `${density} kg/m³` : "-" }, { label: "Hardness", value: str(p["hardness"]) || "-" }, { label: "Yield strength", value: num(p["yieldStrength"]) > 0 ? `${str(p["yieldStrength"])} MPa` : "-" }, { label: "Color", value: hexColor(p["color"]) }]
   }
   if (kind === "tools") {
     return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Diameter", value: `${str(row["diameter"]) || "-"} mm` }, { label: "Material", value: str(row["material"]) || "-" }, { label: "Flutes", value: str(row["numberOfFlutes"]) || "-" },
@@ -313,18 +321,45 @@ const summaryFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: st
     const c = asRecord(row["config"])
     return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Controller", value: str(c["controller"]) || "-" }, { label: "Status", value: str(c["status"]) || "-" }, { label: "Max spindle speed", value: str(c["maxSpindleSpeed"]) || "-" }]
   }
-  return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Visibility", value: row["isPublic"] === true ? "Public" : "Private" }]
+  const elements = resourceElements(row["data"] ?? row)
+  const kinds = [...new Set(componentEntries(elements).map(({ element }) => element.type))]
+  return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Visibility", value: row["isPublic"] === true ? "Public" : "Private" },
+    { label: "Elements", value: String(componentEntries(elements).length) }, { label: "Geometry", value: kinds.length > 0 ? kinds.join(", ") : "-" }]
+}
+
+/** The full list of the Details tab: every figure the resource carries, with its unit. */
+const detailFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: string; readonly value: string }> => {
+  const withUnit = (value: unknown, unit: string): string => (num(value) > 0 ? `${str(value)} ${unit}` : "-")
+  if (kind === "materials") {
+    const p = asRecord(row["properties"])
+    return [...summaryFields(kind, row).filter((field) => field.label !== "Yield strength"), { label: "Yield strength", value: withUnit(p["yieldStrength"], "MPa") },
+      { label: "Ultimate strength", value: withUnit(p["ultimateStrength"], "MPa") }, { label: "Elastic modulus", value: withUnit(p["elasticModulus"], "GPa") },
+      { label: "Poisson ratio", value: num(p["poissonRatio"]) > 0 ? str(p["poissonRatio"]) : "-" }, { label: "Thermal conductivity", value: withUnit(p["thermalConductivity"], "W/(m·K)") }]
+  }
+  if (kind === "tools") {
+    return [...summaryFields(kind, row), { label: "Max RPM", value: str(row["maxRPM"]) || "-" }, { label: "Coolant", value: str(row["coolantType"]) || "-" },
+      { label: "Cutting length", value: withUnit(row["cuttingLength"], "mm") }, { label: "Total length", value: withUnit(row["totalLength"], "mm") }, { label: "Shank diameter", value: withUnit(row["shankDiameter"], "mm") }]
+  }
+  return summaryFields(kind, row)
 }
 
 function DetailsView(props: { readonly kind: Kind; readonly row: Row | undefined }): JSX.Element {
-  return <dl class="grid grid-cols-1 gap-2 md:grid-cols-2">
-    <For each={summaryFields(props.kind, props.row ?? {})}>{(field) => (
-      <div class="rounded-[5px] border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700/70 dark:bg-slate-800/40">
-        <dt class="text-[10px] font-medium uppercase tracking-[0.06em] text-slate-500 dark:text-slate-400">{field.label}</dt>
-        <dd class="mt-0.5 text-xs font-medium text-slate-900 dark:text-white">{field.value}</dd>
-      </div>
-    )}</For>
-  </dl>
+  return <div class="space-y-3">
+    <StatGrid items={detailFields(props.kind, props.row ?? {})} />
+    <Show when={props.kind === "materials"}><MaterialBars properties={asRecord((props.row ?? {})["properties"])} /></Show>
+  </div>
+}
+
+/** Strength / stiffness / conductivity against the strongest common stock, so two materials compare at a glance. */
+function MaterialBars(props: { readonly properties: Row }): JSX.Element {
+  const value = (key: string): number => num(props.properties[key])
+  return <div class="grid grid-cols-1 gap-2.5 rounded-[5px] border border-slate-200 p-3 dark:border-slate-700/70 md:grid-cols-2">
+    <PropertyBar label="Density" value={densityKgM3(value("density"))} max={9000} unit="kg/m³" />
+    <PropertyBar label="Yield strength" value={value("yieldStrength")} max={1800} unit="MPa" />
+    <PropertyBar label="Ultimate strength" value={value("ultimateStrength")} max={2000} unit="MPa" />
+    <PropertyBar label="Elastic modulus" value={value("elasticModulus")} max={400} unit="GPa" />
+    <PropertyBar label="Thermal conductivity" value={value("thermalConductivity")} max={400} unit="W/(m·K)" />
+  </div>
 }
 
 function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly onPatch: (key: string, value: unknown) => void; readonly onPatchConfig: (key: string, value: unknown) => void }): JSX.Element {
@@ -332,6 +367,12 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
     <div>
       <label for={id} class={LABEL}>{label}</label>
       <input id={id} name={key} type={type} class={INPUT} value={str(props.form[key])} onInput={(e) => props.onPatch(key, type === "number" ? Number(e.currentTarget.value) : e.currentTarget.value)} />
+    </div>
+  )
+  const numeric = (id: string, label: string, key: string, min = 0, max?: number) => (
+    <div>
+      <label for={id} class={LABEL}>{label}</label>
+      <NumberField id={id} name={key} class={INPUT} min={min} max={max} value={props.form[key] ?? ""} onChange={(value) => props.onPatch(key, value)} />
     </div>
   )
   return <form class="grid grid-cols-1 gap-3 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
@@ -358,14 +399,20 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
       <ToolShapeFields form={props.form} onPatch={props.onPatch} />
     </Show>
     <Show when={props.kind === "materials"}>
-      {input("res-density", "Density", "density", "number")}
-      {input("res-hardness", "Hardness", "hardness", "number")}
-      {input("res-thermal", "Thermal conductivity", "thermalConductivity", "number")}
-      {input("res-elastic", "Elastic modulus", "elasticModulus", "number")}
-      {input("res-poisson", "Poisson ratio", "poissonRatio", "number")}
-      {input("res-yield", "Yield strength", "yieldStrength", "number")}
-      {input("res-ultimate", "Ultimate strength", "ultimateStrength", "number")}
-      {input("res-color", "Color", "color")}
+      {numeric("res-density", "Density (kg/m³)", "density")}
+      {numeric("res-hardness", "Hardness (HB / HV / HRC value)", "hardness")}
+      {numeric("res-thermal", "Thermal conductivity (W/(m·K))", "thermalConductivity")}
+      {numeric("res-elastic", "Elastic modulus (GPa)", "elasticModulus")}
+      {numeric("res-poisson", "Poisson ratio (0 – 0.5)", "poissonRatio", 0, 0.5)}
+      {numeric("res-yield", "Yield strength (MPa)", "yieldStrength")}
+      {numeric("res-ultimate", "Ultimate strength (MPa)", "ultimateStrength")}
+      <div>
+        <label for="res-color" class={LABEL}>Color</label>
+        <div class="flex items-center gap-2">
+          <input id="res-color-picker" type="color" aria-label="Pick the colour" class="h-[34px] w-10 cursor-pointer rounded-[5px] border border-slate-300 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-800" value={hexColor(props.form["color"]).length === 7 ? hexColor(props.form["color"]) : "#cccccc"} onInput={(e) => props.onPatch("color", e.currentTarget.value)} />
+          <input id="res-color" name="color" type="text" class={INPUT} value={str(props.form["color"])} onInput={(e) => props.onPatch("color", e.currentTarget.value)} />
+        </div>
+      </div>
     </Show>
     <Show when={props.kind === "machines"}>
       <MachineProfileFields form={props.form} onPatchConfig={props.onPatchConfig} />

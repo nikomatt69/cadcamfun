@@ -3,7 +3,11 @@ import { Schema } from "effect"
 import { CamKernelArtifact, CamProgramDocument, type ToolpathRow } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
 import { ResourceGeometryPreview, resourceElements } from "../../library/components/ResourceGeometryPreview.tsx"
+import { StatGrid, type StatItem } from "../../library/components/ResourceStats.tsx"
+import { buildPlayback, playbackSegments } from "../../../viewport/view3d/playback.ts"
 import { t } from "../../../i18n/index.ts"
+
+const minutes = (seconds: number): string => (seconds < 60 ? `${Math.round(seconds)} s` : `${Math.floor(seconds / 60)} min ${Math.round(seconds % 60)} s`)
 
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
 const decode = <A,>(schema: Schema.Codec<A>, value: unknown): A | undefined => {
@@ -50,23 +54,41 @@ export function ToolpathProgramDetails(props: { readonly row: ToolpathRow; reado
       { label: t("cam.resource.depth"), value: params["depth"] === undefined ? undefined : `${params["depth"]} mm` }
     ].filter((field) => field.value !== undefined && field.value !== null)
   })
-  return <section class="space-y-5" data-testid="toolpath-program-details">
+  /** What the program does in the preview: the length cut and rapided, the moves and the time they take. */
+  const motion = createMemo((): ReadonlyArray<StatItem> => {
+    const current = program()
+    if (!current) return []
+    try {
+      const playback = buildPlayback(current)
+      let cut = 0, rapid = 0, moves = 0
+      for (const segment of playbackSegments(playback)) {
+        const length = Math.hypot(segment.to.x - segment.from.x, segment.to.y - segment.from.y, segment.to.z - segment.from.z)
+        if (segment.rapid) rapid += length; else cut += length
+        moves += 1
+      }
+      return [
+        { label: "Cutting length", value: `${(cut / 1000).toFixed(2)} m` }, { label: "Rapid length", value: `${(rapid / 1000).toFixed(2)} m` },
+        { label: "Segments", value: String(moves) }, { label: "Estimated time", value: minutes(playback.duration) }
+      ]
+    } catch { return [] }
+  })
+  return <section class="space-y-4" data-testid="toolpath-program-details">
     <ResourceGeometryPreview elements={elements()} program={program()} origin={artifact()?.origin} />
-    <Show when={!elements().length}><p class="text-sm text-gray-500">{t("cam.resource.noGeometry")}</p></Show>
-    <dl class="grid grid-cols-2 gap-3 text-sm"><For each={summary()}>{(field) => <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><dt class="text-gray-500 dark:text-gray-400">{field.label}</dt><dd class="font-medium text-gray-900 dark:text-white">{String(field.value)}</dd></div>}</For></dl>
+    <Show when={!elements().length}><p class="text-xs text-slate-500 dark:text-slate-400">{t("cam.resource.noGeometry")}</p></Show>
+    <StatGrid columns={3} items={[...summary().map((field) => ({ label: field.label, value: String(field.value) })), ...motion()]} />
     <div>
-      <h3 class="mb-3 text-lg font-medium text-gray-900 dark:text-white">{t("cam.resource.operations", { count: operations().length })}</h3>
-      <Show when={operations().length} fallback={<p class="text-sm text-gray-500">{t("cam.resource.noOperations")}</p>}>
-        <ol class="space-y-3" data-testid="saved-operations"><For each={operations()}>{(operation, index) => <li class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-          <h4 class="font-medium text-gray-900 dark:text-white">{index() + 1}. {operation.name}</h4>
-          <dl class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
+      <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("cam.resource.operations", { count: operations().length })}</h3>
+      <Show when={operations().length} fallback={<p class="text-xs text-slate-500 dark:text-slate-400">{t("cam.resource.noOperations")}</p>}>
+        <ol class="space-y-2" data-testid="saved-operations"><For each={operations()}>{(operation, index) => <li class="rounded-[5px] border border-slate-200 p-3 dark:border-slate-700">
+          <h4 class="text-xs font-semibold text-slate-900 dark:text-white">{index() + 1}. {operation.name}</h4>
+          <dl class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-slate-600 dark:text-slate-300">
             <Show when={operation.strategy}><div><dt class="inline">{t("cam.resource.strategy")}: </dt><dd class="inline">{operation.strategy}</dd></div></Show>
             <div><dt class="inline">{t("cam.resource.tool")}: </dt><dd class="inline">{operation.tool}</dd></div>
             <div>{t("cam.resource.moves", { count: operation.moves })}</div>
           </dl>
-          <Show when={Object.keys(operation.parameters).length}><details class="mt-3 text-sm"><summary class="cursor-pointer text-blue-600 dark:text-blue-400">{t("cam.resource.parameters")}</summary><pre class="mt-2 max-h-56 overflow-auto rounded bg-gray-50 p-3 text-xs text-gray-800 dark:bg-gray-900 dark:text-gray-200">{JSON.stringify(operation.parameters, null, 2)}</pre></details></Show>
-          <Show when={operation.gcode}><details class="mt-2 text-sm"><summary class="cursor-pointer text-blue-600 dark:text-blue-400">{t("cam.resource.operationCode")}</summary><pre class="mt-2 max-h-56 overflow-auto rounded bg-gray-50 p-3 text-xs text-gray-800 dark:bg-gray-900 dark:text-gray-200">{operation.gcode}</pre></details></Show>
-          <For each={operation.warnings}>{(warning) => <p class="mt-2 text-xs text-amber-600">{warning}</p>}</For>
+          <Show when={Object.keys(operation.parameters).length}><details class="mt-2 text-xs"><summary class="cursor-pointer text-blue-600 dark:text-blue-400">{t("cam.resource.parameters")}</summary><pre class="mt-2 max-h-56 overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{JSON.stringify(operation.parameters, null, 2)}</pre></details></Show>
+          <Show when={operation.gcode}><details class="mt-2 text-xs"><summary class="cursor-pointer text-blue-600 dark:text-blue-400">{t("cam.resource.operationCode")}</summary><pre class="mt-2 max-h-56 overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{operation.gcode}</pre></details></Show>
+          <For each={operation.warnings}>{(warning) => <p class="mt-2 text-[11px] text-amber-600 dark:text-amber-400">{warning}</p>}</For>
         </li>}</For></ol>
       </Show>
     </div>

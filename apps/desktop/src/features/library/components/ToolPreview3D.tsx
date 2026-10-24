@@ -8,6 +8,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { cam } from "@cadcamfun/core"
 import { toolObject } from "../../../viewport/view3d/tool-object.ts"
 import { disposeObject } from "../../../viewport/view3d/machine-scene.ts"
+import { PREVIEW_BACKGROUND, addPreviewLights } from "../lib/preview-scene.ts"
+import { PREVIEW_STAGE, PreviewFrame, stageNote } from "./PreviewFrame.tsx"
 
 const numberOrNull = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null
@@ -38,7 +40,7 @@ export function ToolPreview3D(props: { readonly tool: Readonly<Record<string, un
     const resource = toolResourceOf(props.tool)
     return cam.toolModelOf(resource, cam.toolMachineOf(resource.type))
   })
-  let rebuild = () => {}
+  let rebuild = () => {}, fit = () => {}
   createEffect(() => { model(); rebuild() })
   onMount(() => {
     if (!host) return
@@ -47,11 +49,8 @@ export function ToolPreview3D(props: { readonly tool: Readonly<Record<string, un
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     host.append(renderer.domElement)
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x1f2937)
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6), new THREE.HemisphereLight(0xffffff, 0x334155, 0.8))
-    const light = new THREE.DirectionalLight(0xffffff, 1.4)
-    light.position.set(80, -60, 120)
-    scene.add(light)
+    scene.background = new THREE.Color(PREVIEW_BACKGROUND)
+    addPreviewLights(scene, { x: 80, y: -60, z: 120 })
     const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 10000)
     camera.up.set(0, 0, 1)
     const controls = new OrbitControls(camera, renderer.domElement)
@@ -64,6 +63,7 @@ export function ToolPreview3D(props: { readonly tool: Readonly<Record<string, un
       const w = Math.max(1, host.clientWidth), h = Math.max(1, host.clientHeight)
       renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); render()
     }
+    fit = () => rebuild()
     rebuild = () => {
       if (object) { scene.remove(object); disposeObject(object) }
       const m = model()
@@ -84,19 +84,19 @@ export function ToolPreview3D(props: { readonly tool: Readonly<Record<string, un
     const loop = () => { frame = requestAnimationFrame(loop); render() }
     controls.addEventListener("start", () => { if (!frame) loop() })
     controls.addEventListener("end", () => { cancelAnimationFrame(frame); frame = 0; render() })
-    onCleanup(() => { cancelAnimationFrame(frame); observer.disconnect(); controls.dispose(); if (object) disposeObject(object); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {} })
+    onCleanup(() => { cancelAnimationFrame(frame); observer.disconnect(); controls.dispose(); if (object) disposeObject(object); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; fit = () => {} })
   })
   return (
-    <div data-testid="tool-preview" class="space-y-2">
-      <div ref={host} class="w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700" style={{ height: `${props.height ?? 260}px` }}>
-        <Show when={unavailable()}><p class="p-4 text-sm text-gray-500">3D preview unavailable (no WebGL)</p></Show>
+    <PreviewFrame title="Tool model" testId="tool-preview" onFit={() => fit()} hint="Drag to orbit · Scroll to zoom">
+      <div ref={host} class={PREVIEW_STAGE} style={{ height: `${props.height ?? 260}px` }}>
+        <Show when={unavailable()}><p role="status" class={stageNote("info")}>3D preview unavailable (no WebGL)</p></Show>
       </div>
-      <p data-testid="tool-preview-description" class="text-sm text-gray-700 dark:text-gray-300">{cam.describeTool(model())}</p>
+      <p data-testid="tool-preview-description" class="text-xs text-slate-700 dark:text-slate-300">{cam.describeTool(model())}</p>
       <Show when={model().assumed.length > 0}>
-        <p data-testid="tool-preview-assumed" class="text-xs text-amber-600 dark:text-amber-400">
+        <p data-testid="tool-preview-assumed" class="text-[11px] text-amber-600 dark:text-amber-400">
           Not given, drawn from the tool type: <For each={model().assumed}>{(field, i) => <span>{i() > 0 ? ", " : ""}{field}</span>}</For>. The CAM preview and the set-up checks use the same shape.
         </p>
       </Show>
-    </div>
+    </PreviewFrame>
   )
 }

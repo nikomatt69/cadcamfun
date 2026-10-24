@@ -6,10 +6,11 @@
 import { Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { A, useNavigate, useSearchParams } from "@solidjs/router"
 import { CircleCheck, CircleX } from "lucide-solid"
+import Loader from "lucide-solid/icons/loader-circle"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { startSession } from "../../../shared/state/session.ts"
-import { ErrorState, ScreenHeader, Toast } from "../../../shared/components/screen-parts.tsx"
+import { Button, Field, Notice, TextField } from "../../../shared/components/enterprise.tsx"
 
 /** Auth failures carry `{ error, details }`; show both, else `fallback`. */
 export const describe = (cause: unknown, fallback: string = String(cause)): string => {
@@ -38,59 +39,79 @@ function useAction() {
   return { error, done, debug, pending, run }
 }
 
+/** The centred document card the single-step auth pages share. */
+const AuthCard = (props: { readonly title: string; readonly subtitle?: string; readonly children: JSX.Element }): JSX.Element => (
+  <div class="reference-standalone-container">
+    <div class="ent-card" style={{ "max-width": "24rem" }}>
+      <div class="ent-card__head">
+        <h1 class="ent-header__title ent-header--document">{props.title}</h1>
+        <Show when={props.subtitle !== undefined}>
+          <p class="ent-header__description">{props.subtitle}</p>
+        </Show>
+      </div>
+      {props.children}
+    </div>
+  </div>
+)
+
 const Feedback = (props: { a: ReturnType<typeof useAction> }): JSX.Element => <>
-  <Toast message={props.a.done()} />
+  <Show when={props.a.done()}><Notice tone="ok">{props.a.done()}</Notice></Show>
   <Show when={props.a.debug()}><p class="break-all font-mono text-xs"><strong>{t("auth.debugLink")}: </strong>{props.a.debug()}</p></Show>
-  <Show when={props.a.error()}><ErrorState label={t("common.error")} detail={props.a.error()} /></Show>
+  <Show when={props.a.error()}><Notice tone="bad">{props.a.error()}</Notice></Show>
 </>
 
 export function ForgotPasswordScreen(): JSX.Element {
   const app = useApp(); const a = useAction(); const [email, setEmail] = createSignal("")
-  return <section>
-    <ScreenHeader title={t("auth.forgot.title")} subtitle={t("auth.forgot.subtitle")} />
-    <form class="card m-5 grid max-w-md gap-3 p-4" onSubmit={(e) => { e.preventDefault(); void a.run(async () => {
+  return <AuthCard title={t("auth.forgot.title")} subtitle={t("auth.forgot.subtitle")}>
+    <form class="ent-card__body" style={{ display: "flex", "flex-direction": "column", gap: "12px" }} onSubmit={(e) => { e.preventDefault(); void a.run(async () => {
       const r = await app.runtime.run(app.client.auth.forgotPassword({ payload: { email: email().trim() } }))
       return { message: r.message, debug: r.debugResetLink }
     }) }}>
-      <label class="form-label">{t("auth.email")}<input class="form-input" type="email" required value={email()} onInput={(e) => setEmail(e.currentTarget.value)} /></label>
-      <button class="btn btn-primary" disabled={a.pending() || !email().trim()}>{t("auth.send")}</button>
+      <Field label={t("auth.email")} id="forgot-email">
+        <TextField id="forgot-email" type="email" value={email()} required onInput={setEmail} />
+      </Field>
+      <Button tone="primary" type="submit" block disabled={a.pending() || !email().trim()}>{t("auth.send")}</Button>
       <Feedback a={a} />
     </form>
-  </section>
+  </AuthCard>
 }
 
 export function MagicLinkScreen(): JSX.Element {
   const app = useApp(); const a = useAction(); const [email, setEmail] = createSignal("")
-  return <section>
-    <ScreenHeader title={t("auth.magic.title")} subtitle={t("auth.magic.subtitle")} />
-    <form class="card m-5 grid max-w-md gap-3 p-4" onSubmit={(e) => { e.preventDefault(); void a.run(async () => {
+  return <AuthCard title={t("auth.magic.title")} subtitle={t("auth.magic.subtitle")}>
+    <form class="ent-card__body" style={{ display: "flex", "flex-direction": "column", gap: "12px" }} onSubmit={(e) => { e.preventDefault(); void a.run(async () => {
       const r = await app.runtime.run(app.client.auth.sendMagicLink({ payload: { email: email().trim() } }))
       return { message: r.message, debug: r.debugMagicLink }
     }) }}>
-      <label class="form-label">{t("auth.email")}<input class="form-input" type="email" required value={email()} onInput={(e) => setEmail(e.currentTarget.value)} /></label>
-      <button class="btn btn-primary" disabled={a.pending() || !email().trim()}>{t("auth.send")}</button>
+      <Field label={t("auth.email")} id="magic-email">
+        <TextField id="magic-email" type="email" value={email()} required onInput={setEmail} />
+      </Field>
+      <Button tone="primary" type="submit" block disabled={a.pending() || !email().trim()}>{t("auth.send")}</Button>
       <Feedback a={a} />
     </form>
-  </section>
+  </AuthCard>
 }
 
 export function ResetPasswordScreen(): JSX.Element {
   const app = useApp(); const a = useAction()
   const [search] = useSearchParams<{ token?: string }>()
   const [password, setPassword] = createSignal(""); const [confirm, setConfirm] = createSignal("")
-  return <section>
-    <ScreenHeader title={t("auth.reset.title")} />
-    <form class="card m-5 grid max-w-md gap-3 p-4" onSubmit={(e) => { e.preventDefault(); void a.run(async () => {
+  return <AuthCard title={t("auth.reset.title")}>
+    <form class="ent-card__body" style={{ display: "flex", "flex-direction": "column", gap: "12px" }} onSubmit={(e) => { e.preventDefault(); void a.run(async () => {
       const r = await app.runtime.run(app.client.auth.resetPassword({ payload: { token: search.token, newPassword: password(), confirmPassword: confirm() } }))
       return { message: r.message }
     }) }}>
-      <Show when={!search.token}><ErrorState label={t("auth.reset.missingToken")} /></Show>
-      <label class="form-label">{t("auth.reset.password")}<input class="form-input" type="password" minLength={8} required value={password()} onInput={(e) => setPassword(e.currentTarget.value)} /></label>
-      <label class="form-label">{t("auth.reset.confirm")}<input class="form-input" type="password" minLength={8} required value={confirm()} onInput={(e) => setConfirm(e.currentTarget.value)} /></label>
-      <button class="btn btn-primary" disabled={a.pending() || !search.token}>{t("auth.reset.submit")}</button>
+      <Show when={!search.token}><Notice tone="bad">{t("auth.reset.missingToken")}</Notice></Show>
+      <Field label={t("auth.reset.password")} id="reset-password">
+        <TextField id="reset-password" type="password" value={password()} required onInput={setPassword} />
+      </Field>
+      <Field label={t("auth.reset.confirm")} id="reset-confirm">
+        <TextField id="reset-confirm" type="password" value={confirm()} required onInput={setConfirm} />
+      </Field>
+      <Button tone="primary" type="submit" block disabled={a.pending() || !search.token}>{t("auth.reset.submit")}</Button>
       <Feedback a={a} />
     </form>
-  </section>
+  </AuthCard>
 }
 
 export function VerifyEmailScreen(): JSX.Element {
@@ -100,15 +121,14 @@ export function VerifyEmailScreen(): JSX.Element {
     await app.runtime.run(app.client.auth.verifyEmail({ payload: { token: search.token } }))
     return { message: t("auth.verify.done") }
   }) })
-  return <section>
-    <ScreenHeader title={t("auth.verify.title")} />
-    <div class="card m-5 grid max-w-md gap-3 p-4">
-      <Show when={!search.token}><ErrorState label={t("auth.verify.missingToken")} /></Show>
-      <Show when={a.pending()}><p aria-busy="true">{t("auth.verify.working")}</p></Show>
+  return <AuthCard title={t("auth.verify.title")}>
+    <div class="ent-card__body" style={{ display: "flex", "flex-direction": "column", gap: "12px" }}>
+      <Show when={!search.token}><Notice tone="bad">{t("auth.verify.missingToken")}</Notice></Show>
+      <Show when={a.pending()}><Notice>{t("auth.verify.working")}</Notice></Show>
       <Feedback a={a} />
-      <A class="btn btn-outline" href="/">{t("activity.projects")}</A>
+      <A class="ent-btn" href="/">{t("activity.projects")}</A>
     </div>
-  </section>
+  </AuthCard>
 }
 
 /**
@@ -144,43 +164,35 @@ export function MagicLinkVerifyScreen(): JSX.Element {
     })()
   })
   return (
-    <section class="flex min-h-[70vh] items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-12 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 sm:px-6 lg:px-8">
-      <div class="w-full max-w-md rounded-2xl border border-gray-200/50 bg-white/80 p-8 text-center shadow-2xl backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-800/80">
-        <Show when={status() === "loading"}>
-          <div class="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-          <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("magicverify.verifying")}</h2>
-          <p class="text-gray-600 dark:text-gray-400">{t("magicverify.wait")}</p>
-        </Show>
-        <Show when={status() === "success"}>
-          <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-            <CircleCheck class="h-6 w-6 text-green-600 dark:text-green-400" />
-          </div>
-          <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("magicverify.successTitle")}</h2>
-          <p class="mb-4 text-gray-600 dark:text-gray-400">{message()}</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">{t("magicverify.redirecting")}</p>
-        </Show>
-        <Show when={status() === "expired"}>
-          <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/30">
-            <CircleX class="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-          </div>
-          <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("magicverify.expiredTitle")}</h2>
-          <p class="mb-6 text-gray-600 dark:text-gray-400">{t("magicverify.expiredBody")}</p>
-          <A class="inline-block rounded-lg bg-blue-600 px-6 py-2 text-white transition-colors duration-150 hover:bg-blue-700" href="/auth/signin">
-            {t("magicverify.getNew")}
-          </A>
-        </Show>
-        <Show when={status() === "error"}>
-          <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-            <CircleX class="h-6 w-6 text-red-600 dark:text-red-400" />
-          </div>
-          <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("magicverify.errorTitle")}</h2>
-          <p class="mb-6 text-gray-600 dark:text-gray-400">{message()}</p>
-          <A class="inline-block rounded-lg bg-blue-600 px-6 py-2 text-white transition-colors duration-150 hover:bg-blue-700" href="/auth/signin">
-            {t("magicverify.tryAgain")}
-          </A>
-        </Show>
+    <div class="reference-standalone-container">
+      <div class="ent-card" style={{ "max-width": "24rem" }}>
+        <div class="ent-card__body" style={{ display: "flex", "flex-direction": "column", gap: "12px", "align-items": "center", "text-align": "center" }}>
+          <Show when={status() === "loading"}>
+            <div class="ent-stat__icon" style={{ padding: "12px" }}><Loader size={26} aria-hidden="true" /></div>
+            <h1 class="ent-header__title ent-header--document">{t("magicverify.verifying")}</h1>
+            <p class="ent-header__description">{t("magicverify.wait")}</p>
+          </Show>
+          <Show when={status() === "success"}>
+            <CircleCheck size={30} aria-hidden="true" style={{ color: "var(--ent-ok)" }} />
+            <h1 class="ent-header__title ent-header--document">{t("magicverify.successTitle")}</h1>
+            <p class="ent-header__description">{message()}</p>
+            <p class="ent-field__hint">{t("magicverify.redirecting")}</p>
+          </Show>
+          <Show when={status() === "expired"}>
+            <CircleX size={30} aria-hidden="true" style={{ color: "var(--ent-warn)" }} />
+            <h1 class="ent-header__title ent-header--document">{t("magicverify.expiredTitle")}</h1>
+            <p class="ent-header__description">{t("magicverify.expiredBody")}</p>
+            <A class="ent-btn ent-btn--primary" href="/auth/signin">{t("magicverify.getNew")}</A>
+          </Show>
+          <Show when={status() === "error"}>
+            <CircleX size={30} aria-hidden="true" style={{ color: "var(--ent-bad)" }} />
+            <h1 class="ent-header__title ent-header--document">{t("magicverify.errorTitle")}</h1>
+            <p class="ent-header__description">{message()}</p>
+            <A class="ent-btn ent-btn--primary" href="/auth/signin">{t("magicverify.tryAgain")}</A>
+          </Show>
+        </div>
       </div>
-    </section>
+    </div>
   )
 }
 
@@ -210,32 +222,28 @@ export function VerifyScreen(): JSX.Element {
     })()
   })
   return (
-    <section class="flex min-h-[70vh] items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-12 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 sm:px-6 lg:px-8">
-      <div class="w-full max-w-md space-y-6 rounded-2xl border border-gray-200/50 bg-white/80 p-8 text-center shadow-2xl backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-800/80 sm:p-10">
-        <Show when={status() === "loading"}>
-          <div class="h-16 w-16 animate-spin rounded-full border-4 border-blue-500 border-t-transparent mx-auto" />
-          <div>
-            <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-white">{t("auth.verify.verifyingTitle")}</h2>
-            <p class="text-gray-600 dark:text-gray-400">{t("auth.verify.verifyingBody")}</p>
-          </div>
-        </Show>
-        <Show when={status() === "success"}>
-          <CircleCheck class="mx-auto h-16 w-16 text-green-500" />
-          <div>
-            <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-white">{t("auth.verify.successTitle")}</h2>
-            <p class="mb-6 text-gray-600 dark:text-gray-400">{message()}</p>
-            <p class="animate-pulse text-sm text-blue-600 dark:text-blue-400">{t("auth.verify.redirecting")}</p>
-          </div>
-        </Show>
-        <Show when={status() === "error"}>
-          <CircleX class="mx-auto h-16 w-16 text-red-500" />
-          <div>
-            <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-white">{t("auth.verify.failedTitle")}</h2>
-            <p class="mb-6 text-gray-600 dark:text-gray-400">{message()}</p>
-            <A class="btn btn-primary" href="/auth/signin">{t("auth.verify.signIn")}</A>
-          </div>
-        </Show>
+    <div class="reference-standalone-container">
+      <div class="ent-card" style={{ "max-width": "24rem" }}>
+        <div class="ent-card__body" style={{ display: "flex", "flex-direction": "column", gap: "12px", "align-items": "center", "text-align": "center" }}>
+          <Show when={status() === "loading"}>
+            <Loader size={26} aria-hidden="true" class="ent-stat__icon" />
+            <h1 class="ent-header__title ent-header--document">{t("auth.verify.verifyingTitle")}</h1>
+            <p class="ent-header__description">{t("auth.verify.verifyingBody")}</p>
+          </Show>
+          <Show when={status() === "success"}>
+            <CircleCheck size={30} aria-hidden="true" style={{ color: "var(--ent-ok)" }} />
+            <h1 class="ent-header__title ent-header--document">{t("auth.verify.successTitle")}</h1>
+            <p class="ent-header__description">{message()}</p>
+            <p class="ent-field__hint">{t("auth.verify.redirecting")}</p>
+          </Show>
+          <Show when={status() === "error"}>
+            <CircleX size={30} aria-hidden="true" style={{ color: "var(--ent-bad)" }} />
+            <h1 class="ent-header__title ent-header--document">{t("auth.verify.failedTitle")}</h1>
+            <p class="ent-header__description">{message()}</p>
+            <A class="ent-btn ent-btn--primary" href="/auth/signin">{t("auth.verify.signIn")}</A>
+          </Show>
+        </div>
       </div>
-    </section>
+    </div>
   )
 }

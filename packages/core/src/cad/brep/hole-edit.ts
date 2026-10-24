@@ -13,7 +13,7 @@
  * bore that would break into its own counterbore or past a neighbouring wall (the result is checked: valid, the volume moved by
  * exactly the analytic cylinder), and a hole made of cones only.
  */
-import { add3, scale3 } from "../vec.ts"
+import { add3, cross3, normalize3, scale3 } from "../vec.ts"
 import { booleanBrep } from "./boolean.ts"
 import type { RecognizedHole } from "./features.ts"
 import { frame, type Vec3 } from "./math.ts"
@@ -37,8 +37,18 @@ export interface HoleEditResult {
   readonly volumeChange: number
 }
 
-const cylinderAlong = (entry: Vec3, direction: Vec3, from: number, to: number, diameter: number): Brep =>
-  makeCylinder(diameter / 2, to - from, frame(add3(entry, scale3(direction, from)), direction))
+/** Seam angles the edit is retried with: a Boolean can meet a degenerate coincidence at one seam position and not at another. */
+const SEAMS = [0, 0.9, 2.1] as const
+
+/** A unit vector across `axis` turned by `angle` about it: where the seam of a cylinder on that axis lies. */
+const seamRef = (axis: Vec3, angle: number): Vec3 => {
+  const u = normalize3(cross3(axis, Math.abs(axis.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 }))
+  const v = cross3(axis, u)
+  return add3(scale3(u, Math.cos(angle)), scale3(v, Math.sin(angle)))
+}
+
+const cylinderAlong = (entry: Vec3, direction: Vec3, from: number, to: number, diameter: number, seam = 0): Brep =>
+  makeCylinder(diameter / 2, to - from, frame(add3(entry, scale3(direction, from)), direction, seamRef(direction, seam)))
 
 /** The hole's drill segments (the narrowest cylinders), from the entry along the hole direction. */
 const drillSegments = (hole: RecognizedHole): ReadonlyArray<{ readonly start: number; readonly end: number; readonly diameter: number }> => {
@@ -52,6 +62,18 @@ const drillSegments = (hole: RecognizedHole): ReadonlyArray<{ readonly start: nu
  * volume of the cylinders involved (within 1e-6 relative), otherwise the reason it was refused.
  */
 export const editHole = (b: Brep, hole: RecognizedHole, edit: HoleEdit): HoleEditResult | string => {
+  let first: string | undefined
+  for (const seam of SEAMS) {
+    const r = editHoleAt(b, hole, edit, seam)
+    if (typeof r !== "string") return r
+    first ??= r
+    // A refusal about the request itself (a size, a draft, a drill point) does not depend on where the seam is.
+    if (!/^the Boolean failed|^the edit changed the volume|^the edited solid is not valid/.test(r)) return r
+  }
+  return first!
+}
+
+const editHoleAt = (b: Brep, hole: RecognizedHole, edit: HoleEdit, seam: number): HoleEditResult | string => {
   if (hole.segments.every((s) => s.kind !== "cylinder")) return "the hole has no cylindrical wall to edit"
   if (edit.kind === "resize") {
     if (!(edit.diameter > 0) || !Number.isFinite(edit.diameter)) return "the diameter must be positive"
@@ -77,7 +99,7 @@ export const editHole = (b: Brep, hole: RecognizedHole, edit: HoleEdit): HoleEdi
     // 1. Fill what is there (unless a larger bore will remove it anyway). A filler ends exactly where the bore ends, so it never
     //    stands proud of the solid: its caps are coplanar with the faces the hole was cut in.
     if (!grow) {
-      for (const s of segments) solid = booleanBrep(solid, cylinderAlong(hole.entry, hole.direction, s.start, s.end, s.diameter), "union").brep
+      for (const s of segments) solid = booleanBrep(solid, cylinderAlong(hole.entry, hole.direction, s.start, s.end, s.diameter, seam), "union").brep
     }
     // 2. Cut the new bore.
     if (edit.kind === "resize") {
@@ -85,13 +107,13 @@ export const editHole = (b: Brep, hole: RecognizedHole, edit: HoleEdit): HoleEdi
         const last = s.end >= hole.depth - 1e-6
         const from = s.start <= 1e-6 ? -OVERRUN : s.start
         const to = last && through ? hole.depth + OVERRUN : s.end
-        if (taper === 0) solid = booleanBrep(solid, cylinderAlong(hole.entry, hole.direction, from, to, edit.diameter), "subtract").brep
+        if (taper === 0) solid = booleanBrep(solid, cylinderAlong(hole.entry, hole.direction, from, to, edit.diameter, seam), "subtract").brep
         else {
           // The cone keeps its slope through the overruns: radius edit.diameter / 2 at the segment start, narrowing by `slope` per mm.
           const r = (t: number) => edit.diameter / 2 - (t - s.start) * slope
           const closing = Math.min(to, s.start + (edit.diameter / 2 - 1e-3) / slope)
           const end = Math.max(s.end, Math.min(to, closing))
-          solid = booleanBrep(solid, makeCone(r(from), r(end), end - from, frame(add3(hole.entry, scale3(hole.direction, from)), hole.direction)), "subtract").brep
+          solid = booleanBrep(solid, makeCone(r(from), r(end), end - from, frame(add3(hole.entry, scale3(hole.direction, from)), hole.direction, seamRef(hole.direction, seam))), "subtract").brep
         }
       }
     }

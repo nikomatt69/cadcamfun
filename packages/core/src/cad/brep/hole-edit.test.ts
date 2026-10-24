@@ -117,3 +117,29 @@ describe("drafting the wall of a bore", () => {
   })
 })
 
+describe("a body turned into each manual setup", () => {
+  // The signed permutations the CAM planner turns a part by (`setupTransform`): +X, -X, +Y, -Y, -Z.
+  const TURNS: ReadonlyArray<readonly [string, ReadonlyArray<number>]> = [
+    ["+X", [0, 1, 0, 0, 0, 1, 1, 0, 0]], ["-X", [0, -1, 0, 0, 0, 1, -1, 0, 0]],
+    ["+Y", [-1, 0, 0, 0, 0, 1, 0, 1, 0]], ["-Y", [1, 0, 0, 0, 0, 1, 0, -1, 0]], ["-Z", [1, 0, 0, 0, -1, 0, 0, 0, -1]]
+  ]
+
+  test("every hole of a part with a hole on three sides fills and keeps the solid valid, whatever the setup (one seam position hit a degenerate Boolean)", async () => {
+    const { transformBrep } = await import("./topology.ts")
+    let part = block()
+    part = cut(part, makeCylinder(3, 12, frame({ x: 10, y: 10, z: 10 }, Z)))
+    part = cut(part, makeCylinder(2, 14, frame({ x: 28, y: 15, z: 10 }, { x: 1, y: 0, z: 0 })))
+    part = cut(part, makeCylinder(1.5, 14, frame({ x: 20, y: 18, z: 10 }, { x: 0, y: 1, z: 0 })))
+    const volume = massProperties(part).volume
+    for (const [name, m] of TURNS) {
+      const turned = transformBrep(part, { m: m as never, t: { x: 0, y: 0, z: 0 } })
+      for (const hole of recognizeHoles(turned)) {
+        const r = editHole(turned, hole, { kind: "fill" })
+        if (typeof r === "string") throw new Error(`${name} Ø${hole.diameter}: ${r}`)
+        expect(validateBrep(r.brep).valid).toBe(true)
+        expect(massProperties(r.brep).volume).toBeCloseTo(volume + disc(hole.diameter, hole.depth), 4)
+      }
+    }
+  })
+})
+

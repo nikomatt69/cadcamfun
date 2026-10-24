@@ -1,0 +1,560 @@
+/* ==========================================================================
+   Enterprise layout vocabulary — the shared chrome of every non-CAD/CAM page.
+
+   One vocabulary for the whole app shell: a title band, ruled numbered section
+   headings, stat tiles, data tables and key/value lists. The CAD and CAM
+   editors keep their own panel language; every other screen composes these.
+
+   The language is the quiet workstation one: flat 1 px surfaces, a 5 px radius
+   scale, 12.5 px base type, one blue accent, no gradients and no elevation.
+   Type is set as a set — size, weight, leading and tracking move together —
+   so a heading reads as a heading and a label reads as a label.
+
+   Motion is restrained on purpose: a colour or border change settles in
+   120–140 ms on a strong ease-out, and a pressed control answers immediately
+   with a 3 % scale-down. Nothing moves position, nothing fades a page in twice,
+   and every transition is dropped under `prefers-reduced-motion`.
+   ========================================================================== */
+
+.reference-shell {
+  --ent-surface: #ffffff;
+  --ent-surface-subtle: #f6f7f9;
+  --ent-surface-inset: #eef0f3;
+  --ent-line: #dde1e7;
+  --ent-line-strong: #c3c9d2;
+  --ent-text: #1b2230;
+  --ent-text-muted: #5b6575;
+  --ent-text-faint: #8a93a1;
+  --ent-accent: #2557d6;
+  --ent-accent-hover: #1d47b3;
+  --ent-accent-soft: #e8eefc;
+  --ent-ok: #15803d;
+  --ent-ok-soft: #e7f5ec;
+  --ent-warn: #a15c07;
+  --ent-warn-soft: #fbf1df;
+  --ent-bad: #b42318;
+  --ent-bad-soft: #fbe9e7;
+  --ent-radius: 5px;
+  --ent-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* One curve for the whole shell: fast out of the gate, settled at the end. */
+  --ent-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.dark .reference-shell {
+  --ent-surface: #171b22;
+  --ent-surface-subtle: #1c212a;
+  --ent-surface-inset: #12161c;
+  --ent-line: #2b323d;
+  --ent-line-strong: #3a4352;
+  --ent-text: #e6e9ef;
+  --ent-text-muted: #9aa4b2;
+  --ent-text-faint: #6f7886;
+  --ent-accent: #6b95f2;
+  --ent-accent-hover: #86a9f5;
+  --ent-accent-soft: #1c2a47;
+  --ent-ok: #4cc07a;
+  --ent-ok-soft: #14291d;
+  --ent-warn: #e0a24a;
+  --ent-warn-soft: #2e2413;
+  --ent-bad: #f08a80;
+  --ent-bad-soft: #321a18;
+}
+
+/* ---- page title band ---------------------------------------------------
+   The page's first line of defence: what this screen is, in one sentence, and
+   what you can do about it. The title tightens as it grows, the description
+   keeps the body tracking and drops in contrast instead of shrinking. */
+.ent-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-width: 0;
+}
+
+.ent-header__text {
+  min-width: 0;
+  flex: 1 1 20rem;
+}
+
+.ent-header__eyebrow {
+  margin: 0 0 3px;
+  color: var(--ent-text-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 14px;
+  text-transform: uppercase;
+}
+
+.ent-header__title {
+  margin: 0;
+  color: var(--ent-text);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+}
+
+.ent-header__description {
+  margin: 3px 0 0;
+  max-width: 72ch;
+  color: var(--ent-text-muted);
+  font-size: 12px;
+  letter-spacing: 0;
+  line-height: 17px;
+}
+
+/* A document page leads with a larger title than a list page. */
+.ent-header--document .ent-header__title {
+  font-size: 19px;
+  letter-spacing: -0.012em;
+  line-height: 25px;
+}
+
+.ent-header--document .ent-header__description {
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.ent-header__actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---- ruled section heading ---------------------------------------------
+   `01 · LABEL ──────────` — a numbered heading with a hairline that runs to
+   the edge. The number gives the page an order the eye can follow; the rule
+   gives the block a width the reader can scan down. */
+.ent-section {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  min-width: 0;
+}
+
+.ent-section__index {
+  flex: none;
+  color: var(--ent-text-faint);
+  font-family: var(--ent-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 16px;
+}
+
+.ent-section__title {
+  margin: 0;
+  flex: none;
+  color: var(--ent-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 16px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ent-section__rule {
+  flex: 1 1 auto;
+  align-self: center;
+  height: 1px;
+  background: var(--ent-line);
+}
+
+.ent-section__actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---- stat tiles ---------------------------------------------------------
+   A KPI row: value first, label second, provenance last. Numbers are
+   tabular so a row of them lines up on the decimal. */
+.ent-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
+.ent-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--ent-line);
+  border-radius: var(--ent-radius);
+  background: var(--ent-surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.ent-stat__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.ent-stat__value {
+  color: var(--ent-text);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 28px;
+}
+
+.ent-stat__label {
+  color: var(--ent-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  line-height: 15px;
+  text-transform: uppercase;
+}
+
+.ent-stat__meta {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--ent-line);
+  color: var(--ent-text-faint);
+  font-family: var(--ent-mono);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.ent-stat--alert .ent-stat__meta {
+  color: var(--ent-warn);
+}
+
+.ent-stat__icon {
+  flex: none;
+  color: var(--ent-text-faint);
+}
+
+/* ---- data table ---------------------------------------------------------
+   Dense, hairline-ruled and left-aligned; numeric columns align right. */
+.ent-table {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--ent-line);
+  border-radius: var(--ent-radius);
+  background: var(--ent-surface);
+}
+
+.ent-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.ent-table thead {
+  background: var(--ent-surface-subtle);
+}
+
+.ent-table th {
+  padding: 7px 10px;
+  color: var(--ent-text-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 14px;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ent-table td {
+  padding: 8px 10px;
+  border-top: 1px solid var(--ent-line);
+  color: var(--ent-text);
+  vertical-align: middle;
+}
+
+.ent-table tbody tr {
+  transition: background-color 120ms var(--ent-ease);
+}
+
+.ent-table tbody tr:hover {
+  background: var(--ent-surface-subtle);
+}
+
+.ent-table--numeric td:last-child,
+.ent-table th:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- key / value list ---------------------------------------------------
+   A definition list whose values align on the right and count like numbers. */
+.ent-kv {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.ent-kv dt {
+  min-width: 0;
+  color: var(--ent-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ent-kv dd {
+  min-width: 0;
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* ---- card ---------------------------------------------------------------
+   The flat bordered surface of the document pages (auth, legal, admin). One
+   surface, one border, no elevation — a card is a region, not an object. */
+.ent-card {
+  width: 100%;
+  border: 1px solid var(--ent-line);
+  border-radius: var(--ent-radius);
+  background: var(--ent-surface);
+  color: var(--ent-text);
+  overflow: hidden;
+}
+
+.ent-card__body {
+  padding: 16px;
+}
+
+.ent-card__head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ent-line);
+  background: var(--ent-surface-subtle);
+}
+
+.ent-card__foot {
+  padding: 12px 16px;
+  border-top: 1px solid var(--ent-line);
+  background: var(--ent-surface-subtle);
+}
+
+/* ---- buttons ------------------------------------------------------------
+   One button vocabulary for the document pages, matching the workspace
+   toolbar buttons so a screen that changes family does not change the
+   product. */
+.ent-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--ent-line);
+  border-radius: var(--ent-radius);
+  background: var(--ent-surface);
+  color: var(--ent-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 18px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition-property: color, background-color, border-color, opacity, transform;
+  transition-duration: 140ms;
+  transition-timing-function: var(--ent-ease);
+}
+
+.ent-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ent-btn--primary {
+  border-color: var(--ent-accent);
+  background: var(--ent-accent);
+  color: #ffffff;
+}
+
+.ent-btn--primary:not(:disabled):hover {
+  border-color: var(--ent-accent-hover);
+  background: var(--ent-accent-hover);
+}
+
+.ent-btn--danger {
+  border-color: var(--ent-bad);
+  background: var(--ent-bad);
+  color: #ffffff;
+}
+
+.ent-btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ent-text-muted);
+}
+
+.ent-btn--block {
+  width: 100%;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ent-btn:not(:disabled):hover {
+    border-color: var(--ent-line-strong);
+    background: var(--ent-surface-subtle);
+    color: var(--ent-text);
+  }
+  .ent-btn--primary:not(:disabled):hover {
+    border-color: var(--ent-accent-hover);
+    background: var(--ent-accent-hover);
+    color: #ffffff;
+  }
+  .ent-btn--danger:not(:disabled):hover {
+    filter: brightness(0.94);
+  }
+  .ent-btn--ghost:not(:disabled):hover {
+    border-color: transparent;
+    background: var(--ent-surface-inset);
+    color: var(--ent-text);
+  }
+}
+
+.ent-btn:not(:disabled):active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
+}
+
+/* ---- form fields --------------------------------------------------------
+   A label sits above its field, and the field carries the same border and
+   radius as every other surface. */
+.ent-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ent-field__label {
+  color: var(--ent-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 15px;
+}
+
+.ent-field__input {
+  width: 100%;
+  min-height: 31px;
+  padding: 5px 9px;
+  border: 1px solid var(--ent-line-strong);
+  border-radius: var(--ent-radius);
+  background: var(--ent-surface);
+  color: var(--ent-text);
+  font-size: 12.5px;
+  line-height: 18px;
+  transition-property: border-color, box-shadow;
+  transition-duration: 140ms;
+  transition-timing-function: var(--ent-ease);
+}
+
+.ent-field__input::placeholder {
+  color: var(--ent-text-faint);
+}
+
+.ent-field__input:focus {
+  outline: none;
+  border-color: var(--ent-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ent-accent) 22%, transparent);
+}
+
+.ent-field__input:disabled {
+  background: var(--ent-surface-subtle);
+  color: var(--ent-text-faint);
+}
+
+.ent-field__hint {
+  color: var(--ent-text-faint);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+/* ---- notice -------------------------------------------------------------
+   Status, completion, warning and error share one box; only the accent and
+   the copy change, so the reader learns the shape once. */
+.ent-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--ent-line);
+  border-radius: var(--ent-radius);
+  background: var(--ent-surface-subtle);
+  color: var(--ent-text-muted);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.ent-notice--ok {
+  border-color: color-mix(in srgb, var(--ent-ok) 35%, var(--ent-line));
+  background: var(--ent-ok-soft);
+  color: var(--ent-ok);
+}
+
+.ent-notice--warn {
+  border-color: color-mix(in srgb, var(--ent-warn) 35%, var(--ent-line));
+  background: var(--ent-warn-soft);
+  color: var(--ent-warn);
+}
+
+.ent-notice--bad {
+  border-color: color-mix(in srgb, var(--ent-bad) 35%, var(--ent-line));
+  background: var(--ent-bad-soft);
+  color: var(--ent-bad);
+}
+
+.ent-notice__icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* ---- press feedback -----------------------------------------------------
+   A control answers the pointer on press, not on release: 3 % smaller for the
+   length of the press. The scale is a transform, so it never reflows. */
+.workspace-page .workspace-page__toolbar :is(button, a),
+.workspace-page .workspace-page__stage :is(button, .btn),
+.reference-page-container :is(button, .btn),
+.reference-standalone-container :is(button, .btn) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 140ms;
+  transition-timing-function: var(--ent-ease);
+}
+
+.workspace-page .workspace-page__toolbar :is(button, a):not(:disabled):active,
+.workspace-page .workspace-page__stage :is(button, .btn):not(:disabled):active,
+.reference-page-container :is(button, .btn):not(:disabled):active,
+.reference-standalone-container :is(button, .btn):not(:disabled):active {
+  transform: scale(0.97);
+  transition-duration: 60ms;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ent-stat:hover {
+    border-color: color-mix(in srgb, var(--ent-accent) 45%, var(--ent-line));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ent-table tbody tr,
+  .workspace-page .workspace-page__toolbar :is(button, a),
+  .workspace-page .workspace-page__stage :is(button, .btn),
+  .reference-page-container :is(button, .btn),
+  .reference-standalone-container :is(button, .btn) {
+    transition-duration: 0.01ms !important;
+  }
+}

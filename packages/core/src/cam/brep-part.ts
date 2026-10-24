@@ -4,7 +4,9 @@
  * feature history, instead of falling back to 3D surface strategies that know neither holes nor pockets.
  *
  * What it does, all on the exact model:
- *  - the holes come from `recognizeHoles` (coaxial concave cylinders and cones, counterbores, countersinks, drill points);
+ *  - the holes come from `recognizeHoles` (coaxial concave cylinders and cones, counterbores, countersinks, drill points); a hole
+ *    drilled along another axis than Z belongs to another setup: it is plugged (`brep/hole-edit.ts`, an exact fill) before the
+ *    sections are cut, so it neither refuses the part nor becomes a notch of its outline, and it is counted in `sideHoles`;
  *  - every other face must be machinable from above (a 2.5D part): planar walls, planar floors facing up, the underside at the
  *    lowest level, cylindrical walls parallel to Z. A chamfer, a dome, a sloped face or an undercut makes the whole part a
  *    surface job and the reason is returned (never a silent partial plan);
@@ -17,7 +19,7 @@
  * The result has the shape of `historyFeatures` (`generator/history-features.ts`), so the planner, the generator and the DFM
  * see one kind of feature whatever the part came from. Everything is in the element's world coordinates, millimetres.
  */
-import { recognizeHoles, tessellateBrep, transformBrep, type Brep, type RecognizedHole } from "../cad/brep/index.ts"
+import { editHole, recognizeHoles, tessellateBrep, transformBrep, type Brep, type RecognizedHole } from "../cad/brep/index.ts"
 import type { Transform } from "../cad/brep/math.ts"
 import { elementBrep } from "../cad/scene-step.ts"
 import type { Vec2 } from "../cad/vec.ts"
@@ -147,9 +149,31 @@ const asCircle = (loop: ReadonlyArray<Vec2>): { readonly center: Vec2; readonly 
 
 const holeReach = (h: RecognizedHole): number => Math.max(h.diameter, h.headDiameter ?? 0, ...h.segments.flatMap((s) => [s.diameterStart, s.diameterEnd])) / 2
 
+/**
+ * The solid with its holes along other axes than Z filled, and those holes; or the reason one cannot be filled exactly (the part
+ * is then refused as a whole, like any other feature this recogniser cannot place).
+ */
+const plugSideHoles = (b: Brep): { readonly brep: Brep; readonly plugged: ReadonlyArray<RecognizedHole> } | string => {
+  let brep = b
+  const plugged: RecognizedHole[] = []
+  // Each fill changes the solid, so the holes are read again and the first side hole filled, until none is left.
+  for (let guard = 0; guard < 64; guard++) {
+    const side = recognizeHoles(brep).find((h) => Math.abs(h.direction.x) > 1e-6 || Math.abs(h.direction.y) > 1e-6)
+    if (side === undefined) return { brep, plugged }
+    const r = editHole(brep, side, { kind: "fill" })
+    if (typeof r === "string") return `has a hole that is not parallel to Z and cannot be filled exactly (${r}); it needs another setup or 3+2 indexing`
+    brep = r.brep
+    plugged.push(side)
+  }
+  return "has more than 64 holes along other axes"
+}
+
 /** The 2.5D machining features of an exact solid, or why it is not machinable from above as one setup. */
-export const brepFeatures = (b: Brep, name = "part"): ExactFeatures => {
+export const brepFeatures = (original: Brep, name = "part"): ExactFeatures => {
   const refuse = (reason: string): ExactFeatures => ({ reason: `${name}: ${reason}` })
+  const side = plugSideHoles(original)
+  if (typeof side === "string") return refuse(side)
+  const b = side.brep
   const holes = recognizeHoles(b)
 
   // 1. Every face is a hole wall, a vertical wall or a horizontal floor.
@@ -266,7 +290,11 @@ export const brepFeatures = (b: Brep, name = "part"): ExactFeatures => {
     features: {
       holes: machiningHoles, pockets: machiningPockets, outlines: machiningOutlines, turned: [],
       bounds: { min: { x: min.x, y: min.y, z: zMin }, max: { x: max.x, y: max.y, z: zMax } },
-      notes: [`${name}: ${machiningHoles.length} holes, ${machiningPockets.length} pockets and ${machiningOutlines.length} outlines recognised on the exact B-rep`]
+      ...(side.plugged.length > 0 ? { sideHoles: side.plugged.length } : {}),
+      notes: [
+        `${name}: ${machiningHoles.length} holes, ${machiningPockets.length} pockets and ${machiningOutlines.length} outlines recognised on the exact B-rep`,
+        ...(side.plugged.length > 0 ? [`${name}: ${side.plugged.length} hole(s) along other axes (${side.plugged.map((h) => `Ø${Math.round(h.diameter * 1000) / 1000} along ${["x", "y", "z"].map((k) => `${k}${Math.round((h.direction as unknown as Record<string, number>)[k]! * 100) / 100}`).join(" ")}`).join(", ")}) are left to their own setup`] : [])
+      ]
     }
   }
 }

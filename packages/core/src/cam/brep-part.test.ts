@@ -295,3 +295,44 @@ describe("islands standing in a pocket", () => {
     expect(result.value.claims.find((c) => c.id === "nc-replay")!.status).toBe("passed")
   })
 })
+
+describe("holes along other axes", () => {
+  /** Plate 100x60x10 with a Ø6 hole from the top and a Ø5 hole 12 deep from the +X face, 30 mm along Y at mid height. */
+  const withSideHole = () => history([
+    rect("base", 0, 0, 100, 60), { id: "plate", type: "extrude", sketch: "base", depth: 10, operation: "new" },
+    { id: "top", type: "hole", plane: "XY", offset: 10, at: [30, 30], diameter: 6, depth: 10 },
+    { id: "side", type: "hole", plane: "YZ", offset: 100, at: [30, 5], diameter: 5, depth: 12 }
+  ])
+
+  test("a hole along X is left to its own setup: the part keeps its 2.5D features, the outline has no notch, the hole is counted", () => {
+    const f = brepFeatures(brepOf(withSideHole()), "sided")
+    expect(f.reason).toBeUndefined()
+    expect(f.features!.holes).toHaveLength(1)
+    expect(f.features!.holes[0]!.diameter).toBeCloseTo(6, 6)
+    expect(f.features!.sideHoles).toBe(1)
+    expect(f.features!.outlines).toHaveLength(1)
+    expect(area(f.features!.outlines[0]!.outer)).toBeCloseTo(100 * 60, 6)
+    expect(f.features!.outlines[0]!.outer).toHaveLength(4)
+    expect(f.features!.notes.join(" ")).toMatch(/1 hole\(s\) along other axes \(Ø5 .* left to their own setup/)
+  })
+
+  test("the planner drills the top hole and carries the note, and the program passes gouge check and replay", () => {
+    const element = { id: "stp", type: "brep", name: "Sided", brep: brepOf(withSideHole()), x: 0, y: 0, z: 0 }
+    const j: ManufacturingJob = { schemaVersion: 1, id: "j", name: "J", material: "6061", part: { kind: "elements", elements: [element] }, stock: { min: { x: -3, y: -3, z: 0 }, max: { x: 103, y: 63, z: 11 } } }
+    const plan = planOnly(j)
+    if (plan.status !== "ok") throw new Error(plan.issues.map((i) => i.message).join("; "))
+    expect(plan.value.operations.map((o) => o.strategy)).toContain("drill")
+    expect(plan.value.operations.map((o) => o.strategy)).not.toContain("surface")
+    expect(plan.value.notes.join(" ")).toContain("left to their own setup")
+    const result = runJob(j)
+    if (result.status !== "ok") throw new Error(result.issues.map((i) => i.message).join("; "))
+    expect(result.value.claims.find((c) => c.id === "no-gouge")!.status).toBe("passed")
+    expect(result.value.claims.find((c) => c.id === "nc-replay")!.status).toBe("passed")
+  })
+
+  test("a cylindrical boss along another axis is still a surface job, with its reason", () => {
+    const placed = elementBrep({ id: "s", type: "cylinder", x: 0, y: 0, z: 0, radius: 5, height: 20, rotation: { x: 90, y: 0, z: 0 } })
+    expect(placed.brep).toBeDefined()
+    expect(brepFeatures(placed.brep!, "pin").reason).toMatch(/pin: .*not parallel to Z/)
+  })
+})

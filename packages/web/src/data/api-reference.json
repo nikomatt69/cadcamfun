@@ -58580,6 +58580,9 @@
                                   },
                                   "islands": {
                                     "type": "integer"
+                                  },
+                                  "sideHoles": {
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [

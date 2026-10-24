@@ -28,6 +28,7 @@ import LogIn from "lucide-solid/icons/log-in"
 import LogOut from "lucide-solid/icons/log-out"
 import Bell from "lucide-solid/icons/bell"
 import Search from "lucide-solid/icons/search"
+import ArrowUpRight from "lucide-solid/icons/arrow-up-right"
 import { openExternal } from "../../app/external.ts"
 import { isTauri } from "../../app/sidecar.ts"
 import { t, type Key } from "../../i18n/index.ts"
@@ -39,9 +40,18 @@ interface NavItem {
   readonly key: Key
   readonly href: string
   readonly icon: typeof Home
-  readonly group: "workspace" | "tools" | "system"
+  readonly group: NavGroup
   readonly children?: ReadonlyArray<NavItem>
+  /**
+   * The CAD and CAM editors replace the whole shell with their own chrome, so
+   * they are not pages of the console like the rest of the navigation. They
+   * get their own group and a marked exit, because a reader should be able to
+   * tell that following the link leaves this navigation behind.
+   */
+  readonly leavesConsole?: boolean
 }
+
+type NavGroup = "workspace" | "editors" | "tools" | "system"
 
 const navigation: ReadonlyArray<NavItem> = [
   { key: "shell.dashboard", href: "/", icon: Home, group: "workspace" },
@@ -49,8 +59,6 @@ const navigation: ReadonlyArray<NavItem> = [
     { key: "shell.allProjects", href: "/projects", icon: FileText, group: "workspace" },
     { key: "shell.newProject", href: "/projects/create", icon: PlusSquare, group: "workspace" }
   ] },
-  { key: "shell.cad", href: "/cad", icon: Grid, group: "workspace" },
-  { key: "shell.cam", href: "/cam", icon: Tool, group: "workspace" },
   { key: "shell.manuals", href: "/manuals", icon: BookOpen, group: "workspace" },
   { key: "shell.resources", href: "/library", icon: Package, group: "workspace", children: [
     { key: "shell.toolpaths", href: "/toolpaths", icon: Tool, group: "workspace" },
@@ -59,25 +67,33 @@ const navigation: ReadonlyArray<NavItem> = [
     { key: "shell.configurations", href: "/machine", icon: Server, group: "workspace" },
     { key: "shell.tools", href: "/tools", icon: Tool, group: "workspace" }
   ] },
+  { key: "shell.cad", href: "/cad", icon: Grid, group: "editors", leavesConsole: true },
+  { key: "shell.cam", href: "/cam", icon: Tool, group: "editors", leavesConsole: true },
   { key: "shell.organization", href: "/organizations", icon: Users, group: "tools" },
   { key: "shell.plugins", href: "/plugins", icon: Puzzle, group: "tools" },
-  { key: "shell.website", href: "https://cadcam.fun", icon: Globe, group: "tools" },
   { key: "shell.ai", href: "/ai", icon: Cpu, group: "tools" },
   { key: "shell.analytics", href: "/analytics", icon: BarChart, group: "tools", children: [
     { key: "shell.dashboard", href: "/analytics", icon: BarChart, group: "tools" },
     { key: "shell.history", href: "/analytics/history", icon: Activity, group: "tools" }
   ] },
+  { key: "shell.website", href: "https://cadcam.fun", icon: Globe, group: "system" },
   { key: "shell.settings", href: "/settings", icon: Settings, group: "system", children: [
     { key: "shell.profile", href: "/profile", icon: User, group: "system" },
     { key: "shell.preferences", href: "/settings", icon: Settings, group: "system" }
   ] }
 ]
 
-const navGroupLabel = (group: NavItem["group"]): Key =>
-  group === "workspace" ? "shell.group.workspace" : group === "tools" ? "shell.group.tools" : "shell.group.system"
+const navGroupLabel = (group: NavGroup): Key =>
+  group === "workspace"
+    ? "shell.group.workspace"
+    : group === "editors"
+      ? "shell.group.editors"
+      : group === "tools"
+        ? "shell.group.tools"
+        : "shell.group.system"
 
-const navigationGroups: ReadonlyArray<{ readonly id: NavItem["group"]; readonly items: ReadonlyArray<NavItem> }> =
-  (["workspace", "tools", "system"] as const).map((id) => ({ id, items: navigation.filter((item) => item.group === id) }))
+const navigationGroups: ReadonlyArray<{ readonly id: NavGroup; readonly items: ReadonlyArray<NavItem> }> =
+  (["workspace", "editors", "tools", "system"] as const).map((id) => ({ id, items: navigation.filter((item) => item.group === id) }))
 
 export function ReferenceLink(props: { readonly href: string; readonly class?: string; readonly children: JSX.Element; readonly onNavigate?: () => void; readonly label?: string; readonly current?: boolean }): JSX.Element {
   const external = () => props.href.startsWith("https://")
@@ -199,9 +215,9 @@ export function ReferenceSidebar(props: { readonly open: boolean; readonly mobil
       <nav class="reference-sidebar-nav" aria-label={t("shell.navigation")}><For each={navigationGroups}>{(group) => <section class="reference-nav-section" aria-labelledby={`reference-nav-${group.id}`}>
         <Show when={props.open}><h2 id={`reference-nav-${group.id}`} class="reference-nav-section-title">{t(navGroupLabel(group.id))}</h2></Show>
         <For each={group.items}>{(item) => <div class="reference-nav-group">
-          <Show when={item.children} fallback={<ReferenceLink href={item.href} class={`reference-nav-item ${current(item) ? "is-current" : ""}`} current={current(item)} label={t(item.key)} onNavigate={follow}><item.icon size={18} /><Show when={props.open}><span>{t(item.key)}</span></Show></ReferenceLink>}>
-            <button type="button" class={`reference-nav-item ${current(item) ? "is-current" : ""}`} aria-label={t(item.key)} title={t(item.key)} aria-expanded={props.open && !!expanded()[item.key]} aria-controls={`reference-group-${item.key}`} onClick={() => toggle(item)}><item.icon size={18} /><Show when={props.open}><span>{t(item.key)}</span><ChevronDown size={15} class={expanded()[item.key] ? "rotate-180" : ""} /></Show></button>
-            <Show when={props.open && expanded()[item.key]}><div class="reference-nav-children" id={`reference-group-${item.key}`}><For each={item.children}>{(child) => <ReferenceLink href={child.href} class={`reference-nav-item ${location.pathname === child.href ? "is-current" : ""}`} current={location.pathname === child.href} onNavigate={follow}><child.icon size={15} /><span>{t(child.key)}</span></ReferenceLink>}</For></div></Show>
+          <Show when={item.children} fallback={<ReferenceLink href={item.href} class={`reference-nav-item${current(item) ? " is-current" : ""}${item.leavesConsole === true ? " reference-nav-item--exit" : ""}`} current={current(item)} label={t(item.key)} onNavigate={follow}><item.icon size={18} /><Show when={props.open}><span>{t(item.key)}</span></Show><Show when={props.open && item.leavesConsole === true}><ArrowUpRight size={13} aria-hidden="true" class="reference-nav-item__exit" /></Show></ReferenceLink>}>
+            <button type="button" class={`reference-nav-item${current(item) ? " is-current" : ""}`} aria-label={t(item.key)} title={t(item.key)} aria-expanded={props.open && !!expanded()[item.key]} aria-controls={`reference-group-${item.key}`} onClick={() => toggle(item)}><item.icon size={18} /><Show when={props.open}><span>{t(item.key)}</span><ChevronDown size={15} class={expanded()[item.key] ? "rotate-180" : ""} /></Show></button>
+            <Show when={props.open && expanded()[item.key]}><div class="reference-nav-children" id={`reference-group-${item.key}`}><For each={item.children}>{(child) => <ReferenceLink href={child.href} class={`reference-nav-item${location.pathname === child.href ? " is-current" : ""}`} current={location.pathname === child.href} onNavigate={follow}><child.icon size={15} /><span>{t(child.key)}</span></ReferenceLink>}</For></div></Show>
           </Show>
         </div>}</For>
       </section>}</For></nav>

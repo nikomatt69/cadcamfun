@@ -181,3 +181,13 @@ test("a boss of a solid of the scene is listed in the analysis and resized, the 
   expect(sceneBossEdit(elements, "p", 3, 14)).toMatchObject({ ok: false, error: expect.stringContaining("1 recognised bosses") })
   expect(sceneBossEdit([{ id: "n", type: "text", text: "x", x: 0, y: 0 }], "n", 0, 5)).toMatchObject({ ok: false })
 })
+
+test("the machining summary counts the holes along other axes that the setup leaves to others", () => {
+  const m = model()
+  m.extrude(m.sketch("XY").rectangle([0, 0], 100, 60), { depth: 10, id: "plate" })
+  m.hole({ plane: "XY", offset: 10, at: [30, 30], diameter: 6, depth: 10, id: "top" })
+  m.hole({ plane: "YZ", offset: 100, at: [30, 5], diameter: 5, depth: 12, id: "side" })
+  const part = analyzeScene([{ id: "p", type: "parametric", name: "P", history: m.build(), x: 0, y: 0, z: 0, layerId: "default" }]).parts[0]!
+  expect(part.holes).toHaveLength(2)
+  expect(part.machining).toMatchObject({ prismatic: true, holes: 1, sideHoles: 1 })
+})

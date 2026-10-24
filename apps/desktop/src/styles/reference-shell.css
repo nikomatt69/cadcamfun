@@ -121,18 +121,27 @@
 .reference-sidebar-nav { overflow-y: auto; flex: 1; padding: 6px; }
 .reference-nav-section { margin-bottom: 6px; }
 .reference-nav-section:last-child { margin-bottom: 0; }
+/* A group is a labelled block: the title sits above its items, and a hairline
+   separates it from the group above so the eye can find the boundary. */
+.reference-nav-section + .reference-nav-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--panel-border); }
 .reference-nav-section-title { margin: 0; padding: 6px 8px 4px; color: var(--panel-text-faint); font-size: 9.5px; font-weight: 700; letter-spacing: .09em; line-height: 12px; text-transform: uppercase; }
 .reference-nav-group { padding: 0; margin-bottom: 1px; }
-.reference-nav-item { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 30px; padding: 5px 8px; font-size: 12.5px; line-height: 18px; font-weight: 500; color: var(--panel-text-muted); border-radius: 4px; border: 1px solid transparent; text-align: left; box-shadow: none; }
+.reference-nav-item { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 30px; padding: 5px 8px; font-size: 12.5px; line-height: 18px; font-weight: 500; color: var(--panel-text-muted); border-radius: 4px; border: 1px solid transparent; text-align: left; box-shadow: none; transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease; }
 .reference-nav-item svg { flex-shrink: 0; width: 16px; height: 16px; color: var(--panel-text-faint); }
 .reference-nav-item span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .reference-nav-item.is-current { background: var(--panel-accent-soft); border-color: color-mix(in srgb, var(--panel-accent) 26%, transparent); color: var(--panel-accent); }
 .reference-nav-item.is-current svg { color: var(--panel-accent); }
+/* The editors replace this chrome with their own. The arrow says so before the
+   click, not after the user has lost their place. */
+.reference-nav-item--exit { font-weight: 600; }
+.reference-nav-item__exit { flex: none; width: 13px; height: 13px; color: var(--panel-text-faint); opacity: .75; }
+.reference-nav-item--exit.is-current .reference-nav-item__exit { color: var(--panel-accent); opacity: 1; }
 .reference-nav-children { margin: 2px 0 3px 16px; padding-left: 6px; border-left: 1px solid var(--panel-border); display: flex; flex-direction: column; gap: 1px; }
 .reference-nav-children .reference-nav-item { min-height: 26px; padding: 4px 6px; font-size: 12px; }
 .reference-nav-children .reference-nav-item svg { width: 14px; height: 14px; }
 .reference-nav-children .reference-nav-item.is-current { border-color: transparent; background: transparent; box-shadow: inset 2px 0 0 var(--panel-accent); }
 .reference-sidebar.is-collapsed .reference-nav-section-title { display: none; }
+.reference-sidebar.is-collapsed .reference-nav-section + .reference-nav-section { margin-top: 4px; padding-top: 4px; }
 .reference-sidebar.is-collapsed .reference-sidebar-nav { padding: 6px 4px; }
 .reference-sidebar.is-collapsed .reference-nav-item { justify-content: center; padding: 6px 0; }
 .reference-sidebar-foot { flex-shrink: 0; border-top: 1px solid var(--panel-border); padding: 6px; background: var(--panel-bg); }

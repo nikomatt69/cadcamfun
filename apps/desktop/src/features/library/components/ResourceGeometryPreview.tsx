@@ -9,6 +9,8 @@ import { createComponentPreviewObject } from "../lib/component-preview.ts"
 import { buildPlayback, playbackSegments, toolColors } from "../../../viewport/view3d/playback.ts"
 import { t } from "../../../i18n/index.ts"
 import { resourcePreviewElements } from "../lib/resource-geometry.ts"
+import { PREVIEW_BACKGROUND, addPreviewLights } from "../lib/preview-scene.ts"
+import { PREVIEW_STAGE, PreviewFrame, stageNote } from "./PreviewFrame.tsx"
 export { resourceElements } from "../lib/resource-geometry.ts"
 
 /** A read-only scene owns its GPU resources and never writes to the active CAD workspace. */
@@ -27,13 +29,12 @@ export function ResourceGeometryPreview(props: {
     let renderer: THREE.WebGLRenderer
     try { renderer = new THREE.WebGLRenderer({ antialias: true }) } catch { setUnavailable(true); return }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
-    renderer.setClearColor(0xf0f0f0)
+    renderer.setClearColor(PREVIEW_BACKGROUND)
     host.append(renderer.domElement)
     const scene = new THREE.Scene(), content = new THREE.Group()
-    scene.background = new THREE.Color(0xf0f0f0)
-    scene.add(content, new THREE.AmbientLight(0xffffff, 0.5))
-    const light = new THREE.DirectionalLight(0xffffff, 0.8)
-    light.position.set(5, 10, 7.5); scene.add(light)
+    scene.background = new THREE.Color(PREVIEW_BACKGROUND)
+    scene.add(content)
+    addPreviewLights(scene)
     const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 100000)
     camera.position.set(0, 0, 5)
     const controls = new OrbitControls(camera, renderer.domElement)
@@ -92,19 +93,12 @@ export function ResourceGeometryPreview(props: {
       frames.dispose(); controls.dispose(); disposeObject(content); renderer.dispose(); renderer.domElement.remove()
     })
   })
-  return <div data-testid="resource-geometry-preview" class="space-y-2">
-    <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
-      <h3 class="font-medium text-gray-900 dark:text-white">{t("cam.resource.preview")}</h3>
-      <div class="flex items-center gap-3">
-        <Show when={props.program}><label class="flex items-center gap-1 text-gray-600 dark:text-gray-300"><input type="checkbox" checked={pathsVisible()} onChange={(event) => setPathsVisible(event.currentTarget.checked)} />{t("save.toolpaths")}</label></Show>
-        <button type="button" class="rounded border border-gray-300 px-2 py-1 text-gray-700 dark:border-gray-600 dark:text-gray-200" onClick={() => fit()}>{t("cam.resource.fit")}</button>
-      </div>
+  return <PreviewFrame title={t("cam.resource.preview")} testId="resource-geometry-preview" onFit={() => fit()} fitLabel={t("cam.resource.fit")} hint={t("cam.resource.orbit")}
+    actions={<Show when={props.program}><label class="flex items-center gap-1"><input type="checkbox" class="accent-blue-600" checked={pathsVisible()} onChange={(event) => setPathsVisible(event.currentTarget.checked)} />{t("save.toolpaths")}</label></Show>}>
+    <div ref={host} class={`${PREVIEW_STAGE} h-80`} role="img" aria-label={t("cam.resource.preview")}>
+      <Show when={unavailable()}><p role="status" class={stageNote("info")}>{t("cam.resource.noWebgl")}</p></Show>
+      <Show when={!unavailable() && props.elements.length === 0}><p role="status" class={stageNote("info")}>{t("cam.resource.previewEmpty")}</p></Show>
+      <Show when={!unavailable() && geometryError()}><p role="status" class={stageNote("warn")}>{t("cam.resource.geometryError")}</p></Show>
     </div>
-    <div ref={host} class="relative h-80 overflow-hidden rounded-lg bg-[#f0f0f0]" role="img" aria-label={t("cam.resource.preview")}>
-      <Show when={unavailable()}><p role="status" class="absolute inset-0 flex items-center justify-center p-4 text-sm text-gray-700">{t("cam.resource.noWebgl")}</p></Show>
-      <Show when={!unavailable() && props.elements.length === 0}><p role="status" class="pointer-events-none absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-gray-700">{t("cam.resource.previewEmpty")}</p></Show>
-      <Show when={!unavailable() && geometryError()}><p role="status" class="pointer-events-none absolute inset-x-4 bottom-4 rounded-lg border border-amber-500/40 bg-white/90 p-3 text-center text-xs text-amber-900">{t("cam.resource.geometryError")}</p></Show>
-    </div>
-    <p class="text-xs text-gray-500 dark:text-gray-400">{t("cam.resource.orbit")}</p>
-  </div>
+  </PreviewFrame>
 }

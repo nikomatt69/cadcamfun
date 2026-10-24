@@ -3,6 +3,7 @@
   "shell.workstation": "Workstation",
   "shell.menu": "MENU",
   "shell.group.workspace": "Workspace",
+  "shell.group.editors": "Editors",
   "shell.group.tools": "Tools",
   "shell.group.system": "System",
   "shell.search": "Search or jump to…",

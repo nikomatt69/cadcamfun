@@ -91,6 +91,10 @@ export function WorkspaceTabs<T extends string>(props: WorkspaceTabsProps<T>): J
 
 export interface WorkspacePageProps {
   readonly title: string
+  /** One sentence under the title: what this screen is for. */
+  readonly description?: string
+  /** A small uppercase label above the title. */
+  readonly eyebrow?: string
   /** Buttons on the right of the toolbar. */
   readonly actions?: JSX.Element
   /** The left filter rail; omitted for pages without filters. */
@@ -111,10 +115,16 @@ export function WorkspacePage(props: WorkspacePageProps): JSX.Element {
           class="workspace-page__toolbar workstation-toolbar w-full flex flex-wrap items-center justify-between gap-2"
           {...enter(-20, 0)}
         >
-          <div class="workspace-page__title flex min-w-0 items-center">
-            <h1 class="truncate text-sm font-semibold text-slate-900 dark:text-white">{props.title}</h1>
+          <div class="workspace-page__title ent-header__text flex min-w-0 items-center">
+            <Show when={props.eyebrow !== undefined}>
+              <p class="ent-header__eyebrow">{props.eyebrow}</p>
+            </Show>
+            <h1 class="ent-header__title truncate">{props.title}</h1>
+            <Show when={props.description !== undefined}>
+              <p class="ent-header__description truncate">{props.description}</p>
+            </Show>
           </div>
-          <Show when={props.actions !== undefined}><div class="flex flex-wrap items-center gap-1.5">{props.actions}</div></Show>
+          <Show when={props.actions !== undefined}><div class="ent-header__actions">{props.actions}</div></Show>
         </Motion.div>
 
         <div class="workspace-page__body cam-workspace__body flex flex-1 overflow-hidden w-full">

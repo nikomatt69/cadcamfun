@@ -82,7 +82,7 @@ export default function ExactModelPanel(props: Props): JSX.Element {
                   <dt>Through-holes</dt><dd>{v.holes ?? "–"}</dd>
                   <dt>Holes (recognised)</dt><dd data-testid="exact-drilled">{v.drilled.length === 0 ? "–" : v.drilled.map((h) => `Ø${fmt(h.diameter)}${h.form === "simple" ? "" : ` ${h.form}`} × ${fmt(h.depth)}`).join(", ")}</dd>
                   <dt>CAM</dt>
-                  <dd data-testid="exact-machining">{v.machining.prismatic ? `By features: ${v.machining.holes} holes, ${v.machining.pockets} pockets${v.machining.islands ? ` (${v.machining.islands} islands)` : ""}, ${v.machining.outlines} outlines` : `3D surface job: ${v.machining.reason}`}</dd>
+                  <dd data-testid="exact-machining">{v.machining.prismatic ? `By features: ${v.machining.holes} holes, ${v.machining.pockets} pockets${v.machining.islands ? ` (${v.machining.islands} islands)` : ""}, ${v.machining.outlines} outlines${v.machining.sideHoles ? `; ${v.machining.sideHoles} holes along other axes are left to their own setup` : ""}` : `3D surface job: ${v.machining.reason}`}</dd>
                   <dt>Surfaces</dt><dd><For each={Object.entries(v.surfaces)}>{([k, n]) => <span class="mr-1">{k} {n}</span>}</For></dd>
                   <dt>Valid solid</dt><dd class={v.valid ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}>{v.valid ? "yes" : `no: ${v.issues.join("; ")}`}</dd>
                 </dl>
@@ -98,23 +98,27 @@ export default function ExactModelPanel(props: Props): JSX.Element {
               <Show when={ok().drilled.length > 0 || ok().bosses.length > 0}>
                 <div class="mt-2 space-y-1 text-xs" data-testid="exact-hole-edit">
                   <p class="font-medium">Edit a hole or a boss (adds a new solid)</p>
-                  <div class="flex items-center gap-1">
-                    <span class="flex-1">Draft angle (°, 0 = straight)</span>
-                    <NumberField id="exact-draft" value={draft()} accept={(x) => x >= 0 && x <= 30} onValue={setDraft} />
+                  <div class="space-y-0.5">
+                    <div>Draft angle (°, 0 = straight)</div>
+                    <div class="w-24"><NumberField id="exact-draft" value={draft()} accept={(x) => x >= 0 && x <= 30} onValue={setDraft} /></div>
                   </div>
                   <For each={ok().drilled}>{(h, i) => (
-                    <div class="flex items-center gap-1" data-hole={i()}>
-                      <span class="flex-1">#{i() + 1} Ø{fmt(h.diameter)} × {fmt(h.depth)}</span>
-                      <NumberField id={`exact-hole-${i()}`} value={sizes()[i()] ?? h.diameter} onValue={(x) => setSizes({ ...sizes(), [i()]: x })} />
+                    <div class="space-y-0.5" data-hole={i()}>
+                      <div>Hole #{i() + 1} Ø{fmt(h.diameter)} × {fmt(h.depth)}</div>
+                      <div class="flex items-center gap-1">
+                      <div class="w-24"><NumberField id={`exact-hole-${i()}`} value={sizes()[i()] ?? h.diameter} onValue={(x) => setSizes({ ...sizes(), [i()]: x })} /></div>
                       <button type="button" class="panel-btn" data-testid="exact-hole-resize" onClick={() => changeHole(i(), { kind: "resize", diameter: sizes()[i()] ?? h.diameter })}>Resize</button>
                       <button type="button" class="panel-btn" data-testid="exact-hole-fill" onClick={() => changeHole(i(), { kind: "fill" })}>Fill</button>
+                      </div>
                     </div>
                   )}</For>
                   <For each={ok().bosses}>{(x, i) => (
-                    <div class="flex items-center gap-1" data-boss={i()}>
-                      <span class="flex-1">Boss #{i() + 1} Ø{fmt(x.diameter)} × {fmt(x.length)}</span>
-                      <NumberField id={`exact-boss-${i()}`} value={bossSizes()[i()] ?? x.diameter} onValue={(d) => setBossSizes({ ...bossSizes(), [i()]: d })} />
-                      <button type="button" class="panel-btn" data-testid="exact-boss-resize" onClick={() => changeBoss(i(), bossSizes()[i()] ?? x.diameter)}>Resize</button>
+                    <div class="space-y-0.5" data-boss={i()}>
+                      <div>Boss #{i() + 1} Ø{fmt(x.diameter)} × {fmt(x.length)}</div>
+                      <div class="flex items-center gap-1">
+                        <div class="w-24"><NumberField id={`exact-boss-${i()}`} value={bossSizes()[i()] ?? x.diameter} onValue={(d) => setBossSizes({ ...bossSizes(), [i()]: d })} /></div>
+                        <button type="button" class="panel-btn" data-testid="exact-boss-resize" onClick={() => changeBoss(i(), bossSizes()[i()] ?? x.diameter)}>Resize</button>
+                      </div>
                     </div>
                   )}</For>
                   <Show when={note()}>{(n) => <p class={n().ok ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"} role={n().ok ? "status" : "alert"} data-testid="exact-hole-message">{n().text}</p>}</Show>

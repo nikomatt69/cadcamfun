@@ -6605,6 +6605,7 @@ export type CadExactAnalyzeOutput = {
           top: number
           bottom: number
           islands?: number
+          sideHoles?: number
         }
       | { prismatic: false; reason: string }
     bosses: Array<{

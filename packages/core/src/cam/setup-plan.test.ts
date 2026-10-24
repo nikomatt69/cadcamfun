@@ -62,8 +62,8 @@ describe("setup planning on the exact model", () => {
     const all = p.setups.flatMap((s) => [...s.faces])
     expect(new Set(all).size).toBe(all.length)
     expect(p.setups.reduce((s, x) => s + x.share, 0)).toBeCloseTo(1, 9)
-    // The part with a side hole is not a 2.5D part seen from the top.
-    expect(p.setups.find((s) => s.orientation === "+Z")!.prismatic.ok).toBe(false)
+    // Seen from each side the part is 2.5D: the holes of the other sides are plugged, and each setup finds exactly its own hole.
+    for (const s of p.setups) expect(s.prismatic).toEqual({ ok: true, holes: 1, pockets: 0, outlines: 1 })
   })
 
   test("a top hole alone stays one prismatic setup with the hole", () => {
