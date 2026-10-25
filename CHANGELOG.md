@@ -3,6 +3,22 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.22 (October 2026)
+
+## Desktop
+
+- Enhance CADCanvas and preview components with improved rendering and look settings
+- Enhance update handling and UI components
+- Assistant keeps going when a run's step budget is spent; one error card, provider buttons only for provider errors
+- Assistant page keeps the composer in place; rename the dock class that collided with the docked panel
+- Assistant dock: agent questions answered in the composer dock, like permissions
+- Assistant dock: one shared width for permissions, error and composer; compact permission card
+- Assistant UI: fixed composer dock with permissions, always follow the latest turn
+
+## Build and release
+
+- Update CI workflow to use newer versions of cargo-deny and cargo-audit
+
 ## v0.1.21 (October 2026)
 
 ## Core
