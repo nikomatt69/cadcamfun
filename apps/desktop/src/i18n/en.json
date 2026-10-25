@@ -40,6 +40,8 @@
   "titlebar.item.toggleConsole": "Toggle console",
   "titlebar.item.documentation": "Documentation",
   "titlebar.item.openLogs": "Show logs folder",
+  "titlebar.item.checkUpdates": "Check for updates…",
+  "titlebar.item.releaseNotes": "Release notes",
   "titlebar.item.close": "Close menu",
 
   "status.label": "Status bar",

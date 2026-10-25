@@ -23,6 +23,8 @@ export interface ModalProps {
   readonly size?: "sm" | "md" | "lg" | "xl"
   /** Pinned below the body: the actions stay in sight however far the body is scrolled. */
   readonly footer?: JSX.Element
+  /** False hides the close button (the caller also ignores `onClose`): a dialog that must be answered, like a critical update. */
+  readonly closable?: boolean
 }
 
 const sizeClass = (size: "sm" | "md" | "lg" | "xl"): string => {
@@ -118,9 +120,11 @@ export function Modal(props: ModalProps): JSX.Element {
             <Show when={props.title !== undefined}>
               <header class={props.variant === "workspace" ? "px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center" : "ui-modal-header"}>
                 <h3 class={props.variant === "workspace" ? "text-lg font-medium text-gray-900 dark:text-white" : "ui-modal-title"}>{props.title}</h3>
-                <button type="button" class={props.variant === "workspace" ? "text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 transition-colors" : "ui-modal-close"} aria-label="Close" onClick={() => props.onClose()}>
-                  <X size={18} aria-hidden="true" />
-                </button>
+                <Show when={props.closable !== false}>
+                  <button type="button" class={props.variant === "workspace" ? "text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 transition-colors" : "ui-modal-close"} aria-label="Close" onClick={() => props.onClose()}>
+                    <X size={18} aria-hidden="true" />
+                  </button>
+                </Show>
               </header>
             </Show>
             <div class={props.variant === "workspace" ? "" : "ui-modal-body"}>{props.children}</div>

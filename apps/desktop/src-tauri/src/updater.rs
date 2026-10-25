@@ -10,15 +10,20 @@
 //!   - download-progress events forwarded to the webview;
 //!   - a `critical` release forces the prompt and blocks dismissal until applied;
 //!   - never interrupt unsaved editor work, so an install is refused while the
-//!     webview reports unsaved changes and the UI defers it.
+//!     webview reports unsaved changes and the UI defers it;
+//!   - a check the person asked for (the menu bar, Settings) is answered even when
+//!     nothing is new or the check failed; a background check stays silent then.
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
+
+use crate::sidecar::SidecarHandle;
 
 /// Interval between background checks (spec 10 §3: every four hours).
 pub const CHECK_INTERVAL: Duration = Duration::from_secs(4 * 60 * 60);
@@ -26,6 +31,10 @@ pub const CHECK_INTERVAL: Duration = Duration::from_secs(4 * 60 * 60);
 const CHECK_TIMEOUT: Duration = Duration::from_secs(30);
 /// Event the webview listens on for update state.
 pub const UPDATE_EVENT: &str = "update://status";
+/// Where the release notes of every version live.
+pub const RELEASES_URL: &str = "https://github.com/nikomatt69/cadcamfun/releases";
+/// How long a restart waits for the sidecar to finish before it goes ahead anyway.
+const RESTART_SIDECAR_TIMEOUT: Duration = Duration::from_secs(10);
 /// Marker the release manager copies from the `critical` release flag into the
 /// manifest body (see `scripts/updater-manifest.ts`).
 const CRITICAL_MARKER: &str = "[critical]";
@@ -43,6 +52,8 @@ pub enum UpdateStatus {
     /// A release is available.
     Available {
         version: String,
+        /// The version that is running now, so the prompt can say "6.0.0 to 6.1.0".
+        current: String,
         notes: String,
         date: Option<String>,
         /// The manifest flagged this release as critical: the prompt cannot be
@@ -77,6 +88,9 @@ pub struct UpdateEvent {
     pub status: UpdateStatus,
     /// Precomputed so the webview never re-implements the critical/ready rules.
     pub dismissible: bool,
+    /// The check was asked for by the person (menu bar, Settings): the webview answers
+    /// it with every outcome, "up to date" and a failure included.
+    pub manual: bool,
 }
 
 impl UpdateEvent {
@@ -85,7 +99,14 @@ impl UpdateEvent {
         Self {
             status,
             dismissible,
+            manual: false,
         }
+    }
+
+    /// The same event, marked as the answer to a check the person asked for.
+    pub fn manual(mut self, manual: bool) -> Self {
+        self.manual = manual;
+        self
     }
 }
 
@@ -170,10 +191,16 @@ impl Default for UpdaterService {
 }
 
 /// Builds the status for an announced release, deriving criticality from its notes.
-pub fn status_for(version: String, notes: String, date: Option<String>) -> UpdateStatus {
+pub fn status_for(
+    version: String,
+    current: String,
+    notes: String,
+    date: Option<String>,
+) -> UpdateStatus {
     let critical = notes.contains(CRITICAL_MARKER);
     UpdateStatus::Available {
         version,
+        current,
         notes,
         date,
         critical,
@@ -216,8 +243,8 @@ pub fn may_install(
 
 // ---------------------------------------------------------------- plumbing
 
-fn emit(app: &AppHandle, status: UpdateStatus) {
-    if let Err(err) = app.emit(UPDATE_EVENT, UpdateEvent::new(status)) {
+fn emit(app: &AppHandle, status: UpdateStatus, manual: bool) {
+    if let Err(err) = app.emit(UPDATE_EVENT, UpdateEvent::new(status).manual(manual)) {
         log::warn!("failed to emit update status: {err}");
     }
 }
@@ -225,8 +252,9 @@ fn emit(app: &AppHandle, status: UpdateStatus) {
 /// Runs one check and reports the outcome to the webview.
 pub async fn check(app: AppHandle, trigger: CheckTrigger) -> Result<(), String> {
     let running_version = app.package_info().version.to_string();
-    emit(&app, UpdateStatus::Checking);
-    if trigger == CheckTrigger::Manual {
+    let manual = trigger == CheckTrigger::Manual;
+    emit(&app, UpdateStatus::Checking, manual);
+    if manual {
         log::info!("manual update check requested");
     }
 
@@ -242,6 +270,7 @@ pub async fn check(app: AppHandle, trigger: CheckTrigger) -> Result<(), String> 
                 UpdateStatus::UpToDate {
                     version: running_version,
                 },
+                manual,
             );
             return Ok(());
         }
@@ -258,6 +287,7 @@ pub async fn check(app: AppHandle, trigger: CheckTrigger) -> Result<(), String> 
         Ok(Some(update)) => {
             let status = status_for(
                 update.version.clone(),
+                running_version,
                 update.body.clone().unwrap_or_default(),
                 update.date.map(|d| d.to_string()),
             );
@@ -276,7 +306,7 @@ pub async fn check(app: AppHandle, trigger: CheckTrigger) -> Result<(), String> 
                     },
                 );
             }
-            emit(&app, status);
+            emit(&app, status, manual);
             Ok(())
         }
         Ok(None) => {
@@ -285,12 +315,13 @@ pub async fn check(app: AppHandle, trigger: CheckTrigger) -> Result<(), String> 
                 UpdateStatus::UpToDate {
                     version: running_version,
                 },
+                manual,
             );
             Ok(())
         }
         Err(err) => {
             // A failed check is never fatal: the app keeps running offline.
-            emit(&app, UpdateStatus::Failed { message: err });
+            emit(&app, UpdateStatus::Failed { message: err }, manual);
             Ok(())
         }
     }
@@ -329,7 +360,7 @@ pub async fn install(
             .download_and_install(
                 |chunk, total| {
                     downloaded += chunk as u64;
-                    emit(&app, UpdateStatus::Downloading { downloaded, total });
+                    emit(&app, UpdateStatus::Downloading { downloaded, total }, false);
                 },
                 || {},
             )
@@ -349,6 +380,7 @@ pub async fn install(
             UpdateStatus::Ready {
                 version: version.clone(),
             },
+            false,
         );
         Ok(version)
     }
@@ -361,6 +393,40 @@ pub async fn install(
         }
     }
     outcome
+}
+
+/// A check the person asked for from a menu: the window comes to the front so the answer is seen, then the
+/// check runs and the webview answers it with every outcome.
+pub fn request_manual_check<R: tauri::Runtime>(app: &AppHandle<R>) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+    if let Some(service) = app.try_state::<UpdaterService>() {
+        service.request(CheckTrigger::Manual);
+    }
+}
+
+/// Opens the release notes in the browser.
+pub fn open_release_notes<R: tauri::Runtime>(app: &AppHandle<R>) {
+    if let Err(err) = app.opener().open_url(RELEASES_URL, None::<&str>) {
+        log::warn!("failed to open the release notes: {err}");
+    }
+}
+
+/// Restarts into the installed update: the check loop stops and the sidecar finishes first, so a restart never
+/// leaves a database or a worker behind. The webview has already written its unsaved work.
+pub async fn restart(app: AppHandle) {
+    if let Some(service) = app.try_state::<UpdaterService>() {
+        service.shutdown();
+    }
+    if let Some(handle) = app.try_state::<Arc<SidecarHandle>>() {
+        if handle.shutdown() {
+            let _ = tokio::time::timeout(RESTART_SIDECAR_TIMEOUT, handle.wait_finished()).await;
+        }
+    }
+    app.restart();
 }
 
 /// Starts the periodic check loop and the launch check.
@@ -396,14 +462,14 @@ mod tests {
 
     #[test]
     fn a_critical_prompt_cannot_be_dismissed() {
-        let status = status_for("6.1.0".into(), "[critical] fix".into(), None);
+        let status = status_for("6.1.0".into(), "6.0.0".into(), "[critical] fix".into(), None);
         assert!(!status.dismissible());
         assert!(!UpdateEvent::new(status).dismissible);
     }
 
     #[test]
     fn a_normal_prompt_can_be_dismissed() {
-        assert!(status_for("6.1.0".into(), "minor fixes".into(), None).dismissible());
+        assert!(status_for("6.1.0".into(), "6.0.0".into(), "minor fixes".into(), None).dismissible());
     }
 
     #[test]
@@ -426,7 +492,7 @@ mod tests {
 
     #[test]
     fn the_critical_marker_is_the_only_source_of_criticality() {
-        let status = status_for("6.1.0".into(), "no marker here".into(), None);
+        let status = status_for("6.1.0".into(), "6.0.0".into(), "no marker here".into(), None);
         assert!(matches!(
             status,
             UpdateStatus::Available {
@@ -536,6 +602,36 @@ mod tests {
             serde_json::to_string(&UpdateEvent::new(UpdateStatus::Checking)).expect("serialises");
         assert!(json.contains(r#""status":"checking""#), "{json}");
         assert!(json.contains(r#""dismissible":true"#), "{json}");
+        assert!(json.contains(r#""manual":false"#), "{json}");
+    }
+
+    #[test]
+    fn a_manual_check_is_marked_so_the_webview_answers_it() {
+        let event = UpdateEvent::new(UpdateStatus::UpToDate {
+            version: "6.0.0".into(),
+        })
+        .manual(true);
+        let json = serde_json::to_string(&event).expect("serialises");
+        assert!(json.contains(r#""manual":true"#), "{json}");
+        assert!(json.contains(r#""status":"upToDate""#), "{json}");
+    }
+
+    #[test]
+    fn an_available_status_names_the_running_version() {
+        let json = serde_json::to_string(&status_for(
+            "6.1.0".into(),
+            "6.0.0".into(),
+            String::new(),
+            None,
+        ))
+        .expect("serialises");
+        assert!(json.contains(r#""current":"6.0.0""#), "{json}");
+    }
+
+    #[test]
+    fn the_release_notes_live_on_the_releases_page() {
+        assert!(RELEASES_URL.starts_with("https://github.com/"));
+        assert!(RELEASES_URL.ends_with("/releases"));
     }
 
     #[test]
@@ -564,11 +660,12 @@ mod tests {
 
     #[test]
     fn an_available_status_carries_the_release_notes() {
-        let status = status_for("6.1.0".into(), "notes".into(), None);
+        let status = status_for("6.1.0".into(), "6.0.0".into(), "notes".into(), None);
         assert_eq!(
             status,
             UpdateStatus::Available {
                 version: "6.1.0".into(),
+                current: "6.0.0".into(),
                 notes: "notes".into(),
                 date: None,
                 critical: false

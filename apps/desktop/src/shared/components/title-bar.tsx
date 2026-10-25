@@ -28,7 +28,7 @@ interface Menu {
   readonly items: ReadonlyArray<MenuItem>
 }
 
-/** Mirrors `FILE_ITEMS`, `VIEW_ITEMS` and `HELP_ITEMS` in `src-tauri/src/menu.rs`. */
+/** Mirrors `FILE_ITEMS`, `VIEW_ITEMS`, `HELP_ITEMS` and `UPDATE_ITEMS` in `src-tauri/src/menu.rs`. */
 export const MENUS: ReadonlyArray<Menu> = [
   {
     id: "file",
@@ -74,7 +74,9 @@ export const MENUS: ReadonlyArray<Menu> = [
     labelKey: "titlebar.help",
     items: [
       { id: "help.documentation", labelKey: "titlebar.item.documentation", accelerator: undefined },
-      { id: "help.open_logs", labelKey: "titlebar.item.openLogs", accelerator: undefined }
+      { id: "help.open_logs", labelKey: "titlebar.item.openLogs", accelerator: undefined },
+      { id: "help.check_updates", labelKey: "titlebar.item.checkUpdates", accelerator: undefined },
+      { id: "help.release_notes", labelKey: "titlebar.item.releaseNotes", accelerator: undefined }
     ]
   }
 ]

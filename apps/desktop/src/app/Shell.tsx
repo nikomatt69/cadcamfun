@@ -24,6 +24,7 @@ import { useApp } from "../shared/state/context.ts"
 import { projectSession } from "../features/projects/lib/project-session.ts"
 import { SaveSeg } from "../shared/components/workspace-strip.tsx"
 import { UpdatePrompt } from "./UpdatePrompt.tsx"
+import { checkForUpdates, openReleaseNotes } from "./updates.ts"
 import { activeActivity, routeOf, type ActivityId } from "./layout.ts"
 import { findShortcut, shortcuts } from "./shortcuts.ts"
 
@@ -137,6 +138,13 @@ export function Shell(props: ShellProps): JSX.Element {
         return
       case "view.toggle_left_panel":
         setSidebarOpen(!sidebarOpen())
+        return
+      // The shell owns the updater: these two reach it as commands (the native menu bar of macOS handles them in Rust).
+      case "help.check_updates":
+        void checkForUpdates().catch(() => undefined)
+        return
+      case "help.release_notes":
+        void openReleaseNotes().catch(() => undefined)
         return
       default:
         return

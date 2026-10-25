@@ -11,6 +11,10 @@ const COMMANDS: &[&str] = &[
     "pick_file",
     "save_file",
     "set_recent_projects",
+    "check_for_updates",
+    "install_update",
+    "restart_app",
+    "open_release_notes",
 ];
 
 fn main() {

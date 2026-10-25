@@ -131,6 +131,8 @@ pub fn run() {
             commands::set_recent_projects,
             commands::check_for_updates,
             commands::install_update,
+            commands::restart_app,
+            commands::open_release_notes,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the CADCAM FUN shell");

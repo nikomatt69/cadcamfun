@@ -321,6 +321,20 @@ pub async fn install_update(
         .map_err(CommandError::from)
 }
 
+/// Restarts into the installed update. The webview calls it after it wrote its unsaved work.
+#[tauri::command]
+pub async fn restart_app(app: AppHandle) -> Result<(), CommandError> {
+    updater::restart(app).await;
+    Ok(())
+}
+
+/// Opens the release notes page in the browser.
+#[tauri::command]
+pub fn open_release_notes(app: AppHandle) -> Result<(), CommandError> {
+    updater::open_release_notes(&app);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -93,6 +93,10 @@
     "allow-secret-delete",
     "allow-pick-file",
     "allow-save-file",
-    "allow-set-recent-projects"
+    "allow-set-recent-projects",
+    "allow-check-for-updates",
+    "allow-install-update",
+    "allow-restart-app",
+    "allow-open-release-notes"
   ]
 }

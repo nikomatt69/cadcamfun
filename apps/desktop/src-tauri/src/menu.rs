@@ -4,6 +4,8 @@
 use tauri::menu::{Menu, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
+use crate::updater;
+
 /// Event name the webview listens to for menu activations.
 pub const MENU_EVENT: &str = "menu";
 
@@ -44,6 +46,15 @@ const VIEW_ITEMS: &[(&str, &str, Option<&str>)] = &[
 const HELP_ITEMS: &[(&str, &str, Option<&str>)] = &[
     ("help.documentation", "Documentation", None),
     ("help.open_logs", "Show Logs Folder", None),
+];
+
+/// Update items, handled natively (the shell owns the updater) and never forwarded. The in-window menus of Windows and
+/// Linux list the same ids and reach the same commands through the webview.
+pub const CHECK_UPDATES_ID: &str = "help.check_updates";
+pub const RELEASE_NOTES_ID: &str = "help.release_notes";
+const UPDATE_ITEMS: &[(&str, &str, Option<&str>)] = &[
+    (CHECK_UPDATES_ID, "Check for Updates...", None),
+    (RELEASE_NOTES_ID, "Release Notes", None),
 ];
 
 /// Handled natively in debug builds only; never forwarded.
@@ -106,11 +117,15 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 
     let mut help = SubmenuBuilder::new(app, "Help");
     help = add_items(help, app, HELP_ITEMS)?;
+    help = add_items(help.separator(), app, UPDATE_ITEMS)?;
 
     let menu = Menu::new(app)?;
     if cfg!(target_os = "macos") {
+        let check_updates = MenuItemBuilder::with_id(CHECK_UPDATES_ID, "Check for Updates...")
+            .build(app)?;
         let application = SubmenuBuilder::new(app, "CADCAM FUN")
             .about(None)
+            .item(&check_updates)
             .separator()
             .services()
             .separator()
@@ -134,6 +149,11 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 pub fn handle_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     if id.starts_with("tray.") {
         return;
+    }
+    match id {
+        CHECK_UPDATES_ID => return updater::request_manual_check(app),
+        RELEASE_NOTES_ID => return updater::open_release_notes(app),
+        _ => {}
     }
     #[cfg(debug_assertions)]
     if id == DEVTOOLS_ID {
@@ -161,7 +181,7 @@ mod tests {
     #[test]
     fn ids_are_unique_and_namespaced() {
         let mut seen = HashSet::new();
-        for (id, _, _) in [FILE_ITEMS, VIEW_ITEMS, HELP_ITEMS]
+        for (id, _, _) in [FILE_ITEMS, VIEW_ITEMS, HELP_ITEMS, UPDATE_ITEMS]
             .iter()
             .flat_map(|items| items.iter())
         {
@@ -176,6 +196,9 @@ mod tests {
         assert!(is_forwarded_id("view.zoom_in"));
         assert!(is_forwarded_id("tray.recent.abc"));
         assert!(!is_forwarded_id(DEVTOOLS_ID));
+        // The update items are the shell's own: the webview never receives them as menu events.
+        assert!(!is_forwarded_id(CHECK_UPDATES_ID));
+        assert!(!is_forwarded_id(RELEASE_NOTES_ID));
         assert!(!is_forwarded_id("tray.quit"));
         assert!(!is_forwarded_id("1234"));
     }

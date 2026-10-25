@@ -73,7 +73,7 @@ test("a close request with nothing unsaved goes straight through (the default de
   } finally { desktop.stop() }
 })
 
-test("the update banner appears on the shell's update://status event and installing writes unsaved work first", async () => {
+test("the update dialog appears on the shell's update://status event and installing writes unsaved work first", async () => {
   const desktop = await startDesktop()
   const view = app.visit("/projects")
   try {
@@ -84,10 +84,31 @@ test("the update banner appears on the shell's update://status event and install
     expect(banner.textContent).toContain("9.9.9")
     useElementsStore.setState({ elements: [box("a", 44)] })
     await new Promise((r) => setTimeout(r, 450))
-    const install = [...banner.querySelectorAll("button")].find((button) => button.textContent === "Install")!
+    const install = [...document.querySelectorAll("button")].find((button) => button.textContent === "Install update")!
     install.click()
     await until(() => desktop.calls.includes("install_update"))
     const stored = await run<{ data: { elements: Array<{ x: number }> } }>(app.client.drawings.get({ params: { id: desktop.drawingId } }))
     expect(stored.data.elements[0]!.x).toBe(44)
+  } finally { view.dispose(); desktop.stop() }
+})
+
+test("a check from the menu bar is answered, a background one is not, and a finished install ends in a restart", async () => {
+  const desktop = await startDesktop()
+  const view = app.visit("/projects")
+  try {
+    const { emit } = await import("@tauri-apps/api/event")
+    await settle()
+    const dialog = () => document.querySelector("[data-testid='update-prompt']")
+    await emit("update://status", { status: "upToDate", version: "9.9.8", dismissible: true, manual: false })
+    await settle()
+    expect(dialog()).toBeNull()
+    await emit("update://status", { status: "checking", dismissible: true, manual: true })
+    expect((await app.wait(() => dialog(), 10_000)).textContent).toContain("Looking for")
+    await emit("update://status", { status: "upToDate", version: "9.9.8", dismissible: true, manual: true })
+    await app.wait(() => dialog()?.textContent?.includes("9.9.8") ? dialog() : null, 10_000)
+    await emit("update://status", { status: "ready", version: "9.9.9", dismissible: false })
+    const restart = await app.wait(() => [...document.querySelectorAll("button")].find((button) => button.textContent === "Restart now") ?? null, 10_000)
+    restart.click()
+    await until(() => desktop.calls.includes("restart_app"))
   } finally { view.dispose(); desktop.stop() }
 })

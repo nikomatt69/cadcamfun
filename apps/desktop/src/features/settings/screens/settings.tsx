@@ -25,6 +25,7 @@ import { AISettingsPanel } from "../components/ai-settings-panel.tsx"
 import { CompanionPanel } from "../../companion/screens/companion.tsx"
 import { LanguageSelector, SUPPORTED_LANGUAGES } from "../components/language-selector.tsx"
 import { AutosaveSettings } from "../components/autosave-settings.tsx"
+import { checkForUpdates, inDesktopShell, openReleaseNotes } from "../../../app/updates.ts"
 
 type TabId = "profile" | "account" | "security" | "notifications" | "ai" | "devices" | "language"
 
@@ -270,6 +271,20 @@ export function SettingsScreen(): JSX.Element {
               </div>
             </fieldset>
           </div>
+
+          {/* Updates: the desktop shell checks at launch and every four hours; this asks for a check now and the dialog answers it */}
+          <Show when={inDesktopShell()}>
+            <div class="mt-6" data-testid="settings-updates">
+              <fieldset>
+                <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.updates.title")}</legend>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("settings.updates.description")}</p>
+                <div class="mt-3 flex gap-2">
+                  <button type="button" class="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700" onClick={() => void checkForUpdates().catch(() => toast.error(t("update.checkFailed")))}>{t("settings.updates.check")}</button>
+                  <button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800" onClick={() => void openReleaseNotes().catch(() => undefined)}>{t("update.releaseNotes")}</button>
+                </div>
+              </fieldset>
+            </div>
+          </Show>
 
           {/* Push notifications */}
           <div class="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
