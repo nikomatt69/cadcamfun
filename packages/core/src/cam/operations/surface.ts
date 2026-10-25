@@ -38,7 +38,7 @@ import type { Stock, Tool } from "../tool.ts"
 import type { Move, Toolpath } from "../ir.ts"
 import { OperationFields, Positive, NonNegative, heightsOrdered, levelsOf, withDefault } from "../params.ts"
 import { pathFromPoints } from "../path.ts"
-import { MoveBuilder, approach, finish, followPath, liftTo } from "./common.ts"
+import { MoveBuilder, OperationBudgetError, approach, finish, followPath, liftTo } from "./common.ts"
 import { PocketEntrySchema, PocketParams, generatePocket } from "./pocket.ts"
 import { AdaptiveParams, generateAdaptive } from "./adaptive.ts"
 import { restField } from "./rest.ts"
@@ -209,11 +209,10 @@ const startNear = (ring: ReadonlyArray<Vec2>, from: Vec2 | undefined): Vec2[] =>
 export const generateSurface = (params: SurfaceParams, part: PartModel, tool: Tool, stock: Stock, remaining?: (x: number, y: number) => number): SurfaceResult => {
   const levels = levelsOf(params, stock.origin.z)
   const warnings: string[] = [...part.warnings]
-  const b = new MoveBuilder()
-  b.comment(`Surface ${params.strategy}: ${params.name}`)
-  const surface = new Surface(part.grid, part.dexels.top(-Infinity))
+  let b = new MoveBuilder()
+  let surface = new Surface(part.grid, part.dexels.top(-Infinity))
   const cutter = cutterOf(tool, params.allowance)
-  const stats = { levels: 0, lines: 0, loops: 0, points: 0 }
+  let stats = { levels: 0, lines: 0, loops: 0, points: 0 }
   const done = (moves: ReadonlyArray<Move>): SurfaceResult => ({
     toolpath: { id: params.id, name: params.name, toolId: tool.id, spindleRpm: params.spindleRpm, coolant: params.coolant, moves },
     warnings, stats
@@ -430,10 +429,17 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     }
   }
 
-  /** Distance between finishing passes: from the cusp height for a ball cutter, otherwise the stepover percentage. */
-  const passSpacing = (): number => params.scallop > 0 && tool.kind === "ballnose"
+  /**
+   * Distance between finishing passes: from the cusp height for a ball cutter, otherwise the stepover percentage.
+   *
+   * `spacingScale` is how much further apart the passes are than the request asked for. It grows when the pass would ask the
+   * drop-cutter more times than its budget allows: a part too large to finish at the requested cusp height is finished at a
+   * coarser one, and the program says so, rather than leaving the operation out.
+   */
+  let spacingScale = 1
+  const passSpacing = (): number => (params.scallop > 0 && tool.kind === "ballnose"
     ? scallopSpacing(tool.diameter / 2 + params.allowance, Math.min(params.scallop, tool.diameter / 2))
-    : (params.stepover / 100) * tool.diameter
+    : (params.stepover / 100) * tool.diameter) * spacingScale
   /** Sampling step along a finishing pass: the drop-cutter is asked at least once per cell. */
   const ds = Math.max(Math.min(cell, params.tolerance * 5), params.tolerance)
   /** The tool tip at (x, y), or undefined where there is no surface, the previous tool left nothing, or `region` excludes it. */
@@ -814,26 +820,65 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     return (Math.atan(Math.hypot((xp - xm) / (2 * h), (yp - ym) / (2 * h))) * 180) / Math.PI
   }
 
-  if (params.strategy === "waterline") {
-    waterline()
-    if (stats.loops === 0) b.comment(previous === undefined ? "nothing to cut: no contour of the part at the requested depths" : "nothing to cut: the previous tool left no material this tool can reach")
-  } else if (params.strategy === "steep-shallow") {
-    waterline((x, y) => slopeAt(x, y) >= params.slopeAngle - params.overlap)
-    const steepLoops = stats.loops
-    parallel((x, y) => slopeAt(x, y) <= params.slopeAngle + params.overlap)
-    if (steepLoops === 0 && stats.lines === 0) b.comment("nothing to cut: no steep wall and no shallow area reachable")
-  } else if (params.strategy === "scallop") {
-    scallop3d()
-    if (stats.loops === 0) b.comment(previous === undefined ? "nothing to cut: no surface the tool can follow at a constant scallop" : "nothing to cut: the previous tool left no material this tool can reach")
-  } else if (params.strategy === "spiral" || params.strategy === "radial") {
-    if (params.strategy === "spiral") spiral(); else radial()
-    if (stats.lines === 0) b.comment(previous === undefined ? "nothing to cut: the cutter finds no surface along the pattern" : "nothing to cut: the previous tool left no material this tool can reach")
-  } else if (params.strategy === "flat") {
-    flats()
-    if (stats.loops === 0) b.comment("nothing to cut: the part has no flat face the tool can rest on within the depths")
-  } else {
-    parallel()
-    if (stats.lines === 0) b.comment(previous === undefined ? "nothing to cut: the cutter finds no surface along any line" : "nothing to cut: the previous tool left no material this tool can reach")
+  /**
+   * The pass itself. A pass that would ask the drop-cutter more times than its budget allows is run again with the passes
+   * further apart: the part is finished at a coarser cusp height instead of not being finished at all.
+   */
+  const runStrategy = (): void => {
+    if (params.strategy === "waterline") {
+      waterline()
+      if (stats.loops === 0) b.comment(previous === undefined ? "nothing to cut: no contour of the part at the requested depths" : "nothing to cut: the previous tool left no material this tool can reach")
+    } else if (params.strategy === "steep-shallow") {
+      waterline((x, y) => slopeAt(x, y) >= params.slopeAngle - params.overlap)
+      const steepLoops = stats.loops
+      parallel((x, y) => slopeAt(x, y) <= params.slopeAngle + params.overlap)
+      if (steepLoops === 0 && stats.lines === 0) b.comment("nothing to cut: no steep wall and no shallow area reachable")
+    } else if (params.strategy === "scallop") {
+      scallop3d()
+      if (stats.loops === 0) b.comment(previous === undefined ? "nothing to cut: no surface the tool can follow at a constant scallop" : "nothing to cut: the previous tool left no material this tool can reach")
+    } else if (params.strategy === "spiral" || params.strategy === "radial") {
+      if (params.strategy === "spiral") spiral(); else radial()
+      if (stats.lines === 0) b.comment(previous === undefined ? "nothing to cut: the cutter finds no surface along the pattern" : "nothing to cut: the previous tool left no material this tool can reach")
+    } else if (params.strategy === "flat") {
+      flats()
+      if (stats.loops === 0) b.comment("nothing to cut: the part has no flat face the tool can rest on within the depths")
+    } else {
+      parallel()
+      if (stats.lines === 0) b.comment(previous === undefined ? "nothing to cut: the cutter finds no surface along any line" : "nothing to cut: the previous tool left no material this tool can reach")
+    }
+  }
+
+  /** The cusp height the passes are at, given the spacing they are run with. */
+  const cuspOf = (spacing: number): number => {
+    const radius = tool.diameter / 2 + params.allowance
+    const half = spacing / 2
+    return radius > 0 ? (radius - Math.sqrt(Math.max(0, radius * radius - half * half))) : spacing
+  }
+  /** How much further apart the passes are than the request asked for, and what that costs in cusp height. */
+  const describeWidening = (): string => {
+    const wanted = params.scallop > 0 && tool.kind === "ballnose" ? params.scallop : undefined
+    const now = cuspOf(passSpacing())
+    return wanted === undefined
+      ? `the passes are ${spacingScale} times further apart`
+      : `the passes are ${spacingScale} times further apart (the cusp height grows from ${wanted.toFixed(3)} mm to ${now.toFixed(3)} mm)`
+  }
+
+  let attempt = 0
+  for (;;) {
+    try {
+      runStrategy()
+      break
+    } catch (error) {
+      // The pass does not fit its budget: widen the passes and run it again, so the program has the operation in it.
+      if (!(error instanceof OperationBudgetError) || attempt >= 2) throw error
+      attempt++
+      spacingScale *= 4
+      warnings.push(`The ${params.strategy} pass on this part would ask the drop-cutter more times than it can: ${describeWidening()}, so the operation is in the program`)
+      b = new MoveBuilder()
+      b.comment(`Surface ${params.strategy}: ${params.name}`)
+      surface = new Surface(part.grid, part.dexels.top(-Infinity))
+      stats = { levels: 0, lines: 0, loops: 0, points: 0 }
+    }
   }
   if (b.started) finish(b, levels)
   return done(b.moves)

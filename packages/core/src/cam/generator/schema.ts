@@ -340,6 +340,14 @@ export const GenerateRequestSchema = Schema.Struct({
 })
 export type GenerateRequest = typeof GenerateRequestSchema.Type
 
+/**
+ * Decodes any object into a whole request (the missing parts take their defaults); throws on an invalid value.
+ *
+ * The generator reads its request field by field, so a request that is only half filled in would leave it without the
+ * machine it is for. Every caller that does not come through the HTTP layer decodes with this.
+ */
+export const decodeGenerateRequest = (input: unknown): GenerateRequest => Schema.decodeUnknownSync(GenerateRequestSchema)(input)
+
 export const GcodeStatsSchema = Schema.Struct({
   lines: Schema.Int,
   /** Length of feed moves, mm. */

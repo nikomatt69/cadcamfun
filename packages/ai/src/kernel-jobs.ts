@@ -108,7 +108,7 @@ export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]
   "parametric-report": (input) => parametricReport(parseHistory(input.history)),
   "cam-manufacture": ({ stockFromPartBottom, ...job }, report) => cam.kernel.runJob(job, { ...(stockFromPartBottom !== undefined ? { stockFromPartBottom } : {}), ...(report === undefined ? {} : { onProgress: report }) }),
   "cam-plan": ({ stockFromPartBottom, ...job }) => cam.kernel.planOnly(job, stockFromPartBottom === undefined ? {} : { stockFromPartBottom }),
-  "cam-generate": (request, report) => cam.generator.generateToolpath(request, report === undefined ? {} : { onProgress: report }),
+  "cam-generate": (request, report) => cam.generator.generateToolpath(cam.generator.decodeGenerateRequest(request), report === undefined ? {} : { onProgress: report }),
   "cam-parse": ({ gcode, name }) => cam.generator.analyseGcode(gcode, name),
   "cam-verify": (request) => cam.verify.verifyToolpath(request),
   "cad-analyze": cadAnalyze,
