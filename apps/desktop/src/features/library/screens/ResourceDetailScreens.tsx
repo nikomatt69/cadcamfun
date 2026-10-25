@@ -9,7 +9,7 @@
  */
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
-import { Copy, Cpu, Layers, Package, Save, Trash2, Wrench, Box, Edit } from "lucide-solid"
+import { Copy, CopyPlus, Cpu, Layers, Package, Save, Trash2, Wrench, Box, Edit } from "lucide-solid"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
@@ -21,6 +21,8 @@ import {
 import { ResourceGeometryPreview, resourceElements } from "../components/ResourceGeometryPreview.tsx"
 import { ToolPreview3D, toolResourceOf } from "../components/ToolPreview3D.tsx"
 import { MaterialPreview3D, densityKgM3 } from "../components/MaterialPreview3D.tsx"
+import { MachinePreview3D } from "../components/MachinePreview3D.tsx"
+import { machineEnvelope, machineSections } from "../lib/machine-details.ts"
 import { PropertyBar, StatGrid } from "../components/ResourceStats.tsx"
 import { hexColor } from "../lib/preview-scene.ts"
 import { NumberField } from "../../cad/components/property-inputs/NumberField.tsx"
@@ -114,9 +116,17 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
     setLoading(true)
     setError(undefined)
     try {
-      const response = await run<unknown>(fetchEffect(app, props.kind, params.id))
-      // Machine configs answer the legacy envelope `{ success, data }`; the other kinds answer the row itself.
-      const record = props.kind === "machines" ? asRecord(asRecord(response)["data"]) : asRecord(response)
+      let record: Record<string, unknown>
+      try {
+        const response = await run<unknown>(fetchEffect(app, props.kind, params.id))
+        // Machine configs answer the legacy envelope `{ success, data }`; the other kinds answer the row itself.
+        record = props.kind === "machines" ? asRecord(asRecord(response)["data"]) : asRecord(response)
+      } catch (cause) {
+        // A built-in machine is not a stored row: it is read from the catalogue and cannot be edited or deleted, only duplicated.
+        const builtin = props.kind === "machines" ? await builtinMachine(app, params.id) : undefined
+        if (builtin === undefined) throw cause
+        record = builtin
+      }
       const normalized = record as Row
       setRow(normalized)
       setForm(formOf(props.kind, normalized))
@@ -154,6 +164,36 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
       await load()
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : `Failed to update ${meta.title.toLowerCase()}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const builtin = (): boolean => row()?.["builtin"] === true
+
+  /** A copy in the person's own configurations: the way to adapt a built-in preset, or to branch an existing machine. */
+  const duplicate = async (): Promise<void> => {
+    const current = row()
+    if (!current) return
+    setBusy(true)
+    try {
+      const profile = cam.kernel.profileOfConfig(asRecord(current["config"]), str(current["type"]))
+      // The library's own keys (the spindle ceiling and the feed) are filled from the profile's figures; a work volume is only
+      // written when the machine states one (a preset gives its travel or table instead, and the copy is edited to add it).
+      const stored: Record<string, unknown> = { ...cam.kernel.configOfProfile(profile) }
+      const volume = machineEnvelope(profile).volume
+      if (stored["workVolume"] === undefined && volume !== undefined) stored["workVolume"] = volume
+      if (profile.spindle !== undefined) stored["maxSpindleSpeed"] = profile.spindle.maxRpm
+      if (profile.feed !== undefined) stored["maxFeedRate"] = profile.feed.max
+      const created = await run<unknown>(app.client.machineConfigs.create({ payload: {
+        name: `${str(current["name"])} (copy)`, type: str(current["type"]) || "mill", description: str(current["description"]) || null, config: stored, isPublic: false
+      } }))
+      const id = str(asRecord(asRecord(created)["data"])["id"])
+      toast.success("Machine duplicated")
+      invalidatePrefix(app.cache, meta.plural)
+      if (id !== "") navigate(`${meta.listPath}/${encodeURIComponent(id)}`)
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Failed to duplicate the machine")
     } finally {
       setBusy(false)
     }
@@ -203,8 +243,13 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
           <button type="button" class={TOOLBAR_PRIMARY} onClick={() => void save()} disabled={busy() || str(form()["name"]).trim() === ""}><Save size={14} aria-hidden="true" />Save</button>
           <button type="button" class={TOOLBAR_BUTTON} onClick={cancel} disabled={busy()}>Cancel</button>
         </>}>
-          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => { setEditing(true); setTab("details") }} disabled={busy() || row() === undefined}><Edit size={14} aria-hidden="true" />Edit</button>
-          <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => setDeleteOpen(true)} disabled={busy() || row() === undefined}><Trash2 size={14} aria-hidden="true" />Delete</button>
+          <Show when={props.kind === "machines"}>
+            <button type="button" class={builtin() ? TOOLBAR_PRIMARY : TOOLBAR_BUTTON} onClick={() => void duplicate()} disabled={busy() || row() === undefined}><CopyPlus size={14} aria-hidden="true" />Duplicate</button>
+          </Show>
+          <Show when={!builtin()}>
+            <button type="button" class={TOOLBAR_PRIMARY} onClick={() => { setEditing(true); setTab("details") }} disabled={busy() || row() === undefined}><Edit size={14} aria-hidden="true" />Edit</button>
+            <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => setDeleteOpen(true)} disabled={busy() || row() === undefined}><Trash2 size={14} aria-hidden="true" />Delete</button>
+          </Show>
         </Show>
       }
       overlays={
@@ -238,6 +283,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                   <Show when={props.kind === "components"}><div class="mt-3"><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div></Show>
                   <Show when={props.kind === "tools"}><div class="mt-3"><ToolPreview3D tool={current()} /></div></Show>
                   <Show when={props.kind === "materials"}><div class="mt-3"><MaterialPreview3D properties={asRecord(current()["properties"])} /></div></Show>
+                  <Show when={props.kind === "machines"}><div class="mt-3"><MachinePreview3D profile={cam.kernel.profileOfConfig(asRecord(current()["config"]), str(current()["type"]))} /></div></Show>
                   <div class="mt-3"><StatGrid items={summaryFields(props.kind, current())} /></div>
                   <Show when={props.kind === "materials"}><div class="mt-3"><MaterialBars properties={asRecord(current()["properties"])} /></div></Show>
                 </div>
@@ -247,7 +293,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                     <dt>Created</dt><dd>{formatDate(current()["createdAt"]) || "-"}</dd>
                     <dt>Last updated</dt><dd>{formatDate(current()["updatedAt"]) || "-"}</dd>
                     <dt>ID</dt><dd class="font-mono">{str(current()["id"]).substring(0, 8)}…</dd>
-                    <dt>Visibility</dt><dd class={current()["isPublic"] === true ? "text-green-700 dark:text-green-400" : ""}>{current()["isPublic"] === true ? "Public" : "Private"}</dd>
+                    <dt>Visibility</dt><dd class={current()["isPublic"] === true ? "text-green-700 dark:text-green-400" : ""}>{current()["builtin"] === true ? "Built-in preset" : current()["isPublic"] === true ? "Public" : "Private"}</dd>
                   </dl>
                 </aside>
               </div>
@@ -307,6 +353,14 @@ const fetchEffect = (app: ReturnType<typeof useApp>, kind: Kind, id: string | un
   return app.client.machineConfigs.get(key)
 }
 
+/** A built-in machine of the catalogue, as a row, or nothing when the id is not one of them. */
+const builtinMachine = async (app: ReturnType<typeof useApp>, id: string | undefined): Promise<Record<string, unknown> | undefined> => {
+  const run = app.runtime.run as <A>(effect: unknown) => Promise<A>
+  const answer = asRecord(await run<unknown>(app.client.machineConfigs.defaults({})))["data"]
+  const found = (Array.isArray(answer) ? answer : []).map(asRecord).find((row) => row["id"] === id)
+  return found === undefined ? undefined : { ...found, builtin: true }
+}
+
 const summaryFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: string; readonly value: string }> => {
   if (kind === "materials") {
     const p = asRecord(row["properties"])
@@ -318,8 +372,10 @@ const summaryFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: st
       { label: "3D model", value: cam.describeTool(cam.toolModelOf(toolResourceOf(row), cam.toolMachineOf(str(row["type"])))) }]
   }
   if (kind === "machines") {
-    const c = asRecord(row["config"])
-    return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Controller", value: str(c["controller"]) || "-" }, { label: "Status", value: str(c["status"]) || "-" }, { label: "Max spindle speed", value: str(c["maxSpindleSpeed"]) || "-" }]
+    // Read through the profile, so a configuration in any shape (the form's, the assistant's, the catalogue's) shows its figures.
+    const c = asRecord(row["config"]), profile = cam.kernel.profileOfConfig(c, str(row["type"]))
+    return [{ label: "Type", value: str(row["type"]) || "-" }, { label: "Controller", value: profile.controller ?? (str(c["controller"]) || "-") }, { label: "Status", value: str(c["status"]) || "-" },
+      { label: "Max spindle speed", value: profile.spindle === undefined ? "-" : `${profile.spindle.maxRpm} rpm` }]
   }
   const elements = resourceElements(row["data"] ?? row)
   const kinds = [...new Set(componentEntries(elements).map(({ element }) => element.type))]
@@ -344,8 +400,19 @@ const detailFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: str
 }
 
 function DetailsView(props: { readonly kind: Kind; readonly row: Row | undefined }): JSX.Element {
+  // A machine lists every figure of its profile, grouped like a data sheet; the other kinds list their own fields.
+  const sections = (): ReturnType<typeof machineSections> => props.kind === "machines" ? machineSections(cam.kernel.profileOfConfig(asRecord((props.row ?? {})["config"]), str((props.row ?? {})["type"]))) : []
   return <div class="space-y-3">
-    <StatGrid items={detailFields(props.kind, props.row ?? {})} />
+    <Show when={props.kind === "machines"} fallback={<StatGrid items={detailFields(props.kind, props.row ?? {})} />}>
+      <div class="space-y-4" data-testid="machine-sections">
+        <Show when={(props.row ?? {})["builtin"] === true}><p class="text-xs text-slate-500 dark:text-slate-400">A built-in preset: the figures the kernel plans against when no configuration is chosen. Duplicate it to adapt it.</p></Show>
+        <For each={sections()}>{(section) => <div>
+          <h4 class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{section.title}</h4>
+          <StatGrid items={section.facts} />
+        </div>}</For>
+        <Show when={sections().length === 0}><p class="text-xs italic text-slate-500 dark:text-slate-400">This configuration does not state any figures yet. Edit it to add them.</p></Show>
+      </div>
+    </Show>
     <Show when={props.kind === "materials"}><MaterialBars properties={asRecord((props.row ?? {})["properties"])} /></Show>
   </div>
 }

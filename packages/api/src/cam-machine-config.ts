@@ -10,7 +10,8 @@ const Range = Schema.Struct({ min: Schema.Number, max: Schema.Number })
 
 /** The parameters a machine configuration carries (the stored `config` JSON). */
 export const MachineConfigParams = Schema.Struct({
-  workVolume: Schema.Struct({ x: Positive, y: Positive, z: Positive }),
+  /** The space the part takes. A built-in preset states its table and spindle but not this, so a copy of it is created without one; saving an edit asks for it. */
+  workVolume: Schema.optional(Schema.Struct({ x: Positive, y: Positive, z: Positive })),
   maxSpindleSpeed: Positive,
   maxFeedRate: Positive,
   controller: Schema.optional(Schema.String),

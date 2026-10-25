@@ -67,6 +67,43 @@ describe("resource detail pages", () => {
     } finally { dispose() }
   }, PAGE_TIMEOUT)
 
+  test("a machine lists every figure of its profile in sections and draws its envelope", async () => {
+    resetStores()
+    const { dispose } = app.visit(`/machine/${machineId}`)
+    try {
+      await app.wait(() => byText("h1", "Haas VF2"), 30000)
+      expect(await find("[data-testid='machine-preview']")).toBeDefined()
+      toolbarButton("Details")?.click()
+      const sections = await find("[data-testid='machine-sections']")
+      expect(sections.textContent).toContain("Spindle")
+      expect(sections.textContent).toContain("12000 rpm")
+      expect(sections.textContent).toContain("508 × 406 × 635 mm")
+    } finally { dispose() }
+  }, PAGE_TIMEOUT)
+
+  test("a built-in machine opens read-only and can be duplicated into the person's own configurations", async () => {
+    resetStores()
+    const builtin = (await app.sidecar.call("/api/machine-configs/defaults")).body.data[0] as { id: string; name: string }
+    const { dispose } = app.visit(`/machine/${encodeURIComponent(builtin.id)}`)
+    // The router pushes an undefined state on navigation, which the test DOM's history cannot hold; the browser takes it.
+    const push = window.history.pushState.bind(window.history)
+    window.history.pushState = (state: unknown, title: string, url?: string | URL | null) => push(state ?? {}, title, url)
+    try {
+      await app.wait(() => byText("h1", builtin.name), 30000)
+      expect(toolbarButton("Edit")).toBeUndefined()
+      expect(toolbarButton("Delete")).toBeUndefined()
+      toolbarButton("Duplicate")!.click()
+      const copy = await app.wait(() => byText("h1", `${builtin.name} (copy)`), 30000)
+      expect(copy).toBeDefined()
+      expect(toolbarButton("Edit")).toBeDefined()
+      // The copy states what the preset states: its spindle ceiling and feed in the library's own keys, no invented volume.
+      const copies = (await app.sidecar.call("/api/machine-configs")).body.data.data as Array<{ name: string; config: Record<string, unknown> }>
+      const stored = copies.find((row) => row.name === `${builtin.name} (copy)`)!
+      expect(stored.config["maxSpindleSpeed"]).toBe(12000)
+      expect(stored.config["workVolume"]).toBeUndefined()
+    } finally { window.history.pushState = push; dispose() }
+  }, PAGE_TIMEOUT)
+
   test("component opens on its page", async () => {
     resetStores()
     const { dispose } = app.visit(`/components/${componentId}`)

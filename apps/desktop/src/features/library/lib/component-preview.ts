@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import type { Element } from "../../cad/store/elementsStore.ts"
+import { createThreeObject } from "../../cad/lib/createThreeObject.ts"
 
 const value = (element: Element, key: string, fallback: number): number =>
   typeof element[key] === "number" && Number.isFinite(element[key]) ? element[key] as number : fallback
@@ -7,7 +8,7 @@ const value = (element: Element, key: string, fallback: number): number =>
 const material = (element: Element, fallback: number): THREE.MeshStandardMaterial =>
   new THREE.MeshStandardMaterial({ color: element.color ?? fallback, wireframe: element.wireframe === true, roughness: 0.62, metalness: 0.08 })
 
-/** Builds saved component data with the same Three.js primitive mapping as the legacy component details preview. */
+/** Builds saved component data: the legacy details preview's primitives here, everything else through the editor's builder. */
 export const createComponentPreviewObject = (element: Element): THREE.Object3D | null => {
   const x = value(element, "x", 0), y = value(element, "y", 0), z = value(element, "z", 0)
   const children = Array.isArray(element.elements) ? element.elements as Element[] : []
@@ -62,6 +63,10 @@ export const createComponentPreviewObject = (element: Element): THREE.Object3D |
       geometry.setIndex(indices); geometry.computeVertexNormals()
       return mesh(geometry, 0x4285f4)
     }
-    default: return null
+    // Every other element (revolution, extrusion, sweep, loft, B-rep, fasteners, ...) is drawn by the editor's own builder, so a saved
+    // component looks here as it does in the editor. The origin is the component's own (never the open drawing's).
+    default: {
+      try { return createThreeObject(element, { x: 0, y: 0, z: 0 }) } catch { return null }
+    }
   }
 }

@@ -447,7 +447,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                           </thead>
                           <tbody class="divide-y divide-slate-200 bg-white dark:divide-slate-700 dark:bg-slate-900">
                             <For each={filtered()}>{(row) => (
-                              <tr class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50" onClick={() => { if (row["builtin"] !== true) navigate(detailPath(row)) }}>
+                              <tr class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50" onClick={() => navigate(detailPath(row))}>
                                 <td class="whitespace-nowrap px-4 py-3">
                                   <div class="flex items-center gap-3">
                                     <div class="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-900"><Icon size={18} class="text-slate-400 dark:text-slate-600" aria-hidden="true" /></div>
@@ -480,7 +480,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                   >
                     <div class="workspace-resource-grid">
                       <For each={filtered()}>{(row) => (
-                        <div class={`${CARD} cursor-pointer`} onClick={() => { if (row["builtin"] !== true) navigate(detailPath(row)) }} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" && row["builtin"] !== true) navigate(detailPath(row)) }}>
+                        <div class={`${CARD} cursor-pointer`} onClick={() => navigate(detailPath(row))} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") navigate(detailPath(row)) }}>
                           <CardBanner icon={<Icon size={22} />} badge={meta.badge(row)} leftBadge={row["builtin"] === true ? "Built-in" : row["isPublic"] === true ? "Public" : undefined} />
                           <div class="flex flex-1 flex-col gap-2 p-4">
                             <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{str(row["name"])}</h3>
