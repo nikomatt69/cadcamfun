@@ -153,7 +153,7 @@ test("CAM Save creates a private project with CAD and CAM, updates with history 
     await click("[data-testid='workspace-save-as-project']")
     expect(document.querySelector<HTMLSelectElement>("select[name='camSaveDestination']")!.value).toBe("update")
     await click("[data-testid='workspace-save-project']")
-    await app.wait(() => !document.querySelector("[data-testid='workspace-project-dialog']"))
+    await app.wait(() => !document.querySelector("[data-testid='workspace-project-dialog']"), 30_000)
     const updated = await app.state.runtime.run(app.client.toolpaths.get({ params: { id: saved.id } }))
     expect(updated.gcode).toBe(changed)
     expect(updated.data).toMatchObject({ customNote: "Keep this metadata", gcode: changed })

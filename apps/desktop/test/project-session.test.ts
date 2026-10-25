@@ -193,6 +193,22 @@ describe("the CAM program", () => {
     return row
   }
 
+  test("opening an OS program preserves edits to the saved resource and detaches future autosaves", async () => {
+    const row = await program("G0 X1")
+    useCamStore.getState().setGcode("G0 X1\nG1 X8 F300")
+    const { openProgramInEditor } = await import("../src/app/open-program.ts")
+    await openProgramInEditor(app.state, "G0 X99\nM30")
+    expect(useCamStore.getState().savedProgram).toBeUndefined()
+    expect(useCamStore.getState().gcode).toBe("G0 X99\nM30")
+    expect(useCamStore.getState().kernelArtifact).toBeUndefined()
+    expect(useCamStore.getState().operationResults).toEqual([])
+    useCamStore.getState().setGcode("G0 X100")
+    await new Promise((resolve) => setTimeout(resolve, 450))
+    await session.flush()
+    const stored = await run<{ gcode: string }>(app.client.toolpaths.get({ params: { id: row.id } }))
+    expect(stored.gcode).toBe("G0 X1\nG1 X8 F300")
+  })
+
   test("an unsaved program has nothing to autosave; a saved one is updated in place and keeps a version", async () => {
     useCamStore.getState().setGcode("G0 X1")
     begin()

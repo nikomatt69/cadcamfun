@@ -1,3 +1,4 @@
+import { downloadFile } from "../../../shared/lib/save-file.ts"
 /** Single-page drawing export. Browser rasterisation preserves the same Unicode symbols as the SVG preview. */
 import type { drawing } from "@cadcamfun/core"
 
@@ -53,10 +54,5 @@ export const drawingPdf = async (sheet: drawing.DrawingSheet): Promise<Uint8Arra
 }
 
 export const downloadDrawing = (body: BlobPart, mime: string, name: string): void => {
-  const url = URL.createObjectURL(new Blob([body], { type: mime }))
-  const anchor = document.createElement("a")
-  anchor.href = url; anchor.download = name
-  document.body.append(anchor); anchor.click(); anchor.remove()
-  // Webviews may start consuming a download after the event handler returns.
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  downloadFile({ name, data: body, mime })
 }

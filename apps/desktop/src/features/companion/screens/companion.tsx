@@ -4,6 +4,7 @@
  * The pairing link carries a one-time device token, so it is held in memory only while the QR code is on screen.
  * The user can either scan the QR code with the phone, or copy/paste the URL into CADCAM FUN manually.
  */
+import { copyText } from "../../../shared/lib/clipboard.ts"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Check, Copy, Smartphone } from "lucide-solid"
 import qrcode from "qrcode-generator"
@@ -45,7 +46,7 @@ export function CompanionPanel(): JSX.Element {
     const value = link()
     if (value === undefined) return
     try {
-      await navigator.clipboard.writeText(value)
+      await copyText(value)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch (cause) {

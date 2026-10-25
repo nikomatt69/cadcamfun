@@ -3,7 +3,7 @@ name = "cadcamfun-desktop"
 version = "0.1.17"
 description = "CADCAM FUN desktop shell"
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.90"
 publish = false
 
 [lib]
@@ -30,6 +30,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-prevent-default = "=6.0.1"
+tempfile = "3"
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -15,6 +15,7 @@ export const isTauri = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
 let cached: Promise<Endpoint> | undefined
+let liveBaseUrl: string | undefined
 
 export function getEndpoint(): Promise<Endpoint> {
   cached ??= (async () => {
@@ -35,10 +36,12 @@ export function getEndpoint(): Promise<Endpoint> {
 /** Re-resolve the endpoint (the shell restarts the sidecar on a new port after a crash). */
 export const resetEndpoint = (): void => {
   cached = undefined
+  liveBaseUrl = undefined
 }
 
 /** Overrides the endpoint, for tests and for the browser fallback. */
 export const setEndpoint = (endpoint: Endpoint): void => {
+  liveBaseUrl = endpoint.baseUrl
   cached = Promise.resolve(endpoint)
 }
 
@@ -67,4 +70,36 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   const body = text ? JSON.parse(text) : undefined
   if (!res.ok) throw new ApiError(res.status, body?.message ?? res.statusText)
   return body as T
+}
+
+/** Accept only a ready message with a valid loopback port; the launch token remains owned by each client. */
+export const acceptSidecarStatus = (payload: unknown): void => {
+  if (payload === null || typeof payload !== "object") return
+  const status = payload as { state?: unknown; port?: unknown }
+  if (status.state !== "ready" || typeof status.port !== "number" || !Number.isInteger(status.port) || status.port < 1 || status.port > 65535) return
+  liveBaseUrl = `http://127.0.0.1:${status.port}`
+  // The next direct apiFetch resolves the current shell endpoint too.
+  cached = undefined
+}
+
+/** Register before boot resolves the endpoint, so a ready event cannot fall between boot and listener setup. */
+export const trackSidecarStatus = async (): Promise<() => void> => {
+  if (!isTauri()) return () => {}
+  const { listen } = await import("@tauri-apps/api/event")
+  return listen("sidecar-status", (event) => acceptSidecarStatus(event.payload))
+}
+
+/** Rewrite only this client's sidecar origin. Request bodies, authorization and abort signals survive the move. No writes are retried. */
+export const followingFetch = (endpoint: Endpoint, base: typeof fetch = globalThis.fetch): typeof fetch => {
+  const origin = new URL(endpoint.baseUrl).origin
+  const transport = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const url = new URL(input instanceof Request ? input.url : String(input))
+    if (liveBaseUrl !== undefined && url.origin === origin) {
+      const target = new URL(liveBaseUrl)
+      url.host = target.host
+      input = input instanceof Request ? new Request(url, input) : url
+    }
+    return base(input, init)
+  }
+  return Object.assign(transport, { preconnect: base.preconnect })
 }

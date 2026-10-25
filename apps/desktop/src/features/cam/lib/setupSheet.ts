@@ -1,3 +1,4 @@
+import { downloadFile } from "../../../shared/lib/save-file.ts"
 import { cam } from "@cadcamfun/core"
 import type { CamKernelArtifact } from "@cadcamfun/api"
 import { currentTitleBlock } from "../../cad/lib/document-setup.ts"
@@ -12,12 +13,5 @@ export const setupSheetFile = (artifact: CamKernelArtifact, title: string): { re
 
 /** Hands a text file to the browser (or the Tauri webview) as a download. */
 export const downloadText = (file: string, text: string, type: string): void => {
-  const url = URL.createObjectURL(new Blob([text], { type }))
-  const a = document.createElement("a")
-  a.href = url
-  a.download = file
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  downloadFile({ name: file, data: text, mime: type })
 }

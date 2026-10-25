@@ -56,7 +56,15 @@ export default function SaveCamModal(props: { readonly code: string; readonly ex
     setBusy(true); setError(undefined)
     try {
       const snapshot = await snapshotCamProgram(app, props.code)
-      if (!disposed) { downloadCamFile(JSON.stringify(Schema.encodeSync(SavedCamProgram)(snapshot), null, 2), `${filename()}.cam.json`, "application/json"); props.onClose() }
+      if (!disposed && await downloadCamFile(JSON.stringify(Schema.encodeSync(SavedCamProgram)(snapshot), null, 2), `${filename()}.cam.json`, "application/json") && !disposed) props.onClose()
+    } catch (cause) { if (!disposed) setError(cause instanceof Error ? cause.message : String(cause)) }
+    finally { if (!disposed) setBusy(false) }
+  }
+
+  const exportCode = async (): Promise<void> => {
+    setBusy(true); setError(undefined)
+    try {
+      if (await downloadCamFile(props.code, `${filename()}${props.extension}`, "text/plain") && !disposed) props.onClose()
     } catch (cause) { if (!disposed) setError(cause instanceof Error ? cause.message : String(cause)) }
     finally { if (!disposed) setBusy(false) }
   }
@@ -142,7 +150,7 @@ export default function SaveCamModal(props: { readonly code: string; readonly ex
     <WorkspaceExportDialog open={!showProject()} title={t("cam.save.exportTitle")} name={name()} onName={setName} format={format()} onFormat={setFormat}
       formats={[{ id: "gcode", label: `G-code (${props.extension})` }, { id: "toolpath", label: t("cam.save.formatToolpath") }]}
       projectBody={t("cam.save.projectBody")} onProject={() => setShowProject(true)} onClose={close} busy={busy()} error={error()}
-      onExport={() => { if (format() === "toolpath") void exportToolpath(); else { downloadCamFile(props.code, `${filename()}${props.extension}`, "text/plain"); props.onClose() } }} />
+      onExport={() => { if (format() === "toolpath") void exportToolpath(); else void exportCode() }} />
     <WorkspaceProjectDialog open={showProject()} name={projectTitle()} onName={setProjectName} nameReadOnly={mode() !== "new" || !!createdTarget}
       description={description()} onDescription={setDescription} organizationId={organizationId()} onOrganization={setOrganizationId} isPublic={isPublic()} onPublic={setIsPublic}
       organizations={organizations()} summary={summary()} busy={busy()} error={error()} onSubmit={() => void save()}

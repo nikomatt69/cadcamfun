@@ -1,3 +1,6 @@
+import { t } from "../../../i18n/index.ts"
+import { copyText } from "../../../shared/lib/clipboard.ts"
+import { downloadFile } from "../../../shared/lib/save-file.ts"
 /**
  * Toolpath detail (legacy `pages/toolpaths/[id].tsx`) in the CAM workspace style.
  *
@@ -234,20 +237,14 @@ export function ToolpathDetailScreen(): JSX.Element {
   const downloadGcode = (): void => {
     const current = row()
     if (!current || !current.gcode) { toast.error("No G-code available for download"); return }
-    const blob = new Blob([current.gcode], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement("a")
-    anchor.href = url
-    anchor.download = `${current.name.replace(/[^a-z0-9]/gi, "_")}.gcode`
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
-    URL.revokeObjectURL(url)
+    downloadFile({ name: `${current.name.replace(/[^a-z0-9]/gi, "_")}.gcode`, data: current.gcode, mime: "text/plain" })
   }
 
   const share = (): void => {
-    void navigator.clipboard?.writeText(window.location.href)
-    toast.success("Link copied to clipboard")
+    void copyText(window.location.href).then(
+      () => toast.success(t("shell.clipboard.copied")),
+      () => toast.error(t("shell.clipboard.failed"))
+    )
   }
 
   const typeLabel = (value: string | null | undefined): string => TYPE_LABEL[value ?? "mill"] ?? value ?? "Unknown"

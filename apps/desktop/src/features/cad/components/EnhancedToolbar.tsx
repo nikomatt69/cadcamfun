@@ -1,3 +1,4 @@
+import { copyText } from "../../../shared/lib/clipboard.ts"
 import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
 import { A } from "@solidjs/router"
@@ -246,7 +247,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
                         </div>
                         <button
                           class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Copy ID"
-                          onClick={() => { void navigator.clipboard?.writeText(element.id); toast.success("Element ID copied to clipboard") }}
+                          onClick={() => { void copyText(element.id).then(() => toast.success(t("shell.clipboard.copied")), () => toast.error(t("shell.clipboard.failed"))) }}
                         >
                           <Copy size={12} />
                         </button>

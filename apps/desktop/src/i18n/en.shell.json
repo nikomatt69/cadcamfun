@@ -517,5 +517,17 @@
   "update.close": "Close",
   "update.releaseNotes": "Release notes",
   "update.unsavedWork": "The update waits: some work could not be saved yet.",
-  "update.failed": "The update could not be installed."
+  "update.failed": "The update could not be installed.",
+  "shell.open.failed": "Could not open {name}: {reason}",
+  "shell.open.unsupported": "unsupported file type.",
+  "shell.open.unreadable": "the file could not be read as UTF-8 text.",
+  "shell.open.invalid-json": "the drawing is not valid JSON.",
+  "shell.open.no-elements": "the drawing contains no elements.",
+  "shell.open.invalid-elements": "the drawing contains invalid elements.",
+  "shell.open.empty": "the program is empty.",
+  "shell.open.apply-failed": "the file could not be added to the editor.",
+  "shell.open.listenFailed": "Files opened by the system could not be received. Restart the app to try again.",
+  "shell.clipboard.copied": "Copied to clipboard",
+  "shell.clipboard.failed": "Could not copy to the clipboard.",
+  "shell.export.failed": "Could not save {name}: {reason}"
 }

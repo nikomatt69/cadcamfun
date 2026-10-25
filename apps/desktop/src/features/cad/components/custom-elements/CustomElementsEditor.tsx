@@ -1,3 +1,4 @@
+import { downloadFile } from "../../../../shared/lib/save-file.ts"
 /**
  * The custom element editor (legacy `customElements/CustomElementsEditor.tsx`).
  *
@@ -118,15 +119,7 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
   const handleExport = (): void => {
     const active = definition()
     if (!active) return
-    const blob = new Blob([JSON.stringify(active, null, 2)], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `${active.name.replace(/\s+/g, "_")}.json`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    downloadFile({ name: `${active.name.replace(/\s+/g, "_")}.json`, data: JSON.stringify(active, null, 2), mime: "application/json" })
   }
 
   const handleImportFile = (file: File): void => {

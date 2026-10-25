@@ -7,6 +7,7 @@
  * Each page reads the typed client; the API contract types the shape of materials, tools and components, while
  * machine configurations are free-form (`config` JSON), so their fields are read defensively.
  */
+import { copyText } from "../../../shared/lib/clipboard.ts"
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { Copy, CopyPlus, Cpu, Layers, Package, Save, Trash2, Wrench, Box, Edit } from "lucide-solid"
@@ -333,7 +334,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
             <Show when={tab() === "raw"}>
               <div class={`${PANEL} !p-3`}>
                 <div class="mb-2 flex justify-end">
-                  <button type="button" class={TOOLBAR_BUTTON} onClick={() => { void navigator.clipboard?.writeText(JSON.stringify(current(), null, 2)); toast.success("Copied to clipboard") }}><Copy size={14} aria-hidden="true" />Copy JSON</button>
+                  <button type="button" class={TOOLBAR_BUTTON} onClick={() => { void copyText(JSON.stringify(current(), null, 2)).then(() => toast.success(t("shell.clipboard.copied")), () => toast.error(t("shell.clipboard.failed"))) }}><Copy size={14} aria-hidden="true" />Copy JSON</button>
                 </div>
                 <pre class="max-h-[60vh] overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{JSON.stringify(current(), null, 2)}</pre>
               </div>

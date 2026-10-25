@@ -1,3 +1,4 @@
+import { downloadFile } from "../../../shared/lib/save-file.ts"
 import { PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
@@ -371,14 +372,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
                     onClick={() => {
                       const sheet = feature as Feature & { type: "sheet" }
                       const dxf = flatPatternDxf(developed(), numeric(sheet.width), feature.id)
-                      const url = URL.createObjectURL(new Blob([dxf], { type: "application/dxf" }))
-                      const a = document.createElement("a")
-                      a.href = url
-                      a.download = `${feature.id}-flat-pattern.dxf`
-                      document.body.appendChild(a)
-                      a.click()
-                      document.body.removeChild(a)
-                      URL.revokeObjectURL(url)
+                      downloadFile({ name: `${feature.id}-flat-pattern.dxf`, data: dxf, mime: "application/dxf" })
                     }}>Flat pattern DXF</button>
                 </div>}
               </Show>

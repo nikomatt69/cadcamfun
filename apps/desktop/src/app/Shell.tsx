@@ -29,6 +29,12 @@ import { listenToMenu, openLogsFolder, projectOfRecentId } from "./menu-events.t
 import { activeActivity, routeOf, type ActivityId } from "./layout.ts"
 import { findShortcut, shortcuts } from "./shortcuts.ts"
 
+import { listenForOpenedFiles, openDelivered, readDelivered } from "./open-file.ts"
+import { useElementsStore } from "../features/cad/store/elementsStore.ts"
+import { openProgramInEditor } from "./open-program.ts"
+import { useLayerStore } from "../features/cad/store/layerStore.ts"
+import { toast } from "../shared/ui/toast.tsx"
+
 export interface ShellProps {
   /** The routed screen. */
   readonly children: JSX.Element
@@ -170,6 +176,29 @@ export function Shell(props: ShellProps): JSX.Element {
     let off: (() => void) | undefined
     let gone = false
     void listenToMenu(onMenu).then((stop) => { if (gone) stop(); else off = stop }).catch(() => undefined)
+    onCleanup(() => { gone = true; off?.() })
+  })
+
+  onMount(() => {
+    let gone = false
+    let off: (() => void) | undefined
+    void listenForOpenedFiles(async (paths) => {
+      for (const path of paths) {
+        if (gone) break
+        const outcome = await openDelivered(path, {
+          read: readDelivered,
+          addElements: (elements, selected) => {
+            if (gone) return
+            const store = useElementsStore.getState()
+            store.addElements(elements.map((element) => ({ ...element, layerId: useLayerStore.getState().activeLayer })))
+            if (selected) store.selectElement(selected)
+          },
+          setProgram: (text) => openProgramInEditor(app, text, () => !gone),
+          go: (route) => { if (!gone) go(route) }
+        })
+        if (!gone && outcome.kind === "failed") toast.error(t("shell.open.failed", { name: outcome.name, reason: t(`shell.open.${outcome.reason}`) }))
+      }
+    }).then((stop) => { if (gone) stop(); else off = stop }).catch(() => { if (!gone) toast.error(t("shell.open.listenFailed")) })
     onCleanup(() => { gone = true; off?.() })
   })
 

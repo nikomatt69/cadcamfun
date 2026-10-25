@@ -1,3 +1,4 @@
+import { downloadFile } from "../../../../shared/lib/save-file.ts"
 import { PanelCard } from "../../../../shared/components/panel/ui.tsx"
 /**
  * Component automations of the assembly workspace, on the exact model: insert the fasteners the parts' shared holes need, join
@@ -55,14 +56,7 @@ export default function AssemblyAutomation(): JSX.Element {
   const exportCsv = () => {
     const rows = bom()?.rows
     if (rows === undefined) return
-    const url = URL.createObjectURL(new Blob([bomCsv(rows)], { type: "text/csv" }))
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "bill-of-materials.csv"
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    downloadFile({ name: "bill-of-materials.csv", data: bomCsv(rows), mime: "text/csv" })
   }
   const name = (id: string) => clashes()?.names.get(id) ?? id
 

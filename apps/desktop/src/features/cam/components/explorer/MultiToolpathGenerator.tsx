@@ -1,3 +1,4 @@
+import { saveFile } from "../../../../shared/lib/save-file.ts"
 /**
  * Multi-toolpath generator (legacy `MultiToolpathGenerator.tsx`): one toolpath per CAD element, an execution order,
  * and one combined program.
@@ -115,15 +116,9 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
   }
 
   const downloadCombinedGCode = (): void => {
-    const url = URL.createObjectURL(new Blob([store.generateCombinedGCode()], { type: "text/plain" }))
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `multi-toolpath-${new Date().toISOString().slice(0, 10)}.nc`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    toast.success(t("cam.multi.downloaded"))
+    void saveFile({ name: `multi-toolpath-${new Date().toISOString().slice(0, 10)}.nc`, data: store.generateCombinedGCode(), mime: "text/plain" })
+      .then((saved) => { if (saved) toast.success(t("cam.multi.downloaded")) })
+      .catch(() => toast.error(t("shell.export.failed", { name: "G-code", reason: t("common.error") })))
   }
 
   // The combined program replaces the viewport's: G-code text for the editor, the parsed IR for the simulation.

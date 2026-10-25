@@ -312,21 +312,11 @@ fn write_atomic(target: &Path, bytes: &[u8]) -> std::io::Result<()> {
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    let name = target
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let temp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
-    let result = (|| {
-        let mut file = std::fs::File::create(&temp)?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        std::fs::rename(&temp, target)
-    })();
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temp);
-    }
-    result
+    let mut file = tempfile::NamedTempFile::new_in(dir)?;
+    file.write_all(bytes)?;
+    file.as_file().sync_all()?;
+    file.persist(target).map_err(|error| error.error)?;
+    Ok(())
 }
 
 /// Asks where to save and writes the request body (raw bytes: G-code, STEP, a PDF), returning the chosen path, or `None` when
@@ -621,6 +611,27 @@ mod tests {
         let missing = scratch.0.join("nope").join("out.nc");
         assert!(write_atomic(&missing, b"x").is_err());
         assert_eq!(fs::read(&target).expect("read"), b"kept");
+        assert_eq!(fs::read_dir(&scratch.0).expect("dir").count(), 1);
+    }
+
+    #[test]
+    fn simultaneous_atomic_writes_never_mix_contents() {
+        let scratch = Scratch::new("atomic-concurrent");
+        let target = scratch.0.join("out.nc");
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(4));
+        std::thread::scope(|scope| {
+            for value in 0..4u8 {
+                let barrier = barrier.clone();
+                let target = &target;
+                scope.spawn(move || {
+                    barrier.wait();
+                    write_atomic(target, &vec![value; 128 * 1024]).expect("atomic write");
+                });
+            }
+        });
+        let bytes = fs::read(&target).expect("read");
+        assert_eq!(bytes.len(), 128 * 1024);
+        assert!(bytes.iter().all(|value| *value == bytes[0]));
         assert_eq!(fs::read_dir(&scratch.0).expect("dir").count(), 1);
     }
 

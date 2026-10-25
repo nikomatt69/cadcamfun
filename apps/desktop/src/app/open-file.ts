@@ -25,18 +25,18 @@ export interface OpenedDeps {
   /** Adds drawing elements to the open drawing (the same call the import dialog makes). */
   readonly addElements: (elements: ReadonlyArray<Record<string, unknown>>, selectedId?: string) => void
   /** Puts G-code into the CAM editor. */
-  readonly setProgram: (gcode: string) => void
+  readonly setProgram: (gcode: string) => void | Promise<void>
   readonly go: (route: string) => void
 }
 
-export type OpenedFailure = "unsupported" | "unreadable" | "invalid-json" | "no-elements" | "empty"
+export type OpenedFailure = "unsupported" | "unreadable" | "invalid-json" | "no-elements" | "empty" | "invalid-elements" | "apply-failed"
 
 export type OpenedOutcome =
   | { readonly kind: "drawing"; readonly name: string; readonly count: number }
   | { readonly kind: "program"; readonly name: string; readonly lines: number }
   | { readonly kind: "failed"; readonly name: string; readonly reason: OpenedFailure; readonly detail?: string }
 
-const decode = (bytes: Uint8Array): string => new TextDecoder("utf-8").decode(bytes)
+const decode = (bytes: Uint8Array): string => new TextDecoder("utf-8", { fatal: true }).decode(bytes)
 
 /**
  * Opens one delivered file. A drawing is **added** to the open one (like the import dialog; nothing is replaced, so unsaved work
@@ -54,8 +54,8 @@ export const openDelivered = async (path: string, deps: OpenedDeps): Promise<Ope
   }
   if (kind === "program") {
     if (text.trim() === "") return { kind: "failed", name, reason: "empty" }
-    deps.setProgram(text)
-    deps.go("/cam")
+    try { await deps.setProgram(text); deps.go("/cam") }
+    catch (cause) { return { kind: "failed", name, reason: "apply-failed", detail: String(cause) } }
     return { kind: "program", name, lines: text.split("\n").length }
   }
   let json: unknown
@@ -66,10 +66,14 @@ export const openDelivered = async (path: string, deps: OpenedDeps): Promise<Ope
   }
   const envelope = json !== null && typeof json === "object" ? json as { elements?: unknown; selectedElementId?: unknown } : {}
   if (!Array.isArray(envelope.elements) || envelope.elements.length === 0) return { kind: "failed", name, reason: "no-elements" }
-  const elements = envelope.elements.filter((e): e is Record<string, unknown> => e !== null && typeof e === "object")
-  if (elements.length === 0) return { kind: "failed", name, reason: "no-elements" }
-  deps.go("/cad")
-  deps.addElements(elements, typeof envelope.selectedElementId === "string" ? envelope.selectedElementId : undefined)
+  const isElement = (e: unknown): e is Record<string, unknown> => e !== null && typeof e === "object" && !Array.isArray(e) &&
+    "type" in e && typeof e.type === "string" && e.type.length > 0
+  if (!envelope.elements.every(isElement)) return { kind: "failed", name, reason: "invalid-elements" }
+  const elements = envelope.elements
+  try {
+    deps.addElements(elements, typeof envelope.selectedElementId === "string" ? envelope.selectedElementId : undefined)
+    deps.go("/cad")
+  } catch (cause) { return { kind: "failed", name, reason: "apply-failed", detail: String(cause) } }
   return { kind: "drawing", name, count: elements.length }
 }
 
@@ -82,18 +86,24 @@ export interface OpenFileListener {
  * Calls `onPaths` with every path the OS delivers, including those delivered before this call. The listener is registered before
  * the first drain so nothing falls between the two; returns the unsubscribe function. Outside the desktop shell there is nothing to hear.
  */
-export const listenForOpenedFiles = async (onPaths: (paths: ReadonlyArray<string>) => void, options: OpenFileListener = {}): Promise<() => void> => {
+export const listenForOpenedFiles = async (onPaths: (paths: ReadonlyArray<string>) => void | Promise<void>, options: OpenFileListener = {}): Promise<() => void> => {
   if (options.invoke === undefined && options.listen === undefined && !inDesktopShell()) return () => {}
   const call = options.invoke ?? (await import("@tauri-apps/api/core")).invoke as Invoke
   const listen = options.listen ?? (async (event: string, handler: () => void) => (await import("@tauri-apps/api/event")).listen(event, handler))
-  const drain = async (): Promise<void> => {
-    const taken = await call("take_opened_files")
-    const paths = Array.isArray(taken) ? taken.filter((p): p is string => typeof p === "string") : []
-    if (paths.length > 0) onPaths(paths)
+  let disposed = false
+  let queue = Promise.resolve()
+  const drain = (): Promise<void> => {
+    queue = queue.then(async () => {
+      if (disposed) return
+      const taken = await call("take_opened_files")
+      const paths = Array.isArray(taken) ? taken.filter((p): p is string => typeof p === "string") : []
+      if (!disposed && paths.length > 0) await onPaths(paths)
+    })
+    return queue
   }
-  const off = await listen("open-file", () => { void drain().catch(() => undefined) })
-  await drain().catch(() => undefined)
-  return off
+  const off = await listen("open-file", () => { void drain().catch(() => { queue = Promise.resolve() }) })
+  try { await drain() } catch (cause) { disposed = true; off(); throw cause }
+  return () => { disposed = true; off() }
 }
 
 /** The raw bytes of a delivered file, through the shell (`read_opened_file` serves only paths the OS delivered). */

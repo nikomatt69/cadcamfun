@@ -1,5 +1,12 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Native desktop boundary (2026-10-25)
+
+[Spec 56](56-native-shell-integration.md) authorizes frontend OS-file routing, sidecar transport port following, shared native
+export/clipboard helpers and their feature callers. Browser mode keeps download/clipboard fallbacks. External NC is detached from
+the previous stored resource after saving current work, so subsequent autosave cannot overwrite it. OS drawings are added to the
+active layer. Native permission/manifest configuration and Rust tests live in the linked shell spec.
+
 ## Workspace page panels and headers (2026-10-24)
 
 Status: implemented; desktop typecheck and all 32 targeted UI regressions pass.

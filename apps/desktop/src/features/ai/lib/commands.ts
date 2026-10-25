@@ -16,6 +16,7 @@
  * it is given, so the registry, the parser and the matcher are unit-testable
  * without mounting a component.
  */
+import { copyText } from "../../../shared/lib/clipboard.ts"
 import type { AiStoreAndContext } from "../store/context.tsx"
 import type { Key } from "../../../i18n/index.ts"
 
@@ -159,7 +160,7 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
       const markdown = transcriptMarkdown(host.ai)
       if (markdown === "") return reject("ai.cmd.export.empty")
       try {
-        await navigator.clipboard.writeText(markdown)
+        await copyText(markdown)
         host.notify(markdown.length.toLocaleString())
       } catch {
         return reject("ai.cmd.export.failed")

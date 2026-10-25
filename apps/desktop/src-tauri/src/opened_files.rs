@@ -3,6 +3,7 @@
 //! a file are served only for a path that was delivered: the webview has no general permission to read the user's folders.
 
 use std::collections::VecDeque;
+use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -102,15 +103,25 @@ impl OpenedFiles {
         if !is_openable(&canonical) {
             return Err(OpenedFileError::UnsupportedType);
         }
-        let metadata =
-            std::fs::metadata(&canonical).map_err(|e| OpenedFileError::Io(e.to_string()))?;
+        let file =
+            std::fs::File::open(&canonical).map_err(|e| OpenedFileError::Io(e.to_string()))?;
+        let metadata = file
+            .metadata()
+            .map_err(|e| OpenedFileError::Io(e.to_string()))?;
         if !metadata.is_file() {
             return Err(OpenedFileError::NotAFile);
         }
         if metadata.len() > MAX_OPENED_BYTES {
             return Err(OpenedFileError::TooLarge);
         }
-        std::fs::read(&canonical).map_err(|e| OpenedFileError::Io(e.to_string()))
+        let mut bytes = Vec::new();
+        file.take(MAX_OPENED_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|e| OpenedFileError::Io(e.to_string()))?;
+        if bytes.len() as u64 > MAX_OPENED_BYTES {
+            return Err(OpenedFileError::TooLarge);
+        }
+        Ok(bytes)
     }
 }
 

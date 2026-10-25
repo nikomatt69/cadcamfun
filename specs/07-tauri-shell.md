@@ -1,5 +1,15 @@
 # WP5 — Tauri shell (`apps/desktop/src-tauri`)
 
+## Native shell integration (2026-10-25)
+
+[Spec 56](56-native-shell-integration.md) owns the native file/quit/client integration and supersedes the older M1 file-command and
+capability descriptions below. `save_file` accepts bounded raw bytes plus a percent-encoded `x-file-name` header, shows Save As,
+and atomically replaces the chosen file. `take_opened_files` drains the OS-delivered queue; `read_opened_file` serves only delivered
+registered paths, with a 64 MiB read limit. Quit from menu/tray raises the existing window save guard before sidecar shutdown.
+No broad webview `fs`/`dialog` grants are required. Native clipboard uses only `clipboard-manager:allow-write-text`; Rust MSRV is 1.90.
+Production CSP adds object/base/form/frame restrictions while retaining local script and WASM execution. Larger native compute,
+process supervision, notarization and platform-specific smoke checks retain the explicit limits recorded in spec 56.
+
 ## IPC alignment (2026-10-09)
 
 WP5 hardening follows `23-ai-runtime-architecture.md`: bound forced-kill reaping, report unreaped children and suppress restart in that state; move synchronous keychain/path work off async/UI threads; remove blocking waits from the final native exit callback. Keep the 60-second readiness consistent with current code. WP10 updater changes are specified in `10-release-sync.md` before implementation.

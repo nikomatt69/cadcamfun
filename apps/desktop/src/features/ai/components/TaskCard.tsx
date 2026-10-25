@@ -4,6 +4,7 @@
  * turn has ended: queued, working with a running clock, then its report or its error. Nothing here is invented; a task the
  * host no longer lists falls back to what the tool call itself returned.
  */
+import { copyText } from "../../../shared/lib/clipboard.ts"
 import { createEffect, createMemo, createSignal, onCleanup, Show, type JSX } from "solid-js"
 import Check from "lucide-solid/icons/check"
 import Clock from "lucide-solid/icons/clock"
@@ -52,7 +53,7 @@ export function TaskCard(props: TaskCardProps): JSX.Element {
   const [copied, setCopied] = createSignal(false)
   const copy = async (text: string): Promise<void> => {
     try {
-      await navigator.clipboard.writeText(text)
+      await copyText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {

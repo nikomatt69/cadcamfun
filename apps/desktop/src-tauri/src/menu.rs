@@ -184,8 +184,7 @@ pub fn request_quit<R: Runtime>(app: &AppHandle<R>) {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
                 if let Err(err) = window.close() {
-                    log::warn!("quit: the window did not close ({err}); exiting");
-                    app.exit(0);
+                    log::warn!("quit: the window did not close ({err}); keeping unsaved work open");
                 }
             }
         }

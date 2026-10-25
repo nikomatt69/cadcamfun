@@ -1,3 +1,4 @@
+import { downloadFile } from "../../../shared/lib/save-file.ts"
 /**
  * Advanced panel for G-code post-processing (legacy `AdvancedPostProcessorPanel.tsx`).
  *
@@ -95,17 +96,9 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
 
   const saveGcode = (): void => {
     if (!outputGcode()) return
-    const blob = new Blob([outputGcode()], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
     const date = new Date().toISOString().slice(0, 10)
     const extension = selectedController() === "heidenhain" ? ".h" : ".nc"
-    a.download = `optimized_${selectedController()}_${date}${extension}`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    downloadFile({ name: `optimized_${selectedController()}_${date}${extension}`, data: outputGcode(), mime: "text/plain" })
   }
 
   const summary = createMemo(() => gcodeSummary(inputGcode()))

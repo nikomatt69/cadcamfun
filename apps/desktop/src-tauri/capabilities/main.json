@@ -1,5 +1,5 @@
 {
-  "$schema": "../gen/schema/desktop-schema.json",
+  "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
   "description": "Permissions for the main window. Nothing here is granted to remote content.",
   "windows": [
@@ -11,8 +11,11 @@
     "log:default",
     "window-state:default",
     "os:default",
-    "notification:default",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify",
     "shell:allow-open",
+    "clipboard-manager:allow-write-text",
     "allow-get-sidecar-endpoint",
     "allow-prepare-viewport-edges",
     "allow-get-logs-dir",

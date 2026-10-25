@@ -77,6 +77,14 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// A browser refresh bypasses the editor's native close/save guard. Keep every other keyboard and pointer action available.
+#[cfg(any(not(debug_assertions), test))]
+fn production_reload_guard<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri_plugin_prevent_default::Builder::new()
+        .with_flags(tauri_plugin_prevent_default::Flags::RELOAD)
+        .build()
+}
+
 pub fn run() {
     let mut builder = tauri::Builder::default();
 
@@ -88,6 +96,11 @@ pub fn run() {
             forward_open_files(app, openable_paths(args));
         }));
         builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        builder = builder.plugin(production_reload_guard());
     }
 
     // Liquid Glass window material (macOS 26+, vibrancy before it); the webview asks for it once the UI has loaded.
@@ -104,6 +117,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         // Native OS notifications: the webview decides when (synced Notification rows of
@@ -171,4 +185,34 @@ pub fn run() {
         }
         _ => {}
     });
+}
+
+#[cfg(test)]
+mod reload_guard_tests {
+    use super::production_reload_guard;
+    use tauri::plugin::Plugin;
+    use tauri::test::MockRuntime;
+
+    #[test]
+    fn reload_protection_preserves_accessibility_editing_and_native_actions() {
+        let script = production_reload_guard::<MockRuntime>()
+            .initialization_script()
+            .expect("reload guard installs a webview script");
+        assert!(script.contains("onKey('F5',"));
+        assert!(script.contains("onKey('r',{ctrlKey:true"));
+        // These are registrations in the generated script, rather than the Rust flag values: an upstream change cannot
+        // silently turn off backwards focus traversal, find/print/open, or CAD/assistant shortcuts.
+        for registration in [
+            "onKey('Tab',",
+            "onPointer('contextmenu'",
+            "onKey('f',",
+            "onKey('p',",
+            "onKey('o',",
+            "onKey('j',",
+            "onKey('u',",
+            "onKey('i',",
+        ] {
+            assert!(!script.contains(registration), "blocked {registration}");
+        }
+    }
 }

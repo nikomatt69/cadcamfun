@@ -1,3 +1,5 @@
+import { toast } from "../../../shared/ui/toast.tsx"
+import { saveFile } from "../../../shared/lib/save-file.ts"
 import { Show, createEffect, createSignal, onCleanup, type JSX } from "solid-js"
 import { Upload } from "lucide-solid"
 import { useApp } from "../../../shared/state/context.ts"
@@ -36,18 +38,12 @@ export default function ImportExportDialog(props: Props): JSX.Element {
     )
   })
 
-  const download = (body: string, type: string, name: string) => {
-    const url = URL.createObjectURL(new Blob([body], { type }))
-    const anchor = document.createElement("a")
-    anchor.href = url
-    anchor.download = name
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
-    URL.revokeObjectURL(url)
+  const download = async (body: string, type: string, name: string): Promise<boolean> => {
+    try { return await saveFile({ name, data: body, mime: type }) }
+    catch (cause) { toast.error(t("shell.export.failed", { name, reason: cause instanceof Error ? cause.message : String(cause) })); return false }
   }
 
-  const exportFile = () => {
+  const exportFile = async () => {
     const format = fileFormat()
     if (format === "stl" && props.canvas) props.canvas.exportSTL()
     else if (format === "obj" && props.canvas) props.canvas.exportOBJ()
@@ -58,7 +54,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
         alert(`Nothing to write as STEP: no solid in the drawing.${result.skipped.length > 0 ? `\n\n${result.skipped.map((s) => `${s.name}: ${s.reason}`).join("\n")}` : ""}`)
         return
       }
-      download(result.step, "application/step", `${fileName()}.step`)
+      if (!await download(result.step, "application/step", `${fileName()}.step`)) return
       const faceted = result.parts.filter((p) => !p.exact)
       if (faceted.length > 0 || result.skipped.length > 0) {
         alert([
@@ -69,7 +65,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
       }
     } else {
       const data = { elements: elements.elements, selectedElementId: elements.selectedElement?.id, metadata: { created: new Date().toISOString(), version: "1.0", application: "CAD/CAM FUN" } }
-      download(JSON.stringify(data, null, 2), "application/json", `${fileName()}.${format}`)
+      if (!await download(JSON.stringify(data, null, 2), "application/json", `${fileName()}.${format}`)) return
     }
     props.onClose()
   }

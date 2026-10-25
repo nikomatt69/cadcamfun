@@ -12,6 +12,7 @@
  * events this component renders. `cadcamfun/AiCatalog` (Effect v4 service)
  * owns the typed client calls for status, models, and credentials.
  */
+import { copyText } from "../../../shared/lib/clipboard.ts"
 import { For, Index, Show, batch, createEffect, createMemo, createResource, createSignal, createUniqueId, onCleanup, onMount, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import BookOpen from "lucide-solid/icons/book-open"
@@ -252,7 +253,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
 
   const handleCopy = async (text: string, id: string): Promise<void> => {
     try {
-      await navigator.clipboard.writeText(text)
+      await copyText(text)
       setCopiedId(id)
       setTimeout(() => setCopiedId((current) => (current === id ? undefined : current)), 1500)
     } catch {

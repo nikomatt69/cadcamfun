@@ -1,3 +1,4 @@
+import { downloadFile } from "../../../shared/lib/save-file.ts"
 import { PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { For, Show, createEffect, createSignal, on, type JSX } from "solid-js"
@@ -68,14 +69,7 @@ export default function ExactModelPanel(props: Props): JSX.Element {
   const exportStep = () => {
     const out = elementStep(props.element, props.all)
     if (!("step" in out)) { alert(`No exact model: ${out.reason}`); return }
-    const url = URL.createObjectURL(new Blob([out.step], { type: "application/step" }))
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${String(props.element["name"] ?? props.element["type"] ?? "part")}.step`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    downloadFile({ name: `${String(props.element["name"] ?? props.element["type"] ?? "part")}.step`, data: out.step, mime: "application/step" })
   }
   return (
     <PanelCard title={t("cad.exactModel")} testId="exact-model-panel" actions={<>

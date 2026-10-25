@@ -1,3 +1,4 @@
+import { downloadFile } from "../../../shared/lib/save-file.ts"
 import * as THREE from "three"
 import { CSG } from "three-csg-ts"
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js"
@@ -269,11 +270,7 @@ export function booleanElement(operation: BooleanOperation, objects: readonly TH
 }
 
 const download = (blob: Blob, filename: string) => {
-  const link = document.createElement("a")
-  link.href = URL.createObjectURL(blob)
-  link.download = filename
-  link.click()
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000)
+  downloadFile({ name: filename, data: blob })
 }
 
 /** The scene without helpers, gizmos or control points. */

@@ -1,3 +1,4 @@
+import { toast } from "../../../../shared/ui/toast.tsx"
 /**
  * The code panel of the custom element editor (legacy `customElements/JsonEditor.tsx`).
  *
@@ -5,6 +6,7 @@
  * the legacy snippet buttons that paste a template at the caret and a help panel describing the
  * scope a script runs in.
  */
+import { copyText } from "../../../../shared/lib/clipboard.ts"
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { Copy, HelpCircle, RotateCcw } from "lucide-solid"
 import { t, type Key } from "../../../../i18n/index.ts"
@@ -216,7 +218,7 @@ export default function JsonEditor(props: JsonEditorProps): JSX.Element {
       <div class="p-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <button type="button" onClick={() => void navigator.clipboard?.writeText(currentCode())} class="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" title={t("cad.customElements.copy")}>
+            <button type="button" onClick={() => void copyText(currentCode()).catch(() => toast.error(t("shell.clipboard.failed")))} class="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" title={t("cad.customElements.copy")}>
               <Copy class="w-4 h-4" />
             </button>
             <button type="button" onClick={resetToDefault} class="p-1 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200" title={t("cad.customElements.reset")}>

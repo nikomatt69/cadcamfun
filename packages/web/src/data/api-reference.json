@@ -26,6 +26,34 @@
                     },
                     "timestamp": {
                       "type": "string"
+                    },
+                    "jobs": {
+                      "type": "object",
+                      "properties": {
+                        "workers": {
+                          "type": "integer"
+                        },
+                        "running": {
+                          "type": "integer"
+                        },
+                        "waiting": {
+                          "type": "integer"
+                        },
+                        "cached": {
+                          "type": "integer"
+                        },
+                        "closing": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "workers",
+                        "running",
+                        "waiting",
+                        "cached",
+                        "closing"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -65,6 +93,34 @@
                     },
                     "timestamp": {
                       "type": "string"
+                    },
+                    "jobs": {
+                      "type": "object",
+                      "properties": {
+                        "workers": {
+                          "type": "integer"
+                        },
+                        "running": {
+                          "type": "integer"
+                        },
+                        "waiting": {
+                          "type": "integer"
+                        },
+                        "cached": {
+                          "type": "integer"
+                        },
+                        "closing": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "workers",
+                        "running",
+                        "waiting",
+                        "cached",
+                        "closing"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -48045,6 +48101,19 @@
                             "algorithm"
                           ],
                           "additionalProperties": false
+                        },
+                        "titleBlock": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          }
                         }
                       },
                       "required": [

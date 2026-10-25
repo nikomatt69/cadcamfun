@@ -1,5 +1,5 @@
 {
-  "$schema": "../gen/schema/desktop-schema.json",
+  "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "glass",
   "description": "The Liquid Glass window material (private Apple API; left out of Mac App Store builds).",
   "windows": [

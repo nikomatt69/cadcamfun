@@ -1,3 +1,4 @@
+import { saveFile } from "../../../shared/lib/save-file.ts"
 import { Schema } from "effect"
 import { cam } from "@cadcamfun/core"
 import { CamKernelArtifact, CamKernelRequest, CamProgramDocument, type ToolpathRow } from "@cadcamfun/api"
@@ -99,12 +100,8 @@ export const reconcileSavedProgram = async (app: AppState, current: () => boolea
   await restoreCamProgram(app, row, clean)
 }
 
-export const downloadCamFile = (contents: string, filename: string, type: string): void => {
-  const url = URL.createObjectURL(new Blob([contents], { type }))
-  const link = document.createElement("a")
-  try { link.href = url; link.download = filename; document.body.appendChild(link); link.click() }
-  finally { link.remove(); URL.revokeObjectURL(url) }
-}
+export const downloadCamFile = (contents: string, filename: string, type: string): Promise<boolean> =>
+  saveFile({ name: filename, data: contents, mime: type })
 
 /** The stored program was changed by someone else (the phone, another window) since this editor read it. */
 export class ProgramConflict extends Error {

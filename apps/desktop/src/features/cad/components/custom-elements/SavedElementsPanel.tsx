@@ -1,3 +1,4 @@
+import { downloadFile } from "../../../../shared/lib/save-file.ts"
 /**
  * The saved custom elements (legacy `store.ts` made these reachable through open/duplicate/delete,
  * and the legacy app never shipped that browser, so this one is authored for the v6 editor).
@@ -20,14 +21,7 @@ const ROW = "w-full flex items-center justify-between gap-2 p-2 rounded border b
 const ICON = "p-1 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
 
 const download = (filename: string, content: string): void => {
-  const url = URL.createObjectURL(new Blob([content], { type: "application/json" }))
-  const link = document.createElement("a")
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  downloadFile({ name: filename, data: content, mime: "application/json" })
 }
 
 export default function SavedElementsPanel(props: SavedElementsPanelProps): JSX.Element {

@@ -1,3 +1,4 @@
+import { saveFile } from "../../../shared/lib/save-file.ts"
 /**
  * Project details (legacy `pages/projects/[id].tsx`): the project's header with Edit / Delete, and tabs for its
  * drawings, components and toolpaths as cards, each opening in its editor. It is a dashboard of the project, not an
@@ -133,9 +134,7 @@ export function ProjectDetailScreen(): JSX.Element {
   })
   const downloadDrawing = (row: Card): Promise<void> => attempt(async () => {
     const full = await run<{ data: unknown }>(app.client.drawings.get({ params: { id: row.id } }))
-    const url = URL.createObjectURL(new Blob([JSON.stringify(full.data, null, 2)], { type: "application/json" }))
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${row.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.json`; anchor.click()
-    setTimeout(() => URL.revokeObjectURL(url), 0)
+    await saveFile({ name: `${row.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.json`, data: JSON.stringify(full.data, null, 2), mime: "application/json" })
   })
 
   const stop = (action: () => void) => (event: MouseEvent): void => { event.stopPropagation(); action() }

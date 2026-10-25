@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import { Route, Router } from "@solidjs/router"
 import { createSignal, onMount, onCleanup, Show, createEffect } from "solid-js"
 import { createAppState, AppProvider, type AppState } from "../shared/state/context.ts"
-import { getEndpoint, isTauri, resetEndpoint } from "./sidecar.ts"
+import { getEndpoint, isTauri, resetEndpoint, followingFetch, trackSidecarStatus } from "./sidecar.ts"
 import { clientLayer, runtimeForLayer, runtimeForClient, readClient } from "./client.ts"
 import { createFakeApi } from "../testing/fake-api.ts"
 import { BootScreen } from "../shared/components/boot-screen.tsx"
@@ -61,7 +61,7 @@ export default function App() {
             if (!active) {
               const endpoint = await getEndpoint()
               controller.signal.throwIfAborted()
-              active = runtimeForLayer(clientLayer(endpoint))
+              active = runtimeForLayer(clientLayer(endpoint, followingFetch(endpoint)))
             }
             const client = await readClient(active)
             controller.signal.throwIfAborted()
@@ -98,7 +98,13 @@ export default function App() {
   const theme = watchSystemTheme()
   createEffect(() => { const app = state(); if (app) theme.apply(app.settings.settings().theme) })
   onMount(() => {
-    void start()
+    let off: (() => void) | undefined
+    void trackSidecarStatus().then((stop) => {
+      if (disposed) { stop(); return }
+      off = stop
+      void start()
+    }).catch((cause) => { if (!disposed) setBoot({ _tag: "failed", reason: messageOf(cause), timedOut: false }) })
+    onCleanup(() => off?.())
     if (isTauri()) void tauriGlassHost().then(setGlassHost).catch(() => undefined)
   })
   onCleanup(() => { disposed = true; connecting?.abort(); attempt++; state()?.dispose(); theme.dispose() })
