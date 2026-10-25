@@ -410,7 +410,7 @@ dependencies = [
 
 [[package]]
 name = "cadcamfun-desktop"
-version = "0.1.17"
+version = "0.1.18"
 dependencies = [
  "getrandom 0.3.4",
  "keyring",
