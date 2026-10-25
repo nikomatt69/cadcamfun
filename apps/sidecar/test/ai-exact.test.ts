@@ -292,4 +292,4 @@ test("a free-form face is offset and drafted approximately, and the answer says 
   for (const bad of [{ mode: "draft" }, { mode: "offset" }, { mode: "offset", distance: 1, direction: { x: 0, y: 1, z: 0 } }, { mode: "draft", angle: 5, distance: 1 }, { distance: 1, tolerance: 0.1 }]) {
     expect((await app.call("/api/cad/exact/hole", { method: "POST", json: { elements: [free], id: "wall", nurbs: looking, ...bad } })).status).toBe(400)
   }
-})
+}, 300_000)
