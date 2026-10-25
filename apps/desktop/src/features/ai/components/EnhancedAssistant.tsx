@@ -404,8 +404,6 @@ export function EnhancedAssistant(props: Props): JSX.Element {
       <AssistantPanels panel={panel()} onRunCommand={insertCommand} />
 
       <AgentActivity />
-      <AssistantQuestions />
-
       <AssistantTranscript
         onCopy={handleCopy}
         copiedId={copiedId()}
@@ -456,6 +454,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
 
       {/* The dock is its own box, outside the scrolling transcript: it keeps its size while the conversation moves. */}
       <div class="assistant-dock" data-testid="ai-dock">
+      <AssistantQuestions />
       <AssistantPermissions />
       <AssistantControlError />
 

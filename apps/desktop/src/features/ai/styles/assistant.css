@@ -1054,10 +1054,15 @@
 
 /* Question Card */
 .assistant-question-card {
-  flex-shrink: 0;
-  max-height: 40%;
+  flex: 0 0 auto;
+  width: var(--assistant-dock-w, min(940px, calc(100% - 28px)));
+  max-height: 40vh;
   overflow-y: auto;
-  border-bottom: 1px solid var(--assistant-line);
+  margin: 0 auto 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--assistant-line-strong);
+  border-radius: 14px;
+  background: var(--assistant-surface);
 }
 
 .assistant-question-group {
