@@ -56,6 +56,23 @@ test("the published plugin points at the same repository", async () => {
   expect(manifest.repository.url).not.toContain("cadcamfun-tauri");
 });
 
+test("macOS installers and their signed-sidecar smoke run on matching native architectures", async () => {
+  for (const name of ["release.yml", "build-platforms.yml"]) {
+    const workflow = Bun.YAML.parse(await readFile(join(ROOT, ".github/workflows", name), "utf8")) as {
+      jobs: { build: { strategy: { matrix: { include: { os: string; target: string }[] } }; steps: { run?: string; if?: string; "continue-on-error"?: boolean }[] } };
+    };
+    const targets = workflow.jobs.build.strategy.matrix.include;
+    expect(targets).toHaveLength(6);
+    expect(targets.find((target) => target.target === "x86_64-apple-darwin")?.os).toBe("macos-15-intel");
+    expect(targets.find((target) => target.target === "aarch64-apple-darwin")?.os).toBe("macos-15");
+    if (name === "release.yml") {
+      const smoke = workflow.jobs.build.steps.find((step) => step.run?.includes("smoke-macos-bundle.ts"));
+      expect(smoke?.if).toBe("runner.os == 'macOS'");
+      expect(smoke?.["continue-on-error"]).not.toBe(true);
+    }
+  }
+});
+
 test("the release refuses a Bun the workspace does not support", async () => {
   const root = await mkdtemp(join(tmpdir(), "cadcam-bun-"));
   try {

@@ -242,7 +242,7 @@ async function phaseStart(options: { bump?: string | undefined; version?: string
   // The branch push and the tag push share one authenticated origin. Restoring the
   // credential-less URL in between is what made `git push origin <tag>` ask for a username.
   await withAuthenticatedOrigin(async () => {
-    await pushBranch(section);
+    await pushBranch(section, staged, version);
     await pushTag(tag);
   });
 
@@ -269,49 +269,36 @@ async function ensureGitIdentity(): Promise<void> {
 }
 
 /**
- * The files a release commit owns.
- *
- * The version holders, the changelog and the lockfile: the release writes them, so a
- * conflict in one of them is a conflict between two releases and not between the
- * release and somebody else's work.
- */
-function isReleaseOwned(file: string): boolean {
-  return (
-    file === "CHANGELOG.md" ||
-    file === "bun.lock" ||
-    file.endsWith("package.json") ||
-    file.endsWith("tauri.conf.json") ||
-    file.endsWith("Cargo.toml") ||
-    file.endsWith("app.json")
-  );
-}
-
-/**
  * Resolve the conflicts of a rebase that two releases caused.
  *
- * Both releases write the same lines — the version of every holder, the top of the
- * changelog, the lockfile — so the rebase conflicts in all of them. Those files are the
- * release commit's own output, and this release's side wins. The changelog is the
- * exception: the section the other release wrote has to survive, so the remote file is
- * kept and this release's section is written into it again.
+ * Keep the remote files, then reapply this release's version and changelog section.
+ * Taking whole files from the queued release would discard dependency or configuration
+ * changes that reached the branch while it waited for validation.
  */
-async function resolveReleaseConflicts(section: string): Promise<boolean> {
-  const conflicted = (await captureCommand(["git", "diff", "--name-only", "--diff-filter=U"], { cwd: ROOT })).stdout
+export async function resolveReleaseConflicts(section: string, releaseFiles: readonly string[], version: string, root = ROOT): Promise<boolean> {
+  const conflicted = (await captureCommand(["git", "diff", "--name-only", "--diff-filter=U"], { cwd: root })).stdout
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line !== "");
   if (conflicted.length === 0) return false;
-  if (!conflicted.every((file) => isReleaseOwned(file))) return false;
+  // Use the actual release commit's files, including Cargo.lock, rather than a
+  // separate allow-list that can drift from version stamping.
+  if (!conflicted.every((file) => releaseFiles.includes(file))) return false;
   say(`resolving ${conflicted.length} release conflict(s) against the remote tip`);
   for (const file of conflicted) {
-    // During a rebase "ours" is the remote tip and "theirs" is the commit being
-    // replayed: this release.
-    const side = file === "CHANGELOG.md" ? "ours" : "theirs";
-    await captureCommand(["git", "checkout", side, "--", file], { cwd: ROOT });
+    // During a rebase "ours" is the remote tip; only version fields are overwritten.
+    const restored = await captureCommand(["git", "checkout", "--ours", "--", file], { cwd: root });
+    if (restored.code !== 0) throw new Error(`Cannot resolve the release conflict in ${file}: ${restored.stderr.trim()}`);
   }
-  if (conflicted.includes("CHANGELOG.md")) await writeChangelog(ROOT, section);
-  await $`git add -A`.cwd(ROOT);
-  const resumed = await $`git -c core.editor=true rebase --continue`.nothrow().cwd(ROOT);
+  if (conflicted.includes("CHANGELOG.md")) await writeChangelog(root, section);
+  const stamped = await stampVersions(root, version);
+  const hasLockfile = await Bun.file(join(root, "bun.lock")).exists();
+  if (hasLockfile) {
+    await $`${process.execPath} --no-env-file install --lockfile-only`.cwd(root);
+  }
+  const resolvedFiles = [...new Set([...conflicted, ...stamped, ...(hasLockfile ? ["bun.lock"] : [])])];
+  await $`git add -- ${resolvedFiles}`.cwd(root);
+  const resumed = await $`git -c core.editor=true rebase --continue`.nothrow().cwd(root);
   return resumed.exitCode === 0;
 }
 
@@ -355,14 +342,14 @@ async function pushTag(tag: string): Promise<void> {
   say(`pushed the tag ${tag}`);
 }
 
-async function pushBranch(section: string): Promise<void> {
+async function pushBranch(section: string, releaseFiles: readonly string[], version: string): Promise<void> {
   const branch = (await captureCommand(["git", "branch", "--show-current"], { cwd: ROOT })).stdout.trim();
   if (branch === "") throw new Error("Unable to determine the branch to push the release to");
   for (let attempt = 0; attempt < 3; attempt++) {
     await $`git fetch origin ${branch}`.cwd(ROOT);
     const rebase = await $`git rebase ${`origin/${branch}`}`.nothrow().cwd(ROOT);
     if (rebase.exitCode !== 0) {
-      if (!(await resolveReleaseConflicts(section))) {
+      if (!(await resolveReleaseConflicts(section, releaseFiles, version))) {
         await $`git rebase --abort`.nothrow().cwd(ROOT);
         throw new Error(`Cannot rebase the release commit onto origin/${branch}: ${rebase.stderr.toString().trim()}`);
       }

@@ -129,7 +129,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const readout = createMemo(() => readoutAt(timeline(), classes(), props.playbackTime))
   const nc = createMemo(() => (props.gcode !== undefined ? ncWindow(props.gcode, readout()?.line) : []))
   const seekTo = (seconds: number): void => props.onPlaybackTimeChange(Math.max(0, Math.min(timeline().duration, seconds)))
-  const seekLine = (line: number): void => { const at = cam.viewer.timeOfLine(timeline(), line); if (at !== undefined) { props.onPlayingChange?.(false); seekTo(at) } }
+  const seekLine = (line: number): void => { const at = cam.viewer.timeOfLine(timeline(), line); if (at !== undefined) { endRun(); props.onPlayingChange?.(false); seekTo(at) } }
   const toggleHidden = (path: number): void => { setHidden(hidden().includes(path) ? hidden().filter((p) => p !== path) : [...hidden(), path]) }
   const isolate = (path: number): void => { setHidden(props.program.toolpaths.map((_, i) => i).filter((i) => i !== path)) }
   const moveLabel = (k: cam.viewer.MoveClass): string => t(`cam.move.${k}`)
@@ -495,9 +495,11 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               markers={[...findingTimes(timeline(), machineInfo()?.findings ?? []), ...limitMarkers(), ...collisions().map((e) => ({ seconds: e.seconds, severity: e.severity, message: e.message }))]}
               rate={rate()}
               onRate={setRate}
-              onSeek={(seconds) => { props.onPlayingChange?.(false); seekTo(seconds) }}
-              onStepMove={(dir) => { props.onPlayingChange?.(false); seekTo(stepMove(timeline(), props.playbackTime, dir)) }}
-              onStepOperation={(dir) => { props.onPlayingChange?.(false); seekTo(stepOperation(spans(), props.playbackTime, dir, timeline().duration)) }}
+              autoResume={runThrough()}
+              {...(props.onPlayingChange !== undefined ? { onAutoResumeChange: (enabled: boolean) => { if (enabled) runAll(); else endRun() } } : {})}
+              onSeek={(seconds) => { endRun(); props.onPlayingChange?.(false); seekTo(seconds) }}
+              onStepMove={(dir) => { endRun(); props.onPlayingChange?.(false); seekTo(stepMove(timeline(), props.playbackTime, dir)) }}
+              onStepOperation={(dir) => { endRun(); props.onPlayingChange?.(false); seekTo(stepOperation(spans(), props.playbackTime, dir, timeline().duration)) }}
             />
           </div>
         </Show>

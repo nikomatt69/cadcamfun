@@ -102,12 +102,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
             slug: macos-arm64
             bundles: app,dmg
-          # Match nikcli: cross-compile Intel macOS on the Apple Silicon runner.
-          - os: macos-14
+          # Run the signed Intel sidecar on Intel hardware, without Rosetta.
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             slug: macos-x64
             bundles: app,dmg

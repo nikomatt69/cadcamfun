@@ -7,6 +7,7 @@ import { currentTitleBlock } from "../lib/document-setup.ts"
 import { useCADStore } from "../store/cadStore.ts"
 import { useDocumentStore } from "../store/documentStore.ts"
 import TitleBlockDialog from "./TitleBlockDialog.tsx"
+import "../../../styles/viewport-chrome.css"
 
 const STORAGE_KEY = "cadcamfun.title-block-collapsed"
 const readCollapsed = (): boolean => { try { return globalThis.localStorage?.getItem(STORAGE_KEY) === "1" } catch { return false } }

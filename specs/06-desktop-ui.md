@@ -237,6 +237,8 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 
 ## 5. Change log
 
+- 2026-10-26: the title-block overlay imports its own viewport stylesheet, so opening CAM directly no longer depends on visiting CAD first. Verified the compact expanded card in the native app and the stylesheet in the production CAM chunk dependency graph. Added an explicit Auto-resume checkbox to the simulation timeline, connected to the existing short-pause/resume mode. Timeline seeking, stepping and NC-line navigation cancel pending resumption; this is separate from repeating a program. A DOM integration check drives a real collision stop, verifies automatic continuation, then verifies that manual stepping cancels a scheduled restart. Desktop typecheck and production build pass; native visual verification of the new checkbox requires an app running the updated bundle.
+
 - 2026-10-24: printing integration repair removes an unreachable `face` example branch
   unsupported by the operation schema. Desktop typecheck passes (1,171 files); the combined
   generator/HTTP/live print-panel suite passes 93 tests. The bead preview consumes the shared

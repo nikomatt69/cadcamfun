@@ -579,6 +579,8 @@
   "cam.timeline.seek": "Simulation time",
   "cam.timeline.toolChange": "Tool change",
   "cam.timeline.speed": "Speed",
+  "cam.timeline.autoResume": "Auto-resume",
+  "cam.timeline.autoResumeHint": "Resume automatically after a short simulation pause. Manual pause or seeking cancels automatic resumption.",
   "cam.operations.title": "Operations",
   "cam.operations.current": "Operation",
   "cam.operations.toggle": "Show or hide the operation",

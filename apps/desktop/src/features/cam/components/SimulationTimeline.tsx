@@ -23,6 +23,8 @@ export interface SimulationTimelineProps {
   readonly onSeek: (seconds: number) => void
   readonly onStepMove: (dir: 1 | -1) => void
   readonly onStepOperation: (dir: 1 | -1) => void
+  readonly autoResume?: boolean
+  readonly onAutoResumeChange?: (enabled: boolean) => void
 }
 
 const RATES = [0.1, 0.25, 0.5, 1, 2, 5, 10, 25, 100, 1000]
@@ -63,6 +65,13 @@ export function SimulationTimeline(props: SimulationTimelineProps): JSX.Element 
       </div>
       {button(t("cam.timeline.nextMove"), <ChevronRight size={14} />, () => props.onStepMove(1), "timeline-next-move")}
       {button(t("cam.timeline.nextOperation"), <ChevronsRight size={14} />, () => props.onStepOperation(1), "timeline-next-op")}
+      <Show when={props.onAutoResumeChange}>{(change) => (
+        <label class="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-[11px] text-white/80" title={t("cam.timeline.autoResumeHint")}>
+          <input type="checkbox" class="h-3.5 w-3.5 accent-blue-400" data-testid="timeline-auto-resume" aria-label={t("cam.timeline.autoResumeHint")}
+            checked={props.autoResume === true} onChange={(event) => change()(event.currentTarget.checked)} />
+          <span>{t("cam.timeline.autoResume")}</span>
+        </label>
+      )}</Show>
       <label class="flex items-center gap-1 text-[11px] text-white/80">
         <span>{t("cam.timeline.speed")}</span>
         <select aria-label={t("cam.timeline.speed")} class="rounded border border-slate-600 bg-slate-800 px-1 py-0.5 text-white" value={String(props.rate)} onChange={(event) => props.onRate(Number(event.currentTarget.value))} data-testid="timeline-speed">
