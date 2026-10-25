@@ -267,9 +267,23 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     }, (callback) => window.requestAnimationFrame(callback), (id) => window.cancelAnimationFrame(id))
     orbit.addEventListener("change", invalidate)
     gizmo.addEventListener("change", invalidate)
-    const visibility = () => frames?.suspend(document.hidden)
+    // A canvas that was hidden (another tab, a collapsed panel, a minimized window) can come back with an emptied drawing
+    // buffer or a lost GL context: mark the scene dirty on every return so the next frame draws it again, immediately.
+    const visibility = () => {
+      if (!document.hidden) dirty = true
+      frames?.suspend(document.hidden)
+    }
     document.addEventListener("visibilitychange", visibility)
     visibility()
+    const glCanvas = renderer.domElement
+    const contextLost = (event: Event) => event.preventDefault()
+    const contextRestored = () => { resize(); invalidate() }
+    glCanvas.addEventListener("webglcontextlost", contextLost)
+    glCanvas.addEventListener("webglcontextrestored", contextRestored)
+    const shown = typeof IntersectionObserver === "undefined"
+      ? undefined
+      : new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) { resize(); invalidate() } })
+    shown?.observe(container)
     reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")
     const motionChange = () => {
       if (reducedMotion?.matches) exploded.setTarget(cad.explodedView.enabled ? cad.explodedView.amount : 0, true)
@@ -323,6 +337,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       cancelAnimationFrame(hoverFrame)
       clearTimeout(fullscreenTimer)
       document.removeEventListener("visibilitychange", visibility)
+      glCanvas.removeEventListener("webglcontextlost", contextLost)
+      glCanvas.removeEventListener("webglcontextrestored", contextRestored)
+      shown?.disconnect()
       observer?.disconnect()
       window.removeEventListener("resize", resize)
       document.removeEventListener("fullscreenchange", fullscreen)
