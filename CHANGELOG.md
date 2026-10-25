@@ -3,6 +3,27 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.18 (October 2026)
+
+## Core
+
+- Add title block functionality to CAD and CAM workflows
+- Huge generations are bounded and measured: the print evidence runs 3x faster, the replay, operations, panel generator and slicer have explicit budgets that answer with the reason, and kernel jobs get a 5-minute deadline, a worker semaphore, single-flight, a byte-bounded result cache and instant detection of a killed worker (new packages/util)
+- The ellipse and spline tests have a 60 s timeout: their exact rebuilds take seconds on a loaded machine
+
+## Desktop
+
+- The CAD canvas redraws as soon as it is shown again: it marks the scene dirty on return, handles WebGL context loss and restore, and redraws when it becomes visible
+- The shell's menus reach the app: the webview listens to the menu event (native menu bar, tray recents, Save, Open, Show Logs Folder, Check for Updates); the real native menu and its handler are tested on the mock runtime
+- The toolpath visualizer can run the whole program: a button plays it from the start, rests briefly at each collision stop and goes on by itself
+- Machine configurations get full detail pages: every profile figure in data-sheet sections, a 3D envelope, built-in presets open read-only and can be duplicated; component previews draw revolutions, extrusions and the rest through the editor's builder
+- A real dialog (checking, up to date, notes, live progress, restart now), the menu bar and Settings ask for a check and are answered, a release put off stays quiet; native Check for Updates and Release Notes items
+- The resource detail previews draw again: the frame scheduler no longer calls requestAnimationFrame as its own method (Illegal invocation left the stage empty)
+
+## Sidecar
+
+- The sidecar's free-form offset test has its own 300 s timeout: the approximate edits take minutes on a loaded machine
+
 ## v0.1.17 (October 2026)
 
 ## Core
