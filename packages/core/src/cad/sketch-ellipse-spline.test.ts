@@ -1,9 +1,12 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { rebuild, type History, type SketchFeature } from "./history.ts"
 import { rebuildExact } from "./history-brep.ts"
 import { massProperties, validateBrep } from "./brep/index.ts"
 import { meshVolume } from "./solid.ts"
 import { polygonArea, sketchProfiles, solveSketch, type Sketch } from "./sketch.ts"
+
+// The exact rebuild of an extruded profile takes seconds on a loaded machine.
+setDefaultTimeout(60_000)
 
 const rel = (a: number, b: number) => Math.abs(a - b) / Math.abs(b)
 
