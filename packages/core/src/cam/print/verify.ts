@@ -120,26 +120,61 @@ export const replayBeads = (gcode: string): { beads: Bead[]; motions: PrintMotio
   return { beads, motions, states, errors, filamentMm: filament, maxZ }
 }
 
+/** Whether two regions are the same outlines, point for point. */
+const sameRegion = (a: Region, b: Region): boolean => {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  const sameRing = (p: ReadonlyArray<{ readonly x: number; readonly y: number }>, q: ReadonlyArray<{ readonly x: number; readonly y: number }>): boolean => {
+    if (p.length !== q.length) return false
+    for (let k = 0; k < p.length; k++) if (p[k]!.x !== q[k]!.x || p[k]!.y !== q[k]!.y) return false
+    return true
+  }
+  for (let k = 0; k < a.length; k++) {
+    const u = a[k]!, v = b[k]!
+    if (!sameRing(u.outer, v.outer) || u.holes.length !== v.holes.length) return false
+    for (let h = 0; h < u.holes.length; h++) if (!sameRing(u.holes[h]!, v.holes[h]!)) return false
+  }
+  return true
+}
+
 const PART = new Set(["WALL-OUTER", "WALL-INNER", "SKIN", "FILL", "BRIDGE"])
 
-const stamp = (mask: Uint8Array, g: Grid, x0: number, y0: number, x1: number, y1: number, radius: number): void => {
-  const len = Math.hypot(x1 - x0, y1 - y0)
-  const steps = Math.max(1, Math.ceil(len / (g.cell * 0.5)))
-  const r = Math.ceil(radius / g.cell)
-  for (let s = 0; s <= steps; s++) {
-    const px = x0 + ((x1 - x0) * s) / steps
-    const py = y0 + ((y1 - y0) * s) / steps
-    const cx = Math.floor((px - g.minX) / g.cell)
-    const cy = Math.floor((py - g.minY) / g.cell)
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        const ix = cx + dx, iy = cy + dy
-        if (ix < 0 || iy < 0 || ix >= g.nx || iy >= g.ny) continue
-        const qx = g.minX + (ix + 0.5) * g.cell - px
-        const qy = g.minY + (iy + 0.5) * g.cell - py
-        if (qx * qx + qy * qy <= radius * radius) mask[iy * g.nx + ix] = 1
+/**
+ * Marks the cells whose centre lies within `radius` of the segment (a capsule). Row by row: a capsule is convex, so each row
+ * of cell centres meets it in one interval, found from the two end discs and the strip between them. The work is the area the
+ * bead covers, not the length times a sampling density, so a bead of any length costs the same per mm.
+ */
+export const stamp = (mask: Uint8Array, g: Grid, x0: number, y0: number, x1: number, y1: number, radius: number): void => {
+  const dx = x1 - x0, dy = y1 - y0
+  const len2 = dx * dx + dy * dy
+  const len = Math.sqrt(len2)
+  const r2 = radius * radius
+  const rowLo = Math.max(0, Math.ceil((Math.min(y0, y1) - radius - g.minY) / g.cell - 0.5))
+  const rowHi = Math.min(g.ny - 1, Math.floor((Math.max(y0, y1) + radius - g.minY) / g.cell - 0.5))
+  // Along the segment, 0 <= t*len2 = x*dx + (y*dy - x0*dx - y0*dy) <= len2; across it, |x*(-dy) + (x0*dy + (y - y0)*dx)| <= radius*len.
+  for (let iy = rowLo; iy <= rowHi; iy++) {
+    const y = g.minY + (iy + 0.5) * g.cell
+    let lo = Infinity, hi = -Infinity
+    const e0 = r2 - (y - y0) * (y - y0)
+    if (e0 >= 0) { const w = Math.sqrt(e0); lo = x0 - w; hi = x0 + w }
+    const e1 = r2 - (y - y1) * (y - y1)
+    if (e1 >= 0) { const w = Math.sqrt(e1); if (x1 - w < lo) lo = x1 - w; if (x1 + w > hi) hi = x1 + w }
+    if (len2 > 0) {
+      let a = -Infinity, b = Infinity, ok = true
+      const along = (y - y0) * dy - x0 * dx
+      if (Math.abs(dx) < 1e-12) ok = along >= 0 && along <= len2
+      else { const u = (0 - along) / dx, v = (len2 - along) / dx; a = u < v ? u : v; b = u < v ? v : u }
+      const across = x0 * dy + (y - y0) * dx, reach = radius * len
+      if (ok) {
+        if (Math.abs(dy) < 1e-12) ok = across >= -reach && across <= reach
+        else { const u = (across - reach) / dy, v = (across + reach) / dy; const lo2 = u < v ? u : v, hi2 = u < v ? v : u; if (lo2 > a) a = lo2; if (hi2 < b) b = hi2 }
       }
+      if (ok && a <= b) { if (a < lo) lo = a; if (b > hi) hi = b }
     }
+    if (lo > hi) continue
+    const c0 = Math.max(0, Math.ceil((lo - g.minX) / g.cell - 0.5))
+    const c1 = Math.min(g.nx - 1, Math.floor((hi - g.minX) / g.cell - 0.5))
+    if (c1 >= c0) mask.fill(1, iy * g.nx + c0, iy * g.nx + c1 + 1)
   }
 }
 
@@ -224,18 +259,38 @@ export const verifyPrint = (input: PrintEvidenceInput): PrintCheck[] => {
   let worstSkin = 1
   let spillLength = 0
   let partLength = 0
+  // One buffer for every layer, cleared over the rows a layer touched; a prism repeats its region, so its three rasters are kept
+  // from layer to layer while the region is the same. Counting runs over the region's own window of the grid, not the whole plate.
+  const covered = new Uint8Array(g.nx * g.ny)
+  let cached: { readonly region: Region; readonly inside: Uint8Array; readonly core: Uint8Array | undefined; readonly grown: Uint8Array } | undefined
   for (let i = 0; i < count; i++) {
     const region = regions[i]!
     if (region.length === 0) continue
     const layerBeads = (byLayer.get(i + input.firstModelLayer) ?? []).filter((b) => PART.has(b.kind) || b.kind === "WALL-OUTER")
-    const covered = new Uint8Array(g.nx * g.ny)
-    for (const b of layerBeads) stamp(covered, g, b.x0, b.y0, b.x1, b.y1, radius * 1.02)
-    const inside = rasterise(region, g)
+    let rowLo = g.ny, rowHi = -1
+    for (const b of layerBeads) {
+      stamp(covered, g, b.x0, b.y0, b.x1, b.y1, radius * 1.02)
+      rowLo = Math.min(rowLo, Math.floor((Math.min(b.y0, b.y1) - radius * 1.02 - g.minY) / g.cell))
+      rowHi = Math.max(rowHi, Math.ceil((Math.max(b.y0, b.y1) + radius * 1.02 - g.minY) / g.cell))
+    }
     const spiral = p.vase && i >= Math.max(p.bottomLayers, 1)
-    if (p.walls > 0 && !spiral) {
-      const core = rasterise(offsetRegion(region, -p.walls * p.extrusionWidth), g)
+    const wantsCore = p.walls > 0 && !spiral
+    if (cached === undefined || !sameRegion(cached.region, region) || (wantsCore && cached.core === undefined)) {
+      cached = {
+        region, inside: rasterise(region, g),
+        core: wantsCore ? rasterise(offsetRegion(region, -p.walls * p.extrusionWidth), g) : undefined,
+        grown: rasterise(offsetRegion(region, p.extrusionWidth), g)
+      }
+    }
+    const { inside, core, grown } = cached
+    const rb = regionBox(region)!
+    const w = {
+      y0: Math.max(0, Math.floor((rb.minY - g.minY) / g.cell) - 1), y1: Math.min(g.ny - 1, Math.ceil((rb.maxY - g.minY) / g.cell) + 1),
+      x0: Math.max(0, Math.floor((rb.minX - g.minX) / g.cell) - 1), x1: Math.min(g.nx - 1, Math.ceil((rb.maxX - g.minX) / g.cell) + 1)
+    }
+    if (core !== undefined) {
       let band = 0, hit = 0
-      for (let c = 0; c < inside.length; c++) if (inside[c] && !core[c]) { band++; if (covered[c]) hit++ }
+      for (let y = w.y0; y <= w.y1; y++) for (let c = y * g.nx + w.x0, end = y * g.nx + w.x1; c <= end; c++) if (inside[c] && !core[c]) { band++; if (covered[c]) hit++ }
       if (band > 40) {
         const share = hit / band
         if (share < worstWall) { worstWall = share; worstWallLayer = i }
@@ -243,11 +298,10 @@ export const verifyPrint = (input: PrintEvidenceInput): PrintCheck[] => {
     }
     if ((i === 0 || i === count - 1) && !spiral) {
       let total = 0, hit = 0
-      for (let c = 0; c < inside.length; c++) if (inside[c]) { total++; if (covered[c]) hit++ }
+      for (let y = w.y0; y <= w.y1; y++) for (let c = y * g.nx + w.x0, end = y * g.nx + w.x1; c <= end; c++) if (inside[c]) { total++; if (covered[c]) hit++ }
       if (total > 40) worstSkin = Math.min(worstSkin, hit / total)
     }
     // Stray beads: points of part beads that lie further than a bead outside the layer's material.
-    const grown = rasterise(offsetRegion(region, p.extrusionWidth), g)
     for (const b of layerBeads) {
       const len = Math.hypot(b.x1 - b.x0, b.y1 - b.y0)
       const samples = Math.max(1, Math.ceil(len / 0.5))
@@ -259,6 +313,7 @@ export const verifyPrint = (input: PrintEvidenceInput): PrintCheck[] => {
         if (ix < 0 || iy < 0 || ix >= g.nx || iy >= g.ny || !grown[iy * g.nx + ix]) spillLength += len / samples
       }
     }
+    if (rowHi >= 0) covered.fill(0, Math.max(0, rowLo) * g.nx, Math.min(g.ny, rowHi + 1) * g.nx)
   }
   const wallsWanted = p.walls > 0 && !p.vase
   checks.push(!wallsWanted

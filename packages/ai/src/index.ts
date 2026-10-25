@@ -81,7 +81,7 @@ export { describeBridge, bridgeAdmission, bridgeAllowed, scopeBridge, BRIDGE_EXC
 export { definePluginTool, pluginToolId, pluginParameters, MAX_PLUGIN_SCHEMA_CHARS, type PluginToolListing } from "./tools/plugin-tool.ts"
 export { hostPatchesPlugin, patchHostSource, applyHostPatches, HostPatchError, HOST_PATCHES, MEDIA_RULE_MARKER, STEP_INSTRUCTIONS_MARKER, hostPatchesApplied, hostPatchReport } from "./nikcli/host-patches.ts"
 export { acceptPart, type AcceptanceCheck, type AcceptanceReport, type CheckResult } from "./acceptance.ts"
-export { KERNEL_JOB_DEADLINE_MS, KernelJobError, kernelWorkerUrl, runKernelJob, runKernelJobInline } from "./kernel-job.ts"
+export { KERNEL_CACHE_BYTES, KERNEL_CACHE_ENTRIES, KERNEL_JOB_DEADLINE_MS, KERNEL_MEMORY_SHARE, KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, clearKernelJobCache, kernelJobStats, kernelWorkerUrl, runKernelJob, runKernelJobInline } from "./kernel-job.ts"
 export type { KernelJobName, KernelJobProgress, KernelJobs } from "./kernel-jobs.ts"
 
 export { MOD_TOOL_IDS, modToolContributions, modToolIds } from "./nikcli/mod-tools.ts"

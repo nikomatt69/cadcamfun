@@ -15,7 +15,7 @@
 import { Schema } from "effect"
 import { ThreadParams, generateThread } from "../operations/thread.ts"
 import { movesToGcode } from "./surface.ts"
-import { above, circleWords, cutLevels, f3, plunge, retractRapid, type Pt } from "./common.ts"
+import { above, circleWords, cutLevels, spend, f3, plunge, retractRapid, type Pt } from "./common.ts"
 import { elementToolpath } from "./element-paths.ts"
 import { elementOutline, getDrillingPoints, type V3 } from "./elements.ts"
 import type { CadElement, GeometryInput, ToolpathSettings } from "./schema.ts"
@@ -84,6 +84,7 @@ export const pocketElement = (e: CadElement, s: ToolpathSettings): string | unde
     : Math.min(shape.rx, shape.ry) - toolR
   if (reach < 0) return gcode + `; Cannot pocket: shape is smaller than the tool (Ø${s.toolDiameter}mm)\n`
   const count = Math.max(1, Math.ceil(reach / step))
+  spend(count, "The pocket at this stepover")
   for (let k = 1; k <= count; k++) {
     const inset = Math.min(reach, k * step)
     switch (shape.kind) {
@@ -103,7 +104,9 @@ export const pocketElement = (e: CadElement, s: ToolpathSettings): string | unde
     }
   }
 
-  cutLevels(s.depth, s.stepdown).forEach((z, index) => {
+  const levels = cutLevels(s.depth, s.stepdown)
+  spend(levels.length * rings.reduce((n, ring) => n + Math.max(1, ring.path.length), 0), "The pocket at this depth and stepover")
+  levels.forEach((z, index) => {
     gcode += `\n; Z Level: ${z}\n`
     if (index > 0) gcode += retractRapid(5)
     gcode += `G0 X${f3(shape.cx)} Y${f3(shape.cy)} ; Move to center\n`

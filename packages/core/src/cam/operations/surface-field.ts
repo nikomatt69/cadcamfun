@@ -15,6 +15,7 @@ import type { Vec2 } from "../../cad/vec.ts"
 import type { Grid } from "../model/dexel.ts"
 import { toolModel } from "../verify/tool-model.ts"
 import type { Tool } from "../tool.ts"
+import { OperationBudgetError } from "./common.ts"
 
 /**
  * A cutter as the surface strategies see it: the radius it sweeps, the height of its profile above the tip at radius r, and how
@@ -50,8 +51,14 @@ export const cutterOf = (tool: Tool, allowance = 0): Cutter => {
   }
 }
 
+/** Drop-cutter samples one surface may be asked for (each reads the columns under the cutter): about two minutes of work. */
+export const MAX_SURFACE_SAMPLES = 80_000_000
+
 export class Surface {
-  constructor(readonly grid: Grid, /** Top of the part per column, -Infinity where there is none. */ readonly height: Float64Array) {}
+  /** Samples asked so far; the budget is per surface, that is per operation. */
+  private samples = 0
+
+  constructor(readonly grid: Grid, /** Top of the part per column, -Infinity where there is none. */ readonly height: Float64Array, private readonly sampleLimit: number = MAX_SURFACE_SAMPLES) {}
 
   private box: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number } | undefined
   /** Extent in XY of the columns that hold material (undefined when there is none). */
@@ -90,6 +97,9 @@ export class Surface {
    * half a cell, never on the gouging side.
    */
   tip(cutter: Cutter, x: number, y: number): number {
+    if (++this.samples > this.sampleLimit) {
+      throw new OperationBudgetError(`The surface pass asked for more than ${this.sampleLimit.toLocaleString("en-US")} cutter-contact samples: raise the stepover, the tolerance or the scallop, or finish a smaller region`)
+    }
     const { nx, ny, minX, minY, cellX, cellY } = this.grid
     // Nothing of the part within reach of this position: no need to look at a single column.
     const box = this.materialBox()

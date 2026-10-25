@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { runJob, type KernelProgress, type ManufacturingJob } from "./index.ts"
+import { MAX_REPLAY_CELLS, replayCell } from "./execute.ts"
 import { findMachine } from "./machines.ts"
 
 const job: ManufacturingJob = {
@@ -35,5 +36,32 @@ describe("run options: progress and cancellation checkpoints", () => {
     const a = runJob(job), b = runJob(job, { onProgress: () => undefined, signal: { aborted: false } })
     if (a.status !== "ok" || b.status !== "ok") throw new Error("the job must run")
     expect(b.value.nc).toBe(a.value.nc)
+  })
+})
+
+describe("the replayed stock stays inside a column budget", () => {
+  test("a resolution that would need billions of columns is coarsened to the finest cell within the budget", () => {
+    expect(replayCell(0.4, 100, 100)).toBe(0.4)
+    const cell = replayCell(0.001, 1500, 1500)
+    expect(cell).toBeGreaterThan(0.4)
+    expect(Math.ceil(1500 / cell) * Math.ceil(1500 / cell)).toBeLessThanOrEqual(MAX_REPLAY_CELLS)
+    // The finest cell that fits: a hair finer would not.
+    expect((1500 / (cell * 0.99)) ** 2).toBeGreaterThan(MAX_REPLAY_CELLS)
+  })
+})
+
+describe("the stock replay has a work budget", () => {
+  test("a program past the budget is replayed up to it and the rest is reported unchecked, never passed", () => {
+    const full = runJob(job)
+    const cut = runJob(job, { replayWorkLimit: 1e5 })
+    if (full.status !== "ok" || cut.status !== "ok") throw new Error("the job must run")
+    // The program itself is the same; only the evidence about it differs.
+    expect(cut.value.nc).toBe(full.value.nc)
+    expect(cut.value.issues.some((i) => i.tag === "ReplayMismatch" && /replay stopped at NC line \d+/.test(i.message))).toBe(true)
+    expect(cut.value.issues.some((i) => i.tag === "RemainingStock")).toBe(false)
+    for (const id of ["no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed"] as const) {
+      expect(cut.value.claims.find((c) => c.id === id)!.status).toBe("unresolved")
+    }
+    expect(cut.value.release).not.toBe("verified-program")
   })
 })

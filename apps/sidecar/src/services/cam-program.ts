@@ -22,7 +22,7 @@ export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payl
   // terminates the worker) and a job that runs past its deadline is stopped.
   const result = yield* Effect.tryPromise({
     try: (signal) => runKernelJob("cam-manufacture", job.value, { signal, ...(report !== undefined ? { onProgress: report } : {}) }),
-    catch: (error) => new BadRequest({ message: error instanceof KernelJobError && error.reason !== "failed" && error.reason !== "crashed" ? error.message : "The CAM kernel request could not be evaluated" })
+    catch: (error) => new BadRequest({ message: error instanceof KernelJobError && error.explained ? error.message : "The CAM kernel request could not be evaluated" })
   }).pipe(
     // A dropped request interrupts the fiber: say so on the stream, since the code after the run never executes.
     Effect.onInterrupt(() => Effect.sync(() => report?.("cancelled")))

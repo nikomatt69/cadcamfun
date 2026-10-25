@@ -11,7 +11,7 @@ import { emitGcode } from "./gcode.ts"
 import { bestOrientation, rotateMeshes } from "./orient.ts"
 import { planLayers, planRaft } from "./plan.ts"
 import { resolveProfile, type PrintProfile } from "./profile.ts"
-import { printSolidIssue, sliceMesh } from "./slice.ts"
+import { meshVolume, printSolidIssue, sliceMesh } from "./slice.ts"
 import { verifyPrint, type PrintCheck } from "./verify.ts"
 import { planSupports } from "./support.ts"
 import type { PlannedLayer, PrintStats } from "./types.ts"
@@ -86,10 +86,27 @@ export const bedPlacement = (bounds: { min: ReadonlyArray<number>; max: Readonly
   return { dx, dy, dz, note, fits }
 }
 
+/** Layers one print may have: a layer thinner than a hundredth of a millimetre on a tall part is a unit mistake, not a print. */
+export const PRINT_MAX_LAYERS = 40_000
+/**
+ * Layers times the bead-wide cells of a layer's material (area / bead width squared): the planning and the evidence both cost
+ * about this much. At 2e9 a slice takes a few minutes; past it the job cannot finish inside the kernel's deadline.
+ */
+export const PRINT_WORK_LIMIT = 2e9
+
+/** Why a print this large cannot be sliced, or undefined: said before any layer is cut. */
+export const printWorkIssue = (layers: number, area: number, beadWidth: number, layerHeight: number): string | undefined => {
+  if (layers > PRINT_MAX_LAYERS) return `The part would take ${layers.toLocaleString("en-US")} layers of ${layerHeight} mm (the most is ${PRINT_MAX_LAYERS.toLocaleString("en-US")}): use a thicker layer`
+  const work = layers * (area / (beadWidth * beadWidth))
+  if (work > PRINT_WORK_LIMIT) return `The part is too large to slice in one job: ${layers.toLocaleString("en-US")} layers of about ${area.toFixed(0)} mm2 at a ${beadWidth} mm bead (${work.toExponential(1)} planning cells, the most is ${PRINT_WORK_LIMIT.toExponential(0)}): use a thicker layer or a wider nozzle, or print it in parts`
+  return undefined
+}
+
 const layerStack = (height: number, p: PrintProfile): { tops: number[]; heights: number[] } => {
   if (!Number.isFinite(height) || height <= 0) throw new RangeError("The model height must be finite and positive")
   const first = Math.min(p.firstLayerHeight, height)
   const count = Math.max(1, Math.ceil((height - first) / p.layerHeight - 1e-6) + 1)
+  if (count > PRINT_MAX_LAYERS) throw new RangeError(printWorkIssue(count, 1, 1, p.layerHeight)!)
   const tops: number[] = []
   const heights: number[] = []
   for (let i = 0; i < count; i++) {
@@ -139,6 +156,10 @@ export const slicePrint = (input: ReadonlyArray<Mesh64>, settings: PrinterSettin
   const partHeight = raw.max[2] - raw.min[2]
 
   const { tops: modelTops, heights } = layerStack(partHeight, profile)
+  // The part's mean cross-section (its volume over its height), never less than a tenth of its box: a box is not its material.
+  const area = Math.max(meshes.reduce((v, m) => v + Math.abs(meshVolume(m)), 0) / Math.max(partHeight, 1e-9), 0.1 * (raw.max[0] - raw.min[0]) * (raw.max[1] - raw.min[1]))
+  const tooLarge = printWorkIssue(modelTops.length + profile.raftLayers, area, profile.extrusionWidth, profile.layerHeight)
+  if (tooLarge !== undefined) throw new RangeError(tooLarge)
   const raftCount = profile.raftLayers
   const raftHeights = Array.from({ length: raftCount }, (_, r) => (r === 0 ? Math.max(profile.layerHeight, 0.3) : profile.layerHeight))
   const raftTops: number[] = []

@@ -168,6 +168,7 @@
         "@ai-sdk/openai-compatible": "3.0.62",
         "@cadcamfun/api": "workspace:*",
         "@cadcamfun/core": "workspace:*",
+        "@cadcamfun/util": "workspace:*",
         "@nikcli-ai/sdk-next": "1.428.0",
         "ai": "7.0.127",
         "effect": "4.0.0-rc.112",
@@ -243,6 +244,9 @@
         "@cadcamfun/core": "workspace:*",
         "effect": "4.0.0-rc.112",
       },
+    },
+    "packages/util": {
+      "name": "@cadcamfun/util",
     },
     "packages/vcs": {
       "name": "@cadcamfun/vcs",
@@ -521,6 +525,8 @@
     "@cadcamfun/plugin-sdk": ["@cadcamfun/plugin-sdk@workspace:packages/plugin-sdk"],
 
     "@cadcamfun/sidecar": ["@cadcamfun/sidecar@workspace:apps/sidecar"],
+
+    "@cadcamfun/util": ["@cadcamfun/util@workspace:packages/util"],
 
     "@cadcamfun/vcs": ["@cadcamfun/vcs@workspace:packages/vcs"],
 

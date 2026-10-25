@@ -1,5 +1,5 @@
 /** Lathe operations (facing, turning, boring, threading, grooving, parting, knurling). */
-import { cutLevels, f3, type GenerateOptions } from "./common.ts"
+import { GenerationBudgetError, MAX_LEVELS, cutLevels, f3, passCount, spend, type GenerateOptions } from "./common.ts"
 import type { LatheOperationType, ToolpathSettings } from "./schema.ts"
 import type { TurnedProfile } from "./history-features.ts"
 
@@ -34,7 +34,8 @@ const profileTurning = (s: ToolpathSettings, profile: TurnedProfile): string => 
   }
   const target = Math.min(s.stockDiameter!, minimum + allowance)
   const passes = Math.ceil((s.stockDiameter! - target) / (2 * s.stepdown))
-  if (passes > 10_000) throw new RangeError("Turning would require more than 10000 roughing passes")
+  if (passes > MAX_LEVELS) throw new GenerationBudgetError(`Turning would need ${passes.toLocaleString("en-US")} roughing passes (the most is ${MAX_LEVELS.toLocaleString("en-US")}): raise the stepdown`)
+  spend(passes * (points.length + 4), "The roughing of this profile")
   for (let i = 1; i <= passes; i++) pass(Math.max(target, s.stockDiameter! - 2 * s.stepdown * i), `Roughing pass ${i}`)
   pass(0, "Finishing pass: following the model envelope")
   return out
@@ -62,7 +63,7 @@ const latheTurning = (s: ToolpathSettings): string => {
   if (s.turningOperation === "external") {
     gcode += `G0 X${f3(d + 2)} Z2 ; Position tool\n`
     gcode += "G0 Z0 ; Move to face\n"
-    for (let cut = 0; cut < s.depth; cut += s.stepdown) {
+    for (let cut = 0, n = passCount(s.depth, s.stepdown, "The depth at this stepdown"); n > 0 && cut < s.depth; cut += s.stepdown, n--) {
       const currentDepth = Math.min(s.depth, cut + s.stepdown)
       const diameter = d - currentDepth * 2
       gcode += `G0 X${f3(diameter + 1)} ; Rapid to diameter\n`
@@ -75,7 +76,7 @@ const latheTurning = (s: ToolpathSettings): string => {
     const hole = d / 2
     gcode += `G0 X${f3(hole - 1)} Z2 ; Position tool\n`
     gcode += "G0 Z0 ; Move to face\n"
-    for (let cut = 0; cut < s.depth; cut += s.stepdown) {
+    for (let cut = 0, n = passCount(s.depth, s.stepdown, "The depth at this stepdown"); n > 0 && cut < s.depth; cut += s.stepdown, n--) {
       const currentDepth = Math.min(s.depth, cut + s.stepdown)
       const diameter = hole + currentDepth * 2
       gcode += `G0 X${f3(diameter - 1)} ; Rapid to diameter\n`
@@ -94,7 +95,7 @@ const latheBoring = (s: ToolpathSettings): string => {
   let gcode = "\n; Boring operation\n" + reachNote(s, s.stockLength! * 0.5)
   gcode += `G0 X${f3(start - 1)} Z2 ; Position tool\n`
   gcode += "G0 Z0 ; Move to hole entrance\n"
-  for (let cut = 0; cut < s.depth; cut += s.stepdown) {
+  for (let cut = 0, n = passCount(s.depth, s.stepdown, "The depth at this stepdown"); n > 0 && cut < s.depth; cut += s.stepdown, n--) {
     const currentDepth = Math.min(s.depth, cut + s.stepdown)
     gcode += `G1 X${f3(start + currentDepth * 2)} F${s.feedrate / 2} ; Bore to diameter\n`
     gcode += `G1 Z-${f3(boreZ)} F${s.feedrate} ; Bore along Z\n`
@@ -112,6 +113,7 @@ const latheThreading = (s: ToolpathSettings): string => {
   let gcode = "\n; Threading operation\n" + reachNote(s, s.stockLength! * 0.7 - startZ)
   gcode += `G0 X${f3(d + 5)} Z${f3(startZ)} ; Position tool\n`
   const passes = Math.round(s.depth / 0.1)
+  spend(passes * 4, "The thread at this depth")
   for (let i = 1; i <= passes; i++) {
     gcode += `G0 X${f3(d - i * 0.1 * 2)} ; Rapid to thread diameter\n`
     gcode += `G32 Z${f3(endZ)} F${pitch} ; Thread cutting move\n`
@@ -127,7 +129,7 @@ const latheGrooving = (s: ToolpathSettings): string => {
   const positionZ = -Math.max(width / 2, Math.min(20, latheReach(s) - width / 2))
   let gcode = "\n; Grooving operation\n" + reachNote(s, 20 + width / 2)
   gcode += `G0 X${f3(d + 2)} Z${f3(positionZ)} ; Position tool\n`
-  for (let cut = 0; cut < s.depth; cut += 0.5) {
+  for (let cut = 0, n = passCount(s.depth, 0.5, "The groove depth"); n > 0 && cut < s.depth; cut += 0.5, n--) {
     const currentDepth = Math.min(s.depth, cut + 0.5)
     gcode += `G1 X${f3(d - currentDepth * 2)} F${s.feedrate / 2} ; Plunge to depth\n`
     gcode += `G0 X${f3(d + 2)} ; Retract\n`

@@ -14,10 +14,27 @@ import type { Move } from "../ir.ts"
 import { type Levels } from "../params.ts"
 import { type Path, type Seg, pathLength, reversePath, segLength, segStarts, sliceSeg } from "../path.ts"
 
+/** Moves one operation may write (about the size a controller can still load); past it the operation stops with the reason. */
+export const MAX_OPERATION_MOVES = 4_000_000
+
+/** An operation that would be larger than the kernel can write or check: carries what to change. */
+export class OperationBudgetError extends RangeError {
+  override readonly name = "OperationBudgetError"
+}
+
 /** Position-tracking move builder; skips moves that would not move. */
 export class MoveBuilder {
   readonly moves: Move[] = []
   private current: Vec3 | undefined
+
+  constructor(private readonly limit: number = MAX_OPERATION_MOVES) {}
+
+  private add(move: Move): void {
+    if (this.moves.length >= this.limit) {
+      throw new OperationBudgetError(`The operation passed ${this.limit.toLocaleString("en-US")} moves: raise the stepover, stepdown or tolerance, or split the work into regions`)
+    }
+    this.moves.push(move)
+  }
 
   get pos(): Vec3 {
     if (this.current === undefined) throw new Error("MoveBuilder has no position yet; start with rapid()")
@@ -29,25 +46,25 @@ export class MoveBuilder {
   }
 
   comment(text: string): void {
-    this.moves.push({ _tag: "Comment", text })
+    this.add({ _tag: "Comment", text })
   }
 
   rapid(to: Vec3): void {
     const c = this.current
     if (c !== undefined && same(c, to)) return
-    this.moves.push({ _tag: "Rapid", to: { x: to.x, y: to.y, z: to.z } })
+    this.add({ _tag: "Rapid", to: { x: to.x, y: to.y, z: to.z } })
     this.current = { x: to.x, y: to.y, z: to.z }
   }
 
   linear(to: Vec3, feed: number): void {
     const c = this.current
     if (c !== undefined && same(c, to)) return
-    this.moves.push({ _tag: "Linear", to: { x: to.x, y: to.y, z: to.z }, feed })
+    this.add({ _tag: "Linear", to: { x: to.x, y: to.y, z: to.z }, feed })
     this.current = { x: to.x, y: to.y, z: to.z }
   }
 
   arc(to: Vec3, center: Vec2, clockwise: boolean, feed: number): void {
-    this.moves.push({
+    this.add({
       _tag: "Arc",
       to: { x: to.x, y: to.y, z: to.z },
       center: { x: center.x, y: center.y },
@@ -64,11 +81,11 @@ export class MoveBuilder {
   }
 
   dwell(seconds: number): void {
-    this.moves.push({ _tag: "Dwell", seconds })
+    this.add({ _tag: "Dwell", seconds })
   }
 
   push(move: Move): void {
-    this.moves.push(move)
+    this.add(move)
     if (move._tag === "Rapid" || move._tag === "Linear" || move._tag === "Arc") {
       this.current = { x: move.to.x, y: move.to.y, z: move.to.z }
     } else if (move._tag === "Cycle") {

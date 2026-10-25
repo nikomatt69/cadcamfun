@@ -1,5 +1,5 @@
 /** Toolpaths for selected CAD elements (legacy `generateFromSelectedElements` and the primitive generators). */
-import { above, circleSlice, cornerMoves, cutLevels, f3, fullCircleFrom, offsetDistance, offsetRadius, plunge, pointMoves, polygonPoints, ellipsePoints, rectangleCorners, retractRapid, type Pt } from "./common.ts"
+import { above, circleSlice, cornerMoves, cutLevels, f3, passCount, fullCircleFrom, offsetDistance, offsetRadius, plunge, pointMoves, polygonPoints, ellipsePoints, rectangleCorners, retractRapid, type Pt } from "./common.ts"
 import { textStrokes } from "../../cad/stroke-font.ts"
 import { elementOutline } from "./elements.ts"
 import type { CadElement, GeometryInput, ToolpathSettings } from "./schema.ts"
@@ -71,6 +71,7 @@ export const cubeFromElement = (e: CadElement, s: ToolpathSettings): string => {
 export const sphereFromElement = (e: CadElement, s: ToolpathSettings): string => {
   let gcode = `; Sphere: center (${e.x}, ${e.y}, ${e.z}), radius ${e.radius}mm\n`
   const topZ = e.z + e.radius
+  passCount(e.radius + s.depth, s.stepdown, "The sphere at this depth and stepdown")
   for (let sliceZ = topZ; sliceZ >= e.z - s.depth; sliceZ -= s.stepdown) {
     const dist = Math.abs(sliceZ - e.z)
     const sliceRadius = dist < e.radius ? Math.sqrt(e.radius * e.radius - dist * dist) : 0
@@ -97,6 +98,7 @@ export const coneFromElement = (e: CadElement, s: ToolpathSettings): string => {
   let gcode = `; Cone: base center (${e.x}, ${e.y}, ${e.z}), base radius ${e.radius}mm, height ${e.height}mm\n`
   const baseZ = e.z - e.height / 2
   const topZ = e.z + e.height / 2
+  passCount(Math.min(s.depth, e.height), s.stepdown, "The cone at this depth and stepdown")
   for (let sliceZ = baseZ; sliceZ <= Math.min(baseZ + s.depth, topZ); sliceZ += s.stepdown) {
     const sliceRadius = e.radius * (1 - (sliceZ - baseZ) / e.height)
     if (sliceRadius <= s.toolDiameter / 2) continue
@@ -115,6 +117,7 @@ export const torusFromElement = (e: CadElement, s: ToolpathSettings): string => 
   const topZ = e.z + minor
   const bottomZ = e.z - minor
   const tool = s.toolDiameter / 2
+  passCount(Math.min(s.depth, topZ - bottomZ), s.stepdown, "The torus at this depth and stepdown")
   for (let sliceZ = topZ; sliceZ >= Math.max(bottomZ, topZ - s.depth); sliceZ -= s.stepdown) {
     const dist = Math.abs(sliceZ - e.z)
     if (dist > minor) continue

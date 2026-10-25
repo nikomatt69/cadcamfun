@@ -14,10 +14,43 @@ export type Pt = readonly [number, number]
 
 export const f3 = (n: number): string => n.toFixed(3)
 
+// -- generation budget --------------------------------------------------------------------------
+
+/** Z levels one operation may have: a depth over a stepdown beyond this is a typo in a unit, not a tool path. */
+export const MAX_LEVELS = 200_000
+/** Moves one generator run may write, about 100 MB of text: past it a controller cannot load the program and the run cannot hold it. */
+export const MAX_MOVES = 2_000_000
+
+/** A request whose program would be larger than the generator can write: it names the quantity that is too large. */
+export class GenerationBudgetError extends RangeError {
+  override readonly name = "GenerationBudgetError"
+}
+
+let spent = 0
+
+/** Starts the move budget of one generator run (the generator is synchronous: one run at a time). */
+export const resetBudget = (): void => { spent = 0 }
+
+/** Counts `moves` against the run's budget; throws `GenerationBudgetError` past `MAX_MOVES`. `what` names the quantity. */
+export const spend = (moves: number, what: string): void => {
+  spent += moves
+  if (!(spent <= MAX_MOVES)) {
+    throw new GenerationBudgetError(`${what} would take the program past ${MAX_MOVES.toLocaleString("en-US")} moves${Number.isFinite(spent) ? ` (${Math.round(spent).toLocaleString("en-US")} so far)` : ""}: raise the stepdown or the stepover, shorten the depth, or split the job`)
+  }
+}
+
+/** Number of passes of `depth` in steps of `step`, refused when it passes `MAX_LEVELS`. */
+export const passCount = (depth: number, step: number, what = "The depth at this stepdown"): number => {
+  if (!Number.isFinite(depth) || !Number.isFinite(step) || depth <= 0 || step <= 0) return 0
+  const count = Math.ceil(depth / step - 1e-9)
+  if (count > MAX_LEVELS) throw new GenerationBudgetError(`${what} needs ${count.toLocaleString("en-US")} passes (the most is ${MAX_LEVELS.toLocaleString("en-US")}): raise the stepdown or shorten the depth`)
+  spend(count, what)
+  return count
+}
+
 /** Cut levels, negative, from `-stepdown` down to exactly `-depth`. */
 export const cutLevels = (depth: number, stepdown: number): number[] => {
-  if (!Number.isFinite(depth) || !Number.isFinite(stepdown) || depth <= 0 || stepdown <= 0) return []
-  const count = Math.ceil(depth / stepdown - 1e-9)
+  const count = passCount(depth, stepdown)
   const levels: number[] = []
   for (let i = 1; i <= count; i++) levels.push(-Math.min(depth, i * stepdown))
   return levels

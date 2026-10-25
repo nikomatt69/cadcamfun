@@ -23,6 +23,7 @@
  *  - unknown element types get the generic contour without the nested program header the legacy wrapper added.
  */
 import { adaptFeeds, convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
+import { GenerationBudgetError, resetBudget } from "./common.ts"
 import { detectFixedCycles } from "./cycles.ts"
 import { analyseGcode } from "./analysis.ts"
 import { programRecord } from "./evidence.ts"
@@ -45,7 +46,7 @@ export * from "./elements.ts"
 export * from "./analysis.ts"
 export * from "./estimates.ts"
 export * from "./machine-config.ts"
-export { cutLevels, applyOriginOffset, type GenerateOptions } from "./common.ts"
+export { cutLevels, applyOriginOffset, GenerationBudgetError, MAX_LEVELS, MAX_MOVES, type GenerateOptions } from "./common.ts"
 export { orderPoints, pocketShape, elementOperation } from "./actions.ts"
 export { selectedToolpath, millToolpath, originShift, stockComment, stockInWork, withinStock } from "./dispatch.ts"
 export { generateMillGCode } from "./mill.ts"
@@ -231,7 +232,18 @@ export const generateToolpath = (request: GenerateRequest, options: GenerateRunO
   ]
   const enter = (stage: GenerateStage): void => options.onProgress?.({ stage, step: { index: stages.indexOf(stage), count: stages.length } })
   enter("toolpath")
-  const generated = text(request)
+  // A request the generator cannot write is answered with the reason, not a fault: too many passes, or a program past what text can hold.
+  const generated = (() => {
+    try {
+      resetBudget()
+      return text(request)
+    } catch (cause) {
+      const tooLarge = cause instanceof GenerationBudgetError || (cause instanceof RangeError && /string length|array length|out of memory/i.test(cause.message))
+      if (!tooLarge) throw cause
+      const message = cause instanceof GenerationBudgetError ? cause.message : "The program is larger than the generator can hold: raise the stepdown or the stepover, or split the job"
+      return { gcode: `; Error: ${message}\n`, error: message } as ReturnType<typeof text>
+    }
+  })()
   let gcode = generated.gcode
   if (optimize) { enter("optimize"); gcode = optimizeToolpath(gcode, settings.tolerance) }
   if (arcs) { enter("arcs"); gcode = convertLinesToArcs(gcode, settings.tolerance) }

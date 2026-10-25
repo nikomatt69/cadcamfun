@@ -1,5 +1,5 @@
 /** Toolpaths for the panel's own geometry types (rectangle, circle, polygon). */
-import { applyOriginOffset, cutLevels, f3, fullCircleFrom, offsetDistance, offsetRadius, circleWords, pointMoves, cornerMoves, retractRapid, type Pt } from "./common.ts"
+import { applyOriginOffset, cutLevels, spend, f3, fullCircleFrom, offsetDistance, offsetRadius, circleWords, pointMoves, cornerMoves, retractRapid, type Pt } from "./common.ts"
 import type { GeometryInput, ToolpathSettings } from "./schema.ts"
 
 // -- basic geometry toolpaths --------------------------------------------------------------------
@@ -13,6 +13,10 @@ export const rectangleToolpath = (s: ToolpathSettings, g: GeometryInput): string
   const baseY = -height / 2
   const start = applyOriginOffset(s, g, baseX, baseY)
   const levels = cutLevels(s.depth, s.stepdown)
+  if (s.operationType === "pocket") {
+    const step = s.toolDiameter * (s.stepover / 100)
+    spend(levels.length * Math.max(Math.ceil(width / step), Math.ceil(height / step)) * 5, "The rectangular pocket at this depth and stepover")
+  }
   levels.forEach((z, index) => {
     gcode += `\n; Z Level: ${z}\n`
     if (index > 0) gcode += retractRapid(5)
@@ -58,7 +62,9 @@ export const pt = (p: { x: number; y: number }): Pt => [p.x, p.y]
 export const circleToolpath = (s: ToolpathSettings, g: GeometryInput): string => {
   let gcode = "; Circle toolpath\n"
   const radius = offsetRadius(s, g.circleRadius)
-  cutLevels(s.depth, s.stepdown).forEach((z, index) => {
+  const levels = cutLevels(s.depth, s.stepdown)
+  if (s.operationType === "pocket") spend(levels.length * Math.ceil(radius / (s.toolDiameter * (s.stepover / 100))) * 2, "The circular pocket at this depth and stepover")
+  levels.forEach((z, index) => {
     gcode += `\n; Z Level: ${z}\n`
     if (index > 0) gcode += retractRapid(5)
     if (s.operationType === "pocket") {
@@ -89,7 +95,9 @@ export const circleToolpath = (s: ToolpathSettings, g: GeometryInput): string =>
 export const polygonToolpath = (s: ToolpathSettings, g: GeometryInput): string => {
   let gcode = `; Polygon toolpath (${g.polygonSides} sides)\n`
   const radius = offsetRadius(s, g.polygonRadius)
-  cutLevels(s.depth, s.stepdown).forEach((z, index) => {
+  const levels = cutLevels(s.depth, s.stepdown)
+  spend(levels.length * (g.polygonSides + 1) * (s.operationType === "pocket" ? Math.ceil(radius / (s.toolDiameter * (s.stepover / 100))) : 1), "The polygon at this depth and stepover")
+  levels.forEach((z, index) => {
     gcode += `\n; Z Level: ${z}\n`
     if (index > 0) gcode += retractRapid(5)
     if (s.operationType === "pocket") {

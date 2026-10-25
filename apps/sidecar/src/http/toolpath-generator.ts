@@ -1,4 +1,4 @@
-import { runKernelJob } from "@cadcamfun/ai"
+import { KernelJobError, runKernelJob } from "@cadcamfun/ai"
 import { Api, BadRequest, CurrentUser, InternalError } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
 import { Effect } from "effect"
@@ -42,7 +42,10 @@ export const ToolpathGeneratorHandlers = HttpApiBuilder.group(Api, "toolpathGene
           try: (signal) => runKernelJob("cam-generate", request, { signal, ...(report !== undefined ? { onProgress: report } : {}) }),
           catch: (cause) => cause
         }).pipe(
-          Effect.catch((cause) => Effect.logError("Failed to generate toolpath", cause).pipe(Effect.andThen(Effect.fail(new InternalError({ message: "Failed to generate toolpath" }))))),
+          Effect.catch((cause) => cause instanceof KernelJobError && cause.explained
+            // A run that passes its deadline, finds the queue full or is killed for memory is the request's size, not a fault: the caller is told to cut the job down.
+            ? Effect.fail<BadRequest | InternalError>(new BadRequest({ message: cause.reason === "cancelled" ? cause.message : `${cause.message} ${cause.reason === "busy" ? "" : "Reduce the part, the layer height or the stepover, or split the job."}`.trim() }))
+            : Effect.logError("Failed to generate toolpath", cause).pipe(Effect.andThen(Effect.fail<BadRequest | InternalError>(new InternalError({ message: "Failed to generate toolpath" }))))),
           Effect.onInterrupt(() => Effect.sync(() => report?.("cancelled")))
         )
         report?.("done")

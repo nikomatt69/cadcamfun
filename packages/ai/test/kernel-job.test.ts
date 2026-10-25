@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { KernelJobError, kernelWorkerUrl, runKernelJob, runKernelJobInline } from "../src/kernel-job.ts"
+import { KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, clearKernelJobCache, kernelJobStats, kernelWorkerUrl, runKernelJob, runKernelJobInline } from "../src/kernel-job.ts"
 import type { AcceptanceCheck } from "../src/acceptance.ts"
 import { cam } from "@cadcamfun/core"
 import { Schema } from "effect"
@@ -78,6 +78,7 @@ describe("the CAM kernel as a worker job", () => {
   }
 
   test("the worker returns the NC the inline run returns, and reports progress on the way", async () => {
+    clearKernelJobCache()
     const seen: string[] = []
     const inline = runKernelJobInline("cam-manufacture", camJob)
     const worker = await runKernelJob("cam-manufacture", camJob, { onProgress: (p) => seen.push(p.stage) })
@@ -88,6 +89,7 @@ describe("the CAM kernel as a worker job", () => {
   })
 
   test("aborting the caller's signal ends the job at once with a cancelled error", async () => {
+    clearKernelJobCache()
     const controller = new AbortController()
     const run = runKernelJob("cam-manufacture", camJob, { signal: controller.signal })
     controller.abort()
@@ -122,5 +124,107 @@ describe("the toolpath generator as a worker job", () => {
     expect(worker.response.gcode).toBe(inline.response.gcode)
     expect(seen[0]).toBe("toolpath")
     expect(seen.slice(-2)).toEqual(["cycles", "record"])
+  })
+})
+
+describe("the job queue, the shared runs and the result cache", () => {
+  const base = {
+    schemaVersion: 1 as const, id: "q", name: "Plate", material: "6061", part: { kind: "elements" as const, elements: [{ id: "plate", type: "cube", width: 30, height: 20, depth: 5 }] },
+    machine: cam.kernel.findMachine("vmc-standard")!, quality: { resolution: 0.4 }
+  }
+  const distinct = (n: number) => ({ ...base, id: `q${n}` })
+
+  test("an identical request that ran lately is answered from the cache, and a different one is not", async () => {
+    clearKernelJobCache()
+    const first = await runKernelJob("cam-manufacture", base)
+    const before = kernelJobStats()
+    const progress: string[] = []
+    const again = await runKernelJob("cam-manufacture", { ...base }, { onProgress: (p) => progress.push(p.stage) })
+    expect(again).toBe(first)
+    expect(progress).toEqual([])
+    expect(kernelJobStats().hits).toBe(before.hits + 1)
+    const other = await runKernelJob("cam-manufacture", distinct(1))
+    expect(other).not.toBe(first)
+    expect(kernelJobStats().cached).toBe(2)
+    clearKernelJobCache()
+    expect(kernelJobStats().cached).toBe(0)
+    expect(kernelJobStats().cachedBytes).toBe(0)
+  })
+
+  test("two identical requests at once run once; both get the result and the progress", async () => {
+    clearKernelJobCache()
+    const a: string[] = [], b: string[] = []
+    const first = runKernelJob("cam-manufacture", base, { onProgress: (p) => a.push(p.stage) })
+    const second = runKernelJob("cam-manufacture", base, { onProgress: (p) => b.push(p.stage) })
+    expect(kernelJobStats().inFlight).toBe(1)
+    const [x, y] = await Promise.all([first, second])
+    expect(x).toBe(y)
+    expect(a.slice(-3)).toEqual(["post", "replay", "evidence"])
+    expect(b.slice(-3)).toEqual(["post", "replay", "evidence"])
+    expect(kernelJobStats().inFlight).toBe(0)
+  })
+
+  test("one caller leaving does not cancel the run the other waits for; the last one leaving does", async () => {
+    clearKernelJobCache()
+    const one = new AbortController()
+    const left = runKernelJob("cam-manufacture", base, { signal: one.signal })
+    const stays = runKernelJob("cam-manufacture", base)
+    one.abort()
+    await expect(left).rejects.toMatchObject({ reason: "cancelled" })
+    expect((await stays).status).toBe("ok")
+
+    clearKernelJobCache()
+    const alone = new AbortController()
+    const only = runKernelJob("cam-manufacture", distinct(2), { signal: alone.signal })
+    alone.abort()
+    await expect(only).rejects.toMatchObject({ reason: "cancelled" })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(kernelJobStats().inFlight).toBe(0)
+    expect(kernelJobStats().cached).toBe(0)
+  })
+
+  test("no more than the worker slots run at once; the rest wait, and past the queue limit a job is refused as busy", async () => {
+    clearKernelJobCache()
+    let peak = 0
+    const watch = setInterval(() => { peak = Math.max(peak, kernelJobStats().running) }, 2)
+    const jobs = Array.from({ length: KERNEL_WORKERS + KERNEL_QUEUE_LIMIT + 1 }, (_, i) => runKernelJob("cam-plan", distinct(100 + i)).then((r) => r.status, (e: KernelJobError) => e.reason))
+    expect(kernelJobStats().running).toBe(KERNEL_WORKERS)
+    expect(kernelJobStats().waiting).toBe(KERNEL_QUEUE_LIMIT)
+    const outcomes = await Promise.all(jobs)
+    clearInterval(watch)
+    expect(peak).toBeLessThanOrEqual(KERNEL_WORKERS)
+    expect(outcomes.filter((o) => o === "busy")).toHaveLength(1)
+    expect(outcomes.filter((o) => o === "ok")).toHaveLength(KERNEL_WORKERS + KERNEL_QUEUE_LIMIT)
+    expect(kernelJobStats().running).toBe(0)
+    expect(kernelJobStats().waiting).toBe(0)
+  })
+
+  test("a job that fails is not cached", async () => {
+    clearKernelJobCache()
+    const bad = { ...base, part: { kind: "elements" as const, elements: "nope" as never } }
+    await expect(runKernelJob("cam-manufacture", bad)).rejects.toBeInstanceOf(KernelJobError)
+    expect(kernelJobStats().cached).toBe(0)
+  })
+
+  test("a worker the system kills is reported at once with its exit code, not at the deadline", async () => {
+    const before = kernelJobStats().counters
+    const started = performance.now()
+    const error = await runKernelJob("parametric-report", { history: plate }, { workerUrl: new URL("./dying-worker.ts", import.meta.url).href, deadlineMs: 60_000 }).catch((cause: unknown) => cause)
+    expect(performance.now() - started).toBeLessThan(5_000)
+    expect(error).toBeInstanceOf(KernelJobError)
+    expect((error as KernelJobError).reason).toBe("crashed")
+    expect((error as KernelJobError).message).toMatch(/exit code 7.*out of memory or crashed/)
+    expect(kernelJobStats().counters.workerExited).toBe(before.workerExited + 1)
+    expect(kernelJobStats().running).toBe(0)
+  })
+
+  test("the counters tell what happened to the jobs", async () => {
+    const c = kernelJobStats().counters
+    expect(c.started).toBeGreaterThan(0)
+    expect(c.completed).toBeGreaterThan(0)
+    expect(c.busy).toBeGreaterThanOrEqual(1)
+    expect(c.cacheHits).toBeGreaterThanOrEqual(1)
+    expect(c.aborted).toBeGreaterThanOrEqual(1)
+    expect(kernelJobStats().rssBytes).toBeGreaterThan(0)
   })
 })

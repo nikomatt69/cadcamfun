@@ -402,6 +402,23 @@ export interface KernelProgress {
 export interface RunOptions extends PrepareOptions {
   readonly onProgress?: (progress: KernelProgress) => void
   readonly signal?: { readonly aborted: boolean }
+  /** Cell visits the stock replay may spend (default `REPLAY_WORK_LIMIT`); a program past it is replayed up to the budget and the rest reported unchecked. */
+  readonly replayWorkLimit?: number
+}
+
+/**
+ * Cell visits the stock replay of one job may spend (a sample of the path touches the columns under the cutter). A program whose
+ * replay would pass it is replayed up to the budget and the rest is reported unchecked, never silently passed.
+ */
+export const REPLAY_WORK_LIMIT = 1.5e10
+
+/** Columns of the replayed stock a job may use: the replay and the rest cuts touch every one, so this is what keeps a huge stock inside the job's deadline and memory. */
+export const MAX_REPLAY_CELLS = 8_000_000
+
+/** The replay cell for a stock of this footprint: the one asked for, or the finest one that keeps the stock within `MAX_REPLAY_CELLS` columns. */
+export const replayCell = (wanted: number, width: number, depth: number): number => {
+  const floor = Math.sqrt((Math.max(width, 1e-6) * Math.max(depth, 1e-6)) / MAX_REPLAY_CELLS)
+  return wanted >= floor ? wanted : floor * 1.001
 }
 
 class Cancelled extends Error {}
@@ -412,14 +429,14 @@ export const executeJob = (prepared: PreparedJob, options: RunOptions = {}): Cam
     return executeJobWith(prepared, (progress) => {
       if (options.signal?.aborted === true) throw new Cancelled()
       options.onProgress?.(progress)
-    })
+    }, options.replayWorkLimit ?? REPLAY_WORK_LIMIT)
   } catch (error) {
     if (error instanceof Cancelled) return { status: "failed", issues: [issue("Cancelled", "prepare", "The job was cancelled before it finished; no artifact was produced")] }
     throw error
   }
 }
 
-const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProgress) => void): CamResult<CamArtifact> => {
+const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProgress) => void, replayLimit: number): CamResult<CamArtifact> => {
   const { job, material, tools, machine, origin, stock, operations } = prepared
   const issues: CamIssue[] = []
   const o = origin
@@ -432,7 +449,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const sMax = { x: stock.max.x - o.x, y: stock.max.y - o.y, z: stock.max.z - o.z }
   const width = sMax.x - sMin.x, depthY = sMax.y - sMin.y
   const partBottom = prepared.bounds.min[2] - o.z
-  const cell = prepared.job.quality?.resolution ?? Math.min(0.5, Math.max(0.15, Math.sqrt((width * depthY) / 150_000)))
+  const wanted = prepared.job.quality?.resolution ?? Math.min(0.5, Math.max(0.15, Math.sqrt((width * depthY) / 150_000)))
+  const cell = replayCell(wanted, width, depthY)
+  if (cell > wanted * 1.0001) issues.push(issue("UnsupportedCapability", "replay", `A replay cell of ${wanted.toFixed(3)} mm would need ${Math.ceil((width / wanted) * (depthY / wanted)).toLocaleString("en-US")} columns for this stock: the replay uses ${cell.toFixed(3)} mm to stay within ${MAX_REPLAY_CELLS.toLocaleString("en-US")} (the tolerance budget carries the coarser cell)`, { severity: "warning" }))
   const nx = Math.max(1, Math.ceil(width / cell)), ny = Math.max(1, Math.ceil(depthY / cell))
   const field = (): HeightField => new HeightField(nx, ny, sMin.x, sMin.y, width, depthY, sMin.z, sMax.z)
   const provisional = field()
@@ -804,6 +823,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     gougeColumns = columns
     gougeDepth = Math.max(gougeDepth, deepest)
   }
+  let replayStoppedAt: number | undefined
   if (interpreted !== undefined) {
     let lastOp: number | undefined
     const cellSize = Math.min(hf.cellX, hf.cellY)
@@ -820,6 +840,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     if (turnedStock !== undefined) carryHeightField(turnedStock, provisional)
     turnedVoxels = turnedStock
     let angles: RotaryAngles = { a: 0, b: 0, c: 0 }
+    let replayWork = 0
     for (const s of interpreted.segments as ReadonlyArray<GSegment>) {
       if (s.kind === "dwell") continue
       if (s.kind !== "arc" && s.rotary !== undefined) {
@@ -868,6 +889,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       }
       const model = modelOf(n)
       const cutter = cutterByNumber.get(n)!
+      const reach = model.radius / cellSize
+      replayWork += ((Math.hypot(s.to.x - s.from.x, s.to.y - s.from.y, s.to.z - s.from.z) * (s.kind === "arc" ? 1.6 : 1)) / sampleStep(cellSize, model.radius) + 1) * (Math.PI * reach * reach + 1)
+      if (replayWork > replayLimit) { replayStoppedAt = s.line; break }
       let removed = 0
       forEachSample(seg, sampleStep(cellSize, model.radius), (x, y, z) => {
         if (seg.rapid) {
@@ -912,6 +936,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   for (let k = 0; k < hf.top.length; k++) {
     const excess = hf.top[k]! - targetMax[k]!
     if (excess > allowed) { remainingVolume += (excess - allowed) * hf.cellArea; maxRemaining = Math.max(maxRemaining, excess) }
+  }
+  if (replayStoppedAt !== undefined) {
+    // What the stopped replay left is not the program's remaining stock: it is not reported as such.
+    remainingVolume = 0; maxRemaining = 0
+    issues.push(issue("ReplayMismatch", "replay", `The stock replay stopped at NC line ${replayStoppedAt}: the program is larger than the ${replayLimit.toExponential(0)} cell-visit replay budget, so the rest is not checked against the stock (raise the replay cell, or split the job)`, { severity: "warning", line: replayStoppedAt }))
   }
   if (maxRemaining > 0) issues.push(issue("RemainingStock", "evidence", `${remainingVolume.toFixed(1)} mm³ of material is left above the part, up to ${maxRemaining.toFixed(3)} mm thick (corners smaller than the finishing cutter, or features not machined)`, { severity: "warning" }))
 
@@ -1027,6 +1056,13 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       detail: table === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves turn the table (A/B/C): the rotating part body is not modelled, so they are not checked` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table`
     }
   ]
+  if (replayStoppedAt !== undefined) {
+    for (const c of claims) {
+      if ((c.id === "no-rapid-in-stock" || c.id === "holder-clearance" || c.id === "no-gouge" || c.id === "material-removed") && c.status === "passed") {
+        claims[claims.indexOf(c)] = { id: c.id, status: "unresolved", detail: `Replay stopped at NC line ${replayStoppedAt} (replay budget): the program after it is not checked. ${c.detail}` }
+      }
+    }
+  }
   const hidden = hiddenSurfaces(prepared.meshes, prepared.bounds.min[2], Math.max(1e-6, prepared.tolerance))
   const skippedSamples = finalOutcomes.reduce((sum, outcome) => sum + (typeof outcome.parameters["skippedSamples"] === "number" ? outcome.parameters["skippedSamples"] : 0), 0)
   if (hidden > 0 || skippedSamples > 0) {

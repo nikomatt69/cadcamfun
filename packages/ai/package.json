@@ -16,6 +16,7 @@
     "@ai-sdk/openai-compatible": "3.0.62",
     "@cadcamfun/api": "workspace:*",
     "@cadcamfun/core": "workspace:*",
+    "@cadcamfun/util": "workspace:*",
     "@nikcli-ai/sdk-next": "1.428.0",
     "ai": "7.0.127",
     "effect": "4.0.0-rc.112",

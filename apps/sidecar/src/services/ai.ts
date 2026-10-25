@@ -1425,8 +1425,8 @@ const toolHandlers = Effect.gen(function*() {
 
 /** A kernel worker stopped by the assistant's abort or its deadline answers like a failed run, with a typed issue; other faults rethrow. */
 const cancelled = (error: unknown): { readonly status: "failed"; readonly issues: ReadonlyArray<cam.kernel.CamIssue> } => {
-  if (!(error instanceof KernelJobError) || error.reason === "failed" || error.reason === "crashed") throw error
-  return { status: "failed", issues: [{ tag: error.reason === "deadline" ? "GenerationFailed" : "Cancelled", severity: "error", stage: "prepare", message: error.message }] }
+  if (!(error instanceof KernelJobError) || !error.explained) throw error
+  return { status: "failed", issues: [{ tag: error.reason === "cancelled" ? "Cancelled" : "GenerationFailed", severity: "error", stage: "prepare", message: error.message }] }
 }
 
 export const ToolHandlersLive = Layer.effect(ToolHandlers, toolHandlers.pipe(Effect.map((h) => ToolHandlers.of(h))))
