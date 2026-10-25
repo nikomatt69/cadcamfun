@@ -53,6 +53,8 @@
 :root[data-glass] .ui-popover,
 :root[data-glass] .reference-popover,
 :root[data-glass] .ui-toast,
+:root[data-glass] .title-block,
+:root[data-glass] .title-block-tools,
 :root[data-glass] .ui-palette-panel {
   background: var(--glass-fill-strong) !important;
   -webkit-backdrop-filter: var(--glass-blur);
@@ -121,6 +123,8 @@
   :root[data-glass] .ui-popover,
   :root[data-glass] .reference-popover,
   :root[data-glass] .ui-toast,
+  :root[data-glass] .title-block,
+  :root[data-glass] .title-block-tools,
   :root[data-glass] .ui-palette-panel {
     background: Canvas !important;
     -webkit-backdrop-filter: none;

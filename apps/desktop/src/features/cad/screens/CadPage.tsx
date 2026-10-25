@@ -239,8 +239,8 @@ export default function CadPage(): JSX.Element {
               onComponentPlaced={() => { toast.success("Component placed successfully!"); setLibraryComponent(null) }}
               onReady={setCanvas} onSave={openExport}
               footerActions={<CADAssistantButton isVisible={showAssistant()} toggleVisibility={toggleAssistant} />}
+              footerDock={<TitleBlockOverlay mode={cad.viewMode} />}
             />
-            <TitleBlockOverlay mode={cad.viewMode} />
             <Show when={cad.showDimensions && canvas()}>{(api) => <DimensionsOverlay scene={api().scene} camera={api().camera} />}</Show>
             <Show when={showFloating()}>
               <FloatingToolbar initialPosition={{ x: 100, y: 100 }} onClose={() => setShowFloating(false)} library={() => <LibraryBrowser onSelectComponent={pickComponent} />} ai={() => <button class="cad-ribbon-action" onClick={() => app.setPanelOpen(true)}>{t("ai.title")}</button>} />

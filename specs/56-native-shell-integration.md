@@ -151,7 +151,7 @@ that call existing CAM APIs without algorithm changes, and the existing desktop 
 | E least privilege, CSP additions | implemented; configuration tests pass; ad-hoc bundle sidecar smoke passes |
 | E2 native clipboard | implemented; all 8 callers use native write-only transport with browser fallback |
 | E3 production reload protection | implemented in release only; plugin-generated script regression and native checks pass |
-| F supervision | implemented: loopback health checks, bounded failure/restart policy, sleep-gap reset, pidfile recovery and expiring job activity leases; real macOS/Windows/Linux power behavior still needs platform smoke |
+| F supervision | implemented 2026-10-25: health probe (3 misses, GET only, never replays a request), one restart earned per 10 min healthy, wake detected by wall-clock gap, pidfile `sidecar.pid` (pid + start time + name verified before any kill), `panic.rs` hook, `begin_job_activity`/`end_job_activity` (macOS `performActivity`, 90 s lease, no-op elsewhere) called from `live-sync.ts`, restart/recovery toasts from `sidecar-status`; Dock progress is indeterminate only (`core:window:allow-set-progress-bar`); Rust tests pass (129 lib + stub-sidecar); a hidden-window App Nap run, a real sleep/wake and Windows/Linux paths need a GUI/platform smoke |
 | G quality gates | implemented: deny/audit CI, panic hook, dev profile, pinned MSRV floor/toolchain, HTTPS timestamp, stub handshake test |
 | H boundary | deferred; requires its own spec and compatibility rollout |
 | I owner-requested follow-up qualification | benchmark, autosave regression tests and signed-bundle smoke implemented; Developer ID/notarized CI and native GUI checks await their platform/credential environment |

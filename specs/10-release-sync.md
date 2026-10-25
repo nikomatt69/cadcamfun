@@ -295,6 +295,8 @@ Earlier checkpoints:
 
 ## 7. Change log
 
+- 2026-10-25: the updater could never install anything: GitHub rewrites the name of an uploaded release asset (a space becomes a dot), so the bundle the builder produced — `CADCAM FUN.app.tar.gz` — was stored as `CADCAM.FUN.app.tar.gz`, while the manifest kept the builder's name and pointed at `…CADCAM%20FUN.app.tar.gz`. The download answered 404 on every platform and the install failed with "the update could not be installed". The release asset name is now normalised once, where it is created (`releaseAssetName` in `scripts/release-helpers.ts`), so the staged file, the manifest and the uploaded asset carry the same name. The webview now reads the shell's refusal out of its own error shape (`{ kind, message: { reason } }`), so the reason — and the shell's own wording — reaches the user instead of one generic sentence. The corrected manifest of the published v0.1.20 release is in `scripts/release-latest-v0.1.20.json`; publishing it is a separate, explicit act.
+
 - 2026-10-24 follow-up: expose preparation, desktop builds and completion as separate jobs in `ci-pipeline.yml`; defer GitHub release creation until all six targets pass asset verification. Manual release commands dispatch the full CI pipeline.
 
 - 2026-10-24: replace six platform releases plus an index with one release per version, following nikcli's desktop artifact uploads. Consolidate installers, signatures and checksums before publication; point updater and Homebrew downloads at the same version tag. Historical releases remain unchanged.

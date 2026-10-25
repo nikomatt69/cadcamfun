@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   checkForUpdates, decodeUpdateEvent, dismissUpdate, formatBytes, initialUpdateView, installFailed, installPendingUpdate, observeUpdates, percentOf, reduceUpdate, releaseNotesOf, reopenUpdate,
-  restartAfterUpdate, type UpdateEvent, type UpdateView
+  restartAfterUpdate, updateFailure, type UpdateEvent, type UpdateView
 } from "../src/app/updates.ts"
 
 const available = (patch: Partial<Extract<UpdateEvent, { status: "available" }>> = {}): UpdateEvent =>
@@ -184,5 +184,26 @@ describe("restarting into the update", () => {
     const calls: string[] = []
     expect(await checkForUpdates(async (command) => { calls.push(command) })).toBe(true)
     expect(calls).toEqual(["check_for_updates"])
+  })
+})
+
+describe("why an update was refused", () => {
+  test("the reason is read from the shell's own error shape", () => {
+    // The command error wraps the update error: the reason sits one level down.
+    expect(updateFailure({ kind: "update", message: { reason: "unsavedWork" } }).reason).toBe("unsavedWork")
+    // A bare update error carries it at the top.
+    expect(updateFailure({ reason: "noneAvailable" }).reason).toBe("noneAvailable")
+    expect(updateFailure({ kind: "update", message: { reason: "busy" } }).reason).toBe("busy")
+  })
+
+  test("what the shell said is kept, so the reason is never a bare word", () => {
+    expect(updateFailure({ kind: "update", message: { reason: "failed", message: "the download answered 404" } }).message)
+      .toBe("the download answered 404")
+    expect(updateFailure("the installer refused").message).toBe("the installer refused")
+  })
+
+  test("an error that is not one of ours still says something", () => {
+    expect(updateFailure(null)).toEqual({})
+    expect(updateFailure(undefined)).toEqual({})
   })
 })

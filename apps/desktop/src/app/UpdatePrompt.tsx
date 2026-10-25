@@ -6,7 +6,7 @@ import { toast } from "../shared/ui/toast.tsx"
 import { projectSession } from "../features/projects/lib/project-session.ts"
 import {
   checkForUpdates, dismissUpdate, formatBytes, initialUpdateView, installFailed, installPendingUpdate, observeUpdates, openReleaseNotes, percentOf,
-  reduceUpdate, releaseNotesOf, reopenUpdate, restartAfterUpdate, type AvailableUpdate, type UpdateEvent, type UpdateView
+  reduceUpdate, releaseNotesOf, reopenUpdate, restartAfterUpdate, updateFailure, type AvailableUpdate, type UpdateEvent, type UpdateView
 } from "./updates.ts"
 
 const PRIMARY = "rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
@@ -37,8 +37,13 @@ export function UpdatePrompt(): JSX.Element {
   })
 
   const fail = (cause: unknown): void => {
-    const reason = (cause as { reason?: string } | null)?.reason
-    toast.error(reason === "unsavedWork" ? t("update.unsavedWork") : t("update.failed"))
+    const { reason, message } = updateFailure(cause)
+    // The shell says why in its own words; a reason the dialog knows gets its
+    // own sentence, and anything else is shown as it arrived.
+    if (reason === "unsavedWork") { toast.error(t("update.unsavedWork")); return }
+    if (reason === "noneAvailable") { toast.error(t("update.noneAvailable")); return }
+    if (reason === "busy") { toast.error(t("update.busy")); return }
+    toast.error(message !== undefined && message.trim() !== "" ? `${t("update.failed")} ${message}` : t("update.failed"))
   }
   const install = async (): Promise<void> => {
     setBusy(true)

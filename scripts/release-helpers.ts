@@ -122,10 +122,27 @@ export function bundleRoot(srcTauri: string, triple: string, cargoTargetDir?: st
 
 const INSTALLER = /(?:\.app\.tar\.gz|\.AppImage(?:\.tar\.gz)?|\.dmg|\.exe|\.msi|\.deb|\.rpm)(?:\.sig)?$/i;
 
+/**
+ * The name GitHub gives an uploaded asset.
+ *
+ * GitHub rewrites the file name of an uploaded release asset: every character
+ * outside `[A-Za-z0-9._-]` becomes a dot. The product name carries a space, so
+ * the bundle the builder produces — "CADCAM FUN.app.tar.gz" — is stored as
+ * "CADCAM.FUN.app.tar.gz".
+ *
+ * A manifest built from the builder's name therefore points at a file that does
+ * not exist, and the update download answers 404: the updater offers a release
+ * it can never install. The name is normalised here, once, so the staged file,
+ * the manifest and the uploaded asset are the same name.
+ */
+export function releaseAssetName(name: string): string {
+  return name.replace(/[^A-Za-z0-9._-]/g, ".");
+}
+
 export function indexArtifacts(paths: readonly string[], triple: string): { source: string; name: string }[] {
   targetInfo(triple);
   const indexed = paths.filter((path) => INSTALLER.test(path)).map((source) => ({
-    source, name: `${triple}--${basename(source)}`,
+    source, name: `${triple}--${releaseAssetName(basename(source))}`,
   })).sort((a, b) => a.name.localeCompare(b.name));
   const names = new Set<string>();
   for (const entry of indexed) {

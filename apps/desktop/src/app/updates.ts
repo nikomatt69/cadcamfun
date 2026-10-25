@@ -146,6 +146,36 @@ export const installPendingUpdate = async (session: Pick<ProjectSession, "flush"
   finally { applyingCommand = false }
 }
 
+/**
+ * Why the shell refused an update.
+ *
+ * The native side answers with its own error shape: the command error wraps the
+ * update error, so the reason sits one level down (`{ kind, message: { reason } }`)
+ * while a bare update error carries it at the top (`{ reason }`). Reading only
+ * the top level found nothing, and every failure looked the same to the user.
+ */
+export interface UpdateFailure {
+  /** The machine-readable reason, when there is one. */
+  readonly reason?: string
+  /** What the shell said, in its own words. */
+  readonly message?: string
+}
+
+export const updateFailure = (cause: unknown): UpdateFailure => {
+  if (cause === null || typeof cause !== "object") return typeof cause === "string" ? { message: cause } : {}
+  const outer = cause as { reason?: unknown; message?: unknown }
+  const reason = typeof outer.reason === "string" ? outer.reason : undefined
+  const inner = outer.message
+  const nested = inner !== null && typeof inner === "object"
+    ? (inner as { reason?: unknown; message?: unknown })
+    : undefined
+  const nestedReason = typeof nested?.reason === "string" ? nested.reason : undefined
+  const message = typeof outer.message === "string"
+    ? outer.message
+    : typeof nested?.message === "string" ? nested.message : undefined
+  return { ...(reason ?? nestedReason ? { reason: reason ?? nestedReason } : {}), ...(message === undefined ? {} : { message }) }
+}
+
 /** Restarts into the installed update: whatever was edited since the install is written first, and unwritten work stops the restart. */
 export const restartAfterUpdate = async (session: Pick<ProjectSession, "flush" | "hasUnsavedWork">, invoke: Invoke): Promise<void> => {
   try { await session.flush() } catch { /* checked below */ }

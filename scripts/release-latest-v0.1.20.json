@@ -1,0 +1,47 @@
+{
+  "version": "0.1.20",
+  "pub_date": "2026-10-25T19:03:10Z",
+  "notes": "# CADCAM FUN 0.1.20\n\nCommits since `v0.1.19..HEAD`.\n\n## Desktop\n\n- Improve updater shutdown and mobile production cost settings\n\nPrevious release (rollback installer): https://github.com/nikomatt69/cadcamfun/releases/tag/v0.1.19\n\nTo roll back, download that release's installer and run it over this installation.\n\n## Downgrade safety\n\n**Safe.** This range changes no migrations, so the previous version can be reinstalled.\n\n## Signing\n\nmacOS: ad-hoc signed and **not notarised**; confirm the app on first launch.\n\nWindows: **not signed**; SmartScreen may require confirmation on first launch.\n\nLinux: packages are not code-signed.\n\nUpdater bundles on every platform have a verified Tauri signature.\n",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWkRiYStOVGJtN3gxdDZvZEpiZHJjckhBeE1TYmlGNmtLVDc1UVlxYlQ1eVJzWWs0azVjNnBySm5xaG9HdlowS2Z3bkZ4b09lMnF3VUpJSUNsQk1GcytmZ0lWNWsyQVF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTU1NTAwCWZpbGU6Q0FEQ0FNIEZVTi5hcHAudGFyLmd6CXZlcnNpb246MC4xLjIwCitrd1BKRVBJem5lM3lrYkVhb0tFdzVYSjhLWjd5QUFSc0dqRkpuNWNwS1hCeFU3SERScWFRMFYvOGFsRmZBQnJmREZhMzZFU0VnMEs1RExEVTVQWEJnPT0K",
+      "url": "https://github.com/nikomatt69/cadcamfun/releases/download/v0.1.20/aarch64-apple-darwin--CADCAM.FUN.app.tar.gz"
+    },
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWkRiYStOVGJtN3lmbTFWT1JYeFd4S2xKTjhlbXYybFlJY0FxTWhNQnVDM29KL1dmUUw0ejQ5cHVFSkpUVGRBQnl5MVZmY05zUnNTdkhrcVpPVk45YTFDUVV6MUVzR2dJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTU1NTU5CWZpbGU6Q0FEQ0FNIEZVTi5hcHAudGFyLmd6CXZlcnNpb246MC4xLjIwClZ0LzYyZWIvTXNuSUpEbXVWVkZUUVdaVkRRaHVyWVVzbmk4TnZ6R0VMZHNrTEdGTWQyS2tSWFg0eXpOMkxYQ2QzWTlXNDdmb3Fma2VUVlJ2SXYrbURBPT0K",
+      "url": "https://github.com/nikomatt69/cadcamfun/releases/download/v0.1.20/x86_64-apple-darwin--CADCAM.FUN.app.tar.gz"
+    },
+    "linux-aarch64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWkRiYStOVGJtNzNQWXFLa1poN0lJV2MrZ0NwS2dEcVEvVTU5N05jdTdaNHJPSFUrdjJVZzlISm5Kci92amVISjNINzZEejVQK1FyQkxDRDR1SjBwWjBmSDdxZytBdmdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTU2NTEzCWZpbGU6Q0FEQ0FNIEZVTl8wLjEuMjBfYXJtNjQuZGViCXZlcnNpb246MC4xLjIwCk02TGdEKzQ1TEdFT3lickFhekRPVHV3aGpwSzM2NG4yV2E1blNxSFlYbk5qWnczaHVucW9vWnpKZUVaY3UrbW1JeStTNS83ZXQrQ2VaNGZwQW8zSkJnPT0K",
+      "url": "https://github.com/nikomatt69/cadcamfun/releases/download/v0.1.20/aarch64-unknown-linux-gnu--CADCAM.FUN_0.1.20_arm64.deb"
+    },
+    "linux-aarch64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWkRiYStOVGJtNy9GOGtLZTdmN2NETEw3YUoyM3V5VkZGNGVNUUdBSFBZUG9Uc3orbzZVa1pVN2J4N0ZBdG1uL3l3OWVRQTJsWnRIb3hpR1pmYjl2QldXTGhQUzdhQ1FrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTU2NTEzCWZpbGU6Q0FEQ0FNIEZVTi0wLjEuMjAtMS5hYXJjaDY0LnJwbQl2ZXJzaW9uOjAuMS4yMApJcytodHZxaTRhcFNkRkpFMFlmOXBNcEk3Y3A0aVU0Y1YxbUl4RER6TTd2YTVqbWUzM3krZHFUdVhGZFl5TlJWcEdDZEsxWldhQWNGTDg4SFhvd2xEZz09Cg==",
+      "url": "https://github.com/nikomatt69/cadcamfun/releases/download/v0.1.20/aarch64-unknown-linux-gnu--CADCAM.FUN-0.1.20-1.aarch64.rpm"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWkRiYStOVGJtNy9ETVJmTkVMUjBRd1NtdHVMVGI0WU9rODhqaTMyWnN3YmNEN0Q1QUt1ZEphN3djMnNZdklBdE5DMi9RN2daa1pLVlhyNHcxN2hNVXZ1eitFTFlwNWdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTU2NDcyCWZpbGU6Q0FEQ0FNIEZVTl8wLjEuMjBfYW1kNjQuZGViCXZlcnNpb246MC4xLjIwCk83eTRmMUwzbjFNbGUyTUxxZXFTd1Y3UEpFRzYrS3BDbVUxN29YQXhVNlJNdUxtUkdNTm1MQlVManlNaW4yYnNEckI3QlpoL1lERTk5aVN4QlpOM0F3PT0K",
+      "url": "https://github.com/nikomatt69/cadcamfun/releases/download/v0.1.20/x86_64-unknown-linux-gnu--CADCAM.FUN_0.1.20_amd64.deb"
+    },
+    "linux-x86_64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWkRiYStOVGJtNytFeGxDYzVOaTlWRGpxUlVMQ2JJaVZIZG1IaGNnSzcxSmJvdTROeVZ2L2Q5SzJHL1lCdjFVTkdHYXJsWGlWNGRjVWNmZHJRNHVsSldXanNabk43Q0FFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTU2NDcyCWZpbGU6Q0FEQ0FNIEZVTi0wLjEuMjAtMS54ODZfNjQucnBtCXZlcnNpb246MC4xLjIwCjBmREdiVjY5R0xXNVNQdnIxNFJVQUZTQ043MDdqWlZ4Mnc1SjZnaVU5ajFFVVVDRzFYNnQyNmFFY3ZZUURWb2JBMGhhdkVoTmNheCt1ODI3Mk9qTEJ3PT0K",
+      "url": "https://github.com/nikomatt69/cadcamfun/releases/download/v0.1.20/x86_64-unknown-linux-gnu--CADCAM.FUN-0.1.20-1.x86_64.rpm"
+    },
+    "windows-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWkRiYStOVGJtN3lCeFdzRGU0U0JlTlFzeVhFTnhlWVRLaXB6TjVGU3FuN1YrWWd4b1R5ZUluWHptWDVjQ0pCRWM5QW55d1k0eHNMVGlDeG1ZcFRydGtJN2dlWnZ3dXdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTU1OTQ1CWZpbGU6Q0FEQ0FNIEZVTl8wLjEuMjBfYXJtNjQtc2V0dXAuZXhlCXZlcnNpb246MC4xLjIwCkxEOElBMHV3bmR1UVRQOWU0QUxSbFlKMDVBSnBtcnlDVWp4b09vcUh5NGM5MGM0cmtMdnBIcExKaFd3K3JpTjFtZXBlSk9lTTRJMVppVlFYZmUvb0FBPT0K",
+      "url": "https://github.com/nikomatt69/cadcamfun/releases/download/v0.1.20/aarch64-pc-windows-msvc--CADCAM.FUN_0.1.20_arm64-setup.exe"
+    },
+    "windows-aarch64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWkRiYStOVGJtN3pPKysxZkxXWmNDa1FPRTBJVGY0cXpBZ3lmVDkwR0wwc3VPckdUL0dGWUhGdDBKRW0rdE56d1l2NzUrMEhyVGRIZXZvUzY2KzE2K2JsUWtpZGtzN3dzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTU1OTQ1CWZpbGU6Q0FEQ0FNIEZVTl8wLjEuMjBfYXJtNjRfZW4tVVMubXNpCXZlcnNpb246MC4xLjIwCmhkUnZRWjY5N1J6TExMcUVuU1Q1MHJIcEJKcTFyUDV2MmErQm9FOVNVQ1RuTzBxVDVBUlRqaFgrK2hzc29odk84NnVoNk94NzFtWWx3eEhRR1FWaURnPT0K",
+      "url": "https://github.com/nikomatt69/cadcamfun/releases/download/v0.1.20/aarch64-pc-windows-msvc--CADCAM.FUN_0.1.20_arm64_en-US.msi"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWkRiYStOVGJtNzlzRkxkWGxOQ0l4Vk9zUlFtVlh0a3dKR0tQdWZBR3VReHJ5aWJ6MjZ4WHVaQm1uemIzK0Flc3ZlYzh4YUN5dklseHR3VHk2bVNiWFkrWUVlWnI4VFFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTU1OTI5CWZpbGU6Q0FEQ0FNIEZVTl8wLjEuMjBfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMS4yMApRb2Urcm1CeUhjZUZmQ05FcEJKYU45YmdJUmNBcHRBcFNpdkQ1RVBWWk5Rd0RENnY4VldKWDNmUncxUUo4RkpRd1ZjSm1kRGM0aFBqOWIxcEVaYlNBQT09Cg==",
+      "url": "https://github.com/nikomatt69/cadcamfun/releases/download/v0.1.20/x86_64-pc-windows-msvc--CADCAM.FUN_0.1.20_x64-setup.exe"
+    },
+    "windows-x86_64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRWkRiYStOVGJtNzFCN0lsWFN6Wi9CK29vQVpHUWR2dFgralR6VDByR0FTWm9SbERmVGEycDZlQkpLdEx5NURMbS9FSFA2bWZoeFBGZDVVT0puaWJoZG13V2l6WGdHb2dJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyOTU1OTI5CWZpbGU6Q0FEQ0FNIEZVTl8wLjEuMjBfeDY0X2VuLVVTLm1zaQl2ZXJzaW9uOjAuMS4yMAo4N2ttYjdhenpacGFUdEplUVRjZVRURWZEYjlLM0ZWdlRGMjBkVTVSM2hDMWxsdkFTRVk2OC9VU3FtRGNtTCtaQW5XUE0yckpPaXl4UENOVjc1Um5Cdz09Cg==",
+      "url": "https://github.com/nikomatt69/cadcamfun/releases/download/v0.1.20/x86_64-pc-windows-msvc--CADCAM.FUN_0.1.20_x64_en-US.msi"
+    }
+  }
+}

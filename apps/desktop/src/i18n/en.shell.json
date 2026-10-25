@@ -536,5 +536,7 @@
   "shell.export.failed": "Could not save {name}: {reason}",
   "shell.engine.restarting": "The calculation engine stopped responding and is restarting. Requests that were in progress are not repeated: run the last action again if it did not finish.",
   "shell.engine.recovered": "The calculation engine is running again.",
-  "shell.engine.failed": "The calculation engine could not be restarted. Restart the app to continue."
+  "shell.engine.failed": "The calculation engine could not be restarted. Restart the app to continue.",
+  "update.noneAvailable": "There is no update to install. Check for updates again.",
+  "update.busy": "Another update operation is running. Try again in a moment."
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { APPLE_SIGNING_ENV, assertManifestAssets, assertSigningConfig, bundleRoot, indexArtifacts, mergeManifestValues, parseChecksums, previousReleaseTag, releaseVersion, selectReleaseRef, signingStatement, targetInfo, validateManifest } from "./release-helpers.ts";
+import { APPLE_SIGNING_ENV, assertManifestAssets, assertSigningConfig, bundleRoot, indexArtifacts, mergeManifestValues, parseChecksums, previousReleaseTag, releaseAssetName, releaseVersion, selectReleaseRef, signingStatement, targetInfo, validateManifest } from "./release-helpers.ts";
 
 const date = "2026-10-05T12:00:00Z";
 const url = "https://github.com/example/app/releases/download/v6.0.0";
@@ -26,6 +26,32 @@ describe("release targets and flat assets", () => {
     expect(result.map((entry) => entry.name)).toEqual(["x86_64-pc-windows-msvc--App.exe", "x86_64-pc-windows-msvc--App.exe.sig"]);
     expect(() => indexArtifacts(["/a/App.exe", "/b/App.exe"], "x86_64-pc-windows-msvc")).toThrow("Duplicate");
     expect(() => indexArtifacts(["/a/App.exe.sig"], "x86_64-pc-windows-msvc")).toThrow("Orphan");
+  });
+  test("the asset name is the one GitHub will store, so the manifest can point at it", () => {
+    // GitHub rewrites an uploaded file name: a space becomes a dot. A manifest
+    // built from the builder's name would point at a file that is not there.
+    const result = indexArtifacts(["/bundle/macos/CADCAM FUN.app.tar.gz", "/bundle/macos/CADCAM FUN.app.tar.gz.sig"], "aarch64-apple-darwin");
+    expect(result.map((entry) => entry.name)).toEqual([
+      "aarch64-apple-darwin--CADCAM.FUN.app.tar.gz",
+      "aarch64-apple-darwin--CADCAM.FUN.app.tar.gz.sig"
+    ]);
+    expect(releaseAssetName("CADCAM FUN_0.1.20_arm64.deb")).toBe("CADCAM.FUN_0.1.20_arm64.deb");
+    expect(releaseAssetName("App-Setup.exe")).toBe("App-Setup.exe");
+  });
+  test("the manifest and the assets agree on the name the release will have", () => {
+    const assets = indexArtifacts(["/bundle/macos/CADCAM FUN.app.tar.gz", "/bundle/macos/CADCAM FUN.app.tar.gz.sig"], "aarch64-apple-darwin");
+    const names = assets.map((entry) => entry.name);
+    const built = {
+      version: "6.0.0",
+      pub_date: date,
+      platforms: {
+        "darwin-aarch64": {
+          signature: "signature",
+          url: `${url}/${encodeURIComponent("aarch64-apple-darwin--CADCAM.FUN.app.tar.gz")}`
+        }
+      }
+    };
+    expect(() => assertManifestAssets(built, names, url)).not.toThrow();
   });
 });
 

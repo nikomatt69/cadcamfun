@@ -72,6 +72,8 @@ export interface CADCanvasProps {
   readonly keyboard?: boolean
   /** Overlays the page adds on top of the viewport (transform panel, simulation toolbar, ...). */
   readonly footerActions?: JSX.Element
+  /** Above the section control and the actions in the same bottom-right stack, so it cannot lie over them (the title block). */
+  readonly footerDock?: JSX.Element
   readonly children?: JSX.Element
 }
 
@@ -1103,6 +1105,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       </button>
 
       <div class="panel cad-viewport-footer" data-testid="cad-viewport-footer">
+      {props.footerDock}
       <div class="cad-viewport-footer__section" data-testid="section-control">
         <button
           type="button"

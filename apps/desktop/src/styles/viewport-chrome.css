@@ -8,3 +8,25 @@
 .cad-viewport-footer__actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 4px; border: 1px solid var(--panel-border); border-radius: 5px; background: var(--panel-bg); }
 .cad-viewport-footer__actions .panel-icon-btn { width: 30px; height: 30px; box-shadow: none; }
 .cad-viewport-footer__actions .panel-icon-btn[aria-pressed="true"] { background: var(--panel-accent-soft); color: var(--panel-accent); }
+
+/* The title block: a glass card at the bottom right of the CAD canvas and the toolpath view (the host puts `.title-block-dock` in its own
+   bottom-right stack, so nothing lies over it). Own translucent surface here; the native material rules are in glass.css. */
+.title-block-dock { --tb-surface: rgba(255, 255, 255, 0.7); --tb-cell: rgba(255, 255, 255, 0.28); --tb-rule: rgba(15, 23, 42, 0.12); --tb-rim: rgba(255, 255, 255, 0.65); --tb-muted: #64748b; --tb-text: #0f172a; --tb-shadow: 0 10px 28px -14px rgba(15, 23, 42, 0.45); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; width: min(34rem, 100%); max-width: 100%; pointer-events: none; }
+.dark .title-block-dock { --tb-surface: rgba(24, 30, 42, 0.6); --tb-cell: rgba(255, 255, 255, 0.03); --tb-rule: rgba(255, 255, 255, 0.1); --tb-rim: rgba(255, 255, 255, 0.16); --tb-muted: #94a3b8; --tb-text: #f1f5f9; --tb-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.7); }
+.title-block-dock[data-mode="2d"] { --tb-surface: rgba(255, 255, 255, 0.86); }
+.dark .title-block-dock[data-mode="2d"] { --tb-surface: rgba(24, 30, 42, 0.8); }
+.title-block-tools { pointer-events: auto; display: flex; align-items: center; gap: 4px; padding: 2px; border: 1px solid var(--tb-rim); border-radius: 999px; background: var(--tb-surface); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); box-shadow: var(--tb-shadow); }
+.title-block-tools .panel-icon-btn { width: 26px; height: 26px; border-radius: 999px; box-shadow: none; background: transparent; color: var(--tb-text); }
+.title-block-tools .panel-icon-btn:hover { background: var(--tb-cell); }
+.title-block-missing { padding: 1px 8px; border-radius: 999px; background: rgba(245, 158, 11, 0.2); color: #b45309; font-size: 10px; font-weight: 500; }
+.dark .title-block-missing { color: #fbbf24; }
+.title-block { pointer-events: auto; width: 100%; overflow: hidden; border: 1px solid var(--tb-rim); border-radius: 14px; background: var(--tb-surface); color: var(--tb-text); -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%); box-shadow: var(--tb-shadow), inset 0 1px 0 var(--tb-rim); cursor: pointer; text-align: left; }
+.title-block:focus-visible { outline: 2px solid var(--panel-accent, #3b82f6); outline-offset: 2px; }
+.title-block__grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; background: var(--tb-rule); }
+.title-block__cell { min-width: 0; padding: 4px 8px 5px; background: var(--tb-cell); }
+.title-block__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; font-weight: 500; line-height: 1.2; letter-spacing: 0.05em; text-transform: uppercase; color: var(--tb-muted); }
+.title-block__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.title-block__cell--key .title-block__value { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.title-block-pill { display: inline-flex; align-items: baseline; gap: 8px; width: auto; max-width: 100%; padding: 5px 12px; border-radius: 999px; font: inherit; font-size: 11.5px; }
+.title-block-pill__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.title-block-pill__meta { white-space: nowrap; color: var(--tb-muted); font-variant-numeric: tabular-nums; }

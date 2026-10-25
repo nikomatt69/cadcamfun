@@ -34,6 +34,8 @@ export interface ToolpathVisualizerProps {
   readonly playbackDuration?: number
   readonly onPlayingChange?: (playing: boolean) => void
   readonly onPlaybackTimeChange: (seconds: number) => void
+  /** Sits at the bottom right in the same stack as the NC strip and the legend, so it can never lie over them (the title block). */
+  readonly dock?: JSX.Element
   /** Cutters by the toolpaths' `toolId` (the kernel's tool library); playback draws the one in the spindle in 3D. */
   readonly tools?: ReadonlyMap<string, cam.kernel.Cutter>
   /** Cutter for the toolpaths `tools` does not name (the generator's tool settings). */
@@ -498,7 +500,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               onStepOperation={(dir) => { props.onPlayingChange?.(false); seekTo(stepOperation(spans(), props.playbackTime, dir, timeline().duration)) }}
             />
           </div>
-          <div class="absolute bottom-16 right-4 z-20 flex max-w-[45%] flex-col items-end gap-2">
+        </Show>
+        <div class={`absolute right-4 z-20 flex max-w-[55%] flex-col items-end gap-2 ${hasProgram() ? "bottom-16" : "bottom-4"}`} data-testid="visualizer-dock">
             <Show when={nc().length > 0}>
               <ol class="rounded-lg bg-black/65 px-2 py-1 font-mono text-[11px] leading-5 text-slate-300 backdrop-blur" data-testid="nc-strip" aria-label={t("cam.visualizer.ncStrip")}>
                 <For each={nc()}>{(row) => (
@@ -517,8 +520,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 )}</For>
               </ul>
             </Show>
-          </div>
-        </Show>
+            {props.dock}
+        </div>
         <Show when={operationsOpen() && hasProgram()}>
           <aside class="absolute left-4 top-28 z-40 w-80 max-h-[calc(100%-11rem)] overflow-y-auto rounded-xl border border-slate-600 bg-slate-950/95 p-3 text-white shadow-2xl backdrop-blur" aria-label={t("cam.operations.title")} data-testid="operations-panel">
             <div class="mb-2 flex items-center justify-between">

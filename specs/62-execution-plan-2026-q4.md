@@ -94,12 +94,12 @@ kernel job seam (spec 56 §7, needs E2 and the parity harness).
 
 ## 4. Workstream N — Rust, Tauri and CI (spec 56)
 
-Not duplicated here. Spec 56 §3–§8 is the design and the status table. At the time of writing the **open** phases are:
+Not duplicated here. Spec 56 §3–§10 is the design, the status table and the plugin / crate verdicts. State on 2026-10-25, after the lifecycle and quality passes (Rust: 129 unit + 6 stub-sidecar tests, clippy `-D warnings` and fmt clean; `bun test scripts` 103 pass; re-run by the coordinator):
 
-| Spec 56 phase | State to read there | What the plan adds |
+| Spec 56 phase | State | What the plan adds |
 |---|---|---|
-| F process supervision (health probe + restart budget, App Nap / sleep-wake, dock progress, pidfile) | open; its health-probe slice is stated in §3 I.2 | verified in the tree on 2026-10-25: a health loop exists in `sidecar.rs` with `HEALTH_FAILURE_LIMIT`, `MAX_RESTARTS = 1` is still the constant; read spec 56 §4 before assuming either |
-| G quality gates (`cargo-deny` / `cargo-audit`, panic hook, dev profile, `rust-toolchain.toml`, MSRV) | open | on 2026-10-25 `deny.toml`, `rust-toolchain.toml` and a `set_hook` were not in the tree and the workflows had no `cargo-deny` / `cargo-audit` job; the lane may have changed this since |
+| F process supervision | **implemented** (health probe, proportional restart budget, wake by clock gap, pidfile with identity check, panic hook, App Nap lease around kernel runs, indeterminate Dock bar) | **Not verified, needs a GUI or platform smoke:** App Nap in Activity Monitor, a real sleep/wake, the Dock bar, the Windows and Linux branches. Follow-up (S): Dock progress as the share of operations done instead of indeterminate; an OS wake notification needs `unsafe`, which `[lints.rust] unsafe_code = "forbid"` rules out, so the clock-gap detector stays. |
+| G quality gates | **implemented**, with one gap: `deny.toml`, `rust-toolchain.toml`, `clippy.toml`, `[lints]`, dev profile, https timestamp, stub-sidecar integration test, tauri-config lint | `cargo-deny` and `cargo-audit` CI jobs are non-blocking and have **never run** (not installed locally; tool pins and the 0.18 `deny.toml` schema are unverified, the Windows and Linux licence graph is unconfirmed). First task of lane N: run them in CI and triage. Also open (S): make the `sidecar` module public so the integration test drives the real supervisor; `pick_file`, `secret_delete`, `set_recent_projects` are granted without a webview caller (listed in `PENDING_CALLER`); `core:default` is probably wider than needed (needs a real app run); `@tauri-apps/plugin-dialog` and `@tauri-apps/plugin-updater` are in `package.json` but never imported. |
 | I owner-requested qualification (signed bundle smoke, health, performance evidence, save recovery, security configuration) | specified, in progress | I.3 (performance evidence) **must reuse spec 55 E2** (`bench:cam` is the seed) instead of a second bench command |
 | H Rust-owned `cadcam://` scheme, SSE over `ipc::Channel`, binary framing | deferred | after C has been in use |
 | §7 native compute (height-field, drop-cutter, replay in WASM first) | blocked | needs spec 55 E2 numbers and `packages/core/test/parity/`; amend spec 36 §7.6 first |

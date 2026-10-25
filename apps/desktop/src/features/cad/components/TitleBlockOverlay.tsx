@@ -19,17 +19,21 @@ const setCollapsed = (value: boolean): void => {
 /** One cell of the block: a small label over the value. */
 function Cell(props: { readonly label: string; readonly value: string; readonly class?: string; readonly big?: boolean }): JSX.Element {
   return (
-    <div class={`min-w-0 border border-gray-500/70 px-1.5 py-0.5 ${props.class ?? ""}`}>
-      <div class="truncate text-[8px] uppercase leading-tight tracking-wide text-gray-500 dark:text-gray-400">{props.label}</div>
-      <div class={`truncate leading-tight ${props.big === true ? "text-sm font-semibold" : "text-[11px]"}`} title={props.value}>{props.value === "" ? " " : props.value}</div>
+    <div class={`title-block__cell ${props.big === true ? "title-block__cell--key" : ""} ${props.class ?? ""}`}>
+      <div class="title-block__label" title={props.label}>{props.label}</div>
+      <div class="title-block__value" title={props.value}>{props.value === "" ? " " : props.value}</div>
     </div>
   )
 }
 
 /**
- * The title block of the open drawing, at the bottom right of the CAD and CAM views, 2D and 3D alike: the same block, from the same
- * data (`drawing.TitleBlock`, stored with the drawing), laid out the way a drawing office lays it out. It is where the form that
- * creates and edits it opens from. The CAM workspace shows the manufacturing fields (machine, program, setup) as well.
+ * The title block of the open drawing, 2D and 3D alike: the same block, from the same data (`drawing.TitleBlock`, stored with the
+ * drawing), laid out the way a drawing office lays it out. It is where the form that creates and edits it opens from. The CAM
+ * workspace shows the manufacturing fields (machine, program, setup) as well.
+ *
+ * It does not position itself: the CAD canvas (`footerDock`) and the toolpath view (`dock`) put it at the bottom right in the same
+ * stack as their own controls, so it cannot lie over them. Its surface is glass (`.title-block`, `styles/viewport-chrome.css`; the
+ * native material rules are in `styles/glass.css`).
  */
 export default function TitleBlockOverlay(props: { readonly mode: "2d" | "3d"; readonly cam?: boolean }): JSX.Element {
   const doc = useDocumentStore()
@@ -52,22 +56,23 @@ export default function TitleBlockOverlay(props: { readonly mode: "2d" | "3d"; r
   const incomplete = createMemo(() => drawing.titleBlockIssues(block()).length > 0)
 
   return (
-    <div class="pointer-events-none absolute bottom-14 right-4 z-20 flex max-w-[calc(100%-2rem)] flex-col items-end gap-1" data-testid="title-block-overlay" data-mode={props.mode}>
-      <div class="pointer-events-auto flex items-center gap-1">
-        <Show when={incomplete()}><span class="rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-black" role="status">{t("cad.titleBlock.missing", { fields: drawing.titleBlockIssues(block()).map((i) => label(i.key)).join(", ") })}</span></Show>
+    <div class="title-block-dock" data-testid="title-block-overlay" data-mode={props.mode}>
+      <div class="title-block-tools">
+        <Show when={incomplete()}><span class="title-block-missing" role="status">{t("cad.titleBlock.missing", { fields: drawing.titleBlockIssues(block()).map((i) => label(i.key)).join(", ") })}</span></Show>
         <button type="button" class="panel-icon-btn" data-testid="title-block-toggle" aria-expanded={!collapsed()} title={collapsed() ? t("cad.titleBlock.show") : t("cad.titleBlock.hide")} aria-label={collapsed() ? t("cad.titleBlock.show") : t("cad.titleBlock.hide")} onClick={() => setCollapsed(!collapsed())}>
           <Show when={collapsed()} fallback={<ChevronDown size={14} />}><ChevronUp size={14} /></Show>
         </button>
         <button type="button" class="panel-icon-btn" data-testid="title-block-edit" title={t("cad.titleBlock.edit")} aria-label={t("cad.titleBlock.edit")} onClick={() => setEditing(true)}><PencilLine size={14} /></button>
       </div>
       <Show when={!collapsed()} fallback={
-        <div class="pointer-events-auto cursor-pointer border border-gray-500/70 bg-white/90 px-2 py-0.5 text-[11px] text-gray-900 dark:bg-gray-900/90 dark:text-gray-100" onClick={() => setEditing(true)}>
-          <span class="font-semibold">{text("title")}</span> · {text("number")} · {t("cad.titleBlock.field.revision")} {text("revision")}
-        </div>
+        <button type="button" class="title-block title-block-pill" onClick={() => setEditing(true)}>
+          <span class="title-block-pill__title">{text("title")}</span>
+          <span class="title-block-pill__meta">{text("number")} · {t("cad.titleBlock.field.revision")} {text("revision")}</span>
+        </button>
       }>
-        <div class={`pointer-events-auto w-[34rem] max-w-full cursor-pointer text-gray-900 shadow-lg dark:text-gray-100 ${props.mode === "2d" ? "bg-white dark:bg-gray-900" : "bg-white/85 dark:bg-gray-900/85 backdrop-blur-sm"}`}
-          data-testid="title-block" onClick={() => setEditing(true)}>
-          <div class="grid grid-cols-6">
+        <div class="title-block" data-testid="title-block" role="button" tabindex="0" onClick={() => setEditing(true)}
+          onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setEditing(true) } }}>
+          <div class="title-block__grid">
             <Cell label={label("owner")} value={text("owner")} class="col-span-2" />
             <Cell label={label("documentType")} value={t(`cad.titleBlock.option.${block().documentType}`)} />
             <Cell label={label("status")} value={t(`cad.titleBlock.option.${block().status}`)} />
