@@ -112,3 +112,24 @@ test("a check from the menu bar is answered, a background one is not, and a fini
     await until(() => desktop.calls.includes("restart_app"))
   } finally { view.dispose(); desktop.stop() }
 })
+
+test("the shell's menu events reach the app: Check for Updates asks the shell, Show Logs Folder opens the logs, Save writes the work", async () => {
+  const desktop = await startDesktop()
+  const view = app.visit("/projects")
+  try {
+    const { emit } = await import("@tauri-apps/api/event")
+    await settle()
+    await emit("menu", "help.check_updates")
+    await until(() => desktop.calls.includes("check_for_updates"))
+    await emit("menu", "help.release_notes")
+    await until(() => desktop.calls.includes("open_release_notes"))
+    await emit("menu", "help.open_logs")
+    await until(() => desktop.calls.includes("get_logs_dir") && desktop.calls.includes("open_path"))
+    useElementsStore.setState({ elements: [box("a", 55)] })
+    await new Promise((r) => setTimeout(r, 450))
+    await emit("menu", "file.save")
+    await until(() => !desktop.session.hasUnsavedWork())
+    const stored = await run<{ data: { elements: Array<{ x: number }> } }>(app.client.drawings.get({ params: { id: desktop.drawingId } }))
+    expect(stored.data.elements[0]!.x).toBe(55)
+  } finally { view.dispose(); desktop.stop() }
+})

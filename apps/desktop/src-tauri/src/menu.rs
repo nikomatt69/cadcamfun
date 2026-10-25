@@ -202,4 +202,33 @@ mod tests {
         assert!(!is_forwarded_id("tray.quit"));
         assert!(!is_forwarded_id("1234"));
     }
+
+    // The handler on Tauri's mock runtime: no window opens, but the handler and the updater service are the real ones. The built
+    // menu itself is checked by tests/native_menu.rs, which needs the main thread.
+    mod built {
+        use super::*;
+        use crate::updater::{CheckTrigger, UpdaterService};
+        use tauri::test::mock_app;
+
+        #[test]
+        fn clicking_check_for_updates_asks_the_updater_for_a_manual_check() {
+            let app = mock_app();
+            let service = UpdaterService::new();
+            let mut rx = service.take_receiver().expect("receiver");
+            app.manage(service);
+            handle_event(app.handle(), CHECK_UPDATES_ID);
+            assert_eq!(rx.try_recv().ok(), Some(CheckTrigger::Manual));
+        }
+
+        #[test]
+        fn other_items_do_not_start_a_check() {
+            let app = mock_app();
+            let service = UpdaterService::new();
+            let mut rx = service.take_receiver().expect("receiver");
+            app.manage(service);
+            handle_event(app.handle(), "file.new");
+            handle_event(app.handle(), "tray.quit");
+            assert!(rx.try_recv().is_err());
+        }
+    }
 }

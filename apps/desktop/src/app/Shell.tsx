@@ -25,6 +25,7 @@ import { projectSession } from "../features/projects/lib/project-session.ts"
 import { SaveSeg } from "../shared/components/workspace-strip.tsx"
 import { UpdatePrompt } from "./UpdatePrompt.tsx"
 import { checkForUpdates, openReleaseNotes } from "./updates.ts"
+import { listenToMenu, openLogsFolder, projectOfRecentId } from "./menu-events.ts"
 import { activeActivity, routeOf, type ActivityId } from "./layout.ts"
 import { findShortcut, shortcuts } from "./shortcuts.ts"
 
@@ -126,6 +127,15 @@ export function Shell(props: ShellProps): JSX.Element {
       case "file.new":
         go("/projects/create")
         return
+      case "file.open":
+        go("/projects")
+        return
+      case "file.save":
+        void projectSession(app).flush().catch(() => undefined)
+        return
+      case "help.open_logs":
+        void openLogsFolder().catch(() => undefined)
+        return
       case "edit.undo":
         app.editor.undo()
         return
@@ -146,10 +156,22 @@ export function Shell(props: ShellProps): JSX.Element {
       case "help.release_notes":
         void openReleaseNotes().catch(() => undefined)
         return
-      default:
+      default: {
+        // A recent project of the tray menu opens its page.
+        const project = projectOfRecentId(id)
+        if (project !== undefined) go(`/projects/${encodeURIComponent(project)}`)
         return
+      }
     }
   }
+
+  // The native menu bar and the tray reach the same actions as the in-window menus.
+  onMount(() => {
+    let off: (() => void) | undefined
+    let gone = false
+    void listenToMenu(onMenu).then((stop) => { if (gone) stop(); else off = stop }).catch(() => undefined)
+    onCleanup(() => { gone = true; off?.() })
+  })
 
   const onKeyDown = (event: KeyboardEvent): void => {
     const found = findShortcut(event, shortcuts({

@@ -10,6 +10,11 @@ publish = false
 name = "cadcamfun_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[test]]
+name = "native_menu"
+# A native menu can only be built on the main thread, which the default harness never runs tests on.
+harness = false
+
 [features]
 default = ["liquid-glass"]
 # The window material uses private Apple API (see specs/07-tauri-shell.md): a build for the Mac App Store turns this off
@@ -62,4 +67,6 @@ panic = "abort"
 strip = true
 
 [dev-dependencies]
+# The mock runtime builds the real menu and runs its handler without a window (menu.rs tests).
+tauri = { version = "2", features = ["test", "tray-icon", "macos-private-api"] }
 tokio = { version = "1", features = ["sync", "time", "macros", "rt", "test-util"] }

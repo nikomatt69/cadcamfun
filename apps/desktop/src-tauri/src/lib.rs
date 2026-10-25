@@ -2,7 +2,8 @@
 //! the Bun-compiled sidecar that hosts all application logic.
 
 mod commands;
-mod menu;
+// Public so the native-menu test (tests/native_menu.rs, a main-thread harness) can build the real menu.
+pub mod menu;
 mod secrets;
 mod sidecar;
 mod tray;
