@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.17 (October 2026)
+
+## Core
+
+- Free-form face edits are bounded: move, offset and draft stop at the long time budget with the solid unchanged, a trimmed move takes its volume check from the footprint's area, and the offset reuses its fill slab
+
 ## v0.1.16 (October 2026)
 
 ## Core
