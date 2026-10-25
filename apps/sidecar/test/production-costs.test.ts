@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { makeApp } from "./helpers.ts"
+import { Context, Effect } from "effect"
+import { AuthRepo } from "../src/repos/auth-repo.ts"
+import { ProductionCostRepo } from "../src/repos/production-cost-repo.ts"
+import { AuthTokens } from "../src/services/auth-tokens.ts"
 
 let app: Awaited<ReturnType<typeof makeApp>>
 beforeAll(async () => { app = await makeApp() })
@@ -182,5 +186,47 @@ describe("/api/production-costs persistence", () => {
 
     expect((await app.call(`/api/production-costs/estimates/${created.body.id}`, { method: "DELETE" })).status).toBe(200)
     expect((await app.call(`/api/production-costs/estimates/${created.body.id}`)).status).toBe(404)
+  })
+})
+
+describe("production cost account isolation", () => {
+  test("calculation skips another account's rates and cost creation cannot expose private resources", async () => {
+    const { tool, material, toolpath } = await seedToolpath("isolation", squareGcode)
+    const services = await app.services()
+    const auth = Context.get(services, AuthRepo)
+    const repo = Context.get(services, ProductionCostRepo)
+    const tokens = Context.get(services, AuthTokens)
+    const foreign = await Effect.runPromise(auth.createUser({ email: "foreign-costs@example.com", name: "Foreign", passwordHash: "unused" }))
+    if (!foreign) throw new Error("Expected a fresh account")
+    const session = tokens.sign({ userId: foreign.id, email: "foreign-costs@example.com", type: "session" }, 3600)
+    const headers = { "x-session-token": session }
+    // Old databases may contain costs linked to a resource owned by another account. A Promise inside
+    // Array.find was truthy and selected these private rates even though the cost list hid them.
+    await Effect.runPromise(repo.createMaterialCost(foreign.id, { materialId: material.id, costPerUnit: 999999 }))
+    await Effect.runPromise(repo.createToolWear(foreign.id, { toolId: tool.id, wearRatePerMeter: 100, replacementCost: 999999 }))
+    const calculate = () => app.call("/api/production-costs/estimates/calculate", { method: "POST", json: { toolpathId: toolpath.id } })
+    const noRates = await calculate()
+    expect(noRates.status).toBe(200)
+    expect(noRates.body.materialCost).toBe(0)
+    expect(noRates.body.toolWearCost).toBe(0)
+    expect((await app.call("/api/production-costs/material-costs", { method: "POST", json: { materialId: material.id, costPerUnit: 5 } })).status).toBe(201)
+    expect((await app.call("/api/production-costs/tool-wear", { method: "POST", json: { toolId: tool.id, wearRatePerMeter: 10, replacementCost: 20 } })).status).toBe(201)
+    const ownRates = await calculate()
+    expect(ownRates.body.materialCost).toBeCloseTo(0.00005 * 5, 12)
+    expect(ownRates.body.toolWearCost).toBeCloseTo(0.041 * 0.1 * 20, 12)
+    for (const [path, json] of [
+      ["material-costs", { materialId: material.id, costPerUnit: 5 }],
+      ["tool-wear", { toolId: tool.id, wearRatePerMeter: 10, replacementCost: 20 }],
+    ] as const) expect((await app.call(`/api/production-costs/${path}`, { method: "POST", json, headers })).status).toBe(404)
+
+    const privateRate = await app.call("/api/production-costs/operation-costs", { method: "POST", headers, json: { name: "Private rate", machineHourlyRate: 10, operatorHourlyRate: 10 } })
+    expect(privateRate.status).toBe(201)
+    expect((await app.call("/api/production-costs/estimates", { method: "POST", json: { toolpathId: toolpath.id, totalCost: 10, operationCostId: privateRate.body.id } })).status).toBe(404)
+    const estimate = await app.call("/api/production-costs/estimates", { method: "POST", json: { toolpathId: toolpath.id, totalCost: 10 } })
+    expect(estimate.status).toBe(201)
+    for (const method of ["GET", "PUT", "DELETE"]) {
+      expect((await app.call(`/api/production-costs/estimates/${estimate.body.id}`, { method, headers, ...(method === "PUT" ? { json: { notes: "foreign" } } : {}) })).status).toBe(404)
+    }
+    expect((await app.call("/api/production-costs/estimates", { headers })).body).toEqual([])
   })
 })

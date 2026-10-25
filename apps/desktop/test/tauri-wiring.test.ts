@@ -27,10 +27,10 @@ const run = <A,>(effect: unknown) => app.state.runtime.run(effect as never) as P
 const box = (id: string, x: number) => ({ id, type: "cube", layerId: "default", x, y: 0, z: 0, width: 10, height: 10, depth: 10 })
 
 /** Opens a stored drawing and starts the session with the Tauri bridge present. */
-const startDesktop = async () => {
+const startDesktop = async (updateSnapshot?: unknown) => {
   const calls: string[] = []
   mocks.mockWindows("main")
-  mocks.mockIPC((command) => { calls.push(command); return undefined }, { shouldMockEvents: true })
+  mocks.mockIPC((command) => { calls.push(command); return command === "get_update_status" ? updateSnapshot : undefined }, { shouldMockEvents: true })
   clearMocks = mocks.clearMocks
   const project = await run<{ id: string }>(app.client.projects.create({ payload: { name: "Desktop" } }))
   const drawing = await run<{ id: string }>(app.client.drawings.createForProject({ params: { id: project.id }, payload: { name: "Main", data: { elements: [box("a", 0)], version: "1.0" } } }))
@@ -73,6 +73,16 @@ test("a close request with nothing unsaved goes straight through (the default de
   } finally { desktop.stop() }
 })
 
+test("the launch result is recovered even when it preceded the webview event listener", async () => {
+  const desktop = await startDesktop({ status: "available", version: "9.9.9", notes: "Recovered launch update", critical: false, dismissible: true })
+  const view = app.visit("/projects")
+  try {
+    const prompt = await app.wait(() => document.querySelector("[data-testid='update-prompt']"), 10_000)
+    expect(prompt.textContent).toContain("Recovered launch update")
+    expect(desktop.calls).toContain("get_update_status")
+  } finally { view.dispose(); desktop.stop() }
+})
+
 test("the update dialog appears on the shell's update://status event and installing writes unsaved work first", async () => {
   const desktop = await startDesktop()
   const view = app.visit("/projects")
@@ -86,7 +96,7 @@ test("the update dialog appears on the shell's update://status event and install
     await new Promise((r) => setTimeout(r, 450))
     const install = [...document.querySelectorAll("button")].find((button) => button.textContent === "Install update")!
     install.click()
-    await until(() => desktop.calls.includes("install_update"))
+    await until(() => desktop.calls.includes("apply_update"))
     const stored = await run<{ data: { elements: Array<{ x: number }> } }>(app.client.drawings.get({ params: { id: desktop.drawingId } }))
     expect(stored.data.elements[0]!.x).toBe(44)
   } finally { view.dispose(); desktop.stop() }

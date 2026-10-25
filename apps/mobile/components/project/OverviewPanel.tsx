@@ -1,7 +1,7 @@
 import { useCallback } from "react"
 import { RefreshControl, Text, View } from "react-native"
 import { useRouter } from "expo-router"
-import { ArrowUpRight, Box, Boxes, CheckCircle2, GitBranch, Library, Route, Sparkles } from "lucide-react-native"
+import { ArrowUpRight, Box, Boxes, Calculator, CheckCircle2, GitBranch, Library, Route, Sparkles } from "lucide-react-native"
 import type { CompanionClient } from "@/lib/client"
 import { useResource } from "@/lib/use-resource"
 import { useServer } from "@/lib/server"
@@ -69,6 +69,8 @@ export function OverviewPanel({ client, projectId, onCommit, refreshKey, onCheck
       <ActionButton label="Commit changes" variant={dirtyCount ? "primary" : "secondary"} disabled={!vcs || !dirtyCount} onPress={() => onCommit({ branch: vcs?.branch ?? "", files: dirtyCount })} />
     </SurfaceCard>}
 
+    <ListRow title="Production costs" subtitle="Calculate and review this project's estimates" leading={<Calculator size={21} color={palette.accent} />}
+      onPress={() => router.push({ pathname: "/settings/costs", params: { projectId } })} />
     <Text accessibilityRole="header" style={{ color: palette.ink, marginTop: 8, ...type(19, { weight: "700" }) }}>Explore workspace</Text>
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
       {WORKSPACE.map(({ screen, title, detail, Icon }) => <PressableScale key={screen} subtle tint accessibilityLabel={`Open ${title.toLowerCase()}`} onPress={() => router.push(`/projects/${projectId}/workspace/${screen}`)}

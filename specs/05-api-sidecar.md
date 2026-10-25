@@ -1,5 +1,9 @@
 # WP3 + WP4 — Shared API contract and sidecar server
 
+## Mobile production costs parity (2026-10-25)
+
+Owner-requested WP13/WP4 scope is recorded in spec 13. Before exposing the existing production-cost routes to paired devices, WP4 fixes awaited visibility selection in `ProductionCostRepo.materialCostFor` / `toolWearFor`, rejects inaccessible material/tool references on cost creation, and refuses inaccessible operation-cost references when saving an estimate. These preserve the existing HTTP shapes and 404 access-denied behavior; no database migration or new endpoint is required. Regression coverage includes separate accounts and real pinned-gateway phone writes read back through desktop HTTP. Cost mutation notifications use the existing `resources.changed` host event.
+
 ## Additive assistant evidence (2026-10-24)
 
 Deposition increment: existing generator/kernel print reports gain optional raster deposition

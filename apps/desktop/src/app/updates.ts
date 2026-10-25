@@ -14,6 +14,8 @@ export type UpdateEvent =
   | { readonly status: "upToDate"; readonly version: string; readonly manual?: boolean }
   | { readonly status: "available"; readonly version: string; readonly current?: string; readonly notes: string; readonly date?: string | null; readonly critical: boolean; readonly dismissible: boolean; readonly manual?: boolean }
   | { readonly status: "downloading"; readonly downloaded: number; readonly total?: number | null }
+  | { readonly status: "downloaded"; readonly version: string; readonly critical?: boolean }
+  | { readonly status: "installing"; readonly version: string }
   | { readonly status: "ready"; readonly version: string }
   | { readonly status: "failed"; readonly message: string; readonly manual?: boolean }
 
@@ -21,11 +23,50 @@ export type AvailableUpdate = Extract<UpdateEvent, { readonly status: "available
 
 export type Invoke = (command: string, args?: Record<string, unknown>) => Promise<unknown>
 
-/** Narrows an event payload; anything that is not a known status is ignored. */
+let applyingCommand = false, nativeInstalling = false
+export const updateBlocksClose = (): boolean => applyingCommand || nativeInstalling
+
+/** Check the wire boundary before malformed native events can reach the dialog. */
 export const decodeUpdateEvent = (payload: unknown): UpdateEvent | undefined => {
   if (payload === null || typeof payload !== "object") return undefined
-  const event = payload as { status?: unknown }
-  return ["checking", "upToDate", "available", "downloading", "ready", "failed"].includes(String(event.status)) ? payload as UpdateEvent : undefined
+  const event = payload as Record<string, unknown>
+  if (event.manual !== undefined && typeof event.manual !== "boolean") return undefined
+  if (event.dismissible !== undefined && typeof event.dismissible !== "boolean") return undefined
+  const version = (): boolean => typeof event.version === "string" && event.version.length > 0
+  const size = (value: unknown): boolean => typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+  let valid = false
+  switch (event.status) {
+    case "checking": valid = true; break
+    case "upToDate": case "installing": case "ready": valid = version(); break
+    case "downloaded": valid = version() && (event.critical === undefined || typeof event.critical === "boolean"); break
+    case "failed": valid = typeof event.message === "string"; break
+    case "downloading": valid = size(event.downloaded) && (event.total == null || size(event.total)); break
+    case "available": valid = version() && typeof event.notes === "string" && typeof event.critical === "boolean"
+      && typeof event.dismissible === "boolean" && (event.current === undefined || typeof event.current === "string")
+      && (event.date == null || typeof event.date === "string"); break
+  }
+  return valid ? payload as UpdateEvent : undefined
+}
+
+/** Subscribe first, then recover a launch result; a late snapshot never replaces a live event. */
+export const observeUpdates = async (
+  receive: (event: UpdateEvent) => void,
+  listen: (receive: (payload: unknown) => void) => Promise<() => void>,
+  invoke: Invoke
+): Promise<() => void> => {
+  let active = true, live = false
+  const deliver = (event: UpdateEvent): void => { nativeInstalling = event.status === "installing"; receive(event) }
+  const stop = await listen((payload) => {
+    const event = decodeUpdateEvent(payload)
+    if (!active || event === undefined) return
+    live = true
+    deliver(event)
+  })
+  void invoke("get_update_status").then((payload) => {
+    const event = decodeUpdateEvent(payload)
+    if (active && !live && event !== undefined) deliver(event)
+  }).catch(() => undefined)
+  return () => { active = false; stop() }
 }
 
 /** What the update dialog is showing and what it remembers between events. */
@@ -45,6 +86,9 @@ export const initialUpdateView: UpdateView = { dialog: undefined, available: und
 const show = (view: UpdateView, dialog: UpdateEvent): UpdateView => ({ ...view, dialog, minimized: false })
 
 export const reduceUpdate = (view: UpdateView, event: UpdateEvent): UpdateView => {
+  // A manual check during a download or after installation must not hide its progress/restart action.
+  const active = view.dialog !== undefined && ["downloading", "downloaded", "installing", "ready"].includes(view.dialog.status)
+  if (active && ["checking", "upToDate", "failed"].includes(event.status)) return view
   const manual = "manual" in event && event.manual === true
   switch (event.status) {
     case "checking": return manual ? show(view, event) : view
@@ -53,11 +97,13 @@ export const reduceUpdate = (view: UpdateView, event: UpdateEvent): UpdateView =
     case "available": {
       const next = { ...view, available: event }
       // A download or a pending restart is more important than another announcement of the same release.
-      if (view.dialog?.status === "downloading" || view.dialog?.status === "ready") return next
+      if (active) return next
       // A critical release cannot be put off, so it is always shown; any other one only when it is new to the person or asked for.
       return manual || event.critical || event.version !== view.dismissedVersion ? show(next, event) : next
     }
     case "downloading": return { ...view, dialog: event }
+    case "downloaded": return show(view, event)
+    case "installing": return show(view, event)
     case "ready": return show(view, event)
   }
 }
@@ -66,8 +112,10 @@ export const reduceUpdate = (view: UpdateView, event: UpdateEvent): UpdateView =
 export const dismissUpdate = (view: UpdateView): UpdateView => {
   const dialog = view.dialog
   if (dialog === undefined) return view
-  if (dialog.status === "available") return { ...view, dialog: undefined, dismissedVersion: dialog.version }
-  if (dialog.status === "downloading" || dialog.status === "ready") return { ...view, minimized: true }
+  if (dialog.status === "available") return dialog.critical || !dialog.dismissible ? view : { ...view, dialog: undefined, dismissedVersion: dialog.version }
+  if (dialog.status === "installing") return view
+  if (dialog.status === "downloaded" && dialog.critical) return view
+  if (dialog.status === "downloading" || dialog.status === "downloaded" || dialog.status === "ready") return { ...view, minimized: true }
   return { ...view, dialog: undefined }
 }
 
@@ -76,7 +124,7 @@ export const reopenUpdate = (view: UpdateView): UpdateView => ({ ...view, minimi
 
 /** An install that failed leaves the release on offer, so it can be tried again. */
 export const installFailed = (view: UpdateView): UpdateView =>
-  view.available === undefined ? { ...view, dialog: undefined, minimized: false } : show(view, view.available)
+  view.dialog?.status === "downloaded" ? view : view.available === undefined ? { ...view, dialog: undefined, minimized: false } : show(view, view.available)
 
 /** The release notes as the person reads them: the shell's `[critical]` marker is machine text. */
 export const releaseNotesOf = (notes: string): string => notes.replace(/\[critical\]/gi, "").trim()
@@ -90,14 +138,19 @@ export const formatBytes = (bytes: number): string => bytes >= 1024 * 1024 ? `${
 /** Writes unsaved work, then installs; the shell gets the truth about what could not be written. */
 export const installPendingUpdate = async (session: Pick<ProjectSession, "flush" | "hasUnsavedWork">, invoke: Invoke): Promise<string> => {
   try { await session.flush() } catch { /* still unsaved: the shell below refuses and says so */ }
-  return await invoke("install_update", { unsavedWork: session.hasUnsavedWork() }) as string
+  await invoke("install_update", { unsavedWork: session.hasUnsavedWork() })
+  // A long download may have overlapped further editing, especially before Windows exits into its installer.
+  try { await session.flush() } catch { /* the native apply guard below refuses unsaved work */ }
+  applyingCommand = true
+  try { return await invoke("apply_update", { unsavedWork: session.hasUnsavedWork() }) as string }
+  finally { applyingCommand = false }
 }
 
 /** Restarts into the installed update: whatever was edited since the install is written first, and unwritten work stops the restart. */
 export const restartAfterUpdate = async (session: Pick<ProjectSession, "flush" | "hasUnsavedWork">, invoke: Invoke): Promise<void> => {
   try { await session.flush() } catch { /* checked below */ }
   if (session.hasUnsavedWork()) throw { reason: "unsavedWork" }
-  await invoke("restart_app")
+  await invoke("restart_app", { unsavedWork: false })
 }
 
 /** The shell is the only one that can check, and it can only be reached from the desktop app. */

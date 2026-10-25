@@ -78,7 +78,7 @@ bun scripts/build.ts --no-updater`}
     <h2>Updater behavior</h2>
     <p>The configured updater endpoint is the repository's latest GitHub release download at <code>latest.json</code>. The Rust updater checks at launch and every four hours, with manual checks queued through its service. Each request uses a 30-second timeout. The manifest identifies platform-specific assets and signatures; the public key is part of the application configuration.</p>
     <p><code>update://status</code> carries checking, up-to-date, available, downloading, ready, and failed states. Release notes containing <code>[critical]</code> mark the available update as non-dismissible. A ready-to-restart state is also non-dismissible. This affects the prompt; installation still respects the unsaved-work guard.</p>
-    <p><code>install_update</code> consumes a recorded pending version, rechecks the available update, and refuses installation if the version changed or the caller reports unsaved work. Download progress includes bytes and an optional total. Failures preserve pending update information for a later attempt.</p>
+    <p><code>install_update</code> records and rechecks the announced version, then downloads a signature-verified package. The editor saves before download and again before <code>apply_update</code>, protecting edits made during download. Unsaved work blocks both operations; failed saves retain verified bytes for retry. Native status is recovered after subscribing, and checks cannot replace active progress or a pending restart. Windows drains the sidecar before its installer takes control; other platforms offer a restart after installation.</p>
     <DocCallout type="note" title="Keep release keys stable">
       <p>The application verifies update signatures using its embedded public key. A release signed with a different private key is not interchangeable. Verify the produced installer and updater asset on the target platform before declaring a release ready for users.</p>
     </DocCallout>
@@ -108,14 +108,14 @@ bun scripts/build.ts --only=artifacts --dry-run`}
       <tbody>
         <tr><td>macOS Apple Silicon</td><td><code>aarch64-apple-darwin</code></td><td><code>darwin-aarch64</code></td><td><code>.app.tar.gz</code></td></tr>
         <tr><td>macOS Intel</td><td><code>x86_64-apple-darwin</code></td><td><code>darwin-x86_64</code></td><td><code>.app.tar.gz</code></td></tr>
-        <tr><td>Windows ARM64</td><td><code>aarch64-pc-windows-msvc</code></td><td><code>windows-aarch64</code></td><td><code>.exe</code></td></tr>
-        <tr><td>Windows x64</td><td><code>x86_64-pc-windows-msvc</code></td><td><code>windows-x86_64</code></td><td><code>.exe</code></td></tr>
-        <tr><td>Linux ARM64</td><td><code>aarch64-unknown-linux-gnu</code></td><td>—</td><td>not published</td></tr>
-        <tr><td>Linux x64</td><td><code>x86_64-unknown-linux-gnu</code></td><td>—</td><td>not published</td></tr>
+        <tr><td>Windows ARM64</td><td><code>aarch64-pc-windows-msvc</code></td><td><code>windows-aarch64</code>, <code>windows-aarch64-msi</code></td><td><code>.exe</code>, <code>.msi</code></td></tr>
+        <tr><td>Windows x64</td><td><code>x86_64-pc-windows-msvc</code></td><td><code>windows-x86_64</code>, <code>windows-x86_64-msi</code></td><td><code>.exe</code>, <code>.msi</code></td></tr>
+        <tr><td>Linux ARM64</td><td><code>aarch64-unknown-linux-gnu</code></td><td><code>linux-aarch64-deb</code>, <code>linux-aarch64-rpm</code></td><td><code>.deb</code>, <code>.rpm</code></td></tr>
+        <tr><td>Linux x64</td><td><code>x86_64-unknown-linux-gnu</code></td><td><code>linux-x86_64-deb</code>, <code>linux-x86_64-rpm</code></td><td><code>.deb</code>, <code>.rpm</code></td></tr>
       </tbody>
     </table>
-    <p>The manifest generator requires exactly one matching updater asset for the selected target, its adjacent <code>.sig</code> file, and release notes. Installer indexing prefixes asset names with <code>&lt;triple&gt;--</code>, rejects duplicate names, and rejects signatures without a matching asset. A DMG, MSI, DEB, or RPM installer does not replace the updater asset listed above. Linux release jobs do not build an AppImage, so they publish <code>.deb</code> and <code>.rpm</code> installers and no updater manifest.</p>
-    <p>Merged platform manifests must agree on version, publication date, and release notes. The release job expects the four macOS and Windows manifest keys (<code>darwin-aarch64</code>, <code>darwin-x86_64</code>, <code>windows-aarch64</code>, <code>windows-x86_64</code>). URLs must be HTTPS with no embedded credentials, query string, or fragment. Staging checks that the target prefix, suffix, signature, and release URL match the platform.</p>
+    <p>The generator requires exactly one asset per format above, its adjacent <code>.sig</code> file, and release notes. Asset names use a <code>&lt;triple&gt;--</code> prefix; duplicate names and orphan signatures are refused. Tauri updater 2.13.1 selects the installed package type automatically; Linux uses signed Debian/RPM packages without an AppImage.</p>
+    <p>Merged manifests must agree on version, publication date, and notes. Publication requires all ten keys above. Windows base keys retain NSIS compatibility for older clients; MSI keys preserve MSI installations. URLs must use HTTPS without credentials, a query or a fragment. Staging checks each target prefix, package suffix, signature and release URL.</p>
   </section>
 
   <section id="build-options" class="doc-section">
@@ -213,9 +213,9 @@ bun --no-env-file scripts/build.ts \
     </table>
     <ol>
       <li>A trusted job validates the release tag against the application version.</li>
-      <li>Each matrix job runs <code>bun --no-env-file scripts/build.ts --target=… --bundles=… --out-dir=release</code> and signs. macOS and Windows also build an architecture-specific updater manifest. Linux does not. Windows imports and afterwards removes its signing certificate.</li>
-      <li>A merge job validates the four macOS and Windows updater manifests and merges them into one <code>latest.json</code>.</li>
-      <li>A publish job per platform uploads installers under the tag suffixed with the slug, for example <code>&lt;tag&gt;-macos-arm64</code>.</li>
+      <li>Each matrix job runs <code>bun --no-env-file scripts/build.ts --target=… --bundles=… --out-dir=release</code>, signs and builds a manifest for its package formats. Windows imports and afterwards removes its optional signing certificate.</li>
+      <li>A merge job validates all six architecture manifests and their ten package entries into one <code>latest.json</code>.</li>
+      <li>One completion job verifies all installer artifacts, signatures, checksums and notes before creating or resuming the single version release and publishing it.</li>
     </ol>
     <p>CI on every push runs two jobs: install, typecheck and test (and stages the sidecar binary and migrations), and a Rust job with clippy and the <code>src-tauri</code> tests.</p>
   </section>

@@ -142,6 +142,10 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   // Membership and role checks stay in the sidecar handlers; the gateway only admits the routes.
   { methods: ["GET", "POST"], path: /^\/api\/organizations$/ },
   { methods: ["GET", "PUT", "DELETE"], path: /^\/api\/organizations\/[^/]+$/ },
+  // Production costs share the desktop contracts and user/organization checks.
+  { methods: ["GET", "POST"], path: /^\/api\/production-costs\/(estimates|material-costs|operation-costs|tool-wear)$/ },
+  { methods: ["GET", "PUT", "DELETE"], path: /^\/api\/production-costs\/(estimates|material-costs|operation-costs|tool-wear)\/(?!calculate$)[^/]+$/ },
+  { methods: ["POST"], path: /^\/api\/production-costs\/estimates\/calculate$/ },
   { methods: ["GET"], path: /^\/api\/ai\/status$/ },
   { methods: ["GET"], path: /^\/api\/ai\/models$/ },
   { methods: ["GET"], path: /^\/api\/ai\/providers$/ },

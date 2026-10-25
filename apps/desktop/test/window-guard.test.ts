@@ -16,6 +16,24 @@ const harness = (over: { unsaved?: boolean; flush?: () => Promise<void> } = {}) 
 }
 
 describe("closing the window", () => {
+  test("a native application in progress holds close requests even after a previous save", async () => {
+    let finish!: (version: string) => void, started!: () => void
+    const applying = new Promise<void>((resolve) => { started = resolve })
+    const install = installPendingUpdate({ flush: async () => undefined, hasUnsavedWork: () => false }, async (command) => {
+      if (command !== "apply_update") return "1.2.3"
+      started()
+      return new Promise<string>((resolve) => { finish = resolve })
+    })
+    await applying
+    const h = harness({ unsaved: false })
+    await h.guard(h.event())
+    expect(h.log).toEqual(["hold"])
+    finish("1.2.3")
+    await install
+    h.log.length = 0
+    await h.guard(h.event())
+    expect(h.log).toEqual([])
+  })
   test("nothing unsaved: the close goes through untouched", async () => {
     const h = harness({ unsaved: false })
     await h.guard(h.event())
@@ -62,7 +80,10 @@ describe("installing an update", () => {
     const invoke = async (command: string, args?: Record<string, unknown>) => { calls.push({ command, args }); return "1.2.3" }
     let unsaved = true
     expect(await installPendingUpdate({ flush: async () => { unsaved = false }, hasUnsavedWork: () => unsaved }, invoke)).toBe("1.2.3")
-    expect(calls).toEqual([{ command: "install_update", args: { unsavedWork: false } }])
+    expect(calls).toEqual([
+      { command: "install_update", args: { unsavedWork: false } },
+      { command: "apply_update", args: { unsavedWork: false } }
+    ])
     calls.length = 0
     await installPendingUpdate({ flush: async () => { throw new Error("offline") }, hasUnsavedWork: () => true }, invoke)
     expect(calls[0]!.args).toEqual({ unsavedWork: true })

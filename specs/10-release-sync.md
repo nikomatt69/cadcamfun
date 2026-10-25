@@ -1,5 +1,39 @@
 # WP10 — Updates, packaging, CI, (deferred) sync
 
+## Updater completion contract (2026-10-25)
+
+Owner-requested scope covers the WP10 updater, its narrow WP5 command/permission wiring,
+WP6 update prompt/state/i18n/tests and project close guard, and release documentation. Retain the official
+`tauri-plugin-updater` for HTTPS downloads, signature verification and native installation.
+
+- Serialize checks, downloads and application. Keep the latest status in native memory;
+  `get_update_status` lets a listener recover the launch result after subscribing, without
+  replacing a newer live event. Installed/restart and staged-download states survive checks.
+- `install_update(unsavedWork: boolean)` downloads and verifies only, with a bounded
+  timeout. `apply_update(unsavedWork: boolean)` applies the in-memory verified package.
+  Both require an explicit unsaved-work answer. The UI flushes before download and again
+  immediately before application, because users can keep editing during a download.
+  Failed saves retain the verified package for retry. Installation runs off the async executor;
+  native close/exit requests wait while replacement is running. Critical downloaded packages
+  keep their required prompt across webview reloads.
+- Windows installers exit the app themselves. Drain/reap the sidecar before invoking one;
+  normal restarts also refuse to proceed if sidecar shutdown times out. macOS/Linux emit
+  a restart-ready state after application. Configuration errors must never claim up-to-date.
+- Tauri updater 2.13.1 supports Debian and RPM packages and automatically selects
+  `{os}-{arch}-{installer}` before `{os}-{arch}`. Publish signed `linux-{arch}-deb` and
+  `linux-{arch}-rpm` entries using the existing packages, plus `windows-{arch}-msi` entries
+  so MSI installations retain their package type. Keep Windows base keys pointing to NSIS
+  for older clients. Require all ten entries and their actual signed assets before publication.
+  This supersedes older statements below excluding Linux from the updater feed; no AppImage
+  or additional application plugin is needed. Pin the Rust updater minimum to 2.13.1.
+- Validate real event payloads, preserve active update phases across manual checks,
+  and enforce critical dismissal in the state reducer as well as the dialog.
+
+Verification includes native unit tests/Clippy, desktop updater/IPC tests and typecheck,
+release fixture rejection tests, workflow lint and production UI build. Actual replacement
+of installed apps on each operating system remains a separate platform acceptance check;
+do not describe local tests as proof of those installations.
+
 ## Rust updater lifecycle alignment (2026-10-09)
 
 WP10 follow-up: register and retrieve the same updater state type, bound/coalesce check requests, run checks serially in an async task, stop the task on application exit, check unsaved work before consuming pending updates, bound the network recheck and enforce the announced version before install. Installation errors retain the pending announcement for retry.

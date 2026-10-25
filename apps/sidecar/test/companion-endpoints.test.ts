@@ -72,6 +72,22 @@ describe("phone endpoint contract", () => {
   test("every phone call passes the companion gateway's allow-list", () => {
     expect(calls.filter((call) => !isCompanionRoute(call.method, call.path))).toEqual([])
   })
+
+  test("all 21 production-cost endpoints reach the phone with their exact HTTP methods", () => {
+    let count = 0
+    for (const [path, item] of Object.entries(OpenApi.fromApi(Api).paths)) {
+      if (!path.startsWith("/api/production-costs/")) continue
+      for (const method of Object.keys(item)) {
+        if (!["get", "post", "put", "delete"].includes(method)) continue
+        count += 1
+        expect(isCompanionRoute(method, path.replaceAll(/\{[^}]+\}/g, "cost-1"))).toBe(true)
+      }
+    }
+    expect(count).toBe(21)
+    for (const [method, path] of [["DELETE", "/api/production-costs/estimates"], ["PUT", "/api/production-costs/estimates/calculate"], ["GET", "/api/production-costs/estimates/calculate"], ["POST", "/api/production-costs/tool-wear/calculate"], ["GET", "/api/production-costs/settings"], ["GET", "/api/production-costs/estimates/cost-1/private"]] as const) {
+      expect(isCompanionRoute(method, path)).toBe(false)
+    }
+  })
 })
 
 const entry = new URL("../src/main.ts", import.meta.url).pathname
@@ -135,6 +151,49 @@ describe("phone endpoints on the real HTTP server", () => {
       expect((feed as { nextCursor?: unknown }).nextCursor).toBeNull()
       // The AI status says honestly which assistant answers: the embedded nikcli host or the direct model path.
       expect(["nikcli", "direct"]).toContain((await phone.aiStatus()).host ?? "missing")
+
+      // Production costs use the same rows in both clients, across the actual HTTPS gateway.
+      const costMaterial = await phone.createMaterial({ name: "Cost stock", density: 2700 }) as { id: string }
+      const costTool = await phone.createTool({ name: "Cost cutter", type: "endmill", diameter: 6, material: "carbide" }) as { id: string }
+      const programResponse = await local("/api/toolpaths", { method: "POST", body: JSON.stringify({
+        projectId: project.id, name: "Cost program", type: "mill", operationType: "profile", toolId: costTool.id, materialId: costMaterial.id,
+        gcode: "G21\nG90\nG1 X100 F100", data: { stockDimensions: { x: 100, y: 50, z: 10 } },
+      }) })
+      expect(programResponse.status).toBe(201)
+      const costProgram = await programResponse.json()
+      const materialCost = await phone.createMaterialCost({ materialId: costMaterial.id, costPerUnit: 5, wasteFactor: 10 })
+      expect((await phone.materialCost(materialCost.id)).costPerUnit).toBe(5)
+      await phone.updateMaterialCost(materialCost.id, { costPerUnit: 10 })
+      expect((await (await local(`/api/production-costs/material-costs/${materialCost.id}`)).json()).costPerUnit).toBe(10)
+      const wear = await phone.createToolWearCost({ toolId: costTool.id, wearRatePerMeter: 10, replacementCost: 20 })
+      expect((await phone.toolWearCost(wear.id)).replacementCost).toBe(20)
+      await phone.updateToolWearCost(wear.id, { replacementCost: 30 })
+      expect((await (await local(`/api/production-costs/tool-wear/${wear.id}`)).json()).replacementCost).toBe(30)
+      const rate = await phone.createOperationCost({ name: "Phone mill", machineHourlyRate: 50, operatorHourlyRate: 30 })
+      expect((await phone.operationCost(rate.id)).name).toBe("Phone mill")
+      await phone.updateOperationCost(rate.id, { setupTime: 12 })
+      expect((await (await local(`/api/production-costs/operation-costs/${rate.id}`)).json()).setupTime).toBe(12)
+      const calculated = await phone.calculateEstimate({ toolpathId: costProgram.id })
+      expect(calculated.toolWearCost).toBeCloseTo(0.1 * 0.1 * 30, 8)
+      expect(calculated.materialCost).toBeCloseTo(0.00005 * 1.1 * 10, 12)
+      const savedEstimate = await phone.createEstimate({ ...calculated })
+      expect((await phone.estimate(savedEstimate.id)).details).toEqual(calculated.details)
+      expect((await phone.estimates(project.id)).map((row) => row.id)).toEqual([savedEstimate.id])
+      await phone.updateEstimate(savedEstimate.id, { notes: "Quoted from phone" })
+      const desktopEstimate = await (await local(`/api/production-costs/estimates/${savedEstimate.id}`)).json()
+      expect(desktopEstimate.totalCost).toBe(calculated.totalCost)
+      expect(desktopEstimate.details.notes).toBe("Quoted from phone")
+      expect((await phone.materialCosts()).map((row) => row.id)).toContain(materialCost.id)
+      expect((await phone.toolWearCosts()).map((row) => row.id)).toContain(wear.id)
+      expect((await phone.operationCosts()).map((row) => row.id)).toContain(rate.id)
+      await phone.deleteEstimate(savedEstimate.id)
+      await phone.deleteMaterialCost(materialCost.id)
+      await phone.deleteToolWearCost(wear.id)
+      await phone.deleteOperationCost(rate.id)
+      expect(await phone.estimates(project.id)).toEqual([])
+      expect((await local(`/api/production-costs/material-costs/${materialCost.id}`)).status).toBe(404)
+      expect((await local(`/api/production-costs/tool-wear/${wear.id}`)).status).toBe(404)
+      expect((await local(`/api/production-costs/operation-costs/${rate.id}`)).status).toBe(404)
 
       // Routes the phone can adopt before its client calls them: conversation list and history, through the gateway.
       const sessions = await transport.request(`/api/ai/sessions?projectId=${encodeURIComponent(project.id)}`, "GET")

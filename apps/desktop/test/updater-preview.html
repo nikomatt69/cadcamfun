@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><title>Updater component verification</title></head>
+<body><main id="app"></main><script type="module">
+import { createComponent } from "solid-js";
+import { render } from "solid-js/web";
+import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import { emit } from "@tauri-apps/api/event";
+import { AppProvider } from "../src/shared/state/context.ts";
+import { UpdatePrompt } from "../src/app/UpdatePrompt.tsx";
+import "../src/styles/globals.css";
+
+const available = { status: "available", version: "6.1.0", current: "6.0.0", notes: "Faster toolpath previews.\nImproved project recovery and signed native updates.", critical: false, dismissible: true };
+const scenarios = {
+  available,
+  critical: { ...available, critical: true, dismissible: false, notes: "[critical] Fixes a project recovery issue." },
+  downloading: { status: "downloading", downloaded: 37 * 1024 * 1024, total: 70 * 1024 * 1024 },
+  downloaded: { status: "downloaded", version: "6.1.0", critical: false },
+  ready: { status: "ready", version: "6.1.0" },
+  failed: { status: "failed", message: "The connection timed out.", manual: true }
+};
+const scenario = new URLSearchParams(location.search).get("scenario") ?? "available";
+mockWindows("main");
+mockIPC((command) => {
+  if (command === "get_update_status") return scenarios[scenario];
+  if (command === "check_for_updates") void emit("update://status", { status: "upToDate", version: "6.0.0", manual: true });
+}, { shouldMockEvents: true });
+document.body.className = "bg-gray-100 text-gray-900";
+render(() => createComponent(AppProvider, { state: {}, get children() { return createComponent(UpdatePrompt, {}); } }), document.getElementById("app"));
+</script></body></html>

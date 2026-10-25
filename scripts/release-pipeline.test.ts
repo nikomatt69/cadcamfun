@@ -19,7 +19,7 @@ async function fixture(root: string) {
   for (const [key, triple] of Object.entries(RELEASE_PLATFORM_TRIPLES)) {
     const dir = join(installers, `installers-${triple}`);
     await mkdir(dir, { recursive: true });
-    const suffixes = key.startsWith("linux") ? [".deb", ".rpm"]
+    const suffixes = key.startsWith("linux") ? [".deb", ".deb.sig", ".rpm", ".rpm.sig"]
       : key.startsWith("darwin") ? [".app.tar.gz", ".app.tar.gz.sig", ".dmg"] : [".exe", ".exe.sig", ".msi", ".msi.sig"];
     for (const suffix of suffixes) {
       const name = `${triple}--App 6.0.0${suffix}`;
@@ -28,7 +28,7 @@ async function fixture(root: string) {
     }
     await refreshChecksums(dir);
     await writeFile(join(dir, "RELEASE_NOTES.md"), "Release notes\n");
-    if (!key.startsWith("linux")) {
+    {
       const manifestDir = join(manifests, triple);
       await mkdir(manifestDir, { recursive: true });
       const fragment = await buildManifest(dir, triple, "6.0.0", `${DOWNLOAD}/${TAG}`, "2026-10-05T12:00:00Z");

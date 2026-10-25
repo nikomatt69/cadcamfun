@@ -1,6 +1,7 @@
 import type { AiSessionMessages, AiSessionSummary, AiStatus, SessionStreamFrame } from "@cadcamfun/api"
 import type { ComponentPreview, EntityChange, LibraryCatalogue, LiveEvent, MeshPreview, NotificationRow, PullRequestRow, ReviewRow, SessionControlReply, SessionStateReply, ToolpathPreview, ToolpathReview, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow, WorkspaceEntry } from "@cadcamfun/api"
 import type { Pairing } from "./pairing"
+import type { CalculateEstimateBody, CalculatedEstimate, EstimateCreate, EstimateDetails, EstimateResponse, EstimateUpdate, MaterialCostCreate, MaterialCostDetails, MaterialCostResponse, MaterialCostUpdate, OperationCostCreate, OperationCostDetails, OperationCostUpdate, ToolWearCreate, ToolWearDetails, ToolWearResponse, ToolWearUpdate } from "@cadcamfun/api"
 import type { AssistantPreferences, AssistantProvider } from "./assistant-preferences"
 import type { ChatEvent } from "./sse"
 import { sseParser } from "./sse"
@@ -206,6 +207,30 @@ export class CompanionClient {
   renameProject = (id: string, name: string) => this.request<ProjectSummary>("PUT", this.projectPath(id), { name })
   deleteProject = (id: string) => this.request<{ message: string }>("DELETE", this.projectPath(id))
   project = (id: string, signal?: AbortSignal) => this.request<ProjectSummary>("GET", this.projectPath(id), undefined, signal)
+
+  // ── Production costs (shared schema types, no Effect runtime on the phone) ──
+
+  estimates = (projectId?: string, signal?: AbortSignal) => this.request<readonly (typeof EstimateDetails.Type)[]>("GET", `/api/production-costs/estimates${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`, undefined, signal)
+  estimate = (id: string, signal?: AbortSignal) => this.request<typeof EstimateDetails.Type>("GET", `/api/production-costs/estimates/${encodeURIComponent(id)}`, undefined, signal)
+  calculateEstimate = (body: typeof CalculateEstimateBody.Type) => this.request<typeof CalculatedEstimate.Type>("POST", "/api/production-costs/estimates/calculate", body)
+  createEstimate = (body: typeof EstimateCreate.Type) => this.request<typeof EstimateDetails.Type>("POST", "/api/production-costs/estimates", body)
+  updateEstimate = (id: string, body: typeof EstimateUpdate.Type) => this.request<typeof EstimateResponse.Type>("PUT", `/api/production-costs/estimates/${encodeURIComponent(id)}`, body)
+  deleteEstimate = (id: string) => this.request<{ message: string }>("DELETE", `/api/production-costs/estimates/${encodeURIComponent(id)}`)
+  materialCosts = (signal?: AbortSignal) => this.request<readonly (typeof MaterialCostDetails.Type)[]>("GET", "/api/production-costs/material-costs", undefined, signal)
+  materialCost = (id: string, signal?: AbortSignal) => this.request<typeof MaterialCostDetails.Type>("GET", `/api/production-costs/material-costs/${encodeURIComponent(id)}`, undefined, signal)
+  createMaterialCost = (body: typeof MaterialCostCreate.Type) => this.request<typeof MaterialCostResponse.Type>("POST", "/api/production-costs/material-costs", body)
+  updateMaterialCost = (id: string, body: typeof MaterialCostUpdate.Type) => this.request<typeof MaterialCostResponse.Type>("PUT", `/api/production-costs/material-costs/${encodeURIComponent(id)}`, body)
+  deleteMaterialCost = (id: string) => this.request<{ message: string }>("DELETE", `/api/production-costs/material-costs/${encodeURIComponent(id)}`)
+  operationCosts = (signal?: AbortSignal) => this.request<readonly (typeof OperationCostDetails.Type)[]>("GET", "/api/production-costs/operation-costs", undefined, signal)
+  operationCost = (id: string, signal?: AbortSignal) => this.request<typeof OperationCostDetails.Type>("GET", `/api/production-costs/operation-costs/${encodeURIComponent(id)}`, undefined, signal)
+  createOperationCost = (body: typeof OperationCostCreate.Type) => this.request<typeof OperationCostDetails.Type>("POST", "/api/production-costs/operation-costs", body)
+  updateOperationCost = (id: string, body: typeof OperationCostUpdate.Type) => this.request<typeof OperationCostDetails.Type>("PUT", `/api/production-costs/operation-costs/${encodeURIComponent(id)}`, body)
+  deleteOperationCost = (id: string) => this.request<{ message: string }>("DELETE", `/api/production-costs/operation-costs/${encodeURIComponent(id)}`)
+  toolWearCosts = (signal?: AbortSignal) => this.request<readonly (typeof ToolWearDetails.Type)[]>("GET", "/api/production-costs/tool-wear", undefined, signal)
+  toolWearCost = (id: string, signal?: AbortSignal) => this.request<typeof ToolWearDetails.Type>("GET", `/api/production-costs/tool-wear/${encodeURIComponent(id)}`, undefined, signal)
+  createToolWearCost = (body: typeof ToolWearCreate.Type) => this.request<typeof ToolWearResponse.Type>("POST", "/api/production-costs/tool-wear", body)
+  updateToolWearCost = (id: string, body: typeof ToolWearUpdate.Type) => this.request<typeof ToolWearResponse.Type>("PUT", `/api/production-costs/tool-wear/${encodeURIComponent(id)}`, body)
+  deleteToolWearCost = (id: string) => this.request<{ message: string }>("DELETE", `/api/production-costs/tool-wear/${encodeURIComponent(id)}`)
 
   // ── Workspace preview (read-only meshes, G-code and library) ────────────
 

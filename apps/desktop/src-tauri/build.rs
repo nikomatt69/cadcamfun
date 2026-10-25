@@ -14,7 +14,9 @@ const COMMANDS: &[&str] = &[
     "read_opened_file",
     "set_recent_projects",
     "check_for_updates",
+    "get_update_status",
     "install_update",
+    "apply_update",
     "restart_app",
     "open_release_notes",
 ];

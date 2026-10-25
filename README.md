@@ -294,7 +294,7 @@ The pipeline:
 1. Validates the workspace and workflows, resolves a new version, stamps version holders and refreshes the lockfile.
 2. Builds the changelog from commits, commits the release metadata and pushes the version tag.
 3. Cross-compiles the six sidecar variants with Bun, then bundles the desktop on the corresponding native runners.
-4. Verifies installer checksums. macOS and Windows also check updater signatures and URLs. Linux publishes Debian and RPM packages. The updater manifest covers macOS and Windows.
+4. Verifies installer checksums, updater signatures and URLs for all six targets. The updater manifest includes macOS archives, Windows NSIS/MSI and Linux Debian/RPM packages, preserving the installed package type.
 5. Publishes npm, creates one version release after asset verification, uploads all six targets, signatures, combined checksums and updater manifest, publishes the release and then updates the optional Homebrew cask.
 
 The release is created only after all six desktop targets are built and verified. An upload failure leaves a resumable draft. A failed optional Homebrew publication is reported separately. Prereleases do not advance the stable cask or become the latest stable updater release.

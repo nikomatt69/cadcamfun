@@ -5,7 +5,7 @@ import { Modal } from "../shared/ui/modal.tsx"
 import { toast } from "../shared/ui/toast.tsx"
 import { projectSession } from "../features/projects/lib/project-session.ts"
 import {
-  checkForUpdates, decodeUpdateEvent, dismissUpdate, formatBytes, initialUpdateView, installFailed, installPendingUpdate, openReleaseNotes, percentOf,
+  checkForUpdates, dismissUpdate, formatBytes, initialUpdateView, installFailed, installPendingUpdate, observeUpdates, openReleaseNotes, percentOf,
   reduceUpdate, releaseNotesOf, reopenUpdate, restartAfterUpdate, type AvailableUpdate, type UpdateEvent, type UpdateView
 } from "./updates.ts"
 
@@ -26,11 +26,11 @@ export function UpdatePrompt(): JSX.Element {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return
     let off: (() => void) | undefined
     let gone = false
-    void import("@tauri-apps/api/event").then(async ({ listen }) => {
-      const stop = await listen<unknown>("update://status", (message) => {
-        const next = decodeUpdateEvent(message.payload)
-        if (next !== undefined) setView((current) => reduceUpdate(current, next))
-      })
+    void Promise.all([import("@tauri-apps/api/event"), import("@tauri-apps/api/core")]).then(async ([{ listen }, { invoke }]) => {
+      const stop = await observeUpdates(
+        (next) => { if (!gone) setView((current) => reduceUpdate(current, next)) },
+        (receive) => listen<unknown>("update://status", (message) => receive(message.payload)), invoke
+      )
       if (gone) stop(); else off = stop
     }).catch(() => undefined)
     onCleanup(() => { gone = true; off?.() })
@@ -62,7 +62,7 @@ export function UpdatePrompt(): JSX.Element {
 
   const dialog = (): UpdateEvent | undefined => view().minimized ? undefined : view().dialog
   const chip = (): UpdateEvent | undefined => view().minimized ? view().dialog : undefined
-  const mustAnswer = (): boolean => { const current = dialog(); return current?.status === "available" && !current.dismissible }
+  const mustAnswer = (): boolean => { const current = dialog(); return current?.status === "installing" || (current?.status === "downloaded" && current.critical === true) || (current?.status === "available" && (current.critical || !current.dismissible)) }
   const percent = (current: Extract<UpdateEvent, { status: "downloading" }>): number | undefined => percentOf(current.downloaded, current.total)
 
   const title = (current: UpdateEvent): string => {
@@ -71,6 +71,8 @@ export function UpdatePrompt(): JSX.Element {
       case "upToDate": return t("update.title.upToDate")
       case "available": return t(current.critical ? "update.title.critical" : "update.title.available")
       case "downloading": return t("update.title.downloading")
+      case "downloaded": return t("update.title.downloaded")
+      case "installing": return t("update.title.installing")
       case "ready": return t("update.title.ready")
       case "failed": return t("update.title.failed")
     }
@@ -85,6 +87,11 @@ export function UpdatePrompt(): JSX.Element {
         <button type="button" class={PRIMARY} disabled={busy()} onClick={() => void install()}>{t("update.install")}</button>
       </>
       case "downloading": return <button type="button" class={SECONDARY} onClick={close}>{t("update.hide")}</button>
+      case "downloaded": return <>
+        <Show when={!current.critical}><button type="button" class={SECONDARY} onClick={close}>{t("update.later")}</button></Show>
+        <button type="button" class={PRIMARY} disabled={busy()} onClick={() => void install()}>{t("update.install")}</button>
+      </>
+      case "installing": return null
       case "ready": return <>
         <button type="button" class={SECONDARY} onClick={close}>{t("update.later")}</button>
         <button type="button" class={PRIMARY} disabled={busy()} onClick={() => void restart()}>{t("update.restart")}</button>
@@ -116,6 +123,8 @@ export function UpdatePrompt(): JSX.Element {
         </div>
       )
       case "ready": return <p class="text-sm text-gray-700 dark:text-gray-200">{t("update.ready", { version: current.version })}</p>
+      case "downloaded": return <p class="text-sm text-gray-700 dark:text-gray-200">{t("update.downloaded", { version: current.version })}</p>
+      case "installing": return <p class="text-sm text-gray-700 dark:text-gray-200">{t("update.installing")}</p>
       case "failed": return <p role="alert" class="text-sm text-red-600 dark:text-red-400">{t("update.checkFailed")}<span class="mt-1 block text-xs text-gray-500">{current.message}</span></p>
     }
   }
@@ -127,7 +136,7 @@ export function UpdatePrompt(): JSX.Element {
     <Show when={chip()}>{(current) => (
       <button type="button" data-testid="update-chip" onClick={() => { setView(reopenUpdate) }}
         class="fixed bottom-10 right-4 z-50 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs text-gray-800 shadow-lg hover:bg-blue-50 dark:border-blue-800 dark:bg-gray-800 dark:text-gray-100">
-        {current().status === "downloading" ? t("update.chip.downloading", { percent: String(percent(current() as Extract<UpdateEvent, { status: "downloading" }>) ?? "…") }) : t("update.chip.ready")}
+        {current().status === "downloading" ? t("update.chip.downloading", { percent: String(percent(current() as Extract<UpdateEvent, { status: "downloading" }>) ?? "…") }) : t(current().status === "downloaded" ? "update.title.downloaded" : "update.chip.ready")}
       </button>
     )}</Show>
   </>

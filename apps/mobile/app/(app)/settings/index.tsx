@@ -3,7 +3,7 @@ import { Alert, Platform, Switch, Text, View } from "react-native"
 import Constants from "expo-constants"
 import * as Clipboard from "expo-clipboard"
 import { useRouter } from "expo-router"
-import { Building2, Check, ClipboardCopy, EyeOff, Fingerprint, MonitorSmartphone, Palette, Sparkles, Unplug, Vibrate, Lock, Layers3 } from "lucide-react-native"
+import { Building2, Calculator, Check, ClipboardCopy, EyeOff, Fingerprint, MonitorSmartphone, Palette, Sparkles, Unplug, Vibrate, Lock, Layers3 } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useUIStore } from "@/lib/store"
@@ -133,6 +133,9 @@ export default function SettingsScreen() {
     <AccountCard />
 
     <SettingsGroup title="Workspace">
+      <ListRow leading={<IconTile size={36}><Calculator size={18} color={palette.accent} /></IconTile>} title="Production costs"
+        subtitle="Estimates, material costs, tool wear and operation rates" onPress={() => router.push("/settings/costs")} />
+      <Divider inset={16} />
       <ListRow leading={<IconTile size={36}><Building2 size={18} color={palette.accent} /></IconTile>} title="Organizations"
         subtitle="Your organizations, members and roles — synced with the desktop" onPress={() => router.push("/settings/organizations")} />
       <Divider inset={16} />

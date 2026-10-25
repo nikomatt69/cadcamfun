@@ -520,18 +520,24 @@ export class ProductionCostRepo extends Context.Service<ProductionCostRepo, {
 
         materialCostFor: (userId, materialId) =>
           query("production-costs.material-cost-for", async (db) => {
-            const row = await db.select().from(MC).where(eq(MC.materialId, materialId))
-              .orderBy(asc(MC.createdAt)).then((all) => all.find((r) => readable(db, userId, r.ownerId, r.organizationId)))
-            if (!row) return null
-            return { costPerUnit: row.costPerUnit, wasteFactor: row.wasteFactor, minimumCharge: row.minimumCharge }
+            const rows = await db.select().from(MC).where(eq(MC.materialId, materialId)).orderBy(asc(MC.createdAt))
+            for (const row of rows) {
+              if (await readable(db, userId, row.ownerId, row.organizationId)) {
+                return { costPerUnit: row.costPerUnit, wasteFactor: row.wasteFactor, minimumCharge: row.minimumCharge }
+              }
+            }
+            return null
           }),
 
         toolWearFor: (userId, toolId) =>
           query("production-costs.tool-wear-for", async (db) => {
             const all = await db.select().from(TW).where(eq(TW.toolId, toolId)).orderBy(asc(TW.createdAt))
-            const row = all.find((r) => readable(db, userId, r.ownerId, r.organizationId))
-            if (!row) return null
-            return { wearRatePerMeter: row.wearRatePerMeter, replacementCost: row.replacementCost }
+            for (const row of all) {
+              if (await readable(db, userId, row.ownerId, row.organizationId)) {
+                return { wearRatePerMeter: row.wearRatePerMeter, replacementCost: row.replacementCost }
+              }
+            }
+            return null
           })
       }, ["createEstimate", "updateEstimate", "createMaterialCost", "updateMaterialCost", "createOperationCost", "updateOperationCost", "createToolWear", "updateToolWear"]))
     })

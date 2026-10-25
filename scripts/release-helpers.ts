@@ -92,11 +92,15 @@ export const RELEASE_PLATFORM_TRIPLES: Readonly<Record<string, string>> = {
 
 export const RELEASE_PLATFORM_KEYS = Object.freeze(Object.keys(RELEASE_PLATFORM_TRIPLES));
 
-/**
- * Platforms whose installers Tauri can sign for the in-app updater.
- * Linux ships `.deb` and `.rpm` only — the same set as nikcli's desktop — so it has no updater artifact.
- */
-export const UPDATER_PLATFORM_KEYS = Object.freeze(RELEASE_PLATFORM_KEYS.filter((key) => !key.startsWith("linux-")));
+/** Package-specific keys let Tauri retain the installed package manager/type. */
+export const UPDATER_PLATFORM_ASSETS: Readonly<Record<string, { readonly triple: string; readonly suffix: string }>> = Object.freeze(
+  Object.fromEntries(Object.entries(RELEASE_PLATFORM_TRIPLES).flatMap(([key, triple]) => {
+    const formats = key.startsWith("linux-") ? [[`${key}-deb`, ".deb"], [`${key}-rpm`, ".rpm"]]
+      : key.startsWith("windows-") ? [[key, ".exe"], [`${key}-msi`, ".msi"]] : [[key, ".app.tar.gz"]];
+    return formats.map(([platform, suffix]) => [platform!, { triple, suffix: suffix! }]);
+  }))
+);
+export const UPDATER_PLATFORM_KEYS = Object.freeze(Object.keys(UPDATER_PLATFORM_ASSETS));
 
 // Ignore historical per-platform tags when discovering application versions.
 const PLATFORM_TAG = /-(?:macos|windows|linux)-(?:arm64|x64)$/;
@@ -261,7 +265,7 @@ export function validateManifest(value: unknown): Manifest {
   const version = releaseVersion(value.version);
   const platforms: Record<string, PlatformEntry> = {};
   for (const [key, entry] of Object.entries(value.platforms)) {
-    if (!/^(darwin|linux|windows)-(aarch64|x86_64)$/.test(key) || !isRecord(entry)
+    if (!Object.hasOwn(UPDATER_PLATFORM_ASSETS, key) || !isRecord(entry)
       || typeof entry.signature !== "string" || !entry.signature.trim() || typeof entry.url !== "string"
       || !isHttpsUrl(entry.url)) throw new Error(`Invalid updater platform entry: ${key}`);
     platforms[key] = { signature: entry.signature, url: entry.url };
@@ -296,9 +300,8 @@ export function assertManifestAssets(manifest: Manifest, names: readonly string[
     const prefix = `${releaseUrl.replace(/\/$/, "")}/`;
     if (!entry.url.startsWith(prefix)) throw new Error(`Wrong release URL for ${platform}`);
     const name = decodeURIComponent(entry.url.slice(prefix.length));
-    const triple = RELEASE_PLATFORM_TRIPLES[platform] ?? null;
-    const suffix = platform.startsWith("darwin-") ? ".app.tar.gz" : platform.startsWith("windows-") ? ".exe" : ".AppImage";
-    if (!triple || !name.startsWith(`${triple}--`) || !name.endsWith(suffix) || !names.includes(name) || !names.includes(`${name}.sig`)) {
+    const asset = UPDATER_PLATFORM_ASSETS[platform];
+    if (!asset || !name.startsWith(`${asset.triple}--`) || !name.endsWith(asset.suffix) || !names.includes(name) || !names.includes(`${name}.sig`)) {
       throw new Error(`Missing or mismatched release assets for ${platform}`);
     }
   }

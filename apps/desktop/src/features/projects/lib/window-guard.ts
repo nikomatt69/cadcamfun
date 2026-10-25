@@ -1,5 +1,6 @@
 import { t } from "../../../i18n/index.ts"
 import type { ProjectSession } from "./project-session.ts"
+import { updateBlocksClose } from "../../../app/updates.ts"
 
 export interface GuardOptions {
   /** How long the final save may take before the close is refused. */
@@ -23,14 +24,15 @@ export const closeGuard = (
   const timeoutMs = options.timeoutMs ?? 8_000, insistMs = options.insistMs ?? 20_000, now = options.now ?? Date.now
   let refusedAt = Number.NEGATIVE_INFINITY
   return async (event) => {
+    if (updateBlocksClose()) { event.preventDefault(); return }
     if (!session.hasUnsavedWork()) return
     event.preventDefault()
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       await Promise.race([session.flush(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(t("save.closeTimeout"))), timeoutMs) })])
-      await win.destroy()
+      if (!updateBlocksClose()) await win.destroy()
     } catch (cause) {
-      if (now() - refusedAt < insistMs) { await win.destroy(); return }
+      if (now() - refusedAt < insistMs) { if (!updateBlocksClose()) await win.destroy(); return }
       refusedAt = now()
       report(t("save.closeBlocked", { message: cause instanceof Error ? cause.message : String(cause) }))
     } finally {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import {
-  checkForUpdates, dismissUpdate, formatBytes, initialUpdateView, installFailed, percentOf, reduceUpdate, releaseNotesOf, reopenUpdate,
+  checkForUpdates, decodeUpdateEvent, dismissUpdate, formatBytes, initialUpdateView, installFailed, installPendingUpdate, observeUpdates, percentOf, reduceUpdate, releaseNotesOf, reopenUpdate,
   restartAfterUpdate, type UpdateEvent, type UpdateView
 } from "../src/app/updates.ts"
 
@@ -9,6 +9,29 @@ const available = (patch: Partial<Extract<UpdateEvent, { status: "available" }>>
 const feed = (events: ReadonlyArray<UpdateEvent>, from: UpdateView = initialUpdateView): UpdateView => events.reduce(reduceUpdate, from)
 
 describe("what the update dialog shows", () => {
+  test("critical releases cannot be dismissed through the state interface", () => {
+    const critical = feed([available({ critical: true, dismissible: false })])
+    expect(dismissUpdate(critical)).toBe(critical)
+    const inconsistent = feed([available({ critical: true, dismissible: true })])
+    expect(dismissUpdate(inconsistent)).toBe(inconsistent)
+    const downloaded = feed([{ status: "downloaded", version: "1.2.0", critical: true }])
+    expect(dismissUpdate(downloaded)).toBe(downloaded)
+  })
+
+  test("checks cannot overwrite active download, installation or restart states", () => {
+    for (const event of [
+      { status: "downloading", downloaded: 1, total: 100 },
+      { status: "downloaded", version: "1.2.0" },
+      { status: "installing", version: "1.2.0" },
+      { status: "ready", version: "1.2.0" }
+    ] satisfies UpdateEvent[]) {
+      const active = feed([available(), event])
+      for (const check of [{ status: "checking", manual: true }, { status: "upToDate", version: "1.1.0", manual: true }, { status: "failed", message: "offline", manual: true }] satisfies UpdateEvent[]) {
+        expect(reduceUpdate(active, check)).toBe(active)
+      }
+      expect(reduceUpdate(active, available({ manual: true })).dialog).toEqual(event)
+    }
+  })
   test("a check the person asked for is answered with every outcome", () => {
     expect(feed([{ status: "checking", manual: true }]).dialog?.status).toBe("checking")
     expect(feed([{ status: "checking", manual: true }, { status: "upToDate", version: "1.1.0", manual: true }]).dialog).toMatchObject({ status: "upToDate", version: "1.1.0" })
@@ -54,6 +77,76 @@ describe("what the update dialog shows", () => {
     const failed = installFailed(feed([available(), { status: "downloading", downloaded: 5, total: 50 }]))
     expect(failed.dialog).toMatchObject({ status: "available", version: "1.2.0" })
     expect(installFailed(initialUpdateView).dialog).toBeUndefined()
+  })
+})
+
+describe("native update event boundary", () => {
+  test("rejects incomplete and malformed payloads", () => {
+    for (const payload of [null, [], { status: "available" }, { status: "available", version: "1", notes: 3, critical: false, dismissible: true },
+      { status: "ready", version: 1 }, { status: "checking", manual: "true" }, { status: "failed" },
+      { status: "downloading", downloaded: -1 }, { status: "downloading", downloaded: NaN }, { status: "downloading", downloaded: 1, total: "10" }]) {
+      expect(decodeUpdateEvent(payload)).toBeUndefined()
+    }
+  })
+
+  const subscription = async () => {
+    const received: UpdateEvent[] = []
+    let event!: (payload: unknown) => void, snapshot!: (payload: unknown) => void
+    let stopped = false
+    const stop = await observeUpdates((value) => received.push(value), async (receive) => { event = receive; return () => { stopped = true } },
+      async () => new Promise((resolve) => { snapshot = resolve }))
+    return { received, event: (payload: unknown) => event(payload), snapshot: async (payload: unknown) => { snapshot(payload); await Promise.resolve(); await Promise.resolve() }, stop, stopped: () => stopped }
+  }
+
+  test("recovers the launch check after the webview starts listening", async () => {
+    const s = await subscription()
+    await s.snapshot(available())
+    expect(s.received).toEqual([available()])
+    s.stop()
+    expect(s.stopped()).toBe(true)
+  })
+
+  test("a late snapshot cannot replace newer live progress", async () => {
+    const s = await subscription()
+    s.event({ status: "downloading", downloaded: 50, total: 100 })
+    await s.snapshot(available())
+    expect(s.received).toEqual([{ status: "downloading", downloaded: 50, total: 100 }])
+    s.stop()
+  })
+
+  test("unmounted listeners ignore snapshots and queued events", async () => {
+    const s = await subscription()
+    s.stop()
+    await s.snapshot(available())
+    s.event(available())
+    expect(s.received).toEqual([])
+  })
+})
+
+describe("saving around the download", () => {
+  test("edits made during download are written before the native installer can exit", async () => {
+    const calls: string[] = []
+    let dirty = true
+    await installPendingUpdate({ flush: async () => { calls.push("save"); dirty = false }, hasUnsavedWork: () => dirty }, async (command, args) => {
+      calls.push(command)
+      expect(args?.unsavedWork).toBe(false)
+      if (command === "install_update") dirty = true
+      return "1.2.0"
+    })
+    expect(calls).toEqual(["save", "install_update", "save", "apply_update"])
+  })
+
+  test("a failed second save refuses application and keeps the downloaded package for retry", async () => {
+    let saves = 0
+    const calls: string[] = []
+    await expect(installPendingUpdate({ flush: async () => { if (++saves === 2) throw Error("disk full") }, hasUnsavedWork: () => saves === 2 }, async (command, args) => {
+      calls.push(command)
+      if (args?.unsavedWork) throw { reason: "unsavedWork" }
+      return "1.2.0"
+    })).rejects.toMatchObject({ reason: "unsavedWork" })
+    expect(calls).toEqual(["install_update", "apply_update"])
+    const staged = feed([{ status: "downloaded", version: "1.2.0" }])
+    expect(installFailed(staged)).toBe(staged)
   })
 })
 

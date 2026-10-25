@@ -2,6 +2,7 @@ import { Api, BadRequest, CurrentUser, Forbidden, InternalError, NotFound } from
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { MaterialRepo } from "../repos/material-repo.ts"
+import { ToolRepo } from "../repos/tool-repo.ts"
 import { ProductionCostRepo } from "../repos/production-cost-repo.ts"
 import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { CostService } from "../services/costs.ts"
@@ -16,6 +17,7 @@ export const ProductionCostsHandlers = HttpApiBuilder.group(Api, "production-cos
   const repo = yield* ProductionCostRepo
   const toolpaths = yield* ToolpathRepo
   const materials = yield* MaterialRepo
+  const tools = yield* ToolRepo
   const costs = yield* CostService
 
   /** Legacy rule: an organisation id may only be used by one of its members. */
@@ -45,6 +47,7 @@ export const ProductionCostsHandlers = HttpApiBuilder.group(Api, "production-cos
         if (!(yield* toolpaths.find(user.id, payload.toolpathId))) {
           return yield* new NotFound({ message: "Toolpath not found or access denied" })
         }
+        if (payload.operationCostId && !(yield* repo.findOperationCost(user.id, payload.operationCostId))) return yield* inaccessible
         return yield* repo.createEstimate(user.id, { ...payload, organizationId })
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create production cost estimate"))))
     .handle("getEstimate", ({ params }) =>
@@ -115,6 +118,8 @@ export const ProductionCostsHandlers = HttpApiBuilder.group(Api, "production-cos
       Effect.gen(function*() {
         const user = yield* CurrentUser
         const organizationId = yield* checkOrg(user.id, payload.organizationId)
+        const material = yield* materials.access(user.id, payload.materialId)
+        if (!material?.allowed) return yield* inaccessible
         return yield* repo.createMaterialCost(user.id, { ...payload, organizationId })
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create material cost"))))
     .handle("getMaterialCost", ({ params }) =>
@@ -179,6 +184,8 @@ export const ProductionCostsHandlers = HttpApiBuilder.group(Api, "production-cos
       Effect.gen(function*() {
         const user = yield* CurrentUser
         const organizationId = yield* checkOrg(user.id, payload.organizationId)
+        const tool = yield* tools.access(user.id, payload.toolId)
+        if (!tool?.allowed) return yield* inaccessible
         return yield* repo.createToolWear(user.id, { ...payload, organizationId })
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create tool wear cost"))))
     .handle("getToolWear", ({ params }) =>

@@ -29,11 +29,12 @@ use crate::sidecar::SidecarHandle;
 pub const CHECK_INTERVAL: Duration = Duration::from_secs(4 * 60 * 60);
 /// How long one check may take before it is abandoned.
 const CHECK_TIMEOUT: Duration = Duration::from_secs(30);
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 /// Event the webview listens on for update state.
 pub const UPDATE_EVENT: &str = "update://status";
 /// Where the release notes of every version live.
 pub const RELEASES_URL: &str = "https://github.com/nikomatt69/cadcamfun/releases";
-/// How long a restart waits for the sidecar to finish before it goes ahead anyway.
+/// Refuse replacement/restart if the sidecar cannot be reaped within this limit.
 const RESTART_SIDECAR_TIMEOUT: Duration = Duration::from_secs(10);
 /// Marker the release manager copies from the `critical` release flag into the
 /// manifest body (see `scripts/updater-manifest.ts`).
@@ -62,6 +63,10 @@ pub enum UpdateStatus {
     },
     /// The update is downloading.
     Downloading { downloaded: u64, total: Option<u64> },
+    /// Signature-verified bytes are staged; the webview must save again before applying.
+    Downloaded { version: String, critical: bool },
+    /// A native installer is applying the verified package.
+    Installing { version: String },
     /// The update is installed; the webview asks the user to restart.
     Ready { version: String },
     /// A check failed; never surfaced as a blocking error.
@@ -72,9 +77,10 @@ impl UpdateStatus {
     /// Whether the UI may dismiss the prompt for this status (spec 10 §3).
     pub fn dismissible(&self) -> bool {
         match self {
-            UpdateStatus::Available { critical, .. } => !critical,
+            UpdateStatus::Available { critical, .. }
+            | UpdateStatus::Downloaded { critical, .. } => !critical,
             // A pending restart is the whole point of the prompt.
-            UpdateStatus::Ready { .. } => false,
+            UpdateStatus::Ready { .. } | UpdateStatus::Installing { .. } => false,
             _ => true,
         }
     }
@@ -114,6 +120,8 @@ impl UpdateEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, thiserror::Error)]
 #[serde(tag = "reason", rename_all = "camelCase")]
 pub enum UpdateError {
+    #[error("another update operation is running")]
+    Busy,
     /// The editor holds unsaved work; the install must wait.
     #[error("the editor has unsaved work; apply the update once it is saved")]
     UnsavedWork,
@@ -153,6 +161,15 @@ pub struct UpdaterService {
     /// Moved into the polling thread on first use; kept here to document ownership.
     rx: Mutex<Option<Receiver<CheckTrigger>>>,
     task: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    operation: tokio::sync::Mutex<()>,
+    latest: Mutex<Option<UpdateEvent>>,
+    staged: Mutex<Option<DownloadedUpdate>>,
+}
+
+struct DownloadedUpdate {
+    update: tauri_plugin_updater::Update,
+    bytes: Vec<u8>,
+    critical: bool,
 }
 
 impl UpdaterService {
@@ -162,6 +179,9 @@ impl UpdaterService {
             tx,
             rx: Mutex::new(Some(rx)),
             task: Mutex::new(None),
+            operation: tokio::sync::Mutex::new(()),
+            latest: Mutex::new(None),
+            staged: Mutex::new(None),
         }
     }
 
@@ -182,6 +202,33 @@ impl UpdaterService {
             }
         }
     }
+
+    pub fn snapshot(&self) -> Option<UpdateEvent> {
+        self.latest.lock().ok().and_then(|event| event.clone())
+    }
+
+    pub fn is_installing(&self) -> bool {
+        self.snapshot()
+            .is_some_and(|event| matches!(event.status, UpdateStatus::Installing { .. }))
+    }
+
+    fn remember(&self, event: UpdateEvent) {
+        if let Ok(mut latest) = self.latest.lock() {
+            *latest = Some(event);
+        }
+    }
+
+    fn preserves_installation(&self) -> bool {
+        self.snapshot().is_some_and(|event| {
+            matches!(
+                event.status,
+                UpdateStatus::Downloading { .. }
+                    | UpdateStatus::Downloaded { .. }
+                    | UpdateStatus::Installing { .. }
+                    | UpdateStatus::Ready { .. }
+            )
+        })
+    }
 }
 
 impl Default for UpdaterService {
@@ -197,7 +244,7 @@ pub fn status_for(
     notes: String,
     date: Option<String>,
 ) -> UpdateStatus {
-    let critical = notes.contains(CRITICAL_MARKER);
+    let critical = notes.to_ascii_lowercase().contains(CRITICAL_MARKER);
     UpdateStatus::Available {
         version,
         current,
@@ -243,14 +290,31 @@ pub fn may_install(
 
 // ---------------------------------------------------------------- plumbing
 
-fn emit(app: &AppHandle, status: UpdateStatus, manual: bool) {
-    if let Err(err) = app.emit(UPDATE_EVENT, UpdateEvent::new(status).manual(manual)) {
+fn emit<R: tauri::Runtime>(app: &AppHandle<R>, status: UpdateStatus, manual: bool) {
+    let event = UpdateEvent::new(status).manual(manual);
+    if let Some(service) = app.try_state::<UpdaterService>() {
+        service.remember(event.clone());
+    }
+    if let Err(err) = app.emit(UPDATE_EVENT, event) {
         log::warn!("failed to emit update status: {err}");
     }
 }
 
 /// Runs one check and reports the outcome to the webview.
-pub async fn check(app: AppHandle, trigger: CheckTrigger) -> Result<(), String> {
+pub async fn check<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    trigger: CheckTrigger,
+) -> Result<(), String> {
+    let service = app.state::<UpdaterService>();
+    let _operation = service.operation.lock().await;
+    if service.preserves_installation() {
+        if trigger == CheckTrigger::Manual {
+            if let Some(event) = service.snapshot() {
+                emit(&app, event.status, true);
+            }
+        }
+        return Ok(());
+    }
     let running_version = app.package_info().version.to_string();
     let manual = trigger == CheckTrigger::Manual;
     emit(&app, UpdateStatus::Checking, manual);
@@ -258,17 +322,13 @@ pub async fn check(app: AppHandle, trigger: CheckTrigger) -> Result<(), String> 
         log::info!("manual update check requested");
     }
 
-    // The plugin is only usable in a build with a real pubkey. Without one there is
-    // nothing to compare against, so the UI is told the app is current rather than
-    // being shown a false error.
     let updater = match app.updater() {
         Ok(updater) => updater,
         Err(err) => {
-            log::debug!("updater unavailable ({err}); reporting up to date");
             emit(
                 &app,
-                UpdateStatus::UpToDate {
-                    version: running_version,
+                UpdateStatus::Failed {
+                    message: format!("updater configuration unavailable: {err}"),
                 },
                 manual,
             );
@@ -310,6 +370,11 @@ pub async fn check(app: AppHandle, trigger: CheckTrigger) -> Result<(), String> 
             Ok(())
         }
         Ok(None) => {
+            if let Some(pending) = app.try_state::<PendingUpdate>() {
+                if let Ok(mut info) = pending.0.lock() {
+                    *info = None;
+                }
+            }
             emit(
                 &app,
                 UpdateStatus::UpToDate {
@@ -327,12 +392,39 @@ pub async fn check(app: AppHandle, trigger: CheckTrigger) -> Result<(), String> 
     }
 }
 
-/// Downloads and installs the pending update, forwarding progress events.
-pub async fn install(
-    app: AppHandle,
+/// Downloads and verifies only. The editor must save again before `apply`.
+pub async fn install<R: tauri::Runtime>(
+    app: AppHandle<R>,
     pending: tauri::State<'_, PendingUpdate>,
     unsaved_work: bool,
 ) -> Result<String, UpdateError> {
+    let service = app.state::<UpdaterService>();
+    let _operation = service
+        .operation
+        .try_lock()
+        .map_err(|_| UpdateError::Busy)?;
+    if unsaved_work {
+        return Err(UpdateError::UnsavedWork);
+    }
+    let staged_version = service
+        .staged
+        .lock()
+        .map_err(|_| UpdateError::Failed {
+            message: "updater state is poisoned".into(),
+        })?
+        .as_ref()
+        .map(|staged| (staged.update.version.clone(), staged.critical));
+    if let Some((version, critical)) = staged_version {
+        emit(
+            &app,
+            UpdateStatus::Downloaded {
+                version: version.clone(),
+                critical,
+            },
+            false,
+        );
+        return Ok(version);
+    }
     let info = consume_pending(&pending, unsaved_work)?;
     let outcome = async {
         let updater = app.updater().map_err(|e| UpdateError::Failed {
@@ -356,43 +448,154 @@ pub async fn install(
             });
         }
         let mut downloaded = 0u64;
-        update
-            .download_and_install(
+        emit(
+            &app,
+            UpdateStatus::Downloading {
+                downloaded,
+                total: None,
+            },
+            false,
+        );
+        let bytes = tokio::time::timeout(
+            DOWNLOAD_TIMEOUT,
+            update.download(
                 |chunk, total| {
                     downloaded += chunk as u64;
                     emit(&app, UpdateStatus::Downloading { downloaded, total }, false);
                 },
                 || {},
-            )
-            .await
-            .map_err(|e| UpdateError::Failed {
-                message: e.to_string(),
-            })?;
+            ),
+        )
+        .await
+        .map_err(|_| UpdateError::Failed {
+            message: "update download timed out; try again".into(),
+        })?
+        .map_err(|e| UpdateError::Failed {
+            message: e.to_string(),
+        })?;
 
         log::info!(
-            "update {} installed (critical: {})",
+            "update {} verified (critical: {})",
             info.version,
             info.critical
         );
         let version = info.version.clone();
+        *service.staged.lock().map_err(|_| UpdateError::Failed {
+            message: "updater state is poisoned".into(),
+        })? = Some(DownloadedUpdate {
+            update,
+            bytes,
+            critical: info.critical,
+        });
         emit(
             &app,
-            UpdateStatus::Ready {
+            UpdateStatus::Downloaded {
                 version: version.clone(),
+                critical: info.critical,
             },
             false,
         );
         Ok(version)
     }
     .await;
-    if outcome.is_err() {
+    if let Err(error) = &outcome {
         if let Ok(mut current) = pending.0.lock() {
             if current.is_none() {
                 *current = Some(info);
             }
         }
+        emit(
+            &app,
+            UpdateStatus::Failed {
+                message: error.to_string(),
+            },
+            true,
+        );
     }
     outcome
+}
+
+/// Applies already verified bytes, after the webview has flushed edits made during download.
+pub async fn apply<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    unsaved_work: bool,
+) -> Result<String, UpdateError> {
+    let service = app.state::<UpdaterService>();
+    let _operation = service
+        .operation
+        .try_lock()
+        .map_err(|_| UpdateError::Busy)?;
+    if unsaved_work {
+        return Err(UpdateError::UnsavedWork);
+    }
+    if service
+        .staged
+        .lock()
+        .map_err(|_| UpdateError::Failed {
+            message: "updater state is poisoned".into(),
+        })?
+        .is_none()
+    {
+        return Err(UpdateError::NoneAvailable);
+    }
+    // Windows installers terminate the shell without running its normal async exit guard.
+    // Do not hand control to one while the database or child process is still alive.
+    #[cfg(windows)]
+    stop_sidecar(&app).await?;
+
+    let staged = service
+        .staged
+        .lock()
+        .map_err(|_| UpdateError::Failed {
+            message: "updater state is poisoned".into(),
+        })?
+        .take()
+        .ok_or(UpdateError::NoneAvailable)?;
+    let version = staged.update.version.clone();
+    emit(
+        &app,
+        UpdateStatus::Installing {
+            version: version.clone(),
+        },
+        false,
+    );
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        let result = staged.update.install(&staged.bytes);
+        (staged, result)
+    })
+    .await;
+    let (staged, result) = match outcome {
+        Ok(result) => result,
+        Err(error) => {
+            let message = error.to_string();
+            emit(
+                &app,
+                UpdateStatus::Failed {
+                    message: message.clone(),
+                },
+                true,
+            );
+            return Err(UpdateError::Failed { message });
+        }
+    };
+    if let Err(error) = result {
+        let critical = staged.critical;
+        *service.staged.lock().map_err(|_| UpdateError::Failed {
+            message: "updater state is poisoned".into(),
+        })? = Some(staged);
+        emit(&app, UpdateStatus::Downloaded { version, critical }, false);
+        return Err(UpdateError::Failed {
+            message: error.to_string(),
+        });
+    }
+    emit(
+        &app,
+        UpdateStatus::Ready {
+            version: version.clone(),
+        },
+        false,
+    );
+    Ok(version)
 }
 
 /// A check the person asked for from a menu: the window comes to the front so the answer is seen, then the
@@ -417,15 +620,26 @@ pub fn open_release_notes<R: tauri::Runtime>(app: &AppHandle<R>) {
 
 /// Restarts into the installed update: the check loop stops and the sidecar finishes first, so a restart never
 /// leaves a database or a worker behind. The webview has already written its unsaved work.
-pub async fn restart(app: AppHandle) {
+async fn stop_sidecar<R: tauri::Runtime>(app: &AppHandle<R>) -> Result<(), UpdateError> {
+    if let Some(handle) = app.try_state::<Arc<SidecarHandle>>() {
+        handle.shutdown();
+        tokio::time::timeout(RESTART_SIDECAR_TIMEOUT, handle.wait_finished())
+            .await
+            .map_err(|_| UpdateError::Failed {
+                message: "sidecar shutdown timed out; the application was not restarted".into(),
+            })?;
+    }
+    Ok(())
+}
+
+pub async fn restart(app: AppHandle, unsaved_work: bool) -> Result<(), UpdateError> {
+    if unsaved_work {
+        return Err(UpdateError::UnsavedWork);
+    }
     if let Some(service) = app.try_state::<UpdaterService>() {
         service.shutdown();
     }
-    if let Some(handle) = app.try_state::<Arc<SidecarHandle>>() {
-        if handle.shutdown() {
-            let _ = tokio::time::timeout(RESTART_SIDECAR_TIMEOUT, handle.wait_finished()).await;
-        }
-    }
+    stop_sidecar(&app).await?;
     app.restart();
 }
 
@@ -459,6 +673,169 @@ pub fn spawn(app: AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn app() -> tauri::App<tauri::test::MockRuntime> {
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        context
+            .config_mut()
+            .plugins
+            .0
+            .insert("updater".into(), serde_json::json!({ "pubkey": "" }));
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .build(context)
+            .unwrap();
+        app.manage(UpdaterService::new());
+        app.manage(PendingUpdate::default());
+        app
+    }
+
+    #[tokio::test]
+    #[ignore = "downloads the current public release and verifies its signature; never installs"]
+    async fn live_release_download_verifies_the_embedded_public_key() {
+        let app = app();
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let pubkey = config["plugins"]["updater"]["pubkey"].as_str().unwrap();
+        let endpoint = config["plugins"]["updater"]["endpoints"][0]
+            .as_str()
+            .unwrap();
+        let updater = app
+            .updater_builder()
+            .pubkey(pubkey)
+            .endpoints(vec![endpoint.parse().unwrap()])
+            .unwrap()
+            .target(tauri_plugin_updater::target().unwrap())
+            .version_comparator(|_, _| true)
+            .build()
+            .unwrap();
+        let update = tokio::time::timeout(CHECK_TIMEOUT, updater.check())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let bytes = tokio::time::timeout(DOWNLOAD_TIMEOUT, update.download(|_, _| {}, || {}))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!bytes.is_empty());
+        println!(
+            "Verified release {}: {} signed bytes; no installation performed",
+            update.version,
+            bytes.len()
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_plugin_configuration_is_a_failure_not_a_claim_of_being_current() {
+        let app = app();
+        check(app.handle().clone(), CheckTrigger::Manual)
+            .await
+            .unwrap();
+        let event = app.state::<UpdaterService>().snapshot().unwrap();
+        assert!(event.manual);
+        assert!(matches!(event.status, UpdateStatus::Failed { .. }));
+    }
+
+    #[tokio::test]
+    async fn manual_checks_replay_staged_and_installed_states_without_network_access() {
+        let app = app();
+        for status in [
+            UpdateStatus::Downloading {
+                downloaded: 10,
+                total: Some(20),
+            },
+            UpdateStatus::Downloaded {
+                version: "6.1.0".into(),
+                critical: false,
+            },
+            UpdateStatus::Installing {
+                version: "6.1.0".into(),
+            },
+            UpdateStatus::Ready {
+                version: "6.1.0".into(),
+            },
+        ] {
+            emit(app.handle(), status.clone(), false);
+            check(app.handle().clone(), CheckTrigger::Manual)
+                .await
+                .unwrap();
+            let event = app.state::<UpdaterService>().snapshot().unwrap();
+            assert_eq!(event.status, status);
+            assert!(event.manual);
+        }
+    }
+
+    #[tokio::test]
+    async fn overlapping_download_or_apply_calls_are_refused() {
+        let app = app();
+        let service = app.state::<UpdaterService>();
+        let operation = service.operation.lock().await;
+        assert_eq!(
+            install(app.handle().clone(), app.state::<PendingUpdate>(), false).await,
+            Err(UpdateError::Busy)
+        );
+        assert_eq!(
+            apply(app.handle().clone(), false).await,
+            Err(UpdateError::Busy)
+        );
+        drop(operation);
+        assert_eq!(
+            apply(app.handle().clone(), false).await,
+            Err(UpdateError::NoneAvailable)
+        );
+    }
+
+    #[tokio::test]
+    async fn both_download_and_apply_refuse_unsaved_work_before_touching_the_installer() {
+        let app = app();
+        record_pending(
+            &app.state::<PendingUpdate>(),
+            PendingUpdateInfo {
+                version: "6.1.0".into(),
+                critical: false,
+            },
+        );
+        assert_eq!(
+            install(app.handle().clone(), app.state::<PendingUpdate>(), true).await,
+            Err(UpdateError::UnsavedWork)
+        );
+        assert_eq!(
+            apply(app.handle().clone(), true).await,
+            Err(UpdateError::UnsavedWork)
+        );
+        assert!(consume_pending(&app.state::<PendingUpdate>(), false).is_ok());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn restart_shutdown_does_not_bypass_an_already_requested_but_unfinished_drain() {
+        let app = app();
+        let handle = Arc::new(SidecarHandle::new("test-token".into()));
+        handle.shutdown();
+        app.manage(handle);
+        assert!(matches!(
+            stop_sidecar(app.handle()).await,
+            Err(UpdateError::Failed { .. })
+        ));
+    }
+
+    #[test]
+    fn a_late_listener_reads_the_latest_native_event() {
+        let app = app();
+        emit(app.handle(), UpdateStatus::Checking, false);
+        let status = status_for(
+            "6.1.0".into(),
+            "6.0.0".into(),
+            "[CRITICAL] fix".into(),
+            None,
+        );
+        emit(app.handle(), status.clone(), false);
+        assert_eq!(
+            app.state::<UpdaterService>().snapshot().unwrap().status,
+            status
+        );
+        assert!(!status.dismissible());
+    }
 
     #[test]
     fn a_critical_prompt_cannot_be_dismissed() {

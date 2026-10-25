@@ -128,6 +128,17 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .menu(menu::build)
         .on_menu_event(|app, event| menu::handle_event(app, event.id().as_ref()))
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window
+                    .app_handle()
+                    .try_state::<updater::UpdaterService>()
+                    .is_some_and(|service| service.is_installing())
+                {
+                    api.prevent_close();
+                }
+            }
+        })
         .setup(setup)
         .invoke_handler(tauri::generate_handler![
             commands::get_sidecar_endpoint,
@@ -143,7 +154,9 @@ pub fn run() {
             commands::read_opened_file,
             commands::set_recent_projects,
             commands::check_for_updates,
+            commands::get_update_status,
             commands::install_update,
+            commands::apply_update,
             commands::restart_app,
             commands::open_release_notes,
         ])
@@ -153,6 +166,10 @@ pub fn run() {
     app.run(|app, event| match event {
         RunEvent::ExitRequested { api, .. } => {
             if let Some(updater) = app.try_state::<updater::UpdaterService>() {
+                if updater.is_installing() {
+                    api.prevent_exit();
+                    return;
+                }
                 updater.shutdown();
             }
             if let Some(handle) = app.try_state::<Arc<SidecarHandle>>() {

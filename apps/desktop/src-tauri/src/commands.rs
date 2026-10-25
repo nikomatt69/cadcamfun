@@ -403,24 +403,38 @@ pub fn check_for_updates(
     Ok(())
 }
 
-/// Downloads and installs the update a check found. `unsavedWork` is what keeps an
-/// install from interrupting an open editor (spec 10 §3).
+#[tauri::command]
+pub fn get_update_status(
+    state: tauri::State<'_, updater::UpdaterService>,
+) -> Option<updater::UpdateEvent> {
+    state.snapshot()
+}
+
+/// Downloads and verifies the update; application needs a second save guard.
 #[tauri::command]
 pub async fn install_update(
     app: AppHandle,
     pending: tauri::State<'_, updater::PendingUpdate>,
-    unsaved_work: Option<bool>,
+    unsaved_work: bool,
 ) -> Result<String, CommandError> {
-    updater::install(app, pending, unsaved_work.unwrap_or(false))
+    updater::install(app, pending, unsaved_work)
+        .await
+        .map_err(CommandError::from)
+}
+
+#[tauri::command]
+pub async fn apply_update(app: AppHandle, unsaved_work: bool) -> Result<String, CommandError> {
+    updater::apply(app, unsaved_work)
         .await
         .map_err(CommandError::from)
 }
 
 /// Restarts into the installed update. The webview calls it after it wrote its unsaved work.
 #[tauri::command]
-pub async fn restart_app(app: AppHandle) -> Result<(), CommandError> {
-    updater::restart(app).await;
-    Ok(())
+pub async fn restart_app(app: AppHandle, unsaved_work: bool) -> Result<(), CommandError> {
+    updater::restart(app, unsaved_work)
+        .await
+        .map_err(CommandError::from)
 }
 
 /// Opens the release notes page in the browser.

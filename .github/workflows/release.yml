@@ -214,10 +214,8 @@ jobs:
         # Tauri bundle only: `compile` is skipped — the sidecar was cross-compiled
         # by the Bun job above and already placed in src-tauri/binaries/.
         run: bun --no-env-file scripts/build.ts --skip=check,compile --target=${{ matrix.target }} --bundles=${{ matrix.bundles }} --out-dir=release
-      # Tauri's in-app updater consumes an AppImage on Linux. This pipeline matches
-      # nikcli and does not build one, so Linux publishes deb and rpm only.
+      # Tauri 2.13.1 selects the matching signed DEB/RPM or MSI package automatically.
       - name: Build architecture-specific updater manifest
-        if: ${{ !contains(matrix.target, 'linux') }}
         env:
           RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ needs.trusted.outputs.tag }}
           RELEASE_VERSION: ${{ needs.trusted.outputs.version }}
@@ -226,7 +224,6 @@ jobs:
         shell: bash
         run: bun --no-env-file scripts/updater-manifest.ts --collect-dir=release --arch="$RELEASE_TARGET" --version="$RELEASE_VERSION" --release-url="$RELEASE_URL" --pub-date="$RELEASE_DATE" --out=manifest/latest.json
       - uses: actions/upload-artifact@v4
-        if: ${{ !contains(matrix.target, 'linux') }}
         with:
           name: manifest-${{ matrix.target }}
           path: manifest/latest.json
@@ -259,7 +256,7 @@ jobs:
       - name: Validate and merge updater platforms
         env:
           RELEASE_VERSION: ${{ needs.trusted.outputs.version }}
-        run: bun --no-env-file scripts/updater-manifest.ts --merge=manifests --out=latest.json --version="$RELEASE_VERSION" --expected-platforms=darwin-aarch64,darwin-x86_64,windows-aarch64,windows-x86_64
+        run: bun --no-env-file scripts/updater-manifest.ts --merge=manifests --out=latest.json --version="$RELEASE_VERSION"
       - uses: actions/upload-artifact@v4
         with:
           name: latest-json

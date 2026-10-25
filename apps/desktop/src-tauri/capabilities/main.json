@@ -29,7 +29,9 @@
     "allow-read-opened-file",
     "allow-set-recent-projects",
     "allow-check-for-updates",
+    "allow-get-update-status",
     "allow-install-update",
+    "allow-apply-update",
     "allow-restart-app",
     "allow-open-release-notes"
   ]
