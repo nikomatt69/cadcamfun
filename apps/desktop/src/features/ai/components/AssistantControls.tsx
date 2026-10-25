@@ -303,3 +303,41 @@ export function AssistantQuestions(): JSX.Element {
   const ai = useAiStore()
   return <For each={ai.questions()}>{(request) => <QuestionCard request={request} />}</For>
 }
+
+/**
+ * The permissions the agent is waiting on, answered in the composer's dock: next to where the user types, never
+ * inside the conversation, so a request cannot scroll away and is always one click from an answer.
+ */
+export function AssistantPermissions(): JSX.Element {
+  const ai = useAiStore()
+  return (
+    <Show when={ai.permissions().length > 0}>
+      <ul class="assistant-permissions" data-testid="ai-permissions">
+        <For each={ai.permissions()}>
+          {(request) => (
+            <li class="assistant-permission" data-testid="permission">
+              <div class="assistant-permission-copy">
+                <CircleGauge size={14} class="assistant-coral-icon" aria-hidden="true" />
+                <span>{t("ai.message.permission", { permission: request.permission })}</span>
+                <Show when={request.patterns.length > 0}>
+                  <code class="assistant-permission-patterns" title={request.patterns.join("\n")}>{request.patterns.join(", ")}</code>
+                </Show>
+              </div>
+              <div class="assistant-card-actions mt-0">
+                <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => void ai.replyPermission(request.requestId, "reject")}>
+                  {t("ai.message.permission.deny")}
+                </button>
+                <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => void ai.replyPermission(request.requestId, "always")}>
+                  {t("ai.message.permission.remember")}
+                </button>
+                <button type="button" class="assistant-btn assistant-btn-primary" onClick={() => void ai.replyPermission(request.requestId, "once")}>
+                  {t("ai.message.permission.grant")}
+                </button>
+              </div>
+            </li>
+          )}
+        </For>
+      </ul>
+    </Show>
+  )
+}

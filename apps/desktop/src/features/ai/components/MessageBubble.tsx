@@ -8,7 +8,7 @@
  * Claude Code do. This component is that rendering; it was the second half of
  * the assistant's main file.
  */
-import { For, Index, Show, createMemo, createSignal, type JSX } from "solid-js"
+import { For, Index, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
 import Bot from "lucide-solid/icons/bot"
 import Check from "lucide-solid/icons/check"
 import CircleGauge from "lucide-solid/icons/circle-gauge"
@@ -62,7 +62,6 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
     const ms = Date.parse(end) - Date.parse(props.message.createdAt)
     return Number.isFinite(ms) && ms >= 0 ? (ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`) : undefined
   }
-  const permissions = (): ReadonlyArray<StreamEvent> => props.message.events.filter((e) => e.type === "permission_request")
   const isUser = (): boolean => props.message.role === "user"
   const rating = (): "up" | "down" | undefined => ai.feedback()[props.message.id]
 
@@ -83,10 +82,16 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
             return <Show when={segment().kind} keyed>{(kind) => {
               if (kind === "reasoning") {
                 const current = () => segment() as Extract<GroupedSegment, { kind: "reasoning" }>
+                let body: HTMLParagraphElement | undefined
+                // While it streams, the thought shows its newest lines.
+                createEffect(() => {
+                  void current().text
+                  if (body !== undefined && streaming()) body.scrollTop = body.scrollHeight
+                })
                 return (
                   <details class="assistant-reasoning" open={streaming() && last()} data-testid="ai-thinking">
                     <summary class="assistant-reasoning-summary">{t("ai.thinking")}</summary>
-                    <p class="assistant-reasoning-body">{current().text}</p>
+                    <p ref={body} class="assistant-reasoning-body">{current().text}</p>
                   </details>
                 )
               }
@@ -181,43 +186,6 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
           </div>
         </Show>
       </div>
-
-      <Show when={permissions().length > 0}>
-        <ul class="space-y-1.5 mt-2">
-          <For each={permissions()}>
-            {(event) => {
-              if (event.type !== "permission_request") return null
-              const pending = () => ai.permissions().some((permission) => permission.requestId === event.requestId)
-              return (
-                <Show when={pending()}>
-                  <li class="assistant-permission" data-testid="permission">
-                    <div class="assistant-permission-copy">
-                      <CircleGauge size={14} class="assistant-coral-icon" aria-hidden="true" />
-                      <span>{t("ai.message.permission", { permission: event.permission })}</span>
-                    </div>
-                    <div class="assistant-card-actions mt-0">
-                      <button
-                        type="button"
-                        class="assistant-btn assistant-btn-secondary"
-                        onClick={() => ai.replyPermission(event.requestId, "reject")}
-                      >
-                        {t("ai.message.permission.deny")}
-                      </button>
-                      <button
-                        type="button"
-                        class="assistant-btn assistant-btn-primary"
-                        onClick={() => ai.replyPermission(event.requestId, "once")}
-                      >
-                        {t("ai.message.permission.grant")}
-                      </button>
-                    </div>
-                  </li>
-                </Show>
-              )
-            }}
-          </For>
-        </ul>
-      </Show>
 
       <div class="assistant-message-actions" classList={{ "is-user": isUser() }}>
         <button

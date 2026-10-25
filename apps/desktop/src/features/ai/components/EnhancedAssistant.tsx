@@ -31,7 +31,7 @@ import Trash2 from "lucide-solid/icons/trash-2"
 import Wrench from "lucide-solid/icons/wrench"
 import X from "lucide-solid/icons/x"
 import { AssistantHeader, type HeaderItem } from "./AssistantHeader.tsx"
-import { AssistantControlError, AssistantQuestions } from "./AssistantControls.tsx"
+import { AssistantControlError, AssistantPermissions, AssistantQuestions } from "./AssistantControls.tsx"
 import { AssistantComposer, MAX_PROMPT } from "./AssistantComposer.tsx"
 import { AssistantPanels } from "./AssistantPanels.tsx"
 import { AssistantTranscript } from "./AssistantTranscript.tsx"
@@ -454,6 +454,9 @@ export function EnhancedAssistant(props: Props): JSX.Element {
         </section>
       </Show>
 
+      {/* The dock is its own box, outside the scrolling transcript: it keeps its size while the conversation moves. */}
+      <div class="assistant-dock" data-testid="ai-dock">
+      <AssistantPermissions />
       <AssistantControlError />
 
       <AssistantComposer
@@ -486,6 +489,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
         onClosePalette={closePalette}
         completion={completion.suggestion()}
       />
+      </div>
 
       <Show when={panel() === "context"}>
         <ContextDialog onClose={() => setPanel(undefined)} />

@@ -42,27 +42,52 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
 
   const running = (): boolean => ai.status() === "streaming" || ai.status() === "connecting"
 
+  let content: HTMLDivElement | undefined
+
   const scrollToLatest = (): void => {
     if (transcript === undefined) return
     transcript.scrollTop = transcript.scrollHeight
   }
 
+  // Following stops only when the user moves up. Content growing under the viewport, or the box being
+  // resized, also raises scroll events, and they must not let go of the newest turn.
+  let lastTop = 0
   const handleScroll = (el: HTMLDivElement): void => {
-    props.onFollowLatest(el.scrollHeight - el.scrollTop - el.clientHeight < 64)
+    const nearEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 64
+    const movedUp = el.scrollTop < lastTop - 1
+    lastTop = el.scrollTop
+    if (nearEnd) props.onFollowLatest(true)
+    else if (movedUp) props.onFollowLatest(false)
   }
 
   let scrollFrame: number | undefined
   onCleanup(() => { if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame) })
 
-  // Follow the newest turn unless the user scrolled away to read something.
+  const followSoon = (): void => {
+    if (scrollFrame !== undefined || !props.followLatest) return
+    scrollFrame = requestAnimationFrame(() => {
+      scrollFrame = undefined
+      if (props.followLatest) scrollToLatest()
+    })
+  }
+
+  // Follow the newest turn unless the user scrolled away to read something. The turn is more than the
+  // last message: the thinking card, a queued message and an error land below it.
   createEffect(() => {
     const last = ai.messages().at(-1)
-    if (last && props.followLatest && scrollFrame === undefined) {
-      scrollFrame = requestAnimationFrame(() => {
-        scrollFrame = undefined
-        if (props.followLatest) scrollToLatest()
-      })
-    }
+    void ai.pending().length
+    void ai.error()
+    void running()
+    if (last || running()) followSoon()
+  })
+
+  // What grows after it was rendered (a thinking block streaming in, markdown, a tool result opening)
+  // moves the end of the conversation without any signal changing, so the end is watched itself.
+  createEffect(() => {
+    if (content === undefined || typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(followSoon)
+    observer.observe(content)
+    onCleanup(() => observer.disconnect())
   })
 
   /** The messages on screen: the whole conversation, or only the ones that match. */
@@ -102,11 +127,12 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
         aria-live="polite"
         data-testid="ai-transcript"
       >
+        <div ref={content} class="assistant-transcript-content">
         <Show
           when={ai.messages().length > 0}
           fallback={
             /* --- Empty state: the mark, the promise, then the lede. --- */
-            <div class="assistant-empty flex h-full flex-col items-center justify-center text-center">
+            <div class="assistant-empty flex flex-1 flex-col items-center justify-center text-center">
               <div class="relative mb-5">
                 <div class="assistant-emblem" aria-hidden="true">
                   <Sparkles size={19} />
@@ -235,6 +261,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
             )}
           </Show>
         </Show>
+        </div>
       </div>
       <Show when={!props.followLatest && ai.messages().length > 0}>
         <button
