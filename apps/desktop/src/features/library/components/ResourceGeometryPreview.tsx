@@ -9,7 +9,7 @@ import { createComponentPreviewObject } from "../lib/component-preview.ts"
 import { buildPlayback, playbackSegments, toolColors } from "../../../viewport/view3d/playback.ts"
 import { t } from "../../../i18n/index.ts"
 import { resourcePreviewElements } from "../lib/resource-geometry.ts"
-import { PREVIEW_BACKGROUND, addPreviewLights } from "../lib/preview-scene.ts"
+import { PREVIEW_BACKGROUND, addPreviewLook } from "../lib/preview-scene.ts"
 import { PREVIEW_STAGE, PreviewFrame, stageNote } from "./PreviewFrame.tsx"
 export { resourceElements } from "../lib/resource-geometry.ts"
 
@@ -34,7 +34,7 @@ export function ResourceGeometryPreview(props: {
     const scene = new THREE.Scene(), content = new THREE.Group()
     scene.background = new THREE.Color(PREVIEW_BACKGROUND)
     scene.add(content)
-    addPreviewLights(scene)
+    const look = addPreviewLook(renderer, scene, undefined, () => frames.invalidate())
     const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 100000)
     camera.position.set(0, 0, 5)
     const controls = new OrbitControls(camera, renderer.domElement)
@@ -90,7 +90,7 @@ export function ResourceGeometryPreview(props: {
     resize(); rebuild(); visibility()
     onCleanup(() => {
       rebuild = () => {}; fit = () => {}; observer.disconnect(); document.removeEventListener("visibilitychange", visibility)
-      frames.dispose(); controls.dispose(); disposeObject(content); renderer.dispose(); renderer.domElement.remove()
+      frames.dispose(); controls.dispose(); disposeObject(content); look.dispose(); renderer.dispose(); renderer.domElement.remove()
     })
   })
   return <PreviewFrame title={t("cam.resource.preview")} testId="resource-geometry-preview" onFit={() => fit()} fitLabel={t("cam.resource.fit")} hint={t("cam.resource.orbit")}

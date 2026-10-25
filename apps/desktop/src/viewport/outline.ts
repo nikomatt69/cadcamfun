@@ -23,20 +23,24 @@ export const DEFAULT_OUTLINE_STYLE: Readonly<Record<OutlineState, OutlineStyle>>
 }
 
 /** Above this many vertices under one outlined object the hull is skipped (welding costs CPU and the tint remains). */
-export const OUTLINE_MAX_VERTICES = 600_000
+export const OUTLINE_MAX_VERTICES = 250_000
 
 export interface HullPart {
   readonly positions: ArrayLike<number>
   readonly indices?: ArrayLike<number> | undefined
 }
 
+const accumulate = (sum: Float64Array, at: number, nx: number, ny: number, nz: number, weight: number): void => {
+  sum[at] = sum[at]! + nx * weight; sum[at + 1] = sum[at + 1]! + ny * weight; sum[at + 2] = sum[at + 2]! + nz * weight
+}
+
+const angleBetween = (dot: number, l1: number, l2: number): number => Math.acos(Math.max(-1, Math.min(1, dot / (l1 * l2))))
+
 /**
  * One smoothed normal per vertex of each part: the corner-angle-weighted mean of the face normals of every vertex that sits at the
  * same position (within `1e-5` of the extent), across all the parts. Welding across parts is what keeps the hulls of a B-rep's
  * faces (and of a creased mesh) closed along their shared edges.
  */
-const angleBetween = (dot: number, l1: number, l2: number): number => Math.acos(Math.max(-1, Math.min(1, dot / (l1 * l2))))
-
 export const computeHullNormals = (parts: ReadonlyArray<HullPart>): Float32Array[] => {
   let total = 0
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
@@ -94,12 +98,9 @@ export const computeHullNormals = (parts: ReadonlyArray<HullPart>): Float32Array
       const wa = angleBetween(abx * acx + aby * acy + abz * acz, lab, lac)
       const wb = angleBetween(-abx * bcx - aby * bcy - abz * bcz, lab, lbc)
       const wc = Math.PI - wa - wb
-      let u = weld[base + ia]! * 3
-      sum[u] += nx * wa; sum[u + 1] += ny * wa; sum[u + 2] += nz * wa
-      u = weld[base + ib]! * 3
-      sum[u] += nx * wb; sum[u + 1] += ny * wb; sum[u + 2] += nz * wb
-      u = weld[base + ic]! * 3
-      sum[u] += nx * wc; sum[u + 1] += ny * wc; sum[u + 2] += nz * wc
+      accumulate(sum, weld[base + ia]! * 3, nx, ny, nz, wa)
+      accumulate(sum, weld[base + ib]! * 3, nx, ny, nz, wb)
+      accumulate(sum, weld[base + ic]! * 3, nx, ny, nz, wc)
     }
     base += Math.floor(p.length / 3)
   }
@@ -211,6 +212,9 @@ export class Outline {
   get count(): number { return this.entries.size }
 
   stateOf(key: string): OutlineState | undefined { return this.entries.get(key)?.state }
+
+  /** The keys outlined now. */
+  keys(): string[] { return [...this.entries.keys()] }
 
   /**
    * Returns whether anything changed (the caller then asks for a frame). A state of `undefined` or `"none"`, a missing root, a too

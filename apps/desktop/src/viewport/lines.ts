@@ -3,6 +3,7 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import { createDisplayEdges } from "./native-edges.ts"
+import type { LookTier } from "./render-look.ts"
 
 /**
  * Thick lines for the 3D previews. WebGL draws every `THREE.Line` one pixel wide whatever `linewidth` says, so model edges and
@@ -15,8 +16,8 @@ import { createDisplayEdges } from "./native-edges.ts"
  * caller never has to branch and the picture degrades instead of the frame rate.
  */
 
-/** The render quality tiers; the names match the shared setting of `render-look.ts` (`low | standard | high`). */
-export type LineQuality = "low" | "standard" | "high"
+/** The render quality tiers: the shared setting of `render-look.ts` (`low | standard | high`). */
+export type LineQuality = LookTier
 
 /** Segments a tier may keep as thick lines: `total` over everything alive at once, `perObject` for one line. */
 export const LINE_SEGMENT_BUDGET: Readonly<Record<LineQuality, { readonly total: number; readonly perObject: number }>> = {
@@ -32,8 +33,9 @@ export class LineBudget {
   get used(): number { return this.spent }
   get remaining(): number { return Math.max(0, this.limit - this.spent) }
   setLimit(limit: number): void { this.limit = limit }
-  acquire(segments: number): (() => void) | undefined {
-    if (!(segments >= 0) || this.spent + segments > this.limit) return undefined
+  /** `cap` lowers the limit for this one request (the tier's total over a shared budget). */
+  acquire(segments: number, cap = Infinity): (() => void) | undefined {
+    if (!(segments >= 0) || this.spent + segments > Math.min(this.limit, cap)) return undefined
     this.spent += segments
     let released = false
     return () => { if (!released) { released = true; this.spent -= segments } }
@@ -41,14 +43,11 @@ export class LineBudget {
 }
 
 /** One budget for the process: the previews are not on screen at the same time in practice, and a disposed line gives its share back. */
-export const sharedLineBudget = new LineBudget(LINE_SEGMENT_BUDGET.standard.total)
+export const sharedLineBudget = new LineBudget(LINE_SEGMENT_BUDGET.high.total)
 
 let currentQuality: LineQuality = "standard"
-/** The tier new lines are built for. The hook-in to the shared render setting calls this; existing lines keep what they were built as. */
-export const setLineQuality = (quality: LineQuality): void => {
-  currentQuality = quality
-  sharedLineBudget.setLimit(LINE_SEGMENT_BUDGET[quality].total)
-}
+/** The tier lines are built for when the caller passes none. The hook-ins pass the shared tier (`currentLookTier()`) explicitly; lines already built keep what they were built as. */
+export const setLineQuality = (quality: LineQuality): void => { currentQuality = quality }
 export const lineQuality = (): LineQuality => currentQuality
 
 export interface LineStyle {
@@ -93,7 +92,7 @@ const asFloat32 = (data: ArrayLike<number>): Float32Array => data instanceof Flo
 
 /** The number of vertices a line draws (two per segment), thick or not. */
 export const lineVertexCount = (line: THREE.Object3D): number => {
-  if (isThickLine(line)) return line.geometry.attributes.instanceStart?.count * 2 || 0
+  if (isThickLine(line)) return (line.geometry.attributes.instanceStart?.count ?? 0) * 2
   return (line as THREE.LineSegments).geometry?.getAttribute?.("position")?.count ?? 0
 }
 
@@ -135,7 +134,7 @@ export const createLines = (positions: ArrayLike<number>, style: LineStyle = {},
   const segments = Math.floor(positions.length / 6)
   const limits = LINE_SEGMENT_BUDGET[quality]
   const budget = options.budget ?? sharedLineBudget
-  const release = quality !== "low" && segments > 0 && segments <= limits.perObject ? budget.acquire(segments) : undefined
+  const release = quality !== "low" && segments > 0 && segments <= limits.perObject ? budget.acquire(segments, limits.total) : undefined
   const line = release ? thickLines(positions, style, release) : plainLines(positions, style)
   if (!options.pickable) line.raycast = noRaycast
   return line

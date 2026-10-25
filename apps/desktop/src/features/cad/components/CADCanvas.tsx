@@ -2,6 +2,10 @@ import { boxSelectionIncludes, projectedSelectionBounds, type ScreenBox } from "
 import "../../../styles/viewport-chrome.css"
 import { registerViewportCapture } from "../../ai/lib/viewport-capture.ts"
 import { spatialEvidence } from "../../ai/lib/spatial-evidence.ts"
+import { LOOK_TIERS } from "../../../viewport/render-look.ts"
+import { attachRenderLook, currentLookTier, lookTier, setLookTier } from "../../../viewport/render-look-setting.ts"
+import { IdleAmbientOcclusion, aoRadiusFor } from "../../../viewport/ao.ts"
+import { Outline, type OutlineState } from "../../../viewport/outline.ts"
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
 import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
@@ -108,6 +112,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   let orbit: OrbitControls | undefined
   let gizmo: TransformControls | undefined
   let frames: FrameScheduler | undefined
+  let ambientOcclusion: IdleAmbientOcclusion | undefined
+  // Selection / hover outline (inverted hull, see viewport/outline.ts): one extra draw of the outlined parts, nothing otherwise.
+  const outline = new Outline({ quality: currentLookTier })
   const exploded = new ExplodedView()
   const [explosionActive, setExplosionActive] = createSignal(false)
   let reducedMotion: MediaQueryList | undefined
@@ -116,6 +123,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const pivot = new THREE.Object3D()
   const raycaster = new THREE.Raycaster()
   raycaster.params.Line = { threshold: 0.4 }
+  // Thick (screen-space) lines, B-rep edges: picked within a few pixels of the ray.
+  raycaster.params.Line2 = { threshold: 4 }
   const mouse = new THREE.Vector2()
   let controlPoints: THREE.Object3D[] = []
   let preview: THREE.Object3D | undefined
@@ -235,10 +244,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     orbit.zoomSpeed = 1.5
     orbit.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5))
-    const sun = new THREE.DirectionalLight(0xffffff, 0.8)
-    sun.position.set(-5, -7.5, 10)
-    scene.add(sun)
+    // Studio environment, tone mapping and a key/fill/rim rig that follows the camera; the `low` tier keeps the old ambient + sun.
+    const look = attachRenderLook(renderer, scene, { ambient: 0.5, hemisphere: 0, key: 0.8, keyPosition: [-5, -7.5, 10] }, invalidate)
     const grid = new THREE.GridHelper(500, 500)
     grid.rotation.x = Math.PI / 2
     grid.userData.isGrid = true
@@ -264,9 +271,23 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       if ((moved || dirty) && renderer && scene && camera) {
         dirty = false
         renderer.render(scene, camera)
+        // The occlusion is for a scene at rest: every frame restarts the quiet period, one extra frame is drawn after it.
+        ambientOcclusion?.arm()
       }
       return moved || animating
     }, (callback) => window.requestAnimationFrame(callback), (id) => window.cancelAnimationFrame(id))
+    ambientOcclusion = new IdleAmbientOcclusion({
+      renderer, scene, camera,
+      render: () => renderer?.render(scene!, camera!),
+      quality: currentLookTier,
+      busy: () => dirty,
+      exclude: (object) => object === gizmo?.getHelper() || object.userData.isControlPoint === true,
+      radius: () => {
+        const box = new THREE.Box3()
+        for (const object of cadObjects()) box.expandByObject(object)
+        return aoRadiusFor(box)
+      }
+    })
     orbit.addEventListener("change", invalidate)
     gizmo.addEventListener("change", invalidate)
     // A canvas that was hidden (another tab, a collapsed panel, a minimized window) can come back with an emptied drawing
@@ -335,6 +356,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       }
       frames?.dispose()
       frames = undefined
+      ambientOcclusion?.dispose()
+      ambientOcclusion = undefined
+      outline.dispose()
       cancelAnimationFrame(mouseFrame)
       cancelAnimationFrame(hoverFrame)
       clearTimeout(fullscreenTimer)
@@ -354,6 +378,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       gizmo?.getHelper().removeFromParent()
       gizmo?.dispose()
       orbit?.dispose()
+      look.dispose()
       // Dispose the entire owned scene once, including helper textures.
       if (scene) disposeObject(scene)
       objectsById.clear()
@@ -585,6 +610,13 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (lastHighlight && lastHighlight !== hovered && !selected.has(lastHighlight)) tint(lastHighlight, "none")
     lastHighlight = hovered
     lastSelected = selected
+    // The outline follows the same state, re-asserted every time (a rebuilt object gets its outline back). A very large
+    // selection keeps only the tint: one hull per part would cost more than the outline is worth.
+    const wanted = new Map<string, OutlineState>()
+    if (selected.size <= 40) for (const id of selected) wanted.set(id, "selected")
+    if (hovered && !selected.has(hovered)) wanted.set(hovered, "hover")
+    for (const key of outline.keys()) if (!wanted.has(key)) { outline.set(key, undefined, "none"); invalidate() }
+    for (const [id, state] of wanted) if (outline.set(id, objectsById.get(id)?.object, state)) invalidate()
   })
 
   // Selection store -> elements store (the legacy panels read `selectedElement`).
@@ -1084,6 +1116,16 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       <Show when={showPerformance()}>
         <div class="absolute top-16 right-40 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg z-10 w-80">
           <h3 class="text-lg font-semibold mb-3">Performance & Events</h3>
+          <div class="mb-4" data-testid="look-tier">
+            <h4 class="text-sm font-medium mb-2">Visual quality</h4>
+            <div class="flex gap-1" role="radiogroup" aria-label="Visual quality">
+              <For each={LOOK_TIERS}>{(tier) =>
+                <button type="button" role="radio" aria-checked={lookTier() === tier} onClick={() => setLookTier(tier)}
+                  class={`flex-1 text-xs px-2 py-1 rounded capitalize ${lookTier() === tier ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"}`}>{tier}</button>}
+              </For>
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Low: plain lights. Standard: studio reflections and tone mapping. High: sharper reflections.</p>
+          </div>
           <div class="mb-4">
             <h4 class="text-sm font-medium mb-2">Memory Usage</h4>
             <div class="text-xs space-y-1 text-gray-600 dark:text-gray-300">

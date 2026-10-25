@@ -194,16 +194,22 @@ const nodeStack = new Int32Array(MAX_DEPTH * 2 + 8)
 
 /** Slab test; returns the entry distance, or `Infinity` for a miss. `tMax` is the best distance found so far. */
 const boxEntry = (b: Float64Array, o: number, ox: number, oy: number, oz: number, ix: number, iy: number, iz: number, tMax: number): number => {
-  let t1 = (b[o]! - ox) * ix, t2 = (b[o + 3]! - ox) * ix
-  let tmin = t1 < t2 ? t1 : t2, tmax = t1 < t2 ? t2 : t1
-  t1 = (b[o + 1]! - oy) * iy; t2 = (b[o + 4]! - oy) * iy
-  // NaN (a zero direction component on the slab plane) compares false and leaves the interval alone: conservative.
-  if (t1 < t2) { if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2 } else { if (t2 > tmin) tmin = t2; if (t1 < tmax) tmax = t1 }
-  t1 = (b[o + 2]! - oz) * iz; t2 = (b[o + 5]! - oz) * iz
-  if (t1 < t2) { if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2 } else { if (t2 > tmin) tmin = t2; if (t1 < tmax) tmax = t1 }
-  if (tmin < 0) tmin = 0
+  let tmin = 0, tmax = tMax
+  // A zero direction component (an infinite inverse) cannot be divided through: the origin must lie within that slab.
+  if (ix === Infinity || ix === -Infinity) { if (ox < b[o]! || ox > b[o + 3]!) return Infinity } else {
+    const t1 = (b[o]! - ox) * ix, t2 = (b[o + 3]! - ox) * ix
+    if (t1 < t2) { if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2 } else { if (t2 > tmin) tmin = t2; if (t1 < tmax) tmax = t1 }
+  }
+  if (iy === Infinity || iy === -Infinity) { if (oy < b[o + 1]! || oy > b[o + 4]!) return Infinity } else {
+    const t1 = (b[o + 1]! - oy) * iy, t2 = (b[o + 4]! - oy) * iy
+    if (t1 < t2) { if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2 } else { if (t2 > tmin) tmin = t2; if (t1 < tmax) tmax = t1 }
+  }
+  if (iz === Infinity || iz === -Infinity) { if (oz < b[o + 2]! || oz > b[o + 5]!) return Infinity } else {
+    const t1 = (b[o + 2]! - oz) * iz, t2 = (b[o + 5]! - oz) * iz
+    if (t1 < t2) { if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2 } else { if (t2 > tmin) tmin = t2; if (t1 < tmax) tmax = t1 }
+  }
   // A hair of slack: a ray that grazes a box face must still reach the triangle that lies on it.
-  return tmin <= tmax * (1 + 1e-9) + 1e-12 && tmin <= tMax ? tmin : Infinity
+  return tmin <= tmax * (1 + 1e-9) + 1e-12 ? tmin : Infinity
 }
 
 /**
@@ -232,7 +238,7 @@ export const raycastTriangleBvh = (
       for (let k = start; k < start + c; k++) {
         const tri = order[k]!
         const t = triangleT(positions, index, tri, ox, oy, oz, dx, dy, dz, side)
-        if (t >= 0 && (t < best || (t === best && tri < bestTriangle))) { best = t; bestTriangle = tri }
+        if (t >= 0 && (t < best || (t === best && (bestTriangle < 0 || tri < bestTriangle)))) { best = t; bestTriangle = tri }
       }
       continue
     }

@@ -202,6 +202,8 @@ interface LookState {
   readonly surface: SurfaceLook
   /** The element had no colour of its own: the material's colour is used. */
   readonly tint: boolean
+  /** Which colour the material shows now; a highlight tint set by someone else is not overwritten. */
+  applied: "original" | "surface"
 }
 
 const STATE = "renderLook"
@@ -213,7 +215,11 @@ const syncMaterial = (material: THREE.MeshStandardMaterial, tier: LookTier): voi
   const surface = TIERS[tier].materials ? state.surface : undefined
   material.metalness = surface?.metalness ?? state.original.metalness
   material.roughness = surface?.roughness ?? state.original.roughness
-  if (state.tint) material.color.setHex(surface?.color ?? state.original.color)
+  if (state.tint) {
+    const shown = state.applied === "surface" ? state.surface.color : state.original.color
+    if (material.color.getHex() === shown) material.color.setHex(surface?.color ?? state.original.color)
+  }
+  state.applied = surface === undefined ? "original" : "surface"
 }
 
 const eachStandard = (object: THREE.Object3D, visit: (material: THREE.MeshStandardMaterial) => void): void => {
@@ -240,7 +246,7 @@ export const applyMaterialLook = (object: THREE.Object3D, element: unknown, tier
   const hasColor = Boolean((element as { color?: unknown }).color)
   eachStandard(object, (material) => {
     if (material.userData[STATE] === undefined) {
-      material.userData[STATE] = { original: { metalness: material.metalness, roughness: material.roughness, color: material.color.getHex() }, surface, tint: !hasColor } satisfies LookState
+      material.userData[STATE] = { original: { metalness: material.metalness, roughness: material.roughness, color: material.color.getHex() }, surface, tint: !hasColor, applied: "original" } satisfies LookState
     }
     syncMaterial(material, tier)
   })
@@ -253,7 +259,7 @@ export const syncObjectLook = (root: THREE.Object3D, tier: LookTier): void => ea
 
 export interface RenderLookOptions {
   readonly legacy: LegacyLights
-  /** Called whenever the look changed what the next frame shows (tier switched, lights changed). */
+  /** Called when the look changed what the next frame shows (tier switched, lights changed), never while the look is created. */
   readonly onChange?: () => void
   readonly tier?: LookTier
 }
@@ -316,7 +322,7 @@ export const createRenderLook = (renderer: THREE.WebGLRenderer, scene: THREE.Sce
   rig.add(ambient, hemisphere, key, fill, rim)
   scene.add(rig)
 
-  const apply = (): void => {
+  const apply = (notify = true): void => {
     const settings = TIERS[tier]
     const levels = rigLevels(tier, legacy, base)
     ambient.intensity = levels?.ambient ?? legacy.ambient
@@ -345,12 +351,13 @@ export const createRenderLook = (renderer: THREE.WebGLRenderer, scene: THREE.Sce
       scene.environment = null
     }
     syncObjectLook(scene, tier)
-    options.onChange?.()
+    if (notify) options.onChange?.()
   }
 
   const previous = scene.onBeforeRender
-  scene.onBeforeRender = (r, s, camera, target) => {
-    previous.call(scene, r, s, camera, target)
+  scene.onBeforeRender = (...args: Parameters<THREE.Scene["onBeforeRender"]>) => {
+    previous.apply(scene, args)
+    const camera = args[2]
     if (TIERS[tier].rig === undefined) { rig.updateMatrixWorld(true); return }
     camera.updateMatrixWorld()
     const directions = rigDirections(cameraBasis(camera.matrixWorld.elements))
@@ -360,7 +367,7 @@ export const createRenderLook = (renderer: THREE.WebGLRenderer, scene: THREE.Sce
     rig.updateMatrixWorld(true)
   }
 
-  apply()
+  apply(false) // the host draws its first frame itself
   return {
     tier: () => tier,
     setTier: (next) => { if (next !== tier) { tier = next; apply() } },

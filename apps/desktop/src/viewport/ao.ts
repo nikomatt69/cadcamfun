@@ -144,7 +144,9 @@ export class IdleAmbientOcclusion {
     }
     const pass = this.pass
     if (pass.width !== width || pass.height !== height) pass.setSize(width, height)
-    pass.updateGtaoMaterial({ radius: this.options.radius?.() ?? 1, ...(tier.samples !== this.lastSamples ? { samples: tier.samples } : {}) })
+    // The shader's defaults are for a scene of about one unit: radius, assumed occluder thickness and fall-off follow the scene size.
+    const radius = Math.max(this.options.radius?.() ?? 1, 1e-6)
+    pass.updateGtaoMaterial({ radius, thickness: radius * 3, ...(tier.samples !== this.lastSamples ? { samples: tier.samples } : {}) })
     this.lastSamples = tier.samples
 
     // 1. the picture itself, so the occlusion lands on the same pixels (the canvas does not keep the frame drawn before).

@@ -1,6 +1,8 @@
 import * as THREE from "three"
 import type { Element } from "../../cad/store/elementsStore.ts"
 import { createThreeObject } from "../../cad/lib/createThreeObject.ts"
+import { applyMaterialLook } from "../../../viewport/render-look.ts"
+import { currentLookTier } from "../../../viewport/render-look-setting.ts"
 
 const value = (element: Element, key: string, fallback: number): number =>
   typeof element[key] === "number" && Number.isFinite(element[key]) ? element[key] as number : fallback
@@ -28,6 +30,7 @@ export const createComponentPreviewObject = (element: Element): THREE.Object3D |
   const mesh = (geometry: THREE.BufferGeometry, fallback: number): THREE.Mesh => {
     const result = new THREE.Mesh(geometry, material(element, fallback))
     result.position.set(x, y, z)
+    applyMaterialLook(result, element, currentLookTier())
     return result
   }
   switch (element.type) {

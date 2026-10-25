@@ -279,14 +279,33 @@ export const intersectRayPlane = (origin: Vec3, direction: Vec3, point: Vec3, no
   return t > 0 ? add(origin, scale(direction, t)) : undefined
 }
 
+/** A rotation as `[x, y, z, w]` (the layout of `THREE.Quaternion.toArray()`). */
+export type Quat = readonly [number, number, number, number]
+
+export const quatMultiply = (a: Quat, b: Quat): Quat => [
+  a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+  a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+  a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+  a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]
+]
+export const quatConjugate = (q: Quat): Quat => [-q[0], -q[1], -q[2], q[3]]
+export const rotateVector = (q: Quat, v: Vec3): Vec3 => {
+  // v' = v + 2 w (u x v) + 2 u x (u x v), u = (x, y, z)
+  const u: Vec3 = [q[0], q[1], q[2]]
+  const t = scale(cross(u, v), 2)
+  return add(add(v, scale(t, q[3])), cross(u, t))
+}
+
 /**
- * Moves the orbit target onto the line of sight through `pivot` without turning the camera: the picture does not change,
- * but orbiting now turns about the pivot. `undefined` when the pivot is behind the eye or closer than `minDistance`.
+ * OrbitControls turns the camera about its target. To turn it about a pivot instead, add the shift this returns to the eye
+ * and to the target after the controls have moved the camera from orientation `before` to `after`: the rotation is the
+ * same, only its centre changes, and the pivot stays under the same pixel (a rotation about P equals the rotation about T
+ * plus the translation `(I - R)(P - T)`).
  */
-export const retargetAlongView = (position: Vec3, target: Vec3, pivot: Vec3, minDistance = 1e-3): Vec3 | undefined => {
-  const forward = normalize(sub(target, position))
-  const depth = dot(sub(pivot, position), forward)
-  return depth > minDistance ? add(position, scale(forward, depth)) : undefined
+export const pivotOrbitShift = (pivot: Vec3, target: Vec3, before: Quat, after: Quat): Vec3 => {
+  const rotation = quatMultiply(after, quatConjugate(before))
+  const offset = sub(pivot, target)
+  return sub(offset, rotateVector(rotation, offset))
 }
 
 // ------------------------------------------------------------------------------------------------------ framing

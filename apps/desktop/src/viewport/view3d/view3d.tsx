@@ -1,4 +1,5 @@
-import { createDisplayEdges } from "../native-edges.ts"
+import { createDisplayEdgeLines, createLines, setLineDrawRange, syncLineResolution } from "../lines.ts"
+import { Outline } from "../outline.ts"
 import { FrameScheduler } from "../../features/cad/lib/frame-scheduler.ts"
 import { MeshWorkerQueue } from "./mesh-jobs.ts"
 import { registerViewportCapture } from "../../features/ai/index.ts"
@@ -17,6 +18,7 @@ import { gaugeOfTool, previewToolFor } from "./tool-models.ts"
 import { createVoxelStock, type VoxelStock } from "./voxel-stock.ts"
 import { classLookup, pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
+import { attachRenderLook, currentLookTier } from "../render-look-setting.ts"
 import { createLiveStock, createStockSimulation, type LiveStock, type StockInfo } from "./stock-simulation.ts"
 export { machineSpatial, type MachineInfo } from "./machine-scene.ts"
 
@@ -197,6 +199,8 @@ export function View3D(props: View3DProps) {
     gizmo.setSize(.8)
     scene.add(gizmo.getHelper())
     let selectedMesh: THREE.Mesh | undefined
+    // The selection outline: an inverted hull (see `outline.ts`), one extra draw of the selected mesh.
+    const outline = new Outline({ quality: currentLookTier })
     const dragging = (event: { value: unknown }) => { controls.enabled = !event.value }
     const commit = () => {
       if (!selectedMesh || selected() === undefined) return
@@ -224,17 +228,13 @@ export function View3D(props: View3DProps) {
     }
     const origin = new THREE.AxesHelper(12)
     helpers.add(grid, axes, origin)
-    const ambient = new THREE.AmbientLight(0xffffff, props.lighting?.ambient ?? 0.4)
-    const hemisphere = new THREE.HemisphereLight(0xffffff, 0x334155, props.lighting?.hemisphere ?? 1)
-    const directional = new THREE.DirectionalLight(0xffffff, props.lighting?.directional ?? 1.5); directional.position.set(100, 100, 200)
-    scene.add(ambient, hemisphere, directional)
+    // Studio environment, tone mapping and a camera-following rig; the lighting controls scale it, `low` uses them as before.
+    const look = attachRenderLook(renderer, scene, { ambient: props.lighting?.ambient ?? 0.4, hemisphere: props.lighting?.hemisphere ?? 1, key: props.lighting?.directional ?? 1.5, keyPosition: [100, 100, 200] }, () => invalidate())
     applyLighting = () => {
       invalidate()
       const l = props.lighting
       if (l === undefined) return
-      ambient.intensity = l.ambient
-      hemisphere.intensity = l.hemisphere
-      directional.intensity = l.directional
+      look.setLegacy({ ambient: l.ambient, hemisphere: l.hemisphere, key: l.directional })
     }
     applyMaterial = () => {
       invalidate()
@@ -357,7 +357,7 @@ export function View3D(props: View3DProps) {
     const disposeVoxels = (): void => { if (voxelStock === undefined) return; content.remove(voxelStock.mesh); voxelStock.dispose(); voxelStock = undefined }
     let toolColorOf: ReadonlyMap<string, number> = new Map()
     // The path's two line objects and their segments' start times (for the "only what has run" draw range).
-    let pathLines: { readonly cut?: THREE.LineSegments; readonly cutStarts: Float64Array; readonly rapid?: THREE.LineSegments; readonly rapidStarts: Float64Array } | undefined
+    let pathLines: { readonly cut?: THREE.Object3D; readonly cutStarts: Float64Array; readonly rapid?: THREE.Object3D; readonly rapidStarts: Float64Array } | undefined
     const disposeTools = (): void => { for (const g of toolGroups.values()) if (g) { scene.remove(g); disposeGroup(g) } toolGroups.clear() }
     /** The model the preview draws for a toolpath's tool: its own, the kernel's cutter, the generator's tool. A tool setter is
      * on the table (see `rebuild`): what moves is the cutter it measures. */
@@ -410,7 +410,7 @@ export function View3D(props: View3DProps) {
           object.material.wireframe = mode() === "wireframe"
           object.material.transparent = mode() === "xray"; object.material.opacity = mode() === "xray" ? .3 : 1
           object.material.depthWrite = mode() !== "xray"
-          for (const child of object.children) child.visible = mode() === "shaded-edges"
+          for (const child of object.children) if (!child.userData.isOutline) child.visible = mode() === "shaded-edges"
         }
       })
     }
@@ -421,7 +421,7 @@ export function View3D(props: View3DProps) {
       geometry.setAttribute("position", new THREE.BufferAttribute(shaded.positions, 3)); geometry.setIndex(new THREE.BufferAttribute(shaded.indices, 1)); geometry.setAttribute("normal", new THREE.BufferAttribute(shaded.normals, 3))
       const object = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: .2, roughness: .65, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }))
       object.userData.solidIndex = index
-      object.add(new THREE.LineSegments(createDisplayEdges(geometry, 25, invalidate), new THREE.LineBasicMaterial({ color: 0x202830 })))
+      object.add(createDisplayEdgeLines(geometry, 25, invalidate, { color: 0x202830, width: 1.5 }, { quality: currentLookTier() }))
       content.add(object)
       appearance()
     }
@@ -436,9 +436,7 @@ export function View3D(props: View3DProps) {
     }
     const addLines = (positions: number[], rapid: boolean, color?: number) => {
       if (!positions.length) return
-      const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
-      const line = new THREE.LineSegments(geometry, rapid ? new THREE.LineDashedMaterial({ color: color ?? 0xf59e0b, dashSize: 2, gapSize: 1 }) : new THREE.LineBasicMaterial({ color: color ?? 0x38bdf8 }))
-      line.computeLineDistances(); content.add(line)
+      content.add(createLines(positions, rapid ? { color: color ?? 0xf59e0b, width: 1.6, dash: { dash: 2, gap: 1 } } : { color: color ?? 0x38bdf8, width: 1.6 }, { quality: currentLookTier() }))
     }
     const pointColor: Record<ToolpathPointKind, number> = { rapid: 0xef4444, cut: 0x22c55e, arc: 0x3b82f6, cycle: 0xa855f7 }
     const addPointLabel = (text: string, position: Vec3) => {
@@ -455,7 +453,7 @@ export function View3D(props: View3DProps) {
     rebuild = () => {
       invalidate()
       meshJobs.reset(); setMeshError(undefined)
-      gizmo.detach(); selectedMesh = undefined; setSelected(undefined)
+      gizmo.detach(); outline.clear(); selectedMesh = undefined; setSelected(undefined)
       disposeStock(); disposeVoxels()
       props.onStockInfo?.(undefined)
       disposeGroup(content)
@@ -580,16 +578,13 @@ export function View3D(props: View3DProps) {
         ...(display?.operationNames !== undefined ? { operationNames: display.operationNames } : {}),
         ...(display?.hiddenPaths !== undefined ? { hidden: new Set(display.hiddenPaths) } : {})
       }, TOOL_COLORS)
-      const lineObject = (positions: Float32Array, rapidLine: boolean, colorsOf?: Float32Array): THREE.LineSegments | undefined => {
+      // Thick lines while the tier and the segment budget allow it (one pixel wide otherwise); colours per vertex, rapids dashed.
+      const lineObject = (positions: Float32Array, rapidLine: boolean, colorsOf?: Float32Array): THREE.Object3D | undefined => {
         if (positions.length === 0) return undefined
-        const geometry = new THREE.BufferGeometry()
-        geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
-        if (colorsOf !== undefined) geometry.setAttribute("color", new THREE.BufferAttribute(colorsOf, 3))
-        const line = new THREE.LineSegments(geometry, rapidLine
-          ? new THREE.LineDashedMaterial({ color: mode === "move" ? cam.viewer.MOVE_CLASS_COLORS.rapid : 0xf59e0b, dashSize: 2, gapSize: 1 })
-          : new THREE.LineBasicMaterial({ vertexColors: true }))
+        const line = createLines(positions, rapidLine
+          ? { color: mode === "move" ? cam.viewer.MOVE_CLASS_COLORS.rapid : 0xf59e0b, width: 1.4, dash: { dash: 2, gap: 1 } }
+          : { ...(colorsOf !== undefined ? { colors: colorsOf } : {}), width: 2, ...(colorsOf === undefined ? { color: 0x38bdf8 } : {}) }, { quality: currentLookTier() })
         line.name = rapidLine ? "toolpath:rapids" : "toolpath:cuts"
-        if (rapidLine) line.computeLineDistances()
         content.add(line)
         return line
       }
@@ -633,7 +628,7 @@ export function View3D(props: View3DProps) {
       invalidate()
       if (!host) return
       const width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight)
-      renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix()
+      renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix(); syncLineResolution(scene, width, height)
       const aspect = width / height
       orthographic.left = -radius * 1.4 * aspect; orthographic.right = radius * 1.4 * aspect
       orthographic.top = radius * 1.4; orthographic.bottom = -radius * 1.4; orthographic.updateProjectionMatrix()
@@ -652,6 +647,7 @@ export function View3D(props: View3DProps) {
       if (selectedMesh && selectedMesh.material instanceof THREE.MeshStandardMaterial) selectedMesh.material.emissive.setHex(0)
       selectedMesh = hit?.object as THREE.Mesh | undefined
       if (selectedMesh && selectedMesh.material instanceof THREE.MeshStandardMaterial) selectedMesh.material.emissive.setHex(0x163653)
+      outline.set("selected", selectedMesh, selectedMesh ? "selected" : "none")
       setSelected(selectedMesh?.userData.solidIndex as number | undefined); props.onSolidSelect?.(selected()); transform()
     }
     const key = (event: KeyboardEvent) => {
@@ -706,10 +702,10 @@ export function View3D(props: View3DProps) {
       // "Only what has run": the path's draw ranges follow the playhead.
       if (pathLines !== undefined) {
         const done = props.toolpathDisplay?.progress === "done"
-        const range = (line: THREE.LineSegments | undefined, starts: Float64Array) => {
+        const range = (line: THREE.Object3D | undefined, starts: Float64Array) => {
           if (line === undefined) return
           const count = done ? startedBy(starts, seconds) * 2 : Infinity
-          if (line.geometry.drawRange.count !== count) { line.geometry.setDrawRange(0, count); invalidate() }
+          if (setLineDrawRange(line, count)) invalidate()
         }
         range(pathLines.cut, pathLines.cutStarts)
         range(pathLines.rapid, pathLines.rapidStarts)
@@ -751,7 +747,7 @@ export function View3D(props: View3DProps) {
       renderFrame()
       return { canvas: renderer.domElement, camera: { position: [activeCamera.position.x, activeCamera.position.y, activeCamera.position.z], target: [controls.target.x, controls.target.y, controls.target.z] }, ...(props.visionMode === "cam" && props.program ? { programText: cam.programGeometryText(props.program) } : {}), ...(machineScene && props.machine ? { spatial: machineSpatial(props.machine, machineScene, seconds) } : {}) }
     })
-    onCleanup(() => { unregisterCapture(); disposeMachine(); disposeStock(); disposeVoxels(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
+    onCleanup(() => { unregisterCapture(); disposeMachine(); disposeStock(); disposeVoxels(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); look.dispose(); outline.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />

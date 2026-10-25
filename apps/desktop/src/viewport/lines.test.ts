@@ -21,6 +21,12 @@ test("budget grants what fits, refuses the rest, and gives a share back once", (
   expect(budget.acquire(-1)).toBeUndefined()
 })
 
+test("a tier's total caps a shared budget that is larger", () => {
+  const budget = new LineBudget(10_000_000)
+  expect(budget.acquire(10, 5)).toBeUndefined()
+  expect(budget.acquire(5, 5)).toBeDefined()
+})
+
 test("polyline points become segment endpoints, open or closed", () => {
   const open = polylineToSegments([0, 0, 0, 1, 0, 0, 1, 1, 0])
   expect([...open]).toEqual([0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0])

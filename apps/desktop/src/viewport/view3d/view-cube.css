@@ -1,0 +1,44 @@
+/* The orientation cube. Placement belongs to the host (`.vp3-viewcube-dock`, `.cad-viewcube-dock`); this file is the cube itself.
+   Light and dark follow the title block (viewport-chrome.css): a translucent glass surface with its own tokens, and the native
+   glass material tokens (`--glass-*`, glass.css) win where the window has them. */
+.vp3-viewcube {
+  --vc-face: rgba(255, 255, 255, 0.66); --vc-face-edge: rgba(15, 23, 42, 0.28); --vc-text: #0f172a; --vc-muted: #475569;
+  --vc-accent: #3b82f6; --vc-hot: rgba(59, 130, 246, 0.8); --vc-active: rgba(59, 130, 246, 0.28);
+  --vc-surface: rgba(255, 255, 255, 0.7); --vc-rim: rgba(255, 255, 255, 0.65); --vc-shadow: 0 10px 28px -14px rgba(15, 23, 42, 0.45);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; width: 6rem; color: var(--vc-text);
+  user-select: none; -webkit-user-select: none; pointer-events: none;
+}
+.dark .vp3-viewcube {
+  --vc-face: rgba(30, 38, 54, 0.58); --vc-face-edge: rgba(255, 255, 255, 0.3); --vc-text: #f1f5f9; --vc-muted: #94a3b8;
+  --vc-surface: rgba(24, 30, 42, 0.6); --vc-rim: rgba(255, 255, 255, 0.16); --vc-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.7);
+}
+:root[data-glass] .vp3-viewcube { --vc-surface: var(--glass-fill-strong, var(--vc-surface)); --vc-rim: var(--glass-rim, var(--vc-rim)); --vc-shadow: var(--glass-shadow, var(--vc-shadow)); }
+.vp3-viewcube__scene { pointer-events: auto; position: relative; width: 6rem; height: 6rem; perspective: 300px; touch-action: none; cursor: grab; display: grid; place-items: center; }
+.vp3-viewcube__scene:active { cursor: grabbing; }
+.vp3-viewcube__cube { position: relative; width: 56px; height: 56px; transform-style: preserve-3d; will-change: transform; }
+.vp3-viewcube__face {
+  position: absolute; inset: 0; display: grid; grid-template: 25% 1fr 25% / 25% 1fr 25%; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  background: var(--vc-face); border: 1px solid var(--vc-face-edge); box-sizing: border-box;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: inset 0 0 0 1px var(--vc-rim);
+}
+.vp3-viewcube__zone { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; min-width: 0; min-height: 0; }
+.vp3-viewcube__zone--face { grid-area: 2 / 2; font-size: 9px; font-weight: 600; line-height: 1; letter-spacing: 0.06em; text-transform: uppercase; display: grid; place-items: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--vc-text); }
+.vp3-viewcube__zone--face[aria-pressed="true"] { background: var(--vc-active); }
+.vp3-viewcube__zone.is-hot { background: var(--vc-hot); color: #fff; }
+.vp3-viewcube__zone:focus-visible { outline: 2px solid var(--vc-accent); outline-offset: -2px; background: var(--vc-active); }
+.vp3-viewcube__zone:disabled { cursor: not-allowed; }
+.vp3-viewcube__tools { pointer-events: auto; display: flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--vc-rim); border-radius: 999px; background: var(--vc-surface); -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); box-shadow: var(--vc-shadow); }
+.vp3-viewcube__tools button { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border: 0; border-radius: 999px; background: transparent; color: var(--vc-text); font-size: 10px; font-weight: 600; line-height: 1; cursor: pointer; }
+.vp3-viewcube__tools button:not(.vp3-viewcube__projection) { width: 24px; padding: 0; }
+.vp3-viewcube__tools button[aria-pressed="true"] { background: var(--vc-active); color: var(--vc-text); }
+.vp3-viewcube__tools button:focus-visible { outline: 2px solid var(--vc-accent); outline-offset: 1px; }
+.vp3-viewcube__tools button:disabled { opacity: 0.4; cursor: not-allowed; }
+.vp3-viewcube[data-disabled] .vp3-viewcube__scene { opacity: 0.5; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) { .vp3-viewcube__tools button:hover:not(:disabled) { background: var(--vc-active); } }
+@media (prefers-reduced-transparency: reduce) {
+  .vp3-viewcube__face, .vp3-viewcube__tools { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .vp3-viewcube { --vc-face: #e8eef7; --vc-surface: #f8fbff; }
+  .dark .vp3-viewcube { --vc-face: #1e2636; --vc-surface: #1e1e1e; }
+}
+@media (prefers-contrast: more) { .vp3-viewcube__face, .vp3-viewcube__tools { border-width: 2px; border-color: currentColor; } }
+@media (max-width: 540px) { .vp3-viewcube { transform: scale(0.85); transform-origin: top right; } }

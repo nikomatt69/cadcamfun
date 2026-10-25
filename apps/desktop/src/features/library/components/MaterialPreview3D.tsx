@@ -6,10 +6,9 @@
 import { Show, createEffect, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js"
 import { disposeObject } from "../../cad/lib/sceneHelpers.ts"
 import { FrameScheduler } from "../../cad/lib/frame-scheduler.ts"
-import { PREVIEW_BACKGROUND, addPreviewLights, hexColor } from "../lib/preview-scene.ts"
+import { PREVIEW_BACKGROUND, addPreviewLook, hexColor } from "../lib/preview-scene.ts"
 import { PREVIEW_STAGE, PreviewFrame, stageNote } from "./PreviewFrame.tsx"
 
 const METAL_DENSITY = 2000 // kg/m³ — aluminium and above are metals, plastics / woods sit below
@@ -39,10 +38,7 @@ export function MaterialPreview3D(props: { readonly properties: Readonly<Record<
     host.append(renderer.domElement)
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(PREVIEW_BACKGROUND)
-    addPreviewLights(scene)
-    const pmrem = new THREE.PMREMGenerator(renderer)
-    const environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
-    scene.environment = environment
+    const look = addPreviewLook(renderer, scene, undefined, () => frames.invalidate())
     const surface = new THREE.MeshStandardMaterial()
     const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), surface)
     sphere.position.set(-1.35, 0, 1)
@@ -75,7 +71,7 @@ export function MaterialPreview3D(props: { readonly properties: Readonly<Record<
     apply(); resize(); visibility()
     onCleanup(() => {
       apply = () => {}; observer.disconnect(); document.removeEventListener("visibilitychange", visibility)
-      frames.dispose(); controls.dispose(); disposeObject(scene); environment.dispose(); pmrem.dispose(); renderer.dispose(); renderer.domElement.remove()
+      frames.dispose(); controls.dispose(); disposeObject(scene); look.dispose(); renderer.dispose(); renderer.domElement.remove()
     })
   })
   return <PreviewFrame title="Material sample" testId="material-preview" hint="Drag to orbit · Scroll to zoom">

@@ -5,13 +5,15 @@ import { useCustomElementsStore } from "../store/customElementsStore.ts";
 import { evaluateCustomElement } from "./customElements/evaluate.ts";
 import { customElementOf } from "../types/customElements.ts";
 import * as THREE from "three";
-import { createDisplayEdges } from "../../../viewport/native-edges.ts";
+import { createDisplayEdgeLines, createLines, polylineToSegments } from "../../../viewport/lines.ts";
 import { initializeElementTransform } from "./element-transform.ts";
+import { applyMaterialLook, elementMaterialName } from "../../../viewport/render-look.ts";
+import { currentLookTier } from "../../../viewport/render-look-setting.ts";
 
 interface SolidMesh { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }
 
 /** A solid mesh in scene coordinates as a Three mesh (the drawing's origin offset is added; smooth normals are not wanted on a CAD solid). */
-const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: number; z: number }): THREE.Mesh => {
+const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: number; z: number }, onEdgesReady?: () => void): THREE.Mesh => {
   // Smooth across the facets of a curved face, sharp along a real edge (a crease angle of 30 degrees).
   const shaded = creasedNormals({ positions: Float32Array.from(mesh.positions), indices: Uint32Array.from(mesh.indices) });
   const positions = shaded.positions;
@@ -25,7 +27,13 @@ const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: numb
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(shaded.normals, 3));
   const material = new THREE.MeshStandardMaterial({ color: element.color || 0x4285f4, wireframe: element.wireframe || false });
-  return new THREE.Mesh(geometry, material);
+  const result = new THREE.Mesh(geometry, material);
+  if (!element.wireframe) {
+    // The solid's edges (the native Rust path for a big mesh): faces step back a little so the lines sit on top of them.
+    material.polygonOffset = true; material.polygonOffsetFactor = 1; material.polygonOffsetUnits = 1;
+    result.add(createDisplayEdgeLines(geometry, 30, onEdgesReady, { color: 0x1b1f24, width: 1.5 }, { quality: currentLookTier() }));
+  }
+  return result;
 };
 
 /**
@@ -67,7 +75,6 @@ const brepObject = (element: any, offset: { x: number; y: number; z: number }): 
     if (cached.model.faces[face.face]?.name) mesh.userData.faceName = cached.model.faces[face.face]!.name;
     group.add(mesh);
   }
-  const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x1b1f24 });
   for (const edge of t.edges) {
     const pts = new Float32Array(edge.points.length * 3);
     edge.points.forEach((g, k) => {
@@ -75,9 +82,8 @@ const brepObject = (element: any, offset: { x: number; y: number; z: number }): 
       pts[k * 3 + 1] = t.positions[g * 3 + 1]! + offset.y;
       pts[k * 3 + 2] = t.positions[g * 3 + 2]! + offset.z;
     });
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(pts, 3));
-    const line = new THREE.Line(geometry, edgeMaterial);
+    // Pickable: an exact edge is something the user selects (a thick line is picked within its width, see `Line2` in the canvas raycaster).
+    const line = createLines(polylineToSegments(pts), { color: 0x1b1f24, width: 1.5 }, { quality: currentLookTier(), pickable: true });
     line.userData.brepEdge = edge.edge;
     group.add(line);
   }
@@ -149,6 +155,8 @@ const Y_UP_BUILT = new Set(["wall", "floor", "roof", "window", "door", "stair", 
 
 export const createThreeObject = (element: any, originOffset = useCADStore.getState().originOffset, onEdgesReady?: () => void): THREE.Object3D | null => {
   const object = buildObject(element, originOffset, onEdgesReady);
+  // The element's `material` (aluminum, steel, plastic, a catalogue grade...) sets metalness / roughness (and the colour when the element has none).
+  if (object !== null) { const name = elementMaterialName(element); if (name !== undefined) applyMaterialLook(object, element, currentLookTier(), cam.kernel.findMaterial(name)?.family); }
   if (object === null || !Y_UP_BUILT.has(element.type)) return object;
   object.rotation.set(Math.PI / 2, 0, 0);
   // A wall's z is its base (0 = standing on the ground), so moving it by d moves it by d; everything else is placed by x, y, z.
@@ -899,13 +907,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
         screenshotMesh.position.set((startPoint.x + endPoint.x) / 2, (startPoint.y + endPoint.y) / 2, startPoint.z);
 
         // Add border
-        const borderGeometry = createDisplayEdges(screenshotGeometry, 1, onEdgesReady);
-        const borderMaterial = new THREE.LineBasicMaterial({
-          color: 0x2196f3,
-          linewidth: 2
-        });
-
-        const border = new THREE.LineSegments(borderGeometry, borderMaterial);
+        const border = createDisplayEdgeLines(screenshotGeometry, 1, onEdgesReady, { color: 0x2196f3, width: 2 }, { quality: currentLookTier() });
         screenshotMesh.add(border);
 
         screenshotMesh.userData.isDrawingElement = true;
@@ -1378,7 +1380,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
         // solid, a missing one) the wireframe marker stays, so the element is still there to select and fix.
         const solid = booleanSolid(element);
         if (solid) {
-          const result = solidObject(solid, { color: 0x4caf50, ...element }, originOffset);
+          const result = solidObject(solid, { color: 0x4caf50, ...element }, originOffset, onEdgesReady);
           result.userData.isBooleanOperation = true;
           result.userData.operationType = element.type;
           result.userData.operandIds = element.operands;
@@ -1398,7 +1400,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
       // A parametric model: its feature history rebuilt into one solid (the same solid the CAM machines).
       case "parametric": {
         const solid = cam.model.elementMesh(withoutGizmo(element));
-        return solid ? solidObject(solid, { color: 0x26a69a, ...element }, originOffset) : null;
+        return solid ? solidObject(solid, { color: 0x26a69a, ...element }, originOffset, onEdgesReady) : null;
       }
 
       // An exact solid (a STEP import): faces with their exact normals and the B-rep edges.
@@ -1487,16 +1489,9 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
 
         // Highlight the chamfered edges
         if (element.edges && element.edges.length > 0) {
-          const edgesMaterial = new THREE.LineBasicMaterial({
-            color: 0xff5722,
-            linewidth: 3
-          });
-
           // Here we'd create proper chamfer visualization
-          // For now just highlight edges
-          const edgesGeometry = createDisplayEdges(chamferBaseGeometry, 1, onEdgesReady);
-          const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
-          chamferGroup.add(edges);
+          // For now just highlight edges (3 px: `linewidth` is ignored by the 1 px GL lines, the thick lines honour it)
+          chamferGroup.add(createDisplayEdgeLines(chamferBaseGeometry, 1, onEdgesReady, { color: 0xff5722, width: 3 }, { quality: currentLookTier() }));
         }
 
         chamferGroup.position.set(
@@ -1525,16 +1520,9 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
 
         // Highlight the filleted edges
         if (element.edges && element.edges.length > 0) {
-          const filletedEdgesMaterial = new THREE.LineBasicMaterial({
-            color: 0x4caf50,
-            linewidth: 3
-          });
-
           // Here we'd create proper fillet visualization
           // For now just highlight edges
-          const edgesGeometry = createDisplayEdges(filletBaseGeometry, 1, onEdgesReady);
-          const edges = new THREE.LineSegments(edgesGeometry, filletedEdgesMaterial);
-          filletGroup.add(edges);
+          filletGroup.add(createDisplayEdgeLines(filletBaseGeometry, 1, onEdgesReady, { color: 0x4caf50, width: 3 }, { quality: currentLookTier() }));
         }
 
         filletGroup.position.set(
@@ -2296,10 +2284,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
         );
 
         if (!element.wireframe) {
-          const edgesGeometry = createDisplayEdges(workpieceGeometry, 1, onEdgesReady);
-          const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
-          const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
-          workpiece.add(edges);
+          workpiece.add(createDisplayEdgeLines(workpieceGeometry, 1, onEdgesReady, { color: 0x000000, width: 1.5 }, { quality: currentLookTier() }));
         }
 
         return workpiece;

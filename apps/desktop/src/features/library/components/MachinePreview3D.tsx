@@ -9,7 +9,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { cam } from "@cadcamfun/core"
 import { disposeObject, fitCameraToObjects } from "../../cad/lib/sceneHelpers.ts"
 import { FrameScheduler } from "../../cad/lib/frame-scheduler.ts"
-import { PREVIEW_BACKGROUND, addPreviewLights } from "../lib/preview-scene.ts"
+import { PREVIEW_BACKGROUND, addPreviewLook } from "../lib/preview-scene.ts"
 import { machineEnvelope } from "../lib/machine-details.ts"
 import { machineObject } from "../lib/machine-object.ts"
 import { PREVIEW_STAGE, PreviewFrame, stageNote } from "./PreviewFrame.tsx"
@@ -30,7 +30,7 @@ export function MachinePreview3D(props: { readonly profile: ReturnType<typeof ca
     const scene = new THREE.Scene(), content = new THREE.Group()
     scene.background = new THREE.Color(PREVIEW_BACKGROUND)
     scene.add(content)
-    addPreviewLights(scene, { x: 400, y: -600, z: 800 })
+    const look = addPreviewLook(renderer, scene, { x: 400, y: -600, z: 800 }, () => frames.invalidate())
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1_000_000)
     camera.up.set(0, 0, 1)
     camera.position.set(1, -1.3, 0.9)
@@ -58,7 +58,7 @@ export function MachinePreview3D(props: { readonly profile: ReturnType<typeof ca
     resize(); rebuild(); visibility()
     onCleanup(() => {
       rebuild = () => {}; fit = () => {}; observer.disconnect(); document.removeEventListener("visibilitychange", visibility)
-      frames.dispose(); controls.dispose(); disposeObject(content); renderer.dispose(); renderer.domElement.remove()
+      frames.dispose(); controls.dispose(); disposeObject(content); look.dispose(); renderer.dispose(); renderer.domElement.remove()
     })
   })
   return <PreviewFrame title="Machine envelope" testId="machine-preview" onFit={() => fit()} hint="Drag to orbit · Scroll to zoom · Blue box: the space the part takes">

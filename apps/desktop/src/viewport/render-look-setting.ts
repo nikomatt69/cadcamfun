@@ -3,7 +3,7 @@
  * so a change reaches every open viewport and preview at once, and it is kept in `localStorage` like the other viewport
  * choices (a blocked storage only means the choice lasts until the window closes).
  */
-import { createEffect, createSignal } from "solid-js"
+import { createEffect, createSignal, untrack } from "solid-js"
 import type * as THREE from "three"
 import { DEFAULT_LOOK_TIER, createRenderLook, resolveLookTier, type LegacyLights, type LookTier, type RenderLook } from "./render-look.ts"
 
@@ -17,6 +17,9 @@ const [tier, setTier] = createSignal<LookTier>(read())
 
 /** The tier every viewport renders with. */
 export const lookTier = tier
+
+/** The tier now, read without subscribing the caller (for builders that run inside effects and must not rebuild on a change). */
+export const currentLookTier = (): LookTier => untrack(tier)
 
 /** Sets and stores the tier; an unknown value is ignored. */
 export const setLookTier = (value: unknown): void => {

@@ -123,3 +123,12 @@ export const cubeFace = (name: CubeFaceName): CubeFace => FACES.get(name)!
 
 /** Unit normal check used by tests: `right x up` of a face. */
 export const faceHandedness = (face: CubeFace): Vec3 => normalize(cross(face.right, face.up))
+
+/** The faces a snap target lies on, top or bottom first, then front or back, then left or right (for its label). */
+export const signNames = (sign: Vec3): CubeFaceName[] => {
+  const names: CubeFaceName[] = []
+  if (sign[2] !== 0) names.push(sign[2] > 0 ? "top" : "bottom")
+  if (sign[1] !== 0) names.push(sign[1] > 0 ? "back" : "front")
+  if (sign[0] !== 0) names.push(sign[0] > 0 ? "right" : "left")
+  return names
+}

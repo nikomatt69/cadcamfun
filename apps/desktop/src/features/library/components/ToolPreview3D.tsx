@@ -8,7 +8,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { cam } from "@cadcamfun/core"
 import { toolObject } from "../../../viewport/view3d/tool-object.ts"
 import { disposeObject } from "../../../viewport/view3d/machine-scene.ts"
-import { PREVIEW_BACKGROUND, addPreviewLights } from "../lib/preview-scene.ts"
+import { PREVIEW_BACKGROUND, addPreviewLook } from "../lib/preview-scene.ts"
 import { PREVIEW_STAGE, PreviewFrame, stageNote } from "./PreviewFrame.tsx"
 
 const numberOrNull = (value: unknown): number | null => {
@@ -50,7 +50,7 @@ export function ToolPreview3D(props: { readonly tool: Readonly<Record<string, un
     host.append(renderer.domElement)
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(PREVIEW_BACKGROUND)
-    addPreviewLights(scene, { x: 80, y: -60, z: 120 })
+    const look = addPreviewLook(renderer, scene, { x: 80, y: -60, z: 120 }, () => render())
     const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 10000)
     camera.up.set(0, 0, 1)
     const controls = new OrbitControls(camera, renderer.domElement)
@@ -84,7 +84,7 @@ export function ToolPreview3D(props: { readonly tool: Readonly<Record<string, un
     const loop = () => { frame = requestAnimationFrame(loop); render() }
     controls.addEventListener("start", () => { if (!frame) loop() })
     controls.addEventListener("end", () => { cancelAnimationFrame(frame); frame = 0; render() })
-    onCleanup(() => { cancelAnimationFrame(frame); observer.disconnect(); controls.dispose(); if (object) disposeObject(object); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; fit = () => {} })
+    onCleanup(() => { cancelAnimationFrame(frame); observer.disconnect(); controls.dispose(); if (object) disposeObject(object); look.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; fit = () => {} })
   })
   return (
     <PreviewFrame title="Tool model" testId="tool-preview" onFit={() => fit()} hint="Drag to orbit · Scroll to zoom">
