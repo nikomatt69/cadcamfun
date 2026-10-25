@@ -217,6 +217,9 @@ test("a parametric part with an island in a pocket is machined from its exact mo
   expect(sheet.data.totals.cycleSeconds).toBe(artifact.value.cycleTimeSeconds)
   expect(sheet.data.identity.nc).toBe(artifact.value.identity.nc)
   expect(sheet.html).toContain(artifact.value.operations.find((o) => o.id === "finish-pocket-1-island1")!.name)
+  // The title block of the drawing the program belongs to is printed on it, complete, as on the drawing.
+  expect(sheet.data.titleBlock).toMatchObject({ revision: "A", status: "draft", standard: "ISO 2768-1 m", units: "mm" })
+  expect(sheet.html).toContain('<table class="titleblock"')
   expect((await app.call(`/api/toolpaths/${saved.operationId}/setup-sheet`, { auth: false })).status).toBe(401)
   // The assistant reads the same sheet from the stored artifact, without the page itself.
   const readToken = (await app.call("/api/ai/bridge/tokens", { method: "POST", json: { name: "sheet", projectId: project, mode: "read" } })).body.token as string

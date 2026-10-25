@@ -8,6 +8,7 @@
  * `setupSheetData` is the structured form; `setupSheetHtml` renders it as one self-contained HTML page (inline CSS, one inline
  * SVG silhouette per tool, every value escaped) that prints on A4. Printer artifacts have a print report instead and are refused.
  */
+import { titleBlockText, type CompleteTitleBlock, type TitleBlockKey } from "../../drawing/title-block.ts"
 import type { CamArtifact, Claim, OperationOutcome } from "./contracts.ts"
 import type { Cutter } from "./cutters.ts"
 
@@ -65,11 +66,15 @@ export interface SetupSheetData {
   readonly notes: ReadonlyArray<string>
   readonly issues: ReadonlyArray<{ readonly severity: string; readonly message: string }>
   readonly identity: CamArtifact["identity"]
+  /** The title block of the drawing the program belongs to: printed at the bottom right of the sheet, as on the drawing. */
+  readonly titleBlock?: CompleteTitleBlock
 }
 
 export interface SetupSheetOptions {
   /** Heading of the sheet (default: the job id). */
   readonly title?: string
+  /** The title block of the drawing the program belongs to. */
+  readonly titleBlock?: CompleteTitleBlock
 }
 
 /** The sheet of a milling or turning program, or why the artifact has none. */
@@ -100,7 +105,8 @@ export const setupSheetData = (a: CamArtifact, options: SetupSheetOptions = {}):
       tools: tools.length, operations: operations.length, cycleSeconds: a.cycleTimeSeconds,
       cuttingSeconds: operations.reduce((s, o) => s + o.seconds, 0), removedVolume: operations.reduce((s, o) => s + o.removedVolume, 0)
     },
-    claims: a.claims, notes: a.notes, issues: a.issues.map((i) => ({ severity: i.severity, message: i.message })), identity: a.identity
+    claims: a.claims, notes: a.notes, issues: a.issues.map((i) => ({ severity: i.severity, message: i.message })), identity: a.identity,
+    ...(options.titleBlock !== undefined ? { titleBlock: options.titleBlock } : {})
   }
 }
 
@@ -128,7 +134,21 @@ const silhouette = (t: SetupSheetTool): string => {
 const STYLE = `body{font:12px/1.4 system-ui,sans-serif;margin:24px;color:#111}h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;margin:18px 0 6px;border-bottom:1px solid #999}
 table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:3px 6px;text-align:left;vertical-align:top}th{background:#eee}td.n,th.n{text-align:right}
 .meta td{border:none;padding:1px 12px 1px 0}.cut{fill:#9bb}.shank{fill:#ccc}.passed{color:#060}.failed{color:#a00;font-weight:600}.unresolved,.unsupported{color:#870}
+.titleblock{width:36em;margin:28px 0 0 auto;page-break-inside:avoid}.titleblock td{padding:1px 6px}.titleblock .l{display:block;font-size:8px;color:#666;text-transform:uppercase;letter-spacing:.04em}.titleblock .big{font-size:14px;font-weight:600}
 .release{display:inline-block;padding:1px 8px;border:1px solid #333;border-radius:3px}code{font:11px ui-monospace,monospace;word-break:break-all}@media print{body{margin:10mm}}`
+
+/** The drawing's title block as a table, the same rows the drawing office reads: identity, part, people, and the CAM fields when they hold something. */
+const titleBlockHtml = (b: CompleteTitleBlock): string => {
+  const cell = (label: string, key: TitleBlockKey, span = 1, big = false): string =>
+    `<td colspan="${span}"><span class="l">${esc(label)}</span><span${big ? " class=\"big\"" : ""}>${esc(titleBlockText(b, key)) || "&nbsp;"}</span></td>`
+  const cam = [b.machine, b.program, b.setup].some((v) => v !== "")
+  return `<table class="titleblock" aria-label="Title block">` +
+    `<tr>${cell("Owner", "owner", 2)}${cell("Type", "documentType")}${cell("Status", "status")}${cell("Mass", "mass")}${cell("Units", "units")}</tr>` +
+    `<tr>${cell("Title", "title", 3, true)}${cell("Drawing no.", "number", 2, true)}${cell("Rev.", "revision", 1, true)}</tr>` +
+    `<tr>${cell("Material", "material", 2)}${cell("Finish", "finish")}${cell("General tolerances", "standard", 2)}${cell("Sheet", "sheet")}</tr>` +
+    `<tr>${cell("Created by", "createdBy", 2)}${cell("Checked by", "checkedBy", 2)}${cell("Approved by", "approvedBy", 1)}${cell("Date", "date")}</tr>` +
+    (cam ? `<tr>${cell("Machine", "machine", 2)}${cell("Program", "program", 2)}${cell("Setup", "setup", 2)}</tr>` : "") + `</table>`
+}
 
 /** One self-contained HTML page for the sheet. */
 export const setupSheetHtml = (d: SetupSheetData): string => {
@@ -152,5 +172,5 @@ export const setupSheetHtml = (d: SetupSheetData): string => {
     `<h2>Evidence</h2><table><tr><th>Claim</th><th>Status</th><th>Detail</th></tr>${claims}</table>` +
     (d.notes.length > 0 ? `<h2>Notes</h2><ul>${d.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : "") +
     (d.issues.length > 0 ? `<h2>Issues</h2><ul>${d.issues.map((i) => `<li>${esc(i.severity)}: ${esc(i.message)}</li>`).join("")}</ul>` : "") +
-    `<h2>Identity</h2><p>Job <code>${esc(d.identity.job)}</code><br>Part <code>${esc(d.identity.part)}</code><br>NC <code>${esc(d.identity.nc)}</code><br>${esc(d.identity.algorithm)}</p></body></html>`
+    `<h2>Identity</h2><p>Job <code>${esc(d.identity.job)}</code><br>Part <code>${esc(d.identity.part)}</code><br>NC <code>${esc(d.identity.nc)}</code><br>${esc(d.identity.algorithm)}</p>${d.titleBlock !== undefined ? titleBlockHtml(d.titleBlock) : ""}</body></html>`
 }

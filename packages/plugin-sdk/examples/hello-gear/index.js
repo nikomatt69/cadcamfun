@@ -8852,6 +8852,36 @@ var DEG3 = Math.PI / 180;
 
 // packages/core/src/cam/kernel/collision.ts
 var DEG4 = Math.PI / 180;
+// packages/core/src/drawing/title-block.ts
+var DOCUMENT_TYPES = ["part", "assembly", "cam-setup", "cam-program", "sketch"];
+var DOCUMENT_STATUSES = ["draft", "in-review", "released", "obsolete"];
+var TOLERANCE_STANDARDS = ["ISO 2768-1 f", "ISO 2768-1 m", "ISO 2768-1 c", "ISO 2768-1 v", "ISO 2768-mK", "ISO 2768-mH", "ISO 2768-fH", "ISO 286-1", "ASME Y14.5", "DIN 7168 m", "None"];
+var Short = String4.check(isMaxLength(120));
+var Text = String4.check(isMaxLength(200));
+var TitleBlockSchema = Struct({
+  title: optionalKey2(Text),
+  number: optionalKey2(Short),
+  revision: optionalKey2(String4.check(isMaxLength(8))),
+  documentType: optionalKey2(Literals(DOCUMENT_TYPES)),
+  status: optionalKey2(Literals(DOCUMENT_STATUSES)),
+  date: optionalKey2(String4.check(isPattern2(/^\d{4}-\d{2}-\d{2}$/))),
+  sheet: optionalKey2(String4.check(isPattern2(/^\d{1,3}\/\d{1,3}$/))),
+  owner: optionalKey2(Short),
+  createdBy: optionalKey2(Short),
+  checkedBy: optionalKey2(Short),
+  approvedBy: optionalKey2(Short),
+  material: optionalKey2(Short),
+  colour: optionalKey2(Short),
+  finish: optionalKey2(Short),
+  standard: optionalKey2(Literals(TOLERANCE_STANDARDS)),
+  mass: optionalKey2(Finite.check(isGreaterThanOrEqualTo2(0))),
+  scale: optionalKey2(String4.check(isPattern2(/^(auto|\d{1,3}(\.\d+)?:\d{1,3}(\.\d+)?)$/i))),
+  projection: optionalKey2(Literals(["first", "third"])),
+  units: optionalKey2(Literals(["mm", "in"])),
+  machine: optionalKey2(Short),
+  program: optionalKey2(Short),
+  setup: optionalKey2(Short)
+});
 // packages/core/src/cam/kernel/schema.ts
 var SetupOrientationSchema = Literals(SETUP_ORIENTATIONS);
 var positive2 = Finite.check(isGreaterThan2(0));

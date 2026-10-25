@@ -181,10 +181,19 @@ const BLOCK = 8
 
 export interface Rect { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number }
 
-/** Node counts of the contour grid over `rect` at spacing `step`. */
-export const nodeGrid = (rect: Rect, step: number): { readonly nx: number; readonly ny: number; readonly dx: number; readonly dy: number } => {
-  const nx = Math.max(2, Math.ceil((rect.x1 - rect.x0) / step)), ny = Math.max(2, Math.ceil((rect.y1 - rect.y0) / step))
-  return { nx, ny, dx: (rect.x1 - rect.x0) / nx, dy: (rect.y1 - rect.y0) / ny }
+/** Nodes of a contour grid: each is one drop-cutter sample, so this bounds the work of a waterline, flat or constant-scallop pass. */
+export const MAX_GRID_NODES = 12_000_000
+
+/**
+ * Node counts of the contour grid over `rect` at spacing `step`, or the finest spacing that keeps the grid within `MAX_GRID_NODES`
+ * (`coarsened` says it was needed). Every caller asks through here, so the grid and the contours drawn on it always agree.
+ */
+export const nodeGrid = (rect: Rect, step: number): { readonly nx: number; readonly ny: number; readonly dx: number; readonly dy: number; readonly coarsened: boolean } => {
+  const width = rect.x1 - rect.x0, height = rect.y1 - rect.y0
+  const wanted = (Math.ceil(width / step) + 1) * (Math.ceil(height / step) + 1)
+  const spacing = wanted > MAX_GRID_NODES ? step * Math.sqrt(wanted / MAX_GRID_NODES) * 1.001 : step
+  const nx = Math.max(2, Math.ceil(width / spacing)), ny = Math.max(2, Math.ceil(height / spacing))
+  return { nx, ny, dx: width / nx, dy: height / ny, coarsened: spacing > step }
 }
 
 /** `value` at every node of the contour grid (row-major, (nx+1) per row); a level-independent cache shared by all levels. */

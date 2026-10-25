@@ -110,6 +110,24 @@ describe("editor saves merge into the stored document", () => {
   })
 })
 
+describe("the title block stored with a drawing", () => {
+  test("a valid block is stored and merged like the rest of the document; an invalid one is a 400 that writes nothing", async () => {
+    const titleBlock = { title: "Bracket", number: "BRK-001", revision: "B", status: "released", date: "2026-10-25", scale: "1:2", projection: "third", mass: 0.42 }
+    const created = await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Titled", data: { elements: [], titleBlock } } })
+    expect(created.status).toBe(201)
+    expect(created.body.data.titleBlock).toEqual(titleBlock)
+    const edited = await app.call(`/api/drawings/${created.body.id}`, { method: "PUT", json: { data: { titleBlock: { ...titleBlock, revision: "C" } }, mergeData: true } })
+    expect(edited.body.data).toEqual({ elements: [], titleBlock: { ...titleBlock, revision: "C" } })
+
+    const bad = await app.call(`/api/drawings/${created.body.id}`, { method: "PUT", json: { data: { titleBlock: { date: "yesterday", status: "shipped", extra: 1 } }, mergeData: true } })
+    expect(bad.status).toBe(400)
+    expect(bad.body.message).toBe("Invalid title block: 'extra' is not a title block field; 'status' is not valid (one of draft, in-review, released, obsolete); 'date' is not valid (YYYY-MM-DD)")
+    expect((await app.call(`/api/drawings/${created.body.id}`)).body.data.titleBlock.revision).toBe("C")
+    const badCreate = await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Bad", data: { titleBlock: [] } } })
+    expect(badCreate.status).toBe(400)
+  })
+})
+
 describe("restore point retention", () => {
   test("the interval and the number kept follow the policy (CADCAMFUN_VERSION_*): every save is kept when the interval is 0, only the newest N survive", async () => {
     process.env["CADCAMFUN_VERSION_INTERVAL_MS"] = "0"

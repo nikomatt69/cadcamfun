@@ -12,6 +12,8 @@ import { useSelectionStore } from "../../cad/store/selectorStore.ts"
 import { useCADStore } from "../../cad/store/cadStore.ts"
 import { useDocumentStore } from "../../cad/store/documentStore.ts"
 import { useLayerStore } from "../../cad/store/layerStore.ts"
+import { drawing } from "@cadcamfun/core"
+import { currentTitleBlock } from "../../cad/lib/document-setup.ts"
 import { mergeSection } from "../../cad/lib/section.ts"
 import { noteStoredRevision } from "../../cad/lib/stored-revision.ts"
 import { canonicalTool } from "./tools.ts"
@@ -247,13 +249,32 @@ export const rememberDocument = (output: string): void => {
 /** What the stored drawing held when the editor last wrote it (id -> JSON), to tell the assistant's changes from the user's. */
 const pushedByDrawing = new Map<string | null, Map<string, string>>()
 
-/** Remembers the elements just written to the stored drawing. */
+/** The title block the stored drawing held when the editor last wrote or read it (the block as every screen shows it, as JSON). */
+const titleBlocksSeen = new Map<string | null, string>()
+const blockKey = (stored: unknown): string => JSON.stringify(currentTitleBlock(stored))
+
+/** Remembers the elements and the title block just written to (or read from) the stored drawing. */
 export const rememberPushed = (elements: ReadonlyArray<Record<string, unknown>>, drawingId: string | null = useDocumentStore.getState().drawingId): void => {
   const pushed = new Map<string, string>()
   for (const element of elements) pushed.set(String(element["id"]), JSON.stringify(element))
   pushedByDrawing.set(drawingId, pushed)
+  titleBlocksSeen.set(drawingId, blockKey(useDocumentStore.getState().titleBlock))
 }
-export const forgetPushed = (): void => pushedByDrawing.clear()
+export const forgetPushed = (): void => { pushedByDrawing.clear(); titleBlocksSeen.clear() }
+
+/**
+ * The title block the assistant (or another window) stored since the editor last saw it comes into the editor, unless the user
+ * has changed the block here meanwhile: that edit is theirs and goes out with the next save.
+ */
+const reconcileTitleBlock = (drawingId: string, stored: unknown): void => {
+  const document = useDocumentStore.getState()
+  const storedKey = blockKey(stored), mineKey = blockKey(document.titleBlock), seen = titleBlocksSeen.get(drawingId)
+  if (storedKey === mineKey) { titleBlocksSeen.set(drawingId, storedKey); return }
+  if (seen === undefined || mineKey === seen) {
+    document.setTitleBlock(drawing.validTitleBlockFields(stored))
+    titleBlocksSeen.set(drawingId, storedKey)
+  }
+}
 
 interface Point { readonly x?: number; readonly y?: number; readonly z?: number }
 const num = (value: unknown, fallback = 0): number => (typeof value === "number" && Number.isFinite(value) ? value : fallback)
@@ -331,7 +352,8 @@ export async function reconcileFromStored(app: { readonly client: unknown; reado
   if (!owner.current()) return none
   // The copy the editor now merges is the one stored at `updatedAt`: the next save is based on it.
   noteStoredRevision(drawingId, row.updatedAt)
-  const data = row.data !== null && typeof row.data === "object" ? (row.data as { elements?: unknown; entities?: unknown; layers?: unknown }) : {}
+  const data = row.data !== null && typeof row.data === "object" ? (row.data as { elements?: unknown; entities?: unknown; layers?: unknown; titleBlock?: unknown }) : {}
+  reconcileTitleBlock(drawingId, data.titleBlock)
   const layers = Array.isArray(data.layers) ? (data.layers as Array<{ id?: string; name?: string }>) : []
   const name = (id: string): string | undefined => layers.find((layer) => layer.id === id)?.name
   const fromElements = Array.isArray(data.elements) ? (data.elements.filter(isElement) as Record<string, unknown>[]) : []

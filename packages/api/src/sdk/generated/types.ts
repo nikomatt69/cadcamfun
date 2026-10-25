@@ -1775,9 +1775,17 @@ export type CompanionEnablePayload = { readonly port?: number | undefined }
 
 export type CompanionPairPayload = { readonly name: string; readonly host?: string | undefined }
 
-export type HealthCheckOutput = { status: string; timestamp: string }
+export type HealthCheckOutput = {
+  status: string
+  timestamp: string
+  jobs?: { workers: number; running: number; waiting: number; cached: number; closing: boolean }
+}
 
-export type SystemReadyOutput = { status: string; timestamp: string }
+export type SystemReadyOutput = {
+  status: string
+  timestamp: string
+  jobs?: { workers: number; running: number; waiting: number; cached: number; closing: boolean }
+}
 
 export type SystemVersionOutput = { version: string }
 
@@ -5859,6 +5867,7 @@ export type ToolpathsSetupSheetOutput = {
     notes: Array<string>
     issues: Array<{ severity: string; message: string }>
     identity: { job: string; part: string; nc: string; algorithm: string }
+    titleBlock?: { [x: string]: string | number }
   }
   html: string
 }
@@ -7466,6 +7475,7 @@ export type EventsSubscribeOutput =
       runId: string
       phase: "running" | "done" | "cancelled"
       stage?:
+        | "queued"
         | "operations"
         | "post"
         | "replay"
@@ -7481,6 +7491,7 @@ export type EventsSubscribeOutput =
       operationId?: string | undefined
       index?: number | undefined
       count?: number | undefined
+      ahead?: number | undefined
     }
   | { type: "workspace.changed"; at: string; projectId: string }
   | { type: "server.connected"; at: string }
@@ -7602,6 +7613,7 @@ export type EventsSubscribeAllOutput =
       runId: string
       phase: "running" | "done" | "cancelled"
       stage?:
+        | "queued"
         | "operations"
         | "post"
         | "replay"
@@ -7617,6 +7629,7 @@ export type EventsSubscribeAllOutput =
       operationId?: string | undefined
       index?: number | undefined
       count?: number | undefined
+      ahead?: number | undefined
     }
   | { type: "workspace.changed"; at: string; projectId: string }
   | { type: "server.connected"; at: string }

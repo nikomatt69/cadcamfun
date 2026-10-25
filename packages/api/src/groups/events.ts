@@ -90,10 +90,12 @@ export const CamProgress = Schema.Struct({
   projectId: Schema.String,
   runId: Schema.String,
   phase: Schema.Literals(["running", "done", "cancelled"]),
-  stage: Schema.optional(Schema.Literals(["operations", "post", "replay", "evidence", "toolpath", "optimize", "arcs", "feeds", "analysis", "cycles", "record"])),
+  stage: Schema.optional(Schema.Literals(["queued", "operations", "post", "replay", "evidence", "toolpath", "optimize", "arcs", "feeds", "analysis", "cycles", "record"])),
   operationId: Schema.optional(Schema.String),
   index: Schema.optional(Schema.Number),
-  count: Schema.optional(Schema.Number)
+  count: Schema.optional(Schema.Number),
+  /** `queued`: how many jobs are ahead of this one for a worker. */
+  ahead: Schema.optional(Schema.Number)
 })
 
 /** A saved working-copy change, including changes that have not been committed. */

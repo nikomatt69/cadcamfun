@@ -22013,6 +22013,34 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "jobs": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "cached": {
+                          "type": "integer",
+                        },
+                        "closing": {
+                          "type": "boolean",
+                        },
+                        "running": {
+                          "type": "integer",
+                        },
+                        "waiting": {
+                          "type": "integer",
+                        },
+                        "workers": {
+                          "type": "integer",
+                        },
+                      },
+                      "required": [
+                        "workers",
+                        "running",
+                        "waiting",
+                        "cached",
+                        "closing",
+                      ],
+                      "type": "object",
+                    },
                     "status": {
                       "type": "string",
                     },
@@ -66001,6 +66029,19 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "title": {
                           "type": "string",
                         },
+                        "titleBlock": {
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "number",
+                              },
+                            ],
+                          },
+                          "type": "object",
+                        },
                         "tools": {
                           "items": {
                             "additionalProperties": false,
@@ -73033,6 +73074,34 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "jobs": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "cached": {
+                          "type": "integer",
+                        },
+                        "closing": {
+                          "type": "boolean",
+                        },
+                        "running": {
+                          "type": "integer",
+                        },
+                        "waiting": {
+                          "type": "integer",
+                        },
+                        "workers": {
+                          "type": "integer",
+                        },
+                      },
+                      "required": [
+                        "workers",
+                        "running",
+                        "waiting",
+                        "cached",
+                        "closing",
+                      ],
+                      "type": "object",
+                    },
                     "status": {
                       "type": "string",
                     },

@@ -2,10 +2,12 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { Schema } from "effect"
 import { makeProgram } from "../ir.ts"
 import { buildPartModel } from "../model/model.ts"
+import type { Grid } from "../model/dexel.ts"
 import type { Stock, Tool } from "../tool.ts"
 import { verifyToolpath } from "../verify/index.ts"
 import { SurfaceParams, generateSurface, scallopSpacing } from "./surface.ts"
-import { Surface, contour, cutterOf, nest, sampleNodes, simplify } from "./surface-field.ts"
+import { MoveBuilder, OperationBudgetError } from "./common.ts"
+import { MAX_GRID_NODES, Surface, contour, cutterOf, nest, nodeGrid, sampleNodes, simplify } from "./surface-field.ts"
 
 // Finishing a surface samples tens of thousands of drop-cutter positions; a loaded machine needs room.
 setDefaultTimeout(60000)
@@ -231,5 +233,90 @@ describe("steep and shallow finishing", () => {
       target: { solids: [{ _tag: "Box", origin: { x: -15, y: -10, z: -8 }, size: { x: 30, y: 20, z: 8 } }] }
     })
     expect(report.issues.filter((i) => i.code === "Gouge")).toEqual([])
+  })
+})
+
+describe("an operation cannot grow past what the kernel can write and check", () => {
+  test("the move builder refuses the move past its limit, with what to change", () => {
+    const b = new MoveBuilder(5)
+    b.rapid({ x: 0, y: 0, z: 10 })
+    for (let i = 1; i < 5; i++) b.linear({ x: i, y: 0, z: 0 }, 100)
+    expect(b.moves).toHaveLength(5)
+    expect(() => b.linear({ x: 9, y: 0, z: 0 }, 100)).toThrow(OperationBudgetError)
+    expect(() => b.linear({ x: 9, y: 0, z: 0 }, 100)).toThrow(/stepover, stepdown or tolerance/)
+    expect(b.moves).toHaveLength(5)
+  })
+
+  test("the drop-cutter refuses the sample past its limit", () => {
+    const grid: Grid = { nx: 4, ny: 4, minX: 0, minY: 0, cellX: 1, cellY: 1 }
+    const surface = new Surface(grid, new Float64Array(16), 10)
+    const cutter = cutterOf(ball(2), 0)
+    for (let i = 0; i < 10; i++) surface.tip(cutter, 1.5, 1.5)
+    expect(() => surface.tip(cutter, 1.5, 1.5)).toThrow(OperationBudgetError)
+    expect(() => surface.tip(cutter, 1.5, 1.5)).toThrow(/stepover, the tolerance or the scallop/)
+  })
+})
+
+describe("the drop-cutter is asked only where the answer can matter", () => {
+  const run = (elements: ReadonlyArray<Record<string, unknown>>, size: number) => {
+    const part = buildPartModel(elements as never, { cell: 0.25, tolerance: 0.01 })!
+    let calls = 0
+    const tip = Surface.prototype.tip
+    Surface.prototype.tip = function (...a: Parameters<Surface["tip"]>) { calls++; return tip.apply(this, a) }
+    try {
+      const result = generateSurface(params({ strategy: "parallel", stepover: 40, tolerance: 0.01 }), part, ball(6), stockAt(-size / 2, -size / 2, size, size, 12))
+      return { calls, result }
+    } finally {
+      Surface.prototype.tip = tip
+    }
+  }
+  const zs = (r: ReturnType<typeof generateSurface>) => r.toolpath.moves.flatMap((m) => (m._tag === "Linear" ? [m.to] : []))
+
+  test("a flat plate costs a small share of the candidate positions and is cut at its height", () => {
+    const { calls, result } = run([{ id: "p", type: "cube", width: 60, height: 60, depth: 10, z: -5 }], 70)
+    // Candidates: lines 2.4 mm apart over 60 mm, every 0.05 mm (tolerance x 5) along 66 mm: about 25 x 1300.
+    expect(calls).toBeLessThan(25 * 1300 * 0.25)
+    // Straight stretches keep their ends only: the ends of each line over the plate, all at its height.
+    const cut = zs(result).filter((p) => Math.abs(p.x) <= 30.01 && Math.abs(p.y) <= 30.01)
+    expect(cut.length).toBeGreaterThan(20)
+    for (const p of cut) expect(Math.abs(p.z)).toBeLessThan(0.02)
+  })
+
+  test("a sphere keeps its shape: the path never leaves the drop-cutter surface by more than the tolerance between two points", () => {
+    const elements = [{ id: "s", type: "sphere", radius: 10, x: 0, y: 0, z: -10 }]
+    const part = buildPartModel(elements as never, { cell: 0.25, tolerance: 0.01 })!
+    const surface = new Surface(part.grid, part.dexels.top(-Infinity))
+    const cutter = cutterOf(ball(6), 0)
+    const { result } = run(elements, 30)
+    const moves = result.toolpath.moves
+    let checked = 0, worst = 0
+    for (let i = 1; i < moves.length; i++) {
+      const a = moves[i - 1]!, b = moves[i]!
+      if (a._tag !== "Linear" || b._tag !== "Linear") continue
+      const length = Math.hypot(b.to.x - a.to.x, b.to.y - a.to.y)
+      if (length < 0.2 || length > 4) continue
+      const x = (a.to.x + b.to.x) / 2, y = (a.to.y + b.to.y) / 2
+      const tip = surface.tip(cutter, x, y)
+      if (tip === -Infinity) continue
+      // How far the chord sinks below the surface between its ends: the height field's own staircase (cells of 0.25 mm on a sphere)
+      // and the simplification. Dense sampling of every candidate gives 0.0233 mm worst case here; asking fewer must not give more.
+      worst = Math.max(worst, tip - (a.to.z + b.to.z) / 2)
+      checked++
+    }
+    expect(checked).toBeGreaterThan(30)
+    expect(worst).toBeLessThanOrEqual(0.0235)
+  })
+})
+
+describe("a contour grid over a huge part is coarsened to its node budget", () => {
+  test("a normal grid keeps its spacing; a grid of billions of nodes is coarsened, and says so", () => {
+    const small = nodeGrid({ x0: 0, y0: 0, x1: 100, y1: 50 }, 0.25)
+    expect(small.coarsened).toBe(false)
+    expect(small.dx).toBeCloseTo(0.25, 6)
+    const huge = nodeGrid({ x0: 0, y0: 0, x1: 3000, y1: 3000 }, 0.25)
+    expect(huge.coarsened).toBe(true)
+    expect((huge.nx + 1) * (huge.ny + 1)).toBeLessThanOrEqual(MAX_GRID_NODES * 1.01)
+    expect(huge.dx).toBeGreaterThan(0.25)
+    expect(huge.dx).toBeCloseTo(huge.dy, 6)
   })
 })

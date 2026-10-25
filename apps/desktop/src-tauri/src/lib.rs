@@ -4,6 +4,7 @@
 mod commands;
 // Public so the native-menu test (tests/native_menu.rs, a main-thread harness) can build the real menu.
 pub mod menu;
+mod opened_files;
 mod secrets;
 mod sidecar;
 mod tray;
@@ -14,31 +15,23 @@ use std::sync::Arc;
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent};
 
+use crate::opened_files::{openable_paths, OpenedFiles};
 use crate::sidecar::{SidecarConfig, SidecarHandle};
 
-/// File extensions the app registers for; used to pick paths out of launch arguments.
-const OPENABLE_EXTENSIONS: &[&str] = &["cadcam", "nc", "gcode"];
 /// Event name the webview listens to for files opened from the OS.
 const OPEN_FILE_EVENT: &str = "open-file";
 
-fn openable_paths<I: IntoIterator<Item = String>>(args: I) -> Vec<String> {
-    args.into_iter()
-        .filter(|arg| {
-            std::path::Path::new(arg)
-                .extension()
-                .map(|e| {
-                    OPENABLE_EXTENSIONS.contains(&e.to_string_lossy().to_ascii_lowercase().as_str())
-                })
-                .unwrap_or(false)
-        })
-        .collect()
-}
-
+/// Remembers the paths first (a webview that is not listening yet takes them with `take_opened_files`), then tells a webview
+/// that is.
 fn forward_open_files(app: &AppHandle, paths: Vec<String>) {
-    if !paths.is_empty() {
-        if let Err(err) = app.emit(OPEN_FILE_EVENT, paths) {
-            log::warn!("failed to forward opened files: {err}");
-        }
+    if paths.is_empty() {
+        return;
+    }
+    if let Some(opened) = app.try_state::<OpenedFiles>() {
+        opened.record(&paths);
+    }
+    if let Err(err) = app.emit(OPEN_FILE_EVENT, paths) {
+        log::warn!("failed to forward opened files: {err}");
     }
 }
 
@@ -54,6 +47,10 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let token = sidecar::generate_token()?;
     let handle = Arc::new(SidecarHandle::new(token));
     app.manage(Arc::clone(&handle));
+
+    app.manage(OpenedFiles::default());
+    // Windows and Linux hand a double-clicked file over as a launch argument (macOS sends `RunEvent::Opened`).
+    forward_open_files(app.handle(), openable_paths(std::env::args().skip(1)));
 
     app.manage(updater::UpdaterService::new());
     app.manage(updater::PendingUpdate::default());
@@ -107,7 +104,6 @@ pub fn run() {
         )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         // Native OS notifications: the webview decides when (synced Notification rows of
@@ -129,6 +125,8 @@ pub fn run() {
             commands::secret_delete,
             commands::pick_file,
             commands::save_file,
+            commands::take_opened_files,
+            commands::read_opened_file,
             commands::set_recent_projects,
             commands::check_for_updates,
             commands::install_update,
@@ -168,30 +166,9 @@ pub fn run() {
                 .iter()
                 .filter_map(|url| url.to_file_path().ok())
                 .map(|path| path.to_string_lossy().into_owned());
+            focus_main_window(app);
             forward_open_files(app, openable_paths(paths));
         }
         _ => {}
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn picks_only_registered_extensions_from_args() {
-        let args = [
-            "/app/cadcamfun",
-            "/tmp/part.GCODE",
-            "/tmp/a.cadcam",
-            "/tmp/b.nc",
-            "/tmp/c.txt",
-            "--flag",
-        ]
-        .map(String::from);
-        assert_eq!(
-            openable_paths(args),
-            vec!["/tmp/part.GCODE", "/tmp/a.cadcam", "/tmp/b.nc"]
-        );
-    }
 }

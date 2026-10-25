@@ -11,7 +11,7 @@ import { documentSettings } from "../../../shared/state/document-settings.ts"
 import type { AppState } from "../../../shared/state/context.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
-import { setupPayload } from "./document-setup.ts"
+import { setupPayload, titleBlockPayload } from "./document-setup.ts"
 import { cam } from "@cadcamfun/core"
 import { useLocalComponentsLibraryStore } from "../store/localComponentsLibraryStore.ts"
 
@@ -48,6 +48,7 @@ export const drawingPayload = (app: Pick<AppState, "settings">): Record<string, 
     selectedElement: selectedElement?.id ?? null,
     settings: documentSettings(app),
     setup: setupPayload(),
+    titleBlock: titleBlockPayload(),
     version: "1.0"
   }) as Record<string, unknown>
 }

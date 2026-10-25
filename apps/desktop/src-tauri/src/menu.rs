@@ -57,6 +57,10 @@ const UPDATE_ITEMS: &[(&str, &str, Option<&str>)] = &[
     (RELEASE_NOTES_ID, "Release Notes", None),
 ];
 
+/// Quit, handled natively and never forwarded: it must pass through the window's close request so the webview writes unsaved work
+/// first. The predefined quit item cannot do that on macOS (`terminate:` reaches neither `CloseRequested` nor `ExitRequested`).
+pub const QUIT_ID: &str = "app.quit";
+
 /// Handled natively in debug builds only; never forwarded.
 const DEVTOOLS_ID: &str = "view.devtools";
 
@@ -84,11 +88,17 @@ fn add_items<'a, R: Runtime, M: tauri::Manager<R>>(
     Ok(builder)
 }
 
+fn quit_item<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<tauri::menu::MenuItem<R>> {
+    MenuItemBuilder::with_id(QUIT_ID, "Quit CADCAM FUN")
+        .accelerator("CmdOrCtrl+Q")
+        .build(app)
+}
+
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let mut file = SubmenuBuilder::new(app, "File");
     file = add_items(file, app, FILE_ITEMS)?;
     if !cfg!(target_os = "macos") {
-        file = file.separator().quit();
+        file = file.separator().item(&quit_item(app)?);
     }
 
     let edit = SubmenuBuilder::new(app, "Edit")
@@ -121,8 +131,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 
     let menu = Menu::new(app)?;
     if cfg!(target_os = "macos") {
-        let check_updates = MenuItemBuilder::with_id(CHECK_UPDATES_ID, "Check for Updates...")
-            .build(app)?;
+        let check_updates =
+            MenuItemBuilder::with_id(CHECK_UPDATES_ID, "Check for Updates...").build(app)?;
         let application = SubmenuBuilder::new(app, "CADCAM FUN")
             .about(None)
             .item(&check_updates)
@@ -133,7 +143,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             .hide_others()
             .show_all()
             .separator()
-            .quit()
+            .item(&quit_item(app)?)
             .build()?;
         menu.append(&application)?;
     }
@@ -145,12 +155,51 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     Ok(menu)
 }
 
+/// How a quit request is carried out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuitPlan {
+    /// Close the main window: the webview flushes unsaved work on the close request, and the last window closing runs the
+    /// shell's graceful sidecar stop.
+    CloseWindow,
+    /// No window to ask: leave directly (the exit handler still stops the sidecar).
+    ExitNow,
+}
+
+pub fn quit_plan(has_main_window: bool) -> QuitPlan {
+    if has_main_window {
+        QuitPlan::CloseWindow
+    } else {
+        QuitPlan::ExitNow
+    }
+}
+
+/// The one way the app quits from the menu bar, the tray and the Windows/Linux File menu. The window is shown first: a quit from
+/// the tray happens with the window hidden, and a save that is refused has to be visible to the person.
+pub fn request_quit<R: Runtime>(app: &AppHandle<R>) {
+    let window = app.get_webview_window("main");
+    match quit_plan(window.is_some()) {
+        QuitPlan::CloseWindow => {
+            if let Some(window) = window {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+                if let Err(err) = window.close() {
+                    log::warn!("quit: the window did not close ({err}); exiting");
+                    app.exit(0);
+                }
+            }
+        }
+        QuitPlan::ExitNow => app.exit(0),
+    }
+}
+
 /// Application-level menu handler. Tray ids are handled in `tray.rs`.
 pub fn handle_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     if id.starts_with("tray.") {
         return;
     }
     match id {
+        QUIT_ID => return request_quit(app),
         CHECK_UPDATES_ID => return updater::request_manual_check(app),
         RELEASE_NOTES_ID => return updater::open_release_notes(app),
         _ => {}
@@ -181,6 +230,7 @@ mod tests {
     #[test]
     fn ids_are_unique_and_namespaced() {
         let mut seen = HashSet::new();
+        assert!(QUIT_ID.contains('.'));
         for (id, _, _) in [FILE_ITEMS, VIEW_ITEMS, HELP_ITEMS, UPDATE_ITEMS]
             .iter()
             .flat_map(|items| items.iter())
@@ -200,7 +250,14 @@ mod tests {
         assert!(!is_forwarded_id(CHECK_UPDATES_ID));
         assert!(!is_forwarded_id(RELEASE_NOTES_ID));
         assert!(!is_forwarded_id("tray.quit"));
+        assert!(!is_forwarded_id(QUIT_ID));
         assert!(!is_forwarded_id("1234"));
+    }
+
+    #[test]
+    fn quit_asks_the_window_when_there_is_one() {
+        assert_eq!(quit_plan(true), QuitPlan::CloseWindow);
+        assert_eq!(quit_plan(false), QuitPlan::ExitNow);
     }
 
     // The handler on Tauri's mock runtime: no window opens, but the handler and the updater service are the real ones. The built

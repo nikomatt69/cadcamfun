@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { emitGcode } from "./gcode.ts"
 import { resolveProfile } from "./profile.ts"
-import { replayBeads } from "./verify.ts"
+import { replayBeads, type PrintMotion } from "./verify.ts"
 import type { PathKind } from "./types.ts"
 
 describe("the actual NC respects the hotend melt-flow limit", () => {
@@ -10,11 +10,12 @@ describe("the actual NC respects the hotend melt-flow limit", () => {
       test(`${kind}, flow multiplier ${flow} %`, () => {
         const profile = resolveProfile({ layerHeight: 0.1, printSpeed: 100, printTemperature: 205, bedTemperature: 60, extrusionWidth: 0.6, nozzleDiameter: 0.4, filamentDiameter: 1.75, infillDensity: 20, infillPattern: "grid", shellCount: 1, supportType: "none", flow, firstLayerSpeed: 100, minLayerTime: 0, bedWidth: 20, bedDepth: 20, maxVolumetricFlow: 0.503 })
         const { gcode } = emitGcode({ profile, notes: [], layers: [{ index: 0, z: 0.1, height: 0.1, paths: [{ kind, widthScale: kind === "raft" ? 2 : 1, points: [{ x: 2, y: 2 }, { x: 18, y: 2 }] }] }] })
-        const replay = replayBeads(gcode)
+        const motionsSeen: PrintMotion[] = []
+        const replay = replayBeads(gcode, { onMotion: (m) => motionsSeen.push(m) })
         expect(replay.errors).toEqual([])
         const filamentArea = Math.PI * (profile.filamentDiameter / 2) ** 2
         let motions = 0
-        for (const m of replay.motions) {
+        for (const m of motionsSeen) {
           if (m.e <= 0) continue
           const length = Math.hypot(m.to.x - m.from.x, m.to.y - m.from.y, m.to.z - m.from.z)
           if (length === 0) continue
@@ -30,8 +31,9 @@ describe("the actual NC respects the hotend melt-flow limit", () => {
   test("the wider startup purge also respects the melt-flow limit", () => {
     const profile = resolveProfile({ layerHeight: 0.1, printSpeed: 100, printTemperature: 205, bedTemperature: 60, extrusionWidth: 0.6, filamentDiameter: 1.75, infillDensity: 20, infillPattern: "grid", shellCount: 1, supportType: "none", flow: 150, firstLayerSpeed: 100, minLayerTime: 0, maxVolumetricFlow: 0.503 })
     const { gcode } = emitGcode({ profile, notes: [], layers: [{ index: 0, z: 0.1, height: 0.1, paths: [{ kind: "wall-outer", points: [{ x: 100, y: 100 }, { x: 116, y: 100 }] }] }] })
-    const replay = replayBeads(gcode)
-    const positive = replay.motions.filter((m) => m.e > 0)
+    const motionsSeen: PrintMotion[] = []
+    replayBeads(gcode, { onMotion: (m) => motionsSeen.push(m) })
+    const positive = motionsSeen.filter((m) => m.e > 0)
     expect(positive).toHaveLength(2)
     for (const m of positive) {
       const seconds = Math.hypot(m.to.x - m.from.x, m.to.y - m.from.y) / (m.feed / 60)

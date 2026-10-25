@@ -42,7 +42,7 @@ import { MoveBuilder, approach, finish, followPath, liftTo } from "./common.ts"
 import { PocketEntrySchema, PocketParams, generatePocket } from "./pocket.ts"
 import { AdaptiveParams, generateAdaptive } from "./adaptive.ts"
 import { restField } from "./rest.ts"
-import { Surface, contour, cutterOf, nest, nodeGrid, sampleNodes, simplify, simplify3, type Cutter, type Rect } from "./surface-field.ts"
+import { MAX_GRID_NODES, Surface, contour, cutterOf, nest, nodeGrid, sampleNodes, simplify, simplify3, type Cutter, type Rect } from "./surface-field.ts"
 import { ToolKindSchema } from "../tool.ts"
 
 export const SurfaceStrategySchema = Schema.Literals(["roughing", "parallel", "waterline", "rest", "steep-shallow", "scallop", "spiral", "radial", "flat"])
@@ -227,6 +227,11 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
   if (tool.kind === "drill") warnings.push("A drill cannot machine a surface; use an end mill or a ball nose cutter.")
   const bottomZ = levels.bottomZ
   const cell = Math.min(part.grid.cellX, part.grid.cellY)
+  /** The contour grid over a large part is coarsened to its node budget; the pass says so. */
+  const gridNote = (rect: Rect, step: number): void => {
+    const g = nodeGrid(rect, step)
+    if (g.coarsened) warnings.push(`The ${(rect.x1 - rect.x0).toFixed(0)} x ${(rect.y1 - rect.y0).toFixed(0)} mm contour grid would need more than ${MAX_GRID_NODES.toLocaleString("en-US")} samples at ${step.toFixed(3)} mm: its spacing is ${Math.max(g.dx, g.dy).toFixed(3)} mm (finish a smaller region for a finer contour)`)
+  }
   // The previous tool, for rest roughing and rest finishing alike.
   const previousTool: Tool | undefined = params.restFrom === undefined ? undefined : {
     id: "rest-from", name: "previous tool", kind: params.restFrom.kind, diameter: params.restFrom.diameter, flutes: 2, maxRpm: 1,
@@ -352,6 +357,7 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     const margin = cutter.radius + 2 * step
     const rect: Rect = { x0: part.bounds.min[0] - margin, y0: part.bounds.min[1] - margin, x1: part.bounds.max[0] + margin, y1: part.bounds.max[1] + margin }
     const value = (x: number, y: number): number => surface.tip(cutter, x, y)
+    gridNote(rect, step)
     const nodes = sampleNodes(value, rect, step)
     /**
      * The contour is interpolated linearly between grid nodes; where the drop-cutter surface curves (a ball rolling over an
@@ -435,12 +441,60 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     const tip = surface.tip(cutter, x, y)
     return tip === -Infinity || !leftAt(x, y, tip) || (region !== undefined && !region(x, y)) ? undefined : [x, y, Math.max(tip, bottomZ)]
   }
-  /** Splits points along a pass into the runs where the tool has a surface to follow, each simplified to the tolerance. */
+  /**
+   * Splits points along a pass into the runs where the tool has a surface to follow, each simplified to the tolerance.
+   *
+   * The points are candidates, a sampling step `ds` apart; the drop-cutter is asked only where the answer can matter. A span
+   * between two answers is split in halves until (a) the surface is there at both ends, at the middle and at the quarters, and
+   * those lie on the chord, in plan and in height, within a quarter of the tolerance (the simplification below spends the rest):
+   * the span is a straight stretch; or (b) there is no surface at either end and the cutter's reach could not hide material in
+   * between; or (c) it is down to one step. A span longer than the cutter's reach is never taken as straight, and an end with
+   * surface against an end without is always split to one step, so the edges of the surface are found as exactly as with every
+   * candidate asked. A raster line over a flat or gently curved surface asks for a small part of the candidates; a spiral or an
+   * arc, which is not straight in plan, is asked wherever it bends.
+   */
   const runsAlong = (xy: ReadonlyArray<Vec2>, region?: (x: number, y: number) => boolean): P3[][] => {
+    const n = xy.length
+    if (n === 0) return []
+    const drop: Array<P3 | undefined | null> = new Array(n).fill(null)
+    const at = (i: number): P3 | undefined => {
+      const v = drop[i]
+      if (v !== null) return v
+      return (drop[i] = dropAt(xy[i]!.x, xy[i]!.y, region))
+    }
+    // Material further than the cutter's reach from every probe of a span cannot touch the tool inside it: the probes are at most one reach apart.
+    const maxStraight = Math.max(ds, cutter.radius)
+    const half = params.tolerance / 4
+    const span = (i: number, j: number): number => Math.hypot(xy[j]!.x - xy[i]!.x, xy[j]!.y - xy[i]!.y)
+    // A candidate lies on the chord when it is on it in plan (a spiral or an arc is not straight: its candidates are all asked) and in height.
+    const onChord = (i: number, j: number, k: number, a: P3, c: P3): boolean => {
+      const p = xy[k]!, u = xy[i]!, v = xy[j]!
+      const length = Math.hypot(v.x - u.x, v.y - u.y)
+      if (length > 0 && Math.abs((v.x - u.x) * (p.y - u.y) - (v.y - u.y) * (p.x - u.x)) / length > half) return false
+      const m = at(k)
+      if (m === undefined) return false
+      const t = (k - i) / (j - i)
+      return Math.abs(m[2] - (a[2] + (c[2] - a[2]) * t)) <= half
+    }
+    const stack: Array<readonly [number, number]> = [[0, n - 1]]
+    while (stack.length > 0) {
+      const [i, j] = stack.pop()!
+      if (j - i <= 1) continue
+      const a = at(i), c = at(j)
+      const length = span(i, j)
+      if (a === undefined && c === undefined && length <= cutter.radius) continue
+      if (a !== undefined && c !== undefined && length <= maxStraight) {
+        const k = (i + j) >> 1
+        if (onChord(i, j, k, a, c) && (j - i < 4 || (onChord(i, j, (i + k) >> 1, a, c) && onChord(i, j, (k + j) >> 1, a, c)))) continue
+      }
+      const k = (i + j) >> 1
+      stack.push([i, k], [k, j])
+    }
     const runs: P3[][] = []
     let current: P3[] = []
-    for (const q of xy) {
-      const p = dropAt(q.x, q.y, region)
+    for (let i = 0; i < n; i++) {
+      const p = drop[i]
+      if (p === null) continue
       if (p === undefined) { if (current.length > 1) runs.push(simplify3(current, params.tolerance)); current = []; continue }
       current.push(p)
     }
@@ -579,6 +633,7 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     const step = Math.max(cell, Math.min(spacing / 2, params.tolerance * 25, tool.diameter / 6, 0.5))
     const margin = cutter.radius + 2 * step
     const rect: Rect = { x0: part.bounds.min[0] - margin, y0: part.bounds.min[1] - margin, x1: part.bounds.max[0] + margin, y1: part.bounds.max[1] + margin }
+    gridNote(rect, step)
     const grid = nodeGrid(rect, step)
     const w = grid.nx + 1, h = grid.ny + 1
     const z = sampleNodes((x, y) => { const t = surface.tip(cutter, x, y); return t === -Infinity ? t : Math.max(t, bottomZ) }, rect, step)
@@ -719,6 +774,7 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     const step = Math.max(cell, Math.min(params.tolerance * 25, tool.diameter / 6, 0.5))
     const margin = cutter.radius + 2 * step
     const rect: Rect = { x0: part.bounds.min[0] - margin, y0: part.bounds.min[1] - margin, x1: part.bounds.max[0] + margin, y1: part.bounds.max[1] + margin }
+    gridNote(rect, step)
     const tips = sampleNodes((x, y) => surface.tip(cutter, x, y), rect, step)
     const off = new Float64Array(tips.length)
     // Highest face first, so the tool works its way down.

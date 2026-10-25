@@ -4,6 +4,7 @@
  * decodes every call with them. Lengths are millimetres.
  */
 import { Effect, Schema, SchemaTransformation } from "effect"
+import { drawing } from "@cadcamfun/core"
 import { EmptyActionInput as empty } from "./ai-cam.ts"
 
 const optional = Schema.optionalKey
@@ -53,6 +54,16 @@ export const CadAssemblyInput = Schema.Struct({
   washers: optional(Schema.Boolean.annotate({ description: "Count missing washers as missing fasteners; default true." }))
 })
 export type CadAssemblyInput = typeof CadAssemblyInput.Type
+
+/**
+ * The title block of the open drawing (ISO 7200 fields): the document's identity, drawn at the bottom right of every view and on
+ * every sheet. Writing sets only the fields given and keeps the rest.
+ */
+export const CadTitleBlockSetInput = Schema.Struct({
+  titleBlock: drawing.TitleBlockSchema.check(Schema.makeFilter((block) => Object.keys(block).length > 0, { expected: "at least one title block field" }))
+    .annotate({ description: "The fields to set (title, number, revision, status, date, owner, createdBy, checkedBy, approvedBy, material, colour, finish, standard, mass in kg, scale, projection, units, and machine, program, setup for CAM). The others keep their value." })
+})
+export type CadTitleBlockSetInput = typeof CadTitleBlockSetInput.Type
 
 /** What hollowing a solid would give, on paper: nothing in the drawing changes. */
 export const CadShellInput = Schema.Struct({
@@ -193,6 +204,7 @@ export const CAD_ACTION_INPUTS = {
   "cad.vision": VisionInput,
   "cad.exact": CadExactInput,
   "cad.assembly": CadAssemblyInput,
+  "cad.title_block": empty,
   "cad.setups": CadSetupsInput,
   "cad.shell": CadShellInput,
   "cad.offset": CadOffsetInput,
@@ -204,6 +216,7 @@ export const CAD_ACTION_INPUTS = {
   "cad_edit.shell": CadShellInput,
   "cad_edit.offset": CadOffsetInput,
   "cad_edit.hole": CadHoleInput,
+  "cad_edit.title_block_set": CadTitleBlockSetInput,
   "cad.distance": CadDistanceInput,
   "cad_edit.add_entities": Schema.Struct({ entities: Schema.Array(CadSketchEntity).check(Schema.isMinLength(1), Schema.isMaxLength(500)) }),
   "cad_edit.modify": Schema.Struct({

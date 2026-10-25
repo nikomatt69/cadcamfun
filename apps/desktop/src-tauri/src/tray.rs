@@ -6,7 +6,7 @@ use tauri::menu::{Menu, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-use crate::menu::MENU_EVENT;
+use crate::menu::{request_quit, MENU_EVENT};
 
 const TRAY_ID: &str = "main";
 const SHOW_HIDE_ID: &str = "tray.show_hide";
@@ -93,7 +93,7 @@ fn toggle_main_window<R: Runtime>(app: &AppHandle<R>) {
 fn handle_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     match id {
         SHOW_HIDE_ID => toggle_main_window(app),
-        QUIT_ID => app.exit(0),
+        QUIT_ID => request_quit(app),
         _ if id.starts_with(RECENT_PREFIX) => {
             if let Err(err) = app.emit(MENU_EVENT, id) {
                 log::warn!("failed to emit tray event {id}: {err}");

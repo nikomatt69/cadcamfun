@@ -55742,6 +55742,24 @@
                   },
                   "evidence": {
                     "type": "boolean"
+                  },
+                  "progress": {
+                    "type": "object",
+                    "properties": {
+                      "projectId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "projectId",
+                      "runId"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false

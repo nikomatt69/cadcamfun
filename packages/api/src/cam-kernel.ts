@@ -131,7 +131,9 @@ export const CamSetupSheetData = Schema.Struct({
   claims: Schema.Array(Schema.Struct({ id: Schema.String, status: Schema.String, detail: Schema.String })),
   notes: strings,
   issues: Schema.Array(Schema.Struct({ severity: Schema.String, message: Schema.String })),
-  identity: Schema.Struct({ job: Schema.String, part: Schema.String, nc: Schema.String, algorithm: Schema.String })
+  identity: Schema.Struct({ job: Schema.String, part: Schema.String, nc: Schema.String, algorithm: Schema.String }),
+  /** The title block of the drawing the program belongs to (every field complete), printed at the bottom right of the sheet. */
+  titleBlock: Schema.optionalKey(Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Finite])))
 })
 export const CamSetupSheet = Schema.Struct({ data: CamSetupSheetData, html: Schema.String })
 export type CamSetupSheet = typeof CamSetupSheet.Type

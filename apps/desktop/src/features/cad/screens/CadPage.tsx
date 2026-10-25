@@ -23,6 +23,7 @@ import SurfacingPanel, { type SurfacingOp } from "../components/SurfacingPanel.t
 import { t } from "../../../i18n/index.ts"
 import EnhancedSidebarCad, { type SidebarTab } from "../components/EnanchedSidebarCad.tsx"
 import CADCanvas, { type CADCanvasApi } from "../components/CADCanvas.tsx"
+import TitleBlockOverlay from "../components/TitleBlockOverlay.tsx"
 import DimensionsOverlay from "../components/DimensionsOverlay.tsx"
 import PropertyPanel from "../components/PropertyPanel.tsx"
 import ImportExportDialog from "../components/ImportExportDialog.tsx"
@@ -239,6 +240,7 @@ export default function CadPage(): JSX.Element {
               onReady={setCanvas} onSave={openExport}
               footerActions={<CADAssistantButton isVisible={showAssistant()} toggleVisibility={toggleAssistant} />}
             />
+            <TitleBlockOverlay mode={cad.viewMode} />
             <Show when={cad.showDimensions && canvas()}>{(api) => <DimensionsOverlay scene={api().scene} camera={api().camera} />}</Show>
             <Show when={showFloating()}>
               <FloatingToolbar initialPosition={{ x: 100, y: 100 }} onClose={() => setShowFloating(false)} library={() => <LibraryBrowser onSelectComponent={pickComponent} />} ai={() => <button class="cad-ribbon-action" onClick={() => app.setPanelOpen(true)}>{t("ai.title")}</button>} />

@@ -12,6 +12,7 @@ use tauri_plugin_opener::OpenerExt;
 use thiserror::Error;
 use tokio::sync::oneshot;
 
+use crate::opened_files::{OpenedFileError, OpenedFiles};
 use crate::secrets::{self, SecretError};
 use crate::sidecar::{SidecarEndpoint, SidecarError, SidecarHandle, READY_TIMEOUT};
 use crate::tray;
@@ -43,6 +44,15 @@ pub enum CommandError {
     ViewportBusy,
     #[error(transparent)]
     Update(#[from] updater::UpdateError),
+}
+
+impl From<OpenedFileError> for CommandError {
+    fn from(err: OpenedFileError) -> Self {
+        match err {
+            OpenedFileError::Io(message) => Self::Io(message),
+            other => Self::InvalidPath(other.to_string()),
+        }
+    }
 }
 
 impl From<SidecarError> for CommandError {
@@ -257,14 +267,89 @@ pub fn validate_save_path(path: &Path) -> Result<PathBuf, CommandError> {
     Ok(path.to_path_buf())
 }
 
-/// Asks where to save, writes `contents` (UTF-8 text such as G-code), and returns the
-/// chosen path, or `None` when the user cancels.
+/// The largest export the webview may hand over in one call.
+const MAX_SAVE_BYTES: usize = 256 * 1024 * 1024;
+/// Request header that carries the suggested file name, percent-encoded (a header is ASCII, a file name is not).
+const FILE_NAME_HEADER: &str = "x-file-name";
+
+/// Decodes `%XX` escapes; `None` when an escape is malformed or the result is not UTF-8.
+fn percent_decode(text: &str) -> Option<String> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = text.get(i + 1..i + 3)?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+/// A suggestion for the dialog: only the last component, never a directory, falling back to `export`.
+fn suggested_file_name(header: Option<&str>) -> String {
+    header
+        .and_then(percent_decode)
+        .and_then(|name| {
+            name.rsplit(['/', '\\'])
+                .next()
+                .map(str::trim)
+                .filter(|n| !n.is_empty() && *n != "." && *n != "..")
+                .map(str::to_owned)
+        })
+        .unwrap_or_else(|| "export".to_owned())
+}
+
+/// Writes `bytes` next to `target` and renames it into place, so a crash or a full disk never leaves a half-written file
+/// where a good one was.
+fn write_atomic(target: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let dir = target
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let name = target
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let temp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
+    let result = (|| {
+        let mut file = std::fs::File::create(&temp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        std::fs::rename(&temp, target)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    result
+}
+
+/// Asks where to save and writes the request body (raw bytes: G-code, STEP, a PDF), returning the chosen path, or `None` when
+/// the user cancels. The suggested name travels in the `x-file-name` header, percent-encoded.
 #[tauri::command]
 pub async fn save_file(
     app: AppHandle,
-    default_name: String,
-    contents: String,
+    request: tauri::ipc::Request<'_>,
 ) -> Result<Option<String>, CommandError> {
+    let bytes = match request.body() {
+        tauri::ipc::InvokeBody::Raw(bytes) if bytes.len() <= MAX_SAVE_BYTES => bytes.clone(),
+        _ => {
+            return Err(CommandError::InvalidPath(
+                "expected a bounded raw body".to_owned(),
+            ))
+        }
+    };
+    let default_name = suggested_file_name(
+        request
+            .headers()
+            .get(FILE_NAME_HEADER)
+            .and_then(|value| value.to_str().ok()),
+    );
     let (tx, rx) = oneshot::channel();
     app.dialog()
         .file()
@@ -283,11 +368,31 @@ pub async fn save_file(
         .await
         .map_err(|e| CommandError::Io(e.to_string()))??;
     let target = path.clone();
-    tauri::async_runtime::spawn_blocking(move || std::fs::write(&target, contents))
+    tauri::async_runtime::spawn_blocking(move || write_atomic(&target, &bytes))
         .await
         .map_err(|e| CommandError::Io(e.to_string()))?
         .map_err(|e| CommandError::Io(e.to_string()))?;
     Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+/// Paths the operating system delivered while the webview was not listening yet (a double-click that started the app).
+#[tauri::command]
+pub fn take_opened_files(opened: State<'_, OpenedFiles>) -> Vec<String> {
+    opened.take()
+}
+
+/// Raw contents of a file the operating system delivered; any other path is refused.
+#[tauri::command]
+pub async fn read_opened_file(
+    path: String,
+    opened: State<'_, OpenedFiles>,
+) -> Result<tauri::ipc::Response, CommandError> {
+    let opened = opened.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || opened.read(&path))
+        .await
+        .map_err(|e| CommandError::Io(e.to_string()))?
+        .map(tauri::ipc::Response::new)
+        .map_err(CommandError::from)
 }
 
 #[tauri::command]
@@ -461,6 +566,74 @@ mod tests {
                 "path: {path}"
             );
         }
+    }
+
+    #[test]
+    fn percent_decoding_handles_utf8_and_rejects_bad_escapes() {
+        assert_eq!(
+            percent_decode("part%20one.nc").as_deref(),
+            Some("part one.nc")
+        );
+        assert_eq!(
+            percent_decode("caf%C3%A9.step").as_deref(),
+            Some("café.step")
+        );
+        assert_eq!(percent_decode("plain").as_deref(), Some("plain"));
+        assert_eq!(percent_decode("bad%2"), None);
+        assert_eq!(percent_decode("bad%zz"), None);
+        assert_eq!(percent_decode("%FF"), None);
+    }
+
+    #[test]
+    fn the_suggested_name_is_one_component() {
+        assert_eq!(suggested_file_name(Some("part%20one.nc")), "part one.nc");
+        assert_eq!(
+            suggested_file_name(Some("..%2F..%2Fetc%2Fpasswd")),
+            "passwd"
+        );
+        assert_eq!(suggested_file_name(Some("a%5Cb.nc")), "b.nc");
+        for header in [None, Some(""), Some(".."), Some("%2F"), Some("bad%2")] {
+            assert_eq!(suggested_file_name(header), "export", "header: {header:?}");
+        }
+    }
+
+    #[test]
+    fn an_atomic_write_replaces_the_whole_file_and_leaves_no_temp() {
+        let scratch = Scratch::new("atomic");
+        let target = scratch.0.join("out.nc");
+        fs::write(&target, "old contents that are longer").expect("seed");
+        write_atomic(&target, b"G0 X1").expect("write");
+        assert_eq!(fs::read(&target).expect("read"), b"G0 X1");
+        let leftovers: Vec<_> = fs::read_dir(&scratch.0)
+            .expect("dir")
+            .filter_map(Result::ok)
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(leftovers, vec!["out.nc"]);
+    }
+
+    #[test]
+    fn a_failed_atomic_write_keeps_the_old_file_and_cleans_up() {
+        let scratch = Scratch::new("atomic-fail");
+        let target = scratch.0.join("out.nc");
+        fs::write(&target, "kept").expect("seed");
+        // The directory of the target does not exist, so the temp file cannot be created.
+        let missing = scratch.0.join("nope").join("out.nc");
+        assert!(write_atomic(&missing, b"x").is_err());
+        assert_eq!(fs::read(&target).expect("read"), b"kept");
+        assert_eq!(fs::read_dir(&scratch.0).expect("dir").count(), 1);
+    }
+
+    #[test]
+    fn opened_file_errors_map_to_typed_command_errors() {
+        assert!(matches!(
+            CommandError::from(OpenedFileError::NotDelivered),
+            CommandError::InvalidPath(_)
+        ));
+        assert_eq!(
+            CommandError::from(OpenedFileError::Io("x".into())),
+            CommandError::Io("x".into())
+        );
     }
 
     #[test]

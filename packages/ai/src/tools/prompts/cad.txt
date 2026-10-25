@@ -20,6 +20,7 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - exact: ids?, machining?; exact validity, volume, bounds, faceNames, holes and CAM suitability.
 - assembly: washers?; exact clashes, gaps, BOM, joints, missing fasteners.
 - setups: ids?, fixture?, allowed?; setup orientations per solid.
+- title_block: none; the title block, completed, with what it lacks.
 - distance: firstId, secondId; smallest exact gap and closest points.
 - shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]; preview. Get names from exact.
 - hole: id, hole|boss|fillet|nurbs, diameter?|fill?|radius?|distance?|angle?, taper?, mode? (move|offset|draft), direction?, neutral?, pull?, tolerance?; preview; indexes from exact.

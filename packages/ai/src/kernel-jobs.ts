@@ -3,8 +3,72 @@
  * drift. Inputs and outputs are plain data (structured-clone safe); histories are decoded here, at the job's own boundary.
  */
 import { acceptPart, type AcceptanceCheck, type AcceptanceReport } from "./acceptance.ts"
-import { cam } from "@cadcamfun/core"
+import { cad, cam, drawing, type History } from "@cadcamfun/core"
 import { parametricReport, parseHistory } from "./parametric.ts"
+
+// ---------------------------------------------------------------- the exact CAD kernel
+// The B-rep kernel's heavy operations (analysis, STEP export, setup planning, a feature edit, assembly interference): the same
+// functions the HTTP handlers used to run on the sidecar's main thread, now behind the same queue, worker, deadline, cache and
+// history as the CAM kernel. Inputs and outputs are plain data.
+
+export type SceneElements = ReadonlyArray<Record<string, unknown>>
+
+export interface CadAnalyzeInput { readonly elements: SceneElements; readonly options: NonNullable<Parameters<typeof cad.analyzeScene>[1]> }
+export interface CadStepInput { readonly elements: SceneElements; readonly ids?: ReadonlyArray<string>; readonly options: { readonly faceted?: boolean; readonly author: string } }
+export interface CadSetupsInput { readonly elements: SceneElements; readonly options: NonNullable<Parameters<typeof cad.setupsForScene>[1]> }
+export interface CadAssemblyInput { readonly elements: SceneElements; readonly options: NonNullable<Parameters<typeof cad.assemblyReport>[1]> }
+
+/** One feature edit of the exact model; the request's validation has already chosen which. */
+export type CadFeatureEdit =
+  | { readonly kind: "nurbs"; readonly id: string; readonly face: Parameters<typeof cad.sceneNurbsEdit>[2]; readonly edit: cad.NurbsEdit }
+  | { readonly kind: "fillet"; readonly id: string; readonly edge: Parameters<typeof cad.sceneFilletEdit>[2]; readonly radius: number }
+  | { readonly kind: "boss"; readonly id: string; readonly boss: Parameters<typeof cad.sceneBossEdit>[2]; readonly diameter: number; readonly taper: number }
+  | { readonly kind: "hole"; readonly id: string; readonly hole: Parameters<typeof cad.sceneHoleEdit>[2]; readonly change: Parameters<typeof cad.sceneHoleEdit>[3] }
+export interface CadHoleInput { readonly elements: SceneElements; readonly edit: CadFeatureEdit }
+
+/** What a feature-edit request (the HTTP route and the assistant's tool take the same fields) asks for, once it has been validated. */
+export type CadFeatureRequest = Parameters<typeof cad.nurbsEditOf>[0] & {
+  readonly id: string
+  readonly nurbs?: Parameters<typeof cad.sceneNurbsEdit>[2]
+  readonly fillet?: Parameters<typeof cad.sceneFilletEdit>[2]
+  readonly boss?: Parameters<typeof cad.sceneBossEdit>[2]
+  readonly hole?: Parameters<typeof cad.sceneHoleEdit>[2]
+  readonly radius?: number
+  readonly diameter?: number
+  readonly taper?: number
+}
+
+/** The edit a request means, or why a free-form face edit is not one. The HTTP route and the assistant build it the same way. */
+export const featureEditOf = (r: CadFeatureRequest): CadFeatureEdit | string => {
+  if (r.nurbs !== undefined) {
+    const edit = cad.nurbsEditOf(r)
+    return typeof edit === "string" ? edit : { kind: "nurbs", id: r.id, face: r.nurbs, edit }
+  }
+  if (r.fillet !== undefined) return { kind: "fillet", id: r.id, edge: r.fillet, radius: r.radius! }
+  if (r.boss !== undefined) return { kind: "boss", id: r.id, boss: r.boss, diameter: r.diameter!, taper: r.taper ?? 0 }
+  return { kind: "hole", id: r.id, hole: r.hole!, change: r.diameter !== undefined ? { kind: "resize", diameter: r.diameter, ...(r.taper !== undefined ? { taper: r.taper } : {}) } : { kind: "fill" } }
+}
+
+export const cadAnalyze = ({ elements, options }: CadAnalyzeInput) => cad.analyzeScene(elements, options)
+
+export const cadStep = ({ elements, ids, options }: CadStepInput) => {
+  const selected = cad.selectElements(elements, ids)
+  const out = cad.sceneToStep(selected, { ...(options.faceted !== undefined ? { faceted: options.faceted } : {}), author: options.author })
+  return { ...(out.step !== undefined ? { step: out.step } : {}), parts: out.parts.map((p) => ({ id: p.id, name: p.name, exact: p.exact, faces: p.faces, valid: p.valid, ...(p.note !== undefined ? { note: p.note } : {}) })), skipped: out.skipped }
+}
+
+export const cadSetups = ({ elements, options }: CadSetupsInput) => cad.setupsForScene(elements, options)
+
+export const cadAssembly = ({ elements, options }: CadAssemblyInput) => cad.assemblyReport(elements, options)
+
+export const cadHole = ({ elements, edit }: CadHoleInput) => {
+  switch (edit.kind) {
+    case "nurbs": return cad.sceneNurbsEdit(elements, edit.id, edit.face, edit.edit)
+    case "fillet": return cad.sceneFilletEdit(elements, edit.id, edit.edge, edit.radius)
+    case "boss": return cad.sceneBossEdit(elements, edit.id, edit.boss, edit.diameter, edit.taper)
+    case "hole": return cad.sceneHoleEdit(elements, edit.id, edit.hole, edit.change)
+  }
+}
 
 /** Preparation stays in the worker too; optional stock placement never requires a second mesh build on the caller. */
 type ManufacturingInput = cam.kernel.ManufacturingJob & cam.kernel.PrepareOptions
@@ -17,10 +81,25 @@ export interface KernelJobs {
   readonly "cam-plan": { readonly input: ManufacturingInput; readonly output: ReturnType<typeof cam.kernel.planOnly> }
   /** The toolpath generator on one request (the panel's Generate button): G-code plus evidence; progress is reported before each step. */
   readonly "cam-generate": { readonly input: cam.generator.GenerateRequest; readonly output: cam.generator.GenerateOutcome }
+  /** G-code text to statistics and IR (the Parse button and pasted programs): a program of any size is read off the sidecar's main thread. */
+  readonly "cam-parse": { readonly input: { readonly gcode: string; readonly name: string }; readonly output: ReturnType<typeof cam.generator.analyseGcode> }
+  /** The stock simulation of a toolpath (the Verify button): minutes of work on a large program, so it runs in a worker too. */
+  /** The exact CAD kernel (B-rep) on a scene: analysis, STEP export, setup planning, a feature edit, assembly interference. */
+  readonly "cad-analyze": { readonly input: CadAnalyzeInput; readonly output: ReturnType<typeof cadAnalyze> }
+  readonly "cad-step": { readonly input: CadStepInput; readonly output: ReturnType<typeof cadStep> }
+  readonly "cad-setups": { readonly input: CadSetupsInput; readonly output: ReturnType<typeof cadSetups> }
+  readonly "cad-hole": { readonly input: CadHoleInput; readonly output: ReturnType<typeof cadHole> }
+  readonly "cad-assembly": { readonly input: CadAssemblyInput; readonly output: ReturnType<typeof cadAssembly> }
+  /** A drawing sheet of a parametric part: the views, dimensions, section and the title block, as SVG and as entities. */
+  readonly "cad-sheet": { readonly input: { readonly history: History; readonly options: drawing.SheetOptions }; readonly output: ReturnType<typeof drawing.generateSheet> }
+  readonly "cam-verify": { readonly input: Parameters<typeof cam.verify.verifyToolpath>[0]; readonly output: ReturnType<typeof cam.verify.verifyToolpath> }
 }
 
 /** Progress a job may report while it runs (only the CAM jobs do): a kernel stage or a generator step. */
-export type KernelJobProgress = cam.kernel.KernelProgress | cam.generator.GenerateProgress
+/** A job that has to wait for one of the workers says so, with the number of jobs ahead of it. */
+export interface QueuedProgress { readonly stage: "queued"; readonly ahead: number }
+
+export type KernelJobProgress = cam.kernel.KernelProgress | cam.generator.GenerateProgress | QueuedProgress
 
 export type KernelJobName = keyof KernelJobs
 
@@ -29,5 +108,13 @@ export const KERNEL_JOBS: { readonly [K in KernelJobName]: (input: KernelJobs[K]
   "parametric-report": (input) => parametricReport(parseHistory(input.history)),
   "cam-manufacture": ({ stockFromPartBottom, ...job }, report) => cam.kernel.runJob(job, { ...(stockFromPartBottom !== undefined ? { stockFromPartBottom } : {}), ...(report === undefined ? {} : { onProgress: report }) }),
   "cam-plan": ({ stockFromPartBottom, ...job }) => cam.kernel.planOnly(job, stockFromPartBottom === undefined ? {} : { stockFromPartBottom }),
-  "cam-generate": (request, report) => cam.generator.generateToolpath(request, report === undefined ? {} : { onProgress: report })
+  "cam-generate": (request, report) => cam.generator.generateToolpath(request, report === undefined ? {} : { onProgress: report }),
+  "cam-parse": ({ gcode, name }) => cam.generator.analyseGcode(gcode, name),
+  "cam-verify": (request) => cam.verify.verifyToolpath(request),
+  "cad-analyze": cadAnalyze,
+  "cad-step": cadStep,
+  "cad-setups": cadSetups,
+  "cad-hole": cadHole,
+  "cad-assembly": cadAssembly,
+  "cad-sheet": ({ history, options }) => drawing.generateSheet(history, options)
 }

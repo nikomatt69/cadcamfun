@@ -1,5 +1,5 @@
 import { Api, BadRequest, CamKernelArtifact, Conflict, CurrentUser, EnvBadRequest, EnvNotFound, Forbidden, InternalError, NotFound, envErr, okAuth } from "@cadcamfun/api"
-import { cam } from "@cadcamfun/core"
+import { cam, drawing as sheets } from "@cadcamfun/core"
 import { Effect, Schema } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ProjectRepo } from "../repos/project-repo.ts"
@@ -56,7 +56,11 @@ export const ToolpathsHandlers = HttpApiBuilder.group(Api, "toolpaths", Effect.f
         const stored = (found.row.data as { readonly kernelArtifact?: unknown } | null)?.kernelArtifact
         if (stored === undefined || stored === null) return yield* new BadRequest({ message: "This toolpath has no kernel program: only a program the CAM kernel generated has a setup sheet" })
         const artifact = yield* Effect.try({ try: () => Schema.decodeUnknownSync(CamKernelArtifact)(stored), catch: () => new BadRequest({ message: "The stored kernel program does not match the contract; regenerate it" }) })
-        const sheet = cam.kernel.setupSheetData(artifact, { title: found.row.name })
+        // The sheet carries the title block of the drawing the program belongs to, completed the way every screen completes it.
+        const user = yield* CurrentUser
+        const owner = found.row.drawingId === null ? undefined : yield* drawings.find(user.id, found.row.drawingId)
+        const block = sheets.completeTitleBlock((owner?.data as { titleBlock?: unknown } | null)?.titleBlock, { name: owner?.name ?? found.row.name, ...(user.name ? { author: user.name } : {}) })
+        const sheet = cam.kernel.setupSheetData(artifact, { title: found.row.name, titleBlock: block })
         if (typeof sheet === "string") return yield* new BadRequest({ message: sheet })
         return { data: sheet, html: cam.kernel.setupSheetHtml(sheet) }
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to build the setup sheet"))))

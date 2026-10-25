@@ -7,7 +7,7 @@ import {
   searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, decodeHistory, parseHistory, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
   modToolContributions, modSpecs, isolatedPaths, CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
 } from "@cadcamfun/ai"
-import { DESIGN_SPACE, cad, cam, checkModel, type History } from "@cadcamfun/core"
+import { DESIGN_SPACE, cad, cam, checkModel, drawing as sheets, type History } from "@cadcamfun/core"
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
 import { CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
 import { drawingRevision } from "./cam-program.ts"
@@ -32,7 +32,7 @@ import { ToolRepo } from "../repos/tool-repo.ts"
 import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { KvStore } from "./kv.ts"
 import { kvTaskJournal } from "./ai-task-journal.ts"
-import { KernelJobError, normalizeElement, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
+import { KernelJobError, featureEditOf, normalizeElement, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
 import { groupElements, transformElements } from "./ai-transform.ts"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
@@ -148,7 +148,7 @@ const toolHandlers = Effect.gen(function*() {
    * editor snapshot another window wrote cannot redirect it, and a bound drawing that is gone is refused, never replaced.
    * Without a binding (older clients, the compatibility path) the editor snapshot or an unambiguous project resolves it.
    */
-  const load = async (projectId: string, write = false): Promise<{ id: string; projectId: string; data: Record<string, unknown>; elements: Element[]; created: boolean; contentHash: string }> => {
+  const load = async (projectId: string, write = false): Promise<{ id: string; projectId: string; name: string; data: Record<string, unknown>; elements: Element[]; created: boolean; contentHash: string }> => {
     const actor = acting()
     let project: { id: string } | undefined = (await Effect.runPromise(projects.find(actor.id, projectId)))?.project
     let created = false
@@ -166,7 +166,7 @@ const toolHandlers = Effect.gen(function*() {
       const row = rows.find((drawing) => drawing.id === turnDrawing)
       if (!row) throw new Error("The drawing this conversation works on is not in this project any more; open a drawing and send the request again. Nothing was changed.")
       const data = row.data !== null && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {}
-      return { id: row.id, projectId: project.id, data, elements: elementsOf(data), created, contentHash: drawingContentHash(row.data) }
+      return { id: row.id, projectId: project.id, name: row.name, data, elements: elementsOf(data), created, contentHash: drawingContentHash(row.data) }
     }
     const snapshot = (await Effect.runPromise(kv.get(`ai.context.${project.id}`)))?.value as { projectId?: unknown; drawingId?: unknown } | undefined
     // Resolve only inside the accessible project: a snapshot cannot redirect a tool to another project. A bound drawing
@@ -181,7 +181,7 @@ const toolHandlers = Effect.gen(function*() {
       created = true
     }
     const data = row.data !== null && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {}
-    return { id: row.id, projectId: project.id, data, elements: elementsOf(data), created, contentHash: drawingContentHash(row.data) }
+    return { id: row.id, projectId: project.id, name: row.name, data, elements: elementsOf(data), created, contentHash: drawingContentHash(row.data) }
   }
   /**
    * Writes the document a tool read back, only if it is still the content the tool read (`loaded.contentHash`): the check and
@@ -309,8 +309,9 @@ const toolHandlers = Effect.gen(function*() {
         depth: -request.profile[request.profile.length - 1]!.z, stepdown: request.stepdown ?? 4,
         rpm: request.rpm ?? 800, feedrate: (request.feedMmRev ?? 0.2) * Math.round(request.rpm ?? 800), noseRadius: 0, latheZero: "face"
       }))
+      const { program } = await runKernelJob("cam-parse", { gcode: plan.nc, name: "Program" })
       const document = Schema.decodeUnknownSync(CamProgramDocument)({
-        format: "cadcamfun-cam", version: 1, gcode: plan.nc, program: cam.generator.analyseGcode(plan.nc).program,
+        format: "cadcamfun-cam", version: 1, gcode: plan.nc, program,
         settings, printer: decodePrinter({}),
         stock: { width: request.stock.diameter, height: request.stock.diameter, depth: request.stock.length }, drawing: loaded.data
       })
@@ -412,7 +413,7 @@ const toolHandlers = Effect.gen(function*() {
             issues.push(...dfm.issues)
           }
           const geometry = Schema.decodeUnknownSync(cam.generator.GeometrySchema)({ geometryType: "selected", selectedElements: elements, ...(loaded.data["stock"] !== undefined ? { stock: loaded.data["stock"] } : {}) })
-          const generated = issues.some((i) => i.severity === "error") ? undefined : cam.generator.generateToolpath({ settings, geometry, printer: decodePrinter(split.printer) })
+          const generated = issues.some((i) => i.severity === "error") ? undefined : await runKernelJob("cam-generate", { settings, geometry, printer: decodePrinter(split.printer) })
           if (generated?.error) issues.push({ severity: "error", code: "GENERATION", message: generated.error })
           for (const message of generated?.response.warnings ?? []) issues.push({ severity: "error", code: "GENERATION_FINDING", message })
           if (generated !== undefined && generated.response.stats.cutLength <= 0) issues.push({ severity: "error", code: "EMPTY_PATH", message: "The proposal produces no cutting moves." })
@@ -438,10 +439,10 @@ const toolHandlers = Effect.gen(function*() {
       if (artifactData === undefined) return { ok: false, error: "Only a program the CAM kernel generated has a setup sheet; this operation has none." }
       try {
         const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(artifactData)
-        const sheet = cam.kernel.setupSheetData(artifact, { title: stored.row.name })
+        const sheet = cam.kernel.setupSheetData(artifact, { title: stored.row.name, titleBlock: sheets.completeTitleBlock(loaded.data["titleBlock"], { name: loaded.name, ...(acting().name ? { author: acting().name! } : {}) }) })
         if (typeof sheet === "string") return { ok: false, error: sheet }
         return {
-          ok: true, operationId, release: sheet.release,
+          ok: true, operationId, release: sheet.release, ...(sheet.titleBlock !== undefined ? { titleBlock: sheet.titleBlock } : {}),
           tools: sheet.tools.slice(0, 40), toolsTotal: sheet.tools.length, operations: sheet.operations.slice(0, 60), operationsTotal: sheet.operations.length,
           totals: sheet.totals, setup: { ...sheet.setup, material: sheet.material, machine: sheet.machine },
           claims: sheet.claims.map((c) => ({ id: c.id, status: c.status })), htmlBytes: cam.kernel.setupSheetHtml(sheet).length
@@ -593,24 +594,49 @@ const toolHandlers = Effect.gen(function*() {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
       try {
-        return exactForModel(cad.analyzeScene(loaded.elements, { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.machining !== undefined ? { machining: input.machining } : {}) }), where(loaded))
-      } catch (error) { return { ok: false, error: `The exact analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+        return exactForModel(await runKernelJob("cad-analyze", { elements: loaded.elements, options: { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.machining !== undefined ? { machining: input.machining } : {}) } }), where(loaded))
+      } catch (error) { return kernelFailed("The exact analysis failed", error) }
+    },
+    cadTitleBlock: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId, input.action === "set")
+      // What the drawing knows about itself, to complete the fields nobody wrote: the same completion the screens and the sheet use.
+      const workpiece = loaded.elements.find((e) => e["type"] === "workpiece")
+      const context: sheets.TitleBlockContext = {
+        name: loaded.name,
+        ...(acting().name ? { author: acting().name! } : {}),
+        ...(typeof (loaded.data["stock"] as { material?: unknown } | undefined)?.material === "string" ? { material: (loaded.data["stock"] as { material: string }).material } : typeof workpiece?.["material"] === "string" ? { material: workpiece["material"] } : {})
+      }
+      const reply = (stored: unknown) => {
+        const block = sheets.completeTitleBlock(stored, context)
+        return { ok: true as const, titleBlock: { ...block }, issues: sheets.titleBlockIssues(block).map((i) => ({ key: i.key, message: i.message })), ...where(loaded) }
+      }
+      if (input.action === "inspect") return reply(loaded.data["titleBlock"])
+      const merged = { ...sheets.validTitleBlockFields(loaded.data["titleBlock"]), ...input.titleBlock }
+      const errors = sheets.titleBlockErrors(merged)
+      if (errors.length > 0) return { ok: false, error: `Invalid title block: ${errors.map((e) => e.message).join("; ")}` }
+      // The complete block is what a drawing stores, so every screen and the sheet read the same one.
+      const complete = sheets.completeTitleBlock(merged, context)
+      await save(loaded, { ...loaded.data, titleBlock: { ...complete } }, loaded.elements)
+      await audit(loaded.projectId, "ai.cad.title_block_set", { drawingId: loaded.id, fields: Object.keys(input.titleBlock) })
+      return reply(complete)
     },
     cadSetups: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
       try {
-        return setupsForModel(cad.setupsForScene(loaded.elements, {
-          ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.fixture !== undefined ? { fixture: input.fixture } : {}), ...(input.allowed !== undefined ? { allowed: input.allowed } : {})
+        return setupsForModel(await runKernelJob("cad-setups", {
+          elements: loaded.elements,
+          options: { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.fixture !== undefined ? { fixture: input.fixture } : {}), ...(input.allowed !== undefined ? { allowed: input.allowed } : {}) }
         }), where(loaded))
-      } catch (error) { return { ok: false, error: `The setup planning failed: ${error instanceof Error ? error.message : String(error)}` } }
+      } catch (error) { return kernelFailed("The setup planning failed", error) }
     },
     cadAssembly: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
       try {
-        return assemblyForModel(cad.assemblyReport(loaded.elements, input.washers !== undefined ? { washers: input.washers } : {}), where(loaded))
-      } catch (error) { return { ok: false, error: `The assembly analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+        return assemblyForModel(await runKernelJob("cad-assembly", { elements: loaded.elements, options: input.washers !== undefined ? { washers: input.washers } : {} }), where(loaded))
+      } catch (error) { return kernelFailed("The assembly analysis failed", error) }
     },
     cadShell: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
@@ -668,11 +694,12 @@ const toolHandlers = Effect.gen(function*() {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
       try {
-        const report = input.nurbs !== undefined ? cad.sceneNurbsEdit(loaded.elements, input.id, input.nurbs, cad.nurbsEditOf(input) as cad.NurbsEdit) : input.fillet !== undefined ? cad.sceneFilletEdit(loaded.elements, input.id, input.fillet, input.radius!) : input.boss !== undefined ? cad.sceneBossEdit(loaded.elements, input.id, input.boss, input.diameter!, input.taper ?? 0)
-          : cad.sceneHoleEdit(loaded.elements, input.id, input.hole!, input.diameter !== undefined ? { kind: "resize", diameter: input.diameter, ...(input.taper !== undefined ? { taper: input.taper } : {}) } : { kind: "fill" })
+        const edit = featureEditOf(input)
+        if (typeof edit === "string") return { ok: false, error: edit }
+        const report = await runKernelJob("cad-hole", { elements: loaded.elements, edit })
         return { ...report, ...where(loaded) }
       }
-      catch (error) { return { ok: false, error: `The hole edit failed: ${error instanceof Error ? error.message : String(error)}` } }
+      catch (error) { return kernelFailed("The hole edit failed", error) }
     },
     cadBuildHole: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
@@ -736,7 +763,7 @@ const toolHandlers = Effect.gen(function*() {
         const camContext = capture.context["cam"] as { selectedOperationId?: unknown; toolpaths?: unknown } | undefined
         const selected = mode === "cam" && typeof camContext?.selectedOperationId === "string" ? await Effect.runPromise(toolpaths.find(acting().id, camContext.selectedOperationId)) : undefined
         const programError = camContext?.selectedOperationId && mode === "cam" && (!selected || selected.row.drawingId !== loaded.id || !selected.row.gcode) ? "The selected CAM operation has no saved program in the active drawing." : undefined
-        const programRevision = selected?.row.gcode && selected.row.drawingId === loaded.id ? createHash("sha256").update(cam.programGeometryText(cam.generator.analyseGcode(selected.row.gcode).program)).digest("hex") : undefined
+        const programRevision = selected?.row.gcode && selected.row.drawingId === loaded.id ? createHash("sha256").update(cam.programGeometryText((await runKernelJob("cam-parse", { gcode: selected.row.gcode, name: "Program" })).program)).digest("hex") : undefined
         // The toolpaths of the program on screen: what the capture draws, in the model's words.
         const shownToolpaths = mode === "cam" && Array.isArray(camContext?.toolpaths) ? camContext.toolpaths : undefined
         return {
@@ -1002,11 +1029,11 @@ const toolHandlers = Effect.gen(function*() {
           if (tool?.maxRPM && settings.rpm > tool.maxRPM) { results.push({ name: candidate.name, ok: false, error: `Requested RPM ${settings.rpm} exceeds the cutter limit ${tool.maxRPM}.` }); continue }
           if (material && candidate.params["material"] === undefined) { results.push({ name: candidate.name, ok: false, error: "Specify params.material as the verified generator cutting family for this library material; the name alone is not a physical mapping." }); continue }
           const request = { settings, geometry }
-          const generated = cam.generator.generateToolpath(request as never)
+          const generated = await runKernelJob("cam-generate", request as never)
           if (generated.error) { results.push({ name: candidate.name, ok: false, error: generated.error }); continue }
           const built = cam.verify.verifyRequestFor(request as never, generated.response.gcode, { tool: { ...(tool?.cuttingLength ? { cuttingLength: tool.cuttingLength } : {}), ...(tool?.shankDiameter ? { shankDiameter: tool.shankDiameter } : {}) } })
           if (!built.ok) { results.push({ name: candidate.name, ok: false, error: built.error }); continue }
-          const report = cam.verify.verifyToolpath(built.request)
+          const report = await runKernelJob("cam-verify", built.request)
           const suggestions = cam.generator.suggestFor(settings, geometry)
           results.push({ name: candidate.name, ok: report.ok, settings, sources: { tool: tool ? { id: tool.id, name: tool.name, diameter: tool.diameter, type: tool.type, material: tool.material, flutes: tool.numberOfFlutes, maxRPM: tool.maxRPM, cuttingLength: tool.cuttingLength, shankDiameter: tool.shankDiameter } : null, material: material ? { id: material.id, name: material.name, properties: material.properties } : null }, suggestions, generation: generated.response.stats, verification: { ok: report.ok, stats: report.stats, issues: report.issues.slice(0, 20) } })
         } catch { results.push({ name: candidate.name, ok: false, error: "Candidate settings could not be validated or calculated." }) }
@@ -1017,8 +1044,8 @@ const toolHandlers = Effect.gen(function*() {
       await assertWrite(drawingId)
       const found = await operation(drawingId, operationId)
       if ("error" in found) return { gcode: "", stats: { error: found.error } }
-      const { response, error } = cam.generator.generateToolpath(found.request as never)
-      if (error) return { gcode: "", stats: { error } }
+      const { response, error } = await runKernelJob("cam-generate", found.request as never).catch((cause: unknown) => ({ response: undefined, error: kernelFailed("Generation failed", cause).error }))
+      if (error || response === undefined) return { gcode: "", stats: { error: error ?? "Generation failed" } }
       await assertWrite(drawingId)
       const previous = record((await Effect.runPromise(toolpaths.find(acting().id, found.id)))?.row.data)
       const { verification: _verification, ...metadata } = previous
@@ -1083,7 +1110,7 @@ const toolHandlers = Effect.gen(function*() {
         ...(options.start !== undefined ? { start: options.start } : {})
       })
       if (!built.ok) return { ok: false, error: built.error, operationId }
-      const report = cam.verify.verifyToolpath(built.request)
+      const report = await runKernelJob("cam-verify", built.request)
       const modelled = { holder: built.request.tool.holderDiameter !== undefined, shank: built.request.tool.cuttingLength !== undefined, fixtures: built.request.fixtures.length, target: built.request.target !== undefined }
       const evidence = {
         report, revision, requestRevision, programRevision: identity(program), programHash, modelled,
@@ -1422,6 +1449,10 @@ const toolHandlers = Effect.gen(function*() {
   }
   return handlers
 })
+
+/** What the assistant is told when a kernel job fails: the reason when it is the request's size or the host's state, else what failed. */
+const kernelFailed = (what: string, error: unknown): { readonly ok: false; readonly error: string } =>
+  ({ ok: false, error: error instanceof KernelJobError && error.explained ? error.message : `${what}: ${error instanceof Error ? error.message : String(error)}` })
 
 /** A kernel worker stopped by the assistant's abort or its deadline answers like a failed run, with a typed issue; other faults rethrow. */
 const cancelled = (error: unknown): { readonly status: "failed"; readonly issues: ReadonlyArray<cam.kernel.CamIssue> } => {

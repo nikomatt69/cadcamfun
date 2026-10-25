@@ -30,6 +30,7 @@ import CamSidebar, { type SidebarTab } from "../components/CamSidebar.tsx"
 import ToolpathGenerator from "../components/ToolpathGenerator.tsx"
 import VerifyPanel from "../components/VerifyPanel.tsx"
 import ToolpathVisualizer from "../components/ToolpathVisualizer.tsx"
+import TitleBlockOverlay from "../../cad/components/TitleBlockOverlay.tsx"
 import GCodeEditor from "../components/GCodeEditor.tsx"
 import MachineCycles from "../components/MachineCycles.tsx"
 import PostProcessorTab, { type PostProcessorType } from "../components/PostProcessorTab.tsx"
@@ -420,6 +421,7 @@ export default function CamPage(): JSX.Element {
             <Show when={camStore.activeTab === "toolpath"}>
               <div class="h-full rounded-xl">
                 <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} playbackDuration={duration()} onPlayingChange={camStore.setPlaying} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} defaultToolModel={toolModel()} toolIssues={toolIssues()} operationTools={operationTools()} {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} gcode={camStore.gcode} />
+                <TitleBlockOverlay mode="3d" cam />
               </div>
             </Show>
             <Show when={camStore.activeTab === "post"}>

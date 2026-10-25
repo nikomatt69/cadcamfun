@@ -81,6 +81,14 @@ export interface InterpretOptions {
   readonly toolRadius?: (d: number | undefined, tool: number | undefined) => number | undefined
   /** Read G70-G76 as lathe cycles and U / W as incremental X / Z. Default: a program with no Y words that uses G18, G96 or T0101-style tools. */
   readonly lathe?: boolean
+  /** Called with every segment (and, with `track`, its machine state) once the block that made it is complete, in program order. */
+  readonly onSegment?: (segment: GSegment, state: MotionSample | undefined) => void
+  /**
+   * With `onSegment`: keep neither the segments nor the states, so a program of millions of motions is replayed in constant memory
+   * (`segments` of the result is empty, the totals are still counted). Not for programs with lathe cycles, which look back at their
+   * own segments.
+   */
+  readonly discard?: boolean
 }
 
 /** Largest chord sagitta of a G18/G19 arc, mm (the IR's `Arc` lies in XY, so other planes are replayed as chords). */
@@ -165,6 +173,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   }
   const mCodes: string[] = []
   const tools: number[] = []
+  let drained = 0
   const states: Array<{ -readonly [K in keyof MotionSample]: MotionSample[K] }> | undefined = options.track ? [] : undefined
   let pos: P3 = options.start ?? { x: 0, y: 0, z: 0 }
   let unit = 1
@@ -216,6 +225,12 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     if (!feedRev && !threading) return feed
     const rpm = spindle === "off" ? 0 : rpmAt(pos.x)
     return rpm > 0 ? feed * rpm : feed
+  }
+  /** Hands the finished segments to `onSegment`, and lets them go when the caller asked not to keep them. */
+  const drain = (): void => {
+    if (options.onSegment === undefined) return
+    for (let n = drained; n < segments.length; n++) options.onSegment(segments[n]!, states?.[n])
+    if (options.discard === true) { segments.length = 0; if (states !== undefined) states.length = 0; drained = 0 } else drained = segments.length
   }
   const sample = (line: number, at: P3): void => {
     if (states === undefined) return
@@ -890,6 +905,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         }
       }
     }
+    drain()
 
     if (call !== undefined) {
       const target = programs.get(call.program)
@@ -949,6 +965,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
 
   run(0, mainEnd, 0)
   flushComp()
+  drain()
 
   return { segments, errors, end: pos, cutLength, rapidLength, minZ, mCodes, tools, ended, unsupported, ...(states !== undefined ? { states } : {}) }
 }

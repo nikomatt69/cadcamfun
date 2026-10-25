@@ -11,6 +11,7 @@
  *    assistant is built *above* the runner). They are added with `WorkflowRunner.register` once their
  *    service exists, so a workflow naming one is a hard error until then, never a silent no-op.
  */
+import { runKernelJobEffect } from "@cadcamfun/ai"
 import { cam } from "@cadcamfun/core"
 import { filesToSnapshot, toText, type Entity } from "@cadcamfun/vcs"
 import { Effect } from "effect"
@@ -122,7 +123,7 @@ export const camVerify: StepRegistry<StepContext>["cam/verify"] = ({ ctx, with: 
       if (request === undefined) { skipped.push(`${name}: no generation request stored`); continue }
       const built = cam.verify.verifyRequestFor(request as never, gcode, { ...(tolerance !== undefined ? { tolerance } : {}) })
       if (!built.ok) { skipped.push(`${name}: ${built.error}`); continue }
-      const report = cam.verify.verifyToolpath(built.request)
+      const report = yield* runKernelJobEffect("cam-verify", built.request).pipe(Effect.mapError((error) => new StepError({ message: `${name}: ${error.message}` })))
       verified++
       for (const issue of report.issues) {
         if (issue.severity === "error" || (severity === "warning" && issue.severity === "warning")) {
@@ -155,7 +156,7 @@ export const camGcode: StepRegistry<StepContext>["cam/gcode"] = ({ ctx, with: w 
       if (gcode === undefined) { skipped.push(`${name}: no G-code in the commit`); continue }
       if (request === undefined) { skipped.push(`${name}: no generation request stored`); continue }
       // `stamp` is deliberately dropped: it is a header comment, not part of what is being checked.
-      const outcome = cam.generator.generateToolpath({ ...request, stamp: undefined } as never)
+      const outcome = yield* runKernelJobEffect("cam-generate", { ...request, stamp: undefined } as never).pipe(Effect.mapError((error) => new StepError({ message: `${name}: ${error.message}` })))
       if (outcome.error !== undefined) { skipped.push(`${name}: ${outcome.error}`); continue }
       if (outcome.response.gcode.trim() === gcode.trim()) matched++
       else stale.push(`${name}: the committed G-code does not match its generation request`)

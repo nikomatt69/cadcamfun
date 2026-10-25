@@ -1,4 +1,5 @@
 import { Api, BadRequest, Conflict, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
+import { drawing as sheet } from "@cadcamfun/core"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
@@ -6,6 +7,13 @@ import { ProjectRepo } from "../repos/project-repo.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
+
+/** A title block that is stored must be a valid one: the screens, the sheet and the assistant all read it. */
+const titleBlockOf = (data: unknown) => {
+  const block = typeof data === "object" && data !== null && !Array.isArray(data) ? (data as Record<string, unknown>)["titleBlock"] : undefined
+  const errors = sheet.titleBlockErrors(block)
+  return errors.length === 0 ? Effect.void : Effect.fail(new BadRequest({ message: `Invalid title block: ${errors.map((e) => e.message).join("; ")}` }))
+}
 
 export const DrawingsHandlers = HttpApiBuilder.group(Api, "drawings", Effect.fn(function*(handlers) {
   const drawings = yield* DrawingRepo
@@ -33,6 +41,7 @@ export const DrawingsHandlers = HttpApiBuilder.group(Api, "drawings", Effect.fn(
     .handle("update", ({ params, payload }) =>
       Effect.gen(function*() {
         yield* load(params.id)
+        yield* titleBlockOf(payload.data)
         const { baseUpdatedAt, mergeData, ...fields } = payload
         const saved = yield* drawings.save(params.id, fields, baseUpdatedAt, mergeData === true)
         if (!saved.ok) return yield* new Conflict({ message: `The drawing was saved elsewhere since it was read (${saved.currentUpdatedAt}). Nothing was overwritten.` })
@@ -64,6 +73,7 @@ export const DrawingsHandlers = HttpApiBuilder.group(Api, "drawings", Effect.fn(
       Effect.gen(function*() {
         yield* projectAccess(params.id)
         if (!payload.name) return yield* new BadRequest({ message: "Drawing name is required" })
+        yield* titleBlockOf(payload.data)
         return yield* drawings.create(params.id, { ...payload, name: payload.name })
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create drawing"))))
 }))

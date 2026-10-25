@@ -216,6 +216,8 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
       const bad = holeInputProblem(input)
       return bad !== undefined ? { ok: false, error: bad } : handlers.cadBuildHole(projectId, input)
     } }),
+  defineWireAction({ id: "cad_edit.title_block_set", kind: "write", parameters: INPUTS["cad_edit.title_block_set"],
+    run: ({ titleBlock }, { handlers, projectId }) => handlers.cadTitleBlock === undefined ? { ok: false, error: "The title block is unavailable in this host." } : handlers.cadTitleBlock(projectId, { action: "set", titleBlock }) }),
   defineWireAction({ id: "cad_edit.offset", kind: "write", parameters: INPUTS["cad_edit.offset"],
     run: (input, { handlers, projectId }) => handlers.cadBuildOffset === undefined ? { ok: false, error: "Offset construction is unavailable in this host." } : handlers.cadBuildOffset(projectId, input) }),
   defineWireAction({ id: "cad_edit.add", kind: "write", replaces: "cad_add_elements", parameters: addElementsParameters, run: runAddElements }),

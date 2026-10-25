@@ -8,82 +8,11 @@
   "permissions": [
     "core:default",
     "core:window:allow-destroy",
-    "dialog:default",
     "log:default",
     "window-state:default",
     "os:default",
     "notification:default",
     "shell:allow-open",
-    {
-      "identifier": "fs:allow-read-file",
-      "allow": [
-        {
-          "path": "$APPDATA/**"
-        },
-        {
-          "path": "$DOCUMENT/**"
-        },
-        {
-          "path": "$DOWNLOAD/**"
-        }
-      ]
-    },
-    {
-      "identifier": "fs:allow-read-dir",
-      "allow": [
-        {
-          "path": "$APPDATA/**"
-        },
-        {
-          "path": "$DOCUMENT/**"
-        },
-        {
-          "path": "$DOWNLOAD/**"
-        }
-      ]
-    },
-    {
-      "identifier": "fs:allow-exists",
-      "allow": [
-        {
-          "path": "$APPDATA/**"
-        },
-        {
-          "path": "$DOCUMENT/**"
-        },
-        {
-          "path": "$DOWNLOAD/**"
-        }
-      ]
-    },
-    {
-      "identifier": "fs:allow-write-file",
-      "allow": [
-        {
-          "path": "$APPDATA/**"
-        },
-        {
-          "path": "$DOCUMENT/**"
-        },
-        {
-          "path": "$DOWNLOAD/**"
-        }
-      ]
-    },
-    {
-      "identifier": "fs:allow-write-text-file",
-      "allow": [
-        {
-          "path": "$APPDATA/**"
-        },
-        {
-          "path": "$DOCUMENT/**"
-        },
-        {
-          "path": "$DOWNLOAD/**"
-        }
-      ]
-    },
     "allow-get-sidecar-endpoint",
     "allow-prepare-viewport-edges",
     "allow-get-logs-dir",
@@ -93,6 +22,8 @@
     "allow-secret-delete",
     "allow-pick-file",
     "allow-save-file",
+    "allow-take-opened-files",
+    "allow-read-opened-file",
     "allow-set-recent-projects",
     "allow-check-for-updates",
     "allow-install-update",

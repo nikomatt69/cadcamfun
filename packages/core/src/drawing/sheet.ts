@@ -19,6 +19,7 @@ import { fmt, planDimensions, type CircleNote, type DimensionPlan, type HoleGrou
 import { edgesOf, projectView, viewFrame, type Edge3, type ProjectedView, type Seg2, type V3, type ViewName } from "./project.ts"
 import { detailView, sectionView, type Axis, type SectionView } from "./section.ts"
 import { drawingToSvg } from "./svg.ts"
+import { titleBlockText, type CompleteTitleBlock } from "./title-block.ts"
 import { drawBalloon, drawDatumFeature, drawFeatureFrame, drawFrameLeader, validateGdt, type GdtSpec, type Pen } from "./gdt.ts"
 
 export type SheetSize = "A4" | "A3" | "A2"
@@ -38,6 +39,8 @@ export interface SheetOptions {
   readonly sheet?: string
   readonly date?: string
   readonly author?: string
+  /** The whole title block of the document: when given, the block grows a row for what the fields above do not hold (owner, type, status, mass, units, who checked and approved). */
+  readonly titleBlock?: CompleteTitleBlock
   readonly notes?: ReadonlyArray<string>
   /** The principal views, default front, top and right. */
   readonly views?: ReadonlyArray<"front" | "top" | "right">
@@ -213,7 +216,7 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
   const iso = options.iso === false ? undefined : projectView(viewMesh, "iso", { edges, hidden: false })
 
   // The area the views may use: inside the frame, above the title block and notes.
-  const area = { x0: 20, y0: 58, x1: W - 20, y1: H - 20 }
+  const area = { x0: 20, y0: 58 + (options.titleBlock !== undefined ? TITLE_ROW : 0), x1: W - 20, y1: H - 20 }
   // The groups of holes each principal view dimensions, and the room their callouts need to the right of the view.
   const principalNames = [...principal.keys()]
   const groupsFor = (name: string): HoleGroup[] => plan.holes.filter((g) => {
@@ -462,7 +465,29 @@ const drawTitleBlock = (cv: Canvas, W: number, o: SheetOptions, projection: "fir
   const end = (cx: number): void => { cv.circle("frame", { x: cx, y: sy }, 4, "continuous", 0.25); cv.circle("frame", { x: cx, y: sy }, 2, "continuous", 0.25) }
   if (projection === "first") { side(sx - 9); end(sx + 9) } else { end(sx - 9); side(sx + 9) }
   cv.text({ x: sx, y: y0 + 1 }, projection === "first" ? "1st Angle Proj." : "3rd Angle Proj.", 2.2, { align: "center", track: false })
-  cv.text({ x: x1, y: y1 + 3 }, `Scale ${scaleText(scale)}`, 3.5, { align: "right", track: false })
+  const top = o.titleBlock === undefined ? y1 : drawTitleRow(cv, x0, x1, y1, o.titleBlock)
+  cv.text({ x: x1, y: top + 3 }, `Scale ${scaleText(scale)}`, 3.5, { align: "right", track: false })
+}
+
+/** Height of the row the full title block adds above the standard one, mm. */
+const TITLE_ROW = 10
+
+/** The row above the block: owner, document type, status, mass, units, checked and approved by. Returns the new top of the block. */
+const drawTitleRow = (cv: Canvas, x0: number, x1: number, y1: number, b: CompleteTitleBlock): number => {
+  const top = y1 + TITLE_ROW
+  cv.rect("frame", x0, y1, x1, top, 0.5)
+  const cells: ReadonlyArray<readonly [string, string, number]> = [
+    ["Owner", titleBlockText(b, "owner"), 52], ["Type", titleBlockText(b, "documentType"), 28], ["Status", titleBlockText(b, "status"), 24],
+    ["Mass", titleBlockText(b, "mass"), 22], ["Units", titleBlockText(b, "units"), 14], ["Checked / approved", [b.checkedBy, b.approvedBy].filter((v) => v !== "").join(" / "), 40]
+  ]
+  let x = x0
+  for (const [label, value, width] of cells) {
+    if (x > x0) cv.line("frame", { x, y: y1 }, { x, y: top }, "continuous", 0.18)
+    cv.text({ x: x + 1.2, y: top - 3.2 }, label, 1.8, { track: false })
+    cv.text({ x: x + 1.2, y: y1 + 1.8 }, value, 2.8, { track: false })
+    x += width
+  }
+  return top
 }
 
 const drawNotes = (cv: Canvas, notes: ReadonlyArray<string> | undefined): void => {

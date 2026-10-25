@@ -178,6 +178,12 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
       handlers.cadExact === undefined ? { ok: false, error: "Exact analysis is unavailable in this host." } : handlers.cadExact(projectId, input)
   }),
   defineWireAction({
+    id: "cad.title_block", kind: "read",
+    parameters: INPUTS["cad.title_block"],
+    run: (_input, { handlers, projectId }) =>
+      handlers.cadTitleBlock === undefined ? { ok: false, error: "The title block is unavailable in this host." } : handlers.cadTitleBlock(projectId, { action: "inspect" })
+  }),
+  defineWireAction({
     id: "cad.assembly", kind: "read",
     parameters: INPUTS["cad.assembly"],
     run: (input, { handlers, projectId }) =>

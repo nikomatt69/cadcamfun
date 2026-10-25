@@ -96,3 +96,9 @@ test("generate announces its steps under the caller's run id and answers like be
 test("a generator step becomes a frame with its place among the steps", () => {
   expect(camProgressFrame("p", "r", { stage: "arcs", step: { index: 1, count: 5 } }, "t")).toEqual({ type: "cam.progress", projectId: "p", runId: "r", phase: "running", stage: "arcs", index: 1, count: 5, at: "t" })
 })
+
+test("a job waiting for a worker is a frame of its own, with the number of jobs ahead of it", () => {
+  const frame = camProgressFrame("p1", "run-1", { stage: "queued", ahead: 2 }, "2026-10-25T12:00:00.000Z")
+  expect(frame).toEqual({ type: "cam.progress", projectId: "p1", runId: "run-1", phase: "running", stage: "queued", ahead: 2, at: "2026-10-25T12:00:00.000Z" })
+  expect(camProgressFrame("p1", "run-1", { stage: "post" }, "t")).not.toHaveProperty("ahead")
+})

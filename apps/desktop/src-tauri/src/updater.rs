@@ -462,14 +462,21 @@ mod tests {
 
     #[test]
     fn a_critical_prompt_cannot_be_dismissed() {
-        let status = status_for("6.1.0".into(), "6.0.0".into(), "[critical] fix".into(), None);
+        let status = status_for(
+            "6.1.0".into(),
+            "6.0.0".into(),
+            "[critical] fix".into(),
+            None,
+        );
         assert!(!status.dismissible());
         assert!(!UpdateEvent::new(status).dismissible);
     }
 
     #[test]
     fn a_normal_prompt_can_be_dismissed() {
-        assert!(status_for("6.1.0".into(), "6.0.0".into(), "minor fixes".into(), None).dismissible());
+        assert!(
+            status_for("6.1.0".into(), "6.0.0".into(), "minor fixes".into(), None).dismissible()
+        );
     }
 
     #[test]
@@ -492,7 +499,12 @@ mod tests {
 
     #[test]
     fn the_critical_marker_is_the_only_source_of_criticality() {
-        let status = status_for("6.1.0".into(), "6.0.0".into(), "no marker here".into(), None);
+        let status = status_for(
+            "6.1.0".into(),
+            "6.0.0".into(),
+            "no marker here".into(),
+            None,
+        );
         assert!(matches!(
             status,
             UpdateStatus::Available {

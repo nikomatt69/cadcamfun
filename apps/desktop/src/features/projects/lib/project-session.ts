@@ -107,12 +107,14 @@ const createProjectSession = (app: AppState): ProjectSession => {
   let librarySynced = useLocalComponentsLibraryStore.getState().components.length
   let lastComponents = 0
 
+  /** What the title block is made of: what was written, and the name, author and company it is completed from. */
+  const titleBlockInputs = (): ReadonlyArray<unknown> => { const doc = useDocumentStore.getState(); return [doc.titleBlock, doc.name, doc.author, doc.organization] }
   /** The stored content plus the library components a save would add: a new component is an unsaved change too. */
   const revisionOf = (payload: Record<string, unknown>): string => `${payloadRevision(payload)}|${useLocalComponentsLibraryStore.getState().components.length}`
   const documentRevision = cachedRevision(
     () => {
       const settings = app.settings.settings(), cad = useCADStore.getState()
-      return [useElementsStore.getState().elements, useLayerStore.getState().layers, settings.units, settings.tolerance, settings.decimals, cad.workpiece, cad.originOffset, cad.selectedMachine, useDocumentStore.getState().drawingId, useLocalComponentsLibraryStore.getState().components]
+      return [useElementsStore.getState().elements, useLayerStore.getState().layers, settings.units, settings.tolerance, settings.decimals, cad.workpiece, cad.originOffset, cad.selectedMachine, useDocumentStore.getState().drawingId, ...titleBlockInputs(), useLocalComponentsLibraryStore.getState().components]
     },
     () => revisionOf(drawingPayload(app))
   )
@@ -261,6 +263,7 @@ const createProjectSession = (app: AppState): ProjectSession => {
     }
     stops.push(() => { if (draftTimer !== undefined) clearTimeout(draftTimer) })
     stops.push(useElementsStore.subscribe((state) => state.elements, touchDocument))
+    stops.push(useDocumentStore.subscribe((state) => state.titleBlock, () => { void document.touch() }))
     stops.push(useLayerStore.subscribe((state) => state.layers, touchDocument))
     stops.push(useCADStore.subscribe((state) => [state.workpiece, state.originOffset, state.selectedMachine] as const, () => { void document.touch(); void program.touch() }, { equalityFn: sameRefs }))
     stops.push(useLocalComponentsLibraryStore.subscribe((state) => state.components, () => { void document.touch() }))

@@ -66,7 +66,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // Raised to 31 700 when cad hole (resize or fill one recognised hole, preview and store) joined cad and cad_edit.
     // Raised to 31 800 when cam setup_sheet (the shop sheet of a saved kernel program) joined the cam tool.
     // Raised to 32 000 when the swarf operation (a flank cut of a cone or cylinder wall) joined the cam tool, to 32 300 with the post definition input.
-    expect(total).toBeLessThan(32_300)
+    // Raised to 32 500 when cad title_block / title_block_set (the drawing's title block, read and set) joined cad and cad_edit.
+    expect(total).toBeLessThan(32_500)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

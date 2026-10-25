@@ -1,9 +1,11 @@
 import { Api, BadRequest, CurrentUser, Forbidden, InternalError, NotFound } from "@cadcamfun/api"
 import { cad } from "@cadcamfun/core"
+import { featureEditOf } from "@cadcamfun/ai"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { elementsOf } from "../services/ai-elements.ts"
+import { kernelRun } from "../services/kernel-errors.ts"
 
 type Element = Record<string, unknown>
 
@@ -36,28 +38,27 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
     .handle("analyze", ({ payload }) =>
       Effect.gen(function*() {
         const elements = yield* sceneOf(payload)
-        return yield* guarded("Failed to analyse the exact model", () => cad.analyzeScene(elements, {
-          ...(payload.ids !== undefined ? { ids: payload.ids } : {}), ...(payload.machining !== undefined ? { machining: payload.machining } : {})
-        }))
+        return yield* kernelRun("cad-analyze", {
+          elements, options: { ...(payload.ids !== undefined ? { ids: payload.ids } : {}), ...(payload.machining !== undefined ? { machining: payload.machining } : {}) }
+        }, "Failed to analyse the exact model")
       }))
     .handle("step", ({ payload }) =>
       Effect.gen(function*() {
         const elements = yield* sceneOf(payload)
-        const selected = cad.selectElements(elements, payload.ids)
-        return yield* guarded("Failed to write the STEP file", () => {
-          const out = cad.sceneToStep(selected, {
-            ...(payload.faceted !== undefined ? { faceted: payload.faceted } : {}), ...(payload.author !== undefined ? { author: payload.author } : { author: "CAD/CAM FUN" })
-          })
-          return { ...(out.step !== undefined ? { step: out.step } : {}), parts: out.parts.map((p) => ({ id: p.id, name: p.name, exact: p.exact, faces: p.faces, valid: p.valid, ...(p.note !== undefined ? { note: p.note } : {}) })), skipped: out.skipped }
-        })
+        return yield* kernelRun("cad-step", {
+          elements, ...(payload.ids !== undefined ? { ids: payload.ids } : {}),
+          options: { ...(payload.faceted !== undefined ? { faceted: payload.faceted } : {}), author: payload.author ?? "CAD/CAM FUN" }
+        }, "Failed to write the STEP file")
       }))
     .handle("setups", ({ payload }) =>
       Effect.gen(function*() {
         const elements = yield* sceneOf(payload)
-        return yield* guarded("Failed to plan the setups", () => cad.setupsForScene(elements, {
-          ...(payload.ids !== undefined ? { ids: payload.ids } : {}), ...(payload.fixture !== undefined ? { fixture: payload.fixture } : {}),
-          ...(payload.allowed !== undefined ? { allowed: payload.allowed } : {})
-        }))
+        return yield* kernelRun("cad-setups", {
+          elements, options: {
+            ...(payload.ids !== undefined ? { ids: payload.ids } : {}), ...(payload.fixture !== undefined ? { fixture: payload.fixture } : {}),
+            ...(payload.allowed !== undefined ? { allowed: payload.allowed } : {})
+          }
+        }, "Failed to plan the setups")
       }))
     .handle("hole", ({ payload }) =>
       Effect.gen(function*() {
@@ -71,13 +72,13 @@ export const CadExactHandlers = HttpApiBuilder.group(Api, "cadExact", Effect.fn(
         if (payload.boss !== undefined && (payload.diameter === undefined || payload.fill === true)) return yield* new BadRequest({ message: "A boss takes a diameter (fill applies to holes only)" })
         if (payload.hole !== undefined && (payload.diameter !== undefined) === (payload.fill === true)) return yield* new BadRequest({ message: "Give exactly one of diameter (resize the drill) or fill: true" })
         const elements = yield* sceneOf(payload)
-        return yield* guarded("Failed to edit the feature", () => payload.nurbs !== undefined ? cad.sceneNurbsEdit(elements, payload.id, payload.nurbs, nurbsEdit as cad.NurbsEdit) : payload.fillet !== undefined ? cad.sceneFilletEdit(elements, payload.id, payload.fillet, payload.radius!) : payload.boss !== undefined
-          ? cad.sceneBossEdit(elements, payload.id, payload.boss, payload.diameter!, payload.taper ?? 0)
-          : cad.sceneHoleEdit(elements, payload.id, payload.hole!, payload.diameter !== undefined ? { kind: "resize", diameter: payload.diameter, ...(payload.taper !== undefined ? { taper: payload.taper } : {}) } : { kind: "fill" }))
+        const edit = featureEditOf(payload)
+        if (typeof edit === "string") return yield* new BadRequest({ message: edit })
+        return yield* kernelRun("cad-hole", { elements, edit }, "Failed to edit the feature")
       }))
     .handle("assembly", ({ payload }) =>
       Effect.gen(function*() {
         const elements = yield* sceneOf(payload)
-        return yield* guarded("Failed to analyse the assembly", () => cad.assemblyReport(elements, payload.washers !== undefined ? { washers: payload.washers } : {}))
+        return yield* kernelRun("cad-assembly", { elements, options: payload.washers !== undefined ? { washers: payload.washers } : {} }, "Failed to analyse the assembly")
       }))
 }))

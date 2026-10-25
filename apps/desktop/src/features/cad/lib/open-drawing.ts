@@ -5,7 +5,7 @@ import { useDocumentStore } from "../store/documentStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
-import { restoreLayers, restoreSetup } from "./document-setup.ts"
+import { restoreLayers, restoreSetup, restoreTitleBlock } from "./document-setup.ts"
 import { noteStoredRevision } from "./stored-revision.ts"
 
 /** A stored drawing as `drawings.get` returns it. */
@@ -23,10 +23,11 @@ export interface StoredDrawing {
  * a restore point, so both leave the editor in exactly the same state.
  */
 export function applyStoredDrawing(app: AppState, row: StoredDrawing): void {
-  const stored = row.data as { elements?: unknown; layers?: unknown; settings?: unknown; setup?: unknown } | null
+  const stored = row.data as { elements?: unknown; layers?: unknown; settings?: unknown; setup?: unknown; titleBlock?: unknown } | null
   restoreDocumentSettings(app, stored?.settings)
   restoreLayers(stored?.layers)
   restoreSetup(stored?.setup)
+  restoreTitleBlock(stored?.titleBlock)
   const layers = useLayerStore.getState()
   const known = new Set(layers.layers.map((layer) => layer.id))
   const loaded = (Array.isArray(stored?.elements) ? stored.elements : []).map((element: Record<string, unknown>) =>

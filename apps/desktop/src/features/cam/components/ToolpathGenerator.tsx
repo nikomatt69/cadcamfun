@@ -65,6 +65,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
   const progressLabel = (): string => {
     const p = camStore.kernelProgress
     const stage = p?.runId === runId ? STEPS.find((step) => step === p?.stage) : undefined
+    if (p !== undefined && p.runId === runId && p.stage === "queued") return `${t("cam.generator.progress.queued", { ahead: p.ahead ?? 0 })} · ${elapsed()} s`
     const step = p !== undefined && stage !== undefined && p.index !== undefined && p.count !== undefined
       ? t("cam.generator.progress.step", { index: p.index + 1, count: p.count, label: t(`cam.generator.progress.${stage}`) })
       : t("cam.generator.progress.start")

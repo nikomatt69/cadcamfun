@@ -9,6 +9,7 @@
 import { PARAMETRIC_ACTION_INPUTS as INPUTS } from "@cadcamfun/api"
 import { analyzeManufacturability, brep, buildRecipe, drawing, historyToStep, keywayFor, METRIC_THREADS, rebuild, requireThread, type History } from "@cadcamfun/core"
 import { EXACT_ACTION_BUDGET_MS, decodeHistory, exactReport, parametricReport } from "../parametric.ts"
+import { KernelJobError, runKernelJob } from "../kernel-job.ts"
 import type { ActionContext } from "./action.ts"
 
 /** The decoded input of a parametric action; the schemas are declared once in `@cadcamfun/api` (`PARAMETRIC_ACTION_INPUTS`). */
@@ -108,10 +109,14 @@ export const runParametricDrawing = async (input: Input<"cad.drawing">, context:
     revision = inspected["revision"]; projectId = inspected["projectId"]; drawingId = inspected["drawingId"]
   }
   try {
-    const sheet = drawing.generateSheet(history!, input.options ?? {})
+    // The sheet carries the title block the drawing is stored with (what the views show), over which the call's own options win.
+    const stored = asRecord(await context.handlers.cadTitleBlock?.(context.projectId, { action: "inspect" }))
+    const block = stored?.["ok"] === true && asRecord(stored["titleBlock"]) !== undefined ? drawing.sheetOptionsOfTitleBlock(stored["titleBlock"] as drawing.CompleteTitleBlock) : {}
+    // In a worker like the other kernel work: a sheet of a large part never stops the sidecar's other requests.
+    const sheet = await runKernelJob("cad-sheet", { history: history!, options: { ...block, ...(input.options ?? {}) } })
     return { ok: true, mutated: false, ...sheet, elementId: input.elementId, revision, projectId, drawingId }
   } catch (cause) {
-    return { ok: false, error: cause instanceof Error ? cause.message : "The drawing could not be generated." }
+    return { ok: false, error: cause instanceof KernelJobError && cause.explained ? cause.message : cause instanceof Error ? cause.message : "The drawing could not be generated." }
   }
 }
 export const runParametricCreate = (input: Input<"cad_edit.parametric_create">, context: ActionContext) =>

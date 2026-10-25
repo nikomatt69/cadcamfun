@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto"
 import { BadRequest, CamKernelResult, CamProgramDocument, combineCamOperations, type CamKernelRequest } from "@cadcamfun/api"
-import { KernelJobError, runKernelJob } from "@cadcamfun/ai"
+import { runKernelJobEffect } from "@cadcamfun/ai"
 import { cam } from "@cadcamfun/core"
 import { Effect, Schema } from "effect"
 import { elementsOf } from "./ai-elements.ts"
+import type { CamRunProgress } from "./cam-progress.ts"
 
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
 
@@ -14,16 +15,21 @@ export const drawingRevision = (loaded: { readonly id: string; readonly elements
   return createHash("sha256").update(JSON.stringify(canonical({ drawingId: loaded.id, elements: loaded.elements, stock: loaded.data["stock"] ?? null }))).digest("hex")
 }
 
+/** The program (IR) of a G-code text, read in a worker: a saved program of any size never stops the sidecar's other requests. */
+const programOf = (gcode: string, unreadable: string) =>
+  runKernelJobEffect("cam-parse", { gcode, name: "Program" }).pipe(
+    Effect.map((analysis) => analysis.program),
+    Effect.mapError((error) => new BadRequest({ message: error.explained ? error.message : unreadable }))
+  )
+
 /** The same request adapter serves preview generation and persistence revalidation. */
-export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payload: CamKernelRequest, report?: (progress: cam.kernel.KernelProgress | cam.generator.GenerateProgress | "done" | "cancelled") => void) {
+export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payload: CamKernelRequest, report?: (progress: CamRunProgress) => void) {
   const job = cam.kernel.jobOfSnapshot(payload)
   if (job.status === "failed") return yield* new BadRequest({ message: job.issues.map((i) => i.message).join("; ") })
   // In a scoped worker: the event loop keeps serving while the kernel works, a dropped request interrupts the fiber (its signal
   // terminates the worker) and a job that runs past its deadline is stopped.
-  const result = yield* Effect.tryPromise({
-    try: (signal) => runKernelJob("cam-manufacture", job.value, { signal, ...(report !== undefined ? { onProgress: report } : {}) }),
-    catch: (error) => new BadRequest({ message: error instanceof KernelJobError && error.explained ? error.message : "The CAM kernel request could not be evaluated" })
-  }).pipe(
+  const result = yield* runKernelJobEffect("cam-manufacture", job.value, report !== undefined ? { onProgress: report } : {}).pipe(
+    Effect.mapError((error) => new BadRequest({ message: error.explained ? error.message : "The CAM kernel request could not be evaluated" })),
     // A dropped request interrupts the fiber: say so on the stream, since the code after the run never executes.
     Effect.onInterrupt(() => Effect.sync(() => report?.("cancelled")))
   )
@@ -59,7 +65,7 @@ export const prepareCamProgramData = Effect.fn("cam.prepareProgramData")(functio
     if (input.previous === undefined || old["gcode"] !== snapshot.gcode) return yield* new BadRequest({ message: "Toolpath document and G-code must contain the same program" })
     // Existing editor/API updates may send only new NC and the unchanged old document.
     const code = input.gcode ?? ""
-    const program = yield* Effect.try({ try: () => cam.generator.analyseGcode(code).program, catch: () => new BadRequest({ message: "The saved G-code could not be parsed" }) })
+    const program = yield* programOf(code, "The saved G-code could not be parsed")
     delete data["kernelArtifact"]; delete data["kernelRequest"]; delete data["operations"]
     snapshot = yield* Schema.decodeUnknownEffect(CamProgramDocument)({ ...data, gcode: code, program }).pipe(Effect.mapError(() => new BadRequest({ message: "Invalid updated toolpath document" })))
   }
@@ -67,10 +73,8 @@ export const prepareCamProgramData = Effect.fn("cam.prepareProgramData")(functio
     if (new Set(snapshot.operations.map((operation) => operation.id)).size !== snapshot.operations.length || combineCamOperations(snapshot.operations).gcode !== snapshot.gcode) {
       return yield* new BadRequest({ message: "Saved operations must have unique IDs and compose the stored G-code in order" })
     }
-    const operations = yield* Effect.try({
-      try: () => snapshot.operations!.map((operation) => ({ ...operation, program: cam.generator.analyseGcode(operation.gcode).program })),
-      catch: () => new BadRequest({ message: "The saved operation G-code could not be parsed" })
-    })
+    const operations = yield* Effect.forEach(snapshot.operations, (operation) =>
+      programOf(operation.gcode, "The saved operation G-code could not be parsed").pipe(Effect.map((program) => ({ ...operation, program }))))
     snapshot = { ...snapshot, operations, program: combineCamOperations(operations).program }
   }
   delete data["sourceRevision"]
@@ -105,7 +109,7 @@ export const prepareCamProgramData = Effect.fn("cam.prepareProgramData")(functio
   const output = { ...data, ...Schema.encodeSync(CamProgramDocument)(snapshot) }
   if (data["kernelArtifact"] === undefined) {
     delete output["kernelArtifact"]; delete output["kernelRequest"]
-    output["program"] = snapshot.operations?.length ? snapshot.program : yield* Effect.try({ try: () => cam.generator.analyseGcode(snapshot.gcode).program, catch: () => new BadRequest({ message: "The saved G-code could not be parsed" }) })
+    output["program"] = snapshot.operations?.length ? snapshot.program : yield* programOf(snapshot.gcode, "The saved G-code could not be parsed")
   }
   return output
 })

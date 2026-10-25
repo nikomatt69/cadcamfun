@@ -6,13 +6,16 @@ export type { ParametricHandlerInput } from "../actions/parametric.ts"
 import type { WebSearchInput } from "../web-search.ts"
 import type { VisionCapture } from "../vision.ts"
 import { Context } from "effect"
-import type { cad, cam } from "@cadcamfun/core"
+import type { cad, cam, drawing } from "@cadcamfun/core"
 import type { MachineProfile } from "../gcode-analysis.ts"
 import type { ActionConflict, ActionCommitted, ActionDenied, ActionInvalidInput, ActionInterrupted, CadExchangeInput } from "@cadcamfun/api"
 import type { CamManufactureOperationInput, CamTurningOperationInput } from "@cadcamfun/api"
 
 /** What the stock handlers answer with: the raw piece as it is stored, or the one just configured. */
 export type CamStockInput = { action: "inspect" } | { action: "set"; stock: typeof cam.generator.StockSchema.Type }
+
+/** What the title block handler is asked: the drawing's block as it reads now, or the fields to set (the others keep their value). */
+export type CadTitleBlockInput = { action: "inspect" } | { action: "set"; titleBlock: drawing.TitleBlock }
 
 /** What `cam_verify_toolpath` adds to the operation's own settings and stock; validated before the handler runs. */
 export interface VerifyToolOptions {
@@ -47,6 +50,8 @@ export interface ToolHandlersShape {
   /** The exact B-rep kernel over the open drawing: per solid validity, mass properties, holes and how the CAM planner will machine it. */
   cadExact?(projectId: string, input: CadExactInput): Promise<unknown>
   cadSetups?(projectId: string, input: CadSetupsInput): Promise<unknown>
+  /** The title block of the open drawing (ISO 7200 fields), completed from what the drawing knows; or the fields to set in it. */
+  cadTitleBlock?(projectId: string, input: CadTitleBlockInput): Promise<unknown>
   /** Exact interference, bill of materials, joints and the fasteners still missing of the open drawing. */
   cadAssembly?(projectId: string, input: CadAssemblyInput): Promise<unknown>
   /** What hollowing one solid would give (exact shell, volumes, open faces by name); nothing in the drawing changes. */

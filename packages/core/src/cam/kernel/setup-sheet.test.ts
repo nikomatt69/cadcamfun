@@ -1,6 +1,7 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { elementBrep } from "../../cad/scene-step.ts"
 import type { History } from "../../cad/history.ts"
+import { completeTitleBlock } from "../../drawing/title-block.ts"
 import { runJob, setupSheetData, setupSheetHtml, type CamArtifact, type ManufacturingJob } from "./index.ts"
 
 setDefaultTimeout(100_000)
@@ -81,5 +82,21 @@ describe("the setup sheet", () => {
 
   test("a printer artifact has no setup sheet", () => {
     expect(setupSheetData({ ...a, print: {} as never })).toMatch(/print report/)
+  })
+  test("the title block of the drawing is printed at the bottom right, as on the drawing, escaped", () => {
+    const block = completeTitleBlock({ title: "Gearbox <cover>", number: "GB-114", revision: "C", status: "released", owner: "ACME & Sons", checkedBy: "L. Verdi", approvedBy: "M. Bianchi", program: "O1001", machine: "VMC 3-axis", mass: 1.25 }, { today: "2026-10-25", author: "A. Rossi", material: "Al 6061" })
+    const withBlock = setupSheetData(a, { title: "Plate", titleBlock: block })
+    if (typeof withBlock === "string") throw new Error(withBlock)
+    expect(withBlock.titleBlock).toEqual(block)
+    const html = setupSheetHtml(withBlock)
+    const table = html.slice(html.indexOf('<table class="titleblock"'))
+    expect(table.endsWith("</table></body></html>")).toBe(true)
+    for (const text of ["Gearbox &lt;cover&gt;", "GB-114", "ACME &amp; Sons", "A. Rossi", "L. Verdi", "M. Bianchi", "released", "2026-10-25", "1.250 kg", "O1001", "VMC 3-axis", "ISO 2768-1 m"]) expect(table).toContain(text)
+    expect(html).not.toContain("<cover>")
+    // Without the block the sheet is what it was; a block with no CAM fields has no manufacturing row.
+    expect(setupSheetHtml(data)).not.toContain("titleblock\"")
+    const plain = setupSheetData(a, { titleBlock: completeTitleBlock({}, { name: "Plate" }) })
+    if (typeof plain === "string") throw new Error(plain)
+    expect(setupSheetHtml(plain)).not.toContain("<span class=\"l\">Machine</span>")
   })
 })

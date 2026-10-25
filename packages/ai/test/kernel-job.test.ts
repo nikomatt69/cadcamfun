@@ -1,10 +1,12 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, clearKernelJobCache, kernelJobStats, kernelWorkerUrl, runKernelJob, runKernelJobInline } from "../src/kernel-job.ts"
+import { KERNEL_HISTORY_SIZE, KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, clearKernelJobCache, kernelJobHistory, kernelJobStats, kernelWorkerUrl, reopenKernelJobs, runKernelJob, runKernelJobInline, shutdownKernelJobs } from "../src/kernel-job.ts"
 import type { AcceptanceCheck } from "../src/acceptance.ts"
 import { cam } from "@cadcamfun/core"
 import { Schema } from "effect"
 
 setDefaultTimeout(120_000)
+
+const testWorker = new URL("./test-worker.ts", import.meta.url).href
 
 const plate = {
   parameters: { width: 40, height: 25, thick: 6 },
@@ -199,6 +201,20 @@ describe("the job queue, the shared runs and the result cache", () => {
     expect(kernelJobStats().waiting).toBe(0)
   })
 
+  test("a job that has to wait says so, with the jobs ahead of it, before its own progress", async () => {
+    clearKernelJobCache()
+    const running = Array.from({ length: KERNEL_WORKERS }, (_, i) => runKernelJob("cam-plan", distinct(200 + i)))
+    const stages: Array<{ readonly stage: string; readonly ahead?: number }> = []
+    const waited = runKernelJob("cam-manufacture", distinct(300), { onProgress: (p) => stages.push(p as never) })
+    expect(stages[0]).toEqual({ stage: "queued", ahead: 0 })
+    await Promise.all([...running, waited])
+    expect(stages.slice(1).map((p) => p.stage)).toContain("operations")
+    // A job that finds a free worker says nothing about waiting.
+    const free: string[] = []
+    await runKernelJob("cam-manufacture", distinct(301), { onProgress: (p) => free.push(p.stage) })
+    expect(free).not.toContain("queued")
+  })
+
   test("a job that fails is not cached", async () => {
     clearKernelJobCache()
     const bad = { ...base, part: { kind: "elements" as const, elements: "nope" as never } }
@@ -209,7 +225,7 @@ describe("the job queue, the shared runs and the result cache", () => {
   test("a worker the system kills is reported at once with its exit code, not at the deadline", async () => {
     const before = kernelJobStats().counters
     const started = performance.now()
-    const error = await runKernelJob("parametric-report", { history: plate }, { workerUrl: new URL("./dying-worker.ts", import.meta.url).href, deadlineMs: 60_000 }).catch((cause: unknown) => cause)
+    const error = await runKernelJob("parametric-report", { history: plate, mode: "exit" } as never, { workerUrl: testWorker, deadlineMs: 60_000 }).catch((cause: unknown) => cause)
     expect(performance.now() - started).toBeLessThan(5_000)
     expect(error).toBeInstanceOf(KernelJobError)
     expect((error as KernelJobError).reason).toBe("crashed")
@@ -226,5 +242,55 @@ describe("the job queue, the shared runs and the result cache", () => {
     expect(c.cacheHits).toBeGreaterThanOrEqual(1)
     expect(c.aborted).toBeGreaterThanOrEqual(1)
     expect(kernelJobStats().rssBytes).toBeGreaterThan(0)
+  })
+})
+
+describe("the job history, the worker id and the shutdown", () => {
+  const base = {
+    schemaVersion: 1 as const, id: "h", name: "Plate", material: "6061", part: { kind: "elements" as const, elements: [{ id: "plate", type: "cube", width: 30, height: 20, depth: 5 }] },
+    machine: cam.kernel.findMachine("vmc-standard")!, quality: { resolution: 0.4 }
+  }
+
+  test("every job leaves a line with how it ended, how long it waited and ran, and how large its program was", async () => {
+    clearKernelJobCache()
+    await runKernelJob("cam-manufacture", { ...base, id: "history-1" })
+    await runKernelJob("cam-manufacture", { ...base, id: "history-1" })
+    const [ran, cached] = kernelJobHistory().slice(-2)
+    expect(ran).toMatchObject({ job: "cam-manufacture", outcome: "completed" })
+    expect(ran!.ranMs).toBeGreaterThan(0)
+    expect(ran!.bytes).toBeGreaterThan(1000)
+    expect(ran!.moves).toBeGreaterThan(10)
+    expect(cached).toMatchObject({ job: "cam-manufacture", outcome: "cached", waitedMs: 0, ranMs: 0, bytes: ran!.bytes, moves: ran!.moves })
+    expect(Object.keys(ran!).sort()).toEqual(["at", "bytes", "id", "job", "moves", "outcome", "ranMs", "waitedMs"])
+    const killed = await runKernelJob("parametric-report", { history: plate, mode: "exit" } as never, { workerUrl: testWorker }).catch((e: KernelJobError) => e.reason)
+    expect(killed).toBe("crashed")
+    expect(kernelJobHistory().at(-1)).toMatchObject({ job: "parametric-report", outcome: "crashed", bytes: 0 })
+  })
+
+  test("the history keeps the last jobs only", async () => {
+    for (let i = 0; i < KERNEL_HISTORY_SIZE + 5; i++) await runKernelJob("cam-plan", { ...base, id: `many-${i % 3}` })
+    expect(kernelJobHistory()).toHaveLength(KERNEL_HISTORY_SIZE)
+  })
+
+  test("the worker is told which job it runs, and a terminated worker is not counted as a leak", async () => {
+    const seen = await runKernelJob("parametric-report", { history: plate }, { workerUrl: testWorker }) as unknown as { id: string; name: string }
+    expect(seen.name).toBe("parametric-report")
+    expect(seen.id).toMatch(/^k\d+$/)
+    expect(kernelJobHistory().at(-1)!.id).toBe(seen.id)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(kernelJobStats().counters.workerLeaks).toBe(0)
+  })
+
+  test("a shutdown stops the job that runs and refuses the next, until the host reopens", async () => {
+    clearKernelJobCache()
+    const running = runKernelJob("parametric-report", { history: heavy })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    shutdownKernelJobs()
+    await expect(running).rejects.toMatchObject({ reason: "cancelled" })
+    await expect(runKernelJob("cam-plan", { ...base, id: "after" })).rejects.toMatchObject({ reason: "cancelled" })
+    expect(kernelJobStats().closing).toBe(true)
+    reopenKernelJobs()
+    expect((await runKernelJob("cam-plan", { ...base, id: "after" })).status).toBe("ok")
+    expect(kernelJobStats().running).toBe(0)
   })
 })

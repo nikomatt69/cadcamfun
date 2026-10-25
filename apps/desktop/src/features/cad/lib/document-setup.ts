@@ -3,7 +3,9 @@
  * origin, machine) the CAM workspace reads. They travel with the stored drawing, so a project reopened tomorrow draws on the
  * same layers and machines the same stock; both used to live only in the memory of the editor that happened to be open.
  */
+import { drawing } from "@cadcamfun/core"
 import { useCADStore } from "../store/cadStore.ts"
+import { useDocumentStore } from "../store/documentStore.ts"
 import { useLayerStore, type Layer } from "../store/layerStore.ts"
 
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value)
@@ -46,3 +48,23 @@ export const restoreLayers = (stored: unknown): void => {
   const { activeLayer } = useLayerStore.getState()
   useLayerStore.setState({ layers, activeLayer: layers.some((layer) => layer.id === activeLayer) ? activeLayer : layers[0]!.id })
 }
+
+/** What the drawing already knows about itself, to fill the title block fields nobody has written. */
+export const titleBlockContext = (): drawing.TitleBlockContext => {
+  const { name, author, organization } = useDocumentStore.getState()
+  const { workpiece, selectedMachine } = useCADStore.getState()
+  return {
+    ...(name !== null ? { name } : {}), ...(author !== "" ? { author } : {}), ...(organization !== "" ? { organization } : {}),
+    ...(workpiece.material !== "" ? { material: workpiece.material } : {}),
+    ...(selectedMachine !== null && typeof selectedMachine.name === "string" ? { machine: selectedMachine.name } : {})
+  }
+}
+
+/** The title block of the open drawing as every screen shows it: what was written (or the given block), over what the drawing knows. */
+export const currentTitleBlock = (stored: unknown = useDocumentStore.getState().titleBlock): drawing.CompleteTitleBlock => drawing.completeTitleBlock(stored, titleBlockContext())
+
+/** What is stored under `titleBlock`: the complete block, so a drawing opened anywhere shows and exports the same one. */
+export const titleBlockPayload = (): Record<string, unknown> => ({ ...currentTitleBlock() })
+
+/** Puts a stored `titleBlock` back; fields that are missing or damaged are left to the defaults. */
+export const restoreTitleBlock = (stored: unknown): void => { useDocumentStore.getState().setTitleBlock(drawing.validTitleBlockFields(stored)) }

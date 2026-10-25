@@ -1,10 +1,11 @@
-import { KernelJobError, runKernelJob } from "@cadcamfun/ai"
+import { runKernelJobEffect } from "@cadcamfun/ai"
 import { Api, BadRequest, CurrentUser, InternalError } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { runKernelRequest } from "../services/cam-program.ts"
 import { camProgressReporter } from "../services/cam-progress.ts"
+import { explainKernelFailure, kernelRun } from "../services/kernel-errors.ts"
 import { LiveEvents } from "../services/live-events.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
 
@@ -38,14 +39,8 @@ export const ToolpathGeneratorHandlers = HttpApiBuilder.group(Api, "toolpathGene
         const report = target === undefined ? undefined : camProgressReporter(events, target.projectId, target.runId)
         // In a scoped worker like the kernel: the event loop keeps serving, so each step's frame reaches the stream while the run works,
         // and a dropped request interrupts the fiber and terminates the worker.
-        const outcome = yield* Effect.tryPromise({
-          try: (signal) => runKernelJob("cam-generate", request, { signal, ...(report !== undefined ? { onProgress: report } : {}) }),
-          catch: (cause) => cause
-        }).pipe(
-          Effect.catch((cause) => cause instanceof KernelJobError && cause.explained
-            // A run that passes its deadline, finds the queue full or is killed for memory is the request's size, not a fault: the caller is told to cut the job down.
-            ? Effect.fail<BadRequest | InternalError>(new BadRequest({ message: cause.reason === "cancelled" ? cause.message : `${cause.message} ${cause.reason === "busy" ? "" : "Reduce the part, the layer height or the stepover, or split the job."}`.trim() }))
-            : Effect.logError("Failed to generate toolpath", cause).pipe(Effect.andThen(Effect.fail<BadRequest | InternalError>(new InternalError({ message: "Failed to generate toolpath" }))))),
+        const outcome = yield* runKernelJobEffect("cam-generate", request, report === undefined ? {} : { onProgress: report }).pipe(
+          Effect.catch(explainKernelFailure("Failed to generate toolpath")),
           Effect.onInterrupt(() => Effect.sync(() => report?.("cancelled")))
         )
         report?.("done")
@@ -55,8 +50,8 @@ export const ToolpathGeneratorHandlers = HttpApiBuilder.group(Api, "toolpathGene
     .handle("suggest", ({ payload }) =>
       guarded("Failed to compute suggestions", () => g.suggestFor(payload.settings, payload.geometry)))
     .handle("parse", ({ payload }) =>
-      guarded("Failed to parse G-code", () => g.analyseGcode(payload.gcode, payload.name)).pipe(
+      // In a worker like the generator: a pasted program of hundreds of megabytes never stops the sidecar's other requests.
+      kernelRun("cam-parse", { gcode: payload.gcode, name: payload.name ?? "Program" }, "Failed to parse G-code").pipe(
         Effect.map((analysis) => ({ warnings: analysis.warnings, stats: analysis.stats, program: analysis.program, motion: analysis.motion }))))
-    .handle("verify", ({ payload }) =>
-      guarded("Failed to verify toolpath", () => cam.verify.verifyToolpath(payload)))
+    .handle("verify", ({ payload }) => kernelRun("cam-verify", payload, "Failed to verify toolpath"))
 }))

@@ -5,6 +5,9 @@ import { t } from "../../../i18n/index.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
 import { downloadDrawing, drawingPdf } from "../lib/drawing-export.ts"
+import { currentTitleBlock } from "../lib/document-setup.ts"
+import { useDocumentStore } from "../store/documentStore.ts"
+import TitleBlockDialog from "./TitleBlockDialog.tsx"
 
 const BUTTON = "panel-btn"
 type Principal = "front" | "top" | "right"
@@ -16,9 +19,10 @@ export default function DrawingPanel(): JSX.Element {
   const [chosen, setChosen] = createSignal("")
   const part = createMemo(() => parts().find((e) => e.id === chosen()) ?? parts().find((e) => selection.selectedElementIds.includes(e.id)) ?? parts()[0])
   const [size, setSize] = createSignal<drawing.SheetSize>("A3")
-  const [projection, setProjection] = createSignal<"first" | "third">("first")
-  const [title, setTitle] = createSignal("")
-  const [material, setMaterial] = createSignal("")
+  // Title, number, material, projection, scale and the rest of the title block belong to the drawing: one form, one block everywhere.
+  const doc = useDocumentStore()
+  const [editingInfo, setEditingInfo] = createSignal(false)
+  const block = createMemo(() => { void [doc.titleBlock, doc.name, doc.author, doc.organization]; return currentTitleBlock() })
   const [section, setSection] = createSignal(false)
   const [axis, setAxis] = createSignal<"x" | "y" | "z">("y")
   const [at, setAt] = createSignal("0")
@@ -32,7 +36,7 @@ export default function DrawingPanel(): JSX.Element {
   let dialog: HTMLDialogElement | undefined
   const numeric = (text: string): number => text.trim() === "" ? NaN : Number(text)
   const options = createMemo((): drawing.SheetOptions => ({
-    size: size(), projection: projection(), title: title() || part()?.name || "Drawing", material: material() || "N.A.",
+    ...drawing.sheetOptionsOfTitleBlock(block()), size: size(),
     ...(section() ? { section: { axis: axis(), at: numeric(at()) } } : {}),
     ...(detail() ? { detail: { view: parent(), centre: { x: numeric(x()), y: numeric(y()), z: numeric(z()) }, radius: numeric(radius()), factor: numeric(factor()) } } : {})
   }))
@@ -68,8 +72,7 @@ export default function DrawingPanel(): JSX.Element {
         </select></label>
         <div class="grid grid-cols-2 gap-2">
           <label class="text-xs">{t("cad.drawing.paper")}<select class={INPUT} value={size()} onChange={(e) => setSize(e.currentTarget.value as drawing.SheetSize)}><For each={["A4", "A3", "A2"]}>{(s) => <option value={s}>{s}</option>}</For></select></label>
-          <label class="text-xs">{t("cad.drawing.projection")}<select class={INPUT} value={projection()} onChange={(e) => setProjection(e.currentTarget.value as "first" | "third")}><option value="first">{t("cad.drawing.first")}</option><option value="third">{t("cad.drawing.third")}</option></select></label>
-          {field(t("cad.drawing.sheetTitle"), title, setTitle)}{field(t("cad.drawing.material"), material, setMaterial)}
+          <button type="button" class={`${BUTTON} self-end`} data-testid="drawing-info" onClick={() => setEditingInfo(true)}>{t("cad.drawing.infoButton")}</button>
         </div>
         <label class="flex items-center gap-2 text-xs"><input type="checkbox" checked={section()} onChange={(e) => setSection(e.currentTarget.checked)} />{t("cad.drawing.section")}</label>
         <Show when={section()}><div class="grid grid-cols-2 gap-2"><label class="text-xs">{t("cad.drawing.axis")}<select class={INPUT} value={axis()} onChange={(e) => setAxis(e.currentTarget.value as "x" | "y" | "z")}><For each={["x", "y", "z"]}>{(a) => <option value={a}>{a.toUpperCase()}</option>}</For></select></label>{field(t("cad.drawing.position"), at, setAt, true)}</div></Show>
@@ -94,5 +97,6 @@ export default function DrawingPanel(): JSX.Element {
         </dialog>
       </div>}</Show>
     </Show>
+    <Show when={editingInfo()}><TitleBlockDialog open onClose={() => setEditingInfo(false)} /></Show>
   </PanelCard>
 }

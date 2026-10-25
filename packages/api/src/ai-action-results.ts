@@ -118,6 +118,13 @@ const assembly = Schema.Struct({
   interference: Schema.StructWithRest(Schema.Struct({ clashes: Schema.Array(record), clashesTotal: int, checked: int }), [record]),
   bom: Schema.Array(record), bomTotal: int, jointsTotal: int, fasteners: record, ...drawingRef
 })
+const titleBlock = Schema.Struct({
+  ok: Schema.Literal(true),
+  titleBlock: record,
+  /** The fields a complete drawing still lacks. */
+  issues: Schema.Array(Schema.Struct({ key: str, message: str })),
+  ...drawingRef
+})
 const setups = Schema.Struct({
   ok: Schema.Literal(true),
   parts: Schema.Array(Schema.Struct({ id: str, name: str, plan: record })), partsTotal: int,
@@ -296,6 +303,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad.parametric_exact": read(parametricExact),
   "cad.exact": read(exact),
   "cad.assembly": read(assembly),
+  "cad.title_block": read(titleBlock),
   "cad.setups": read(setups),
   "cad.shell": read(shell),
   "cad.surface": read(Schema.Struct({ ok: Schema.Literal(true), kind: Schema.Literals(["surface", "solid"]), valid: Schema.Boolean, faces: int, boundaryEdges: int })),
@@ -318,6 +326,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad_edit.shell": write(["drawing"], added),
   "cad_edit.offset": write(["drawing"], added),
   "cad_edit.hole": write(["drawing"], added),
+  "cad_edit.title_block_set": write(["drawing"], titleBlock),
   "cad_edit.add": write(["drawing"], added, "skipped"),
   "cad_edit.add_entities": write(["drawing"], added),
   "cad_edit.modify": write(["drawing"], modified),

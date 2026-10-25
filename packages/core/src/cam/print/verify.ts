@@ -19,8 +19,6 @@ export interface PrintCheck {
 }
 
 interface Bead { readonly layer: number; readonly height: number; readonly kind: string; readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number; readonly z0: number; readonly z: number; readonly e: number; readonly line: number }
-interface PrintMotion { readonly from: P3; readonly to: P3; readonly feed: number; readonly e: number; readonly line: number }
-interface PrintState { readonly layer: number; readonly height: number; readonly kind: string; readonly homed: boolean; readonly nozzleReady: number; readonly bedReady: number }
 
 /** Maximum deviation of an arc's replay chords, mm. Cardinal extrema are also included. */
 export const PRINT_REPLAY_SAGITTA = 0.01
@@ -29,13 +27,62 @@ export const PRINT_REPLAY_SAGITTA = 0.01
 const PRINT_G = new Set([0, 1, 2, 3, 4, 17, 20, 21, 28, 90, 91, 90.1, 91.1, 92, 92.1])
 const PRINT_M = new Set([0, 1, 2, 17, 18, 30, 82, 83, 84, 104, 109, 140, 190, 106, 107, 204, 205, 400, 900])
 
-/** The extruding moves of a program with the layer and feature each belongs to. */
-export const replayBeads = (gcode: string): { beads: Bead[]; motions: PrintMotion[]; states: ReadonlyArray<PrintState>; errors: ReadonlyArray<string>; filamentMm: number; maxZ: number } => {
+/** What the program has declared at one line: the feature and layer being printed, and whether the machine is ready to deposit. */
+export interface PrintLineState { readonly kind: string; readonly layer: number; readonly height: number; readonly homed: boolean; readonly nozzleReady: number; readonly bedReady: number }
+
+/**
+ * The state of every line of a program, in columns: a program of millions of lines costs a few tens of bytes a line, not an
+ * object a line.
+ */
+class LineStates {
+  private readonly kinds: string[] = []
+  private kindIds = new Map<string, number>()
+  private kind: Uint16Array
+  private layer: Int32Array
+  private height: Float64Array
+  private homed: Uint8Array
+  private nozzle: Float64Array
+  private bed: Float64Array
+  length = 0
+
+  constructor(capacity: number) {
+    this.kind = new Uint16Array(capacity); this.layer = new Int32Array(capacity); this.height = new Float64Array(capacity)
+    this.homed = new Uint8Array(capacity); this.nozzle = new Float64Array(capacity); this.bed = new Float64Array(capacity)
+  }
+
+  push(state: PrintLineState): number {
+    let id = this.kindIds.get(state.kind)
+    if (id === undefined) { id = this.kinds.length; this.kinds.push(state.kind); this.kindIds.set(state.kind, id) }
+    const n = this.length++
+    this.kind[n] = id; this.layer[n] = state.layer; this.height[n] = state.height
+    this.homed[n] = state.homed ? 1 : 0; this.nozzle[n] = state.nozzleReady; this.bed[n] = state.bedReady
+    return this.length
+  }
+
+  at(n: number): PrintLineState | undefined {
+    if (n < 0 || n >= this.length) return undefined
+    return { kind: this.kinds[this.kind[n]!]!, layer: this.layer[n]!, height: this.height[n]!, homed: this.homed[n] === 1, nozzleReady: this.nozzle[n]!, bedReady: this.bed[n]! }
+  }
+}
+
+/** A motion of the replay (an arc already in chords), handed to `onMotion` as it is read. */
+export interface PrintMotion { readonly from: P3; readonly to: P3; readonly feed: number; readonly e: number; readonly line: number }
+
+export interface ReplayOptions {
+  /** Called for every motion in program order; the motions are not kept. */
+  readonly onMotion?: (motion: PrintMotion) => void
+}
+
+/**
+ * The extruding moves of a program with the layer and feature each belongs to. The program is replayed as a stream: the beads
+ * are kept (the evidence reads them), the motions and the interpreter's segments are not.
+ */
+export const replayBeads = (gcode: string, options: ReplayOptions = {}): { beads: Bead[]; motionCount: number; states: { at: (line: number) => PrintLineState | undefined }; errors: ReadonlyArray<string>; filamentMm: number; maxZ: number } => {
   const beads: Bead[] = []
-  const motions: PrintMotion[] = []
-  const replay = interpretGcode(gcode, { track: true, lathe: false })
-  const errors = [...replay.errors]
-  const states: PrintState[] = []
+  const errors: string[] = []
+  let newlines = 0
+  for (let at = gcode.indexOf("\n"); at >= 0; at = gcode.indexOf("\n", at + 1)) newlines++
+  const states = new LineStates(newlines + 1)
   let kind = ""
   let layer = -1
   let height = 0.2
@@ -43,9 +90,14 @@ export const replayBeads = (gcode: string): { beads: Bead[]; motions: PrintMotio
   let nozzleTarget = 0, nozzleReady = 0, bedTarget = 0, bedReady = 0
   let filament = 0
   let maxZ = 0
-  const lines = gcode.split("\n")
-  for (let n = 0; n < lines.length; n++) {
-    const raw = lines[n]!.trim()
+  let motionCount = 0
+  // The lines first: the layer and feature markers and the heater waits are state of the text, independent of the motions.
+  let start = 0
+  for (let n = 0; start <= gcode.length; n++) {
+    let end = gcode.indexOf("\n", start)
+    if (end < 0) end = gcode.length
+    const raw = gcode.slice(start, end).trim()
+    start = end + 1
     if (raw.startsWith(";TYPE:")) kind = raw.slice(6).trim()
     if (raw.startsWith(";LAYER:")) layer = Number(raw.slice(7))
     if (raw.startsWith(";HEIGHT:")) height = Number(raw.slice(8))
@@ -84,40 +136,45 @@ export const replayBeads = (gcode: string): { beads: Bead[]; motions: PrintMotio
     states.push({ kind, layer, height, homed: homeAxes.size === 3, nozzleReady, bedReady })
   }
   const add = (from: P3, to: P3, e: number, feed: number, line: number): void => {
-    motions.push({ from, to, e, feed, line })
+    motionCount++
+    options.onMotion?.({ from, to, e, feed, line })
     if (e <= 1e-9 || (from.x === to.x && from.y === to.y)) return
-    const state = states[line - 1]!
+    const state = states.at(line - 1)!
     beads.push({ layer: state.layer, height: state.height, kind: state.kind, x0: from.x, y0: from.y, x1: to.x, y1: to.y, z0: from.z, z: to.z, e, line })
     filament += e
     maxZ = Math.max(maxZ, from.z, to.z)
   }
-  replay.segments.forEach((segment, index) => {
-    if (segment.kind === "dwell") return
-    const e = replay.states![index]!.extrude
-    if (segment.kind !== "arc") { add(segment.from, segment.to, e, segment.feed, segment.line); return }
-    const sweep = arcSweepBetween(segment.from, segment.to, segment.center, segment.clockwise)
-    const radius = segment.radiusStart
-    const count = Math.max(1, Math.ceil(sweep / (2 * Math.acos(Math.max(-1, 1 - PRINT_REPLAY_SAGITTA / radius)))))
-    if (!Number.isFinite(count) || count > 100_000) { errors.push(`line ${segment.line}: arc exceeds the bounded print replay budget`); return }
-    const a0 = Math.atan2(segment.from.y - segment.center.y, segment.from.x - segment.center.x)
-    const direction = segment.clockwise ? -1 : 1
-    const stops = Array.from({ length: count }, (_, i) => (i + 1) / count)
-    for (let quadrant = 0; quadrant < 4; quadrant++) {
-      const angle = quadrant * Math.PI / 2
-      const delta = ((direction * (angle - a0)) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
-      if (delta > 1e-12 && delta < sweep) stops.push(delta / sweep)
-    }
-    stops.sort((a, b) => a - b)
-    let from = segment.from, previous = 0
-    for (const t of stops) {
-      if (t - previous < 1e-12) continue
-      const angle = a0 + direction * sweep * t
-      const to = t === 1 ? segment.to : { x: segment.center.x + radius * Math.cos(angle), y: segment.center.y + radius * Math.sin(angle), z: segment.from.z + (segment.to.z - segment.from.z) * t }
-      add(from, to, e * (t - previous), segment.feed, segment.line)
-      from = to; previous = t
+  const replay = interpretGcode(gcode, {
+    track: true, lathe: false, discard: true,
+    onSegment: (segment, state) => {
+      if (segment.kind === "dwell") return
+      const e = state!.extrude
+      if (segment.kind !== "arc") { add(segment.from, segment.to, e, segment.feed, segment.line); return }
+      const sweep = arcSweepBetween(segment.from, segment.to, segment.center, segment.clockwise)
+      const radius = segment.radiusStart
+      const count = Math.max(1, Math.ceil(sweep / (2 * Math.acos(Math.max(-1, 1 - PRINT_REPLAY_SAGITTA / radius)))))
+      if (!Number.isFinite(count) || count > 100_000) { errors.push(`line ${segment.line}: arc exceeds the bounded print replay budget`); return }
+      const a0 = Math.atan2(segment.from.y - segment.center.y, segment.from.x - segment.center.x)
+      const direction = segment.clockwise ? -1 : 1
+      const stops = Array.from({ length: count }, (_, i) => (i + 1) / count)
+      for (let quadrant = 0; quadrant < 4; quadrant++) {
+        const angle = quadrant * Math.PI / 2
+        const delta = ((direction * (angle - a0)) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
+        if (delta > 1e-12 && delta < sweep) stops.push(delta / sweep)
+      }
+      stops.sort((a, b) => a - b)
+      let from = segment.from, previous = 0
+      for (const t of stops) {
+        if (t - previous < 1e-12) continue
+        const angle = a0 + direction * sweep * t
+        const to = t === 1 ? segment.to : { x: segment.center.x + radius * Math.cos(angle), y: segment.center.y + radius * Math.sin(angle), z: segment.from.z + (segment.to.z - segment.from.z) * t }
+        add(from, to, e * (t - previous), segment.feed, segment.line)
+        from = to; previous = t
+      }
     }
   })
-  return { beads, motions, states, errors, filamentMm: filament, maxZ }
+  errors.unshift(...replay.errors)
+  return { beads, motionCount, states, errors, filamentMm: filament, maxZ }
 }
 
 /** Whether two regions are the same outlines, point for point. */
@@ -138,6 +195,7 @@ const sameRegion = (a: Region, b: Region): boolean => {
 }
 
 const PART = new Set(["WALL-OUTER", "WALL-INNER", "SKIN", "FILL", "BRIDGE"])
+
 
 /**
  * Marks the cells whose centre lies within `radius` of the segment (a capsule). Row by row: a capsule is convex, so each row
@@ -195,17 +253,22 @@ const pct = (v: number): string => `${(v * 100).toFixed(1)} %`
 export const verifyPrint = (input: PrintEvidenceInput): PrintCheck[] => {
   const { gcode, regions, profile: p } = input
   const checks: PrintCheck[] = []
-  const replay = replayBeads(gcode)
-  const { filamentMm } = replay
-  checks.push({ id: "nc-interpretation", status: replay.errors.length === 0 ? "passed" : "failed", detail: replay.errors.length === 0 ? `Replayed ${replay.motions.length} motions; arc chord bound ${PRINT_REPLAY_SAGITTA} mm` : replay.errors.join("; ") })
-
-  if (replay.beads.length === 0) return [...checks, { id: "filament", status: "failed", detail: "The program extrudes nothing" }]
-
-  // The plate and the build height.
+  // The plate and the build height: every motion is tested as the replay reads it, and only the first one outside is kept.
   const half = { x: p.bedOrigin === "center" ? p.bedWidth / 2 : 0, y: p.bedOrigin === "center" ? p.bedDepth / 2 : 0 }
   const lo = { x: -half.x, y: -half.y }
   const hi = { x: p.bedWidth - half.x, y: p.bedDepth - half.y }
-  const outside = replay.motions.find((m) => [m.from, m.to].some((q) => ![q.x, q.y, q.z].every(Number.isFinite) || q.x < lo.x - 1e-6 || q.x > hi.x + 1e-6 || q.y < lo.y - 1e-6 || q.y > hi.y + 1e-6 || q.z < -1e-6 || q.z > p.buildHeight + 1e-6))
+  const found: { motion?: PrintMotion } = {}
+  const replay = replayBeads(gcode, {
+    onMotion: (m) => {
+      if (found.motion === undefined && [m.from, m.to].some((q) => ![q.x, q.y, q.z].every(Number.isFinite) || q.x < lo.x - 1e-6 || q.x > hi.x + 1e-6 || q.y < lo.y - 1e-6 || q.y > hi.y + 1e-6 || q.z < -1e-6 || q.z > p.buildHeight + 1e-6)) found.motion = m
+    }
+  })
+  const { filamentMm } = replay
+  const outside = found.motion
+  checks.push({ id: "nc-interpretation", status: replay.errors.length === 0 ? "passed" : "failed", detail: replay.errors.length === 0 ? `Replayed ${replay.motionCount} motions; arc chord bound ${PRINT_REPLAY_SAGITTA} mm` : replay.errors.join("; ") })
+
+  if (replay.beads.length === 0) return [...checks, { id: "filament", status: "failed", detail: "The program extrudes nothing" }]
+
   const offPlateBead = replay.beads.find((b) => {
     const radius = p.extrusionWidth * (b.layer < 0 ? 1.3 : 1) / 2
     return [[b.x0, b.y0], [b.x1, b.y1]].some(([x, y]) => x! - radius < lo.x - 0.00051 || x! + radius > hi.x + 0.00051 || y! - radius < lo.y - 0.00051 || y! + radius > hi.y + 0.00051)
@@ -214,7 +277,7 @@ export const verifyPrint = (input: PrintEvidenceInput): PrintCheck[] => {
     ? { id: "bed-fit", status: "passed", detail: `Every replayed move stays in the ${p.bedWidth} x ${p.bedDepth} x ${p.buildHeight} mm build envelope` }
     : { id: "bed-fit", status: "failed", detail: `Motion or deposited bead on line ${outside?.line ?? offPlateBead!.line} leaves the ${p.bedWidth} x ${p.bedDepth} x ${p.buildHeight} mm build envelope`, line: outside?.line ?? offPlateBead!.line })
 
-  const cold = replay.beads.find((b) => { const s = replay.states[b.line - 1]!; return !s.homed || s.nozzleReady < p.nozzleTemperature - 1e-6 || (p.bedTemperature > 0 && s.bedReady < p.bedTemperature - 1e-6) })
+  const cold = replay.beads.find((b) => { const s = replay.states.at(b.line - 1)!; return !s.homed || s.nozzleReady < p.nozzleTemperature - 1e-6 || (p.bedTemperature > 0 && s.bedReady < p.bedTemperature - 1e-6) })
   checks.push(cold
     ? { id: "heated-start", status: "failed", detail: "Deposition requires homed XYZ axes and explicit nozzle/required-bed temperature waits; heater setpoints and opaque macros do not prove readiness", line: cold.line }
     : { id: "heated-start", status: "passed", detail: "XYZ homing and nozzle/required-bed temperature waits precede every deposited bead" })

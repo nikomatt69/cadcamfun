@@ -10,6 +10,8 @@ const COMMANDS: &[&str] = &[
     "secret_delete",
     "pick_file",
     "save_file",
+    "take_opened_files",
+    "read_opened_file",
     "set_recent_projects",
     "check_for_updates",
     "install_update",

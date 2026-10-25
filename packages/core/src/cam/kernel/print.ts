@@ -169,12 +169,22 @@ export const runPrintJob = (job: ManufacturingJob, options: PrintRunOptions = {}
 
   const nc = result.gcode
   const analysis = analyseGcode(nc, job.name)
-  const replay = interpretGcode(nc, { track: true })
+  // The independent replay as a stream: only what the claims need is kept, so a program of millions of motions costs no memory.
+  const maxFeed = machine.printer.maxSpeed * 60 + 1e-6
+  let motions = 0, replayedBead = 0
+  let tooFast: { readonly line: number; readonly feed: number } | undefined
+  const replay = interpretGcode(nc, {
+    track: true, discard: true,
+    onSegment: (s, state) => {
+      motions++
+      if (s.kind === "dwell" || state === undefined || state.extrude <= 0) return
+      if (s.from.x !== s.to.x || s.from.y !== s.to.y) replayedBead++
+      if (tooFast === undefined && s.feed > maxFeed) tooFast = { line: s.line, feed: s.feed }
+    }
+  })
   const settings = resolved.settings
   const claims: Claim[] = []
   const expectedBead = Object.values(result.stats.lengthByKind).reduce((a, b) => a + b, 0)
-  const replayedBead = replay.segments.filter((s, index) => s.kind !== "dwell" && replay.states![index]!.extrude > 0 && (s.from.x !== s.to.x || s.from.y !== s.to.y)).length
-  const tooFast = replay.segments.find((s, index) => s.kind !== "dwell" && replay.states![index]!.extrude > 0 && s.feed > machine.printer!.maxSpeed * 60 + 1e-6)
   const interpretation = result.checks.find((c) => c.id === "nc-interpretation")
   const filamentArea = Math.PI * ((settings.filamentDiameter ?? 1.75) / 2) ** 2
 
@@ -182,12 +192,12 @@ export const runPrintJob = (job: ManufacturingJob, options: PrintRunOptions = {}
   claims.push({
     id: "machine-limits",
     status: (settings.printTemperature ?? 0) <= machine.printer.nozzle.maxTemperature && (settings.bedTemperature ?? 0) <= machine.printer.maxBedTemperature && tooFast === undefined ? "passed" : "failed",
-    detail: tooFast !== undefined && tooFast.kind !== "dwell" ? `NC line ${tooFast.line} deposits at ${tooFast.feed / 60} mm/s above the printer's ${machine.printer.maxSpeed} mm/s limit` : `Nozzle ${settings.printTemperature} / ${machine.printer.nozzle.maxTemperature} degrees C, bed ${settings.bedTemperature} / ${machine.printer.maxBedTemperature}; all replayed deposition speeds <= ${machine.printer.maxSpeed} mm/s`
+    detail: tooFast !== undefined ? `NC line ${tooFast.line} deposits at ${tooFast.feed / 60} mm/s above the printer's ${machine.printer.maxSpeed} mm/s limit` : `Nozzle ${settings.printTemperature} / ${machine.printer.nozzle.maxTemperature} degrees C, bed ${settings.bedTemperature} / ${machine.printer.maxBedTemperature}; all replayed deposition speeds <= ${machine.printer.maxSpeed} mm/s`
   })
   for (const check of result.checks) if (check.id !== "nc-interpretation") claims.push({ id: CLAIM_OF_CHECK[check.id]!, status: check.status, detail: check.detail })
   claims.push({
     id: "nc-replay", status: replay.errors.length > 0 || interpretation?.status !== "passed" || replayedBead === 0 ? "failed" : "passed",
-    detail: interpretation?.status !== "passed" ? interpretation?.detail ?? "Print replay evidence is missing" : replay.errors.length > 0 ? `${replay.errors.length} block(s) the interpreter could not follow, the first: ${replay.errors[0]}` : `Interpreted ${replay.segments.length} NC motions independently of the slicer, including ${replayedBead} depositing motions`
+    detail: interpretation?.status !== "passed" ? interpretation?.detail ?? "Print replay evidence is missing" : replay.errors.length > 0 ? `${replay.errors.length} block(s) the interpreter could not follow, the first: ${replay.errors[0]}` : `Interpreted ${motions} NC motions independently of the slicer, including ${replayedBead} depositing motions`
   })
   if (result.warnings.length > 0) {
     for (const w of result.warnings) issues.push(issue("UnsupportedCapability", "evidence", w, { severity: "warning" }))
