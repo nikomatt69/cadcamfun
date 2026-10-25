@@ -453,7 +453,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
       </Show>
 
       {/* The dock is its own box, outside the scrolling transcript: it keeps its size while the conversation moves. */}
-      <div class="assistant-dock" data-testid="ai-dock">
+      <div class="assistant-composer-dock" data-testid="ai-dock">
       <AssistantQuestions />
       <AssistantPermissions />
       <AssistantControlError />

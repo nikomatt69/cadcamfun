@@ -1256,7 +1256,7 @@
 }
 
 /* The composer (and the error above it) never shrinks and never scrolls away with the conversation. */
-.assistant-dock {
+.assistant-composer-dock {
   --assistant-dock-w: min(940px, calc(100% - 28px));
   position: relative;
   z-index: 90;
@@ -3519,7 +3519,7 @@ html.dark .assistant-surface .assistant-field:focus {
 }
 
 @media (max-width: 520px) {
-  .assistant-dock {
+  .assistant-composer-dock {
     --assistant-dock-w: calc(100% - 18px);
   }
   .assistant-composer {

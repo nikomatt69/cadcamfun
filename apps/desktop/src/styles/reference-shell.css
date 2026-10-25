@@ -186,6 +186,20 @@
 }
 .reference-page-column:has(.workspace-page) .reference-breadcrumbs { display: none; }
 .reference-page-column:has(.workspace-page) .reference-footer { display: none; }
+/* The assistant page owns the column too: the conversation scrolls inside it and the composer stays put,
+   instead of the whole page growing with every message. */
+.reference-page-scroll:has(.assistant-page) { display: flex; flex-direction: column; overflow: hidden; }
+.reference-page-container:has(.assistant-page) {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  max-width: 90rem;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 20px;
+}
+.reference-page-container:has(.assistant-page) > .assistant-page { flex: 1; height: auto; min-height: 0; }
+.reference-page-column:has(.assistant-page) .reference-footer { display: none; }
 .reference-workspace-container { display: flex; flex: 1; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; }
 .reference-standalone-container { min-height: 100%; }
 .reference-scroll-top { position: absolute; bottom: 16px; right: 16px; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 4px; padding: 0; color: #fff; background: var(--shell-accent); border: 1px solid var(--shell-accent); box-shadow: none; z-index: 40; }
