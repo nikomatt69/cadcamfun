@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.21 (October 2026)
+
+## Core
+
+- Add performance benchmarking script and enhance CI workflows
+
 ## v0.1.20 (October 2026)
 
 ## Desktop
