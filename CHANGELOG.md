@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.20 (October 2026)
+
+## Desktop
+
+- Improve updater shutdown and mobile production cost settings
+
 ## v0.1.19 (October 2026)
 
 ## Core
