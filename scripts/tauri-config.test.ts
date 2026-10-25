@@ -361,4 +361,42 @@ describe("Rust build and release configuration", () => {
     expect(ci).toContain("cargo audit --file Cargo.lock")
     expect(Bun.TOML.parse(text(join(native, "deny.toml")))).toHaveProperty("licenses.allow")
   })
+
+  test("CI treats Rust diagnostics as advisory while keeping functional validation mandatory", () => {
+    interface Step {
+      name: string
+      run?: string
+      "continue-on-error"?: boolean
+    }
+    const ci = Bun.YAML.parse(text(join(root, ".github/workflows/ci.yml"))) as {
+      jobs: Record<string, { "continue-on-error"?: boolean; steps: Step[] }>
+    }
+    const rust = ci.jobs["src-tauri"]!
+    expect(rust["continue-on-error"]).not.toBe(true)
+    for (const name of ["cargo fmt", "cargo clippy"]) {
+      const step = rust.steps.find((step) => step.name === name)
+      expect(step).toBeDefined()
+      expect(step?.["continue-on-error"]).toBe(true)
+      expect(step?.run).not.toContain("-D warnings")
+    }
+    for (const [jobName, requiredNames] of [
+      ["src-tauri", ["Install dependencies", "Stage the sidecar binary and the migrations resource", "cargo test"]],
+      ["workspace", ["Install dependencies", "Typecheck", "Validate workflows", "Verify release automation"]],
+      ["mobile", ["Typecheck", "Test companion transport", "Export the iOS JavaScript bundle"]],
+    ] as const) {
+      const job = ci.jobs[jobName]!
+      expect(job["continue-on-error"]).not.toBe(true)
+      for (const name of requiredNames) {
+        const step = job.steps.find((step) => step.name === name)
+        expect(step).toBeDefined()
+        expect(step?.["continue-on-error"]).not.toBe(true)
+      }
+    }
+    expect(rust.steps.find((step) => step.name === "cargo test")?.run).toBe("cargo test --locked --all-features")
+    for (const [jobName, report] of [["cargo-deny", "cargo deny check"], ["cargo-audit", "cargo audit"]] as const) {
+      const steps = ci.jobs[jobName]!.steps
+      expect(steps.find((step) => step.name === report)?.["continue-on-error"]).toBe(true)
+      expect(steps.some((step) => step.name.startsWith("Report ") && step.run?.includes("::warning::"))).toBe(true)
+    }
+  })
 })

@@ -114,6 +114,16 @@ so a wedged sidecar left by a crashed shell is refused/killed before the next sp
 `debug = "line-tables-only"`, `[profile.dev.package."*"] opt-level = 2`; a `rust-toolchain.toml` and an MSRV that matches the tree
 (`rust-version = "1.77"` is stale); `timestampUrl` over https; an integration test that spawns the stub sidecar through the ready handshake.
 
+CI triage (2026-10-25): the scanner versions must parse current RustSec CVSS 4.0 advisories. Update compatible TLS, Tokio,
+clipboard and updater dependencies to patched versions. Allow the permissive `BSL-1.0` used by the Windows clipboard dependencies
+and include its notice. Disable the updater's optional `zip` feature: Windows updates are raw signed NSIS/MSI installers, Linux
+uses raw DEB/RPM packages, and macOS tar.gz support is unconditional. Keep rustls and system proxy support. This removes the
+vulnerable ZIP extractor without changing any published updater format. A single documented exception is permitted for `RUSTSEC-2024-0429`: Tauri's GTK3 stack requires glib 0.18,
+while the upstream fix requires glib 0.20. Source inspection of the shell and downloaded crate sources found no runtime callers
+of `Variant::array_iter_str` / `VariantStrIter` outside glib's own implementation and tests. Keep all other unsoundness and
+vulnerability checks enabled and revisit this exception when the GTK dependency graph changes. This is a scoped risk acceptance,
+not a claim that glib 0.18 is patched.
+
 ### H. Larger boundary work (deferred, needs its own spec)
 
 A Rust-owned `cadcam://` URI scheme that proxies to the sidecar (removes CORS and the token in JS, survives port changes, but does not stream);
@@ -241,6 +251,7 @@ and the installed locked packages. Catalog inclusion alone does not establish Ta
 
 ## 9. Change log
 
+- 2026-10-25: triaged the Rust security jobs exposed by CI run `40237651751`: CVSS 4.0-capable scanners, compatible patched dependencies, Windows clipboard Boost licence coverage, and the documented unused GLib iterator exception in §3 G.
 - 2026-10-25: continued the interrupted integration; completed OS file delivery, guarded quit, sidecar port following, atomic raw-byte
   exports and browser fallbacks. Fixed concurrent temp-file collisions and bounded reads while preserving concurrent work.
 - 2026-10-25: added write-only native clipboard at the owner's request; audited capabilities/configuration, strengthened CSP without

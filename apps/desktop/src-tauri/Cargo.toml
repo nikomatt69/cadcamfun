@@ -41,7 +41,9 @@ log = "0.4"
 thiserror = "2"
 tokio = { version = "1", features = ["sync", "time", "macros", "rt", "net", "io-util"] }
 tauri-plugin-log = "2"
-tauri-plugin-updater = "2.13.1"
+# The feed serves raw NSIS/MSI/DEB/RPM installers; macOS tar.gz support is unconditional.
+# Avoid the optional legacy ZIP extractor and its vulnerable zip 4 dependency.
+tauri-plugin-updater = { version = "2.13.1", default-features = false, features = ["rustls-tls", "system-proxy"] }
 tauri-plugin-os = "2"
 tauri-plugin-notification = "2"
 # macOS 26 Liquid Glass (NSGlassEffectView) with a vibrancy fallback on older macOS; a no-op on Windows and Linux.
@@ -65,7 +67,7 @@ keyring = { version = "3.6", features = ["windows-native"] }
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3.6", features = ["sync-secret-service"] }
 
-# Policy, checked by `cargo clippy --all-targets --all-features -- -D warnings` (CI, src-tauri job). The shell has no `unsafe`
+# Policy, reported by `cargo clippy --locked --all-targets --all-features` (CI, src-tauri job). The shell has no `unsafe`
 # and no `.unwrap()`: the release profile aborts on panic, so one stray unwrap would take the whole app and the sidecar down.
 [lints.rust]
 unsafe_code = "forbid"

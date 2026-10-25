@@ -2,9 +2,9 @@
 #
 #   cd apps/desktop/src-tauri && cargo deny --locked check
 #
-# Non-blocking in CI until the first run has been triaged (`continue-on-error`). The licence list below was derived from
-# `cargo metadata --filter-platform aarch64-apple-darwin` (360 packages, 2026-10-25); the Windows and Linux graphs add only
-# permissive licences already in the list (their crates were not in the offline registry, so that part is verified by CI).
+# Advisory in CI at the owner's request (`continue-on-error`). The licence list below was derived from
+# `cargo metadata --filter-platform aarch64-apple-darwin` (360 packages, 2026-10-25), with BSL-1.0 added after checking the
+# Windows clipboard dependencies across all six release targets.
 
 [graph]
 # The six release targets of .github/workflows/release.yml: a crate that only one platform pulls in is still checked.
@@ -21,10 +21,12 @@ all-features = true
 [advisories]
 version = 2
 # "workspace": an unmaintained advisory fails only for the shell's direct dependencies, not for crates deep in Tauri's own GTK3
-# tree that we cannot replace. Vulnerabilities and unsound code are always errors. Every ignore needs an id and a reason.
+# tree that we cannot replace. Vulnerabilities and unsound code are errors unless individually triaged below.
 unmaintained = "workspace"
 yanked = "warn"
-ignore = []
+ignore = [
+  { id = "RUSTSEC-2024-0429", reason = "Tauri's GTK3 stack pins glib 0.18; the fix needs glib 0.20. No runtime callers of Variant::array_iter_str or VariantStrIter were found in the shell or downloaded crate sources. Revisit when the GTK graph changes (spec 56 section 3 G)." },
+]
 
 [licenses]
 version = 2
@@ -35,6 +37,7 @@ allow = [
   "Apache-2.0 WITH LLVM-exception",
   "BSD-2-Clause",
   "BSD-3-Clause",
+  "BSL-1.0",
   "ISC",
   "Zlib",
   "0BSD",
