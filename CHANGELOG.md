@@ -3,6 +3,13 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.19 (October 2026)
+
+## Core
+
+- Save remaining CAM request and surface generation changes
+- Complete native Tauri integration and restrict plugin capabilities
+
 ## v0.1.18 (October 2026)
 
 ## Core
