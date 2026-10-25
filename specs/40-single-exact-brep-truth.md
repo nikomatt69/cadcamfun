@@ -3,6 +3,8 @@
 Status: **in progress** (U0, U4, U5 built 2026-10-24; U1, U2, U3, U6, U7 open). Part of [spec 39](39-professional-parity-master-plan.md). Owner: WP1.
 Files: `packages/core/src/cad/{history.ts,history-brep.ts,history-edit.ts}`, `cad/brep/*`; adapters named in §6.
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Problem
 
 SolidWorks, Creo and Fusion keep one boundary representation per body; display and CAM meshes are tessellations of it. Here a

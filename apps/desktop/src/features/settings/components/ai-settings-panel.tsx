@@ -5,10 +5,7 @@ import {
 } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
-import { useAiStore } from "../../ai/store/context.tsx"
-import { ProviderSettings } from "../../ai/components/ProviderSettings.tsx"
-import { BridgeSettings } from "../../ai/components/BridgeSettings.tsx"
-import { SkillsSettings } from "../../ai/components/SkillsSettings.tsx"
+import { BridgeSettings, ProviderSettings, SkillsSettings, useAiStore } from "../../ai/index.ts"
 import { DEFAULT_TEMPERATURE, defaultAiSettings, loadAiSettings, saveAiSettings, type AiSettings, type McpStrategy } from "./ai-settings.ts"
 import { getEndpoint } from "../../../app/sidecar.ts"
 

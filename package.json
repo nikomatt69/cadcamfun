@@ -15,6 +15,7 @@
   "scripts": {
     "typecheck": "turbo run typecheck && bun check -p tsconfig.json",
     "test": "bun test packages apps scripts",
+    "bench:cam": "bun --no-env-file scripts/cam-performance.ts",
     "build": "bun scripts/build.ts",
     "build:sidecar": "bun scripts/build.ts --only=compile,resources",
     "build:desktop": "bun run --filter @cadcamfun/desktop build",

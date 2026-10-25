@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { acceptSidecarStatus, followingFetch, resetEndpoint, type Endpoint } from "../src/app/sidecar.ts"
+import { acceptSidecarStatus, followingFetch, resetEndpoint, sidecarNotice, type Endpoint } from "../src/app/sidecar.ts"
 import { clientLayer, readClient, runtimeForLayer } from "../src/app/client.ts"
 
 const endpoint: Endpoint = { baseUrl: "http://127.0.0.1:3001", token: "launch-token" }
@@ -51,4 +51,22 @@ test("invalid or non-ready status payloads cannot redirect a client", async () =
   for (const payload of [null, {}, { state: "ready", port: "4" }, { state: "ready", port: 0 }, { state: "ready", port: 65536 }, { state: "ready", port: 1.5 }, { state: "failed", port: 5 }]) acceptSidecarStatus(payload)
   await followingFetch(endpoint, base)(`${endpoint.baseUrl}/api/health`)
   expect(urls).toEqual([`${endpoint.baseUrl}/api/health`])
+})
+
+test("the person is told about a restart once, about the recovery, and about a permanent failure; a first start is silent", () => {
+  const replay = (payloads: unknown[]) => {
+    let restarting = false
+    const notices: unknown[] = []
+    for (const payload of payloads) {
+      const next = sidecarNotice(payload, restarting)
+      restarting = next.restarting
+      if (next.notice !== undefined) notices.push(next.notice)
+    }
+    return notices
+  }
+  expect(replay([{ state: "starting" }, { state: "ready", port: 3001 }])).toEqual([])
+  expect(replay([{ state: "ready", port: 3001 }, { state: "restarting" }, { state: "restarting" }, { state: "ready", port: 4999 }])).toEqual(["restarting", "recovered"])
+  expect(replay([{ state: "restarting" }, { state: "failed", message: "x" }])).toEqual(["restarting", "failed"])
+  // A second crash after a recovery is announced again; malformed payloads change nothing.
+  expect(replay([{ state: "restarting" }, { state: "ready", port: 1 }, { state: "restarting" }, null, 7, {}])).toEqual(["restarting", "recovered", "restarting"])
 })

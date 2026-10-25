@@ -4,6 +4,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 (`cad/brep/{step,iges,export-mesh}.ts`, `cad/{import-step,import-drawing,dxf}.ts`); adapters WP3/WP4/WP6. Depends on
 [41](41-persistent-topological-naming.md) (names), [55](55-evidence-performance-qualification.md) (corpus).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - `step.ts` (926 lines) reads and writes: `MANIFOLD_SOLID_BREP`, `BREP_WITH_VOIDS`, `FACETED_BREP`, `SHELL_BASED_SURFACE_MODEL`,

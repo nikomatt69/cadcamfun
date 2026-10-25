@@ -5,6 +5,8 @@ exists today (no FEA, stress or mesh-solver module in `packages/core`). Owner: n
 WP1 sibling; register it in [spec 00](00-overview.md) when started), adapters WP3/WP4/WP6/WP8. Depends on
 [41](41-persistent-topological-naming.md) (loads and supports are named faces) and [40](40-single-exact-brep-truth.md).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Scope and target
 
 First product: **linear static stress** of a single part or a bonded assembly, with results a designer can trust for

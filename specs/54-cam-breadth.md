@@ -4,6 +4,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 [spec 33](33-kernel-gap-analysis.md). Owner: WP2 (`cam/{post,operations,kernel,generator}`); adapters WP3/WP4/WP6/WP8. Depends
 on [53](53-stock-simulation-verification.md) (proof) and [41](41-persistent-topological-naming.md) (feature face refs).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - Posts: `generic` (LinuxCNC), `fanuc`, `haas`, `grbl`, `heidenhain` (with `advanced/`), `siemens`; subprograms; a post is a

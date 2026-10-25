@@ -4,6 +4,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 [spec 33](33-kernel-gap-analysis.md). Owner: WP1 (`cad/brep/{surface-patch,nurbs,loft,sweep}.ts`, new
 `cad/brep/{trim,fill,analysis}.ts`). Depends on [42](42-kernel-robustness-booleans.md) R5 (SSI).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - NURBS curve/surface evaluation with derivatives, knot insertion, sub-curve, interpolation (`nurbs.ts`).

@@ -55,6 +55,21 @@ function shutdown(code: number): never {
 }
 
 // The shell closes our stdin when it exits (or dies): that is the signal to stop.
+// The graceful stop of sidecar.rs (SHUTDOWN_COMMAND) is one JSON line, like the real sidecar (apps/sidecar/src/shutdown.ts):
+// without it the shell would wait out its whole shutdown timeout and then kill the stub.
+let pendingInput = "";
+process.stdin.on("data", (chunk: Buffer) => {
+  pendingInput += chunk.toString();
+  for (let end = pendingInput.indexOf("\n"); end >= 0; end = pendingInput.indexOf("\n")) {
+    const line = pendingInput.slice(0, end);
+    pendingInput = pendingInput.slice(end + 1);
+    try {
+      if ((JSON.parse(line) as { event?: unknown }).event === "shutdown") shutdown(0);
+    } catch {
+      // not JSON: ignored, as the real sidecar does
+    }
+  }
+});
 process.stdin.on("end", () => shutdown(0));
 process.stdin.on("close", () => shutdown(0));
 process.stdin.resume();

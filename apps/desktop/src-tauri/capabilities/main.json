@@ -9,8 +9,6 @@
     "core:default",
     "core:window:allow-destroy",
     "log:default",
-    "window-state:default",
-    "os:default",
     "notification:allow-is-permission-granted",
     "notification:allow-request-permission",
     "notification:allow-notify",
@@ -33,6 +31,9 @@
     "allow-install-update",
     "allow-apply-update",
     "allow-restart-app",
-    "allow-open-release-notes"
+    "allow-open-release-notes",
+    "allow-begin-job-activity",
+    "allow-end-job-activity",
+    "core:window:allow-set-progress-bar"
   ]
 }

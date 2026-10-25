@@ -352,7 +352,7 @@ async function stepBundle(): Promise<void> {
     build: { beforeBuildCommand: "" },
     bundle: {
       createUpdaterArtifacts: updaterArtifacts,
-      ...(thumbprint && platform === "windows" ? { windows: { certificateThumbprint: thumbprint, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" } } : {}),
+      ...(thumbprint && platform === "windows" ? { windows: { certificateThumbprint: thumbprint } } : {}),
       ...(adHoc ? { macOS: { signingIdentity: "-" } } : {}),
     },
   })];

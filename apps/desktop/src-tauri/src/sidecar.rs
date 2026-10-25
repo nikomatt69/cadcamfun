@@ -10,23 +10,32 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use thiserror::Error;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::sync::{mpsc, watch};
-use tokio::time::timeout;
+use tokio::time::{interval_at, timeout, Instant, MissedTickBehavior};
+
+use crate::pidfile;
 
 /// File name of the sidecar next to the app executable (`externalBin` minus its folder
 /// and target-triple suffix; the Tauri bundler strips the suffix).
 const SIDECAR_BIN: &str = "sidecar";
 /// How long the sidecar may take to print its ready line.
 pub const READY_TIMEOUT: Duration = Duration::from_secs(60);
-/// The sidecar is restarted at most this many times after a failure.
+/// Restarts that may be spent in a row; one is earned back for every [`RESTART_REPLENISH_AFTER`] of healthy running.
 pub const MAX_RESTARTS: u32 = 1;
+/// Probe a ready sidecar often enough to recover from hangs without treating one busy response as a crash.
+pub const HEALTH_INTERVAL: Duration = Duration::from_secs(15);
+pub const HEALTH_TIMEOUT: Duration = Duration::from_secs(5);
+pub const HEALTH_FAILURE_LIMIT: u32 = 3;
+pub const RESTART_REPLENISH_AFTER: Duration = Duration::from_secs(10 * 60);
 /// Event name the webview listens to for sidecar state changes.
 pub const STATUS_EVENT: &str = "sidecar-status";
 const REDACTED: &str = "[redacted: line may contain credentials]";
@@ -424,31 +433,96 @@ async fn wait_for_ready_decoded(
 /// Drains events after the handshake, logging them, until the process terminates.
 async fn monitor(
     rx: &mut mpsc::Receiver<ProcEvent>,
-    token: &str,
     output: &mut OutputDecoder,
+    port: u16,
+    token: &str,
 ) -> String {
     for line in output.lines.drain(..) {
         log_proc_line(false, &line, token);
     }
-    while let Some(event) = rx.recv().await {
-        match event {
-            ProcEvent::Stdout(chunk) => {
-                for line in output.stdout.push(&chunk) {
-                    log_proc_line(false, &line, token);
+    let mut health = interval_at(Instant::now() + HEALTH_INTERVAL, HEALTH_INTERVAL);
+    health.set_missed_tick_behavior(MissedTickBehavior::Delay);
+    let mut failures = HealthFailures::default();
+    let mut last_tick = SystemTime::now();
+    loop {
+        tokio::select! {
+            event = rx.recv() => match event {
+                Some(ProcEvent::Stdout(chunk)) => {
+                    for line in output.stdout.push(&chunk) { log_proc_line(false, &line, token); }
+                }
+                Some(ProcEvent::Stderr(chunk)) => {
+                    for line in output.stderr.push(&chunk) { log_proc_line(true, &line, token); }
+                }
+                Some(ProcEvent::Error(message)) => log::error!(target: "sidecar", "{}", redact_line(&message, token)),
+                Some(ProcEvent::Terminated(code)) => return format!("exit code {code:?}"),
+                None => return "output stream closed".to_owned(),
+            },
+            _ = health.tick() => {
+                let now = SystemTime::now();
+                if resumed_from_sleep(last_tick, now) {
+                    // Probes that failed before the sleep, or that timed out while the machine was suspended, say nothing about now.
+                    log::info!(target: "sidecar", "the machine woke from sleep; probing the sidecar again");
+                    failures = HealthFailures::default();
+                }
+                last_tick = now;
+                // One GET per tick and nothing else: a failed probe never repeats a request the webview made, it only counts.
+                if failures.record(probe_health(port, token).await) {
+                    log::warn!(target: "sidecar", "health probe failed ({}/{HEALTH_FAILURE_LIMIT})", failures.count);
+                    return format!("health probe failed {} consecutive times", failures.count);
                 }
             }
-            ProcEvent::Stderr(chunk) => {
-                for line in output.stderr.push(&chunk) {
-                    log_proc_line(true, &line, token);
-                }
-            }
-            ProcEvent::Error(message) => {
-                log::error!(target: "sidecar", "{}", redact_line(&message, token))
-            }
-            ProcEvent::Terminated(code) => return format!("exit code {code:?}"),
         }
     }
-    "output stream closed".to_owned()
+}
+
+async fn probe_health(port: u16, token: &str) -> bool {
+    timeout(HEALTH_TIMEOUT, async {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).await.ok()?;
+        let request = format!(
+            "GET /health HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {token}\r\nConnection: close\r\n\r\n"
+        );
+        stream.write_all(request.as_bytes()).await.ok()?;
+        let mut response = [0u8; 512];
+        let read = stream.read(&mut response).await.ok()?;
+        let line_end = response[..read].windows(2).position(|pair| pair == b"\r\n")?;
+        health_status_ok(&response[..line_end]).then_some(())
+    })
+    .await
+    .is_ok_and(|result| result.is_some())
+}
+
+fn health_status_ok(status_line: &[u8]) -> bool {
+    status_line.starts_with(b"HTTP/1.1 200 ") || status_line == b"HTTP/1.1 200"
+}
+
+#[derive(Default)]
+struct HealthFailures {
+    count: u32,
+}
+
+impl HealthFailures {
+    fn record(&mut self, healthy: bool) -> bool {
+        self.count = if healthy {
+            0
+        } else {
+            self.count.saturating_add(1)
+        };
+        self.count >= HEALTH_FAILURE_LIMIT
+    }
+}
+
+/// One restart is earned back for every [`RESTART_REPLENISH_AFTER`] a sidecar stayed healthy (so a sidecar that runs for hours and then
+/// hangs is restarted, while one that crashes in a loop still ends up `Failed`).
+fn replenish_restart_budget(restarts: &mut u32, healthy_for: Duration) {
+    let earned = healthy_for.as_secs() / RESTART_REPLENISH_AFTER.as_secs();
+    *restarts = restarts.saturating_sub(u32::try_from(earned).unwrap_or(u32::MAX));
+}
+
+/// The wall clock jumped well past the probe interval: the machine slept (the monotonic clock may stop during sleep, so the timer alone
+/// cannot tell). Detecting it without the OS wake notification (which needs `unsafe` Objective-C observers) costs at most one interval.
+fn resumed_from_sleep(previous: SystemTime, now: SystemTime) -> bool {
+    now.duration_since(previous)
+        .is_ok_and(|gap| gap > HEALTH_INTERVAL * 2)
 }
 
 /// Paths and identity the supervisor needs to (re)spawn the sidecar.
@@ -578,10 +652,11 @@ async fn supervise(app: AppHandle, handle: Arc<SidecarHandle>, config: SidecarCo
         if handle.is_shutting_down() {
             return;
         }
-        let failure = run_once(&app, &handle, &config).await;
+        let (failure, healthy_for) = run_once(&app, &handle, &config).await;
         if handle.is_shutting_down() {
             return;
         }
+        replenish_restart_budget(&mut restarts, healthy_for);
         log::error!(target: "sidecar", "sidecar stopped: {failure}");
         if !matches!(failure, SidecarError::ShutdownFailed(_))
             && restart_after_failure(&handle, &mut restarts).is_some()
@@ -620,12 +695,65 @@ fn restart_after_failure(handle: &SidecarHandle, restarts: &mut u32) -> Option<u
     }
 }
 
+/// Stops a sidecar that an earlier shell left behind (see `pidfile.rs`). `Err` means a leftover is still alive and the data directory
+/// is not safe to open a second time.
+async fn reclaim_leftover(data_dir: &std::path::Path) -> Result<(), SidecarError> {
+    let dir = data_dir.to_owned();
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        pidfile::reclaim(
+            &dir,
+            &pidfile::SystemProcesses,
+            SIDECAR_BIN,
+            pidfile::PATIENCE,
+        )
+    })
+    .await;
+    match outcome {
+        Ok(Ok(pidfile::Reclaim::Stuck { pid })) => Err(SidecarError::Spawn(format!(
+            "a sidecar left by an earlier run (pid {pid}) could not be stopped"
+        ))),
+        Ok(Ok(pidfile::Reclaim::Stopped { pid, forced })) => {
+            log::warn!(target: "sidecar", "stopped a sidecar left by an earlier run (pid {pid}, forced: {forced})");
+            Ok(())
+        }
+        Ok(Ok(pidfile::Reclaim::NotOurs { pid })) => {
+            log::info!(target: "sidecar", "pid {pid} from the pidfile is another program; left alone");
+            Ok(())
+        }
+        Ok(Ok(_)) => Ok(()),
+        // An unreadable pidfile must not keep the app from starting.
+        Ok(Err(error)) => {
+            log::warn!(target: "sidecar", "pidfile check failed: {error}");
+            Ok(())
+        }
+        Err(error) => {
+            log::warn!(target: "sidecar", "pidfile check did not finish: {error}");
+            Ok(())
+        }
+    }
+}
+
+/// Records the new sidecar's pid; the file is only a safety net, so a failure is logged and ignored.
+async fn record_pid(data_dir: &std::path::Path, pid: u32) {
+    let dir = data_dir.to_owned();
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        pidfile::write(&dir, &pidfile::SystemProcesses, pid)
+    })
+    .await;
+    if !matches!(outcome, Ok(Ok(()))) {
+        log::warn!(target: "sidecar", "could not write the sidecar pidfile");
+    }
+}
+
 /// One spawn-to-exit cycle. Always returns the reason the cycle ended.
 async fn run_once(
     app: &AppHandle,
     handle: &Arc<SidecarHandle>,
     config: &SidecarConfig,
-) -> SidecarError {
+) -> (SidecarError, Duration) {
+    if let Err(error) = reclaim_leftover(&config.data_dir).await {
+        return (error, Duration::ZERO);
+    }
     let spawned = app
         .shell()
         .sidecar(SIDECAR_BIN)
@@ -639,9 +767,15 @@ async fn run_once(
     let (mut raw_rx, child) = match spawned {
         Ok(pair) => pair,
         Err(err) => {
-            return SidecarError::Spawn(redact_line(&err.to_string(), &handle.token).into_owned())
+            return (
+                SidecarError::Spawn(redact_line(&err.to_string(), &handle.token).into_owned()),
+                Duration::ZERO,
+            )
         }
     };
+
+    let pid = child.pid();
+    record_pid(&config.data_dir, pid).await;
 
     let (tx, mut rx) = mpsc::channel(256);
     let (reaped_tx, mut reaped_rx) = watch::channel(false);
@@ -664,9 +798,11 @@ async fn run_once(
             Ok(port) => {
                 log::info!(target: "sidecar", "sidecar ready on port {port}");
                 handle.set_status(Some(app), SidecarStatus::Ready { port });
-                SidecarError::Crashed(monitor(&mut rx, &handle.token, &mut output).await)
+                let ready_at = Instant::now();
+                let failure = monitor(&mut rx, &mut output, port, &handle.token).await;
+                (SidecarError::Crashed(failure), ready_at.elapsed())
             }
-            Err(err) => err,
+            Err(err) => (err, Duration::ZERO),
         }
     };
     let outcome = tokio::select! {
@@ -675,12 +811,16 @@ async fn run_once(
             while !*shutdown_rx.borrow_and_update() {
                 if shutdown_rx.changed().await.is_err() { break; }
             }
-        } => SidecarError::ShuttingDown,
+        } => (SidecarError::ShuttingDown, Duration::ZERO),
     };
 
     match stop_child(child, &mut rx, &mut reaped_rx, &handle.token).await {
-        Ok(()) => outcome,
-        Err(error) => error,
+        Ok(()) => {
+            // Confirmed gone: the file has nothing left to guard. (After a failed stop it stays for the next launch.)
+            pidfile::clear(&config.data_dir, pid);
+            outcome
+        }
+        Err(error) => (error, outcome.1),
     }
 }
 
@@ -1161,6 +1301,81 @@ mod tests {
     }
 
     #[test]
+    fn health_status_accepts_only_a_success_response() {
+        assert!(health_status_ok(b"HTTP/1.1 200 OK"));
+        assert!(!health_status_ok(b"HTTP/1.1 401 Unauthorized"));
+        assert!(!health_status_ok(b"HTTP/1.1 500 Internal Server Error"));
+    }
+
+    #[test]
+    fn health_failures_must_be_consecutive_and_restart_budget_replenishes_after_stability() {
+        let mut failures = HealthFailures::default();
+        assert!(!failures.record(false));
+        assert!(!failures.record(false));
+        assert!(!failures.record(true));
+        assert!(!failures.record(false));
+        assert!(!failures.record(false));
+        assert!(failures.record(false));
+
+        let mut restarts = MAX_RESTARTS;
+        replenish_restart_budget(
+            &mut restarts,
+            RESTART_REPLENISH_AFTER - Duration::from_secs(1),
+        );
+        assert_eq!(restarts, MAX_RESTARTS);
+        replenish_restart_budget(&mut restarts, RESTART_REPLENISH_AFTER);
+        assert_eq!(restarts, 0);
+        // One restart per period, never below zero, and a huge duration cannot overflow.
+        let mut restarts = 3;
+        replenish_restart_budget(
+            &mut restarts,
+            RESTART_REPLENISH_AFTER * 2 + Duration::from_secs(5),
+        );
+        assert_eq!(restarts, 1);
+        replenish_restart_budget(&mut restarts, Duration::MAX);
+        assert_eq!(restarts, 0);
+    }
+
+    #[test]
+    fn a_long_gap_between_probes_is_a_wake_from_sleep() {
+        let now = SystemTime::now();
+        assert!(!resumed_from_sleep(
+            now,
+            now + HEALTH_INTERVAL + HEALTH_TIMEOUT
+        ));
+        assert!(!resumed_from_sleep(now, now + HEALTH_INTERVAL * 2));
+        assert!(resumed_from_sleep(
+            now,
+            now + HEALTH_INTERVAL * 2 + Duration::from_secs(1)
+        ));
+        // A clock set backwards is not a sleep.
+        assert!(!resumed_from_sleep(now + Duration::from_secs(600), now));
+    }
+
+    #[tokio::test]
+    async fn health_probe_uses_loopback_and_the_launch_token() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("bind");
+        let port = listener.local_addr().expect("address").port();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("connect");
+            let mut request = [0; 512];
+            let count = stream.read(&mut request).await.expect("read request");
+            let request = String::from_utf8_lossy(&request[..count]);
+            assert!(request.starts_with("GET /health HTTP/1.1\r\n"));
+            assert!(request.contains("Authorization: Bearer test-token\r\n"));
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+                .await
+                .expect("respond");
+        });
+        assert!(probe_health(port, "test-token").await);
+        server.await.expect("server task");
+    }
+
+    #[test]
     fn tokens_are_64_hex_chars_and_unique() {
         let a = generate_token().expect("token");
         let b = generate_token().expect("token");
@@ -1485,5 +1700,168 @@ mod tests {
             graceful,
             "WP4 binary must drain on the stdin shutdown command (fallback kill/reap succeeded)"
         );
+    }
+
+    /// Probe behaviour against a server that accepts a request and never answers (a wedged event loop), and against a dead port.
+    #[tokio::test(start_paused = true)]
+    async fn a_silent_or_missing_server_fails_the_probe_once_without_a_retry() {
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("bind");
+        let port = listener.local_addr().expect("address").port();
+        let accepted = Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let counter = Arc::clone(&accepted);
+        let held = tokio::spawn(async move {
+            let mut streams = Vec::new();
+            while let Ok((stream, _)) = listener.accept().await {
+                counter.fetch_add(1, Ordering::SeqCst);
+                streams.push(stream);
+            }
+        });
+        assert!(
+            !probe_health(port, "token").await,
+            "no answer within HEALTH_TIMEOUT"
+        );
+        tokio::time::sleep(Duration::from_secs(60)).await;
+        assert_eq!(
+            accepted.load(Ordering::SeqCst),
+            1,
+            "exactly one connection per probe"
+        );
+        held.abort();
+        // Nothing listening any more: refused immediately.
+        assert!(!probe_health(port, "token").await);
+    }
+
+    /// `monitor` on a sidecar that never reports an exit: three failed probes end it with the reason the supervisor restarts on.
+    #[tokio::test(start_paused = true)]
+    async fn the_monitor_gives_up_after_three_failed_probes_and_not_before() {
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .expect("bind");
+        let port = listener.local_addr().expect("address").port();
+        drop(listener);
+        let (_keep_open, mut rx) = mpsc::channel::<ProcEvent>(1);
+        let started = Instant::now();
+        let reason = monitor(&mut rx, &mut OutputDecoder::default(), port, "token").await;
+        assert_eq!(reason, "health probe failed 3 consecutive times");
+        // The third interval, not the first: one busy answer or two hiccups never restart the sidecar.
+        assert!(started.elapsed() >= HEALTH_INTERVAL * 3);
+        assert!(started.elapsed() < HEALTH_INTERVAL * 4);
+    }
+
+    /// The stub sidecar (`stub/stub-sidecar.ts`, the same process contract as the real one) as a real child process.
+    struct StubSidecar {
+        child: std::process::Child,
+        port: u16,
+    }
+
+    impl StubSidecar {
+        fn start(token: &str) -> Option<Self> {
+            use std::io::{BufRead, BufReader};
+            use std::process::Stdio;
+
+            let stub =
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("stub/stub-sidecar.ts");
+            let mut child = std::process::Command::new("bun")
+                .arg(stub)
+                .env("CADCAMFUN_TOKEN", token)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+                .ok()?;
+            let stdout = child.stdout.take()?;
+            let (tx, rx) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                    if let StdoutLine::Ready { port } = parse_stdout_line(&line) {
+                        let _ = tx.send(port);
+                        return;
+                    }
+                }
+            });
+            let port = rx.recv_timeout(Duration::from_secs(30)).ok()?;
+            Some(Self { child, port })
+        }
+
+        fn signal(&self, name: &str) {
+            let status = std::process::Command::new("kill")
+                .args([name, &self.child.id().to_string()])
+                .status()
+                .expect("kill");
+            assert!(status.success());
+        }
+    }
+
+    impl Drop for StubSidecar {
+        fn drop(&mut self) {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_wedged_stub_sidecar_fails_the_probe_and_is_reclaimed_by_the_next_launch() {
+        let token = "stub-token";
+        let Some(mut stub) = StubSidecar::start(token) else {
+            eprintln!("bun is not available: skipping the stub sidecar test");
+            return;
+        };
+        // Healthy: the real probe against the real contract (Bearer-protected /health).
+        assert!(probe_health(stub.port, token).await);
+        assert!(!probe_health(stub.port, "wrong-token").await);
+
+        // The shell records the pid, then dies; the sidecar is wedged (stopped: it cannot read the stdin EOF, nor handle SIGTERM).
+        let data = tempfile::tempdir().expect("tempdir");
+        pidfile::write(data.path(), &pidfile::SystemProcesses, stub.child.id()).expect("pidfile");
+        stub.signal("-STOP");
+        assert!(
+            !probe_health(stub.port, token).await,
+            "a stopped process answers nothing"
+        );
+
+        // The next launch: the file names a live process that is the right program with the right start time, so it is stopped. The
+        // test runs the stub as `bun`, which is the image name `ps` reports for it.
+        let patience = pidfile::Patience {
+            poll: Duration::from_millis(20),
+            graceful: Duration::from_millis(300),
+            forced: Duration::from_secs(3),
+        };
+        let pid = stub.child.id();
+        let outcome = pidfile::reclaim(data.path(), &pidfile::SystemProcesses, "bun", patience)
+            .expect("reclaim");
+        assert_eq!(
+            outcome,
+            pidfile::Reclaim::Stopped { pid, forced: true },
+            "SIGTERM cannot reach a stopped process, SIGKILL can"
+        );
+        assert!(stub.child.wait().is_ok(), "reaped");
+        assert!(!pidfile::path(data.path()).exists());
+        assert!(!probe_health(stub.port, token).await);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_healthy_stub_sidecar_is_never_a_failed_probe_and_stops_on_the_shutdown_contract() {
+        let token = "stub-token";
+        let Some(mut stub) = StubSidecar::start(token) else {
+            eprintln!("bun is not available: skipping the stub sidecar test");
+            return;
+        };
+        for _ in 0..3 {
+            assert!(probe_health(stub.port, token).await);
+        }
+        // Closing stdin is how the real shell's death reaches the sidecar.
+        drop(stub.child.stdin.take());
+        let status = tokio::task::spawn_blocking(move || {
+            let status = stub.child.wait();
+            (status, stub)
+        })
+        .await
+        .expect("join");
+        assert!(status.0.expect("status").success());
+        assert!(!probe_health(status.1.port, token).await);
     }
 }

@@ -191,6 +191,44 @@ jobs:
         working-directory: apps/desktop/src-tauri
         run: cargo test --all-features
 
+  # Supply-chain gates for the desktop shell (spec 56 §3 G). Non-blocking until the first run has been triaged: a finding shows as a
+  # failed step but does not fail the pipeline. They read Cargo.lock and the crates.io index only, so no sidecar or system libraries.
+  cargo-deny:
+    name: cargo-deny (licences, bans, advisories, sources)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.18.3
+
+      - name: cargo deny check
+        working-directory: apps/desktop/src-tauri
+        run: cargo deny --locked check
+
+  cargo-audit:
+    name: cargo-audit (RustSec advisories)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit@0.21.2
+
+      - name: cargo audit
+        working-directory: apps/desktop/src-tauri
+        run: cargo audit --file Cargo.lock
+
   mobile:
     name: Expo companion (typecheck, test, export)
     runs-on: ubuntu-latest

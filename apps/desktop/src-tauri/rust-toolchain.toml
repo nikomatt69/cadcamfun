@@ -1,0 +1,7 @@
+# The shell builds on the current stable compiler; `rust-version` in Cargo.toml (1.90, set by Tauri 2.12 and the clipboard plugin)
+# is the floor. Following `stable` keeps local builds on the same compiler as CI (`dtolnay/rust-toolchain@stable`) and makes a fresh
+# checkout install the two components that CI runs (`cargo clippy -D warnings`, `cargo fmt --check`).
+[toolchain]
+channel = "stable"
+profile = "minimal"
+components = ["clippy", "rustfmt"]

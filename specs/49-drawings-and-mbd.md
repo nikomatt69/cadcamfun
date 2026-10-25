@@ -5,6 +5,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 [41](41-persistent-topological-naming.md) (associativity), [46](46-assembly-and-configurations.md) (assembly drawings),
 [50](50-data-exchange.md) (PMI in STEP).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - Pipeline of [spec 12](12-professional-cad-cam.md) "Technical drawings from the 3D model": `project.ts` (creased, boundary and

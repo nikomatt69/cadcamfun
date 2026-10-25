@@ -19,7 +19,7 @@ import "../styles/page-consistency.css"
 import "../styles/enterprise.css"
 import { TitleBar } from "../shared/components/title-bar.tsx"
 import { CommandPalette, type PaletteCommand } from "../shared/components/command-palette.tsx"
-import { AssistantPanel } from "../features/ai/components/AssistantPanel.tsx"
+import { AssistantPanel } from "../features/ai/index.ts"
 import { useApp } from "../shared/state/context.ts"
 import { projectSession } from "../features/projects/lib/project-session.ts"
 import { SaveSeg } from "../shared/components/workspace-strip.tsx"
@@ -30,6 +30,7 @@ import { activeActivity, routeOf, type ActivityId } from "./layout.ts"
 import { findShortcut, shortcuts } from "./shortcuts.ts"
 
 import { listenForOpenedFiles, openDelivered, readDelivered } from "./open-file.ts"
+import { listenForSidecarNotices } from "./sidecar.ts"
 import { useElementsStore } from "../features/cad/store/elementsStore.ts"
 import { openProgramInEditor } from "./open-program.ts"
 import { useLayerStore } from "../features/cad/store/layerStore.ts"
@@ -199,6 +200,19 @@ export function Shell(props: ShellProps): JSX.Element {
         if (!gone && outcome.kind === "failed") toast.error(t("shell.open.failed", { name: outcome.name, reason: t(`shell.open.${outcome.reason}`) }))
       }
     }).then((stop) => { if (gone) stop(); else off = stop }).catch(() => { if (!gone) toast.error(t("shell.open.listenFailed")) })
+    onCleanup(() => { gone = true; off?.() })
+  })
+
+  // The shell restarts a sidecar that crashed or stopped answering; the requests that were in flight are not repeated.
+  onMount(() => {
+    let gone = false
+    let off: (() => void) | undefined
+    void listenForSidecarNotices((notice) => {
+      if (gone) return
+      if (notice === "recovered") toast.success(t("shell.engine.recovered"))
+      else if (notice === "restarting") toast.warn(t("shell.engine.restarting"))
+      else toast.error(t("shell.engine.failed"))
+    }).then((stop) => { if (gone) stop(); else off = stop }).catch(() => undefined)
     onCleanup(() => { gone = true; off?.() })
   })
 

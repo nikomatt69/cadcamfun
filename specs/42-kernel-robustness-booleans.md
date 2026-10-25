@@ -3,6 +3,8 @@
 Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-parity-master-plan.md). Owner: WP1
 (`packages/core/src/cad/brep`). Extends the 2026-10-21 enterprise pass recorded in [spec 33](33-kernel-gap-analysis.md) §7.
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - Topology already carries tolerances: `Vertex.tol`, `Edge.tol`; `validateBrep` checks vertex-on-curve, edge-on-surface, loop

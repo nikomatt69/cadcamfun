@@ -1,7 +1,6 @@
 {
   "app.name": "CADCAM FUN",
   "app.tagline": "CAD, CAM and cost estimation on your machine",
-
   "activity.label": "Main navigation",
   "activity.projects": "Projects",
   "activity.cad": "CAD",
@@ -11,7 +10,6 @@
   "activity.ai": "AI",
   "activity.plugins": "Plugins",
   "activity.settings": "Settings",
-
   "titlebar.menu": "Menu",
   "titlebar.file": "File",
   "titlebar.edit": "Edit",
@@ -43,7 +41,6 @@
   "titlebar.item.checkUpdates": "Check for updates…",
   "titlebar.item.releaseNotes": "Release notes",
   "titlebar.item.close": "Close menu",
-
   "status.label": "Status bar",
   "status.units": "Units",
   "status.snap": "Snap",
@@ -58,7 +55,6 @@
   "status.sidecarFake": "Fake API",
   "status.sidecarMissing": "Unavailable",
   "status.tool": "Tool",
-
   "boot.connecting": "Starting the sidecar",
   "boot.waiting": "Waiting for the sidecar to answer",
   "boot.checking": "Checking the API",
@@ -69,7 +65,6 @@
   "boot.retry": "Retry",
   "boot.viewLogs": "View logs",
   "boot.elapsed": "Waited {seconds} s",
-
   "palette.placeholder": "Type a command",
   "palette.title": "Command palette",
   "palette.hint": "Arrow keys to move, Enter to run, Escape to close",
@@ -78,7 +73,6 @@
   "palette.group.edit": "Edit",
   "palette.group.view": "View",
   "palette.group.ai": "AI",
-
   "projects.title": "Projects",
   "projects.subtitle": "Everything stored locally in this workspace.",
   "projects.create": "New project",
@@ -109,10 +103,9 @@
   "projects.column.updated": "Updated",
   "projects.column.drawings": "Drawings",
   "projects.column.components": "Components",
-
   "cad.title": "CAD editor",
   "cad.subtitle": "Draw and edit geometry. The canvas is provided by the viewport layer.",
-  "cad.viewport": "Viewport slot",
+  "cad.viewport": "Viewport",
   "cad.viewportPending": "The 2D canvas is not mounted in this build.",
   "cad.tools": "Tools",
   "cad.layers": "Layers",
@@ -148,9 +141,8 @@
   "cad.revolve": "Revolve",
   "cad.transform": "Transform",
   "cad.modify": "Modify",
-  "cad.modifyTools": "Modify tools",
+  "cad.modifyTools": "Modify",
   "cad.snap": "Snap",
-  "cad.viewport": "Viewport",
   "cad.primitives": "3D Primitives",
   "cad.extrusionHeight": "Extrusion height",
   "cad.revolutionAngle": "Revolution angle",
@@ -228,9 +220,7 @@
   "cad.snap.gridHeading": "Grid",
   "cad.snap.toleranceLabel": "Tolerance",
   "cad.snap.gridSpacingLabel": "Spacing",
-  "cad.modifyTools": "Modify",
   "cad.drawingTools": "Drawing",
-
   "cam.title": "CAM workspace",
   "cam.subtitle": "Operations, toolpaths and G-code for the current project.",
   "cam.operations": "Operations",
@@ -250,12 +240,11 @@
   "cam.export": "Export G-code",
   "cam.empty": "No operations in this project yet.",
   "cam.downloads": "{count} moves",
-
   "library.title": "Library",
   "library.subtitle": "Materials, tools and machine configurations.",
   "library.tab.materials": "Materials",
   "library.tab.tools": "Tools",
-  "library.tab.machines": "Machine configs",
+  "library.tab.machines": "Machines",
   "library.tab.components": "Components",
   "library.empty.materials": "No materials yet",
   "library.empty.tools": "No tools yet",
@@ -272,7 +261,6 @@
   "library.column.name": "Name",
   "library.column.category": "Category",
   "library.column.value": "Value",
-
   "costs.title": "Costs",
   "costs.subtitle": "Estimate the production cost of a toolpath.",
   "costs.toolpath": "Toolpath",
@@ -292,20 +280,6 @@
   "costs.total": "Total",
   "costs.empty": "Pick a toolpath to see a breakdown.",
   "costs.error": "The estimate could not be calculated",
-
-  "ai.title": "AI assistant",
-  "ai.subtitle": "Ask about the current project; answers stream in.",
-  "ai.placeholder": "Describe what you want to machine",
-  "ai.send": "Send",
-  "ai.thinking": "Thinking",
-  "ai.clear": "Clear conversation",
-  "ai.empty": "Ask a question to get started.",
-  "ai.open": "Open the AI panel",
-  "ai.close": "Close the AI panel",
-  "ai.docked": "Docked",
-  "ai.you": "You",
-  "ai.assistant": "Assistant",
-
   "plugins.title": "Plugins",
   "plugins.subtitle": "Extend the application.",
   "plugins.installed": "Installed",
@@ -316,7 +290,6 @@
   "plugins.uninstall": "Uninstall",
   "plugins.version": "Version",
   "plugins.error": "The plugin registry could not be read",
-
   "settings.title": "Settings",
   "settings.subtitle": "Units, appearance and post-processor defaults.",
   "settings.units": "Units",
@@ -344,13 +317,11 @@
   "settings.shortcut.toggleAi": "Toggle the AI panel",
   "settings.shortcut.zoomIn": "Zoom in",
   "settings.shortcut.zoomOut": "Zoom out",
-
   "form.submit": "Submit",
   "form.reset": "Reset",
   "form.required": "Required",
   "form.unknownField": "This parameter has no form control yet.",
   "form.unsupported": "The schema cannot be rendered as a form.",
-
   "common.close": "Close",
   "common.back": "Back",
   "common.cancel": "Cancel",
@@ -379,7 +350,6 @@
   "library.invalidTool": "A tool requires a type, material and positive diameter.",
   "cam.play": "Play",
   "cam.pause": "Pause",
-
   "plugins.install": "Install plugin (.zip)",
   "plugins.installing": "Installing…",
   "plugins.enabled": "Enabled",
@@ -448,9 +418,7 @@
   "analytics.response": "Response time (ms)",
   "analytics.refresh": "Refresh",
   "analytics.error": "Metrics could not be loaded",
-
   "viewport.noWebgl": "The 3D preview needs WebGL, which is not available in this window.",
-
   "dashboard.hero.name": "CAD/CAM FUN",
   "dashboard.hero.eyebrow": "Workspace overview",
   "dashboard.hero.env": "Units mm · Post ISO · 3-axis",
@@ -525,7 +493,6 @@
   "dashboard.quick.drawingsDetail": "2D shop drawings per job",
   "dashboard.quick.toolpaths": "Toolpaths",
   "dashboard.quick.toolpathsDetail": "Setups and posted programs",
-
   "projects.page.title": "Projects",
   "projects.page.subtitle": "Everything stored locally in this workspace.",
   "projects.page.create": "New project",
@@ -545,24 +512,8 @@
   "projects.detail.components": "Components",
   "projects.detail.openings": "Open in CAD",
   "projects.detail.delete": "Delete",
-
   "library.page.title": "Library",
   "library.page.subtitle": "Materials, tools, machine configurations and components.",
-  "library.tab.materials": "Materials",
-  "library.tab.tools": "Tools",
-  "library.tab.machines": "Machines",
-  "library.tab.components": "Components",
-  "library.create": "Create item",
-  "library.column.name": "Name",
-  "library.column.category": "Category",
-  "library.column.value": "Value",
-  "library.tool.diameter": "Diameter",
-  "library.tool.flutes": "Flutes",
-  "library.material.density": "Density",
-  "library.material.cost": "Cost",
-  "library.machine.type": "Machine type",
-  "library.machine.controller": "Controller",
-
   "cad.shell.title": "CAD Editor",
   "cad.shell.subtitle": "Draw and edit geometry. The canvas is provided by the viewport layer.",
   "cad.shell.tools": "Tools",
@@ -570,7 +521,6 @@
   "cad.shell.properties": "Properties",
   "cad.shell.fit": "Fit view",
   "cad.shell.fullscreen": "Fullscreen viewport",
-
   "cam.shell.title": "CAM Workspace",
   "cam.shell.subtitle": "Operations, toolpaths and G-code for the current project.",
   "cam.shell.operations": "Operations",
@@ -579,24 +529,8 @@
   "cam.shell.gcode": "G-code",
   "cam.shell.export": "Export G-code",
   "cam.shell.addOperation": "Add operation",
-
   "settings.page.title": "Settings",
   "settings.page.subtitle": "Units, appearance and post-processor defaults.",
-  "settings.units": "Units",
-  "settings.theme": "Theme",
-  "settings.locale": "Language",
-  "settings.shortcuts": "Keyboard shortcuts",
-  "settings.shortcut.palette": "Command palette",
-  "settings.shortcut.newProject": "New project",
-  "settings.shortcut.undo": "Undo",
-  "settings.shortcut.redo": "Redo",
-  "settings.shortcut.save": "Save",
-  "settings.shortcut.export": "Export G-code",
-  "settings.shortcut.zoomFit": "Zoom to fit",
-  "settings.shortcut.toggleAi": "Toggle the AI panel",
-  "settings.shortcut.zoomIn": "Zoom in",
-  "settings.shortcut.zoomOut": "Zoom out",
-
   "auth.signin.title": "Sign in",
   "auth.signin.email": "Email",
   "auth.signin.password": "Password",
@@ -606,7 +540,6 @@
   "auth.signup.title": "Create account",
   "auth.signup.submit": "Create account",
   "auth.signup.haveAccount": "Already have an account?",
-
   "pricing.page.title": "Pricing",
   "pricing.page.subtitle": "Pick a plan that scales with your team.",
   "pricing.tier.free": "Free",
@@ -614,33 +547,15 @@
   "pricing.tier.team": "Team",
   "pricing.cta.choose": "Choose plan",
   "pricing.cta.current": "Current plan",
-
   "analytics.page.title": "Analytics",
   "analytics.page.subtitle": "Live health of the local sidecar.",
-  "analytics.refresh": "Refresh",
-  "analytics.error": "Metrics could not be loaded",
-
-  "ai.page.title": "AI assistant",
-  "ai.page.subtitle": "Ask about the current project; answers stream in.",
-  "ai.page.placeholder": "Describe what you want to machine",
-  "ai.page.send": "Send",
-
   "plugins.page.title": "Plugins",
   "plugins.page.subtitle": "Extend the application.",
-  "plugins.install": "Install plugin (.zip)",
-
   "organizations.page.title": "Organizations",
   "organizations.page.subtitle": "Teams you share projects and library items with.",
   "organizations.create": "Create organization",
-
   "costs.page.title": "Costs",
   "costs.page.subtitle": "Estimate the production cost of a toolpath.",
-  "costs.calculate": "Calculate estimate",
-  "costs.save": "Save estimate",
-
   "waitlist.page.title": "Join the waitlist",
-  "waitlist.page.subtitle": "Leave your e-mail and we will tell you about new releases.",
-  "waitlist.email": "E-mail address",
-  "waitlist.submit": "Join",
-  "waitlist.done": "You are on the list."
+  "waitlist.page.subtitle": "Leave your e-mail and we will tell you about new releases."
 }

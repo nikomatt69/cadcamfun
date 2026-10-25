@@ -47,6 +47,13 @@ cited) or a **target** (marked "target"); a target is not a claim.
 | [53](53-stock-simulation-verification.md) | Exact-bound stock, final-NC proof, full machine simulation | K5, M4, M9 | spec 32 |
 | [54](54-cam-breadth.md) | Posts and post builder, feature recognition, tool library, linking, other processes | M6–M8 | 53 |
 | [55](55-evidence-performance-qualification.md) | Corpus, benchmarks, scale, qualification, parity scorecard | gate 1 of spec 12 | — |
+| [58](58-parametric-timeline.md) | Suppress, rollback, reorder, groups, edit in place, incremental rebuild (added 2026-10-25) | G1 of spec 57 | 40 (two replays); 41 for refs |
+| [59](59-cad-to-cam-associativity.md) | Stale-program detection, regeneration with diff, operation matching (added 2026-10-25) | G2 of spec 57 | 58; 41 N6 |
+| [60](60-cam-templates-automation.md) | User-owned CAM templates, rule-based programming, job lists (added 2026-10-25) | G3 of spec 57 | 54 R1 / R2 |
+| [61](61-process-physics.md) | Engagement along the path, force-limited feed, stability, tool life (added 2026-10-25) | G4 of spec 57 | 53 V1 / V2 / V8 |
+
+[Spec 57](57-parity-ledger-2026-10-25.md) is the verified status ledger of specs 40–55 and the list of gaps outside them; [spec 62](62-execution-plan-2026-q4.md)
+is the current execution plan and replaces the wave order of §1.3 below where they differ; [spec 56](56-native-shell-integration.md) is the Rust / Tauri workstream.
 
 ### 1.3 Dependency order
 

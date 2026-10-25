@@ -6,6 +6,8 @@ owned by the collaborating session) and [spec 29](29-native-cam-kernel.md) (clai
 (`cam/{model,sim,verify,kernel}`). **Spec 32 stays the authority on simulator internals; this spec fixes the evidence
 semantics both rely on.**
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - `cam/model/dexel.ts`: **Z-dexel** model (columns of material intervals over an XY grid, exact interval Booleans per column,

@@ -9,7 +9,7 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { Sparkles } from "lucide-solid"
 import { useApp } from "../../../shared/state/context.ts"
-import { useAiStore } from "../../ai/store/context.tsx"
+import { useAiStore } from "../../ai/index.ts"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { Modal } from "../../toolpaths/components/shared.tsx"
 import {

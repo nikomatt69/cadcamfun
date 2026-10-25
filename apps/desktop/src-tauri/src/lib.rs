@@ -5,6 +5,9 @@ mod commands;
 // Public so the native-menu test (tests/native_menu.rs, a main-thread harness) can build the real menu.
 pub mod menu;
 mod opened_files;
+mod panic;
+mod pidfile;
+mod power;
 mod secrets;
 mod sidecar;
 mod tray;
@@ -49,6 +52,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(Arc::clone(&handle));
 
     app.manage(OpenedFiles::default());
+    app.manage(power::JobPower::default());
     // Windows and Linux hand a double-clicked file over as a launch argument (macOS sends `RunEvent::Opened`).
     forward_open_files(app.handle(), openable_paths(std::env::args().skip(1)));
 
@@ -86,6 +90,8 @@ fn production_reload_guard<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R>
 }
 
 pub fn run() {
+    // First, so a panic anywhere after this leaves a line in the log before the release profile aborts.
+    panic::install();
     let mut builder = tauri::Builder::default();
 
     #[cfg(desktop)]
@@ -159,6 +165,8 @@ pub fn run() {
             commands::apply_update,
             commands::restart_app,
             commands::open_release_notes,
+            power::begin_job_activity,
+            power::end_job_activity,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the CADCAM FUN shell");

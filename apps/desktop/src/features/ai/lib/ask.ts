@@ -1,5 +1,6 @@
 /**
- * "Ask the assistant" from anywhere in the app: opens the docked panel and sends the prompt, so a button on a browser row or on a verification report is one click from a conversation about exactly that.
+ * The prompts the app hands to the assistant from outside the assistant: what
+ * the user selected in the browser, and what the verifier found.
  *
  * Prompts are validated before they go to the assistant: empty selection prompts
  * are routed through a sensible default, oversize briefs are truncated with a
@@ -8,19 +9,10 @@
  * irreversible change. This mirrors the CAD skill's "extract everything from the
  * input, then ask one focused question only when missing info makes the model
  * impossible" rule.
+ *
+ * The hook that sends them lives in `hooks/use-ask-ai.ts`: this module is the
+ * library, and the library does not depend on the store.
  */
-import { useApp } from "../../../shared/state/context.ts"
-import { useAiStore } from "../store/context.tsx"
-
-export const useAskAi = (): ((prompt: string) => void) => {
-  const app = useApp()
-  const ai = useAiStore()
-  return (prompt) => {
-    app.setPanelOpen(true)
-    void ai.send(prompt)
-  }
-}
-
 /** Header the assistant sees before the user prompt. Kept terse so the model
  *  does not over-spec; this is the only place we steer behaviour. */
 export const SYSTEM_PREAMBLE =

@@ -1,6 +1,6 @@
 # 56 — Native shell integration and Rust-side quality
 
-Status: A–E3 implemented 2026-10-25. Focused verification is recorded in §5; F–H remain open. Owner: WP5 (`apps/desktop/src-tauri`) for
+Status: A–G and I implemented 2026-10-25; H deferred. Focused verification and remaining platform gates are recorded in §4–5. Owner: WP5 (`apps/desktop/src-tauri`) for
 the Rust half, WP6 (`apps/desktop/src/app`) for the webview half, WP10 for CI and signing. Part of [spec 39](39-professional-parity-master-plan.md)
 only through §7 (native compute), which waits for [spec 55](55-evidence-performance-qualification.md).
 
@@ -99,7 +99,7 @@ pinned release with **only `Flags::RELOAD` in production**. Development reloads 
 Shift+Tab focus traversal, native/custom context menus, find, print and editing shortcuts must remain available. This plugin
 injects an initialization script and needs no frontend IPC capability. Existing close/autosave guards remain authoritative.
 
-### F. Process supervision (open)
+### F. Process supervision (implemented; native smoke pending)
 
 (1) Rust pings `/health` every 10–15 s after `Ready`; three misses with a generous threshold → the existing stop/restart path; the restart
 budget replenishes (one per 10 min of healthy time) instead of the hard `MAX_RESTARTS = 1`. (2) `NSProcessInfo.beginActivity(userInitiated)`
@@ -107,7 +107,7 @@ around CAM/kernel jobs (a Rust command + `cam.progress` listener) and a wake han
 `window.setProgressBar` / `setBadgeCount` (needs `core:window:allow-set-progress-bar`, `allow-set-badge-count`). (4) A pidfile in the data dir
 so a wedged sidecar left by a crashed shell is refused/killed before the next spawn. Each process-lifecycle change needs a test on the stub sidecar; native power and progress integration also needs a platform smoke test.
 
-### G. Quality gates (open)
+### G. Quality gates (implemented; CI reports initially non-blocking)
 
 `cargo-deny` (`deny.toml`: advisories, licences, bans, duplicate warnings; the licence list also feeds `THIRD_PARTY_NOTICES.md`) and
 `cargo-audit` as CI jobs, non-blocking at first; a `std::panic::set_hook` that logs location and message before the abort; dev profile
@@ -121,12 +121,25 @@ a Rust SSE consumer feeding an `ipc::Channel` (keeps the stream alive while the 
 meshes and G-code with optional zstd. Cost L, medium risk, every call path affected: only behind a flag with the current path as fallback and only
 after C has been in use.
 
+### I. Owner-requested follow-up qualification (2026-10-25)
+
+This follow-up qualifies five operational risks without changing CAD/CAM geometry or G-code output:
+
+1. **Signed macOS bundle:** add a release smoke that verifies Developer ID signatures and launches the bundled sidecar using temporary data; run it only when the CI release has Apple signing credentials. The existing ad-hoc bundle smoke remains useful but does not count as notarization qualification. Do not add JIT entitlements unless the signed binary demonstrates they are required.
+2. **Sidecar health:** after ready, probe its loopback health endpoint at a conservative interval with bounded timeouts. Three consecutive failures trigger the existing graceful stop/restart path. Replenish one restart after ten minutes of healthy operation. A health failure must not retry API mutations. Test the state policy and stub-sidecar recovery path.
+3. **Performance evidence:** add a repeatable, opt-in benchmark command for representative existing CAM verification and surface-sampling workloads, reporting median/p95, workload dimensions, runtime/Bun version and machine fingerprint. Keep outputs informational until a stable reference corpus and hardware policy exist; do not add Rust or change algorithms in this phase.
+4. **Save recovery:** extend regression coverage for a process interruption around atomic file replacement and autosave failure/retry/flush behavior. Keep the current same-directory temporary-file plus fsync/rename contract; do not claim power-loss durability beyond the guarantees of the target filesystem.
+5. **Security configuration:** remove only permissions with no current caller. Preserve `'unsafe-eval'` while parametric scripts and code-mode use dynamic evaluation; test `freezePrototype` against the real viewport, editor and AI runtime before changing its release default. Keep the current value until that native smoke is available.
+
+Any item that cannot be exercised without owner-only signing credentials or a native GUI must ship with an automated gate and be explicitly recorded as awaiting that environment, rather than reported as qualified.
+
 ## 4. Status
 
 Integration ownership: this spec authorizes WP5 native commands/configuration, WP6 `src/app`, `src/shared/lib/save-file.ts`,
 `src/i18n/en.shell.json`, `src/shared/lib/clipboard.ts`, clipboard callers and dependencies, desktop regression tests, and WP10 `scripts/tauri-config.test.ts`. Native export conversion also owns the
 export functions in otherwise clean CAD/CAM/toolpath feature files; foreign edits are preserved and remaining sites are listed here.
-No commit is required. F–H and native compute remain explicitly deferred.
+Owner-requested follow-up I authorizes WP5 sidecar supervision, WP10 release smoke and benchmark scripts, WP2/WP1 benchmark adapters
+that call existing CAM APIs without algorithm changes, and the existing desktop autosave/export regression surface. No commit is required.
 
 
 | Phase | State |
@@ -138,7 +151,10 @@ No commit is required. F–H and native compute remain explicitly deferred.
 | E least privilege, CSP additions | implemented; configuration tests pass; ad-hoc bundle sidecar smoke passes |
 | E2 native clipboard | implemented; all 8 callers use native write-only transport with browser fallback |
 | E3 production reload protection | implemented in release only; plugin-generated script regression and native checks pass |
-| F supervision, G gates, H boundary | open |
+| F supervision | implemented: loopback health checks, bounded failure/restart policy, sleep-gap reset, pidfile recovery and expiring job activity leases; real macOS/Windows/Linux power behavior still needs platform smoke |
+| G quality gates | implemented: deny/audit CI, panic hook, dev profile, pinned MSRV floor/toolchain, HTTPS timestamp, stub handshake test |
+| H boundary | deferred; requires its own spec and compatibility rollout |
+| I owner-requested follow-up qualification | benchmark, autosave regression tests and signed-bundle smoke implemented; Developer ID/notarized CI and native GUI checks await their platform/credential environment |
 
 Entitlements verification: the existing ad-hoc signed hardened-runtime bundle sidecar started with no entitlements, reached ready in
 1473.6 ms, completed `cad.parametric_test` with `accepted: true`, and shut down in 62.4 ms with exit 0. Run used temporary data and
@@ -163,6 +179,8 @@ Latest focused verification (2026-10-25):
 - One broader run initially hit a sandbox socket restriction and was rerun with the required approval. A save-dialog wait timed out
   under concurrent build load, passed in isolation, and now has the same 30-second integration budget as the surrounding actions.
   The final focused 83-test run passes under concurrent build load.
+
+Follow-up verification: desktop typecheck passed (1,255 files); Tauri capability/lint, Liquid Glass and autosave selection passed (35 tests); workflow lint passed (7 workflows); `cargo fmt --check` passed after formatting. A subsequent Rust test invocation could not acquire Cargo's build-directory lock and was stopped; rerun Rust tests and clippy after the active build releases it. The CAM microbenchmark ran under high machine load (load average 13.5/18.7/17.6), so its timings are diagnostic only, not a performance baseline.
 
 
 - Rust: `quit_plan` cases; `OpenedFiles` (queue drains once, only delivered paths readable, extension and size limits, symlink to a foreign
@@ -228,3 +246,53 @@ and the installed locked packages. Catalog inclusion alone does not establish Ta
 - 2026-10-25: added write-only native clipboard at the owner's request; audited capabilities/configuration, strengthened CSP without
   breaking dynamic local scripts, corrected capability schema paths and declared Rust MSRV. Verified existing signed bundle sidecar.
 - 2026-10-25: reviewed official/community catalogs with three parallel tasks; integrated selective production reload protection with a generated-script regression test; narrowed notification permissions to the actual bridge calls.
+
+## 10. Plugin and crate verdicts (2026-10-25)
+
+Audit of every `tauri-plugin-*` in `apps/desktop/src-tauri/Cargo.toml`, every capability grant, and the webview imports (`apps/desktop/src`,
+`src-tauri/guest-js`). Evidence is the repo, the locked sources in `~/.cargo/registry`, and `gen/schemas/acl-manifests.json` (ACL
+contents of each default set). The rules below are enforced by `scripts/tauri-config.test.ts` ("Tauri least-privilege lint") and
+`deny.toml`; each rule is also run against a deliberately broken copy of the tree, so a rule that stops detecting fails its own test.
+
+| Plugin / crate | Verdict | Reason and evidence |
+|---|---|---|
+| `tauri-plugin-shell` | keep, grant already narrow | Rust spawns the sidecar through `app.shell().sidecar()`. The webview grant is only `shell:allow-open` (caller `app/external.ts`); spawn/execute/stdin-write/kill are asserted absent. Not a duplicate of opener: opener has no webview grant. Later option: move `external.ts` to the opener's scoped `openUrl` and drop `shell:allow-open` (a migration, not a removal). |
+| `tauri-plugin-dialog` | keep (Rust only) | `app.dialog()` in `pick_file`/`save_file`. No capability since E (`dialog:default` removed). It pulls `tauri-plugin-fs` as a library; `deny.toml` allows `fs` only as a dependency of `dialog`. |
+| `tauri-plugin-clipboard-manager` | keep, narrow | Only `clipboard-manager:allow-write-text`; no read, image or history. |
+| `tauri-plugin-prevent-default` (`=6.0.1`) | keep | Release-only reload guard; injects a script, no IPC, no permission. Pin is deliberate (E3). |
+| `tauri-plugin-opener` | keep (Rust only) | Opens the release page (`updater.rs`) and backs the guarded `open_path` command (`commands.rs`). No webview grant. |
+| `tauri-plugin-log` | keep | `log:default` is exactly `allow-log` (ACL manifest); caller `main.tsx`. |
+| `tauri-plugin-updater` | keep (Rust only) | Driven by the update commands; no grant. `@tauri-apps/plugin-updater` and `@tauri-apps/plugin-dialog` are listed in `apps/desktop/package.json` but imported nowhere: remove from that manifest (outside WP5/WP10 ownership of this audit, not changed). |
+| `tauri-plugin-os` | keep crate, **grant removed** | The webview imports only `platform()` (`app/glass.ts`). In `@tauri-apps/plugin-os` `platform()` returns `window.__TAURI_OS_PLUGIN_INTERNALS__.platform`, injected at init: no IPC, so `os:default` (7 commands) had no caller. Removed from `capabilities/main.json`. |
+| `tauri-plugin-notification` | keep, narrow | Three grants (`is-permission-granted`, `request-permission`, `notify`) against a 17-entry default set; caller `features/notifications/native.ts`. |
+| `tauri-plugin-liquid-glass` | keep, optional | macOS only, behind the `liquid-glass` feature and the separate `glass` capability, both dropped for the App Store build. |
+| `tauri-plugin-single-instance` | keep | Desktop-only target dependency; forwards second launches. |
+| `tauri-plugin-window-state` | keep (Rust only) | Restores geometry in Rust; `window-state:default` was already removed, nothing in the webview calls it. |
+| Direct crates (`tempfile`, `getrandom`, `keyring`, `thiserror`, `serde`, `serde_json`, `tokio`, `log`, platform crates) | keep | The lint fails on any `[dependencies]` entry that no Rust source references. |
+| `fs`, `http`, `websocket`, `upload`, `localhost`, `sql`, `store`, `stronghold`, `process`, `persisted-scope` | **do not add** | The sidecar, the keyring and the guarded native commands own these jobs (§2, §6). `deny.toml` bans each, so adding one needs a spec change first. |
+| `global-shortcut`, `autostart`, `deep-link`, `positioner` | add later, conditional | Only for the features named in §8; no grant until a caller exists. |
+
+Capability findings:
+
+- `core:default` (nine sets: path, event, window, webview, app, image, resources, menu, tray) is wider than the webview needs. The imports are
+  `api/core` (`invoke`), `api/event` (`listen`) and `api/window` (`getCurrentWindow().onCloseRequested`, `destroy`), which suggests
+  `core:event:default` plus `core:window:allow-destroy`. **Not changed:** that cannot be proven without running the packaged app (the
+  close guard, the menu and the update prompt all depend on it); bisect in a real run, as for `'unsafe-eval'` in §3 E.
+- Three commands have no webview caller yet and are granted: `pick_file`, `secret_delete`, `set_recent_projects`. They are kept (each has a
+  planned caller, see the `PENDING_CALLER` table in the lint). The lint fails for a new command without a caller and for a stale entry.
+- `shell:allow-open` is **not** removable: `app/external.ts` imports `open` from `@tauri-apps/plugin-shell`.
+- Every grant must have a rule in `CALLER_EVIDENCE` (webview code that justifies it); adding a permission without a caller now fails the
+  Bun test with the permission name.
+
+Release configuration verified in the same pass: `bundle.windows` carries `digestAlgorithm: sha256` and an **https** `timestampUrl`
+(`scripts/build.ts` no longer overrides it with an http URL); the targets are `app, dmg, nsis, msi, deb, rpm` as built by
+`release.yml`; `tauri.appstore.conf.json` differs from the main window only by `transparent: false` and an opaque `backgroundColor`
+(asserted), and drops `macOSPrivateApi` and the `glass` capability. Open for the App Store build, not changed here: the updater plugin
+and the unsandboxed sidecar need a separate review against Mac App Store rules.
+
+Quality gates added (G): `deny.toml` and the `cargo-deny` / `cargo-audit` jobs in `.github/workflows/ci.yml` (non-blocking until the
+first run is triaged); `rust-toolchain.toml` (`stable`, clippy and rustfmt); `[lints]` (`unsafe_code = forbid`, `unwrap_used`,
+`dbg_macro`, `todo`, `unimplemented` denied: the release profile aborts on panic); dev profile `debug = "line-tables-only"` with
+dependencies at `opt-level = 2`; `tests/stub_sidecar.rs`, which runs the stub through the ready handshake, authenticated `/health`, the
+shutdown command, stdin EOF, never-ready and crash-after-ready. That test found a real drift: the stub ignored the JSON shutdown command the
+shell writes (so `tauri dev` always waited out the shutdown timeout and killed it); fixed in `stub/stub-sidecar.ts`.

@@ -8,7 +8,7 @@
  * the height back to the conversation. Each keeps its label as an accessible
  * name and the agent description as a tooltip, so nothing was lost.
  */
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import Bot from "lucide-solid/icons/bot"
 import Compass from "lucide-solid/icons/compass"
 import ShieldCheck from "lucide-solid/icons/shield-check"
@@ -17,6 +17,7 @@ import Check from "lucide-solid/icons/check"
 import ChevronDown from "lucide-solid/icons/chevron-down"
 import CircleGauge from "lucide-solid/icons/circle-gauge"
 import { t } from "../../../i18n/index.ts"
+import { createDismissable } from "../lib/dismiss.ts"
 import { useAiStore } from "../store/context.tsx"
 import type { AiPendingQuestion } from "../lib/types.ts"
 
@@ -117,21 +118,8 @@ export function AssistantControls(): JSX.Element {
     return variant ? { ...model, variant } : model
   })
 
-  createEffect(() => {
-    if (!open()) return
-    const away = (event: PointerEvent): void => {
-      if (!(event.target as Element | null)?.closest?.(".assistant-control-menu-root")) setOpen(undefined)
-    }
-    const escape = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setOpen(undefined)
-    }
-    document.addEventListener("pointerdown", away, true)
-    document.addEventListener("keydown", escape)
-    onCleanup(() => {
-      document.removeEventListener("pointerdown", away, true)
-      document.removeEventListener("keydown", escape)
-    })
-  })
+  // One rule for every menu in the assistant: click outside or Escape closes it.
+  createDismissable({ open: () => open() !== undefined, root: ".assistant-control-menu-root", onDismiss: () => setOpen(undefined) })
 
   return (
     <div class="assistant-chips" data-testid="ai-controls" aria-label={t("ai.controls.label")}>

@@ -1,0 +1,78 @@
+# cargo-deny policy for the desktop shell (CI job `cargo-deny`, spec 56 §3 G):
+#
+#   cd apps/desktop/src-tauri && cargo deny --locked check
+#
+# Non-blocking in CI until the first run has been triaged (`continue-on-error`). The licence list below was derived from
+# `cargo metadata --filter-platform aarch64-apple-darwin` (360 packages, 2026-10-25); the Windows and Linux graphs add only
+# permissive licences already in the list (their crates were not in the offline registry, so that part is verified by CI).
+
+[graph]
+# The six release targets of .github/workflows/release.yml: a crate that only one platform pulls in is still checked.
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+]
+all-features = true
+
+[advisories]
+version = 2
+# "workspace": an unmaintained advisory fails only for the shell's direct dependencies, not for crates deep in Tauri's own GTK3
+# tree that we cannot replace. Vulnerabilities and unsound code are always errors. Every ignore needs an id and a reason.
+unmaintained = "workspace"
+yanked = "warn"
+ignore = []
+
+[licenses]
+version = 2
+# What `THIRD_PARTY_NOTICES.md` and the bundled binary may carry. Copyleft other than file-level MPL-2.0 is not allowed.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "0BSD",
+  "Unlicense",
+  "CC0-1.0",
+  "Unicode-3.0",
+  "MPL-2.0",
+]
+confidence-threshold = 0.9
+# The shell itself has no `license` field (`publish = false`).
+private = { ignore = true }
+
+[bans]
+# Different major versions of syn, getrandom, windows-sys, ... come from Tauri's tree; they are listed in the CI log so a new
+# duplicate is noticed, but not fatal.
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+deny = [
+  { crate = "openssl", reason = "the updater and the shell use rustls; OpenSSL would add a dynamic libssl dependency to the Linux packages" },
+  { crate = "openssl-sys", reason = "see openssl" },
+  { crate = "native-tls", reason = "see openssl" },
+  # Plugins the owner decided against (spec 56 §2 and §6): the sidecar and the keyring already own these jobs. Adding one is
+  # a spec change first, then an entry removed here.
+  { crate = "tauri-plugin-fs", wrappers = ["tauri-plugin-dialog"], reason = "no webview file access: the guarded native commands read and write (spec 56 §3 E); only the dialog plugin may pull it in" },
+  { crate = "tauri-plugin-http", reason = "the webview must not reach the network; the sidecar does" },
+  { crate = "tauri-plugin-websocket", reason = "see tauri-plugin-http" },
+  { crate = "tauri-plugin-upload", reason = "see tauri-plugin-http" },
+  { crate = "tauri-plugin-localhost", reason = "an unauthenticated local port" },
+  { crate = "tauri-plugin-sql", reason = "the sidecar owns the database" },
+  { crate = "tauri-plugin-store", reason = "the sidecar owns persistence" },
+  { crate = "tauri-plugin-stronghold", reason = "the OS keyring owns secrets" },
+  { crate = "tauri-plugin-process", reason = "the custom restart_app command covers it" },
+  { crate = "tauri-plugin-persisted-scope", reason = "no fs scope is granted" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

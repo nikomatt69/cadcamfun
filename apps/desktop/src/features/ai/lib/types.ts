@@ -111,6 +111,26 @@ export interface AiMessage {
 
 export type AiEvent = import("@cadcamfun/api").AiStreamEvent
 
+/** How a message written while the agent works reaches the turn it joins. */
+export type PendingDelivery = "queue" | "steer"
+
+/** A message the agent has not taken in yet. */
+export interface AiPending {
+  readonly id: string
+  readonly text: string
+  readonly delivery: PendingDelivery
+}
+
+/** The counters the statistics panel shows. */
+export interface AiStats {
+  readonly exchanges: number
+  readonly toolCalls: number
+  readonly thinkingSteps: number
+  readonly totalInputTokens: number
+  readonly totalOutputTokens: number
+  readonly totalLatencyMs: number
+}
+
 export type TodoStatus = "pending" | "in_progress" | "completed" | "cancelled"
 export interface AiTodo { readonly id?: string; readonly content: string; readonly status: TodoStatus; readonly priority?: string }
 export type GoalStatus = "active" | "paused" | "blocked" | "usage_limited" | "budget_limited" | "complete"

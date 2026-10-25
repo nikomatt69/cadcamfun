@@ -69,7 +69,9 @@ describe("Liquid Glass for the Tauri window", () => {
     expect(conf.app.macOSPrivateApi).toBe(true)
     expect(conf.app.windows[0].transparent).toBe(true)
     const caps = JSON.parse(readFileSync(join(tauri, "capabilities/main.json"), "utf8")).permissions
-    for (const permission of ["os:default", "window-state:default", "log:default"]) expect(caps).toContain(permission)
+    expect(caps).toContain("log:default")
+    expect(caps.some((permission: string) => permission.startsWith("os:"))).toBe(false)
+    expect(caps).not.toContain("window-state:default")
     // The glass permission lives in its own capability, so a build without the plugin can leave it out.
     expect(JSON.parse(readFileSync(join(tauri, "capabilities/glass.json"), "utf8")).permissions).toEqual(["liquid-glass:default"])
     expect(conf.app.security.capabilities).toEqual(["main", "glass"])

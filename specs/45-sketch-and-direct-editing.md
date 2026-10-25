@@ -4,6 +4,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 [spec 33](33-kernel-gap-analysis.md). Owner: WP1 (`cad/sketch*.ts`, `cad/brep/face-edit.ts`, `cad/face-edit.ts`); desktop
 sketcher UI is WP6/WP7 (`apps/desktop/src/features/cad`). Depends on [41](41-persistent-topological-naming.md).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - Sketch entities: point, line, circle, arc, ellipse, spline. The spline is a Catmull-Rom curve through points

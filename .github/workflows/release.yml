@@ -214,6 +214,9 @@ jobs:
         # Tauri bundle only: `compile` is skipped — the sidecar was cross-compiled
         # by the Bun job above and already placed in src-tauri/binaries/.
         run: bun --no-env-file scripts/build.ts --skip=check,compile --target=${{ matrix.target }} --bundles=${{ matrix.bundles }} --out-dir=release
+      - name: Verify the macOS app signature and bundled sidecar
+        if: runner.os == 'macOS'
+        run: bun --no-env-file scripts/smoke-macos-bundle.ts --bundle-root "apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos"
       # Tauri 2.13.1 selects the matching signed DEB/RPM or MSI package automatically.
       - name: Build architecture-specific updater manifest
         env:

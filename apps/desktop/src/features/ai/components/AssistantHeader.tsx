@@ -11,11 +11,12 @@
  * The bar remains in the document flow so opening a panel or reading a long
  * answer never changes the user's wayfinding anchor.
  */
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import ChevronDown from "lucide-solid/icons/chevron-down"
 import Ellipsis from "lucide-solid/icons/ellipsis"
 import X from "lucide-solid/icons/x"
 import { t } from "../../../i18n/index.ts"
+import { createDismissable } from "../lib/dismiss.ts"
 import { useAiStore } from "../store/context.tsx"
 import { ProviderBadge } from "./ProviderBadge.tsx"
 import { ContextGauge } from "./ContextGauge.tsx"
@@ -63,21 +64,7 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
   const sessionsAction = createMemo(() => props.quick.find((item) => item.id === "sessions"))
 
   // The menu is a transient layer: a click anywhere else or an Escape closes it.
-  createEffect(() => {
-    if (!menuOpen()) return
-    const away = (event: PointerEvent): void => {
-      if (!(event.target as Element | null)?.closest?.(".assistant-bar-menu-root")) closeMenu()
-    }
-    const escape = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") closeMenu()
-    }
-    document.addEventListener("pointerdown", away, true)
-    document.addEventListener("keydown", escape)
-    onCleanup(() => {
-      document.removeEventListener("pointerdown", away, true)
-      document.removeEventListener("keydown", escape)
-    })
-  })
+  createDismissable({ open: menuOpen, root: ".assistant-bar-menu-root", onDismiss: closeMenu })
 
   return (
     <header

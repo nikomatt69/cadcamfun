@@ -4,6 +4,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 [spec 33](33-kernel-gap-analysis.md). Owner: WP1 (`cad/sheet-metal.ts`, new `cad/weldment.ts`, `cad/mold.ts`). Depends on
 [41](41-persistent-topological-naming.md) and [43](43-general-blends-shell-offset.md).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - `sheet-metal.ts` (296 lines): `sheetOutline`, `thickenPath`, `withHems`, `withEdgeFlanges`, `edgeFlangeReliefs`; history `sheet`

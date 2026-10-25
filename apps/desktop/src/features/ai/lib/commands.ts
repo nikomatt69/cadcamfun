@@ -19,6 +19,7 @@
 import { copyText } from "../../../shared/lib/clipboard.ts"
 import type { AiStoreAndContext } from "../store/context.tsx"
 import type { Key } from "../../../i18n/index.ts"
+import type { PanelId } from "./panels.ts"
 
 export type CommandGroup = "session" | "model" | "context" | "design" | "cam" | "library" | "version"
 
@@ -46,9 +47,17 @@ export interface CommandHost {
   /** Replaces the composer draft (used by commands that prefill a prompt). */
   setDraft(next: string): void
   /** Opens one of the panel disclosures; passing the open one closes it. */
-  togglePanel(panel: "sessions" | "tools" | "skills" | "stats" | "context" | "help"): void
+  togglePanel(panel: PanelId): void
   /** One-line feedback in the panel, for commands that have nothing else to show. */
   notify(message: string, tone?: "info" | "error"): void
+  /** Looks for something in the conversation on screen. */
+  search(query: string): void
+  /** Reads the messages before the ones on screen. */
+  loadOlder(): void
+  /** Asks the last question again. */
+  regenerate(): void
+  /** Writes the conversation to a file. */
+  saveTranscript(): Promise<void>
 }
 
 export interface SlashCommand {
@@ -167,6 +176,55 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
       }
       return done
     }
+  },
+  {
+    name: "save",
+    aliases: ["download"],
+    group: "session",
+    title: "ai.cmd.save",
+    description: "ai.cmd.save.desc",
+    keywords: ["markdown", "file", "write", "transcript"],
+    run: async ({ host }) => {
+      try {
+        await host.saveTranscript()
+      } catch {
+        return reject("ai.cmd.save.failed")
+      }
+      return done
+    }
+  },
+  {
+    name: "again",
+    aliases: ["redo", "retry"],
+    group: "session",
+    title: "ai.cmd.again",
+    description: "ai.cmd.again.desc",
+    keywords: ["regenerate", "repeat", "once more"],
+    run: ({ host }) => { host.regenerate(); return done }
+  },
+  {
+    name: "find",
+    aliases: ["search"],
+    group: "session",
+    title: "ai.cmd.find",
+    description: "ai.cmd.find.desc",
+    args: "<text>",
+    keywords: ["search", "grep", "lookup", "conversation"],
+    run: ({ args, host }) => {
+      const wanted = args.trim()
+      if (wanted === "") return reject("ai.cmd.find.empty")
+      host.search(wanted)
+      return done
+    }
+  },
+  {
+    name: "older",
+    aliases: ["earlier", "back"],
+    group: "session",
+    title: "ai.cmd.older",
+    description: "ai.cmd.older.desc",
+    keywords: ["earlier", "before", "history", "previous"],
+    run: ({ host }) => { host.loadOlder(); return done }
   },
   {
     name: "stop",
@@ -323,6 +381,15 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
     description: "ai.cmd.tools.desc",
     keywords: ["catalogue", "available", "permissions", "allow-list"],
     run: ({ host }) => { host.togglePanel("tools"); return done }
+  },
+  {
+    name: "catalog",
+    aliases: ["catalogue", "actions"],
+    group: "context",
+    title: "ai.cmd.catalog",
+    description: "ai.cmd.catalog.desc",
+    keywords: ["actions", "catalogue", "permissions", "read", "write", "destructive"],
+    run: ({ host }) => { host.togglePanel("catalog"); return done }
   },
   {
     name: "skills",

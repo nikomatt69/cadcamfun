@@ -1,7 +1,7 @@
 import { For, Show, createEffect, on, type JSX } from "solid-js"
 import { Cpu } from "lucide-solid"
 import { useApp } from "../../../../shared/state/context.ts"
-import { useAiStore } from "../../../ai/store/context.tsx"
+import { useAiStore } from "../../../ai/index.ts"
 import { geometryOf } from "../../lib/job.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"

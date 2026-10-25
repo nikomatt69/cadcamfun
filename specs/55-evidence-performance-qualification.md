@@ -5,6 +5,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 `packages/core/test/corpus/` and `scripts/`), release process WP10. **This spec is built first (Wave A): without it no other
 spec can say how far it got.**
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Problem
 
 Every spec says "parity is not claimed". The repository has thousands of unit tests (core: 2 427 tests over 164 files at the
@@ -34,6 +36,14 @@ targets, the qualification record and the scorecard that turns those into levels
   config; timings are judged against the **budget** in `bench.config.json`, not absolute history.
 - **Gate:** a change that worsens a benchmark's median by > 20 % against its budget needs a recorded justification in the commit.
 - Existing time gates stay (`gates.test.ts` 15 s budget; history-brep suite split in two halves to stay below 118 s).
+
+### 3.1 Initial CAM microbenchmark (2026-10-25)
+
+`bun run bench:cam --runs=7` is an informational first measurement of three existing TypeScript seams: sampled stock removal,
+drop-cutter grid evaluation, and G-code verification. It reports workload dimensions, Bun/OS/CPU, load average, p50 and p95.
+It is deliberately separate from the full corpus benchmark in §3: these synthetic fixtures do not qualify geometry parity,
+release budgets, or performance against another implementation. Use the output to decide which representative corpus cases to add;
+do not use these numbers as CI limits.
 
 ## 4. Scale targets (declared, measured by the benchmarks; all are targets until measured)
 

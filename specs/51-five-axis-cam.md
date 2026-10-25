@@ -5,6 +5,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 `cam/kernel/{head,kinematics,collision,motion,machine-clearance}.ts`, `cam/post/*`); adapters WP3/WP4/WP6/WP8. Depends on
 [53](53-stock-simulation-verification.md) (stock and proof of the final NC).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - Indexed 3+2 (AC / BC trunnion) in `cam/indexing.ts` with an `Orient` move in the IR.

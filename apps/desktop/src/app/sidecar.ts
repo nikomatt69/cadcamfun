@@ -89,6 +89,33 @@ export const trackSidecarStatus = async (): Promise<() => void> => {
   return listen("sidecar-status", (event) => acceptSidecarStatus(event.payload))
 }
 
+export type SidecarNotice = "restarting" | "recovered" | "failed"
+
+/**
+ * What a `sidecar-status` payload means for the person using the app. The shell restarts a sidecar that crashed or stopped answering
+ * its health probe; requests that were in flight then failed and are **not** repeated, so the person has to know. `restarting` carries
+ * the state between two payloads: the first `ready` after a restart is a recovery, the first `ready` of a launch is not.
+ */
+export const sidecarNotice = (payload: unknown, restarting: boolean): { readonly notice?: SidecarNotice; readonly restarting: boolean } => {
+  const state = payload !== null && typeof payload === "object" ? (payload as { state?: unknown }).state : undefined
+  if (state === "restarting") return { notice: restarting ? undefined : "restarting", restarting: true }
+  if (state === "ready") return { notice: restarting ? "recovered" : undefined, restarting: false }
+  if (state === "failed") return { notice: "failed", restarting: false }
+  return { restarting }
+}
+
+/** Reports restart, recovery and permanent failure of the sidecar. Outside the desktop shell there is nothing to hear. */
+export const listenForSidecarNotices = async (onNotice: (notice: SidecarNotice) => void): Promise<() => void> => {
+  if (!isTauri()) return () => {}
+  const { listen } = await import("@tauri-apps/api/event")
+  let restarting = false
+  return listen("sidecar-status", (event) => {
+    const next = sidecarNotice(event.payload, restarting)
+    restarting = next.restarting
+    if (next.notice !== undefined) onNotice(next.notice)
+  })
+}
+
 /** Rewrite only this client's sidecar origin. Request bodies, authorization and abort signals survive the move. No writes are retried. */
 export const followingFetch = (endpoint: Endpoint, base: typeof fetch = globalThis.fetch): typeof fetch => {
   const origin = new URL(endpoint.baseUrl).origin

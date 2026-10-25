@@ -4,6 +4,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 [spec 33](33-kernel-gap-analysis.md). Owner: WP1 (`cad/{kinematics,assembly-analysis,smart-fasteners}.ts`, new
 `cad/assembly/`); adapters WP3/WP4, desktop `features/cad` assembly panel (WP6).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - `kinematics.ts`: `KinematicModel` of parts and joints (fixed, revolute, prismatic, cylindrical, ball, planar), gear / rack

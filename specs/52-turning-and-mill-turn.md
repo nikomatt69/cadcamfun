@@ -5,6 +5,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 `cam/generator/lathe.ts`, `cam/viewer/{turn-mill,turned-profile,lathe-tools}.ts`, `cam/post/*`). Depends on
 [53](53-stock-simulation-verification.md).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - `kernel/turning.ts`: **external turning preview** in diameter X / axial Z with an ideal point tool (`TurnPoint`, `TurnStock`,

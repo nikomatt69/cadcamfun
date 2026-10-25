@@ -1,0 +1,3 @@
+# `unwrap_used` is denied in Cargo.toml ([lints.clippy]) for shipped code, where a panic aborts the whole app in release.
+# Test assertions may unwrap: a failing unwrap there is the failure the test reports.
+allow-unwrap-in-tests = true

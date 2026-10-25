@@ -19,6 +19,8 @@ const COMMANDS: &[&str] = &[
     "apply_update",
     "restart_app",
     "open_release_notes",
+    "begin_job_activity",
+    "end_job_activity",
 ];
 
 fn main() {

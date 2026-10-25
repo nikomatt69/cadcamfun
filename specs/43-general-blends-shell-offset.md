@@ -4,6 +4,8 @@ Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-pari
 [spec 33](33-kernel-gap-analysis.md). Owner: WP1 (`cad/brep/{blend,shell,draft}.ts`, new `offset.ts` in `cad/brep`). Depends on
 [42](42-kernel-robustness-booleans.md) (SSI, tangent contact) and [44](44-surface-modelling.md) (surface offset).
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Where it stands (verified)
 
 - `blendBrep`/`blendCandidates`: constant fillet / chamfer of **straight edges** and **coaxial rims** (plane, cylinder, cone),

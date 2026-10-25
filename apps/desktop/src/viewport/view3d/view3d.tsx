@@ -1,7 +1,7 @@
 import { createDisplayEdges } from "../native-edges.ts"
 import { FrameScheduler } from "../../features/cad/lib/frame-scheduler.ts"
 import { MeshWorkerQueue } from "./mesh-jobs.ts"
-import { registerViewportCapture } from "../../features/ai/lib/viewport-capture.ts"
+import { registerViewportCapture } from "../../features/ai/index.ts"
 import { Show, createEffect, createSignal, onCleanup, onMount, untrack, type JSX } from "solid-js"
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"

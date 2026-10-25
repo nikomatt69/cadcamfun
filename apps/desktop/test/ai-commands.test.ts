@@ -29,6 +29,10 @@ interface Recorder {
   readonly drafts: ReadonlyArray<string>
   readonly panels: ReadonlyArray<string>
   readonly notices: ReadonlyArray<{ message: string; tone: string | undefined }>
+  readonly searches: ReadonlyArray<string>
+  readonly older: number
+  readonly regenerated: number
+  readonly saved: number
 }
 
 const stubAi = (overrides: Record<string, unknown> = {}): CommandHost["ai"] => {
@@ -65,14 +69,20 @@ const stubAi = (overrides: Record<string, unknown> = {}): CommandHost["ai"] => {
 
 const recorder = (ai: CommandHost["ai"] = stubAi()): Recorder => {
   const sent: string[] = [], drafts: string[] = [], panels: string[] = [], notices: Array<{ message: string; tone: string | undefined }> = []
+  const searches: string[] = []
+  let older = 0, regenerated = 0, saved = 0
   const host: CommandHost = {
     ai,
     send: async (prompt) => { sent.push(prompt) },
     setDraft: (next) => { drafts.push(next) },
     togglePanel: (panel) => { panels.push(panel) },
-    notify: (message, tone) => { notices.push({ message, tone }) }
+    notify: (message, tone) => { notices.push({ message, tone }) },
+    search: (query) => { searches.push(query) },
+    loadOlder: () => { older += 1 },
+    regenerate: () => { regenerated += 1 },
+    saveTranscript: async () => { saved += 1 }
   }
-  return { host, sent, drafts, panels, notices }
+  return { host, sent, drafts, panels, notices, searches, get older() { return older }, get regenerated() { return regenerated }, get saved() { return saved } }
 }
 
 const run = async (input: string, rec = recorder()): Promise<CommandOutcome | undefined> =>
@@ -340,6 +350,71 @@ describe("/goal (nikcli's goal command)", () => {
   test("a malformed token budget is refused before anything is sent", async () => {
     for (const bad of ["/goal x --token-budget", "/goal x --token-budget abc", "/goal x --token-budget -1", "/goal x --token-budget 2.5"]) {
       expect(await run(bad), bad).toEqual({ kind: "rejected", reason: "ai.cmd.goal.budget" })
+    }
+  })
+})
+
+describe("the commands that act on the conversation itself", () => {
+  test("/find looks for something in the conversation on screen", async () => {
+    const rec = recorder()
+    expect(await run("/find wall thickness", rec)).toEqual({ kind: "done" })
+    expect(rec.searches).toEqual(["wall thickness"])
+  })
+
+  test("/find without a word keeps the draft so it can be corrected", async () => {
+    const rec = recorder()
+    expect(await run("/find", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.find.empty" })
+    expect(rec.searches).toEqual([])
+  })
+
+  test("/older reads the messages before the ones on screen", async () => {
+    const rec = recorder()
+    expect(await run("/older", rec)).toEqual({ kind: "done" })
+    expect(rec.older).toBe(1)
+  })
+
+  test("/again asks the last question again", async () => {
+    const rec = recorder()
+    expect(await run("/again", rec)).toEqual({ kind: "done" })
+    expect(rec.regenerated).toBe(1)
+  })
+
+  test("/save writes the conversation to a file", async () => {
+    const rec = recorder()
+    expect(await run("/save", rec)).toEqual({ kind: "done" })
+    expect(rec.saved).toBe(1)
+  })
+
+  test("a file that cannot be written is reported, not swallowed", async () => {
+    const rec = recorder()
+    const host: CommandHost = { ...rec.host, saveTranscript: async () => { throw new Error("no disk") } }
+    expect(await runCommand("/save", host)).toEqual({ kind: "rejected", reason: "ai.cmd.save.failed" })
+  })
+
+  test("/catalog opens the catalogue of actions the agent may call", async () => {
+    const rec = recorder()
+    expect(await run("/catalog", rec)).toEqual({ kind: "done" })
+    expect(rec.panels).toEqual(["catalog"])
+    expect(findCommand("catalogue")?.name).toBe("catalog")
+    expect(findCommand("actions")?.name).toBe("catalog")
+  })
+
+  test("the new commands are in the palette", () => {
+    expect(searchCommands("find")[0]?.name).toBe("find")
+    expect(searchCommands("older")[0]?.name).toBe("older")
+    expect(searchCommands("save")[0]?.name).toBe("save")
+    expect(searchCommands("again")[0]?.name).toBe("again")
+    expect(searchCommands("catalog")[0]?.name).toBe("catalog")
+  })
+
+  test("no two commands answer to the same word", () => {
+    const seen = new Map<string, string>()
+    for (const command of COMMANDS) {
+      for (const name of commandNames(command)) {
+        const owner = seen.get(name)
+        expect(owner === undefined || owner === command.name, `${name} answers to two commands`).toBe(true)
+        seen.set(name, command.name)
+      }
     }
   })
 })

@@ -3,6 +3,8 @@
 Status: specified 2026-10-24 (not built). Part of [spec 39](39-professional-parity-master-plan.md). Closes C6 and extends K7
 of [spec 33](33-kernel-gap-analysis.md). Owner: WP1; adapters WP3, WP4, WP6, WP8.
 
+Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-10-25.md); it supersedes the status line above.
+
 ## 1. Problem
 
 A parametric model is only as robust as its references. Today (verified):

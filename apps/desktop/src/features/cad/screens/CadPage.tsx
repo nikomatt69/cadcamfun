@@ -35,7 +35,7 @@ import LibraryBrowser, { type LibraryComponent } from "../components/LibraryBrow
 import CustomElementsEditor from "../components/custom-elements/CustomElementsEditor.tsx"
 import AssemblyPanel from "../components/assembly/AssemblyPanel.tsx"
 import { CADAssistantButton } from "../components/CADAssistantButton.tsx"
-import { CADAssistantBridge } from "../../ai/components/CADAssistantBridge.tsx"
+import { CADAssistantBridge } from "../../ai/index.ts"
 import { FIT_VIEW_EVENT } from "../../ai/lib/editor-sync.ts"
 import { syncDocumentSettings } from "../../../shared/state/document-settings.ts"
 import { applyStoredDrawing } from "../lib/open-drawing.ts"
