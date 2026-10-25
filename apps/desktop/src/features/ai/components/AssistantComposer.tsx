@@ -15,6 +15,7 @@ import Plus from "lucide-solid/icons/plus"
 import Square from "lucide-solid/icons/square"
 import X from "lucide-solid/icons/x"
 import { t } from "../../../i18n/index.ts"
+import { isProviderError } from "../lib/error-kind.ts"
 import { ACCEPT, MAX_ATTACHMENTS, type ChatAttachment } from "../lib/attachments.ts"
 import { AssistantControls } from "./AssistantControls.tsx"
 import { CommandPalette } from "./CommandPalette.tsx"
@@ -86,7 +87,7 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
         />
       </Show>
 
-      <Show when={ai.error()}>
+      <Show when={ai.messages().some((message) => message.error === ai.error()) ? undefined : ai.error()}>
         {(error) => (
           <div class="assistant-composer-banner" role="status">
             <div class="assistant-composer-banner-head">
@@ -94,13 +95,15 @@ export function AssistantComposer(props: AssistantComposerProps): JSX.Element {
               <span>{t("ai.runtime.error")}</span>
             </div>
             <p class="assistant-composer-banner-copy">{error()}</p>
-            <button
-              type="button"
-              class="assistant-btn assistant-btn-secondary"
-              onClick={() => props.onOpenProviders()}
-            >
-              {t("ai.providers.title")}
-            </button>
+            <Show when={isProviderError(error())}>
+              <button
+                type="button"
+                class="assistant-btn assistant-btn-secondary"
+                onClick={() => props.onOpenProviders()}
+              >
+                {t("ai.providers.title")}
+              </button>
+            </Show>
           </div>
         )}
       </Show>

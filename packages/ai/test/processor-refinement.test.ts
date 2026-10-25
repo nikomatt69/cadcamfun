@@ -23,9 +23,37 @@ test("a model that ignores the host step hint is aborted and the stream closes o
   const events = await Effect.runPromise(Stream.runCollect(hostChatStream({ host, sessionId: "s", message: "Check", model: { providerID: "fake", modelID: "fake" } })))
   expect(events.filter((event) => event.type === "step")).toHaveLength(PRIMARY_STEP_LIMIT)
   expect(events.filter((event) => event.type === "error")).toHaveLength(1)
-  expect(events.at(-1)).toMatchObject({ type: "error", code: "internal", message: expect.stringContaining("step limit") })
+  expect(events.at(-1)).toMatchObject({ type: "error", code: "internal", message: expect.stringContaining("model steps") })
   expect(aborted).toBe(1)
 }, 10_000)
+
+test("a spent step budget resumes the turn by itself while it keeps making tool calls", async () => {
+  let started!: () => void
+  const prompting = new Promise<void>((resolve) => { started = resolve })
+  const prompts: string[] = []
+  let aborted = 0
+  const host = { client: {
+    session: { messages: async () => [], abort: async () => { aborted++; return true } },
+    events: { subscribe: async function* () {
+      yield { type: "server.connected", properties: {} }
+      await prompting
+      yield { type: "message.part.updated", properties: { part: { type: "tool", id: "t1", callID: "c1", tool: "cad_edit", sessionID: "s", messageID: "answer", state: { status: "running", input: {} } } } }
+      for (let step = 1; step <= PRIMARY_STEP_LIMIT + 1; step++) yield { type: "message.part.updated", properties: { part: { type: "step-start", id: `step-${step}`, sessionID: "s", messageID: "answer" } } }
+      yield { type: "session.idle", properties: { sessionID: "s" } }
+    } },
+    "session-prompt": { prompt: async (request: { parts: Array<{ text?: string }> }) => {
+      prompts.push(request.parts[0]?.text ?? "")
+      if (prompts.length === 1) { started(); return new Promise(() => {}) }
+      return { info: { finish: "stop" }, parts: [{ type: "text", text: "Finished." }] }
+    } }
+  } } as unknown as ProjectHost
+  const events = await Effect.runPromise(Stream.runCollect(hostChatStream({ host, sessionId: "s", message: "Build it", model: { providerID: "fake", modelID: "fake" } })))
+  expect(prompts).toHaveLength(2)
+  expect(prompts[1]).toContain("step budget")
+  expect(aborted).toBe(1)
+  expect(events.filter((event) => event.type === "error")).toHaveLength(0)
+  expect(events.at(-1)).toMatchObject({ type: "done" })
+}, 20_000)
 
 describe("native processor ownership", () => {
   test("retry admission belongs to nikcli and usage covers every completed step", async () => {

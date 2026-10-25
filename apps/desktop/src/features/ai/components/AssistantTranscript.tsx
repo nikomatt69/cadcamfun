@@ -239,27 +239,6 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
               </div>
             </div>
           </Show>
-          <Show when={ai.error() && !ai.messages().some((message) => message.error === ai.error())}>
-            {(error) => (
-              <div class="assistant-enterprise-card mt-4" role="alert">
-                <div class="assistant-enterprise-card-head">
-                  <CircleGauge size={15} class="assistant-coral-icon" aria-hidden="true" />
-                  <span class="assistant-enterprise-card-title">{t("ai.runtime.error")}</span>
-                </div>
-                <div class="assistant-enterprise-card-body">
-                  <p>{error()}</p>
-                  <div class="assistant-card-actions">
-                    <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => void ai.refresh()}>
-                      {t("ai.toolbar.refresh")}
-                    </button>
-                    <button type="button" class="assistant-btn assistant-btn-primary" onClick={() => props.onOpenProviders()}>
-                      {t("ai.providers.title")}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </Show>
         </Show>
         </div>
       </div>

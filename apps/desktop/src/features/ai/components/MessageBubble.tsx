@@ -21,6 +21,7 @@ import { t } from "../../../i18n/index.ts"
 import { groupExploration, timelineOf, type GroupedSegment } from "../lib/timeline.ts"
 import { renderAssistantMarkdown } from "../lib/markdown.ts"
 import { toolTitle } from "../lib/tools.ts"
+import { isProviderError } from "../lib/error-kind.ts"
 import { TaskCard } from "./TaskCard.tsx"
 import { ToolRow } from "./ToolRow.tsx"
 import { isTaskStart } from "../lib/task-card.ts"
@@ -174,14 +175,16 @@ export function MessageBubble(props: MessageBubbleProps): JSX.Element {
             </div>
             <div class="assistant-enterprise-card-body">
               <p>{props.message.error}</p>
-              <div class="assistant-card-actions">
-                <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => void ai.refresh()}>
-                  {t("ai.toolbar.refresh")}
-                </button>
-                <button type="button" class="assistant-btn assistant-btn-primary" onClick={() => props.onOpenProviders()}>
-                  {t("ai.providers.title")}
-                </button>
-              </div>
+              <Show when={isProviderError(props.message.error ?? "")}>
+                <div class="assistant-card-actions">
+                  <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => void ai.refresh()}>
+                    {t("ai.toolbar.refresh")}
+                  </button>
+                  <button type="button" class="assistant-btn assistant-btn-primary" onClick={() => props.onOpenProviders()}>
+                    {t("ai.providers.title")}
+                  </button>
+                </div>
+              </Show>
             </div>
           </div>
         </Show>

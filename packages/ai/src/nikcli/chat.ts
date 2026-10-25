@@ -92,6 +92,12 @@ export const isInterruption = (message: string): boolean => /session interrupted
 const INTERRUPT_BACKOFF_MS = 1_000
 const INTERRUPTED_MESSAGE = "The assistant was interrupted before it could answer. Send the message again."
 
+const STEP_LIMIT_NAME = "StepLimitError"
+const STEP_LIMIT_MESSAGE = "The assistant used up the model steps of one run. Completed changes were preserved."
+/** How many runs one turn may chain after step budgets ran out, as long as each run made tool calls. */
+const MAX_STEP_RESUMES = 40
+const STEP_LIMIT_PROMPT = "You used up the step budget of this run and were paused. Completed work is saved. Read the conversation and the last tool results, do not repeat steps that completed, and carry on until the request is complete and checked."
+
 const RESUME_PROMPT = "The connection to the model failed and has been restored. Continue from where you stopped: do not repeat steps that already completed (read the conversation and the tool results), and carry on until the request is done."
 /** nikcli's retry curve (`session/retry.ts`): 2 s, doubling, never longer than 30 s. */
 const RESUME_BACKOFF_MS = 2_000
@@ -336,14 +342,16 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       const state = newMapperState()
       let stepCeiling = input.goalArguments === undefined ? PRIMARY_STEP_LIMIT : PRIMARY_STEP_LIMIT * 10
       let limitReached!: (result: HostPromptResult) => void
-      const stepLimit = new Promise<HostPromptResult>((resolve) => { limitReached = resolve })
+      let stepLimit = new Promise<HostPromptResult>((resolve) => { limitReached = resolve })
+      // True from the moment the step budget ran out until the turn is resumed: the aborted run's trailing events are not shown.
+      let suspended = false
       let terminal = false
       state.ownTexts.add(input.message.trim())
       state.ownTexts.add(RESUME_PROMPT)
       let connected!: () => void
       const connectedPromise = new Promise<void>((resolve) => (connected = resolve))
       const offer = (event: AiEvent) => {
-        if (terminal || subscriber.signal.aborted) return
+        if (terminal || subscriber.signal.aborted || suspended) return
         if (event.type === "done" || event.type === "error") terminal = true
         if (event.type === "done" || event.type === "error") Queue.offerUnsafe(queue, { type: "turn", sessionId, phase: "finish", reason: event.type === "done" ? "completed" : event.code })
         Queue.offerUnsafe(queue, event)
@@ -361,11 +369,10 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
               continue
             }
             for (const mapped of mapHostEvent(sessionId, event, state)) {
-              if (mapped.type === "step" && mapped.phase === "start" && mapped.index > stepCeiling) {
-                const message = "The assistant reached its model step limit and was stopped. Completed changes were preserved. Review the last tool result before continuing."
-                offer({ type: "error", sessionId, code: "internal", message })
-                controller.abort()
-                limitReached({ name: "StepLimitError", data: { message } })
+              if (mapped.type === "step" && mapped.phase === "start" && mapped.index > stepCeiling && !suspended) {
+                // The step budget of one run is spent, not the job: the run is stopped here and the turn resumes by itself (see `STEP_LIMIT_NAME`).
+                suspended = true
+                limitReached({ name: STEP_LIMIT_NAME, data: { message: STEP_LIMIT_MESSAGE } })
                 void Promise.resolve().then(() => host.client.session.abort({ sessionID: sessionId })).catch(() => undefined)
                 break
               }
@@ -431,6 +438,8 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         let callsAtNudge: number | undefined
         let errorAtNudge: string | undefined
         let stalls = 0
+        let stepResumes = 0
+        let callsAtStepLimit: number | undefined
         const answers: string[] = []
         let parts: Array<{ type: "text"; text: string; synthetic?: boolean } | { type: "file"; mime: string; filename: string; url: string }> = [
           { type: "text", text: input.message },
@@ -539,6 +548,30 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             controller.abort()
             offer({ type: "error", sessionId, code: "provider", message })
             return
+          }
+          if (result.info === undefined && result.name === STEP_LIMIT_NAME) {
+            // Keep moving: the host session was aborted by the pump; wait for it to settle, then start the next run.
+            const settle = Date.now() + 5_000
+            while (!subscriber.signal.aborted && !state.idle && Date.now() < settle) await new Promise((r) => setTimeout(r, 25))
+            const progressed = state.toolCalls > (callsAtStepLimit ?? 0)
+            if (controller.signal.aborted || subscriber.signal.aborted) return
+            if (!progressed || stepResumes >= MAX_STEP_RESUMES) {
+              suspended = false
+              offer({ type: "error", sessionId, code: "internal", message: `${STEP_LIMIT_MESSAGE} It made no further progress on its own: review the last tool result, then tell it to continue.` })
+              controller.abort()
+              return
+            }
+            stepResumes += 1
+            callsAtStepLimit = state.toolCalls
+            suspended = false
+            stepLimit = new Promise<HostPromptResult>((resolve) => { limitReached = resolve })
+            state.idle = false
+            state.retry = undefined
+            state.sessionError = undefined
+            offer({ type: "turn", sessionId, phase: "continuing", reason: STEP_LIMIT_PROMPT })
+            parts = [{ type: "text", text: STEP_LIMIT_PROMPT, synthetic: true }]
+            state.ownTexts.add(STEP_LIMIT_PROMPT)
+            continue
           }
           // Let trailing bus events (final deltas, session.idle) reach the subscriber.
           const deadline = Date.now() + IDLE_GRACE_MS
