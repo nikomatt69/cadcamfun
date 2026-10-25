@@ -205,7 +205,8 @@ jobs:
       - name: Install cargo-deny
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-deny@0.18.3
+          # RustSec advisories use CVSS 4.0; older parsers abort before checking the lockfile.
+          tool: cargo-deny@0.18.6
 
       - name: cargo deny check
         working-directory: apps/desktop/src-tauri
@@ -223,7 +224,8 @@ jobs:
       - name: Install cargo-audit
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-audit@0.21.2
+          # Keep a CVSS 4.0-capable RustSec parser, matching the cargo-deny gate above.
+          tool: cargo-audit@0.22.2
 
       - name: cargo audit
         working-directory: apps/desktop/src-tauri
