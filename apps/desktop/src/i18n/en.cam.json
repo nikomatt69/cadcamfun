@@ -568,6 +568,7 @@
   "cam.player.back": "Back 5 seconds",
   "cam.player.forward": "Forward 5 seconds",
   "cam.player.seek": "Simulation position",
+  "cam.player.runAll": "Run the whole program: it rests briefly at each stop and goes on by itself",
   "cam.timeline.label": "Simulation timeline",
   "cam.timeline.prevOperation": "Previous operation",
   "cam.timeline.nextOperation": "Next operation",

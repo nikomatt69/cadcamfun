@@ -1,5 +1,5 @@
 import { Show, type JSX } from "solid-js"
-import { Pause, Play, Rewind, FastForward } from "lucide-solid"
+import { Pause, Play, Rewind, FastForward, ListVideo } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import "../styles/simulation-mini-player.css"
 
@@ -9,6 +9,10 @@ interface SimulationMiniPlayerProps {
   readonly duration: number
   readonly onPlayingChange: (playing: boolean) => void
   readonly onSeek: (seconds: number) => void
+  /** Plays the whole program from where it is (from the start at the end), resting briefly at each stop and going on by itself. */
+  readonly onRunAll?: () => void
+  /** A run through the stops is in progress. */
+  readonly runningAll?: boolean
 }
 
 const clock = (seconds: number): string => {
@@ -39,6 +43,12 @@ export function SimulationMiniPlayer(props: SimulationMiniPlayerProps): JSX.Elem
       <button type="button" disabled={duration() === 0 || time() >= duration()} title={t("cam.player.forward")} aria-label={t("cam.player.forward")} onClick={() => seek(time() + 5)}>
         <FastForward size={13} aria-hidden="true" />
       </button>
+      <Show when={props.onRunAll}>{(run) => (
+        <button type="button" class="cam-mini-player__run" data-testid="simulation-run-all" disabled={duration() === 0} aria-pressed={props.runningAll === true}
+          title={t("cam.player.runAll")} aria-label={t("cam.player.runAll")} onClick={() => run()()}>
+          <ListVideo size={14} aria-hidden="true" />
+        </button>
+      )}</Show>
       <input type="range" min="0" max={duration()} step="any" value={time()} disabled={duration() === 0}
         aria-label={t("cam.player.seek")} aria-valuetext={`${clock(time())} / ${clock(duration())}`}
         style={{ background: `linear-gradient(to right, #60a5fa ${duration() > 0 ? time() / duration() * 100 : 0}%, #ffffff30 0%) center / 100% 3px no-repeat` }}

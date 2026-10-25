@@ -7,7 +7,7 @@
  * gizmos. The shell hosts only the controls that are CAM-specific (playback
  * timeline, simulator overlay).
  */
-import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import { Eye, EyeOff, ListTree, Play, RotateCcw, Settings, X } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
@@ -17,6 +17,7 @@ import { t } from "../../../i18n/index.ts"
 import type { Workpiece } from "../store/camStore.ts"
 import { SimulationMiniPlayer } from "./SimulationMiniPlayer.tsx"
 import { SimulationTimeline } from "./SimulationTimeline.tsx"
+import { RUN_THROUGH_PAUSE_MS, shouldResume } from "../lib/run-through.ts"
 import { findingTimes, ncWindow, operationAt, readoutAt, stepMove, stepOperation, toolChangeTimes } from "../lib/simulation.ts"
 import { COLOR_MODES, operationColor, type ColorMode, type LegendEntry } from "../../../viewport/view3d/toolpath-colors.ts"
 import { TOOL_COLORS, colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
@@ -150,6 +151,19 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     return model !== undefined && r !== undefined ? cam.viewer.machinePose(model, r.program, r.angles, rotary(), 0, "machine").joints : undefined
   })
   const [stopAtCollision, setStopAtCollision] = createSignal(true)
+  // "Run the whole program": each stop is a short pause, then the run goes on by itself. Any pause, seek or step of the person ends it.
+  const [runThrough, setRunThrough] = createSignal(false)
+  let resumeTimer: ReturnType<typeof setTimeout> | undefined
+  const endRun = (): void => { setRunThrough(false); clearTimeout(resumeTimer); resumeTimer = undefined }
+  onCleanup(() => clearTimeout(resumeTimer))
+  const runAll = (): void => {
+    clearTimeout(resumeTimer)
+    setRunThrough(true)
+    if (props.playbackTime >= timeline().duration) props.onPlaybackTimeChange(0)
+    props.onPlayingChange?.(true)
+  }
+  /** The person's own play / pause / seek: it ends a run in progress. */
+  const byPerson = (playing: boolean): void => { endRun(); props.onPlayingChange?.(playing) }
   /**
    * Collisions on the timeline (spec 32 P7): pure checks of the core on the same clock and the same tools the 3D view draws,
    * so they hold without a WebGL view too. The machine's head is checked when the machine is shown.
@@ -175,8 +189,17 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     lastTime = now
     if (!props.playing || !stopAtCollision() || now <= before) return
     const hit = collisions().find((e) => e.seconds > before + 1e-9 && e.seconds <= now + 1e-9)
-    if (hit !== undefined) { props.onPlayingChange?.(false); props.onPlaybackTimeChange(hit.seconds) }
+    if (hit === undefined) return
+    props.onPlayingChange?.(false); props.onPlaybackTimeChange(hit.seconds)
+    if (!runThrough()) return
+    clearTimeout(resumeTimer)
+    resumeTimer = setTimeout(() => {
+      resumeTimer = undefined
+      if (shouldResume({ runThrough: runThrough(), playing: props.playing, time: props.playbackTime, stoppedAt: hit.seconds, duration: timeline().duration })) props.onPlayingChange?.(true)
+    }, RUN_THROUGH_PAUSE_MS)
   }))
+  // The run is over at the end of the program.
+  createEffect(() => { if (runThrough() && !props.playing && resumeTimer === undefined && props.playbackTime >= timeline().duration) setRunThrough(false) })
   /**
    * Machine limits on the same clock (spec 32 §4.1): singularities and C unwinding for every rotary program; travel and rotary
    * ranges only with the machine shown (they need its sizes).
@@ -293,7 +316,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             playbackTime={props.playbackTime}
             playbackRate={props.playbackRate * rate()}
             onPlaybackTimeChange={props.onPlaybackTimeChange}
-            controlsFooter={<Show when={props.onPlayingChange}>{(onPlayingChange) => <SimulationMiniPlayer playing={props.playing} time={props.playbackTime} duration={props.playbackDuration ?? 0} onPlayingChange={onPlayingChange()} onSeek={props.onPlaybackTimeChange} />}</Show>}
+            controlsFooter={<Show when={props.onPlayingChange}>{(onPlayingChange) => <SimulationMiniPlayer playing={props.playing} time={props.playbackTime} duration={props.playbackDuration ?? 0} onPlayingChange={byPerson} onSeek={(seconds) => { endRun(); props.onPlaybackTimeChange(seconds) }} onRunAll={runAll} runningAll={runThrough()} />}</Show>}
             stock={stock()}
             toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
             onPathLegend={setLegend}

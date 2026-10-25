@@ -26,6 +26,7 @@
   box-shadow: none;
 }
 .vp3-root .cam-mini-player .cam-mini-player__toggle { color: #93c5fd; }
+.vp3-root .cam-mini-player .cam-mini-player__run[aria-pressed="true"] { color: #4ade80; background: #ffffff14; }
 .cam-mini-player input[type=range] {
   appearance: none;
   -webkit-appearance: none;

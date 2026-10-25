@@ -69,3 +69,22 @@ test("an empty simulation disables the mini player", async () => {
     expect(root.querySelector("output")!.textContent).toBe("0:00 / 0:00")
   } finally { dispose() }
 })
+
+test("the run-the-whole-program button is offered only when the page can run it, and shows while a run is on", async () => {
+  installDom()
+  const { render } = await import("solid-js/web")
+  const { SimulationMiniPlayer } = await import("../src/features/cam/components/SimulationMiniPlayer.tsx")
+  const root = document.createElement("div")
+  document.body.replaceChildren(root)
+  let runs = 0
+  const without = render(() => SimulationMiniPlayer({ playing: false, time: 0, duration: 10, onPlayingChange: () => {}, onSeek: () => {} }), root)
+  expect(root.querySelector('[data-testid="simulation-run-all"]')).toBeNull()
+  without()
+  const dispose = render(() => SimulationMiniPlayer({ playing: false, time: 0, duration: 10, onPlayingChange: () => {}, onSeek: () => {}, onRunAll: () => { runs++ }, runningAll: true }), root)
+  try {
+    const run = root.querySelector<HTMLButtonElement>('[data-testid="simulation-run-all"]')!
+    expect(run.getAttribute("aria-pressed")).toBe("true")
+    run.click()
+    expect(runs).toBe(1)
+  } finally { dispose() }
+})
