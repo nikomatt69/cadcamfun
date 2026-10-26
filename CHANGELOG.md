@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.26 (October 2026)
+
+## Desktop
+
+- One command catalog, keymap, Effect service and listener for the shell, CAD and CAM; remappable in Settings, synced through the sidecar
+
 ## v0.1.25 (October 2026)
 
 ## Desktop
