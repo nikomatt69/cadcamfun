@@ -73,7 +73,10 @@ switch) and the panel shows the user's chord. The engine (`features/cad/lib/enan
 lines, circles, rectangles, cubes, spheres, cylinders, cones and tori, plus perpendicular, tangent and parallel, which are
 relative to a start point (`snapPoint(point, elements, settings, anchor)`); the panel marks them with an arrow because
 nothing in the canvas supplies a start point yet (no interactive line drawing), so they never apply there. Snapping runs
-while a part is dragged over the canvas or placed; moving with the gizmo only has the grid constraint.
+while a part is dragged over the canvas or placed, and while a part is moved with the gizmo: its pivot catches the named
+points of the other parts (`snapPointAlongAxes`, distance measured on the dragged axes only; the grid and `nearest` stay
+out of a drag) and the marker shows which one. Checked in a real browser: dragging a cube's X handle toward another cube
+stops at its corner exactly (x = 50).
 Fixed on the way: line-circle crossings (computed perpendicular to the line), tangent points (asin instead of acos),
 `nearest` shadowing every other snap, equidistant dropping far-apart pairs, no marker for quadrant/nearest/parallel.
 
@@ -81,5 +84,4 @@ Fixed on the way: line-circle crossings (computed perpendicular to the line), ta
 
 - Click-to-place after a creation key is not a mode (the form takes the position).
 - Perpendicular/tangent/parallel need a start point: they apply once a flow supplies one (interactive line drawing).
-- The gizmo move does not use the point snaps (endpoint, midpoint...), only the grid constraint.
 - The built-in library components of type `extrusion` have no 3D preview, so "Place" does not start a placement for them.

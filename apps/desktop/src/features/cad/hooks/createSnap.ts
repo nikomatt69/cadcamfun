@@ -1,5 +1,5 @@
 import { createEffect, createSignal } from "solid-js"
-import { defaultSnapSettings, snapPoint, SnapType } from "../lib/enanchedSnapService.ts"
+import { defaultSnapSettings, snapPoint, snapPointAlongAxes, SnapType, type SnapAxis } from "../lib/enanchedSnapService.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 
 export interface SnapIndicatorState { x: number; y: number; z: number; type: SnapType; visible: boolean }
@@ -33,6 +33,24 @@ export function createSnap() {
     return snapped
   }
 
+  /**
+   * The snap for a part that is being dragged along `axes`, skipping `exclude` (the parts being moved: they must not snap
+   * to where they were). Publishes the indicator; returns `undefined` when nothing is within reach.
+   */
+  const snapAlongAxes = (point: { x: number; y: number; z?: number }, axes: ReadonlyArray<SnapAxis>, exclude: ReadonlySet<string>) => {
+    const others = elements.elements.filter((element) => !exclude.has(element.id))
+    const hit = snapPointAlongAxes({ x: point.x, y: point.y, z: point.z || 0 }, others, settings(), axes)
+    if (hit) {
+      setIndicator({ x: hit.x, y: hit.y, z: hit.z, type: hit.type, visible: true })
+      setIsSnapping(true)
+    } else clearIndicator()
+    return hit
+  }
+  const clearIndicator = () => {
+    setIndicator((prev) => ({ ...prev, visible: false }))
+    setIsSnapping(false)
+  }
+
   createEffect(() => {
     if (!settings().enabled) {
       setIndicator((prev) => ({ ...prev, visible: false }))
@@ -41,5 +59,5 @@ export function createSnap() {
   })
   void isSnapping
 
-  return { snapSettings: settings, updateSnapSettings, toggleSnapType, snapToPoint, snapIndicator: indicator, isSnapping }
+  return { snapSettings: settings, updateSnapSettings, toggleSnapType, snapToPoint, snapAlongAxes, clearIndicator, snapIndicator: indicator, isSnapping }
 }

@@ -38,13 +38,10 @@ interface SnapPoint {
 }
 
 /**
- * Snap a point to the nearest valid snap location with intelligent snap
+ * Every snap point on offer for a cursor position, before one is chosen: the grid, the points of each element, the crossings,
+ * the alignments and the ones relative to a start point. Kinds that are switched off contribute nothing.
  */
-export function snapPoint(point: Point, elements: Element[], settings: SnapSettings, anchor?: Point): SnapPoint {
-  if (!settings.enabled) {
-    return { ...point, type: SnapType.NEAREST };
-  }
-
+function collectSnapPoints(point: Point, elements: Element[], settings: SnapSettings, anchor?: Point): { readonly snapPoints: SnapPoint[]; readonly activeElement: Element | undefined } {
   const snapPoints: SnapPoint[] = [];
 
   // Add grid snap points
@@ -70,13 +67,11 @@ export function snapPoint(point: Point, elements: Element[], settings: SnapSetti
 
   // Add intelligent snap points if enabled
   if (settings.types[SnapType.INTERSECTION]) {
-    const intersectionPoints = findIntersectionPoints(elements, settings);
-    snapPoints.push(...intersectionPoints);
+    snapPoints.push(...findIntersectionPoints(elements, settings));
   }
 
   if (settings.types[SnapType.HORIZONTAL] || settings.types[SnapType.VERTICAL]) {
-    const alignmentPoints = findAlignmentPoints(point, elements, settings);
-    snapPoints.push(...alignmentPoints);
+    snapPoints.push(...findAlignmentPoints(point, elements, settings));
   }
 
   if (settings.types[SnapType.PERPENDICULAR] && from) {
@@ -92,9 +87,21 @@ export function snapPoint(point: Point, elements: Element[], settings: SnapSetti
   }
 
   if (settings.types[SnapType.EQUIDISTANT]) {
-    const equidistantPoints = findEquidistantPoints(point, elements, settings);
-    snapPoints.push(...equidistantPoints);
+    snapPoints.push(...findEquidistantPoints(point, elements, settings));
   }
+
+  return { snapPoints, activeElement };
+}
+
+/**
+ * Snap a point to the nearest valid snap location with intelligent snap
+ */
+export function snapPoint(point: Point, elements: Element[], settings: SnapSettings, anchor?: Point): SnapPoint {
+  if (!settings.enabled) {
+    return { ...point, type: SnapType.NEAREST };
+  }
+
+  const { snapPoints, activeElement } = collectSnapPoints(point, elements, settings, anchor);
 
   // Find the closest valid snap point, considering priority
   const closestPoint = findClosestSnapPoint(point, snapPoints, settings.tolerance);
@@ -112,6 +119,29 @@ export function snapPoint(point: Point, elements: Element[], settings: SnapSetti
 
   // If no snap point is found within tolerance, return the original point
   return { ...point, type: SnapType.NEAREST };
+}
+
+export type SnapAxis = "x" | "y" | "z";
+
+/**
+ * Snap for a point that can only move along some axes (a gizmo drag along X, or in the XY plane): the snap point is the one
+ * nearest to `point` measured along those axes alone, so a part sliding along X still catches an endpoint that lies off
+ * its line. Returns `undefined` when nothing is within the tolerance. The grid is left out (the drag has its own grid
+ * constraint), and so is `nearest`: on a drag only the named points of other parts count.
+ */
+export function snapPointAlongAxes(point: Point, elements: Element[], settings: SnapSettings, axes: ReadonlyArray<SnapAxis>): SnapPoint | undefined {
+  if (!settings.enabled || axes.length === 0) return undefined;
+  const without = { ...settings, types: { ...settings.types, [SnapType.GRID]: false, [SnapType.NEAREST]: false } };
+  const { snapPoints } = collectSnapPoints(point, elements, without);
+  const toleranceSq = settings.tolerance * settings.tolerance;
+  let best: SnapPoint | undefined, bestSq = Infinity;
+  for (const candidate of snapPoints) {
+    let sq = 0;
+    for (const axis of axes) sq += (candidate[axis] - point[axis]) ** 2;
+    if (sq > toleranceSq) continue;
+    if (sq < bestSq || (sq === bestSq && (candidate.priority ?? 0) > (best?.priority ?? 0))) { best = candidate; bestSq = sq; }
+  }
+  return best;
 }
 
 /**

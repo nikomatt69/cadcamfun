@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from "bun:test"
 import { createRoot } from "solid-js"
-import { SnapType, defaultSnapSettings, snapPoint } from "../src/features/cad/lib/enanchedSnapService.ts"
+import { SnapType, defaultSnapSettings, snapPoint, snapPointAlongAxes } from "../src/features/cad/lib/enanchedSnapService.ts"
 import { createSnap } from "../src/features/cad/hooks/createSnap.ts"
 import { useElementsStore } from "../src/features/cad/store/elementsStore.ts"
 
@@ -249,5 +249,55 @@ describe("the snap marker", () => {
     const dispose = render(() => SnapIndicator({ x: 10, y: 10, type: SnapType.GRID, visible: false }), root)
     expect(root.querySelector("div")).toBeNull()
     dispose(); root.remove()
+  })
+})
+
+describe("snapping a part that is moved with the gizmo", () => {
+  const cube: any = { id: "k", type: "cube", x: 100, y: 50, z: 0, width: 20, height: 20, depth: 20 }
+  const kinds = only(SnapType.ENDPOINT, SnapType.CENTER, SnapType.GRID, SnapType.NEAREST)
+
+  test("along one axis the nearest point is measured on that axis alone", () => {
+    // Sliding along X at y=0: the cube's centre is 50 off the line in Y, but 1 away in X, so it is caught.
+    const hit = snapPointAlongAxes(at(99, 0, 0), [cube], kinds, ["x"])
+    expect(hit).toMatchObject({ x: 100, type: SnapType.CENTER })
+    // In 3D the same cursor is nowhere near it.
+    expect(snapOf(at(99, 0, 0), [cube], only(SnapType.ENDPOINT, SnapType.CENTER)).type).toBe(SnapType.NEAREST)
+  })
+
+  test("in a plane both axes count; the third is ignored", () => {
+    expect(snapPointAlongAxes(at(98, 52, 400), [cube], kinds, ["x", "y"])).toMatchObject({ x: 100, y: 50, type: SnapType.CENTER })
+    expect(snapPointAlongAxes(at(98, 80, 0), [cube], kinds, ["x", "y"])).toBeUndefined()
+  })
+
+  test("nothing within the tolerance, nothing to snap, snapping off: no snap", () => {
+    expect(snapPointAlongAxes(at(60, 0, 0), [cube], kinds, ["x"])).toBeUndefined()
+    expect(snapPointAlongAxes(at(99, 0, 0), [], kinds, ["x"])).toBeUndefined()
+    expect(snapPointAlongAxes(at(99, 0, 0), [cube], { ...kinds, enabled: false }, ["x"])).toBeUndefined()
+    expect(snapPointAlongAxes(at(99, 0, 0), [cube], kinds, [])).toBeUndefined()
+  })
+
+  test("the grid and the point on an edge never pull a drag: only named points do", () => {
+    const grid = snapPointAlongAxes(at(11, 0, 0), [], only(SnapType.GRID), ["x"])
+    expect(grid).toBeUndefined()
+    expect(snapPointAlongAxes(at(30, 4, 0), [line(0, 0, 100, 0)] as any, only(SnapType.NEAREST), ["x", "y"])).toBeUndefined()
+  })
+
+  test("the hook skips the parts being moved, publishes the marker and clears it", () => {
+    createRoot((dispose) => {
+      const moving = { ...cube, id: "moving", x: 0, y: 0 }
+      useElementsStore.setState({ elements: [cube as never, moving as never] })
+      const snap = createSnap()
+      snap.updateSnapSettings({ enabled: true, tolerance: 10, types: { ...none, center: true } as never })
+      // The moving part's own centre is at the cursor, and must not be offered to itself.
+      expect(snap.snapAlongAxes({ x: 1, y: 0, z: 0 }, ["x"], new Set(["moving"]))).toBeUndefined()
+      expect(snap.snapIndicator().visible).toBe(false)
+      const hit = snap.snapAlongAxes({ x: 99, y: 0, z: 0 }, ["x"], new Set(["moving"]))
+      expect(hit).toMatchObject({ x: 100, type: SnapType.CENTER })
+      expect(snap.snapIndicator()).toMatchObject({ visible: true, type: SnapType.CENTER })
+      snap.clearIndicator()
+      expect(snap.snapIndicator().visible).toBe(false)
+      useElementsStore.setState({ elements: [] })
+      dispose()
+    })
   })
 })

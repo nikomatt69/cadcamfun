@@ -771,8 +771,25 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       })
     }
   }
+  /**
+   * While a part is moved with the gizmo its pivot catches the named points of the other parts (endpoint, midpoint, centre,
+   * quadrant, crossings...) on the axes being dragged, and the snap marker shows which one. Only a move snaps: a rotation
+   * or a scale has no position to catch.
+   */
+  function snapDragPivot(): void {
+    if (transformMode() !== "translate" || !snap.snapSettings().enabled) { snap.clearIndicator(); return }
+    const axes = (gizmo?.axis ?? "").toLowerCase().split("").filter((letter): letter is "x" | "y" | "z" => letter === "x" || letter === "y" || letter === "z")
+    if (axes.length === 0) { snap.clearIndicator(); return }
+    const offset = originOffset()
+    const model = { x: pivot.position.x - offset.x, y: pivot.position.y - offset.y, z: pivot.position.z - offset.z }
+    const hit = snap.snapAlongAxes(model, axes, new Set(selectedIds()))
+    if (!hit) return
+    for (const axis of axes) pivot.position[axis] = hit[axis] + offset[axis]
+    pivot.updateMatrix()
+  }
   function updateDrag(): void {
     if (!dragStart) return
+    snapDragPivot()
     applyDragDelta(dragStart, deltaFrom(dragStart, pivot))
     invalidate()
   }
@@ -782,6 +799,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     dragStart = undefined
     commitDrag(start, deltaFrom(start, pivot))
     useElementsStore.getState().endEdit()
+    snap.clearIndicator()
   }
 
   // Control points for a single selected element.
