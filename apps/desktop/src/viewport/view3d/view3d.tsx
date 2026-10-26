@@ -358,7 +358,7 @@ export function View3D(props: View3DProps) {
     const disposeVoxels = (): void => { if (voxelStock === undefined) return; content.remove(voxelStock.mesh); voxelStock.dispose(); voxelStock = undefined }
     let toolColorOf: ReadonlyMap<string, number> = new Map()
     // The path's two line objects and their segments' start times (for the "only what has run" draw range).
-    let pathLines: { readonly cut?: THREE.Object3D; readonly cutStarts: Float64Array; readonly rapid?: THREE.Object3D; readonly rapidStarts: Float64Array; readonly arrows?: DirectionArrows } | undefined
+    let pathLines: { readonly cut?: THREE.Object3D; readonly cutStarts: Float64Array; readonly rapid?: THREE.Object3D; readonly rapidStarts: Float64Array; readonly arrows?: DirectionArrows; readonly ghost?: THREE.Object3D } | undefined
     const disposeTools = (): void => { for (const g of toolGroups.values()) if (g) { scene.remove(g); disposeGroup(g) } toolGroups.clear() }
     /** The model the preview draws for a toolpath's tool: its own, the kernel's cutter, the generator's tool. A tool setter is
      * on the table (see `rebuild`): what moves is the cutter it measures. */
@@ -596,7 +596,12 @@ export function View3D(props: View3DProps) {
       // Feed direction and where the cutting starts and ends; a printer's deposits are the machine scene's.
       const arrows = display?.showDirection === false || machine?.kind === "3dprinter" ? undefined : createDirectionArrows(buffers.cut)
       if (arrows !== undefined) content.add(arrows.object)
-      pathLines = { ...(cutLine ? { cut: cutLine } : {}), cutStarts: buffers.cut.starts, ...(rapidLine ? { rapid: rapidLine } : {}), rapidStarts: buffers.rapid.starts, ...(arrows !== undefined ? { arrows } : {}) }
+      // The cuts under the stock's top face are the point of the program: a faint copy drawn through the material keeps them readable.
+      const ghost = cutLine !== undefined && machine?.kind !== "3dprinter"
+        ? createLines(buffers.cut.positions, { ...(buffers.cut.colors !== undefined ? { colors: buffers.cut.colors } : { color: 0x38bdf8 }), width: 1.2, opacity: 0.3, depthTest: false }, { quality: currentLookTier() })
+        : undefined
+      if (ghost !== undefined) { ghost.name = "toolpath:cuts-ghost"; ghost.renderOrder = 9; content.add(ghost) }
+      pathLines = { ...(cutLine ? { cut: cutLine } : {}), cutStarts: buffers.cut.starts, ...(rapidLine ? { rapid: rapidLine } : {}), rapidStarts: buffers.rapid.starts, ...(arrows !== undefined ? { arrows } : {}), ...(ghost !== undefined ? { ghost } : {}) }
       props.onPathLegend?.(buffers.legend)
       if (props.program && props.toolpathDisplay) {
         const overlay = toolpathOverlayModel(props.program)
@@ -739,6 +744,7 @@ export function View3D(props: View3DProps) {
         range(pathLines.rapid, pathLines.rapidStarts)
       }
       // A lathe tool or a printer nozzle is the machine scene's; the milling cutter and the marker are for mills only.
+        range(pathLines.ghost, pathLines.cutStarts)
       const ownTool = machineScene !== undefined && props.machine?.kind !== "mill"
         if (pathLines.arrows?.update(done ? startedBy(pathLines.cutStarts, seconds) : Infinity)) invalidate()
       const visible = playback.segmentCount > 0 && !ownTool
