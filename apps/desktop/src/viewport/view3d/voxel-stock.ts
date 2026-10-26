@@ -22,7 +22,7 @@ export const createVoxelStock = (input: { readonly program: cam.Program; readonl
     toolOf: (path) => previewToolFor(input.program.toolpaths[path]?.toolId ?? "", input.tools)
   })
   const geometry = new THREE.BufferGeometry()
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xc8a878, metalness: 0.35, roughness: 0.6, transparent: (input.opacity ?? 1) < 1, opacity: input.opacity ?? 1 }))
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xc8a878, metalness: 0.35, roughness: 0.6, transparent: (input.opacity ?? 1) < 1, opacity: input.opacity ?? 1, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 8 }))
   mesh.name = "live-stock:voxels"
   const draw = () => {
     const { positions, normals } = sim.surface()

@@ -115,6 +115,8 @@ export const createLiveStock = (simulation: cam.sim.StockSimulation, options: { 
     metalness: 0.25,
     roughness: 0.65,
     side: THREE.DoubleSide,
+    // Pushed back a little so the axes and the grid lying in the stock's top face are drawn over it, not through it.
+    polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 8,
     ...(options.opacity !== undefined && options.opacity < 1 ? { transparent: true, opacity: options.opacity } : {})
   })
   const mesh = new THREE.Mesh(geometry, material)

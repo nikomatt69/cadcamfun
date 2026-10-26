@@ -79,7 +79,7 @@ const COLORS = {
 } as const
 
 const material = (color: number, assumed: boolean, opacity = 1): THREE.MeshStandardMaterial =>
-  new THREE.MeshStandardMaterial({ color, metalness: 0.45, roughness: 0.5, transparent: assumed || opacity < 1, opacity: assumed ? 0.45 : opacity, depthWrite: !assumed, side: THREE.DoubleSide })
+  new THREE.MeshStandardMaterial({ color, metalness: 0.45, roughness: 0.5, transparent: assumed || opacity < 1, opacity: assumed ? 0.45 : opacity, depthWrite: !assumed, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })
 
 /** A revolved outline about display +x: `points` are (radius, x). Three's LatheGeometry turns about +Y, so it is laid onto +X. */
 const revolveX = (points: ReadonlyArray<readonly [number, number]>, segments = 64): THREE.BufferGeometry => {

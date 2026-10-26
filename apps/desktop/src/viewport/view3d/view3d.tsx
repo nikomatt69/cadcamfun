@@ -17,6 +17,7 @@ import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlay
 import { toolObject } from "./tool-object.ts"
 import { gaugeOfTool, previewToolFor } from "./tool-models.ts"
 import { createDirectionArrows, type DirectionArrows } from "./direction-arrows.ts"
+import { createCameraRig } from "../camera-rig.ts"
 import { createVoxelStock, type VoxelStock } from "./voxel-stock.ts"
 import { classLookup, pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
@@ -376,6 +377,8 @@ export function View3D(props: View3DProps) {
       return group
     }
     let radius = 100
+    /** The bounding sphere the camera rig sets near and far from; dropped whenever the scene is rebuilt. */
+    let sphereCache: THREE.Sphere | undefined
     const meshJobs = new MeshWorkerQueue({
       create: () => new Worker(new URL("./mesh-worker.ts", import.meta.url), { type: "module" }),
       onError: (message) => { setMeshError(message); invalidate() }
@@ -620,6 +623,7 @@ export function View3D(props: View3DProps) {
       appearance()
       if (!initialized) { fit(); initialized = true }
     }
+      sphereCache = undefined
     let initialized = false
     fit = () => {
       const box = new THREE.Box3().setFromObject(content)
@@ -643,6 +647,27 @@ export function View3D(props: View3DProps) {
     let pointerStart: readonly [number, number] = [0, 0]
     const down = (event: PointerEvent) => { pointerStart = [event.clientX, event.clientY] }
     const pick = (event: PointerEvent) => {
+    // Zoom toward the cursor, orbit about the selection or the surface under it, near and far that follow the scene (no depth fighting).
+    const rig = createCameraRig({
+      controls, camera: () => activeCamera, surface: host, canvas: () => renderer.domElement,
+      pick: (ndc, cam) => {
+        // Only the solids are tested: a line or a voxel stock of a million triangles would make every wheel notch stall.
+        raycaster.setFromCamera(ndc, cam)
+        return raycaster.intersectObjects(content.children, false).find((hit) => hit.object instanceof THREE.Mesh && typeof hit.object.userData.solidIndex === "number")?.point
+      },
+      selectionCenter: () => selectedMesh ? new THREE.Box3().setFromObject(selectedMesh).getCenter(new THREE.Vector3()) : undefined,
+      sceneSphere: () => {
+        if (sphereCache === undefined) {
+          const box = new THREE.Box3().setFromObject(content)
+          if (machineScene) fitBounds(machineScene.root, box)
+          sphereCache = box.isEmpty() ? new THREE.Sphere(controls.target.clone(), radius) : box.getBoundingSphere(new THREE.Sphere())
+        }
+        return { center: [sphereCache.center.x, sphereCache.center.y, sphereCache.center.z], radius: sphereCache.radius }
+      },
+      invalidate: () => invalidate(),
+      reducedMotion: () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true,
+      canNavigate: () => preset() !== "four-view" && !gizmo.dragging && !gizmo.axis
+    })
       if (event.button !== 0 || gizmo.dragging || preset() === "four-view" || Math.hypot(event.clientX - pointerStart[0], event.clientY - pointerStart[1]) > 4 || gizmo.axis) return
       const rect = renderer.domElement.getBoundingClientRect()
       raycaster.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), activeCamera)
@@ -736,7 +761,9 @@ export function View3D(props: View3DProps) {
         const moved = marker.position.x !== p.x || marker.position.y !== p.y || marker.position.z !== p.z
         if (moved || marker.visible !== visible) { marker.position.set(p.x, p.y, p.z); marker.visible = visible; invalidate() }
       }
-      const cameraMoved = controls.update()
+      const rigAnimating = rig.beforeUpdate(performance.now())
+      const cameraMoved = controls.update() || rigAnimating
+      if (rig.afterUpdate(cameraMoved)) dirty = true
       if (!document.hidden && (dirty || cameraMoved || props.playing)) { dirty = false; renderFrame() }
       const playing = !!props.playing && seconds < playback.duration && (props.playbackRate ?? 1) > 0
       if (!playing && !cameraMoved) previous = undefined
@@ -751,7 +778,7 @@ export function View3D(props: View3DProps) {
       renderFrame()
       return { canvas: renderer.domElement, camera: { position: [activeCamera.position.x, activeCamera.position.y, activeCamera.position.z], target: [controls.target.x, controls.target.y, controls.target.z] }, ...(props.visionMode === "cam" && props.program ? { programText: cam.programGeometryText(props.program) } : {}), ...(machineScene && props.machine ? { spatial: machineSpatial(props.machine, machineScene, seconds) } : {}) }
     })
-    onCleanup(() => { unregisterCapture(); disposeMachine(); disposeStock(); disposeVoxels(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); look.dispose(); outline.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
+    onCleanup(() => { rig.dispose(); unregisterCapture(); disposeMachine(); disposeStock(); disposeVoxels(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); look.dispose(); outline.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />
