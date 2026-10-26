@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { acceptAttachments, attachmentProblem, base64Bytes, MAX_ATTACHMENTS, MAX_IMAGE_BYTES, photoName } from "../lib/attachments"
+import { acceptAttachments, attachmentPreviews, attachmentProblem, base64Bytes, MAX_ATTACHMENTS, MAX_IMAGE_BYTES, photoName } from "../lib/attachments"
 
 const photo = (bytes: number, name = "photo.jpg") => ({ name, mime: "image/jpeg", data: "A".repeat(Math.ceil((bytes * 4) / 3)) })
 
@@ -32,4 +32,9 @@ test("the desktop takes five attachments per message", () => {
 
 test("a photo gets a name of its own", () => {
   expect(photoName(Date.UTC(2026, 9, 17, 9, 5, 3))).toBe("photo-2026-10-17T09-05-03-000Z.jpg")
+})
+
+test("only pictures become transcript previews, as inline data URLs", () => {
+  const pdf = { name: "drawing.pdf", mime: "application/pdf", data: "JVBERi0=" }
+  expect(attachmentPreviews([{ name: "part.jpg", mime: "image/jpeg", data: "QUJD" }, pdf])).toEqual([{ name: "part.jpg", uri: "data:image/jpeg;base64,QUJD" }])
 })

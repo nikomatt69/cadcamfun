@@ -46,7 +46,7 @@ export function Composer({
   onStop,
   seed,
   seedToken,
-  modelLabel, permissionLabel, onOpenModels, onOpenControls, status,
+  modelLabel, permissionLabel, onOpenModels, onOpenControls,
   attachments = [],
   onAddAttachment,
   onRemoveAttachment,
@@ -70,8 +70,6 @@ export function Composer({
   permissionLabel: string
   onOpenModels(): void
   onOpenControls(): void
-  /** Live phase of the desktop turn (step, tool, retries, tokens); shown while busy. */
-  status?: string
   /** Pictures waiting to go with the next message. */
   attachments?: readonly PendingAttachment[]
   /** Opens the camera for a picture of the part. */
@@ -123,31 +121,6 @@ export function Composer({
 
   return (
     <View onLayout={content.onLayout} style={{ paddingHorizontal: content.gutter, paddingTop: 8, paddingBottom: 8 }}>
-      {busy ? (
-        <View
-          style={{
-            alignSelf: "center",
-            maxWidth: "100%",
-            minHeight: 26,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-            marginBottom: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 4,
-            borderRadius: 999,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: hexToRgba(stopping ? palette.danger : palette.ink, stopping ? 0.22 : isDark ? 0.1 : 0.12),
-            backgroundColor: hexToRgba(stopping ? palette.danger : palette.ink, stopping ? 0.08 : 0.05),
-          }}
-        >
-          <View style={{ width: 6, height: 6, flexShrink: 0, borderRadius: 3, backgroundColor: stopping ? palette.danger : palette.warning }} />
-          <Text accessibilityLiveRegion="polite" numberOfLines={stacked ? undefined : 1} style={{ flexShrink: 1, color: palette.muted, fontVariant: ["tabular-nums"], ...typeStyle(12, { weight: "600" }) }}>
-            {status ?? "Desktop assistant working"}{stopping ? "" : " · send to steer"}
-          </Text>
-        </View>
-      ) : null}
-
       {/* The shadow sits outside the clipped capsule so it can render. */}
       <View style={{ borderRadius: CARD_RADIUS, borderCurve: "continuous", boxShadow: `0 10px 24px ${hexToRgba(palette.overlay, isDark ? 0.34 : 0.1)}` }}>
         <View style={{ borderRadius: CARD_RADIUS, borderCurve: "continuous", overflow: "hidden" }}>

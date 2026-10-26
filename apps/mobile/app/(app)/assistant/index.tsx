@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { Stack, useFocusEffect, useRouter } from "expo-router"
-import { useHeaderHeight } from "expo-router/react-navigation"
-import { Bot, Check, ChevronDown, CircleGauge, CloudOff, GitPullRequest, History, Plus, Route, SlidersHorizontal, Sparkles } from "lucide-react-native"
+import { Bot, Check, CircleGauge, CloudOff, GitPullRequest, Route, Sparkles } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useResource } from "@/lib/use-resource"
@@ -22,7 +21,8 @@ import { Composer, type AssistantMode } from "@/components/chat/Composer"
 import { TranscriptItemView, type ErrorRecovery, type TranscriptActions } from "@/components/chat/TranscriptItemView"
 import { JumpToLatestPill } from "@/components/chat/JumpToLatestPill"
 import { BrandMark } from "@/components/layout/BrandMark"
-import { TypingRow } from "@/components/chat/TypingRow"
+import { AssistantHeader } from "@/components/chat/AssistantHeader"
+import { SessionStatusLine } from "@/components/chat/SessionStatusLine"
 import { hexToRgba } from "@/lib/theme"
 import { caps, type } from "@/lib/typography"
 import { BottomSheet } from "@/components/ui/BottomSheet"
@@ -38,7 +38,7 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ModelPickerSheet } from "@/components/chat/model-picker-sheet"
 import { AssistantInspectorSheet } from "@/components/chat/assistant-inspector-sheet"
 import { CameraSheet } from "@/components/chat/camera-sheet"
-import { acceptAttachments, type PendingAttachment } from "@/lib/attachments"
+import { acceptAttachments, attachmentPreviews, type PendingAttachment } from "@/lib/attachments"
 import { assistantModels, formatVariantLabel, resolveAssistantPreferences, PERMISSION_MODES, selectedAssistantModel, type AssistantPreferences } from "@/lib/assistant-preferences"
 
 const QUICK_PROMPTS = [
@@ -75,11 +75,9 @@ const QUICK_PROMPTS = [
 export default function AssistantScreen() {
   const { client, ai, config, connectivity, refreshBootstrap } = useServer()
   const { palette } = useTheme()
-  const headerHeight = useHeaderHeight()
   const content = useContentLayout()
   const router = useRouter()
-  const { width, fontScale } = content
-  const stackedContext = fontScale > 1.3 || width < 375
+  const { width } = content
 
   const projectId = useUIStore((state) => state.assistantProjectId)
   const draft = useUIStore((state) => state.assistantDraft)
@@ -392,7 +390,7 @@ export default function AssistantScreen() {
     // A new turn starts its own meter; steering (queue) keeps the running one.
     setActivity(idleActivity)
     const sent = attachments
-    apply({ type: "user", text, ...(sent.length > 0 ? { attachments: sent.map((item) => item.name) } : {}) })
+    apply({ type: "user", text, ...(sent.length > 0 ? { attachments: sent.map((item) => item.name), previews: attachmentPreviews(sent) } : {}) })
     jumpToLatest(false)
     try {
       // The desktop owns the turn from here; this answers as soon as the host session exists.
@@ -580,8 +578,6 @@ export default function AssistantScreen() {
   const lastErrorId = useMemo(() => transcript.findLast((item) => item.kind === "row" && item.row.kind === "error")?.id, [transcript])
   const newest = transcript[transcript.length - 1]
   const liveReasoningId = busy && newest?.kind === "row" && newest.row.kind === "reasoning" ? newest.id : undefined
-  // Between sending and the first reply row there is nothing to read yet: show the typing row at the newest end.
-  const awaitingFirstRow = busy && newest?.kind === "row" && newest.row.kind === "user"
   const lastPrompt = useMemo(() => lastUserPrompt(log), [log])
   const recovery = useMemo<ErrorRecovery | undefined>(() => busy ? undefined : { refresh: Boolean(followed), ...(lastPrompt ? { lastPrompt } : {}) }, [busy, followed, lastPrompt])
   const renderItem = useCallback(({ item }: { item: TranscriptItem }) => (
@@ -611,44 +607,19 @@ export default function AssistantScreen() {
       : ai === null ? "Checking the desktop AI configuration…" : "Add a model key on the desktop to chat"
 
   return (
-    <SafeAreaView edges={{ bottom: true, left: true, right: true }} style={{ flex: 1, backgroundColor: palette.background }}>
-    <Stack.Screen options={{ headerRight: () => <View style={{ flexDirection: "row", gap: 4 }}>
-      <PressableScale accessibilityRole="button" accessibilityLabel="Conversations" onPress={() => router.push("/assistant/conversations")} disabled={!projectId} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><History size={20} color={palette.accent} /></PressableScale>
-      <PressableScale accessibilityRole="button" accessibilityLabel="New conversation" onPress={newConversation} disabled={!projectId} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><Plus size={21} color={palette.accent} /></PressableScale>
-      <PressableScale accessibilityRole="button" accessibilityLabel="Assistant controls" onPress={() => setInspectorOpen(true)} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><SlidersHorizontal size={20} color={palette.accent} /></PressableScale>
-    </View> }} />
-    <KeyboardAvoidingView onLayout={content.onLayout} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={headerHeight} style={{ flex: 1 }}>
-      {/* Project + agent context: the two things that determine where and how the turn runs. */}
-      <View style={{ minHeight: 56, marginHorizontal: content.gutter, marginTop: 8, marginBottom: 8, borderRadius: 18, borderCurve: "continuous", overflow: "hidden", backgroundColor: palette.surface, flexDirection: stackedContext ? "column" : "row", alignItems: "stretch", borderWidth: 0.5, borderColor: palette.border }}>
-        <PressableScale
-          onPress={() => { haptic("selection"); setPickerOpen(true) }}
-          subtle
-          tint
-          accessibilityRole="button"
-          accessibilityLabel={`Choose assistant project${currentProject ? `, current project: ${currentProject.name}` : ""}`}
-          style={{ flex: stackedContext ? undefined : 1, minHeight: 44, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 10 }}
-        >
-          <Text style={{ flexShrink: 1, color: palette.ink, ...type(15, { weight: "600" }) }} numberOfLines={stackedContext ? undefined : 1}>
-            {currentProject ? currentProject.name : "Choose a project"}
-          </Text>
-          <ChevronDown size={15} color={palette.muted} />
-        </PressableScale>
-        <View style={stackedContext ? { height: 0.5, marginHorizontal: 12, backgroundColor: palette.border } : { width: 0.5, marginVertical: 10, backgroundColor: palette.border }} />
-        <PressableScale
-          onPress={() => { haptic("selection"); setAgentPickerOpen(true) }}
-          subtle
-          tint
-          accessibilityRole="button"
-          accessibilityLabel={`Choose CADCAMFUN agent${currentAgent ? `, current agent: ${currentAgent.title}` : ""}`}
-          style={{ flex: stackedContext ? undefined : 1, minHeight: 44, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 10 }}
-        >
-          <Bot size={15} color={palette.accent} />
-          <Text style={{ flexShrink: 1, color: palette.soft, ...type(13, { weight: "600" }) }} numberOfLines={stackedContext ? undefined : 1}>
-            {currentAgent?.title ?? "CAD/CAM assistant"}
-          </Text>
-          <ChevronDown size={14} color={palette.muted} />
-        </PressableScale>
-      </View>
+    <SafeAreaView edges={{ top: true, bottom: true, left: true, right: true }} style={{ flex: 1, backgroundColor: palette.background }}>
+    <Stack.Screen options={{ headerShown: false }} />
+    <KeyboardAvoidingView onLayout={content.onLayout} behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+      <AssistantHeader
+        gutter={content.gutter}
+        project={currentProject ? currentProject.name : "Choose a project"}
+        detail={`${currentAgent?.title ?? "CAD/CAM assistant"} · ${modelLabel}${thinkingLabel ? ` · ${thinkingLabel}` : ""}`}
+        hasProject={Boolean(projectId)}
+        onChooseProject={() => setPickerOpen(true)}
+        onChooseAgent={() => setAgentPickerOpen(true)}
+        onHistory={() => router.push("/assistant/conversations")}
+        onNew={newConversation}
+      />
 
       {!online ? <LinkStrip gutter={content.gutter} offline text="Desktop offline. New messages wait on this iPhone and send when it reconnects." />
         : link === "reconnecting" && !busy ? <LinkStrip gutter={content.gutter} text="Reconnecting to the conversation…" /> : null}
@@ -673,16 +644,8 @@ export default function AssistantScreen() {
             <EmptyState title="What are we working on?" description="Choose a workspace to review designs, inspect manufacturing paths or prepare your next change." icon={<Sparkles size={26} color={palette.accent} />} action={<ActionButton label="Choose a project" onPress={() => setPickerOpen(true)} />} />
           ) : (
             <View style={{ alignItems: "center", gap: 18 }}>
-              <BrandMark size={58} wordmark={false} />
-              <View style={{ alignItems: "center", gap: 7 }}>
-                <Text selectable style={{ color: palette.ink, textAlign: "center", ...type(28, { weight: "700" }) }}>Build with CADCAMFUN</Text>
-                <Text selectable style={{ maxWidth: 340, color: palette.soft, textAlign: "center", ...type(15) }}>
-                  Turn an idea into a reviewed change. Your assistant works with the tools and context on your desktop.
-                </Text>
-                {ai?.tools?.length ? (
-                  <Text selectable style={{ color: palette.muted, ...type(12) }}>{ai.tools.length} desktop tools available</Text>
-                ) : null}
-              </View>
+              <BrandMark size={56} wordmark={false} />
+              <Text selectable accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(24, { weight: "600" }) }}>What are we making?</Text>
               <View style={{ alignSelf: "stretch", gap: 8 }}>
                 {QUICK_PROMPTS.map((item) => {
                   const Icon = item.icon
@@ -716,7 +679,6 @@ export default function AssistantScreen() {
             contentInsetAdjustmentBehavior="never"
             contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: Math.max(0, contentGutter(width) - 16) }}
             renderItem={renderItem}
-            ListHeaderComponent={awaitingFirstRow ? <TypingRow /> : null}
             maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 80 }}
             keyboardDismissMode="interactive"
             onScroll={onTranscriptScroll}
@@ -744,6 +706,15 @@ export default function AssistantScreen() {
         </View>
       )}
 
+      {busy && online ? (
+        <View style={{ paddingHorizontal: content.gutter }}>
+          <SessionStatusLine
+            stopping={stopRequested}
+            label={stopRequested ? "Stopping the desktop turn…" : link === "reconnecting" ? "Reconnecting to the desktop… the turn keeps running there" : link === "connecting" ? "Connecting to the desktop…" : `${activityLabel(activity)} · send to steer`}
+          />
+        </View>
+      ) : null}
+
       <Composer
         key={projectId ?? "no-project"}
         busy={busy && online}
@@ -763,7 +734,6 @@ export default function AssistantScreen() {
         attachments={attachments}
         onAddAttachment={() => setCameraOpen(true)}
         onRemoveAttachment={(index) => setAttachments((previous) => previous.filter((_, at) => at !== index))}
-        status={stopRequested ? "Stopping the desktop turn…" : link === "reconnecting" ? "Reconnecting to the desktop… the turn keeps running there" : link === "connecting" && busy ? "Connecting to the desktop…" : activityLabel(activity)}
         seed={promptSeed?.projectId === projectId ? promptSeed.text : undefined}
         seedToken={promptSeed?.projectId === projectId ? promptSeed.token : undefined}
       />

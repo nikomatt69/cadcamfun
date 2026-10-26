@@ -1,6 +1,5 @@
 import { memo, useState } from "react"
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native"
 import { Box, Check, CircleGauge, Copy, GitPullRequest, Route, Workflow, Wrench, X, type LucideIcon } from "lucide-react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
@@ -11,6 +10,7 @@ import { layout } from "@/lib/layout"
 import { caps, mono, type as typeStyle } from "@/lib/typography"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { DisclosureChevron, Reveal } from "./disclosure"
+import { ImageViewer } from "./image-preview"
 
 /**
  * A muted row showing the assistant working — vcs_start_change, cad_*, cam_* tool calls. Watching
@@ -28,9 +28,6 @@ function toolIdentity(raw: string | undefined, label: string): { icon: LucideIco
   return { icon: Wrench, category: "TOOL", title }
 }
 
-/** The full-screen render viewer is always black, so its chrome is white in both themes. */
-const ON_DARK = "#FFFFFF"
-
 function stringify(value: unknown): string {
   if (typeof value === "string") return value
   if (value === undefined) return ""
@@ -47,7 +44,6 @@ function stringify(value: unknown): string {
  */
 export function ToolImages({ images, tool }: { images: readonly string[]; tool: string }) {
   const { palette } = useTheme()
-  const { width, height } = useWindowDimensions()
   const [shown, setShown] = useState<string | null>(null)
   const name = tool.replaceAll("_", " ")
   return <>
@@ -58,21 +54,7 @@ export function ToolImages({ images, tool }: { images: readonly string[]; tool: 
         <Image source={{ uri }} resizeMode="cover" style={{ width: "100%", height: "100%" }} />
       </Pressable>)}
     </View>
-    <Modal visible={shown !== null} animationType="fade" presentationStyle="fullScreen" supportedOrientations={["portrait", "landscape"]} onRequestClose={() => setShown(null)}>
-      <SafeAreaView edges={["top", "bottom", "left", "right"]} style={{ flex: 1, backgroundColor: palette.overlay }}>
-        <View style={{ flexDirection: "row", alignItems: "center", minHeight: layout.touchTarget + 8, paddingLeft: 20, paddingRight: 8 }}>
-          <Text accessibilityRole="header" numberOfLines={1} style={{ flex: 1, color: ON_DARK, ...typeStyle(17, { weight: "600" }) }}>{name}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close image" onPress={() => setShown(null)}
-            style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.5 : 1 })}>
-            <X size={22} color={ON_DARK} />
-          </Pressable>
-        </View>
-        {/* iOS pinch-zooms a ScrollView natively; a double tap is not needed to read a render. */}
-        <ScrollView maximumZoomScale={4} minimumZoomScale={1} centerContent showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center" }}>
-          {shown ? <Image source={{ uri: shown }} resizeMode="contain" accessibilityLabel={`Render from ${name}`} style={{ width, height: height * 0.8 }} /> : null}
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
+    <ImageViewer uri={shown} title={name} onClose={() => setShown(null)} />
   </>
 }
 

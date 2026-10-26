@@ -61,3 +61,7 @@ export const acceptAttachments = (
 
 /** The name a photo gets: a short stamp so several photos do not share one name. */
 export const photoName = (at: number = Date.now()): string => `photo-${new Date(at).toISOString().replace(/[:.]/g, "-")}.jpg`
+
+/** The pictures among the attachments, as inline data URLs the transcript can draw; other kinds have no preview. */
+export const attachmentPreviews = (attachments: readonly PendingAttachment[]): ReadonlyArray<{ readonly name: string; readonly uri: string }> =>
+  attachments.filter((item) => item.mime.startsWith("image/")).map((item) => ({ name: item.name, uri: `data:${item.mime};base64,${item.data}` }))

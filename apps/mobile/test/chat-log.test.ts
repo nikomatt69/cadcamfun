@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { answerRequest, appendChatEvent, emptyLog, lastUserPrompt, transcriptText } from "../lib/chat-log"
+import { answerRequest, appendChatEvent, emptyLog, lastUserPrompt, queueLastUserRow, settleOfflineRows, transcriptText } from "../lib/chat-log"
 import type { ChatEvent } from "../lib/sse"
 
 const ev = (e: ChatEvent | { type: "user"; text: string }) => e
@@ -116,4 +116,17 @@ test("the plan updates in place, retries collapse and clear when the turn ends",
   expect(log.filter((row) => row.kind === "notice").map((row) => row.kind === "notice" && row.tone)).toEqual(["info", "warning"])
   expect(log.at(-1)).toEqual({ kind: "assistant", sessionId: "s", text: "Done" })
   expect(transcriptText(log)).toBe("You: Mill it\n\nAssistant: Done")
+})
+
+test("a message keeps its photo previews when it is queued, taken in by the desktop or settled from the outbox", () => {
+  const previews = [{ name: "part.jpg", uri: "data:image/jpeg;base64,AAAA" }]
+  const sent = appendChatEvent(emptyLog, { type: "user", text: "Check this fixture", attachments: ["part.jpg"], previews })
+  expect(sent[0]).toMatchObject({ kind: "user", attachments: ["part.jpg"], previews })
+  const queued = queueLastUserRow(sent, "Check this fixture")
+  expect(queued[0]).toMatchObject({ queued: true, previews })
+  const taken = appendChatEvent(queued, { type: "user_message", text: "Check this fixture" } as ChatEvent)
+  expect(taken[0]).toMatchObject({ kind: "user", previews })
+  expect(taken[0]).not.toHaveProperty("queued")
+  const offline = appendChatEvent(emptyLog, { type: "user", text: "Later", offline: true, previews })
+  expect(settleOfflineRows(offline, [])[0]).toEqual({ kind: "user", text: "Later", previews })
 })

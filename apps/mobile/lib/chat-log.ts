@@ -10,13 +10,20 @@ import type { ChatEvent } from "./sse"
  */
 export type PlanItem = { readonly content: string; readonly status: "pending" | "in_progress" | "completed" | "cancelled" }
 
+/** A picture that went with a message: its name and an inline `data:` URL the transcript can draw. */
+export interface ChatPreview {
+  readonly name: string
+  readonly uri: string
+}
+
 export type ChatRow =
   /**
    * `queued`: sent while the desktop was busy and not yet taken into the conversation.
    * `offline`: written while the desktop was unreachable; it waits in the outbox and sends when the desktop is back.
    * `attachments`: the names of the pictures that went with the message.
+   * `previews`: those pictures as inline data URLs, so the transcript shows what was sent (a reopened conversation has only the names).
    */
-  | { kind: "user"; text: string; queued?: boolean; offline?: boolean; attachments?: readonly string[] }
+  | { kind: "user"; text: string; queued?: boolean; offline?: boolean; attachments?: readonly string[]; previews?: readonly ChatPreview[] }
   | { kind: "assistant"; text: string; sessionId: string }
   /** The model's reasoning before it answers or calls a tool; consecutive frames fold into one row. */
   | { kind: "reasoning"; text: string; sessionId: string }
@@ -39,6 +46,8 @@ export interface UserEvent {
   offline?: boolean
   /** The names of the pictures sent with the message. */
   attachments?: readonly string[]
+  /** The same pictures, drawable in the transcript. */
+  previews?: readonly ChatPreview[]
 }
 
 export type LogEvent = ChatEvent | UserEvent
@@ -63,13 +72,19 @@ export const toolLabel = (tool: string): string =>
     .replace(/^cam_/, "")
     .replaceAll("_", " ")
 
+/** A user row once the desktop has it: the waiting marks go, the pictures that went with it stay. */
+const delivered = (row: Extract<ChatRow, { kind: "user" }>): ChatRow => {
+  const { queued: _queued, offline: _offline, ...rest } = row
+  return rest
+}
+
 export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): readonly ChatRow[] => {
   switch (event.type) {
     case "user": {
       // The ChatEvent union has an index-signature fallback, so an unmatched literal narrows to it
       // ("user" → unknown). The explicit cast recovers the UserEvent shape.
       const user = event as UserEvent
-      return [...log, { kind: "user" as const, text: user.text, ...(user.queued ? { queued: true } : {}), ...(user.offline ? { offline: true } : {}), ...(user.attachments && user.attachments.length > 0 ? { attachments: user.attachments } : {}) }]
+      return [...log, { kind: "user" as const, text: user.text, ...(user.queued ? { queued: true } : {}), ...(user.offline ? { offline: true } : {}), ...(user.attachments && user.attachments.length > 0 ? { attachments: user.attachments } : {}), ...(user.previews && user.previews.length > 0 ? { previews: user.previews } : {}) }]
     }
 
     case "user_message": {
@@ -77,7 +92,7 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
       const text = String((event as { text?: unknown }).text ?? "").trim()
       if (!text) return log
       const queued = log.findIndex((row) => row.kind === "user" && row.queued === true && row.text.trim() === text)
-      if (queued >= 0) return log.map((row, index) => index === queued && row.kind === "user" ? { kind: "user", text: row.text } : row)
+      if (queued >= 0) return log.map((row, index) => index === queued && row.kind === "user" ? delivered(row) : row)
       const latest = log.findLast((row) => row.kind === "user")
       return latest?.kind === "user" && latest.text.trim() === text ? log : [...log, { kind: "user", text }]
     }
@@ -214,7 +229,7 @@ export const settleOfflineRows = (log: readonly ChatRow[], waiting: readonly str
     const left = pending.get(row.text) ?? 0
     if (left > 0) { pending.set(row.text, left - 1); return row }
     changed = true
-    return { kind: "user" as const, text: row.text }
+    return delivered(row)
   }).reverse()
   return changed ? settled : log
 }
@@ -222,7 +237,7 @@ export const settleOfflineRows = (log: readonly ChatRow[], waiting: readonly str
 /** The newest copy of a prompt becomes a steer: the desktop was already running a turn and takes it at the next step. */
 export const queueLastUserRow = (log: readonly ChatRow[], text: string): readonly ChatRow[] => {
   const index = log.findLastIndex((row) => row.kind === "user" && row.text === text && !row.queued)
-  return index < 0 ? log : log.map((row, at) => at === index ? { kind: "user" as const, text, queued: true } : row)
+  return index < 0 ? log : log.map((row, at) => at === index && row.kind === "user" ? { ...row, queued: true } : row)
 }
 
 /** Marks a permission request as answered so the button row collapses. */

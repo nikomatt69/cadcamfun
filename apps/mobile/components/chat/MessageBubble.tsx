@@ -9,6 +9,7 @@ import { haptic } from "@/lib/haptics"
 import { toast } from "@/components/ui/ToastHost"
 import type { ChatRow } from "@/lib/chat-log"
 import { Reveal } from "./disclosure"
+import { MessageImages } from "./image-preview"
 
 /**
  * nikcli's transcript hierarchy adapted for CADCAMFUN: user prompts are compact right-aligned
@@ -51,7 +52,7 @@ export const MessageBubble = memo(function MessageBubble({ row, onReuse, startsT
       onLongPress={() => { haptic("selection"); setActive(true) }}
       delayLongPress={220}
       accessibilityRole="text"
-      accessibilityLabel={`${isUser ? offline ? "Your message, waiting for the desktop" : queued ? "Your queued message" : "Your message" : "Assistant"}: ${row.text}`}
+      accessibilityLabel={`${isUser ? offline ? "Your message, waiting for the desktop" : queued ? "Your queued message" : "Your message" : "Assistant"}${isUser && row.attachments?.length ? `, with ${row.attachments.length === 1 ? "1 photo" : `${row.attachments.length} photos`}` : ""}: ${row.text}`}
       accessibilityHint="Long press for copy, share and reuse"
       accessibilityActions={[{ name: "copy", label: "Copy" }, { name: "share", label: "Share" }, ...(isUser && onReuse ? [{ name: "reuse", label: "Reuse in composer" }] : [])]}
       onAccessibilityAction={(event) => {
@@ -81,6 +82,10 @@ export const MessageBubble = memo(function MessageBubble({ row, onReuse, startsT
       >
         {offline ? <Text style={{ color: palette.soft, marginBottom: 6, ...typeStyle(12, { weight: "600" }) }}>Waiting for the desktop · sends when it reconnects</Text>
           : queued ? <Text style={{ color: palette.soft, marginBottom: 6, ...typeStyle(12, { weight: "600" }) }}>Queued · the desktop takes it at the next step</Text> : null}
+        {/* The photos that went with the message, above the words they illustrate. */}
+        {isUser && row.previews && row.previews.length > 0 ? (
+          <View style={{ marginBottom: 8, marginHorizontal: -6 }}><MessageImages images={row.previews} /></View>
+        ) : null}
         <Text
           selectable={!active}
           style={{
@@ -90,8 +95,8 @@ export const MessageBubble = memo(function MessageBubble({ row, onReuse, startsT
         >
           {row.text}
         </Text>
-        {/* The pictures that went with the message: the transcript says they were sent. */}
-        {isUser && row.attachments && row.attachments.length > 0 ? (
+        {/* A reopened conversation keeps the names, not the pixels: the transcript still says they were sent. */}
+        {isUser && !row.previews?.length && row.attachments && row.attachments.length > 0 ? (
           <Text style={{ marginTop: 6, color: palette.soft, ...typeStyle(12, { weight: "600" }) }}>
             {row.attachments.length === 1 ? "1 photo attached" : `${row.attachments.length} photos attached`}
           </Text>
