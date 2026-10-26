@@ -11,7 +11,7 @@ import { applyMaterialLook, elementMaterialName } from "../../../viewport/render
 import { currentLookTier } from "../../../viewport/render-look-setting.ts";
 
 /** The edges of solids and curves: a mid-dark grey that lets the face colour show through, not black, so a part reads as one body and not as a drawing of one. */
-const EDGE_STYLE = { color: 0x59606a, opacity: 0.6 } as const
+const EDGE_STYLE = { color: 0x59606a, opacity: 0.45 } as const
 
 interface SolidMesh { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }
 

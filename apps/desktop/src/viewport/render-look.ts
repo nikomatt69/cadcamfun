@@ -57,7 +57,7 @@ export interface RigLevels {
 
 export const TIERS: Readonly<Record<LookTier, TierSettings>> = {
   low: { environment: false, environmentBlur: 0, environmentIntensity: 0, toneMapping: THREE.NoToneMapping, exposure: 1, materials: false },
-  balanced: { environment: true, environmentBlur: 0.3, environmentIntensity: 0.22, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: false, rig: { key: 0.95, fill: 0.35, rim: 0.15, hemisphere: 0.3, ambient: 0.32 } },
+  balanced: { environment: true, environmentBlur: 0.3, environmentIntensity: 0.16, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: false, rig: { key: 0.9, fill: 0.3, rim: 0.1, hemisphere: 0.28, ambient: 0.36 } },
   standard: { environment: true, environmentBlur: 0.04, environmentIntensity: 0.95, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: true, rig: { key: 1.3, fill: 0.45, rim: 0.7, hemisphere: 0.2, ambient: 0.08 } },
   high: { environment: true, environmentBlur: 0, environmentIntensity: 1.1, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: true, rig: { key: 1.4, fill: 0.5, rim: 1.1, hemisphere: 0.2, ambient: 0.08 } }
 }

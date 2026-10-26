@@ -28,7 +28,7 @@ export const LINE_SEGMENT_BUDGET: Readonly<Record<LineQuality, { readonly total:
 }
 
 /** Thick lines are drawn this much of the width the caller asked for: `balanced` sits between the one-pixel edges of the plain look and the 1.5 px of standard, antialiased. */
-export const LINE_WIDTH_SCALE: Readonly<Record<LineQuality, number>> = { low: 1, balanced: 0.75, standard: 1, high: 1 }
+export const LINE_WIDTH_SCALE: Readonly<Record<LineQuality, number>> = { low: 1, balanced: 0.7, standard: 1, high: 1 }
 
 /** Counts the segments of the thick lines alive. `acquire` returns a release function, or undefined when it does not fit. */
 export class LineBudget {
