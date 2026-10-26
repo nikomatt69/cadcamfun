@@ -282,6 +282,20 @@ describe("snapping a part that is moved with the gizmo", () => {
     expect(snapPointAlongAxes(at(30, 4, 0), [line(0, 0, 100, 0)] as any, only(SnapType.NEAREST), ["x", "y"])).toBeUndefined()
   })
 
+  test("where the drag began is the start point: perpendicular and parallel apply to a move", () => {
+    const wall: any = line(0, 0, 100, 0)
+    const settings = only(SnapType.PERPENDICULAR)
+    // Dragging along X from (30, 50): the foot of the perpendicular onto the wall is straight below the start, at x = 30.
+    expect(snapPointAlongAxes(at(33, 50), [wall], settings, ["x"], at(30, 50))).toMatchObject({ x: 30, type: SnapType.PERPENDICULAR })
+    // Without a start point there is nothing to be perpendicular to.
+    expect(snapPointAlongAxes(at(33, 50), [wall], settings, ["x"])).toBeUndefined()
+    // Parallel to the wall, a move along X is already parallel: the cursor itself is the snap point.
+    expect(snapPointAlongAxes(at(33, 50), [wall], only(SnapType.PARALLEL), ["x"], at(30, 50))).toMatchObject({ x: 33, type: SnapType.PARALLEL })
+    // In the plane, a move that would run parallel to the wall is pulled onto the line through the start.
+    const slanted: any = line(0, 0, 100, 100)
+    expect(snapPointAlongAxes(at(60, 62), [slanted], only(SnapType.PARALLEL), ["x", "y"], at(10, 10))).toMatchObject({ type: SnapType.PARALLEL })
+  })
+
   test("the hook skips the parts being moved, publishes the marker and clears it", () => {
     createRoot((dispose) => {
       const moving = { ...cube, id: "moving", x: 0, y: 0 }

@@ -103,5 +103,21 @@ Fixed on the way: line-circle crossings (computed perpendicular to the line), ta
 ## Open
 
 - Click-to-place after a creation key is not a mode (the form takes the position).
-- Perpendicular/tangent/parallel apply only while drawing a line (the start point); a move or a placement has none.
-- The built-in library components of type `extrusion` have no 3D preview, so "Place" does not start a placement for them.
+
+## Library placement and relative move snaps
+
+Built-in structural library records are converted at the desktop library adapter into parametric histories. Preview and
+placement use the same geometry, dimensions, axis convention and boolean cuts; editor-authored component documents retain
+their own transforms and children. Placement targets the geometric centre of the part, as it does for saved components.
+The adapter preserves the solids described by the catalogue; it does not invent unspecified grooves or mounting holes.
+
+The gizmo supplies its initial pivot as the reference for perpendicular, tangent and parallel snaps. Named-point alignment
+continues to measure distance only on the dragged axes. Relative snaps must also satisfy the locked coordinates: projecting
+an unreachable tangent or perpendicular point onto a locked axis would falsely advertise a geometric relation.
+Placement uses the previous placed part's pivot as its reference, excluding that part from self-snapping. Cancelling clears
+the placement reference; removing the reference part leaves no anchor. Model coordinates remain independent of the scene's
+origin offset. Pure geometry stays synchronous; the existing Effect keybinding and sidecar services keep their contracts.
+
+## Change log
+
+- 2026-10-26: resumed validation of structural-part placement and relative snaps for placement and gizmo movement.

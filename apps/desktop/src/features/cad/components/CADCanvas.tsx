@@ -788,7 +788,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (axes.length === 0) { snap.clearIndicator(); return }
     const offset = originOffset()
     const model = { x: pivot.position.x - offset.x, y: pivot.position.y - offset.y, z: pivot.position.z - offset.z }
-    const hit = snap.snapAlongAxes(model, axes, new Set(selectedIds()), unitsPerPixel())
+    // Where the drag began is the start point: perpendicular, tangent and parallel are relative to it.
+    const from = dragStart ? new THREE.Vector3().setFromMatrixPosition(dragStart.pivotMatrix) : undefined
+    const anchor = from ? { x: from.x - offset.x, y: from.y - offset.y, z: from.z - offset.z } : undefined
+    const hit = snap.snapAlongAxes(model, axes, new Set(selectedIds()), unitsPerPixel(), anchor)
     if (!hit) return
     for (const axis of axes) pivot.position[axis] = hit[axis] + offset[axis]
     pivot.updateMatrix()
@@ -858,6 +861,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const untrackedPreviewPosition = () => previewPosition()
 
   const cancelPlacement = () => {
+    lastPlaced = undefined
     if (preview) disposeObject(preview)
     preview = undefined
     setPlacing(false)
@@ -932,7 +936,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     raycaster.setFromCamera(mouse, camera)
     return step > 1e-9 ? step : fallback
   }
-  const snapped = (point: Point3): Point3 => (snap.snapSettings().enabled ? snap.snapToPoint(point, undefined, unitsPerPixelOnPlane()) ?? point : point)
+  /** Where the last part was placed in this session: the next placement snaps relative to it (perpendicular, parallel...). */
+  let lastPlaced: Point3 | undefined
+  const snapped = (point: Point3): Point3 => (snap.snapSettings().enabled ? snap.snapToPoint(point, lastPlaced, unitsPerPixelOnPlane()) ?? point : point)
 
   /**
    * The cursor readout the status bar shows. Published once per frame at most: a pointer can emit
@@ -987,7 +993,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (isPlacing() && preview) {
       const hit = planePoint()
       if (!hit) return
-      const at = snapped({ x: hit.x, y: hit.y, z: hit.z })
+      // The snap points are in model units; the scene is shifted by the origin offset.
+      const offset = originOffset()
+      const model = snapped({ x: hit.x - offset.x, y: hit.y - offset.y, z: hit.z - offset.z })
+      const at = { x: model.x + offset.x, y: model.y + offset.y, z: model.z + offset.z }
       preview.position.set(at.x, at.y, at.z)
       setPreviewPosition(at)
       publishMousePosition({ x: round2(at.x), y: round2(at.y), z: round2(at.z) })
@@ -1121,8 +1130,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const component = props.previewLibraryItem ?? predefinedComponents.find((candidate: any) => candidate.data === name || candidate.name === name)
     if (!component) return
     const offset = originOffset()
-    const id = elements.addElement(transformLibraryItemToCADElement(component, { x: position.x - offset.x, y: position.y - offset.y, z: position.z - offset.z }))
+    const model = { x: position.x - offset.x, y: position.y - offset.y, z: position.z - offset.z }
+    const id = elements.addElement(transformLibraryItemToCADElement(component, model))
     if (!id) return
+    lastPlaced = model
     selection.selectElement(id)
     props.onComponentPlaced?.(name, position)
     cancelPlacementKeepPreview()
@@ -1138,7 +1149,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     setPointer(event)
     let target: Point3
     const hits = visibleObjects.length > 0 ? raycaster.intersectObjects(visibleObjects, true) : []
-    if (hits.length > 0) target = { x: hits[0]!.point.x, y: hits[0]!.point.y, z: hits[0]!.point.z }
+    if (hits.length > 0) { const shift = originOffset(); target = { x: hits[0]!.point.x - shift.x, y: hits[0]!.point.y - shift.y, z: hits[0]!.point.z - shift.z } }
     else {
       const hit = planePoint()
       const offset = originOffset()
@@ -1156,7 +1167,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     setDraggingComponent(false)
     if (!componentId) return
     const component = predefinedComponents.find((candidate: any) => candidate.data === componentId || candidate.name === componentId)
-    if (component) elements.addElement(transformLibraryItemToCADElement(component, dropPosition()))
+    if (component) { elements.addElement(transformLibraryItemToCADElement(component, dropPosition())); lastPlaced = dropPosition() }
   }
 
   // ---------------------------------------------------------------------------------------------------- keyboard

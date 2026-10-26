@@ -47,9 +47,9 @@ export function createSnap() {
    * The snap for a part that is being dragged along `axes`, skipping `exclude` (the parts being moved: they must not snap
    * to where they were). Publishes the indicator; returns `undefined` when nothing is within reach.
    */
-  const snapAlongAxes = (point: { x: number; y: number; z?: number }, axes: ReadonlyArray<SnapAxis>, exclude: ReadonlySet<string>, unitsPerPixel = 1) => {
+  const snapAlongAxes = (point: { x: number; y: number; z?: number }, axes: ReadonlyArray<SnapAxis>, exclude: ReadonlySet<string>, unitsPerPixel = 1, anchor?: { x: number; y: number; z?: number }) => {
     const others = elements.elements.filter((element) => !exclude.has(element.id))
-    const hit = snapPointAlongAxes({ x: point.x, y: point.y, z: point.z || 0 }, others, inUnits(unitsPerPixel), axes)
+    const hit = snapPointAlongAxes({ x: point.x, y: point.y, z: point.z || 0 }, others, inUnits(unitsPerPixel), axes, anchor ? { x: anchor.x, y: anchor.y, z: anchor.z || 0 } : undefined)
     if (hit) {
       setIndicator({ x: hit.x, y: hit.y, z: hit.z, type: hit.type, visible: true })
       setIsSnapping(true)

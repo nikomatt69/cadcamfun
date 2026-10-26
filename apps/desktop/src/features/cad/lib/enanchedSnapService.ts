@@ -53,7 +53,7 @@ function collectSnapPoints(point: Point, elements: Element[], settings: SnapSett
   // Get active element (typically the one being created/modified)
   const activeElement = elements.find(el => el.isActive);
   // The point the user is drawing or moving from: perpendicular, tangent and parallel are relative to it. Without one
-  // (placing a part, dropping from the library) there is nothing to be perpendicular or parallel to.
+  // there is nothing to be perpendicular or parallel to.
   const from = anchor ?? anchorOf(activeElement);
 
   // Collect basic snap points from elements
@@ -127,15 +127,22 @@ export type SnapAxis = "x" | "y" | "z";
  * Snap for a point that can only move along some axes (a gizmo drag along X, or in the XY plane): the snap point is the one
  * nearest to `point` measured along those axes alone, so a part sliding along X still catches an endpoint that lies off
  * its line. Returns `undefined` when nothing is within the tolerance. The grid is left out (the drag has its own grid
- * constraint), and so is `nearest`: on a drag only the named points of other parts count.
+ * constraint), and so is `nearest`: on a drag only the named points of other parts count. `anchor` is where the drag started:
+ * perpendicular, tangent and parallel are relative to it.
  */
-export function snapPointAlongAxes(point: Point, elements: Element[], settings: SnapSettings, axes: ReadonlyArray<SnapAxis>): SnapPoint | undefined {
+export function snapPointAlongAxes(point: Point, elements: Element[], settings: SnapSettings, axes: ReadonlyArray<SnapAxis>, anchor?: Point): SnapPoint | undefined {
   if (!settings.enabled || axes.length === 0) return undefined;
   const without = { ...settings, types: { ...settings.types, [SnapType.GRID]: false, [SnapType.NEAREST]: false } };
-  const { snapPoints } = collectSnapPoints(point, elements, without);
+  const { snapPoints } = collectSnapPoints(point, elements, without, anchor);
   const toleranceSq = settings.tolerance * settings.tolerance;
   let best: SnapPoint | undefined, bestSq = Infinity;
   for (const candidate of snapPoints) {
+    const relative = candidate.type === SnapType.PERPENDICULAR || candidate.type === SnapType.TANGENT || candidate.type === SnapType.PARALLEL;
+    // Named points also offer alignment with an off-axis feature. A relative relation, however, only holds at the actual
+    // candidate: replacing its locked coordinates would no longer meet the line perpendicularly or touch the circle.
+    if (relative && (["x", "y", "z"] as const).some(axis => !axes.includes(axis) && Math.abs(candidate[axis] - point[axis]) > 1e-7)) continue;
+    // The start itself has no direction and must not trap an incompatible axis drag at its initial position.
+    if (relative && anchor && Math.hypot(candidate.x - anchor.x, candidate.y - anchor.y, candidate.z - anchor.z) < 1e-7) continue;
     let sq = 0;
     for (const axis of axes) sq += (candidate[axis] - point[axis]) ** 2;
     if (sq > toleranceSq) continue;

@@ -4,6 +4,7 @@ import type { SelectionBounds } from "../store/selectorStore.ts"
 import { createThreeObject } from "./createThreeObject.ts"
 import { initializeElementTransform, type ElementTransformFields } from "./element-transform.ts"
 import { disposeObject } from "./sceneHelpers.ts"
+import { legacyPartElement } from "./library-parts.ts"
 
 export const componentChildren = (element: Element): Element[] => {
   if (Array.isArray(element.elements)) return element.elements
@@ -113,6 +114,9 @@ export function libraryComponentElement(item: Record<string, unknown>): Element 
   const document = data as Record<string, unknown>
   const geometry = document.geometry as { elements?: Element[] } | undefined
   const elements = (Array.isArray(document.elements) && document.elements.length ? document.elements : geometry?.elements) as Element[] | undefined
+  // The built-in structural parts list simple solids in their own shape: they become one parametric part.
+  const part = elements ? legacyPartElement(String(item.name ?? document.name ?? "Component"), elements) : undefined
+  if (part) return cloneComponentElement({ ...part, id: "", layerId: "default" }, true)
   // Direct component records already carry their root pose and children.
   if ((document.type === "component" || document.type === "group") && typeof document.x === "number") {
     return cloneComponentElement(document as Element, true)
