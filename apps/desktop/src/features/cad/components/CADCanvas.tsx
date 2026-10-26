@@ -7,6 +7,7 @@ import { attachRenderLook, currentLookTier, lookTier, setLookTier } from "../../
 import { IdleAmbientOcclusion, aoRadiusFor } from "../../../viewport/ao.ts"
 import { Outline, type OutlineState } from "../../../viewport/outline.ts"
 import { createAdaptiveGrid } from "../../../viewport/adaptive-grid.ts"
+import { createCameraRig, type CameraRig } from "../../../viewport/camera-rig.ts"
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
 import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
@@ -109,6 +110,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
   let container!: HTMLDivElement
   let scene: THREE.Scene | undefined
+  /** Zoom toward the cursor, orbit about the selection or the surface under the pointer, near and far that follow the scene. */
+  let rig: CameraRig | undefined
   let camera: THREE.PerspectiveCamera | undefined
   let renderer: THREE.WebGLRenderer | undefined
   let orbit: OrbitControls | undefined
@@ -242,6 +245,36 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     orbit = new OrbitControls(camera, renderer.domElement)
     orbit.enableDamping = true
     orbit.minDistance = 0.01
+    // The bounds of the drawing change with every edit and cost a walk of the scene: recomputed at most a few times a second.
+    let sphere: { readonly at: number; readonly value: THREE.Sphere } | undefined
+    const drawingSphere = (): THREE.Sphere => {
+      const now = performance.now()
+      if (sphere === undefined || now - sphere.at > 250) {
+        const box = new THREE.Box3()
+        for (const object of cadObjects()) box.expandByObject(object)
+        sphere = { at: now, value: box.isEmpty() ? new THREE.Sphere(orbit!.target.clone(), 100) : box.getBoundingSphere(new THREE.Sphere()) }
+      }
+      return sphere.value
+    }
+    rig = createCameraRig({
+      controls: orbit, camera: () => nextCamera, surface: container, canvas: () => renderer!.domElement,
+      pick: (ndc, view) => {
+        // Solids and sketches only; a thick line or a control point under the cursor must not decide where a wheel notch zooms to.
+        raycaster.setFromCamera(ndc, view)
+        const hit = raycaster.intersectObjects(visibleObjects, true).find(({ object }) => !object.userData.isControlPoint && !(object as { isLine?: boolean; isLineSegments2?: boolean }).isLine && !(object as { isLineSegments2?: boolean }).isLineSegments2)
+        return hit?.point
+      },
+      selectionCenter: () => {
+        const objects = selectedIds().flatMap((id) => objectOf(id) ?? [])
+        if (objects.length === 0) return undefined
+        const box = new THREE.Box3()
+        for (const object of objects) box.expandByObject(object)
+        return box.isEmpty() ? undefined : box.getCenter(new THREE.Vector3())
+      },
+      sceneSphere: () => { const value = drawingSphere(); return { center: [value.center.x, value.center.y, value.center.z], radius: value.radius } },
+      invalidate: () => invalidate(),
+      reducedMotion: () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+    })
     orbit.maxDistance = 5000
     orbit.zoomSpeed = 1.5
     orbit.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
@@ -268,7 +301,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       const animating = exploded.tick(performance.now())
       if (wasExploded) dirty = true
       if (!exploded.active) setExplosionActive(false)
-      const moved = orbit?.update() === true
+      const rigAnimating = rig?.beforeUpdate(performance.now()) === true
+      const moved = (orbit?.update() === true) || rigAnimating
+      if (rig?.afterUpdate(moved) === true) dirty = true
       if ((moved || dirty) && renderer && scene && camera) {
         dirty = false
         renderer.render(scene, camera)
@@ -375,6 +410,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       window.removeEventListener("blur", cancelSelection)
       window.removeEventListener("keydown", escapeSelection)
       container.removeEventListener("pointerdown", stopOrbitSelection, true)
+      rig?.dispose()
+      rig = undefined
       if (screenBox()) selection.endBoxSelection()
       gizmo?.getHelper().removeFromParent()
       gizmo?.dispose()
@@ -406,7 +443,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const ids = selectedIds()
     const targets = ids.length > 0 ? ids.flatMap((id) => objectOf(id) ?? []) : cadObjects()
     const center = fitCameraToObjects(camera, orbit.target, targets)
-    if (center) { orbit.target.copy(center); orbit.update() }
+    if (center) { orbit.target.copy(center); orbit.update(); rig?.updateClip() }
   }
 
   const zoom = (factor: number) => {

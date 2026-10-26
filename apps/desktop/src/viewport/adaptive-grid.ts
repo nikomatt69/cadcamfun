@@ -32,8 +32,10 @@ export const GRID_COLORS = { line: 0xaab4c3, axisX: 0xe5484d, axisY: 0x30a46c, a
 
 const VERTEX = /* glsl */ `
 varying vec2 vPlane;
+varying vec3 vWorld;
 void main() {
   vPlane = position.xy;
+  vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`
 
@@ -46,7 +48,9 @@ uniform float uMinorAlpha;
 uniform vec2 uFocus;
 uniform float uReach;
 uniform float uOpacity;
+uniform float uFar;
 varying vec2 vPlane;
+varying vec3 vWorld;
 
 float lines(vec2 p, float step) {
   vec2 q = p / step;
@@ -62,7 +66,8 @@ float axis(float coordinate) {
 }
 
 void main() {
-  float fade = 1.0 - smoothstep(uReach * 0.5, uReach, length(vPlane - uFocus));
+  // Fades out before the camera's far plane cuts it: a grid that ends in a hard line is worse than one that dissolves.
+  float fade = (1.0 - smoothstep(uReach * 0.5, uReach, length(vPlane - uFocus))) * (1.0 - smoothstep(uFar * 0.55, uFar * 0.92, distance(vWorld, cameraPosition)));
   float grid = max(max(lines(vPlane, uSteps.x) * 0.14 * uMinorAlpha, lines(vPlane, uSteps.y) * 0.3), lines(vPlane, uSteps.z) * 0.5);
   float alongA = axis(vPlane.y), alongB = axis(vPlane.x);
   float alpha = max(grid, max(alongA, alongB) * 0.95) * fade * uOpacity;
@@ -86,6 +91,7 @@ export const createAdaptiveGrid = (options: AdaptiveGridOptions): AdaptiveGrid =
     uMinorAlpha: { value: 1 },
     uFocus: { value: new THREE.Vector2() },
     uReach: { value: 100 },
+    uFar: { value: 1e9 },
     uOpacity: { value: 1 }
   }
   const material = new THREE.ShaderMaterial({
@@ -98,6 +104,8 @@ export const createAdaptiveGrid = (options: AdaptiveGridOptions): AdaptiveGrid =
   object.frustumCulled = false
   object.renderOrder = options.underlay === true ? -1 : 0
   object.userData.isGrid = true
+  // A flat quad in the ground plane would be read by the ambient occlusion as a floor and darken every part standing in it.
+  object.userData.noAO = true
   object.raycast = () => undefined
   const focus = new THREE.Vector3(), local = new THREE.Vector3()
 
@@ -118,6 +126,7 @@ export const createAdaptiveGrid = (options: AdaptiveGridOptions): AdaptiveGrid =
     uniforms.uSteps.value.set(levels.minor, levels.mid, levels.major)
     uniforms.uMinorAlpha.value = levels.minorAlpha
     uniforms.uReach.value = gridReach(span)
+    uniforms.uFar.value = camera instanceof THREE.OrthographicCamera ? 1e9 : (camera as THREE.PerspectiveCamera).far
     local.copy(focus)
     object.worldToLocal(local)
     uniforms.uFocus.value.set(local.x, local.y)

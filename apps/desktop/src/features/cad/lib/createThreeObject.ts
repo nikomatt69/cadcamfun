@@ -10,6 +10,9 @@ import { initializeElementTransform } from "./element-transform.ts";
 import { applyMaterialLook, elementMaterialName } from "../../../viewport/render-look.ts";
 import { currentLookTier } from "../../../viewport/render-look-setting.ts";
 
+/** The edges of solids and curves: a mid-dark grey that lets the face colour show through, not black, so a part reads as one body and not as a drawing of one. */
+const EDGE_STYLE = { color: 0x59606a, opacity: 0.6 } as const
+
 interface SolidMesh { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }
 
 /** A solid mesh in scene coordinates as a Three mesh (the drawing's origin offset is added; smooth normals are not wanted on a CAD solid). */
@@ -31,7 +34,7 @@ const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: numb
   if (!element.wireframe) {
     // The solid's edges (the native Rust path for a big mesh): faces step back a little so the lines sit on top of them.
     material.polygonOffset = true; material.polygonOffsetFactor = 1; material.polygonOffsetUnits = 1;
-    result.add(createDisplayEdgeLines(geometry, 30, onEdgesReady, { color: 0x1b1f24, width: 1.5 }, { quality: currentLookTier() }));
+    result.add(createDisplayEdgeLines(geometry, 30, onEdgesReady, { ...EDGE_STYLE, width: 1.5 }, { quality: currentLookTier() }));
   }
   return result;
 };
@@ -83,7 +86,7 @@ const brepObject = (element: any, offset: { x: number; y: number; z: number }): 
       pts[k * 3 + 2] = t.positions[g * 3 + 2]! + offset.z;
     });
     // Pickable: an exact edge is something the user selects (a thick line is picked within its width, see `Line2` in the canvas raycaster).
-    const line = createLines(polylineToSegments(pts), { color: 0x1b1f24, width: 1.5 }, { quality: currentLookTier(), pickable: true });
+    const line = createLines(polylineToSegments(pts), { ...EDGE_STYLE, width: 1.5 }, { quality: currentLookTier(), pickable: true });
     line.userData.brepEdge = edge.edge;
     group.add(line);
   }
@@ -2284,7 +2287,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
         );
 
         if (!element.wireframe) {
-          workpiece.add(createDisplayEdgeLines(workpieceGeometry, 1, onEdgesReady, { color: 0x000000, width: 1.5 }, { quality: currentLookTier() }));
+          workpiece.add(createDisplayEdgeLines(workpieceGeometry, 1, onEdgesReady, { ...EDGE_STYLE, width: 1.5 }, { quality: currentLookTier() }));
         }
 
         return workpiece;

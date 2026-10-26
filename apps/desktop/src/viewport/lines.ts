@@ -27,6 +27,9 @@ export const LINE_SEGMENT_BUDGET: Readonly<Record<LineQuality, { readonly total:
   high: { total: 1_500_000, perObject: 600_000 }
 }
 
+/** Thick lines are drawn this much of the width the caller asked for: `balanced` sits between the one-pixel edges of the plain look and the 1.5 px of standard, antialiased. */
+export const LINE_WIDTH_SCALE: Readonly<Record<LineQuality, number>> = { low: 1, balanced: 0.75, standard: 1, high: 1 }
+
 /** Counts the segments of the thick lines alive. `acquire` returns a release function, or undefined when it does not fit. */
 export class LineBudget {
   private spent = 0
@@ -136,7 +139,7 @@ export const createLines = (positions: ArrayLike<number>, style: LineStyle = {},
   const limits = LINE_SEGMENT_BUDGET[quality]
   const budget = options.budget ?? sharedLineBudget
   const release = quality !== "low" && segments > 0 && segments <= limits.perObject ? budget.acquire(segments, limits.total) : undefined
-  const line = release ? thickLines(positions, style, release) : plainLines(positions, style)
+  const line = release ? thickLines(positions, style, release, LINE_WIDTH_SCALE[quality]) : plainLines(positions, style)
   if (!options.pickable) line.raycast = noRaycast
   return line
 }
@@ -152,13 +155,13 @@ const plainLines = (positions: ArrayLike<number>, style: LineStyle): THREE.LineS
   return line
 }
 
-const thickLines = (positions: ArrayLike<number>, style: LineStyle, release: () => void): LineSegments2 => {
+const thickLines = (positions: ArrayLike<number>, style: LineStyle, release: () => void, widthScale = 1): LineSegments2 => {
   const geometry = new LineSegmentsGeometry()
   geometry.setPositions(asFloat32(positions))
   if (style.colors) geometry.setColors(style.colors)
   const material = new LineMaterial({
     color: new THREE.Color(style.color ?? 0xffffff).getHex(),
-    linewidth: style.width ?? 1.6,
+    linewidth: (style.width ?? 1.6) * widthScale,
     vertexColors: style.colors !== undefined,
     dashed: style.dash !== undefined,
     depthTest: style.depthTest ?? true,

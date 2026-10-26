@@ -15,8 +15,9 @@
  *
  * Quality tiers, one setting (see `render-look-setting.ts`):
  *  - `low`      the host's own lights, no environment, no tone mapping (what the viewport looked like before);
- *  - `balanced` the old look, raised: colours exactly as picked (no material table), bright even lights, and only a soft, satin
- *               environment, a faint rim and gentle occlusion, so shapes read better without turning into a studio render;
+ *  - `balanced` halfway between `low` and `standard`: the old lights' character (bright, even, colours exactly as picked, no
+ *               material table) with a faint satin environment, a little fill and rim, soft contact shadows and edges a
+ *               little over a pixel wide, smooth;
  *  - `standard` environment + tone mapping + key / fill / rim rig + project material surfaces;
  *  - `high`     like standard, with a sharper environment (mirror-like reflections on polished metal) and a stronger rim.
  */
@@ -56,7 +57,7 @@ export interface RigLevels {
 
 export const TIERS: Readonly<Record<LookTier, TierSettings>> = {
   low: { environment: false, environmentBlur: 0, environmentIntensity: 0, toneMapping: THREE.NoToneMapping, exposure: 1, materials: false },
-  balanced: { environment: true, environmentBlur: 0.2, environmentIntensity: 0.4, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: false, rig: { key: 1.0, fill: 0.55, rim: 0.3, hemisphere: 0.55, ambient: 0.2 } },
+  balanced: { environment: true, environmentBlur: 0.3, environmentIntensity: 0.22, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: false, rig: { key: 0.95, fill: 0.35, rim: 0.15, hemisphere: 0.3, ambient: 0.32 } },
   standard: { environment: true, environmentBlur: 0.04, environmentIntensity: 0.95, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: true, rig: { key: 1.3, fill: 0.45, rim: 0.7, hemisphere: 0.2, ambient: 0.08 } },
   high: { environment: true, environmentBlur: 0, environmentIntensity: 1.1, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: true, rig: { key: 1.4, fill: 0.5, rim: 1.1, hemisphere: 0.2, ambient: 0.08 } }
 }
