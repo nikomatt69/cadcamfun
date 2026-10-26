@@ -16,6 +16,7 @@ import { buildPlayback, emptyPlayback, positionAt, toolAt, toolColors, TOOL_COLO
 import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
 import { toolObject } from "./tool-object.ts"
 import { gaugeOfTool, previewToolFor } from "./tool-models.ts"
+import { createDirectionArrows, type DirectionArrows } from "./direction-arrows.ts"
 import { createVoxelStock, type VoxelStock } from "./voxel-stock.ts"
 import { classLookup, pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
@@ -116,6 +117,8 @@ export interface View3DProps {
     readonly showTool?: boolean
     /** Draw the holder, a generic one when the cutter has none (default true). */
     readonly showHolder?: boolean
+    /** Arrows along the cuts showing the feed direction, and the start and end of the cutting (default true). */
+    readonly showDirection?: boolean
     /** Draw the live stock: the material as the program removes it (default true). */
     readonly liveStock?: boolean
     /** Colour the path by tool (default), operation, move class, feed or height (spec 32 §4.4). */
@@ -354,7 +357,7 @@ export function View3D(props: View3DProps) {
     const disposeVoxels = (): void => { if (voxelStock === undefined) return; content.remove(voxelStock.mesh); voxelStock.dispose(); voxelStock = undefined }
     let toolColorOf: ReadonlyMap<string, number> = new Map()
     // The path's two line objects and their segments' start times (for the "only what has run" draw range).
-    let pathLines: { readonly cut?: THREE.Object3D; readonly cutStarts: Float64Array; readonly rapid?: THREE.Object3D; readonly rapidStarts: Float64Array } | undefined
+    let pathLines: { readonly cut?: THREE.Object3D; readonly cutStarts: Float64Array; readonly rapid?: THREE.Object3D; readonly rapidStarts: Float64Array; readonly arrows?: DirectionArrows } | undefined
     const disposeTools = (): void => { for (const g of toolGroups.values()) if (g) { scene.remove(g); disposeGroup(g) } toolGroups.clear() }
     /** The model the preview draws for a toolpath's tool: its own, the kernel's cutter, the generator's tool. A tool setter is
      * on the table (see `rebuild`): what moves is the cutter it measures. */
@@ -587,7 +590,10 @@ export function View3D(props: View3DProps) {
       }
       const rapidLine = lineObject(buffers.rapid.positions, true)
       const cutLine = lineObject(buffers.cut.positions, false, buffers.cut.colors)
-      pathLines = { ...(cutLine ? { cut: cutLine } : {}), cutStarts: buffers.cut.starts, ...(rapidLine ? { rapid: rapidLine } : {}), rapidStarts: buffers.rapid.starts }
+      // Feed direction and where the cutting starts and ends; a printer's deposits are the machine scene's.
+      const arrows = display?.showDirection === false || machine?.kind === "3dprinter" ? undefined : createDirectionArrows(buffers.cut)
+      if (arrows !== undefined) content.add(arrows.object)
+      pathLines = { ...(cutLine ? { cut: cutLine } : {}), cutStarts: buffers.cut.starts, ...(rapidLine ? { rapid: rapidLine } : {}), rapidStarts: buffers.rapid.starts, ...(arrows !== undefined ? { arrows } : {}) }
       props.onPathLegend?.(buffers.legend)
       if (props.program && props.toolpathDisplay) {
         const overlay = toolpathOverlayModel(props.program)
@@ -709,6 +715,7 @@ export function View3D(props: View3DProps) {
       }
       // A lathe tool or a printer nozzle is the machine scene's; the milling cutter and the marker are for mills only.
       const ownTool = machineScene !== undefined && props.machine?.kind !== "mill"
+        if (pathLines.arrows?.update(done ? startedBy(pathLines.cutStarts, seconds) : Infinity)) invalidate()
       const visible = playback.segmentCount > 0 && !ownTool
       const activeId = visible ? toolAt(playback, seconds) : undefined
       const active = activeId !== undefined ? toolGroupFor(activeId) : null

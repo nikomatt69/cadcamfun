@@ -81,6 +81,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const [mode, setMode] = createSignal<RenderMode>("shaded-edges")
   const [gridVisible, setGridVisible] = createSignal(true)
   const [axesVisible, setAxesVisible] = createSignal(true)
+  const [showDirection, setShowDirection] = createSignal(true)
   const [settingsOpen, setSettingsOpen] = createSignal(false)
   const [showStats, setShowStats] = createSignal(true)
   const [showPoints, setShowPoints] = createSignal(false)
@@ -320,7 +321,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             onPlaybackTimeChange={props.onPlaybackTimeChange}
             controlsFooter={<Show when={props.onPlayingChange}>{(onPlayingChange) => <SimulationMiniPlayer playing={props.playing} time={props.playbackTime} duration={props.playbackDuration ?? 0} onPlayingChange={byPerson} onSeek={(seconds) => { endRun(); props.onPlaybackTimeChange(seconds) }} onRunAll={runAll} runningAll={runThrough()} />}</Show>}
             stock={stock()}
-            toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
+            toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), showDirection: showDirection(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
             onPathLegend={setLegend}
             onStockInfo={setStockInfo}
             {...(effectiveMachine() !== undefined ? { machine: effectiveMachine()!, machineDisplay: machineDisplay(), machineOptions: machineOptions(), onMachineInfo: setMachineInfo } : {})}
@@ -559,6 +560,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               <h3 class="text-sm font-semibold">{t("cam.visualizer.settings")}</h3>
               <button type="button" class="rounded p-1 hover:bg-white/10" aria-label={t("common.close")} onClick={() => setSettingsOpen(false)}><X size={16} /></button>
             </div>
+              {toggle(t("cam.visualizer.showDirection"), showDirection, setShowDirection)}
             <div class="space-y-3">
               {toggle(t("cam.visualizer.showStats"), showStats, setShowStats)}
               <section class="space-y-2 border-t border-slate-700 pt-3">

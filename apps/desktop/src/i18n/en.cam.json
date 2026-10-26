@@ -171,6 +171,7 @@
   "cam.visualizer.tool": "Tool",
   "cam.visualizer.showTool": "Show cutter and shank",
   "cam.visualizer.showHolder": "Show holder (generic when not given)",
+  "cam.visualizer.showDirection": "Show feed direction",
   "cam.visualizer.activeTool": "Tool",
   "cam.visualizer.opacity": "Opacity",
   "cam.toggleSidebar": "Toggle sidebar",
