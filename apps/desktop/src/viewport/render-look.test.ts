@@ -33,6 +33,13 @@ describe("tier resolution", () => {
     expect(TIERS.low.materials).toBe(false)
     expect(TIERS.standard.environment && TIERS.high.environment).toBe(true)
     expect(TIERS.high.environmentBlur).toBeLessThan(TIERS.standard.environmentBlur)
+    // The balanced tier is the old look, raised: colours as picked, a soft satin environment, gentler than standard everywhere.
+    expect(TIERS.balanced.materials).toBe(false)
+    expect(TIERS.balanced.environmentBlur).toBeGreaterThan(TIERS.standard.environmentBlur)
+    expect(TIERS.balanced.environmentIntensity).toBeLessThan(TIERS.standard.environmentIntensity)
+    expect(TIERS.balanced.rig!.rim).toBeLessThan(TIERS.standard.rig!.rim)
+    expect(TIERS.balanced.rig!.hemisphere).toBeGreaterThan(TIERS.standard.rig!.hemisphere)
+    expect(DEFAULT_LOOK_TIER).toBe("balanced")
   })
 })
 

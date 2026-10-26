@@ -16,12 +16,13 @@ import type { LookTier } from "./render-look.ts"
  * caller never has to branch and the picture degrades instead of the frame rate.
  */
 
-/** The render quality tiers: the shared setting of `render-look.ts` (`low | standard | high`). */
+/** The render quality tiers: the shared setting of `render-look.ts` (`low | balanced | standard | high`). */
 export type LineQuality = LookTier
 
 /** Segments a tier may keep as thick lines: `total` over everything alive at once, `perObject` for one line. */
 export const LINE_SEGMENT_BUDGET: Readonly<Record<LineQuality, { readonly total: number; readonly perObject: number }>> = {
   low: { total: 0, perObject: 0 },
+  balanced: { total: 400_000, perObject: 150_000 },
   standard: { total: 400_000, perObject: 150_000 },
   high: { total: 1_500_000, perObject: 600_000 }
 }

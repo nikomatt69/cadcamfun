@@ -62,6 +62,7 @@ export class IdleTrigger {
 /** What the tier gets: `scale` of the canvas resolution, GTAO `samples`, blend `intensity`. `low` has no AO. */
 export const AO_TIERS: Readonly<Record<LineQuality, { readonly scale: number; readonly samples: number; readonly intensity: number } | undefined>> = {
   low: undefined,
+  balanced: { scale: 0.5, samples: 12, intensity: 0.5 },
   standard: { scale: 0.5, samples: 12, intensity: 0.85 },
   high: { scale: 1, samples: 16, intensity: 0.9 }
 }

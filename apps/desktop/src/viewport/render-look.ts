@@ -15,16 +15,18 @@
  *
  * Quality tiers, one setting (see `render-look-setting.ts`):
  *  - `low`      the host's own lights, no environment, no tone mapping (what the viewport looked like before);
+ *  - `balanced` the old look, raised: colours exactly as picked (no material table), bright even lights, and only a soft, satin
+ *               environment, a faint rim and gentle occlusion, so shapes read better without turning into a studio render;
  *  - `standard` environment + tone mapping + key / fill / rim rig + project material surfaces;
  *  - `high`     like standard, with a sharper environment (mirror-like reflections on polished metal) and a stronger rim.
  */
 import * as THREE from "three"
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js"
 
-export type LookTier = "low" | "standard" | "high"
+export type LookTier = "low" | "balanced" | "standard" | "high"
 
-export const LOOK_TIERS: readonly LookTier[] = ["low", "standard", "high"]
-export const DEFAULT_LOOK_TIER: LookTier = "standard"
+export const LOOK_TIERS: readonly LookTier[] = ["low", "balanced", "standard", "high"]
+export const DEFAULT_LOOK_TIER: LookTier = "balanced"
 
 /** A tier from a stored or typed value; anything unknown is the fallback (a stale or hand-edited setting never breaks a viewport). */
 export const resolveLookTier = (value: unknown, fallback: LookTier = DEFAULT_LOOK_TIER): LookTier =>
@@ -54,6 +56,7 @@ export interface RigLevels {
 
 export const TIERS: Readonly<Record<LookTier, TierSettings>> = {
   low: { environment: false, environmentBlur: 0, environmentIntensity: 0, toneMapping: THREE.NoToneMapping, exposure: 1, materials: false },
+  balanced: { environment: true, environmentBlur: 0.2, environmentIntensity: 0.4, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: false, rig: { key: 1.0, fill: 0.55, rim: 0.3, hemisphere: 0.55, ambient: 0.2 } },
   standard: { environment: true, environmentBlur: 0.04, environmentIntensity: 0.95, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: true, rig: { key: 1.3, fill: 0.45, rim: 0.7, hemisphere: 0.2, ambient: 0.08 } },
   high: { environment: true, environmentBlur: 0, environmentIntensity: 1.1, toneMapping: THREE.NeutralToneMapping, exposure: 1, materials: true, rig: { key: 1.4, fill: 0.5, rim: 1.1, hemisphere: 0.2, ambient: 0.08 } }
 }

@@ -42,6 +42,7 @@ test("the idle trigger fires once, a quiet period after the LAST arm", () => {
 test("tiers: none on low, half resolution on standard, full on high", () => {
   expect(AO_TIERS.low).toBeUndefined()
   expect(AO_TIERS.standard!.scale).toBe(0.5)
+  expect(AO_TIERS.balanced!.intensity).toBeLessThan(AO_TIERS.standard!.intensity)
   expect(AO_TIERS.high!.scale).toBe(1)
 })
 
