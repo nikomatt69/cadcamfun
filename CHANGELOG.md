@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.25 (October 2026)
+
+## Desktop
+
+- A panel over the canvas keeps its own wheel: the camera rig only navigates events that land on the canvas
+
 ## v0.1.24 (October 2026)
 
 ## Desktop
