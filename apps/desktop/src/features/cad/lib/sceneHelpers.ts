@@ -6,6 +6,7 @@ import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js"
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js"
 import { useCADStore } from "../store/cadStore.ts"
 import { HISTORY_LIMIT, useElementsStore, type Element } from "../store/elementsStore.ts"
+import { GRID_COLORS } from "../../../viewport/adaptive-grid.ts"
 import { createThreeObject } from "./createThreeObject.ts"
 import { initializeElementTransform, premultiplyObject, rotationOf, type ElementTransformFields } from "./element-transform.ts"
 
@@ -38,13 +39,13 @@ export function createCustomAxes(size: number): THREE.Group {
   }
 
   const group = new THREE.Group()
-  group.add(line([-size * 2, 0, 0, size * 2, 0, 0], 0x0000ff))
-  group.add(line([0, -size * 2, 0, 0, size * 2, 0], 0xff00ff))
-  group.add(line([0, 0, -size * 2, 0, 0, size * 2], 0x00ff7f))
+  group.add(line([-size * 2, 0, 0, size * 2, 0, 0], GRID_COLORS.axisX))
+  group.add(line([0, -size * 2, 0, 0, size * 2, 0], GRID_COLORS.axisY))
+  group.add(line([0, 0, -size * 2, 0, 0, size * 2], GRID_COLORS.axisZ))
   for (const sprite of [
-    label("X", [size + 1, 0, 0], new THREE.Color(0, 0, 1)),
-    label("Y", [0, size + 1, 0], new THREE.Color(1, 0, 1)),
-    label("Z", [0, 0, size + 1], new THREE.Color(0, 1, 0.5))
+    label("X", [size + 1, 0, 0], new THREE.Color(GRID_COLORS.axisX)),
+    label("Y", [0, size + 1, 0], new THREE.Color(GRID_COLORS.axisY)),
+    label("Z", [0, 0, size + 1], new THREE.Color(GRID_COLORS.axisZ))
   ]) if (sprite) group.add(sprite)
   group.userData.isCustomAxes = true
   return group

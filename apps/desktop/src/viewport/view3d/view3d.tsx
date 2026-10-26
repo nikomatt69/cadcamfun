@@ -1,5 +1,6 @@
 import { createDisplayEdgeLines, createLines, setLineDrawRange, syncLineResolution } from "../lines.ts"
 import { Outline } from "../outline.ts"
+import { GRID_COLORS, createAdaptiveGrid } from "../adaptive-grid.ts"
 import { FrameScheduler } from "../../features/cad/lib/frame-scheduler.ts"
 import { MeshWorkerQueue } from "./mesh-jobs.ts"
 import { registerViewportCapture } from "../../features/ai/index.ts"
@@ -215,15 +216,11 @@ export function View3D(props: View3DProps) {
     }
     const content = new THREE.Group(), helpers = new THREE.Group()
     scene.add(content, helpers)
-    const grid = new THREE.GridHelper(500, 500, 0x777777, 0x444444)
-    grid.rotation.x = Math.PI / 2
-    if (props.visionMode === "cam") {
-      // Toolpaths cut below Z0: a dense grid there must not hide them in the depth buffer (it is drawn first, never occludes).
-      for (const material of Array.isArray(grid.material) ? grid.material : [grid.material]) material.depthWrite = false
-      grid.renderOrder = -1
-    }
+    // Toolpaths cut below Z0 in the CAM view: the grid there is an underlay, drawn first and never occluding them.
+    const ground = createAdaptiveGrid({ focus: () => controls.target, underlay: props.visionMode === "cam", half: 20000 })
+    const grid = ground.object
     const axes = new THREE.Group()
-    for (const [end, color] of [[new THREE.Vector3(500, 0, 0), 0x0000ff], [new THREE.Vector3(0, 500, 0), 0xff00ff], [new THREE.Vector3(0, 0, 500), 0x00ff7f]] as const) {
+    for (const [end, color] of [[new THREE.Vector3(500, 0, 0), GRID_COLORS.axisX], [new THREE.Vector3(0, 500, 0), GRID_COLORS.axisY], [new THREE.Vector3(0, 0, 500), GRID_COLORS.axisZ]] as const) {
       axes.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([end.clone().negate(), end]), new THREE.LineBasicMaterial({ color })))
     }
     const origin = new THREE.AxesHelper(12)
@@ -401,7 +398,7 @@ export function View3D(props: View3DProps) {
       invalidate()
       grid.visible = gridVisible(); axes.visible = axesVisible() && !machineScene; origin.visible = axesVisible() && !machineScene
       // A lathe works in the XZ plane: its grid lies there.
-      grid.rotation.x = props.machine?.kind === "lathe" ? 0 : Math.PI / 2
+      ground.setPlane(props.machine?.kind === "lathe" ? "xz" : "xy")
       const machineTriad = machineScene?.root.getObjectByName("machine-triad")
       if (machineTriad) machineTriad.visible = axesVisible()
       origin.position.set(props.origin?.x ?? 0, props.origin?.y ?? 0, props.origin?.z ?? 0)

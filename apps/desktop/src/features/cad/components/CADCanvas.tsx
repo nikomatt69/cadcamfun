@@ -6,6 +6,7 @@ import { LOOK_TIERS } from "../../../viewport/render-look.ts"
 import { attachRenderLook, currentLookTier, lookTier, setLookTier } from "../../../viewport/render-look-setting.ts"
 import { IdleAmbientOcclusion, aoRadiusFor } from "../../../viewport/ao.ts"
 import { Outline, type OutlineState } from "../../../viewport/outline.ts"
+import { createAdaptiveGrid } from "../../../viewport/adaptive-grid.ts"
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
 import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
@@ -84,6 +85,7 @@ export interface CADCanvasProps {
 const size = (value: string | number) => (typeof value === "number" ? `${value}px` : value)
 const round2 = (value: number) => Math.round(value * 100) / 100
 const BG = "#2A2A2A"
+const ORIGIN = new THREE.Vector3()
 /** Front-right-above, in millimetres: the default 3D view of a Z-up scene (fit-to-view keeps this direction). */
 const ISO_VIEW = new THREE.Vector3(300, -300, 240)
 const QUICK_BUTTON = "padding:6px 8px;background-color:#374151;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px"
@@ -246,10 +248,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
     // Studio environment, tone mapping and a key/fill/rim rig that follows the camera; the `low` tier keeps the old ambient + sun.
     const look = attachRenderLook(renderer, scene, { ambient: 0.5, hemisphere: 0, key: 0.8, keyPosition: [-5, -7.5, 10] }, invalidate)
-    const grid = new THREE.GridHelper(500, 500)
-    grid.rotation.x = Math.PI / 2
-    grid.userData.isGrid = true
-    scene.add(grid)
+    const ground = createAdaptiveGrid({ focus: () => orbit?.target ?? ORIGIN, half: 5000 })
+    ground.object.userData.setOpacity = ground.setOpacity
+    scene.add(ground.object)
     scene.add(createCustomAxes(30))
     scene.add(createOriginIndicator())
     scene.add(pivot)
@@ -495,7 +496,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (!isReady || !camera || !orbit || !scene) return
     scene.background = new THREE.Color(BG)
     const axes = scene.children.find((child) => child.userData.isCustomAxes)
-    const grid = scene.children.find((child) => child.userData.isGrid) as THREE.GridHelper | undefined
+    const grid = scene.children.find((child) => child.userData.isGrid)
+    const setGridOpacity = (opacity: number) => (grid?.userData.setOpacity as ((value: number) => void) | undefined)?.(opacity)
     if (mode === "2d") {
       camera.position.set(0, 0, 50)
       camera.up.set(0, 1, 0)
@@ -503,12 +505,13 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       orbit.target.set(0, 0, 0)
       orbit.enableRotate = false
       orbit.enablePan = true
-      if (grid) { (grid.material as THREE.Material).opacity = 0.2; (grid.material as THREE.Material).transparent = true }
+      setGridOpacity(0.5)
       axes?.children.forEach((child, index) => { child.visible = index !== 2 })
     } else {
       camera.up.set(0, 0, 1)
       camera.position.copy(ISO_VIEW)
       camera.lookAt(0, 0, 0)
+      setGridOpacity(1)
       orbit.target.set(0, 0, 0)
       orbit.enableRotate = true
       orbit.enablePan = true
