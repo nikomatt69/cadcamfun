@@ -3,6 +3,30 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.23 (October 2026)
+
+## Core
+
+- Refactor CADCanvas and keyboard shortcuts for improved functionality
+
+## Desktop
+
+- A little closer to the earlier look: fainter edges, balanced lights nearer the plain ones, a touch more selection glow
+- The look-tier setting test no longer depends on which test file loaded the module first
+- CAD canvas: a selected part keeps its colour
+- Toolpath view: a faint ghost of the cut path shows through the stock
+- Fit-to-view frames the bounding sphere: the eye never ends up inside a cube seen along its diagonal
+- CAD canvas: grey translucent edges, halfway look tier, camera rig, grid fixes
+- Toolpath view: wire the camera rig (zoom to cursor, pivot orbit, adaptive near/far); no depth fighting at Z0
+- Add a balanced look tier and make it the default
+- Toolpath view: feed-direction arrows with start/end marks; softer viewport chrome
+- Add adaptive shader grid to the CAD and toolpath viewports
+- Update macOS CI workflows to target macOS 15 and introduce auto-resume feature in simulation timeline
+
+## Documentation
+
+- Update README.md to enhance project description and structure
+
 ## v0.1.22 (October 2026)
 
 ## Desktop
