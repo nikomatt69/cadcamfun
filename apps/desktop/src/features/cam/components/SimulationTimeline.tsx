@@ -46,10 +46,21 @@ export function SimulationTimeline(props: SimulationTimelineProps): JSX.Element 
       {button(t("cam.timeline.prevMove"), <ChevronLeft size={14} />, () => props.onStepMove(-1), "timeline-prev-move")}
       <div
         ref={track}
-        class="relative h-6 flex-1 cursor-pointer overflow-hidden rounded bg-white/10"
+        class="simulation-timeline__track relative h-6 flex-1 cursor-pointer overflow-hidden rounded bg-white/10"
         role="slider" aria-label={t("cam.timeline.seek")} aria-valuemin={0} aria-valuemax={props.duration} aria-valuenow={props.seconds} tabIndex={0}
-        onPointerDown={(event) => { (event.currentTarget as HTMLDivElement).setPointerCapture?.(event.pointerId); seekAt(event) }}
+        onPointerDown={(event) => { if (event.button !== 0 || !event.isPrimary) return; event.currentTarget.focus(); event.currentTarget.setPointerCapture?.(event.pointerId); seekAt(event) }}
         onPointerMove={(event) => { if (event.buttons & 1) seekAt(event) }}
+        onKeyDown={(event) => {
+          if (event.altKey || event.ctrlKey || event.metaKey) return
+          const step = event.shiftKey ? 10 : 1
+          const next = event.key === "Home" ? 0 : event.key === "End" ? props.duration
+            : event.key === "ArrowLeft" || event.key === "ArrowDown" ? props.seconds - step
+            : event.key === "ArrowRight" || event.key === "ArrowUp" ? props.seconds + step
+            : event.key === "PageDown" ? props.seconds - 10 : event.key === "PageUp" ? props.seconds + 10 : undefined
+          if (next === undefined) return
+          event.preventDefault(); event.stopPropagation()
+          props.onSeek(Math.max(0, Math.min(props.duration, next)))
+        }}
       >
         <For each={props.spans}>{(span) => (
           <div

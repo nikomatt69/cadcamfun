@@ -37,7 +37,7 @@ export function createCadKeyboardShortcuts(handlers: KeyboardShortcutHandlers): 
   const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform)
   onMount(() => {
     const down = (e: KeyboardEvent) => {
-      if (isTyping(e)) return
+      if (e.defaultPrevented || isTyping(e) || document.querySelector('[role="dialog"]')) return
       const mod = isMac ? e.metaKey : e.ctrlKey
       const key = e.key.toLowerCase()
       const run = (fn: (() => void) | undefined): boolean => { if (!fn) return false; e.preventDefault(); fn(); return true }
@@ -53,7 +53,7 @@ export function createCadKeyboardShortcuts(handlers: KeyboardShortcutHandlers): 
         if (key === "c") return void run(handlers.onCopy)
         if (key === "v") return void run(handlers.onPaste)
         if (key === "d") return void run(handlers.onDuplicate)
-        if (key === "s") return void run(handlers.onSave)
+        if (key === "s" && !e.shiftKey) return void run(handlers.onSave)
         if (key === "x") return void run(handlers.onToggleSnap)
         if (key === "g") return void run(handlers.onToggleGrid)
         if (key === "1") return void run(handlers.onViewModeToggle && (() => handlers.onViewModeToggle!("3d")))

@@ -13,7 +13,7 @@ import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js"
-import { Cog, HelpCircle, Layers, Maximize, Maximize2, Minimize2, Move, RotateCw, Sliders } from "lucide-solid"
+import { Cog, HelpCircle, Layers, Maximize2, Minimize2, Move, RotateCw, Sliders } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -89,9 +89,6 @@ const BG = "#2A2A2A"
 const ORIGIN = new THREE.Vector3()
 /** Front-right-above, in millimetres: the default 3D view of a Z-up scene (fit-to-view keeps this direction). */
 const ISO_VIEW = new THREE.Vector3(300, -300, 240)
-const QUICK_BUTTON = "padding:6px 8px;background-color:#374151;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px"
-const modeButton = (active: boolean) =>
-  `padding:6px 12px;background-color:${active ? "#3b82f6" : "#374151"};color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:4px`
 
 /**
  * The 3D editor canvas: scene, camera and orbit controls, every element rendered through `createThreeObject`,
@@ -110,11 +107,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
   let container!: HTMLDivElement
   let scene: THREE.Scene | undefined
-  /** Zoom toward the cursor, orbit about the selection or the surface under the pointer, near and far that follow the scene. */
-  let rig: CameraRig | undefined
   let camera: THREE.PerspectiveCamera | undefined
   let renderer: THREE.WebGLRenderer | undefined
   let orbit: OrbitControls | undefined
+  /** Zoom toward the cursor, orbit about the selection or the surface under the pointer, near and far that follow the scene. */
+  let rig: CameraRig | undefined
   let gizmo: TransformControls | undefined
   let frames: FrameScheduler | undefined
   let ambientOcclusion: IdleAmbientOcclusion | undefined
@@ -245,6 +242,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     orbit = new OrbitControls(camera, renderer.domElement)
     orbit.enableDamping = true
     orbit.minDistance = 0.01
+    orbit.maxDistance = 5000
+    orbit.zoomSpeed = 1.5
+    orbit.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
     // The bounds of the drawing change with every edit and cost a walk of the scene: recomputed at most a few times a second.
     let sphere: { readonly at: number; readonly value: THREE.Sphere } | undefined
     const drawingSphere = (): THREE.Sphere => {
@@ -275,9 +275,6 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       invalidate: () => invalidate(),
       reducedMotion: () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
     })
-    orbit.maxDistance = 5000
-    orbit.zoomSpeed = 1.5
-    orbit.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
 
     // Studio environment, tone mapping and a key/fill/rim rig that follows the camera; the `low` tier keeps the old ambient + sun.
     const look = attachRenderLook(renderer, scene, { ambient: 0.5, hemisphere: 0, key: 0.8, keyPosition: [-5, -7.5, 10] }, invalidate)
@@ -410,11 +407,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       window.removeEventListener("blur", cancelSelection)
       window.removeEventListener("keydown", escapeSelection)
       container.removeEventListener("pointerdown", stopOrbitSelection, true)
-      rig?.dispose()
-      rig = undefined
       if (screenBox()) selection.endBoxSelection()
       gizmo?.getHelper().removeFromParent()
       gizmo?.dispose()
+      rig?.dispose()
+      rig = undefined
       orbit?.dispose()
       look.dispose()
       // Dispose the entire owned scene once, including helper textures.
@@ -548,10 +545,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       camera.up.set(0, 0, 1)
       camera.position.copy(ISO_VIEW)
       camera.lookAt(0, 0, 0)
-      setGridOpacity(1)
       orbit.target.set(0, 0, 0)
       orbit.enableRotate = true
       orbit.enablePan = true
+      setGridOpacity(1)
       axes?.children.forEach((child) => { child.visible = true })
     }
     orbit.update()
@@ -1052,7 +1049,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     <div
       ref={container}
       style={{ width: size(props.width ?? "100%"), height: size(props.height ?? "100%") }}
-      class={`relative bg-gradient-to-b rounded-xl from-[#2A2A2A] to-[#303030] overflow-hidden ${isPlacing() || isDraggingComponent() ? "cursor-cell" : ""}`}
+      class={`cad-viewport relative bg-[#2A2A2A] overflow-hidden ${isPlacing() || isDraggingComponent() ? "cursor-cell" : ""}`}
       onMouseMove={onMouseMove}
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
@@ -1066,19 +1063,88 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
       {props.children}
 
-      {/* Quick transform toolbar */}
-      <Show when={selectedIds().length > 0 && !explosionActive() && !cad.explodedView.enabled}>
-        <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background-color:rgba(0,0,0,0.8);padding:8px 12px;border-radius:8px;z-index:1001">
-          <button onClick={() => setMode("translate")} style={modeButton(transformMode() === "translate")}><Move size={14} />Move (G)</button>
-          <button onClick={() => setMode("rotate")} style={modeButton(transformMode() === "rotate")}><RotateCw size={14} />Rotate (R)</button>
-          <button onClick={() => setMode("scale")} style={modeButton(transformMode() === "scale")}><Maximize2 size={14} />Scale (S)</button>
-          <div style="width:1px;background-color:#6b7280;margin:0 4px" />
-          <button onClick={() => transformControls.resetToOrigin()} style={QUICK_BUTTON} title="Reset Position">Reset</button>
-          <button onClick={() => transformControls.alignToGrid()} style={QUICK_BUTTON} title="Align to Grid">Grid</button>
-          <button onClick={() => transformControls.duplicateInPlace()} style={QUICK_BUTTON} title="Duplicate">Dup</button>
+      <div class="panel cad-viewport-top">
+        <div class="cad-viewport-selection">
+          <SelectionControls
+            isSelectionMode={isSelectionMode()}
+            isMultiSelectMode={isMultiSelectMode()}
+            onSelectionModeChange={(active) => { setSelectionMode(active); if (active) cad.setActiveTool("select") }}
+            onMultiSelectModeToggle={() => setMultiSelectMode((on) => !on)}
+            onDeleteSelected={() => selection.deleteSelection()}
+            onDuplicateSelected={() => selection.duplicateSelection()}
+            onMoveToLayer={(layerId) => selection.moveSelectionToLayer(layerId)}
+            onCreateComponent={() => setShowComponentModal(true)}
+            bounds={bounds()}
+          />
         </div>
-      </Show>
+        <div class="cad-viewport-tools">
+          <div class="cad-viewport-actions">
+            <button type="button" onClick={() => { setShowElementInfo(false); setShowPerformance(false); setShowElementsList((open) => !open) }} class="cad-viewport-button" title="Toggle Elements List" aria-label="Toggle Elements List" aria-expanded={showElementsList()}><Layers size={18} /></button>
+            <Show when={singleSelected() !== undefined}>
+              <button type="button" onClick={() => { setShowElementsList(false); setShowPerformance(false); setShowElementInfo((open) => !open) }} class="cad-viewport-button" title="Show Element Properties" aria-label="Show Element Properties" aria-expanded={showElementInfo()}><Sliders size={18} /></button>
+            </Show>
+            <button type="button" onClick={() => { refreshMemory(); setShowElementsList(false); setShowElementInfo(false); setShowPerformance((open) => !open) }} class="cad-viewport-button" title="Performance Settings" aria-label="Performance Settings" aria-expanded={showPerformance()}><Cog size={18} /></button>
+          </div>
+          <Show when={selectedIds().length > 0 && !explosionActive() && !cad.explodedView.enabled}>
+            <div class="cad-viewport-transforms" role="group" aria-label={t("cad.viewport.transforms")}>
+              <button onClick={() => setMode("translate")} class="cad-viewport-button" aria-pressed={transformMode() === "translate"}><Move size={14} />Move (G)</button>
+              <button onClick={() => setMode("rotate")} class="cad-viewport-button" aria-pressed={transformMode() === "rotate"}><RotateCw size={14} />Rotate (R)</button>
+              <button onClick={() => setMode("scale")} class="cad-viewport-button" aria-pressed={transformMode() === "scale"}><Maximize2 size={14} />Scale (S)</button>
+              <button onClick={() => transformControls.resetToOrigin()} class="cad-viewport-button" title="Reset Position">Reset</button>
+              <button onClick={() => transformControls.alignToGrid()} class="cad-viewport-button" title="Align to Grid">Grid</button>
+              <button onClick={() => transformControls.duplicateInPlace()} class="cad-viewport-button" title="Duplicate">Dup</button>
+              <For each={[
+                { op: "union" as const, title: "Boolean Union (Ctrl+U)", extra: "" },
+                { op: "subtract" as const, title: "Boolean Subtract (Ctrl+Shift+S)", extra: "M2 2l20 20" },
+                { op: "intersect" as const, title: "Boolean Intersect (Ctrl+I)", extra: "M8 14a6 6 0 0 0 8-8" }
+              ]}>{(entry) =>
+                <button onClick={() => runBoolean(entry.op)} class="cad-viewport-button" title={entry.title} disabled={selectedIds().length < 2} classList={{ "opacity-40": selectedIds().length < 2 }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="8" cy="8" r="6" /><circle cx="16" cy="16" r="6" />
+                    <Show when={entry.extra}><path d={entry.extra} /></Show>
+                  </svg>
+                </button>}
+              </For>
+            </div>
+          </Show>
 
+          <Show when={showElementsList()}>
+            <div class="cad-viewport-popover"><ElementsListPanel onClose={() => setShowElementsList(false)} /></div>
+          </Show>
+          <Show when={singleSelected() !== undefined && showElementInfo()}>
+            <div class="cad-viewport-popover"><ElementInfo elementId={singleSelected()!} onClose={() => setShowElementInfo(false)} /></div>
+          </Show>
+          <Show when={showPerformance()}>
+            <div class="cad-viewport-popover p-3">
+              <h3 class="text-lg font-semibold mb-3">Performance & Events</h3>
+              <div class="mb-4" data-testid="look-tier">
+                <h4 class="text-sm font-medium mb-2">Visual quality</h4>
+                <div class="flex gap-1" role="radiogroup" aria-label="Visual quality">
+                  <For each={LOOK_TIERS}>{(tier) =>
+                    <button type="button" role="radio" aria-checked={lookTier() === tier} onClick={() => setLookTier(tier)}
+                      class={`flex-1 text-xs px-2 py-1 rounded capitalize ${lookTier() === tier ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"}`}>{tier}</button>}
+                  </For>
+                </div>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Low: plain lights. Balanced: the classic look, refined. Standard: studio reflections and tone mapping. High: sharper reflections.</p>
+              </div>
+              <div class="mb-4">
+                <h4 class="text-sm font-medium mb-2">Memory Usage</h4>
+                <div class="text-xs space-y-1 text-gray-600 dark:text-gray-300">
+                  <div>JS Heap: {(memory().used / 1024 / 1024).toFixed(1)}MB</div>
+                  <div>Total Heap: {(memory().total / 1024 / 1024).toFixed(1)}MB</div>
+                  <div>Geometries: {memory().geometries}</div>
+                  <div>Textures: {memory().textures}</div>
+                </div>
+                <div class="mt-2 space-x-2">
+                  <button onClick={cleanupMemory} class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Cleanup Memory</button>
+                  <button onClick={refreshMemory} class="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600">Refresh</button>
+                </div>
+              </div>
+              <button onClick={() => setShowPerformance(false)} class="mt-4 w-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-2 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600">Close</button>
+            </div>
+          </Show>
+        </div>
+      </div>
       <Show when={transformControls.isTransforming}>
         <div style="position:absolute;bottom:20px;left:20px;background-color:rgba(0,0,0,0.9);color:white;padding:12px 16px;border-radius:8px;font-size:12px;font-family:monospace;z-index:1002">
           <div>Mode: {transformStore.mode.toUpperCase()}</div>
@@ -1087,42 +1153,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </div>
       </Show>
 
-
-
       <SnapIndicator x={snapScreen().x} y={snapScreen().y} type={snapScreen().type} visible={snapScreen().visible} />
-
-      <div class="absolute top-4 left-4 z-10">
-        <SelectionControls
-          isSelectionMode={isSelectionMode()}
-          isMultiSelectMode={isMultiSelectMode()}
-          onSelectionModeChange={(active) => { setSelectionMode(active); if (active) cad.setActiveTool("select") }}
-          onMultiSelectModeToggle={() => setMultiSelectMode((on) => !on)}
-          onDeleteSelected={() => selection.deleteSelection()}
-          onDuplicateSelected={() => selection.duplicateSelection()}
-          onMoveToLayer={(layerId) => selection.moveSelectionToLayer(layerId)}
-          onCreateComponent={() => setShowComponentModal(true)}
-          bounds={bounds()}
-        />
-      </div>
-
-      <BoxSelection box={screenBox()} />
-
-      <Show when={showElementsList()}>
-        <div class="absolute top-16 cursor-pointer right-4 bottom-16 z-10"><ElementsListPanel onClose={() => setShowElementsList(false)} /></div>
-      </Show>
-      <Show when={singleSelected() !== undefined && showElementInfo()}>
-        <div class="absolute cursor-pointer top-16 right-4 z-10 w-80"><ElementInfo elementId={singleSelected()!} onClose={() => setShowElementInfo(false)} /></div>
-      </Show>
-      <ComponentCreationModal isOpen={showComponentModal()} onClose={() => setShowComponentModal(false)} />
-
-      <button onClick={() => setShowElementsList((open) => !open)} class="absolute top-4 right-4 p-2 bg-white dark:bg-gray-800 rounded-md shadow-md hover:bg-gray-100 z-10" title="Toggle Elements List">
-        <Layers size={18} />
-      </button>
-      <Show when={singleSelected() !== undefined}>
-        <button onClick={() => setShowElementInfo((open) => !open)} class="absolute top-4 right-16 p-2 bg-white dark:bg-gray-800 rounded-md shadow-md hover:bg-gray-100 z-10" title="Show Element Properties">
-          <Sliders size={18} />
-        </button>
-      </Show>
 
       <Show when={isPlacing()}>
         <div class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-md shadow-lg z-100">
@@ -1131,60 +1162,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       </Show>
       <Show when={isDraggingComponent()}><DragDropIndicator position={dropPosition()} screenPosition={dropScreen()} /></Show>
 
-      {/* Transformation tools */}
-      <Show when={elements.selectedElement}>
-        <div class="absolute top-14 right-4 flex space-x-2 bg-[#F8FBFF] dark:bg-gray-800 p-2 rounded-md shadow-md z-10">
-          <button onClick={() => setMode("translate")} class={`p-2 rounded ${transformMode() === "translate" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-700"}`} title="Move (G)"><Move size={16} /></button>
-          <button onClick={() => setMode("rotate")} class={`p-2 rounded ${transformMode() === "rotate" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-700"}`} title="Rotate (R)"><RotateCw size={16} /></button>
-          <button onClick={() => setMode("scale")} class={`p-2 rounded ${transformMode() === "scale" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-700"}`} title="Scale (S)"><Maximize size={16} /></button>
-          <For each={[
-            { op: "union" as const, title: "Boolean Union (Ctrl+U)", extra: "" },
-            { op: "subtract" as const, title: "Boolean Subtract (Ctrl+Shift+S)", extra: "M2 2l20 20" },
-            { op: "intersect" as const, title: "Boolean Intersect (Ctrl+I)", extra: "M8 14a6 6 0 0 0 8-8" }
-          ]}>{(entry) =>
-            <button onClick={() => runBoolean(entry.op)} class="p-1 rounded-md hover:bg-gray-200 text-gray-800" title={entry.title} disabled={selectedIds().length < 2} classList={{ "opacity-40": selectedIds().length < 2 }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="8" cy="8" r="6" /><circle cx="16" cy="16" r="6" />
-                <Show when={entry.extra}><path d={entry.extra} /></Show>
-              </svg>
-            </button>}
-          </For>
-        </div>
-      </Show>
-
-      {/* Performance */}
-      <Show when={showPerformance()}>
-        <div class="absolute top-16 right-40 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg z-10 w-80">
-          <h3 class="text-lg font-semibold mb-3">Performance & Events</h3>
-          <div class="mb-4" data-testid="look-tier">
-            <h4 class="text-sm font-medium mb-2">Visual quality</h4>
-            <div class="flex gap-1" role="radiogroup" aria-label="Visual quality">
-              <For each={LOOK_TIERS}>{(tier) =>
-                <button type="button" role="radio" aria-checked={lookTier() === tier} onClick={() => setLookTier(tier)}
-                  class={`flex-1 text-xs px-2 py-1 rounded capitalize ${lookTier() === tier ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"}`}>{tier}</button>}
-              </For>
-            </div>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Low: plain lights. Standard: studio reflections and tone mapping. High: sharper reflections.</p>
-          </div>
-          <div class="mb-4">
-            <h4 class="text-sm font-medium mb-2">Memory Usage</h4>
-            <div class="text-xs space-y-1 text-gray-600 dark:text-gray-300">
-              <div>JS Heap: {(memory().used / 1024 / 1024).toFixed(1)}MB</div>
-              <div>Total Heap: {(memory().total / 1024 / 1024).toFixed(1)}MB</div>
-              <div>Geometries: {memory().geometries}</div>
-              <div>Textures: {memory().textures}</div>
-            </div>
-            <div class="mt-2 space-x-2">
-              <button onClick={cleanupMemory} class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Cleanup Memory</button>
-              <button onClick={refreshMemory} class="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600">Refresh</button>
-            </div>
-          </div>
-          <button onClick={() => setShowPerformance(false)} class="mt-4 w-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-2 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600">Close</button>
-        </div>
-      </Show>
-      <button onClick={() => { refreshMemory(); setShowPerformance((open) => !open) }} class="absolute top-4 right-28 p-2 bg-white dark:bg-gray-800 rounded-md shadow-md hover:bg-gray-100 z-10" title="Performance Settings">
-        <Cog size={18} />
-      </button>
+      <BoxSelection box={screenBox()} />
+      <ComponentCreationModal isOpen={showComponentModal()} onClose={() => setShowComponentModal(false)} />
 
       <div class="panel cad-viewport-footer" data-testid="cad-viewport-footer">
       {props.footerDock}

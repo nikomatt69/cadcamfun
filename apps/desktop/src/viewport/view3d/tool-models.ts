@@ -12,13 +12,13 @@ export interface ToolSources {
 }
 
 export const previewToolFor = (id: string, sources: ToolSources): cam.ToolModel | undefined => {
-  const own = sources.toolModels?.get(id)
-  if (own !== undefined) return own
   const cutter = sources.tools?.get(id)
-  if (cutter !== undefined) return cam.toolModelFromCutter(cutter)
-  const fallback = sources.defaultToolModel ?? (sources.defaultTool !== undefined ? cam.toolModelFromCutter(sources.defaultTool) : undefined)
+  const model = sources.toolModels?.get(id)
+    ?? (cutter !== undefined ? cam.toolModelFromCutter(cutter) : undefined)
+    ?? sources.defaultToolModel
+    ?? (sources.defaultTool !== undefined ? cam.toolModelFromCutter(sources.defaultTool) : undefined)
   // A tool setter is on the table, not in the spindle: what plays is a generic cutter.
-  return fallback?.family === "setter" ? cam.toolModelOf({ type: "endmill", diameter: 6 }) : fallback
+  return model?.family === "setter" ? cam.toolModelOf({ type: "endmill", diameter: 6 }) : model
 }
 
 /** Tip to spindle nose of a tool as drawn: through its holder (the assumed one when it names none). */

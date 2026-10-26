@@ -38,7 +38,8 @@ export const snapshotCamProgram = async (app: AppState, gcode: string): Promise<
   } : useCADStore.getState().workpiece
   const drawing = drawingPayload(app)
   if (request?.stock) drawing["stock"] = request.stock
-  const snapshot = structuredClone(toJsonSafe({ settings: generator.settings, printer: generator.printer, stock, drawing, ...(operations ? { operations } : {}), ...(request ? { kernelRequest: request } : {}) })) as Record<string, unknown>
+  const settings = generator.currentGCode === gcode ? generator.generatedSettings ?? generator.settings : generator.settings
+  const snapshot = structuredClone(toJsonSafe({ settings, printer: generator.printer, stock, drawing, ...(operations ? { operations } : {}), ...(request ? { kernelRequest: request } : {}) })) as Record<string, unknown>
   // Parse the captured bytes, never the delayed editor preview, which may belong to earlier NC.
   const program = artifact?.program ?? (operations ? combineOperationResults(operations).program : (await app.runtime.run(makeToolpathGenerator(app.client).parse(gcode))).program)
   return Schema.decodeUnknownSync(SavedCamProgram)({ format: "cadcamfun-cam", version: 1, gcode, program, ...snapshot, ...(artifact ? { kernelArtifact: artifact } : {}) })
@@ -85,7 +86,8 @@ export const restoreCamProgram = async (app: AppState, row: Pick<ToolpathRow, "i
     store.setWorkpiece({ x: snapshot.stock.width, y: snapshot.stock.height, z: snapshot.stock.depth })
     store.setStockAllowance(snapshot.stock.allowance)
   }
-  generator.setResult(code, [])
+  // Raw imported NC has no generator provenance: resolve its tools from the program.
+  generator.setResult(snapshot !== undefined ? code : "", [])
   if (store.kernelRequest) restoreKernelSettings(store.kernelRequest)
   store.setSavedProgram(row.id ? { id: row.id, name: row.name, projectId: row.projectId, drawingId: row.drawingId,
     description: row.description ?? null, isPublic: row.isPublic ?? false, editorRevision: camEditorRevision(), storedRevision: storedProgramRevision(row) } : undefined)

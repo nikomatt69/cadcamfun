@@ -65,8 +65,8 @@ export const previewSetup = (
  * machine (and its diameter is still the generator's), else the generator's tool settings (spec 31: the same model the
  * resource's page shows).
  */
-export const previewToolModel = (kind: cam.MachineKind, settings: cam.generator.ToolpathSettings, library: (cam.ToolResource & { readonly type?: string }) | null | undefined): cam.ToolModel =>
-  cam.previewToolModel(kind, settings, library?.type !== undefined ? library as cam.ToolResource : undefined)
+export const previewToolModel = (kind: cam.MachineKind, settings: cam.generator.ToolpathSettings, library: Partial<cam.ToolResource> | null | undefined): cam.ToolModel =>
+  cam.previewToolModel(kind, settings, library?.type !== undefined && library.diameter !== undefined ? { ...library, type: library.type, diameter: library.diameter } : undefined)
 
 /** The tool an operation of a multi-operation program uses, as the preview draws it, and what is wrong with it. */
 export interface OperationTool {
@@ -74,22 +74,29 @@ export interface OperationTool {
   readonly name: string
   readonly model: cam.ToolModel
   readonly issues: ReadonlyArray<cam.ToolOperationIssue>
+  readonly source?: cam.ProgramTool["source"]
+  readonly operations?: ReadonlyArray<string>
 }
 
 /**
  * The tools of the operations of a combined program (spec 32 §4.2), keyed like `combineCamOperations` keys its toolpaths: every
  * operation that carries its settings draws its own operation's tool, so drill → tap → chamfer shows three tools. Operations
- * without settings are left to the preview's default tool. The first operation to use a tool id names it.
+ * without settings resolve their own NC evidence. The first operation to use a tool id names it.
  */
-export const operationToolsOf = (results: ReadonlyArray<{ readonly id: string; readonly name: string; readonly tool?: string; readonly settings?: cam.generator.ToolpathSettings; readonly program: cam.Program }>): ReadonlyArray<OperationTool> => {
+export const operationToolsOf = (results: ReadonlyArray<{ readonly id: string; readonly name: string; readonly tool?: string; readonly settings?: cam.generator.ToolpathSettings; readonly program: cam.Program; readonly gcode?: string }>): ReadonlyArray<OperationTool> => {
   const out = new Map<string, OperationTool>()
   for (const r of results) {
-    if (r.settings === undefined) continue
-    const model = cam.toolForOperation(r.settings)
-    const issues = cam.settingsToolIssues(r.settings, model)
+    const parsed = r.gcode !== undefined && (r.settings === undefined || r.program.toolpaths.length > 1) ? cam.generator.analyseGcode(r.gcode) : undefined
+    const inferred = parsed !== undefined ? cam.programTools(r.program, parsed.motion, r.gcode ?? "", r.settings?.machineType ?? cam.inferMachineKind(r.gcode ?? "")?.kind ?? "mill") : undefined
     for (const tp of r.program.toolpaths) {
+      const own = inferred?.get(tp.toolId)
+      const model = r.settings !== undefined && (r.program.toolpaths.length === 1 || own?.source !== "header") ? cam.toolForOperation(r.settings) : own?.model
+      if (model === undefined) continue
+      const issues = r.settings !== undefined ? cam.settingsToolIssues(r.settings, model) : own?.issues ?? []
       const toolId = r.tool ?? `${r.id}:${tp.toolId}`
-      if (!out.has(toolId)) out.set(toolId, { toolId, name: r.name, model, issues })
+      const previous = out.get(toolId)
+      if (previous === undefined) out.set(toolId, { toolId, name: r.name, model, issues, ...(r.settings === undefined && own !== undefined ? { source: own.source, operations: own.operations } : {}) })
+      else if (JSON.stringify(previous.model) !== JSON.stringify(model)) out.set(toolId, { ...previous, issues: [...previous.issues, { code: "TOOL_CANNOT_DO_OPERATION", severity: "error", message: `Operation ${r.name} assigns a different model to shared tool ${toolId}. Give distinct physical tools distinct tool ids.` }] })
     }
   }
   return [...out.values()]

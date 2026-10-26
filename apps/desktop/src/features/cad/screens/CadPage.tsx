@@ -2,7 +2,6 @@ import { transformLibraryItemToCADElement } from "../lib/libraryTransform.ts"
 import { Effect } from "effect"
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router"
-import { Motion } from "solid-motionone"
 import { WorkspaceInspector } from "../../../shared/components/panel/inspector.tsx"
 import { SidebarSection } from "../../../shared/components/panel/sidebar.tsx"
 import { CheckRow, Field, Segmented } from "../../../shared/components/panel/ui.tsx"
@@ -36,7 +35,7 @@ import CustomElementsEditor from "../components/custom-elements/CustomElementsEd
 import AssemblyPanel from "../components/assembly/AssemblyPanel.tsx"
 import { CADAssistantButton } from "../components/CADAssistantButton.tsx"
 import { CADAssistantBridge } from "../../ai/index.ts"
-import { FIT_VIEW_EVENT } from "../../ai/lib/editor-sync.ts"
+import { captureEditorOwner, FIT_VIEW_EVENT } from "../../ai/lib/editor-sync.ts"
 import { syncDocumentSettings } from "../../../shared/state/document-settings.ts"
 import { applyStoredDrawing } from "../lib/open-drawing.ts"
 import { readDraft } from "../lib/draft.ts"
@@ -45,7 +44,6 @@ import { projectSession } from "../../projects/lib/project-session.ts"
 import DrawingVersionsDialog from "../components/DrawingVersionsDialog.tsx"
 import "../../../styles/workstation.css"
 
-const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
 type RightPanel = "proprieties" | "settings" | "constraints" | "modeling" | "assembly" | "drawing"
 
 /** The `/cad` editor: toolbar, sidebar, canvas with floating tools, right-hand properties/settings/plugins, status bar. */
@@ -94,25 +92,30 @@ export default function CadPage(): JSX.Element {
   createEffect(() => {
     const id = requestedDrawing()
     const projectId = requestedProject()
-    if (id === undefined && projectId === undefined) return
     const current = ++generation
+    const owner = captureEditorOwner()
+    const controller = new AbortController()
+    onCleanup(() => controller.abort())
+    const active = () => !controller.signal.aborted && current === generation && owner.current()
+    if (id === undefined && projectId === undefined) return
     void (async () => {
       // A named drawing wins; otherwise the project's newest one, so reopening a project is never an empty canvas.
       let target = id
       if (target === undefined && projectId !== undefined) {
-        const rows = await app.runtime.run(app.client.drawings.listForProject({ params: { id: projectId } })) as ReadonlyArray<{ id: string }>
+        const rows = await app.runtime.run(app.client.drawings.listForProject({ params: { id: projectId } }), { signal: controller.signal }) as ReadonlyArray<{ id: string }>
         target = rows[0]?.id
       }
-      if (target === undefined || current !== generation) return
+      if (target === undefined || !active()) return
       if (loadedFor === target) return
-      loadedFor = target
-      await app.runtime.run(app.client.drawings.get({ params: { id: target } })).then((row) => {
+      await app.runtime.run(app.client.drawings.get({ params: { id: target } }), { signal: controller.signal }).then((row) => {
+        if (!active()) return
+        loadedFor = target
         applyStoredDrawing(app, row)
         setDrawingId(row.id)
         setDrawingName(row.name)
         toast.success(`Drawing "${row.name}" opened`)
-      }, () => toast.error("The drawing could not be opened"))
-    })().catch(() => { if (current === generation) toast.error("The drawing could not be opened") })
+      }, () => { if (active()) toast.error("The drawing could not be opened") })
+    })().catch(() => { if (active()) toast.error("The drawing could not be opened") })
   })
 
   /**
@@ -134,12 +137,13 @@ export default function CadPage(): JSX.Element {
   })
   // The assistant added something: frame it once the canvas has drawn it.
   onMount(() => {
-    const onFit = () => { setTimeout(() => canvas()?.fitToView(), 150) }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const onFit = () => { clearTimeout(timer); timer = setTimeout(() => canvas()?.fitToView(), 150) }
     window.addEventListener(FIT_VIEW_EVENT, onFit)
-    onCleanup(() => window.removeEventListener(FIT_VIEW_EVENT, onFit))
+    onCleanup(() => { clearTimeout(timer); window.removeEventListener(FIT_VIEW_EVENT, onFit) })
   })
   onMount(() => {
-    const onKey = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") { event.preventDefault(); save() } }
+    const onKey = (event: KeyboardEvent) => { if (!event.defaultPrevented && !event.shiftKey && !event.altKey && !document.querySelector('[role="dialog"]') && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") { event.preventDefault(); save() } }
     window.addEventListener("keydown", onKey)
     onCleanup(() => window.removeEventListener("keydown", onKey))
   })
@@ -214,11 +218,10 @@ export default function CadPage(): JSX.Element {
   })
 
   return (
-    <Motion.div
+    <div
       class="cad-workspace h-full w-full flex flex-col overflow-hidden"
-      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
     >
-      <Motion.div class="cad-workspace__frame flex flex-col h-full w-full" {...rise} transition={{ duration: 0.8, delay: 0.2 }}>
+      <div class="cad-workspace__frame flex flex-col h-full w-full">
         <EnhancedToolbar
           sidebarOpen={sidebarOpen()} setSidebarOpen={setSidebarOpen} handleSaveProject={save} onShowVersions={() => setShowVersions(true)}
           setDialogMode={setDialogMode} setShowImportExportDialog={setShowImportExport} setShowLibraryView={() => navigate("/library")}
@@ -230,14 +233,14 @@ export default function CadPage(): JSX.Element {
           onSurface={operation => { setSurfaceOperation(operation); setRightPanel("modeling"); setRightOpen(true) }}
           onBoolean={operation => canvas()?.boolean(operation)} />
 
-        <Motion.div class="cad-workspace__body flex flex-1 overflow-hidden w-full" {...rise} transition={{ duration: 0.6, delay: 0.4 }}>
+        <div class="cad-workspace__body flex flex-1 overflow-hidden w-full">
           <EnhancedSidebarCad isOpen={sidebarOpen()} setIsOpen={setSidebarOpen} activeSidebarTab={sidebarTab()} setActiveSidebarTab={setSidebarTab} />
 
-          <Motion.div class="cad-workspace__stage flex-1 min-w-0 flex relative overflow-hidden rounded-2xl mr-2" {...rise} transition={{ duration: 0.8, delay: 0.6 }}>
+          <div class="cad-workspace__stage flex-1 min-w-0 flex relative overflow-hidden rounded-2xl mr-2">
             <CADCanvas
               width="100%" height="100%" previewComponent={libraryComponent()} previewLibraryItem={libraryItem()}
               onComponentPlaced={() => { toast.success("Component placed successfully!"); setLibraryComponent(null) }}
-              onReady={setCanvas} onSave={openExport}
+              onReady={setCanvas} onSave={save}
               footerActions={<CADAssistantButton isVisible={showAssistant()} toggleVisibility={toggleAssistant} />}
               footerDock={<TitleBlockOverlay mode={cad.viewMode} />}
             />
@@ -249,7 +252,7 @@ export default function CadPage(): JSX.Element {
             <Show when={showAssistant()}>
               <CADAssistantBridge isVisible initialContextData={assistantContext()} />
             </Show>
-          </Motion.div>
+          </div>
 
           <WorkspaceInspector class="cad-workspace__inspector" open={rightOpen()}
             active={rightPanel() === "modeling" || rightPanel() === "drawing" ? "proprieties" : rightPanel() as "proprieties" | "settings" | "constraints" | "assembly"}
@@ -297,15 +300,15 @@ export default function CadPage(): JSX.Element {
               <Show when={rightPanel() === "assembly"}><AssemblyPanel /></Show>
             </div>
           </WorkspaceInspector>
-        </Motion.div>
+        </div>
 
-        <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 1.4 }}><StatusBar /></Motion.div>
-      </Motion.div>
+        <div><StatusBar /></div>
+      </div>
 
       <DrawingVersionsDialog open={showVersions()} onClose={() => setShowVersions(false)} />
       <ImportExportDialog isOpen={showImportExport()} mode={dialogMode()} onClose={() => setShowImportExport(false)} canvas={canvas()} />
       <UnifiedLibraryModal isOpen={showLibrary()} onClose={() => setShowLibrary(false)}><LibraryBrowser onSelectComponent={pickComponent} /></UnifiedLibraryModal>
       <CustomElementsEditor isOpen={showCustomElements()} onClose={() => setShowCustomElements(false)} />
-    </Motion.div>
+    </div>
   )
 }

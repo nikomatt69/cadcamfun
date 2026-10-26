@@ -492,7 +492,7 @@ export function View3D(props: View3DProps) {
           ...(start !== undefined ? { start } : {}),
           ...(props.machineOptions !== undefined ? { machineOptions: props.machineOptions } : {}),
           gaugeOf,
-          ...(props.toolModels !== undefined ? { pathTools: props.program.toolpaths.map((tp) => props.toolModels!.get(tp.toolId)) } : {}),
+          pathTools: props.program.toolpaths.map((tp) => modelFor(tp.toolId)),
           ...(cutter ? { tool: { radius: cutter.diameter / 2, length: cutter.stickout } } : {}),
           scale: machine.kind === "lathe" ? Math.max(machine.stock.diameter, machine.stock.length / 2) : machine.kind === "3dprinter" ? Math.max(machine.bed.width, machine.bed.depth) / 2 : extent
         })
@@ -534,9 +534,12 @@ export function View3D(props: View3DProps) {
         }
       }
       // A tool setter stands on the table where the program measures (its pad top is the length reference, Z0).
-      const setterModel = props.defaultToolModel?.family === "setter" ? props.defaultToolModel : undefined
-      if (setterModel !== undefined && props.program) {
-        const first = props.program.toolpaths.flatMap((tp) => tp.moves).find((m) => m._tag === "Rapid" || m._tag === "Linear")
+      const setters = new Set<string>()
+      for (const path of props.program?.toolpaths ?? []) {
+        const setterModel = props.toolModels?.get(path.toolId) ?? props.defaultToolModel
+        if (setterModel?.family !== "setter" || setters.has(path.toolId)) continue
+        setters.add(path.toolId)
+        const first = path.moves.find((m) => m._tag === "Rapid" || m._tag === "Linear")
         const at = first && (first._tag === "Rapid" || first._tag === "Linear") ? first.to : { x: 0, y: 0, z: 0 }
         const body = toolObject(setterModel)
         body.position.set(at.x, at.y, 0)
@@ -593,14 +596,14 @@ export function View3D(props: View3DProps) {
       }
       const rapidLine = lineObject(buffers.rapid.positions, true)
       const cutLine = lineObject(buffers.cut.positions, false, buffers.cut.colors)
-      // Feed direction and where the cutting starts and ends; a printer's deposits are the machine scene's.
-      const arrows = display?.showDirection === false || machine?.kind === "3dprinter" ? undefined : createDirectionArrows(buffers.cut)
-      if (arrows !== undefined) content.add(arrows.object)
       // The cuts under the stock's top face are the point of the program: a faint copy drawn through the material keeps them readable.
       const ghost = cutLine !== undefined && machine?.kind !== "3dprinter"
         ? createLines(buffers.cut.positions, { ...(buffers.cut.colors !== undefined ? { colors: buffers.cut.colors } : { color: 0x38bdf8 }), width: 1.2, opacity: 0.3, depthTest: false }, { quality: currentLookTier() })
         : undefined
       if (ghost !== undefined) { ghost.name = "toolpath:cuts-ghost"; ghost.renderOrder = 9; content.add(ghost) }
+      // Feed direction and where the cutting starts and ends; a printer's deposits are the machine scene's.
+      const arrows = display?.showDirection === false || machine?.kind === "3dprinter" ? undefined : createDirectionArrows(buffers.cut)
+      if (arrows !== undefined) content.add(arrows.object)
       pathLines = { ...(cutLine ? { cut: cutLine } : {}), cutStarts: buffers.cut.starts, ...(rapidLine ? { rapid: rapidLine } : {}), rapidStarts: buffers.rapid.starts, ...(arrows !== undefined ? { arrows } : {}), ...(ghost !== undefined ? { ghost } : {}) }
       props.onPathLegend?.(buffers.legend)
       if (props.program && props.toolpathDisplay) {
@@ -625,10 +628,10 @@ export function View3D(props: View3DProps) {
           }
         }
       }
+      sphereCache = undefined
       appearance()
       if (!initialized) { fit(); initialized = true }
     }
-      sphereCache = undefined
     let initialized = false
     fit = () => {
       const box = new THREE.Box3().setFromObject(content)
@@ -649,9 +652,6 @@ export function View3D(props: View3DProps) {
     const observer = new ResizeObserver(resize)
     observer.observe(host)
     const raycaster = new THREE.Raycaster()
-    let pointerStart: readonly [number, number] = [0, 0]
-    const down = (event: PointerEvent) => { pointerStart = [event.clientX, event.clientY] }
-    const pick = (event: PointerEvent) => {
     // Zoom toward the cursor, orbit about the selection or the surface under it, near and far that follow the scene (no depth fighting).
     const rig = createCameraRig({
       controls, camera: () => activeCamera, surface: host, canvas: () => renderer.domElement,
@@ -673,6 +673,9 @@ export function View3D(props: View3DProps) {
       reducedMotion: () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true,
       canNavigate: () => preset() !== "four-view" && !gizmo.dragging && !gizmo.axis
     })
+    let pointerStart: readonly [number, number] = [0, 0]
+    const down = (event: PointerEvent) => { pointerStart = [event.clientX, event.clientY] }
+    const pick = (event: PointerEvent) => {
       if (event.button !== 0 || gizmo.dragging || preset() === "four-view" || Math.hypot(event.clientX - pointerStart[0], event.clientY - pointerStart[1]) > 4 || gizmo.axis) return
       const rect = renderer.domElement.getBoundingClientRect()
       raycaster.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), activeCamera)
@@ -741,12 +744,12 @@ export function View3D(props: View3DProps) {
           if (setLineDrawRange(line, count)) invalidate()
         }
         range(pathLines.cut, pathLines.cutStarts)
+        range(pathLines.ghost, pathLines.cutStarts)
         range(pathLines.rapid, pathLines.rapidStarts)
+        if (pathLines.arrows?.update(done ? startedBy(pathLines.cutStarts, seconds) : Infinity)) invalidate()
       }
       // A lathe tool or a printer nozzle is the machine scene's; the milling cutter and the marker are for mills only.
-        range(pathLines.ghost, pathLines.cutStarts)
       const ownTool = machineScene !== undefined && props.machine?.kind !== "mill"
-        if (pathLines.arrows?.update(done ? startedBy(pathLines.cutStarts, seconds) : Infinity)) invalidate()
       const visible = playback.segmentCount > 0 && !ownTool
       const activeId = visible ? toolAt(playback, seconds) : undefined
       const active = activeId !== undefined ? toolGroupFor(activeId) : null

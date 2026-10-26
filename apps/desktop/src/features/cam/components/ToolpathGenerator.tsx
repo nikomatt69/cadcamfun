@@ -60,8 +60,9 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
   const [elapsed, setElapsed] = createSignal(0)
   const [running, setRunning] = createSignal(false)
   let ticker: ReturnType<typeof setInterval> | undefined
+  let generationController: AbortController | undefined
   const stopTicker = (): void => { if (ticker !== undefined) clearInterval(ticker); ticker = undefined; setRunning(false) }
-  onCleanup(stopTicker)
+  onCleanup(() => { stopTicker(); generationController?.abort() })
   const progressLabel = (): string => {
     const p = camStore.kernelProgress
     const stage = p?.runId === runId ? STEPS.find((step) => step === p?.stage) : undefined
@@ -76,7 +77,13 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
     gen.setGenerating(true)
     gen.setError(null)
     gen.setSuccess(null)
-    const projectId = captureEditorOwner().projectId
+    const owner = captureEditorOwner()
+    const projectId = owner.projectId
+    const settings = gen.settings, tool = gen.selectedLibraryTool
+    const previousCode = camStore.gcode
+    generationController?.abort()
+    const controller = new AbortController()
+    generationController = controller
     runId = crypto.randomUUID()
     camStore.setKernelProgress(undefined)
     setElapsed(0)
@@ -86,18 +93,20 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
     setRunning(true)
     try {
       const response: GenerateResponse = await app.runtime.run(generator.generate({
-        settings: gen.settings,
+        settings,
         geometry: geometryOf(gen, job.sources()),
         printer: gen.printer,
         ...(projectId == null ? {} : { progress: { projectId, runId } })
-      }))
-      gen.setResult(response.gcode, response.cycles, response.evidence, response.print)
+      }), { signal: controller.signal })
+      if (controller.signal.aborted || !owner.current() || camStore.gcode !== previousCode) return
+      gen.setResult(response.gcode, response.cycles, response.evidence, response.print, { settings, tool })
       camStore.setGcode(response.gcode)
       camStore.setProgram(response.program)
       for (const warning of response.warnings) toast(warning)
       gen.flash(t("cam.generator.success"), 5000)
       props.onGCodeGenerated(response.gcode)
     } catch (cause) {
+      if (controller.signal.aborted || !owner.current()) return
       const message = cause instanceof Error ? cause.message : String(cause)
       if (gen.settings.machineType === "3dprinter") toast.error(message)
       gen.setError(gen.settings.machineType === "3dprinter" ? message : message || t("cam.generator.error"))

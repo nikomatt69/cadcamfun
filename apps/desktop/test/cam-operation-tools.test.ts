@@ -52,9 +52,12 @@ describe("operations of a combined program draw their own tools", () => {
     expect(tools[1]!.issues.map((i) => i.code)).toContain("TOOL_CANNOT_DO_OPERATION")
   })
 
-  test("operations without settings are left to the default tool", () => {
+  test("operations without settings keep an assumed tool independent of current generator settings", () => {
     const { settings: _, ...bare } = drill
-    expect(operationToolsOf([bare])).toEqual([])
+    const tools = operationToolsOf([bare])
+    expect(tools).toHaveLength(1)
+    expect(tools[0]).toMatchObject({ toolId: "op1:tool", source: "assumed" })
+    expect(tools[0]!.model.assumed).toContain("diameter")
   })
 })
 
@@ -84,4 +87,22 @@ describe("a lathe program of several operations swaps the insert", () => {
     expect(shown(0)).toEqual([expect.stringContaining("facing")])
     scene.dispose()
   })
+})
+
+test("a printer swaps the actual nozzle object per operation and restores it on rewind", () => {
+  const a = g.analyseGcode("G21 G90\nM104 S200\nT0\nG0 X0 Y0 Z0.2\nG1 X10 E1 F600\nT1\nG1 X20 E2\nM30")
+  expect(a.program.toolpaths).toHaveLength(2)
+  const brass = cam.toolModelOf({ type: "brass", diameter: 0.4 })
+  const ruby = cam.toolModelOf({ type: "ruby", diameter: 0.8 })
+  const scene = createMachineScene({ setup: cam.viewer.printerSetupOf(settings({ machineType: "3dprinter" })), program: a.program, motion: a.motion, pathTools: [brass, ruby], display: DEFAULT_MACHINE_DISPLAY, scale: 100 })
+  try {
+    const visible = () => scene.root.children.filter((o) => o.name === "nozzle" && o.visible).map((o) => o.userData.tool)
+    scene.update(0)
+    expect(visible()).toEqual([expect.stringContaining("brass nozzle Ø0.4")])
+    const next = scene.timeline.moves.find((move) => move.path === 1)!
+    scene.update(next.start + next.duration / 2)
+    expect(visible()).toEqual([expect.stringContaining("ruby nozzle Ø0.8")])
+    scene.update(0)
+    expect(visible()).toEqual([expect.stringContaining("brass nozzle Ø0.4")])
+  } finally { scene.dispose() }
 })

@@ -8,7 +8,6 @@
  * timeline, simulator overlay).
  */
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
 import { Eye, EyeOff, ListTree, Play, RotateCcw, Settings, X } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { View3D, toolpathOverlayModel, type MachineInfo, type RenderMode, type ToolpathPointKind, type ViewPreset } from "../../../viewport/view3d/index.ts"
@@ -23,6 +22,7 @@ import { COLOR_MODES, operationColor, type ColorMode, type LegendEntry } from ".
 import { TOOL_COLORS, colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
 import { gaugeOfTool, previewToolFor } from "../../../viewport/view3d/tool-models.ts"
 import type { StockInfo } from "../../../viewport/view3d/stock-simulation.ts"
+import "../../../styles/viewport-chrome.css"
 
 export interface ToolpathVisualizerProps {
   readonly program: cam.Program
@@ -68,8 +68,6 @@ const prefersReducedMotion = (): boolean => {
 
 const fmt = (n: number): string => (Math.round(n * 1000) / 1000).toString()
 
-const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
-
 /** Half the longest stock side, used to size the default camera distance. */
 const defaultDistance = (workpiece: Workpiece): number => {
   const longest = Math.max(workpiece.x, workpiece.y, workpiece.z)
@@ -81,9 +79,9 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const [mode, setMode] = createSignal<RenderMode>("shaded-edges")
   const [gridVisible, setGridVisible] = createSignal(true)
   const [axesVisible, setAxesVisible] = createSignal(true)
-  const [showDirection, setShowDirection] = createSignal(true)
   const [settingsOpen, setSettingsOpen] = createSignal(false)
   const [showStats, setShowStats] = createSignal(true)
+  const [showDirection, setShowDirection] = createSignal(true)
   const [showPoints, setShowPoints] = createSignal(false)
   const [showPointLabels, setShowPointLabels] = createSignal(false)
   const [pointFilter, setPointFilter] = createSignal<"all" | ToolpathPointKind>("all")
@@ -138,8 +136,13 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const currentToolModel = (): cam.ToolModel | undefined => {
     const r = readout()
     const id = r !== undefined ? props.program.toolpaths[r.operation]?.toolId : undefined
-    return id !== undefined ? props.toolModels?.get(id) : undefined
+    return id !== undefined ? previewToolFor(id, props) : undefined
   }
+  const currentOperationTool = () => props.operationTools?.find((tool) => tool.toolId === props.program.toolpaths[readout()?.operation ?? 0]?.toolId)
+  const operationLabel = (key: string): string => ({
+    "mill/drill": t("cam.strategy.drill"), "mill/tap": t("cam.visualizer.tapping"),
+    "mill/bore": t("cam.strategy.boring"), "mill/probing": t("cam.visualizer.probing")
+  } as Readonly<Record<string, string>>)[key] ?? key
   const machineDisplay = createMemo(() => ({ showWorkholding: showWorkholding(), showTriad: true, spin: spin(), depositMode: depositMode(), frame: frame(), showMachine: showMachine(), showTool: showTool(), showHolder: showHolder(), ...(layer() !== undefined ? { layer: layer()! } : {}) }))
   const machineOptions = createMemo((): cam.viewer.MachineModelOptions => ({ ...(machinePreset() !== "auto" ? { preset: machinePreset() as cam.viewer.MachinePresetId } : {}), ...(props.machineTravel !== undefined ? { travel: props.machineTravel } : {}) }))
   const effectiveMachine = createMemo(() => {
@@ -167,6 +170,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   }
   /** The person's own play / pause / seek: it ends a run in progress. */
   const byPerson = (playing: boolean): void => { endRun(); props.onPlayingChange?.(playing) }
+  const navigate = (seconds: number): void => { endRun(); props.onPlayingChange?.(false); seekTo(seconds) }
+  createEffect(on(() => props.program, () => { endRun(); setMachineInfo(undefined); setStockInfo(undefined); setLegend([]) }, { defer: true }))
   /**
    * Collisions on the timeline (spec 32 P7): pure checks of the core on the same clock and the same tools the 3D view draws,
    * so they hold without a WebGL view too. The machine's head is checked when the machine is shown.
@@ -238,15 +243,6 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     if (!state || state.spindle === "off") return t("cam.visualizer.spindleOff")
     return `${kind === "lathe" ? "M" + (state.spindle === "cw" ? "3" : "4") : state.spindle === "cw" ? "M3" : "M4"} S${Math.round(state.rpm)}${state.css ? " (G96)" : ""} ${state.spindle === "cw" ? "CW" : "CCW"}`
   }
-  /** The cutters the program uses, as the viewport draws them, for the stats overlay. */
-  const usedTools = createMemo(() => {
-    const seen = new Map<string, cam.kernel.Cutter>()
-    for (const tp of props.program.toolpaths) {
-      const cutter = props.tools?.get(tp.toolId) ?? props.defaultTool
-      if (cutter !== undefined && !seen.has(tp.toolId)) seen.set(tp.toolId, cutter)
-    }
-    return [...seen.values()]
-  })
   const overlay = createMemo(() => toolpathOverlayModel(props.program))
 
   const stock = createMemo(() => props.machine?.kind === "mill" ? {
@@ -260,6 +256,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const hasProgram = (): boolean => props.program.toolpaths.length > 0
 
   const resetView = (): void => {
+    endRun()
+    props.onPlayingChange?.(false)
     setPreset(presetFor(props.machine?.kind))
     setMode("shaded-edges")
     setGridVisible(true)
@@ -293,12 +291,14 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   )
 
   return (
-    <Motion.div class="h-full w-full flex flex-col" {...rise} transition={{ duration: 0.5 }}>
-      <div class="flex-1 relative overflow-hidden rounded-2xl border border-white/30 dark:border-gray-600/30 bg-gradient-to-br from-slate-900 to-slate-700 shadow-xl">
+    <div class="toolpath-visualizer h-full w-full flex flex-col" onKeyDown={(event) => {
+      if (event.key === "Escape" && (settingsOpen() || operationsOpen())) { setSettingsOpen(false); setOperationsOpen(false); event.preventDefault(); event.stopPropagation() }
+    }}>
+      <div class="toolpath-visualizer__stage flex-1 relative overflow-hidden bg-slate-900">
         <Show
           when={hasProgram()}
           fallback={
-            <div class="absolute inset-0 flex flex-col items-center justify-center text-white/70 text-sm">
+            <div class="toolpath-visualizer__empty flex flex-col items-center justify-center text-white/70 text-sm">
               <p class="font-medium">{t("cam.preview.noToolpath")}</p>
               <p class="mt-1 text-xs text-white/50">{props.program.toolpaths.length === 0 ? t("cam.preview.hint") : t("cam.preview.pick")}</p>
             </div>
@@ -319,7 +319,6 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             playbackTime={props.playbackTime}
             playbackRate={props.playbackRate * rate()}
             onPlaybackTimeChange={props.onPlaybackTimeChange}
-            controlsFooter={<Show when={props.onPlayingChange}>{(onPlayingChange) => <SimulationMiniPlayer playing={props.playing} time={props.playbackTime} duration={props.playbackDuration ?? 0} onPlayingChange={byPerson} onSeek={(seconds) => { endRun(); props.onPlaybackTimeChange(seconds) }} onRunAll={runAll} runningAll={runThrough()} />}</Show>}
             stock={stock()}
             toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), showDirection: showDirection(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
             onPathLegend={setLegend}
@@ -331,7 +330,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             onRenderModeChange={setMode}
           />
         </Show>
-        <div class="absolute top-4 left-4 right-4 flex justify-between pointer-events-none">
+        <div class="toolpath-visualizer__actions flex justify-between pointer-events-none">
           <div class="pointer-events-auto flex gap-2">
             <button
               onClick={resetView}
@@ -358,7 +357,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           </div>
           <div class="pointer-events-auto">
             <button
-              onClick={() => props.onPlaybackTimeChange(0)}
+              onClick={() => navigate(0)}
               class="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 backdrop-blur text-white text-xs flex items-center gap-1.5"
               aria-label={t("cam.rewind")}
             >
@@ -368,9 +367,9 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           </div>
         </div>
         {/* Below the viewport's own control bar, so the machine shown is always readable. */}
-        <div class="absolute left-4 top-16 z-30 flex flex-wrap items-center gap-2 pointer-events-auto" data-testid="machine-header">
+        <div class="toolpath-visualizer__machine flex flex-wrap items-center gap-2 pointer-events-auto" data-testid="machine-header">
             <button
-              onClick={() => setOperationsOpen(!operationsOpen())}
+              onClick={() => { setSettingsOpen(false); setOperationsOpen(!operationsOpen()) }}
               aria-pressed={operationsOpen()}
               data-testid="operations-toggle"
               class={`px-2 py-1 rounded-lg text-xs backdrop-blur flex items-center gap-1.5 ${operationsOpen() ? "bg-blue-600 text-white" : "bg-black/40 hover:bg-black/60 text-white"}`}
@@ -413,18 +412,18 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               {t("cam.visualizer.partialPreview", { count: props.motion!.unsupported.length })}
             </span>
           </Show>
-        </div>
         <button
           type="button"
-          class={`absolute right-4 top-16 z-30 rounded-lg p-2 text-white backdrop-blur ${settingsOpen() ? "bg-blue-600" : "bg-black/50 hover:bg-black/70"}`}
+          class={`ml-auto rounded p-2 text-white ${settingsOpen() ? "bg-blue-600" : "bg-black/50 hover:bg-black/70"}`}
           aria-label={t("cam.visualizer.settings")}
           aria-expanded={settingsOpen()}
-          onClick={() => setSettingsOpen((value) => !value)}
+          onClick={() => { setOperationsOpen(false); setSettingsOpen((value) => !value) }}
         >
           <Settings size={18} />
         </button>
+        </div>
         <Show when={showStats()}>
-          <div class="absolute bottom-16 left-4 z-20 max-w-[45%] rounded-lg bg-black/65 px-3 py-2 text-[11px] leading-5 text-slate-200 backdrop-blur pointer-events-none">
+          <div class="toolpath-visualizer__stats rounded-lg bg-black/80 px-3 py-2 text-[11px] leading-5 text-slate-200" tabIndex={0} aria-label={t("cam.visualizer.showStats")}>
             <div>{t("cam.visualizer.moves")}: <span class="text-white">{overlay().moveCount}</span></div>
             <div>{t("cam.visualizer.points")}: <span class="text-white">{overlay().points.length}</span></div>
             <div>{t("cam.visualizer.arcs")}: <span class="text-white">{overlay().arcs.length}</span></div>
@@ -448,7 +447,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                       <div data-testid="visualizer-joints">{t("cam.visualizer.machineAxes")}: <span class="text-white">X{fmt(j().x)} Y{fmt(j().y)} Z{fmt(j().z)}{j().a !== undefined ? ` A${fmt(j().a!)}` : ""}{j().b !== undefined ? ` B${fmt(j().b!)}` : ""}{j().c !== undefined ? ` C${fmt(j().c!)}` : ""}</span></div>
                     )}</Show>
                     <For each={collisions().slice(0, 4)}>{(e) => (
-                      <button type="button" data-testid="visualizer-collision" class={`block text-left pointer-events-auto hover:underline ${e.severity === "error" ? "text-red-400" : "text-amber-300"}`} onClick={() => { props.onPlayingChange?.(false); props.onPlaybackTimeChange(e.seconds) }}>
+                      <button type="button" data-testid="visualizer-collision" class={`block text-left pointer-events-auto hover:underline ${e.severity === "error" ? "text-red-400" : "text-amber-300"}`} onClick={() => navigate(e.seconds)}>
                         {t("cam.visualizer.collision")}: {e.message}{e.count > 1 ? ` (×${e.count})` : ""}
                       </button>
                     )}</For>
@@ -471,21 +470,20 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 )}</For>
               </div>
             )}</Show>
-            <Show when={props.defaultToolModel !== undefined && (props.operationTools ?? []).length === 0 && (props.tools === undefined || props.machine?.kind !== "mill")}>
-              <div data-testid="visualizer-tool-model">{t("cam.visualizer.activeTool")}: <span class="text-white">{cam.describeTool(currentToolModel() ?? props.defaultToolModel!)}</span></div>
+            <Show when={currentToolModel()}>{(model) => <div data-testid="visualizer-tool-model">{t("cam.visualizer.activeTool")}: <span class="text-white">{cam.describeTool(model())}</span></div>}</Show>
+            <Show when={currentOperationTool()}>{(tool) => <>
+              <Show when={(tool().operations?.length ?? 0) > 0}><div data-testid="visualizer-recognized-operation">{tool().operations?.map(operationLabel).join(" · ")}</div></Show>
+              <Show when={tool().source}>{(source) => <div data-testid="visualizer-tool-source">{t(`cam.visualizer.toolSource.${source()}`)}</div>}</Show>
+              <For each={tool().issues}>{(issue) => <div data-testid="visualizer-tool-issue" class={issue.severity === "error" ? "text-red-400" : "text-amber-300"}>{issue.message}</div>}</For>
+            </>}</Show>
+            <Show when={(props.operationTools ?? []).length === 0}>
               <For each={props.toolIssues ?? []}>{(issue) => <div data-testid="visualizer-tool-issue" class={issue.severity === "error" ? "text-red-400" : "text-amber-300"}>{issue.message}</div>}</For>
             </Show>
-            <For each={props.operationTools ?? []}>{(o) => (
-              <div data-testid="visualizer-operation-tool">
-                <div>{o.name}: <span class="text-white">{cam.describeTool(o.model)}</span></div>
-                <For each={o.issues}>{(issue) => <div data-testid="visualizer-tool-issue" class={issue.severity === "error" ? "text-red-400" : "text-amber-300"}>{issue.message}</div>}</For>
-              </div>
-            )}</For>
-            <For each={props.defaultToolModel !== undefined && props.tools === undefined ? [] : usedTools()}>{(c) => <div data-testid="visualizer-tool">{t("cam.visualizer.activeTool")}: <span class="text-white">{c.name} · Ø{c.diameter} · {c.fluteLength} mm flutes · {c.stickout} mm out{c.holder ? ` · holder Ø${c.holder.diameter}` : ""}</span></div>}</For>
           </div>
         </Show>
         <Show when={hasProgram()}>
-          <div class="absolute bottom-2 left-4 right-4 z-30">
+          <div class="toolpath-visualizer__transport">
+            <Show when={props.onPlayingChange}><SimulationMiniPlayer playing={props.playing} time={props.playbackTime} duration={timeline().duration} onPlayingChange={byPerson} onSeek={navigate} onRunAll={runAll} runningAll={runThrough()} /></Show>
             <SimulationTimeline
               duration={timeline().duration}
               seconds={props.playbackTime}
@@ -504,7 +502,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             />
           </div>
         </Show>
-        <div class={`absolute right-4 z-20 flex max-w-[55%] flex-col items-end gap-2 ${hasProgram() ? "bottom-16" : "bottom-4"}`} data-testid="visualizer-dock">
+        <div class="toolpath-visualizer__dock flex flex-col items-end gap-2" data-testid="visualizer-dock">
             <Show when={nc().length > 0}>
               <ol class="rounded-lg bg-black/65 px-2 py-1 font-mono text-[11px] leading-5 text-slate-300 backdrop-blur" data-testid="nc-strip" aria-label={t("cam.visualizer.ncStrip")}>
                 <For each={nc()}>{(row) => (
@@ -526,7 +524,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             {props.dock}
         </div>
         <Show when={operationsOpen() && hasProgram()}>
-          <aside class="absolute left-4 top-28 z-40 w-80 max-h-[calc(100%-11rem)] overflow-y-auto rounded-xl border border-slate-600 bg-slate-950/95 p-3 text-white shadow-2xl backdrop-blur" aria-label={t("cam.operations.title")} data-testid="operations-panel">
+          <aside class="toolpath-visualizer__panel toolpath-visualizer__operations" aria-label={t("cam.operations.title")} data-testid="operations-panel">
             <div class="mb-2 flex items-center justify-between">
               <h3 class="text-sm font-semibold">{t("cam.operations.title")}</h3>
               <button type="button" class="rounded p-1 hover:bg-white/10" aria-label={t("common.close")} onClick={() => setOperationsOpen(false)}><X size={16} /></button>
@@ -539,12 +537,12 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 return (
                   <li class={`flex items-center gap-2 rounded px-1.5 py-1 text-xs ${current() ? "bg-blue-600/30" : "hover:bg-white/5"}`} data-testid="operation-row">
                     <span class="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ background: colorHex(bandColors()[span.path] ?? 0x38bdf8) }} />
-                    <span class="flex-1 truncate" title={names()[span.path]}>{names()[span.path]}</span>
+                    <span class="flex-1 min-w-0" title={names()[span.path]}><span class="block truncate">{names()[span.path]}</span><span class="block text-[10px] text-slate-400" data-testid="operation-model">{(() => { const model = path !== undefined ? previewToolFor(path.toolId, props) : undefined; return model !== undefined ? cam.describeTool(model) : t("cam.visualizer.toolUnknown") })()}</span><span class="block text-[10px] text-blue-300">{props.operationTools?.find((tool) => tool.toolId === path?.toolId)?.operations?.map(operationLabel).join(" · ")}</span></span>
                     <span class="tabular-nums text-slate-400">{Math.round(span.end - span.start)} s</span>
                     <span class="text-slate-400" title={(() => { const m = path !== undefined ? props.toolModels?.get(path.toolId) : undefined; return m !== undefined ? cam.describeTool(m) : undefined })()} data-testid="operation-tool">{path?.toolId ?? ""}</span>
                     <button type="button" class="rounded p-0.5 hover:bg-white/10" aria-label={t("cam.operations.toggle")} aria-pressed={visible()} data-testid="operation-visible" onClick={() => toggleHidden(span.path)}>{visible() ? <Eye size={14} /> : <EyeOff size={14} />}</button>
                     <button type="button" class="rounded px-1 hover:bg-white/10" title={t("cam.operations.isolate")} data-testid="operation-isolate" onClick={() => isolate(span.path)}>{t("cam.operations.only")}</button>
-                    <button type="button" class="rounded p-0.5 hover:bg-white/10" aria-label={t("cam.operations.go")} data-testid="operation-go" onClick={() => { props.onPlayingChange?.(false); seekTo(span.start) }}><Play size={13} /></button>
+                    <button type="button" class="rounded p-0.5 hover:bg-white/10" aria-label={t("cam.operations.go")} data-testid="operation-go" onClick={() => navigate(span.start)}><Play size={13} /></button>
                   </li>
                 )
               }}</For>
@@ -555,14 +553,14 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           </aside>
         </Show>
         <Show when={settingsOpen()}>
-          <aside class="absolute right-14 top-16 z-40 w-64 max-h-[calc(100%-5rem)] overflow-y-auto rounded-xl border border-slate-600 bg-slate-950/95 p-3 text-white shadow-2xl backdrop-blur" aria-label={t("cam.visualizer.settings")}>
+          <aside class="toolpath-visualizer__panel toolpath-visualizer__settings" aria-label={t("cam.visualizer.settings")}>
             <div class="mb-3 flex items-center justify-between">
               <h3 class="text-sm font-semibold">{t("cam.visualizer.settings")}</h3>
               <button type="button" class="rounded p-1 hover:bg-white/10" aria-label={t("common.close")} onClick={() => setSettingsOpen(false)}><X size={16} /></button>
             </div>
-              {toggle(t("cam.visualizer.showDirection"), showDirection, setShowDirection)}
             <div class="space-y-3">
               {toggle(t("cam.visualizer.showStats"), showStats, setShowStats)}
+              {toggle(t("cam.visualizer.showDirection"), showDirection, setShowDirection)}
               <section class="space-y-2 border-t border-slate-700 pt-3">
                 <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.toolpathPoints")}</h4>
                 {toggle(t("cam.visualizer.showPoints"), showPoints, setShowPoints)}
@@ -656,6 +654,6 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           </aside>
         </Show>
       </div>
-    </Motion.div>
+    </div>
   )
 }

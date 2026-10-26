@@ -29,13 +29,13 @@ export function createTransformControls(options: UseTransformControlsOptions = {
   const selectedCount = () => selectedIds().length
   const canTransform = () => selectedCount() > 0 && !store.isTransforming && !cad.explodedView.enabled
 
-  const typing = (event: KeyboardEvent) => event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement
+  const typing = (event: KeyboardEvent) => event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLElement && event.target.isContentEditable
 
   onMount(() => {
     if (autoUpdateHandles && selectedCount() > 0) store.updateHandles()
     if (!enableKeyboardShortcuts) return
     const down = (event: KeyboardEvent) => {
-      if (typing(event)) return
+      if (event.defaultPrevented || typing(event) || event.metaKey || event.altKey || document.querySelector('[role="dialog"]')) return
       if (cad.explodedView.enabled) return
       const { ctrlKey, shiftKey } = event
       switch (event.key.toLowerCase()) {

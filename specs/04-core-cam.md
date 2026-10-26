@@ -1,5 +1,19 @@
 # WP2 — CAM and G-code core (`packages/core/src/cam`)
 
+## Operation-aware preview tooling (2026-10-26)
+
+Status: in progress. Owner extension: WP2 owns a pure `programTools` resolver for
+imported NC, its export and regression tests. Resolve every toolpath's actual tool
+number through the aligned motion track, including single-tool paths named `tool`.
+Explicit tool headers win; otherwise recognized drilling, tapping, boring and
+probing cycles select an assumed matching model. Turning uses the existing insert
+resolver. Unknown free-form cuts remain explicitly assumed; do not infer pocket
+versus contour or actual dimensions from insufficient motion evidence. Preserve a
+physical tool's identity across reuse and report conflicting operation/tool kinds.
+The result carries source, recognized operation keys and compatibility issues so
+WP6/WP7 can draw, replay and explain the same tool. No NC rewrite, API change or
+machine qualification is implied by preview recognition.
+
 Status: **done; targeted cycle/arc safety hardening verified** (IR, five operations, `generic`/`fanuc`/`grbl` posts with modal emission, reference interpreter, goldens and a regression test per legacy bug; `linuxcnc` and `haas` are reserved ids, not implemented). Owner dir: `packages/core/src/cam`. Depends on WP1 types (`Vec2`, `Vec3`, `Entity`, `tessellate`, `offsetPolyline`) — import them from `../cad/index.ts`; until WP1 lands, code against the interfaces in `03-core-cad.md`.
 
 ## Parametric machining continuation contract (2026-10-13)

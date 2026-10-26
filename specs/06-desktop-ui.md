@@ -1,5 +1,22 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## CAD/CAM refinement and operation tooling (2026-10-26)
+
+Status: in progress. Owner-requested refinement covers CADCanvas, CadPage, CamPage,
+ToolpathVisualizer and their shared viewport chrome, locale and regression checks.
+WP6/WP7 also own the tool-source adapters in the CAM page and viewport. Every
+operation must replay with its own configured cutter/model. Imported NC uses
+declared tool headers, then unambiguous cycle/probe evidence from the shared CAM
+resolver (WP2 contract in `04-core-cam.md`), then an explicitly assumed model.
+Do not substitute the current generator's tool into unrelated imported operations.
+Preserve explicit tools even when incompatible and report their operation issues.
+Drawing, stock removal, collision checks and active-tool readout must agree.
+Manual simulation navigation cancels automatic resumption; timeline seeking works
+with pointer and keyboard. Overlay controls must fit the available stage without
+overlapping the shared viewport controls. Late loads/parses cannot replace newer
+editor work. Verify targeted geometry/DOM regressions, typecheck and production build,
+plus rendered views where computer access is available. No API contracts change.
+
 ## Native desktop boundary (2026-10-25)
 
 [Spec 56](56-native-shell-integration.md) authorizes frontend OS-file routing, sidecar transport port following, shared native

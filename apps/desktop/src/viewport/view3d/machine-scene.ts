@@ -302,7 +302,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     marker.name = "spindle-marker"
     spinning.add(marker)
   } else if (setup.kind === "3dprinter") {
-    tool = toolObjectOf(setup.tool)
+    tool = toolObjectOf(modelOfPath(timeline.moves[0]?.path)!)
     tool.visible = true
     deposits = v.printerDeposits(timeline, setup.layerHeight)
     const positions = new Float32Array(deposits.beads.length * 6)
@@ -359,7 +359,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   const update = (seconds: number): boolean => {
     let changed = updateTurned(seconds)
     const pose = v.poseAt(timeline, seconds)
-    const model = setup.kind === "lathe" ? modelOfPath(pose.move?.path) : undefined
+    const model = setup.kind !== "mill" ? modelOfPath(pose.move?.path) : undefined
     if (tool && model !== undefined) {
       const next = toolObjectOf(model)
       if (next !== tool) { next.position.copy(tool.position); tool.visible = false; tool = next; changed = true }

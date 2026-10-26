@@ -9,7 +9,6 @@
  */
 import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
-import { Motion } from "solid-motionone"
 import { WorkspaceInspector } from "../../../shared/components/panel/inspector.tsx"
 import { Box, ShieldCheck, Wrench } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
@@ -21,7 +20,7 @@ import { useElementsStore } from "../../cad/store/elementsStore.ts"
 import { kernelStockOf, stockOf } from "../lib/job.ts"
 import { operationToolsOf, previewSetup, previewToolModel, resolveMachineKind } from "../lib/machine-view.ts"
 import CamStatusBar from "../components/CamStatusBar.tsx"
-import { buildPlayback, colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
+import { colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
 import { makeToolpathGenerator } from "../api/generator.ts"
 import { combineOperationResults, useCamStore } from "../store/camStore.ts"
 import { useGeneratorStore, type LibraryTool } from "../store/generatorStore.ts"
@@ -50,7 +49,6 @@ import { useVerifyStore } from "../store/verifyStore.ts"
 import { mountCamHistory, useCamHistoryStore } from "../store/camHistoryStore.ts"
 import CamHistoryModal from "../components/CamHistoryModal.tsx"
 
-const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
 const PARSE_DELAY_MS = 400
 /** The rapid rate the CAM store's own estimates use (mm/min). */
 const RAPID_RATE_MM_PER_MIN = 5000
@@ -64,6 +62,8 @@ export default function CamPage(): JSX.Element {
   const app = useApp()
   const camStore = useCamStore()
   const gen = useGeneratorStore()
+  const previewSettings = () => gen.currentGCode !== "" && gen.currentGCode === camStore.gcode ? gen.generatedSettings ?? gen.settings : gen.settings
+  const previewLibraryTool = () => gen.currentGCode !== "" && gen.currentGCode === camStore.gcode && gen.generatedSettings !== undefined ? gen.generatedTool : gen.selectedLibraryTool
   const cadStore = useCADStore()
   const elementStore = useElementsStore()
   /** The kernel's cutters by toolpath id when the preview shows its program; the generator's tool otherwise. */
@@ -78,39 +78,36 @@ export default function CamPage(): JSX.Element {
   const inferredMachine = createMemo(() => cam.inferMachineKind(camStore.gcode))
   const machineChoice = createMemo(() => resolveMachineKind({
     override: camStore.machineOverride,
-    produced: kernelShown() ? { kind: "mill", source: "kernel" } : gen.currentGCode !== "" && gen.currentGCode === camStore.gcode ? { kind: gen.settings.machineType, source: "generator" } : undefined,
+    produced: kernelShown() ? { kind: "mill", source: "kernel" } : gen.currentGCode !== "" && gen.currentGCode === camStore.gcode ? { kind: previewSettings().machineType, source: "generator" } : undefined,
     inferred: inferredMachine(),
     setting: gen.settings.machineType
   }))
-  const toolModel = createMemo(() => previewToolModel(machineChoice().kind, gen.settings, gen.selectedLibraryTool as never))
+  const toolModel = createMemo(() => previewToolModel(machineChoice().kind, previewSettings(), previewLibraryTool()))
   // The generator's tool against its operation: only for the generator's own program on its own machine.
-  const toolIssues = createMemo(() => gen.currentGCode !== "" && gen.currentGCode === camStore.gcode && machineChoice().kind === gen.settings.machineType ? cam.settingsToolIssues(gen.settings, toolModel()) : [])
+  const toolIssues = createMemo(() => gen.currentGCode !== "" && gen.currentGCode === camStore.gcode && machineChoice().kind === previewSettings().machineType ? cam.settingsToolIssues(previewSettings(), toolModel()) : [])
   // The assistant's operations shown together: each one's own tool (spec 32 §4.2).
   const operationTools = createMemo(() => camStore.operationResults.length > 0 && combineOperationResults(camStore.operationResults).gcode === camStore.gcode
     ? operationToolsOf(camStore.operationResults)
     : [])
   // An imported program split at its tool changes (T1, T2…): each tool as its header comments describe it.
+  const importedTools = createMemo(() => {
+    if (kernelShown() || operationTools().length > 0 || gen.currentGCode !== "" && gen.currentGCode === camStore.gcode) return []
+    return [...cam.programTools(camStore.program, camStore.motion, camStore.gcode, machineChoice().kind).values()].map((tool) => ({
+      ...tool, name: camStore.program.toolpaths.find((path) => path.toolId === tool.toolId)?.name ?? tool.toolId
+    }))
+  })
   const headerModels = createMemo(() => {
-    const paths = camStore.program.toolpaths
+    if (importedTools().length > 0) return new Map(importedTools().map((tool) => [tool.toolId, tool.model]))
     const used = cam.viewer.turnMillAxesOf(camStore.program)
     if (machineChoice().kind === "lathe" && (used.milling || used.cPositioned)) return cam.viewer.turnMillToolModels(camStore.program, camStore.motion, camStore.gcode)
-    // A one-tool program keeps its toolpath `tool`: its tool is the T word the program selects, if the header names it.
-    if (paths.length === 1 && paths[0]!.toolId === "tool") {
-      const number = camStore.motion?.paths[0]?.runs.find((r) => r.tool !== undefined)?.tool
-      const own = number !== undefined ? cam.headerToolModels(camStore.gcode, machineChoice().kind).get(`T${number}`) : undefined
-      return own !== undefined ? new Map([["tool", own]]) : undefined
-    }
-    if (!paths.some((tp) => /^T\d+$/.test(tp.toolId))) return undefined
-    const header = cam.headerToolModels(camStore.gcode, machineChoice().kind)
-    // A lathe program's tools from its own words (threading, grooving, parting), unless its header names them.
-    return machineChoice().kind === "lathe" ? new Map([...cam.latheToolModels(camStore.program, camStore.motion, camStore.gcode), ...[...header].filter(([, m]) => m.family === "lathe")]) : header
+    return undefined
   })
   const operationToolModels = createMemo(() => operationTools().length > 0 ? new Map(operationTools().map((o) => [o.toolId, o.model])) : (headerModels()?.size ?? 0) > 0 ? headerModels() : undefined)
-  const previewMachine = createMemo(() => previewSetup(machineChoice().kind, gen.settings, previewStock(), {
+  const previewMachine = createMemo(() => previewSetup(machineChoice().kind, previewSettings(), previewStock(), {
     ...(kernelShown() ? { artifact: camStore.kernelArtifact, machineId: gen.kernelSettings.machine } : {}),
     program: camStore.program, gcode: camStore.gcode, tool: toolModel()
   }))
-  const previewDefaultTool = createMemo(() => machineChoice().kind === "mill" ? cam.kernel.settingsCutter(gen.settings) : undefined)
+  const previewDefaultTool = createMemo(() => machineChoice().kind === "mill" ? cam.kernel.settingsCutter(previewSettings()) : undefined)
   /** What the program sheet says about the program: the machine, its toolpaths and their moves. */
   const sheetSummary = createMemo(() => {
     const paths = camStore.program.toolpaths
@@ -137,6 +134,12 @@ export default function CamPage(): JSX.Element {
   const [showHistory, setShowHistory] = createSignal(false)
   const [saveRequest, setSaveRequest] = createSignal<{ readonly code: string; readonly extension: string; readonly projectOnly: boolean }>()
   let ribbonFilePicker: HTMLInputElement | undefined
+  let parseVersion = 0
+  let manualParse: AbortController | undefined
+  let automaticParse: AbortController | undefined
+  let parseTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => { parseVersion++; manualParse?.abort() })
+  createEffect(on(() => [gcode(), selectedPostProcessor()] as const, () => setProcessedGcode(""), { defer: true }))
 
   const setGcode = (next: string): void => {
     setGcodeSignal(next)
@@ -180,25 +183,31 @@ export default function CamPage(): JSX.Element {
 
   // Preview and Toolpath play a program; for any G-code text (imported, edited, generated) the sidecar parses it.
   createEffect(on(gcode, (text) => {
-    if (text.trim().length === 0) return
+    const version = ++parseVersion
+    manualParse?.abort()
+    camStore.setPlaying(false)
+    camStore.setPlaybackTime(0)
+    if (text.trim().length === 0) { camStore.setProgram({ ...camStore.program, toolpaths: [] }); return }
     // The text the store composed from the assistant's operations already has its program (every operation's toolpaths,
     // one colour per tool): parsing the concatenated programs back would collapse them into one.
     if (camStore.operationResults.length > 0 && text === combineOperationResults(camStore.operationResults).gcode) return
     // The kernel returned this exact program with named operations/tool changes; reparsing would discard that structure.
     if (camStore.kernelArtifact?.nc === text) return
     const controller = new AbortController()
+    automaticParse = controller
     const owner = captureEditorOwner()
     const timer = setTimeout(() => {
       void app.runtime.run(generator.parse(text), { signal: controller.signal }).then(
-        (parsed) => { if (!controller.signal.aborted && owner.current() && camStore.gcode === text) camStore.setProgram(parsed.program, parsed.motion) },
-        () => undefined
+        (parsed) => { if (!controller.signal.aborted && version === parseVersion && owner.current() && camStore.gcode === text) camStore.setProgram(parsed.program, parsed.motion) },
+        () => { if (!controller.signal.aborted && version === parseVersion && owner.current() && camStore.gcode === text) camStore.setProgram({ ...camStore.program, toolpaths: [] }) }
       )
     }, PARSE_DELAY_MS)
+    parseTimer = timer
     onCleanup(() => { clearTimeout(timer); controller.abort() })
   }, { defer: true }))
 
   // The same start as the preview, so the clock stops where the drawn program ends.
-  const duration = createMemo(() => buildPlayback(camStore.program, 5000, 0.1, cam.viewer.programStart(machineChoice().kind, camStore.program)).duration)
+  const duration = createMemo(() => cam.viewer.buildTimeline(camStore.program, camStore.motion, RAPID_RATE_MM_PER_MIN, cam.viewer.programStart(machineChoice().kind, camStore.program)).duration)
   // Leaving the page stops the simulation clock.
   onCleanup(() => camStore.setPlaying(false))
 
@@ -299,13 +308,22 @@ export default function CamPage(): JSX.Element {
 
   // "Process G-Code": re-parse the edited text so the views and the statistics match it.
   const processGCode = (): void => {
-    void app.runtime.run(generator.parse(gcode())).then(
+    const text = gcode(), owner = captureEditorOwner(), version = ++parseVersion
+    manualParse?.abort()
+    automaticParse?.abort()
+    clearTimeout(parseTimer)
+    const controller = new AbortController()
+    manualParse = controller
+    const current = () => !controller.signal.aborted && version === parseVersion && owner.current() && camStore.gcode === text
+    void app.runtime.run(generator.parse(text), { signal: controller.signal }).then(
       (parsed) => {
+        if (!current()) return
+        camStore.setPlaying(false); camStore.setPlaybackTime(0)
         camStore.setProgram(parsed.program as never, parsed.motion)
         for (const warning of parsed.warnings) toast(warning)
         toast.success(t("cam.toast.parsed", { count: parsed.program.toolpaths.length }))
       },
-      (cause) => toast.error(cause instanceof Error ? cause.message : String(cause))
+      (cause) => { if (current()) toast.error(cause instanceof Error ? cause.message : String(cause)) }
     )
   }
 
@@ -335,16 +353,11 @@ export default function CamPage(): JSX.Element {
 
 
   return (
-    <Motion.div
+    <div
       class="cam-workspace h-full w-full flex flex-col overflow-hidden"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
     >
-      <Motion.div
+      <div
         class="cam-workspace__frame flex flex-col h-full w-full"
-        {...rise}
-        transition={{ duration: 0.8, delay: 0.2 }}
       >
         <CamToolbar
           canSave={(camStore.activeTab === "post" ? processedGcode() : gcode()).length > 0}
@@ -391,10 +404,8 @@ export default function CamPage(): JSX.Element {
           }}
         />
 
-        <Motion.div
+        <div
           class="cam-workspace__body flex flex-1 overflow-hidden w-full"
-          {...rise}
-          transition={{ duration: 0.6, delay: 1 }}
         >
           <CamSidebar
             activeTab={sidebarTab()}
@@ -408,10 +419,8 @@ export default function CamPage(): JSX.Element {
             onGCodeGenerated={setGcode}
           />
 
-          <Motion.div
+          <div
             class="cam-workspace__stage flex-1 min-w-0 relative overflow-hidden rounded-2xl mx-2"
-            {...rise}
-            transition={{ duration: 0.8, delay: 1.2 }}
           >
             <Show when={camStore.activeTab === "editor"}>
               <div class="h-full">
@@ -420,7 +429,19 @@ export default function CamPage(): JSX.Element {
             </Show>
             <Show when={camStore.activeTab === "toolpath"}>
               <div class="h-full rounded-xl">
-                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} dock={<TitleBlockOverlay mode="3d" cam />}playbackDuration={duration()} onPlayingChange={camStore.setPlaying} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} machine={previewMachine()} defaultToolModel={toolModel()} toolIssues={toolIssues()} operationTools={operationTools()} {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})} {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})} machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} gcode={camStore.gcode} />
+                <ToolpathVisualizer
+                  stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece}
+                  playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1}
+                  playbackDuration={duration()} onPlayingChange={camStore.setPlaying} onPlaybackTimeChange={camStore.setPlaybackTime}
+                  dock={<TitleBlockOverlay mode="3d" cam />}
+                  {...(previewTools() !== undefined ? { tools: previewTools()! } : {})}
+                  {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})}
+                  machine={previewMachine()} defaultToolModel={toolModel()} toolIssues={toolIssues()}
+                  operationTools={operationTools().length > 0 ? operationTools() : importedTools()}
+                  {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})}
+                  {...(camStore.motion !== undefined ? { motion: camStore.motion } : {})}
+                  machineChoice={machineChoice()} onMachineOverride={camStore.setMachineOverride} gcode={camStore.gcode}
+                />
               </div>
             </Show>
             <Show when={camStore.activeTab === "post"}>
@@ -432,7 +453,7 @@ export default function CamPage(): JSX.Element {
                 onProcessedGcode={setProcessedGcode}
               />
             </Show>
-          </Motion.div>
+          </div>
 
           <WorkspaceInspector class="cam-workspace__inspector" open={camStore.rightOpen}
             active={camStore.rightTab === "control" ? "generator" : camStore.rightTab}
@@ -458,18 +479,18 @@ export default function CamPage(): JSX.Element {
                 </Show>
               </div>
           </WorkspaceInspector>
-        </Motion.div>
+        </div>
 
-        <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 1.6 }}>
+        <div>
           <CamStatusBar />
-        </Motion.div>
-      </Motion.div>
+        </div>
+      </div>
 
       <ToolLibraryModal isOpen={showLibrary()} onClose={() => setShowLibrary(false)} />
       <CostsModal isOpen={showCosts()} onClose={() => setShowCosts(false)} />
       <CamHistoryModal open={showHistory()} onClose={() => setShowHistory(false)} />
       <Show when={saveRequest()}>{(request) => <SaveCamModal code={request().code} extension={request().extension} projectOnly={request().projectOnly} onClose={() => setSaveRequest(undefined)} />}</Show>
-    </Motion.div>
+    </div>
   )
 }
 

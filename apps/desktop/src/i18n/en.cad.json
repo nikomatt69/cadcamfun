@@ -1,4 +1,5 @@
 {
+  "cad.viewport.transforms": "Selection transforms and boolean operations",
   "cad.saveProject": "Save Project",
   "cad.importProject": "Import Project",
   "cad.exportProject": "Export Project",

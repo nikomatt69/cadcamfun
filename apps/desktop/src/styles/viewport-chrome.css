@@ -1,4 +1,37 @@
 /* One footer owns the bottom-right corner, including the page's assistant action. */
+.cad-viewport-top { position: absolute; inset: 8px 8px 100px; z-index: 10; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; pointer-events: none; }
+.cad-viewport-top > * { min-width: 0; pointer-events: auto; max-height: 100%; overflow: auto; }
+.cad-viewport-selection { width: min(190px, 40%); flex-shrink: 0; }
+.cad-viewport-tools { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; width: min(340px, 58%); }
+.cad-viewport-actions, .cad-viewport-transforms { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--panel-border, #475569); border-radius: 5px; background: var(--panel-bg, #1b232c); color: var(--panel-text, #e2e8f0); }
+.cad-viewport-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 28px; padding: 4px 7px; border: 0; border-radius: 4px; background: transparent; color: inherit; font-size: 11px; white-space: nowrap; }
+.cad-viewport-button[aria-pressed="true"] { background: var(--panel-accent, #2563eb); color: #fff; }
+.cad-viewport-button:disabled { opacity: .4; cursor: not-allowed; }
+.cad-viewport-button:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.cad-viewport-popover { width: 100%; min-width: 0; overflow: auto; border: 1px solid var(--panel-border, #475569); border-radius: 5px; background: var(--panel-bg, #1b232c); color: var(--panel-text, #e2e8f0); }
+@media (hover: hover) and (pointer: fine) { .cad-viewport-button:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--panel-accent-soft, #334155); } }
+.toolpath-visualizer { min-height: 0; container-type: inline-size; }
+.toolpath-visualizer__stage { min-height: 0; display: grid; grid-template: auto auto minmax(0, 1fr) auto / minmax(0, 1fr); color: #e2e8f0; }
+.toolpath-visualizer__stage > .vp3-root { grid-area: 3 / 1; min-height: 0; }
+.toolpath-visualizer__empty { grid-area: 3 / 1; }
+.toolpath-visualizer__stats { grid-area: 3 / 1; align-self: end; justify-self: start; z-index: 3; max-width: 44%; max-height: calc(100% - 110px); overflow: auto; margin: 8px; overflow-wrap: anywhere; }
+.toolpath-visualizer__actions { grid-area: 1 / 1; padding: 8px; gap: 8px; background: #17202c; border-bottom: 1px solid #35414d; }
+.toolpath-visualizer__actions > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.toolpath-visualizer__machine { grid-area: 2 / 1; min-width: 0; padding: 6px 8px; background: #17202c; font-size: 11px; }
+.toolpath-visualizer__transport { grid-area: 4 / 1; z-index: 30; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: #17202c; border-top: 1px solid #35414d; }
+.toolpath-visualizer__transport .cam-mini-player { width: 100%; box-sizing: border-box; }
+.toolpath-visualizer__transport [data-testid="simulation-timeline"] { flex-wrap: wrap; gap: 4px; background: transparent; padding: 0; backdrop-filter: none; }
+.simulation-timeline__track { min-width: 64px; touch-action: none; }
+.toolpath-visualizer__dock { grid-area: 3 / 1; z-index: 3; align-self: end; justify-self: end; min-width: 0; max-width: 48%; max-height: calc(100% - 110px); overflow: auto; padding: 8px; pointer-events: none; }
+.toolpath-visualizer__dock > * { min-width: 0; max-width: 100%; pointer-events: auto; flex-shrink: 0; }
+.toolpath-visualizer__panel { grid-area: 3 / 1; align-self: start; z-index: 40; width: min(320px, calc(100% - 16px)); max-height: calc(100% - 100px); overflow: auto; margin: 90px 8px 8px; padding: 12px; border: 1px solid #475569; border-radius: 6px; background: #111b2a; color: #f1f5f9; box-shadow: 0 8px 24px #0005; }
+.toolpath-visualizer__settings { justify-self: end; }
+.toolpath-visualizer button:focus-visible, .toolpath-visualizer select:focus-visible, .toolpath-visualizer [role="slider"]:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+@container (max-width: 500px) {
+  .simulation-timeline__track { order: -1; flex-basis: 100%; }
+  .toolpath-visualizer__transport [data-testid="simulation-timeline"] > output { margin-left: auto; }
+  .toolpath-visualizer__dock { max-width: 55%; }
+}
 .cad-viewport-footer { position: absolute; right: 12px; bottom: 12px; z-index: 10; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: calc(100% - 72px); pointer-events: none; }
 .cad-viewport-footer > * { pointer-events: auto; max-width: 100%; }
 .cad-viewport-footer__section { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
