@@ -57,7 +57,7 @@ export interface UIState {
   startAssistantConversation: (projectId: string) => void
   setAssistantDraft: (draft: AssistantDraft) => void
   clearAssistantDraft: () => void
-  openAssistantConversation: (projectId: string, sessionId: string) => void
+  openAssistantConversation: (projectId: string, sessionId: string | null) => void
   setOfflineQueue: (count: number) => void
   setUnreadCount: (count: number) => void
   showToast: (message: string, kind?: "info" | "success" | "error") => void
@@ -73,7 +73,8 @@ export interface AssistantDraft {
 
 export interface AssistantOpened {
   readonly projectId: string
-  readonly sessionId: string
+  /** `null` starts a fresh conversation instead of opening a stored one. */
+  readonly sessionId: string | null
   /** Changes on every open, so opening the same conversation twice still reloads it. */
   readonly token: number
 }

@@ -59,3 +59,19 @@ export const sectionConversations = <T extends ConversationLike>(items: readonly
   }
   return order.flatMap((title) => buckets.has(title) ? [{ title, data: buckets.get(title)! }] : [])
 }
+
+export type ConversationFilter = "all" | "running" | "week"
+
+/** The filter sheet's choices, in nikcli's order: everything first, then the narrower views. */
+export const CONVERSATION_FILTERS: ReadonlyArray<{ id: ConversationFilter; label: string; description: string }> = [
+  { id: "all", label: "All conversations", description: "Everything on this project" },
+  { id: "running", label: "Running", description: "The assistant is working on these" },
+  { id: "week", label: "Last 7 days", description: "Active this week" },
+]
+
+export const matchesConversationFilter = (item: ConversationLike, filter: ConversationFilter, now: number = Date.now()): boolean => {
+  if (filter === "all") return true
+  if (filter === "running") return item.busy
+  const time = conversationTime(item)
+  return time > 0 && time >= startOfDay(now) - 6 * DAY
+}

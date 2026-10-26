@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { conversationTime, dayBucket, filterConversations, sectionConversations, sortConversations, type ConversationLike } from "../lib/conversation-list"
+import { CONVERSATION_FILTERS, conversationTime, dayBucket, matchesConversationFilter, filterConversations, sectionConversations, sortConversations, type ConversationLike } from "../lib/conversation-list"
 
 const NOW = new Date(2026, 9, 26, 15, 0, 0).getTime()
 const at = (daysAgo: number, hour = 9) => new Date(2026, 9, 26 - daysAgo, hour, 0, 0).toISOString()
@@ -37,4 +37,13 @@ test("sections list running conversations first, then by day, and drop empty gro
     ["Running", ["e"]], ["Today", ["b", "a"]], ["Yesterday", ["c"]], ["Earlier", ["d"]],
   ])
   expect(sectionConversations([], NOW)).toEqual([])
+})
+
+test("the filters keep running conversations or this week's, and 'all' keeps everything", () => {
+  const list = [item("run", "Run", at(30), true), item("new", "New", at(2)), item("old", "Old", at(9)), item("none", "None", null)]
+  const keep = (filter: "all" | "running" | "week") => list.filter((entry) => matchesConversationFilter(entry, filter, NOW)).map((entry) => entry.id)
+  expect(keep("all")).toEqual(["run", "new", "old", "none"])
+  expect(keep("running")).toEqual(["run"])
+  expect(keep("week")).toEqual(["new"])
+  expect(CONVERSATION_FILTERS.map((entry) => entry.id)).toEqual(["all", "running", "week"])
 })

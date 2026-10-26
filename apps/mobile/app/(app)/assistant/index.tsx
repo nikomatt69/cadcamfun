@@ -258,7 +258,7 @@ export default function AssistantScreen() {
    */
   const opened = useUIStore((state) => state.assistantOpened)
   useEffect(() => {
-    if (!client || !opened || opened.projectId !== projectId) return
+    if (!client || !opened || opened.projectId !== projectId || opened.sessionId === null) return
     const sessionId = opened.sessionId
     const version = generation.current
     let cancelled = false
@@ -583,6 +583,14 @@ export default function AssistantScreen() {
     pendingStop.current = false
     haptic("selection")
   }
+
+  // "New" in the conversation list asks for a fresh conversation; each request is taken once.
+  const handledNewToken = useRef(0)
+  useEffect(() => {
+    if (!opened || opened.sessionId !== null || opened.projectId !== projectId || opened.token === handledNewToken.current) return
+    handledNewToken.current = opened.token
+    newConversation()
+  }, [opened, projectId])
 
   const aiReady = ai?.configured ?? false
 

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react"
-import { RefreshControl, SectionList, Text, View, type ListRenderItemInfo } from "react-native"
+import { KeyboardAvoidingView, Platform, RefreshControl, SectionList, Text, View, type ListRenderItemInfo } from "react-native"
+import { SafeAreaView } from "react-native-screens/experimental"
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated"
 import { Stack, useRouter } from "expo-router"
-import { CloudOff, MessageSquare, Search } from "lucide-react-native"
+import { ArrowRight, Check, ChevronLeft, CloudOff, Funnel, MessageSquare, Search, Square } from "lucide-react-native"
 import type { AiSessionSummary } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
@@ -12,7 +13,7 @@ import { accountStore } from "@/lib/account"
 import { usePrefersReducedMotion } from "@/lib/animation"
 import { relativeTime } from "@/lib/format"
 import { sessionTitle } from "@/lib/session-history"
-import { SEARCH_THRESHOLD, conversationTime, filterConversations, sectionConversations } from "@/lib/conversation-list"
+import { CONVERSATION_FILTERS, conversationTime, filterConversations, matchesConversationFilter, sectionConversations, type ConversationFilter } from "@/lib/conversation-list"
 import { type } from "@/lib/typography"
 import { haptic } from "@/lib/haptics"
 import { PressableScale } from "@/components/ui/PressableScale"
@@ -20,15 +21,24 @@ import { EmptyState } from "@/components/ui/EmptyState"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { Skeleton } from "@/components/ui/Skeleton"
-import { TextField } from "@/components/ui/TextField"
+import { IconCircleButton } from "@/components/ui/IconCircleButton"
+import { ListRow } from "@/components/ui/ListRow"
+import { BottomSheet } from "@/components/ui/BottomSheet"
+import { SearchDock } from "@/components/ui/SearchDock"
+import { toast } from "@/components/ui/ToastHost"
+import { CenteredScreenHeader } from "@/components/layout/CenteredScreenHeader"
 import { useContentLayout } from "@/components/layout/use-content-layout"
+import { DividedRows } from "@/components/chat/sheet-parts"
 
 type Conversation = AiSessionSummary
 
+/** iOS cannot present a modal over one that is still dismissing; the next one waits for it. */
+const AFTER_DISMISS_MS = 350
+
 /**
- * The conversations of the current project, newest first, after nikcli's session list: flat rows on the
- * page (a glyph, the title, one quiet meta line) under day headings, with search once there is enough to
- * search through.
+ * The conversations of the current project, laid out like nikcli's sessions index: a centred header with a
+ * back control and a filter, flat rows under day headings, and one dock at the foot — a glass search field
+ * beside the primary action, "New".
  *
  * The phone keeps only the *last* session id per project, so without this screen a conversation that
  * started on the desktop (or before the phone was closed) could not be reopened at all. The list is the
@@ -45,6 +55,9 @@ export default function ConversationsScreen() {
   const setAssistantSession = useUIStore((state) => state.setAssistantSession)
   const openAssistantConversation = useUIStore((state) => state.openAssistantConversation)
   const [query, setQuery] = useState("")
+  const [filter, setFilter] = useState<ConversationFilter>("all")
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [actionsFor, setActionsFor] = useState<Conversation | null>(null)
 
   const resource = useResource(
     useCallback(
@@ -58,11 +71,11 @@ export default function ConversationsScreen() {
   )
 
   const all = resource.data
-  const searchable = (all?.length ?? 0) >= SEARCH_THRESHOLD || query.length > 0
-  const sections = useMemo(
-    () => sectionConversations(filterConversations(all ?? [], query, (item) => sessionTitle(item))),
-    [all, query],
-  )
+  const sections = useMemo(() => {
+    const now = Date.now()
+    const kept = (all ?? []).filter((item) => matchesConversationFilter(item, filter, now))
+    return sectionConversations(filterConversations(kept, query, (item) => sessionTitle(item)), now)
+  }, [all, filter, query])
   const initialLoading = resource.loading && all === undefined
   const failed = resource.error !== undefined && (all === undefined || all.length === 0)
 
@@ -74,14 +87,54 @@ export default function ConversationsScreen() {
     router.back()
   }
 
+  const startNew = () => {
+    if (!projectId) return
+    haptic("selection")
+    openAssistantConversation(projectId, null)
+    router.back()
+  }
+
+  /** Stops a running conversation on the desktop without opening it. */
+  const stop = (item: Conversation) => {
+    if (!client) return
+    setActionsFor(null)
+    void client.abortChat(item.id).then(() => { haptic("success"); void resource.reload() }).catch((error: unknown) => {
+      toast(error instanceof Error ? error.message : "Could not stop the conversation", "error")
+    })
+  }
+
+  const header = (
+    <View style={{ paddingHorizontal: gutter, paddingTop: 8, paddingBottom: 4 }}>
+      <CenteredScreenHeader
+        title="Conversations"
+        left={
+          <IconCircleButton accessibilityLabel="Back to the assistant" onPress={() => { haptic("selection"); router.back() }}>
+            <ChevronLeft size={21} color={palette.ink} strokeWidth={2.2} />
+          </IconCircleButton>
+        }
+        right={projectId ? (
+          <IconCircleButton
+            tone="warm"
+            accessibilityLabel={filter === "all" ? "Filter conversations" : `Filter conversations, ${CONVERSATION_FILTERS.find((item) => item.id === filter)?.label}`}
+            accessibilityHint="Shows running conversations or this week's"
+            onPress={() => { haptic("selection"); setFilterOpen(true) }}
+          >
+            <Funnel size={18} color={palette.ink} strokeWidth={2.2} fill={filter === "all" ? "none" : palette.ink} />
+          </IconCircleButton>
+        ) : undefined}
+      />
+    </View>
+  )
+
   if (!projectId) {
     return (
-      <>
-        <Stack.Screen options={{ title: "Conversations" }} />
+      <SafeAreaView edges={{ top: true, bottom: true, left: true, right: true }} style={{ flex: 1, backgroundColor: palette.background }}>
+        <Stack.Screen options={{ headerShown: false }} />
+        {header}
         <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: gutter }}>
           <EmptyState title="No project selected" description="Choose a project in the Assistant tab to see its conversations." icon={<MessageSquare size={25} color={palette.accent} />} />
         </View>
-      </>
+      </SafeAreaView>
     )
   }
 
@@ -92,46 +145,90 @@ export default function ConversationsScreen() {
     ) : query.trim() ? (
       <EmptyState title="No matches" description={`No conversation has “${query.trim()}” in its title.`} icon={<Search size={25} color={palette.muted} />}
         action={<ActionButton variant="secondary" label="Clear search" onPress={() => { haptic("selection"); setQuery("") }} />} />
+    ) : filter !== "all" ? (
+      <EmptyState title={`No ${CONVERSATION_FILTERS.find((item) => item.id === filter)?.label.toLowerCase() ?? "matching conversations"}`} description="Try another filter, or show everything in this project."
+        action={<ActionButton variant="secondary" label="Show all" onPress={() => { haptic("selection"); setFilter("all") }} />} />
     ) : (
-      <EmptyState title="No conversations yet" description="Start one in the Assistant tab and it will appear here." icon={<MessageSquare size={25} color={palette.accent} />}
-        action={<ActionButton label="Back to the assistant" onPress={() => router.back()} />} />
+      <EmptyState title="No conversations yet" description="Ask the assistant about this project and the conversation will appear here." icon={<MessageSquare size={25} color={palette.accent} />}
+        action={<ActionButton label="Start a conversation" onPress={startNew} />} />
     )
 
   return (
-    <>
-      <Stack.Screen options={{ title: "Conversations" }} />
-      <SectionList<Conversation, { title: string; data: Conversation[] }>
-        onLayout={onLayout}
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        extraData={currentSession}
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 8, paddingBottom: 32 }}
-        refreshControl={<RefreshControl refreshing={resource.loading && all !== undefined} onRefresh={() => void resource.reload()} tintColor={palette.accent} />}
-        ListHeaderComponent={searchable || (resource.error && !failed) || resource.stale ? (
-          <View style={{ gap: 12, paddingBottom: 4 }}>
-            {searchable ? <TextField value={query} onChangeText={setQuery} placeholder="Search conversations" autoCapitalize="none" autoCorrect={false} returnKeyType="search" /> : null}
-            {resource.error && !failed ? <ErrorBanner message={resource.stale ? "The desktop is out of reach. Showing the copy saved on this phone." : resource.error} actionLabel="Try again" onAction={() => void resource.reload()} /> : null}
-          </View>
+    <SafeAreaView edges={{ top: true, bottom: true, left: true, right: true }} style={{ flex: 1, backgroundColor: palette.background }}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        {header}
+        <SectionList<Conversation, { title: string; data: Conversation[] }>
+          onLayout={onLayout}
+          style={{ flex: 1 }}
+          sections={sections}
+          keyExtractor={(item) => item.id}
+          extraData={{ currentSession, filter }}
+          contentInsetAdjustmentBehavior="never"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          stickySectionHeadersEnabled={false}
+          contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 8, paddingBottom: 16, flexGrow: 1 }}
+          refreshControl={<RefreshControl refreshing={resource.loading && all !== undefined} onRefresh={() => void resource.reload()} tintColor={palette.muted} />}
+          ListHeaderComponent={(resource.error && !failed) || resource.stale ? (
+            <View style={{ paddingBottom: 4 }}>
+              <ErrorBanner message={resource.stale ? "The desktop is out of reach. Showing the copy saved on this phone." : resource.error ?? ""} actionLabel="Try again" onAction={() => void resource.reload()} />
+            </View>
+          ) : null}
+          ListEmptyComponent={empty}
+          renderSectionHeader={({ section }) => (
+            <Text accessibilityRole="header" style={{ color: palette.muted, paddingTop: 16, paddingBottom: 8, ...type(15, { weight: "500" }) }}>{section.title}</Text>
+          )}
+          ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 32, backgroundColor: hexToRgba(palette.ink, 0.06) }} />}
+          renderItem={({ item }: ListRenderItemInfo<Conversation>) => (
+            <ConversationRow item={item} current={item.id === currentSession} wrap={fontScale > 1.3} onPress={() => open(item.id)} onActions={() => { haptic("selection"); setActionsFor(item) }} />
+          )}
+        />
+        <SearchDock gutter={gutter} actionLabel="New" onAction={startNew} value={query} onChangeText={setQuery} placeholder="Search conversations" />
+      </KeyboardAvoidingView>
+
+      <BottomSheet open={filterOpen} onClose={() => setFilterOpen(false)} title="Filter" padded>
+        <DividedRows>
+          {CONVERSATION_FILTERS.map((item) => (
+            <ListRow
+              key={item.id}
+              title={item.label}
+              subtitle={item.description}
+              selected={item.id === filter}
+              showChevron={false}
+              trailing={item.id === filter ? <Check size={18} color={palette.ink} strokeWidth={2.4} /> : undefined}
+              onPress={() => { if (item.id !== filter) haptic("selection"); setFilter(item.id); setFilterOpen(false) }}
+            />
+          ))}
+        </DividedRows>
+      </BottomSheet>
+
+      <BottomSheet open={actionsFor !== null} onClose={() => setActionsFor(null)} title={actionsFor ? sessionTitle(actionsFor) : "Conversation"} padded>
+        {actionsFor ? (
+          <DividedRows>
+            <ListRow
+              leading={<ArrowRight size={20} color={palette.soft} />}
+              title="Open conversation"
+              subtitle="Jump to the transcript"
+              onPress={() => { const target = actionsFor; setActionsFor(null); setTimeout(() => open(target.id), AFTER_DISMISS_MS) }}
+            />
+            <ListRow
+              leading={<Square size={20} color={actionsFor.busy ? palette.danger : palette.muted} />}
+              title="Stop the run"
+              subtitle={actionsFor.busy ? "End the desktop's current turn" : "Nothing is running here"}
+              disabled={!actionsFor.busy}
+              showChevron={false}
+              onPress={() => stop(actionsFor)}
+            />
+          </DividedRows>
         ) : null}
-        ListEmptyComponent={empty}
-        renderSectionHeader={({ section }) => (
-          <Text accessibilityRole="header" style={{ color: palette.muted, paddingTop: 16, paddingBottom: 8, ...type(15, { weight: "500" }) }}>{section.title}</Text>
-        )}
-        ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 32, backgroundColor: hexToRgba(palette.ink, 0.06) }} />}
-        renderItem={({ item }: ListRenderItemInfo<Conversation>) => (
-          <ConversationRow item={item} current={item.id === currentSession} wrap={fontScale > 1.3} onPress={() => open(item.id)} />
-        )}
-      />
-    </>
+      </BottomSheet>
+    </SafeAreaView>
   )
 }
 
 /** One conversation: glyph, title and a meta line ("Running · 3m ago"). Flat on the page, like nikcli's session rows. */
-function ConversationRow({ item, current, wrap, onPress }: { item: Conversation; current: boolean; wrap: boolean; onPress: () => void }) {
+function ConversationRow({ item, current, wrap, onPress, onActions }: { item: Conversation; current: boolean; wrap: boolean; onPress: () => void; onActions: () => void }) {
   const { palette } = useTheme()
   const title = sessionTitle(item)
   const time = conversationTime(item) > 0 ? relativeTime(item.updatedAt ?? item.createdAt ?? "") : undefined
@@ -140,11 +237,13 @@ function ConversationRow({ item, current, wrap, onPress }: { item: Conversation;
   return (
     <PressableScale
       onPress={onPress}
+      onLongPress={onActions}
+      delayLongPress={380}
       tint
       subtle
       accessibilityRole="button"
       accessibilityLabel={`${title}${meta ? `. ${meta}` : ""}`}
-      accessibilityHint="Opens this conversation"
+      accessibilityHint="Opens this conversation. Long press for actions."
       accessibilityState={{ selected: current }}
       style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44, paddingVertical: 13, paddingHorizontal: 4, borderRadius: 12, borderCurve: "continuous" }}
     >
