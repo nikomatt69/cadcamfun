@@ -94,14 +94,16 @@ export function applyHighlight(root: THREE.Object3D, state: HighlightState): voi
         emissiveIntensity: material.emissiveIntensity
       }) as { color?: number; emissive?: number; emissiveIntensity?: number }
       const tint = state === "selected" ? SELECTED_COLOR : state === "hover" ? HOVER_COLOR : undefined
-      const intensity = state === "selected" ? 0.5 : 0.3
+      // A hint of the tint, not a wash: the outline says what is selected, the part keeps the colour it was given.
+      const intensity = state === "selected" ? 0.16 : 0.1
       const lit = material.emissive !== undefined && !material.wireframe && !(object instanceof THREE.Line)
       if (tint === undefined) {
         if (base.color !== undefined) material.color?.setHex(base.color)
         if (base.emissive !== undefined) material.emissive?.setHex(base.emissive)
         if (base.emissiveIntensity !== undefined) material.emissiveIntensity = base.emissiveIntensity
       } else if (lit) {
-        material.emissive!.setHex(tint)
+        // The part's own colour glows a little: it brightens without changing hue; the outline carries the selection colour.
+        if (base.color !== undefined) material.emissive!.setHex(base.color); else material.emissive!.setHex(tint)
         material.emissiveIntensity = intensity
       } else if (material.color) material.color.setHex(tint)
     }
