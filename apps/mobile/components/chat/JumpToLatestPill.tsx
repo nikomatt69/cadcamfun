@@ -21,7 +21,7 @@ export function JumpToLatestPill({ visible, count, onPress }: { visible: boolean
         <PressableScale
           onPress={() => { haptic("selection"); onPress() }}
           accessibilityRole="button"
-          accessibilityLabel={count > 0 ? `Scroll to latest, ${count} new ${count === 1 ? "update" : "updates"}` : "Scroll to latest"}
+          accessibilityLabel={count > 0 ? `Scroll to latest messages, ${count} new ${count === 1 ? "update" : "updates"}` : "Scroll to latest messages"}
           hitSlop={8}
           dim
           style={{
@@ -29,21 +29,21 @@ export function JumpToLatestPill({ visible, count, onPress }: { visible: boolean
             flexDirection: "row",
             alignItems: "center",
             gap: 8,
-            paddingLeft: 16,
-            paddingRight: count > 0 ? 10 : 16,
-            borderRadius: 22,
+            paddingLeft: 14,
+            paddingRight: 16,
+            borderRadius: 16,
             borderCurve: "continuous",
-            backgroundColor: hexToRgba(palette.ink, 0.9),
+            backgroundColor: hexToRgba(palette.ink, 0.92),
             borderWidth: StyleSheet.hairlineWidth,
             borderColor: hexToRgba(palette.background, 0.14),
             boxShadow: `0 6px 16px ${hexToRgba(palette.overlay, 0.22)}`,
           }}
         >
           <ArrowDown size={14} color={palette.background} strokeWidth={2.6} />
-          <Text maxFontSizeMultiplier={1.6} style={{ color: palette.background, ...typeStyle(13, { weight: "600" }) }}>Latest</Text>
+          <Text numberOfLines={1} maxFontSizeMultiplier={1.4} style={{ color: palette.background, ...typeStyle(13, { weight: "600" }) }}>Latest messages</Text>
           {count > 0 ? (
-            <View style={{ minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, alignItems: "center", justifyContent: "center", backgroundColor: palette.background }}>
-              <Text maxFontSizeMultiplier={1.2} style={{ color: palette.ink, fontVariant: ["tabular-nums"], ...typeStyle(11, { weight: "800", leadingScale: 1 }) }}>{count > 99 ? "99+" : count}</Text>
+            <View style={{ minWidth: 22, height: 20, borderRadius: 999, paddingHorizontal: 6, alignItems: "center", justifyContent: "center", backgroundColor: palette.background }}>
+              <Text maxFontSizeMultiplier={1.2} style={{ color: palette.ink, fontVariant: ["tabular-nums"], ...typeStyle(11, { weight: "800", leadingScale: 0.88 }) }}>{count > 99 ? "99+" : count}</Text>
             </View>
           ) : null}
         </PressableScale>

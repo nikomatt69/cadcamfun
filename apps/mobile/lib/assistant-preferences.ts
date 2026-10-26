@@ -82,3 +82,37 @@ export const rememberedSelection = (model: AssistantModelOption, remembered: Rea
   const variant = remembered[model.key]
   return { provider: model.provider, model: model.model, ...(variant && model.variants.includes(variant) ? { variant } : {}) }
 }
+
+/** A context window as a short label: 8k, 128k, 1M. */
+export const formatContextWindow = (tokens: number): string => {
+  if (!Number.isFinite(tokens) || tokens <= 0) return ""
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
+  return tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(Math.round(tokens))
+}
+
+/** The facts a model row shows under its name, like nikcli's quiet badge line. Skips what the name already says. */
+export const modelFacts = (model: AssistantModelOption): readonly string[] => [
+  model.badge,
+  model.model !== model.name ? model.model : undefined,
+  model.contextWindow > 0 ? `${formatContextWindow(model.contextWindow)} context` : undefined,
+  model.tools ? "Tools" : "Chat only",
+  model.vision ? "Vision" : undefined,
+  model.variants.length > 0 ? `${model.variants.length} thinking ${model.variants.length === 1 ? "level" : "levels"}` : undefined,
+].filter((fact): fact is string => Boolean(fact))
+
+export interface AssistantModelGroup {
+  readonly provider: string
+  readonly providerName: string
+  readonly models: readonly AssistantModelOption[]
+}
+
+/** Models grouped under their provider in list order (the list is already sorted by provider). */
+export const groupAssistantModels = (models: readonly AssistantModelOption[]): readonly AssistantModelGroup[] => {
+  const groups: Array<{ provider: string; providerName: string; models: AssistantModelOption[] }> = []
+  for (const model of models) {
+    const last = groups[groups.length - 1]
+    if (last && last.provider === model.provider) last.models.push(model)
+    else groups.push({ provider: model.provider, providerName: model.providerName, models: [model] })
+  }
+  return groups
+}

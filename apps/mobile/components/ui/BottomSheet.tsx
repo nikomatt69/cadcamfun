@@ -1,5 +1,5 @@
-import type { PropsWithChildren, ReactNode } from "react"
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native"
+import { useEffect, useState, type PropsWithChildren, type ReactNode } from "react"
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { X } from "lucide-react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
@@ -37,12 +37,15 @@ export function BottomSheet({ open, onClose, title, children, dragEnabled = true
   const reduced = usePrefersReducedMotion()
   const content = useContentLayout()
   const { fontScale } = useWindowDimensions()
+  // The header gets a hairline only once content scrolls beneath it (nikcli's sheet header rule).
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => { if (!open) setScrolled(false) }, [open])
   return <Modal visible={open} presentationStyle="pageSheet" animationType={reduced ? "fade" : "slide"}
     allowSwipeDismissal={dragEnabled} onRequestClose={onClose}>
     <SafeAreaView accessibilityViewIsModal edges={["top", "bottom", "left", "right"]} style={{ flex: 1, backgroundColor: palette.background }}>
       <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden pointerEvents="none"
         style={{ alignSelf: "center", width: 36, height: 5, marginTop: 6, borderRadius: 3, backgroundColor: hexToRgba(palette.muted, 0.5) }} />
-      <View onLayout={content.onLayout} style={{ flexDirection: "row", alignItems: "center", minHeight: layout.touchTarget + 16, paddingHorizontal: content.gutter, paddingVertical: 8, gap: 12 }}>
+      <View onLayout={content.onLayout} style={{ flexDirection: "row", alignItems: "center", minHeight: layout.touchTarget + 16, paddingHorizontal: content.gutter, paddingVertical: 8, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: scrolled ? palette.border : "transparent" }}>
         <Text accessibilityRole="header" numberOfLines={fontScale > 1.3 ? undefined : 2} style={{ flex: 1, minWidth: 0, color: palette.ink, ...type(20, { weight: "700" }) }}>{title}</Text>
         <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close sheet"
           style={({ pressed }) => ({ width: layout.touchTarget, height: layout.touchTarget, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: layout.touchTarget / 2, borderCurve: "continuous", backgroundColor: pressed ? hexToRgba(palette.ink, 0.12) : palette.panel })}>
@@ -51,6 +54,7 @@ export function BottomSheet({ open, onClose, title, children, dragEnabled = true
       </View>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
+          scrollEventThrottle={32} onScroll={(event) => { const next = event.nativeEvent.contentOffset.y > 2; setScrolled((current) => current === next ? current : next) }}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: 32, width: "100%", maxWidth: layout.contentWidth + layout.gutter * 2, alignSelf: "center" }}>
           {padded ? <View style={{ paddingHorizontal: content.gutter, gap: 16 }}>{children}</View> : children}
         </ScrollView>

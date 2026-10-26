@@ -1,6 +1,6 @@
-import { memo, useState } from "react"
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native"
-import { Box, Check, CircleGauge, Copy, GitPullRequest, Route, Workflow, Wrench, X, type LucideIcon } from "lucide-react-native"
+import { memo, useMemo, useState } from "react"
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native"
+import { Box, Camera, Check, CircleGauge, Copy, FileCode2, Globe, GitPullRequest, Play, Route, Shield, SquareTerminal, Workflow, Wrench, X, type LucideIcon } from "lucide-react-native"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { PressableScale } from "@/components/ui/PressableScale"
@@ -8,24 +8,20 @@ import type { ChatRow } from "@/lib/chat-log"
 import { useCopiedFeedback } from "@/hooks/use-copied-feedback"
 import { layout } from "@/lib/layout"
 import { caps, mono, type as typeStyle } from "@/lib/typography"
+import { toolIdentity, type ToolIconKey } from "@/lib/tool-identity"
+import { clipText } from "@/lib/transcript-rows"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { DisclosureChevron, Reveal } from "./disclosure"
-import { ImageViewer } from "./image-preview"
+import { ImageThumb, ImageViewer } from "./image-preview"
 
 /**
  * A muted row showing the assistant working — vcs_start_change, cad_*, cam_* tool calls. Watching
  * the assistant act is the feedback loop (Apple §13 causality: the row appears at the causal
  * moment, and the tool that changed state is the one the user reads).
  */
-function toolIdentity(raw: string | undefined, label: string): { icon: LucideIcon; category: string; title: string } {
-  const value = (raw ?? label).toLowerCase()
-  const title = label.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
-  if (value.startsWith("cad_")) return { icon: Box, category: "CAD", title }
-  if (value.startsWith("cam_") || value.includes("toolpath") || value.includes("gcode")) return { icon: Route, category: "CAM", title }
-  if (value.startsWith("vcs_") || value.includes("pull_request")) return { icon: GitPullRequest, category: "VERSION CONTROL", title }
-  if (value.startsWith("actions_") || value.includes("workflow")) return { icon: Workflow, category: "ACTIONS", title }
-  if (value.includes("verify") || value.includes("analy")) return { icon: CircleGauge, category: "ANALYSIS", title }
-  return { icon: Wrench, category: "TOOL", title }
+export const TOOL_ICONS: Record<ToolIconKey, LucideIcon> = {
+  box: Box, route: Route, git: GitPullRequest, workflow: Workflow, gauge: CircleGauge, wrench: Wrench,
+  camera: Camera, code: FileCode2, play: Play, terminal: SquareTerminal, file: FileCode2, globe: Globe, shield: Shield,
 }
 
 function stringify(value: unknown): string {
@@ -43,18 +39,20 @@ function stringify(value: unknown): string {
  * seeing the part change is how the user follows a CAD turn from the phone. A tap opens a zoomable full-screen view.
  */
 export function ToolImages({ images, tool }: { images: readonly string[]; tool: string }) {
-  const { palette } = useTheme()
-  const [shown, setShown] = useState<string | null>(null)
+  const [shown, setShown] = useState<{ uri: string; title: string } | null>(null)
   const name = tool.replaceAll("_", " ")
+  const single = images.length === 1
   return <>
     <View style={{ flexDirection: "row", gap: 8 }}>
-      {images.map((uri, index) => <Pressable key={index} onPress={() => { haptic("selection"); setShown(uri) }}
-        accessibilityRole="imagebutton" accessibilityLabel={`Render from ${name}${images.length > 1 ? `, ${index + 1} of ${images.length}` : ""}`} accessibilityHint="Opens the image full screen"
-        style={({ pressed }) => ({ flex: 1, maxWidth: images.length === 1 ? 320 : undefined, aspectRatio: 4 / 3, borderRadius: 12, borderCurve: "continuous", overflow: "hidden", borderWidth: StyleSheet.hairlineWidth, borderColor: palette.border, backgroundColor: palette.panel, opacity: pressed ? 0.85 : 1 })}>
-        <Image source={{ uri }} resizeMode="cover" style={{ width: "100%", height: "100%" }} />
-      </Pressable>)}
+      {images.map((uri, index) => {
+        const title = single ? name : `${name} ${index + 1} of ${images.length}`
+        return <ImageThumb key={index} uri={uri} label={`Render from ${name}${single ? "" : `, ${index + 1} of ${images.length}`}`} expandGlyph
+          badge={single ? undefined : `${index + 1}/${images.length}`}
+          onPress={() => { haptic("selection"); setShown({ uri, title }) }}
+          style={{ flex: 1, maxWidth: single ? 320 : undefined, aspectRatio: 4 / 3 }} />
+      })}
     </View>
-    <ImageViewer uri={shown} title={name} onClose={() => setShown(null)} />
+    <ImageViewer uri={shown?.uri ?? null} title={shown?.title ?? ""} onClose={() => setShown(null)} />
   </>
 }
 
@@ -64,13 +62,24 @@ export function ToolImages({ images, tool }: { images: readonly string[]; tool: 
  */
 function CodeBlock({ text, color }: { text: string; color: string }) {
   const { palette, isDark } = useTheme()
+  const [all, setAll] = useState(false)
+  const clip = useMemo(() => clipText(text), [text])
   return (
-    <View style={{ borderRadius: 12, borderCurve: "continuous", backgroundColor: hexToRgba(palette.ink, isDark ? 0.07 : 0.045), maxHeight: 260, overflow: "hidden" }}>
-      <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 10 }}>
-        <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false}>
-          <Text selectable style={{ color, ...mono(12) }}>{text}</Text>
+    <View style={{ borderRadius: 12, borderCurve: "continuous", backgroundColor: hexToRgba(palette.ink, isDark ? 0.07 : 0.045), overflow: "hidden" }}>
+      <View style={{ maxHeight: 260 }}>
+        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 10 }}>
+          <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false}>
+            <Text selectable maxFontSizeMultiplier={1.6} style={{ color, ...mono(12) }}>{all ? text : clip.text}</Text>
+          </ScrollView>
         </ScrollView>
-      </ScrollView>
+      </View>
+      {clip.clipped ? (
+        <PressableScale subtle tint onPress={() => { haptic("selection"); setAll((value) => !value) }} accessibilityRole="button" accessibilityState={{ expanded: all }}
+          accessibilityLabel={all ? "Show less" : `Show all ${clip.total.toLocaleString("en")} characters`}
+          style={{ minHeight: layout.touchTarget, alignItems: "center", justifyContent: "center", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: hexToRgba(palette.ink, 0.09) }}>
+          <Text style={{ color: palette.accent, ...typeStyle(12, { weight: "600" }) }}>{all ? "Show less" : `Show all (${clip.total.toLocaleString("en")} characters)`}</Text>
+        </PressableScale>
+      ) : null}
     </View>
   )
 }
@@ -81,7 +90,7 @@ export const ToolCallRow = memo(function ToolCallRow({ row }: { row: Extract<Cha
   const { copied, error: copyError, copy } = useCopiedFeedback()
   const { fontScale } = useWindowDimensions()
   const identity = toolIdentity(row.rawTool, row.tool)
-  const Icon = identity.icon
+  const Icon = TOOL_ICONS[identity.icon]
   const hasDetails = row.input !== undefined || Boolean(row.output) || Boolean(row.diagnostic)
   const statusColor = row.ok === null ? palette.warning : row.ok ? palette.success : palette.danger
 

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { assistantModels, filterAssistantModels, formatVariantLabel, rememberedSelection, resolveAssistantPreferences, selectedAssistantModel, type AssistantProvider } from "../lib/assistant-preferences"
+import { assistantModels, filterAssistantModels, formatContextWindow, formatVariantLabel, groupAssistantModels, modelFacts, rememberedSelection, resolveAssistantPreferences, selectedAssistantModel, type AssistantProvider } from "../lib/assistant-preferences"
 
 const provider = (id: string, configured = true): AssistantProvider => ({ id, name: id, source: "config", auth: ["api"], configured, models: [
   { id: "family/model", name: "Model Pro", provider: id, contextWindow: 100_000, maxOutput: 4096, tools: true, vision: true, variants: ["low", "high"], cost: { input: 1, output: 2 } },
@@ -42,4 +42,19 @@ test("projects without their own settings follow the phone defaults; a project's
   expect(resolveAssistantPreferences({ agent: "machinist", permissionMode: "auto", includeContext: true }, { permissionMode: "ask", includeContext: false })).toEqual({ agent: "machinist", permissionMode: "auto", includeContext: true })
   // A corrupt stored default never becomes a permission mode the desktop does not know.
   expect(resolveAssistantPreferences(undefined, { permissionMode: "everything" as never }).permissionMode).toBe("approve")
+})
+
+test("the model picker groups models under their provider and describes each one with quiet facts", () => {
+  const models = assistantModels([provider("second"), provider("first")])
+  const groups = groupAssistantModels(models)
+  expect(groups.map((group) => [group.provider, group.models.length])).toEqual([["first", 1], ["second", 1]])
+  expect(groupAssistantModels([])).toEqual([])
+  expect(modelFacts(models[0]!)).toEqual(["Reasoning", "family/model", "100k context", "Tools", "Vision", "2 thinking levels"])
+  const plain = { ...models[0]!, name: "same", model: "same", badge: undefined, variants: [], contextWindow: 0, tools: false, vision: false }
+  expect(modelFacts(plain)).toEqual(["Chat only"])
+  expect(modelFacts({ ...plain, variants: ["low"] })).toEqual(["Chat only", "1 thinking level"])
+})
+
+test("context windows read as short labels", () => {
+  expect([0, 512, 8192, 128_000, 1_000_000, 1_048_576, 2_000_000, Number.NaN].map(formatContextWindow)).toEqual(["", "512", "8k", "128k", "1M", "1M", "2M", ""])
 })

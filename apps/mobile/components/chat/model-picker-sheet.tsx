@@ -1,22 +1,26 @@
 import { useMemo, useState } from "react"
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
-import { Brain, Check, Search } from "lucide-react-native"
+import { ScrollView, Text, View } from "react-native"
+import { Brain, Cpu, Search, Sparkles } from "lucide-react-native"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { TextField } from "@/components/ui/TextField"
-import { ListRow } from "@/components/ui/ListRow"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { Skeleton } from "@/components/ui/Skeleton"
-import { assistantModelKey, filterAssistantModels, formatVariantLabel, rememberedSelection, selectedAssistantModel, type AssistantModelOption, type AssistantModelSelection } from "@/lib/assistant-preferences"
+import { assistantModelKey, filterAssistantModels, formatVariantLabel, groupAssistantModels, modelFacts, rememberedSelection, selectedAssistantModel, type AssistantModelOption, type AssistantModelSelection } from "@/lib/assistant-preferences"
 import { useUIStore } from "@/lib/store"
-import { hexToRgba, useTheme } from "@/lib/theme"
-import { layout } from "@/lib/layout"
+import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
-import { caps, type as typeStyle } from "@/lib/typography"
+import { type as typeStyle } from "@/lib/typography"
 import { useContentLayout } from "@/components/layout/use-content-layout"
+import { ChoiceChip, ChoiceRow, DividedRows, SheetSection, SheetSummary, TILE_INSET, chipRowStyle } from "./sheet-parts"
 
+/**
+ * Model and thinking effort, after nikcli's ModelPickerSheet: what is chosen now, the effort chips for
+ * that model, search, the providers as filter chips and the models grouped under their provider.
+ * A model with thinking levels is picked in two steps, the model and then its effort.
+ */
 export function ModelPickerSheet({ open, onClose, models, selection, onSelect, loading, error, reload }: {
   open: boolean
   onClose(): void
@@ -32,57 +36,113 @@ export function ModelPickerSheet({ open, onClose, models, selection, onSelect, l
   const remembered = useUIStore((state) => state.assistantModelVariants)
   const [query, setQuery] = useState("")
   const [provider, setProvider] = useState<string | undefined>()
-  // A model with thinking levels is picked in two steps, like nikcli: the model, then its effort.
   const [draft, setDraft] = useState<AssistantModelSelection | undefined>()
   const current = draft ?? selection
   const selected = selectedAssistantModel(models, current)
   const providers = useMemo(() => [...new Map(models.map((model) => [model.provider, model.providerName])).entries()], [models])
-  const filtered = filterAssistantModels(models, query, provider)
-  const close = () => { setDraft(undefined); onClose() }
+  const groups = useMemo(() => groupAssistantModels(filterAssistantModels(models, query, provider)), [models, query, provider])
+  const matches = groups.reduce((total, group) => total + group.models.length, 0)
+  const filtering = query.trim().length > 0 || provider !== undefined
+  const pad = { paddingHorizontal: gutter }
+  const close = () => { setDraft(undefined); setQuery(""); setProvider(undefined); onClose() }
   const apply = (model: AssistantModelSelection | undefined) => {
-    haptic("selection")
     if (model) useUIStore.getState().rememberModelVariant(assistantModelKey(model), model.variant)
     onSelect(model)
     close()
   }
+  const pick = (model: AssistantModelOption) => {
+    const next = rememberedSelection(model, remembered)
+    if (model.variants.length) setDraft(next)
+    else apply(next)
+  }
   return <BottomSheet open={open} onClose={close} title="Model & thinking">
-    <View style={{ paddingHorizontal: gutter, gap: 16 }}>
-      <View style={{ gap: 5 }}>
-        <Text selectable style={{ color: palette.ink, ...typeStyle(18, { weight: "700" }) }}>{selected ? `${selected.providerName} — ${selected.name}` : selection?.model ?? "Automatic model"}</Text>
-        <Text selectable style={{ color: palette.muted, ...typeStyle(13, { leadingScale: 1.05 }) }}>Choose a connected provider, model and thinking effort for this project. Uses the credentials on your paired desktop.</Text>
+    <View style={{ gap: 16 }}>
+      <View style={pad}>
+        <SheetSummary
+          title={selected ? `${selected.providerName} — ${selected.name}` : selection?.model ?? "Automatic model"}
+          description="Choose a connected provider, model and thinking effort for this project. Uses the credentials on your paired desktop." />
       </View>
-      {selected && selected.variants.length > 0 ? <SurfaceCard>
-        <View style={{ gap: 10 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}><Brain size={16} color={palette.accent} style={{ flexShrink: 0 }} /><Text accessibilityRole="header" style={{ flexShrink: 1, color: palette.ink, ...typeStyle(15, { weight: "600" }) }}>Thinking effort · {selected.name}</Text></View>
-          {draft ? <Text style={{ color: palette.muted, ...typeStyle(12) }}>Choose a thinking effort to use this model</Text> : null}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {[undefined, ...selected.variants].map((variant) => <Choice key={variant ?? "default"} title={variant ? formatVariantLabel(variant) : "Default"} selected={current?.variant === variant} onPress={() => apply({ provider: selected.provider, model: selected.model, ...(variant ? { variant } : {}) })} />)}
+
+      {selected && selected.variants.length > 0 ? <View style={pad}>
+        <SurfaceCard inset={false}>
+          <View style={{ gap: 4, padding: 16, paddingBottom: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Brain size={16} color={palette.accent} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+              <Text accessibilityRole="header" style={{ flexShrink: 1, color: palette.ink, ...typeStyle(15, { weight: "600" }) }}>Thinking effort · {selected.name}</Text>
+            </View>
+            <Text style={{ color: draft ? palette.accentStrong : palette.muted, ...typeStyle(12, { leadingScale: 1.05 }) }}>
+              {draft ? "Choose a thinking effort to use this model." : "Higher effort thinks longer and uses more tokens."}
+            </Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ ...chipRowStyle(16), paddingBottom: 16 }}>
+            {[undefined, ...selected.variants].map((variant) => (
+              <ChoiceChip key={variant ?? "default"} title={variant ? formatVariantLabel(variant) : "Default"} selected={current?.variant === variant}
+                onPress={() => apply({ provider: selected.provider, model: selected.model, ...(variant ? { variant } : {}) })} />
+            ))}
           </ScrollView>
-        </View>
-      </SurfaceCard> : null}
-      <TextField value={query} onChangeText={setQuery} placeholder="Search providers and models" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
-      {providers.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8 }}>
-        {[[undefined, "All providers"], ...providers].map(([id, name]) => <Choice key={id ?? "all"} title={name ?? ""} selected={provider === id} onPress={() => setProvider(id)} />)}
+        </SurfaceCard>
+      </View> : null}
+
+      <View style={pad}>
+        <TextField value={query} onChangeText={setQuery} placeholder="Search providers and models" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
+      </View>
+      {providers.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={chipRowStyle(gutter)}>
+        <ChoiceChip title="All providers" selected={provider === undefined} onPress={() => setProvider(undefined)} />
+        {providers.map(([id, name]) => <ChoiceChip key={id} title={name} selected={provider === id} onPress={() => setProvider(id)} />)}
       </ScrollView> : null}
-      {error ? <ErrorBanner message={error} actionLabel="Retry" onAction={reload} /> : null}
-      <SurfaceCard inset={false}><ListRow title="Automatic" subtitle="Let the desktop choose from its connected providers" selected={!current} trailing={!current ? <Check size={18} color={palette.accent} /> : undefined} onPress={() => apply(undefined)} /></SurfaceCard>
-      {loading && models.length === 0 ? <View accessible accessibilityLabel="Loading desktop models" style={{ gap: 8 }}>{[0, 1, 2].map((key) => <Skeleton key={key} style={{ height: 70 }} />)}</View> : null}
-      {filtered.map((model, index) => <View key={model.key} style={{ gap: 8 }}>
-        {(index === 0 || filtered[index - 1]?.provider !== model.provider) ? <Text accessibilityRole="header" style={{ color: palette.muted, marginTop: 8, paddingHorizontal: 4, ...caps(11) }}>{model.providerName}</Text> : null}
-        <SurfaceCard inset={false}><ListRow title={model.name}
-          subtitle={[model.badge, model.model, model.contextWindow ? `${Math.round(model.contextWindow / 1000)}k context` : undefined, model.tools ? "Tools" : "Chat only", model.vision ? "Vision" : undefined, model.variants.length ? `${model.variants.length} thinking levels` : undefined].filter(Boolean).join(" · ")}
-          selected={selected?.key === model.key} trailing={selected?.key === model.key ? <Check size={18} color={palette.accent} /> : undefined}
-          onPress={() => { const next = rememberedSelection(model, remembered); if (model.variants.length) { setDraft(next); haptic("selection") } else apply(next) }} /></SurfaceCard>
-      </View>)}
-      {!loading && filtered.length === 0 && !(error && models.length === 0) ? <EmptyState title={models.length ? "No matching models" : "No connected models"} description={models.length ? "Try another provider or search." : "Connect a provider in desktop AI settings, then refresh this list."} icon={<Search size={24} color={palette.muted} />} /> : null}
-      <ActionButton variant="secondary" label="Refresh desktop models" loading={loading} onPress={reload} />
+
+      {error ? <View style={pad}><ErrorBanner message={error} actionLabel="Retry" onAction={reload} /></View> : null}
+
+      <View style={pad}>
+        <DividedRows inset={TILE_INSET}>
+          <ChoiceRow icon={Sparkles} title="Automatic"
+            description="Let the desktop choose from its connected providers" selected={!current} onPress={() => apply(undefined)} />
+        </DividedRows>
+      </View>
+
+      {loading && models.length === 0 ? <View style={pad}><ModelSkeleton /></View> : null}
+
+      {groups.map((group) => (
+        <View key={group.provider} style={pad}>
+          <SheetSection title={group.providerName} accessory={<Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...typeStyle(12) }}>{group.models.length}</Text>}>
+            <DividedRows inset={TILE_INSET}>
+              {group.models.map((model) => {
+                const active = selected?.key === model.key
+                return <ChoiceRow key={model.key} icon={model.badge ? Brain : Cpu}
+                  title={model.name} description={modelFacts(model).join(" · ")} selected={active}
+                  hint={model.variants.length ? "Then choose a thinking effort" : undefined}
+                  onPress={() => pick(model)} />
+              })}
+            </DividedRows>
+          </SheetSection>
+        </View>
+      ))}
+
+      {!loading && matches === 0 && !(error && models.length === 0) ? <View style={pad}>
+        <EmptyState title={models.length ? "No matching models" : "No connected models"}
+          description={models.length ? "Try another provider or search." : "Connect a provider in desktop AI settings, then refresh this list."}
+          icon={<Search size={24} color={palette.muted} />}
+          action={filtering ? <ActionButton variant="secondary" small label="Clear search" onPress={() => { haptic("selection"); setQuery(""); setProvider(undefined) }} /> : undefined} />
+      </View> : null}
+
+      <View style={pad}>
+        <ActionButton variant="secondary" label="Refresh desktop models" loading={loading} onPress={() => { haptic("light"); reload() }} />
+      </View>
     </View>
   </BottomSheet>
 }
 
-function Choice({ title, selected, onPress }: { title: string; selected: boolean; onPress(): void }) {
-  const { palette } = useTheme()
-  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ selected }} style={({ pressed }) => ({ minHeight: 44, justifyContent: "center", paddingHorizontal: 12, paddingVertical: 8, borderRadius: layout.cardRadius, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: selected ? palette.accent : palette.border, backgroundColor: hexToRgba(selected ? palette.accent : palette.ink, pressed ? 0.14 : 0.07) })}>
-    <Text style={{ color: selected ? palette.accentStrong : palette.soft, ...typeStyle(13, { weight: "600" }) }}>{title}</Text>
-  </Pressable>
+/** Row-shaped placeholders: icon tile, title and fact line. */
+function ModelSkeleton() {
+  return <View accessible accessibilityLabel="Loading desktop models">
+    <SurfaceCard inset={false}>
+      {[0, 1, 2].map((key) => <View key={key} style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 72, paddingHorizontal: 16, paddingVertical: 12 }}>
+        <Skeleton style={{ width: 40, height: 40, borderRadius: 12 }} />
+        <View style={{ flex: 1, gap: 8 }}>
+          <Skeleton style={{ height: 15, width: "55%", borderRadius: 6 }} />
+          <Skeleton style={{ height: 12, width: "80%", borderRadius: 6 }} />
+        </View>
+      </View>)}
+    </SurfaceCard>
+  </View>
 }

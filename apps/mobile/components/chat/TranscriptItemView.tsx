@@ -1,7 +1,7 @@
 import { memo } from "react"
-import { StyleSheet, Text, View } from "react-native"
+import { Text, View } from "react-native"
 import { CircleAlert, PencilLine, RefreshCw } from "lucide-react-native"
-import type { TranscriptItem } from "@/lib/transcript-rows"
+import { sameItem, type TranscriptItem } from "@/lib/transcript-rows"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { layout } from "@/lib/layout"
 import { type as typeStyle } from "@/lib/typography"
@@ -28,13 +28,13 @@ export interface ErrorRecovery {
   readonly lastPrompt?: string
 }
 
-export const TranscriptItemView = memo(function TranscriptItemView({ item, actions, live = false, recovery, startsTurn = false }: {
+export const TranscriptItemView = memo(function TranscriptItemView({ item, actions, live = false, recovery, startsTurn }: {
   item: TranscriptItem
   actions: TranscriptActions
   /** The newest reasoning row while the turn runs: it is still being written. */
   live?: boolean
   recovery?: ErrorRecovery
-  /** A user prompt that follows something else (an answer, a tool run): a new turn starts here. */
+  /** Overrides what the item says; normally the transcript already knows which prompts open a turn. */
   startsTurn?: boolean
 }) {
   if (item.kind === "tools") return <ToolRunGroup rows={item.rows} />
@@ -42,7 +42,7 @@ export const TranscriptItemView = memo(function TranscriptItemView({ item, actio
   switch (row.kind) {
     case "user":
     case "assistant":
-      return <MessageBubble row={row} onReuse={actions.reuse} startsTurn={startsTurn} />
+      return <MessageBubble id={item.id} row={row} onReuse={actions.reuse} startsTurn={startsTurn ?? item.startsTurn ?? false} />
     case "reasoning":
       return <ReasoningRow row={row} live={live} />
     case "plan":
@@ -58,7 +58,9 @@ export const TranscriptItemView = memo(function TranscriptItemView({ item, actio
     case "error":
       return <ErrorRow message={row.message} recovery={recovery} actions={actions} />
   }
-})
+  // The list rebuilds its items on every change, but a row that did not change keeps its identity: comparing those
+  // (not the item object) is what lets a streaming delta re-render one row of a conversation with hundreds.
+}, (prev, next) => sameItem(prev.item, next.item) && prev.actions === next.actions && prev.live === next.live && prev.recovery === next.recovery && prev.startsTurn === next.startsTurn)
 
 /**
  * A failed turn, said where it happened. Recovery reads the desktop session; it never resends the prompt, which may
@@ -68,7 +70,7 @@ function ErrorRow({ message, recovery, actions }: { message: string; recovery?: 
   const { palette } = useTheme()
   const lastPrompt = recovery?.lastPrompt
   return (
-    <View accessibilityRole="alert" style={{ marginHorizontal: layout.gutter, marginVertical: 8, padding: 14, gap: 10, borderRadius: layout.controlRadius, borderCurve: "continuous", borderWidth: StyleSheet.hairlineWidth, borderColor: hexToRgba(palette.danger, 0.3), backgroundColor: hexToRgba(palette.danger, 0.06) }}>
+    <View accessibilityRole="alert" style={{ marginHorizontal: layout.gutter, marginVertical: 8, padding: 14, gap: 10, borderRadius: 14, borderCurve: "continuous", borderWidth: 1, borderColor: hexToRgba(palette.danger, 0.2), backgroundColor: hexToRgba(palette.danger, 0.08) }}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
         <CircleAlert size={18} color={palette.danger} style={{ marginTop: 1 }} />
         <Text selectable style={{ flex: 1, minWidth: 0, color: palette.ink, ...typeStyle(14) }}>{message}</Text>

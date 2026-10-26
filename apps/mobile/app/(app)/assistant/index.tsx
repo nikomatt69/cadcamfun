@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native"
+import { AccessibilityInfo, ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { Stack, useFocusEffect, useRouter } from "expo-router"
 import { Bot, Check, CircleGauge, CloudOff, GitPullRequest, Route, Sparkles } from "lucide-react-native"
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
+import { EASE_OUT, usePrefersReducedMotion } from "@/lib/animation"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useResource } from "@/lib/use-resource"
@@ -23,6 +25,10 @@ import { JumpToLatestPill } from "@/components/chat/JumpToLatestPill"
 import { BrandMark } from "@/components/layout/BrandMark"
 import { AssistantHeader } from "@/components/chat/AssistantHeader"
 import { SessionStatusLine } from "@/components/chat/SessionStatusLine"
+import { ApprovalDock } from "@/components/chat/ApprovalDock"
+import { AssistantSkeleton } from "@/components/chat/AssistantSkeleton"
+import { dockVisible, itemIndex, pendingApprovals } from "@/lib/approval-dock"
+import { isHydrating, linkNotice, startsTurn, statusLabel, turnEndAnnouncement } from "@/lib/assistant-view"
 import { hexToRgba } from "@/lib/theme"
 import { caps, type } from "@/lib/typography"
 import { BottomSheet } from "@/components/ui/BottomSheet"
@@ -108,6 +114,12 @@ export default function AssistantScreen() {
   const [historyRows, setHistoryRows] = useState<readonly ChatRow[]>(emptyLog)
   const [olderBefore, setOlderBefore] = useState<string | null>(null)
   const [loadingOlder, setLoadingOlder] = useState(false)
+  /** A stored conversation is being read from the desktop; the first read has nothing to show yet. */
+  const [opening, setOpening] = useState(false)
+  /** The journal of the followed session is being read (first connect, reconnect gap). */
+  const [syncing, setSyncing] = useState(false)
+  /** A failed composer action (stop, saving a message for later), shown above the composer with Retry where it can be retried. */
+  const [composerError, setComposerError] = useState<{ message: string; retry?: "stop" } | null>(null)
   /** Every stream frame feeds both the transcript and the live status strip. */
   const apply = (event: LogEvent) => {
     setLogState((previous) => appendChatEvent(previous, event))
@@ -197,6 +209,9 @@ export default function AssistantScreen() {
     setLog(logs.current.get(key) ?? emptyLog)
     setHistoryRows(emptyLog)
     setOlderBefore(null)
+    setOpening(false)
+    setSyncing(false)
+    setComposerError(null)
     setActivity(idleActivity)
     setBusy(false)
     stopping.current = false
@@ -247,6 +262,7 @@ export default function AssistantScreen() {
     const sessionId = opened.sessionId
     const version = generation.current
     let cancelled = false
+    setOpening(true)
     void client.sessionMessages(sessionId, null, 30).then((page) => {
       if (cancelled || version !== generation.current) return
       sessionRef.current = sessionId
@@ -263,8 +279,8 @@ export default function AssistantScreen() {
     }).catch((error: unknown) => {
       if (cancelled) return
       toast(error instanceof Error ? error.message : "Could not open the conversation", "error")
-    })
-    return () => { cancelled = true }
+    }).finally(() => { if (!cancelled) setOpening(false) })
+    return () => { cancelled = true; setOpening(false) }
   }, [opened, client, projectId, logKeyFor])
 
   /** One page further back in the stored conversation. */
@@ -293,6 +309,15 @@ export default function AssistantScreen() {
     return () => { cancelled = true }
   }, [queueRevision, projectId])
 
+  // The outbox count behind the composer's "N messages saved" pill: it follows every enqueue and delivery.
+  const [savedCount, setSavedCount] = useState(0)
+  useEffect(() => {
+    if (!projectId) { setSavedCount(0); return }
+    let cancelled = false
+    void queuedTextsForProject(projectId).then((texts) => { if (!cancelled) setSavedCount(texts.length) }).catch(() => undefined)
+    return () => { cancelled = true }
+  }, [queueRevision, projectId])
+
   useEffect(() => { if (!busy) setStopRequested(false) }, [busy])
 
   /**
@@ -302,6 +327,7 @@ export default function AssistantScreen() {
   const syncSession = useCallback(async (sessionId: string, signal?: AbortSignal) => {
     if (!client) return
     const version = generation.current
+    setSyncing(true)
     try {
       const [state, controls] = await Promise.all([client.sessionState(sessionId, signal), client.sessionControls(sessionId, signal)])
       if (signal?.aborted || version !== generation.current || sessionRef.current !== sessionId) return
@@ -316,6 +342,8 @@ export default function AssistantScreen() {
       }
     } catch (error) {
       if (!signal?.aborted && version === generation.current) toast(error instanceof Error ? error.message : "Could not read the desktop conversation", "error")
+    } finally {
+      if (version === generation.current) setSyncing(false)
     }
   }, [client])
 
@@ -353,8 +381,9 @@ export default function AssistantScreen() {
         if (sessionRef.current !== sessionId) return
         if (event.type === "turn" && event.phase === "start") setBusy(true)
         if (event.type === "permission_request") haptic("warning")
-        if (event.type === "done") { haptic("success"); setBusy(false) }
-        if (event.type === "error") { haptic("error"); setBusy(false) }
+        if (event.type === "question_request") haptic("selection")
+        if (event.type === "done") { haptic("success"); setBusy(false); AccessibilityInfo.announceForAccessibility(turnEndAnnouncement("done")) }
+        if (event.type === "error") { haptic("error"); setBusy(false); AccessibilityInfo.announceForAccessibility(turnEndAnnouncement("error")) }
         apply(event as LogEvent)
       },
       onDisconnected: () => { if (!controller.signal.aborted) setLink("reconnecting") },
@@ -379,13 +408,14 @@ export default function AssistantScreen() {
         haptic("selection")
       } catch (error) {
         haptic("error")
-        toast(error instanceof Error ? error.message : "Could not save the message for later", "error")
+        setComposerError({ message: error instanceof Error ? error.message : "Could not save the message for later" })
         reuse(text)
       }
       return
     }
     const version = ++generation.current
     posting.current = true
+    setComposerError(null)
     setBusy(true)
     // A new turn starts its own meter; steering (queue) keeps the running one.
     setActivity(idleActivity)
@@ -413,7 +443,8 @@ export default function AssistantScreen() {
         // Stop was pressed while the prompt was still starting; the session exists now, so the turn can end.
         pendingStop.current = false
         void client.abortChat(started.sessionId).catch((error: unknown) => {
-          toast(error instanceof Error ? error.message : "Could not stop the desktop turn", "error")
+          setStopRequested(false)
+          setComposerError({ message: error instanceof Error ? error.message : "Could not stop the desktop turn", retry: "stop" })
         })
       }
     } catch (error) {
@@ -463,6 +494,7 @@ export default function AssistantScreen() {
     haptic("selection")
     const version = generation.current
     const sessionId = sessionRef.current
+    setComposerError(null)
     if (!sessionId) {
       // The turn is still starting: the desktop has no session to abort yet, so the request is remembered
       // and applied the moment the session exists. Saying "stopped" now would be a lie.
@@ -477,7 +509,7 @@ export default function AssistantScreen() {
     void stopped.catch((error: unknown) => {
       if (version === generation.current) {
         setStopRequested(false)
-        toast(error instanceof Error ? error.message : "Could not stop the desktop turn", "error")
+        setComposerError({ message: error instanceof Error ? error.message : "Could not stop the desktop turn", retry: "stop" })
       }
     }).finally(() => {
       stopping.current = false
@@ -573,15 +605,21 @@ export default function AssistantScreen() {
   // The stored past comes first, then the live turn: one conversation, oldest row first.
   const transcript = useMemo(() => buildTranscript([...historyRows, ...log]), [historyRows, log])
   const reversed = useMemo(() => [...transcript].reverse(), [transcript])
+  const reversedRef = useRef(reversed)
+  reversedRef.current = reversed
   const transcriptLength = useRef(0)
   transcriptLength.current = transcript.length
+  const approvals = useMemo(() => pendingApprovals(transcript), [transcript])
+  const dockShown = dockVisible({ busy, online, pending: approvals.length })
+  const hydrating = isHydrating({ opening, followed: Boolean(followed), transcriptEmpty: transcript.length === 0, link, syncing })
   const lastErrorId = useMemo(() => transcript.findLast((item) => item.kind === "row" && item.row.kind === "error")?.id, [transcript])
   const newest = transcript[transcript.length - 1]
   const liveReasoningId = busy && newest?.kind === "row" && newest.row.kind === "reasoning" ? newest.id : undefined
   const lastPrompt = useMemo(() => lastUserPrompt(log), [log])
   const recovery = useMemo<ErrorRecovery | undefined>(() => busy ? undefined : { refresh: Boolean(followed), ...(lastPrompt ? { lastPrompt } : {}) }, [busy, followed, lastPrompt])
-  const renderItem = useCallback(({ item }: { item: TranscriptItem }) => (
-    <TranscriptItemView item={item} actions={actions} live={item.id === liveReasoningId} recovery={item.id === lastErrorId ? recovery : undefined} />
+  // The list is inverted: the row before `index` in time is the one after it in the data.
+  const renderItem = useCallback(({ item, index }: { item: TranscriptItem; index: number }) => (
+    <TranscriptItemView item={item} actions={actions} live={item.id === liveReasoningId} recovery={item.id === lastErrorId ? recovery : undefined} startsTurn={startsTurn(item, reversedRef.current[index + 1])} />
   ), [actions, liveReasoningId, lastErrorId, recovery])
 
   // Inverted list: offset 0 is the newest row. Hysteresis keeps the pill from flickering at the threshold.
@@ -600,7 +638,18 @@ export default function AssistantScreen() {
     setReadingFrom(null)
     listRef.current?.scrollToOffset({ offset: 0, animated })
   }
+  /** The dock's "Answer": brings the question's card to the middle of the list. */
+  const showItem = useCallback((itemId: string) => {
+    const index = itemIndex(reversedRef.current, itemId)
+    if (index >= 0) listRef.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true })
+  }, [])
+  /** Rows have no fixed height, so an unmeasured row is reached in two steps: toward it, then to it. */
+  const onScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
+    listRef.current?.scrollToOffset({ offset: info.index * info.averageItemLength, animated: false })
+    setTimeout(() => listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 80)
+  }, [])
 
+  const notice = linkNotice({ online, link, busy })
   const composeReady = Boolean(currentProject) && !modelUnavailable && (online ? aiReady : true)
   const composeNote = modelUnavailable ? "Choose an available desktop model"
     : !currentProject ? "Choose a project to chat"
@@ -621,8 +670,7 @@ export default function AssistantScreen() {
         onNew={newConversation}
       />
 
-      {!online ? <LinkStrip gutter={content.gutter} offline text="Desktop offline. New messages wait on this iPhone and send when it reconnects." />
-        : link === "reconnecting" && !busy ? <LinkStrip gutter={content.gutter} text="Reconnecting to the conversation…" /> : null}
+      {notice ? <LinkStrip gutter={content.gutter} offline={notice.tone === "offline"} text={notice.text} /> : null}
 
       {/* The roster could not be read: the assistant still runs, but the phone cannot show which agent it picked. */}
       {agents.error ? (
@@ -632,11 +680,14 @@ export default function AssistantScreen() {
       ) : null}
 
       {/* Transcript */}
-      {transcript.length === 0 ? (
+      {hydrating ? (
+        <AssistantSkeleton gutter={content.gutter} />
+      ) : transcript.length === 0 ? (
         <ScrollView
           style={{ flex: 1 }}
           contentInsetAdjustmentBehavior="never"
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: contentGutter(width), paddingVertical: 28, gap: 16 }}
         >
           {projects.error ? <ErrorBanner message={projects.error} actionLabel="Retry" onAction={() => void projects.reload()} /> : null}
@@ -658,6 +709,7 @@ export default function AssistantScreen() {
                       tint
                       accessibilityRole="button"
                       accessibilityLabel={item.label}
+                      accessibilityHint={aiReady && online ? "Sends this to the desktop assistant" : "Available when the desktop is online and its AI is configured"}
                       style={{ minHeight: 52, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 16, borderCurve: "continuous", borderWidth: 0.5, borderColor: palette.border, backgroundColor: palette.surface, paddingHorizontal: 14, paddingVertical: 10 }}
                     >
                       <Icon size={18} color={palette.accent} />
@@ -677,10 +729,12 @@ export default function AssistantScreen() {
             keyExtractor={(item) => item.id}
             inverted
             contentInsetAdjustmentBehavior="never"
-            contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: Math.max(0, contentGutter(width) - 16) }}
+            contentContainerStyle={{ paddingVertical: 16, paddingHorizontal: Math.max(0, contentGutter(width) - 16) }}
             renderItem={renderItem}
             maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 80 }}
             keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
+            onScrollToIndexFailed={onScrollToIndexFailed}
             onScroll={onTranscriptScroll}
             scrollEventThrottle={64}
             // Long CAD/CAM turns hold hundreds of rows: render a screenful at a time.
@@ -710,12 +764,24 @@ export default function AssistantScreen() {
         <View style={{ paddingHorizontal: content.gutter }}>
           <SessionStatusLine
             stopping={stopRequested}
-            label={stopRequested ? "Stopping the desktop turn…" : link === "reconnecting" ? "Reconnecting to the desktop… the turn keeps running there" : link === "connecting" ? "Connecting to the desktop…" : `${activityLabel(activity)} · send to steer`}
+            label={statusLabel({ stopping: stopRequested, link, activity: activityLabel(activity) })}
+            onPress={() => setInspectorOpen(true)}
           />
         </View>
       ) : null}
 
+      {dockShown ? (
+        <ApprovalDock
+          approvals={approvals}
+          gutter={content.gutter}
+          onDecide={replyPermission}
+          onSkip={(requestId) => replyQuestion(requestId)}
+          onShow={showItem}
+        />
+      ) : null}
+
       <Composer
+        savedCount={savedCount}
         key={projectId ?? "no-project"}
         busy={busy && online}
         offline={!online}
@@ -731,6 +797,9 @@ export default function AssistantScreen() {
         onSend={(text) => void send(text)}
         onQueue={(text) => void queue(text)}
         onStop={stop}
+        error={composerError?.message ?? null}
+        onRetryError={composerError?.retry === "stop" ? stop : undefined}
+        onDismissError={() => setComposerError(null)}
         attachments={attachments}
         onAddAttachment={() => setCameraOpen(true)}
         onRemoveAttachment={(index) => setAttachments((previous) => previous.filter((_, at) => at !== index))}
@@ -819,15 +888,45 @@ export default function AssistantScreen() {
   )
 }
 
-/** One quiet line under the context bar: the conversation is not live, and what that means for a message sent now. */
+// Layout-animation builders live at module scope: building them in render re-creates them on every re-render.
+const STRIP_ENTER = FadeIn.duration(180).easing(EASE_OUT)
+const STRIP_EXIT = FadeOut.duration(120).easing(EASE_OUT)
+
+/**
+ * One quiet pill under the header: the conversation is not live, and what that means for a message sent now.
+ * Same language as the status pill above the composer (hairline, tinted fill, 13pt text), so the two read as one family.
+ */
 function LinkStrip({ text, gutter, offline = false }: { text: string; gutter: number; offline?: boolean }) {
-  const { palette } = useTheme()
+  const { palette, isDark } = useTheme()
+  const reduced = usePrefersReducedMotion()
   const color = offline ? palette.warning : palette.muted
+  // iOS has no live regions: a strip that merely appears is not read, so say it once per change.
+  useEffect(() => { AccessibilityInfo.announceForAccessibility(text) }, [text])
   return (
-    <View accessible accessibilityRole="text" accessibilityLiveRegion="polite" accessibilityLabel={text}
-      style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginHorizontal: gutter, marginBottom: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderCurve: "continuous", backgroundColor: hexToRgba(color, 0.1) }}>
-      {offline ? <CloudOff size={14} color={color} /> : <ActivityIndicator size="small" color={color} />}
-      <Text style={{ flexShrink: 1, color: offline ? palette.ink : palette.soft, ...type(12, { weight: "500" }) }}>{text}</Text>
-    </View>
+    <Animated.View entering={reduced ? undefined : STRIP_ENTER} exiting={reduced ? undefined : STRIP_EXIT} style={{ marginHorizontal: gutter, marginBottom: 8, alignItems: "center" }}>
+      <View
+        accessible
+        accessibilityRole="text"
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={text}
+        style={{
+          maxWidth: "100%",
+          minHeight: 28,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 14,
+          borderCurve: "continuous",
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: offline ? hexToRgba(palette.warning, isDark ? 0.34 : 0.28) : isDark ? hexToRgba(palette.ink, 0.1) : hexToRgba(palette.border, 0.72),
+          backgroundColor: offline ? hexToRgba(palette.warning, isDark ? 0.12 : 0.08) : hexToRgba(palette.ink, isDark ? 0.04 : 0.03),
+        }}
+      >
+        {offline ? <CloudOff size={13} color={color} strokeWidth={2.2} /> : <ActivityIndicator size="small" color={color} style={{ transform: [{ scale: 0.7 }] }} />}
+        <Text maxFontSizeMultiplier={1.5} style={{ flexShrink: 1, color: offline ? palette.ink : palette.soft, ...type(13, { weight: "500" }) }}>{text}</Text>
+      </View>
+    </Animated.View>
   )
 }

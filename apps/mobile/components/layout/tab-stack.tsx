@@ -5,9 +5,9 @@ import { BrandHeaderTitle } from "./BrandMark"
 
 /**
  * Every tab owns a native stack, so titles, status-bar insets and back gestures have one owner.
- * `children` registers the tab's own pushed screens (a list inside the tab, a detail sheet).
+ * `hideHeader` is for a tab that draws its own header. `children` registers the tab's own pushed screens (a list inside the tab, a detail sheet).
  */
-export function TabStack({ title, largeTitle = true, children }: { title: string; largeTitle?: boolean; children?: ReactNode }) {
+export function TabStack({ title, largeTitle = true, hideHeader = false, children }: { title: string; largeTitle?: boolean; hideHeader?: boolean; children?: ReactNode }) {
   const { palette } = useTheme()
   return (
     <Stack screenOptions={{
@@ -21,7 +21,7 @@ export function TabStack({ title, largeTitle = true, children }: { title: string
       headerBackButtonDisplayMode: "minimal",
       contentStyle: { backgroundColor: palette.background },
     }}>
-      <Stack.Screen name="index" options={{ title, headerTitle: () => <BrandHeaderTitle /> }} />
+      <Stack.Screen name="index" options={{ title, headerShown: !hideHeader, headerTitle: () => <BrandHeaderTitle /> }} />
       {children}
     </Stack>
   )

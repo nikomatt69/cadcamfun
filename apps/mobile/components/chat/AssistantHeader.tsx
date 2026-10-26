@@ -4,13 +4,16 @@ import { Bot, ChevronDown, History, Plus } from "lucide-react-native"
 import { AdaptiveBlur } from "@/components/GlassView"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
+import { usePrefersReducedMotion } from "@/lib/animation"
 import { type as typeStyle } from "@/lib/typography"
 
-const BUTTON = 40
+/** nikcli's chrome button: an 18pt icon in 12pt of padding inside a 1pt ring, which is also the minimum touch target. */
+const BUTTON = 44
 
 /** A round glass button: the chrome the nikcli session header uses, so the header floats over the transcript. */
 function ChromeButton({ label, hint, disabled, onPress, children }: { label: string; hint?: string; disabled?: boolean; onPress: () => void; children: ReactNode }) {
   const { palette, isDark } = useTheme()
+  const reduced = usePrefersReducedMotion()
   return (
     <Pressable
       onPress={() => { haptic("selection"); onPress() }}
@@ -19,7 +22,6 @@ function ChromeButton({ label, hint, disabled, onPress, children }: { label: str
       accessibilityLabel={label}
       accessibilityHint={hint}
       accessibilityState={{ disabled }}
-      hitSlop={2}
       style={({ pressed }) => ({
         width: BUTTON,
         height: BUTTON,
@@ -28,10 +30,10 @@ function ChromeButton({ label, hint, disabled, onPress, children }: { label: str
         overflow: "hidden",
         alignItems: "center",
         justifyContent: "center",
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: hexToRgba(palette.ink, isDark ? 0.14 : 0.1),
+        borderWidth: 1,
+        borderColor: isDark ? hexToRgba(palette.ink, 0.16) : hexToRgba(palette.border, 0.82),
         opacity: disabled ? 0.35 : pressed ? 0.7 : 1,
-        transform: [{ scale: pressed ? 0.95 : 1 }],
+        transform: [{ scale: pressed && !reduced ? 0.95 : 1 }],
       })}
     >
       <AdaptiveBlur
@@ -67,7 +69,7 @@ export function AssistantHeader({ gutter, project, detail, hasProject, onChooseP
 }) {
   const { palette } = useTheme()
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: gutter, paddingTop: 8, paddingBottom: 10 }}>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: gutter, paddingTop: 8, paddingBottom: 12 }}>
       <ChromeButton label="Conversations" hint="Opens the conversations of this project" disabled={!hasProject} onPress={onHistory}>
         <History size={18} color={palette.ink} strokeWidth={2.1} />
       </ChromeButton>
@@ -77,19 +79,19 @@ export function AssistantHeader({ gutter, project, detail, hasProject, onChooseP
         accessibilityRole="button"
         accessibilityLabel={hasProject ? `Project: ${project}. ${detail}` : "Choose a project"}
         accessibilityHint="Choose the project the assistant works in"
-        style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 44, justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
+        style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: BUTTON, justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Text numberOfLines={1} style={{ flexShrink: 1, color: palette.ink, ...typeStyle(16, { weight: "600" }) }}>{project}</Text>
+          <Text numberOfLines={1} maxFontSizeMultiplier={1.4} style={{ flexShrink: 1, color: palette.ink, ...typeStyle(16, { weight: "600" }) }}>{project}</Text>
           <ChevronDown size={14} color={palette.muted} style={{ flexShrink: 0 }} />
         </View>
-        {hasProject ? <Text numberOfLines={1} style={{ marginTop: 1, color: palette.soft, ...typeStyle(13) }}>{detail}</Text> : null}
+        {hasProject ? <Text numberOfLines={1} maxFontSizeMultiplier={1.4} style={{ marginTop: 4, color: palette.soft, ...typeStyle(14) }}>{detail}</Text> : null}
       </Pressable>
 
       <ChromeButton label="Choose agent" hint="Choose which CADCAMFUN agent answers" onPress={onChooseAgent}>
         <Bot size={18} color={palette.ink} strokeWidth={2.1} />
       </ChromeButton>
-      <ChromeButton label="New conversation" disabled={!hasProject} onPress={onNew}>
+      <ChromeButton label="New conversation" hint="Starts a fresh conversation in this project" disabled={!hasProject} onPress={onNew}>
         <Plus size={19} color={palette.ink} strokeWidth={2.2} />
       </ChromeButton>
     </View>
