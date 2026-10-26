@@ -66,10 +66,11 @@ export function fitCameraToObjects(camera: THREE.PerspectiveCamera, target: THRE
   if (box.isEmpty()) return null
   const center = box.getCenter(new THREE.Vector3())
   const size = box.getSize(new THREE.Vector3())
-  const maxDim = Math.max(size.x, size.y, size.z, 0.001)
-  const distance = Math.abs(maxDim / (2 * Math.tan((camera.fov * Math.PI) / 360)))
+  // Frame the bounding sphere, not the longest side: from a corner direction the eye would otherwise sit inside a cube.
+  const radius = Math.max(size.length() / 2, 0.001)
+  const distance = radius / Math.sin(Math.min(camera.fov, camera.fov * Math.min(1, camera.aspect)) * Math.PI / 360)
   const direction = camera.position.clone().sub(target).normalize()
-  camera.position.copy(center.clone().add(direction.multiplyScalar(distance * 1.25)))
+  camera.position.copy(center.clone().add(direction.multiplyScalar(distance * 1.1)))
   camera.lookAt(center)
   return center
 }

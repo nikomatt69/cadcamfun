@@ -127,6 +127,27 @@ describe("the Z-up view the assistant builds for", () => {
   })
 })
 
+describe("fit-to-view frames the whole part from outside it", () => {
+  test("a cube looked at along its corner diagonal is framed from beyond its corner, with every vertex in front of the eye", () => {
+    const camera = new THREE.PerspectiveCamera(75, 1.6, 0.01, 5000)
+    camera.up.set(0, 0, 1)
+    camera.position.set(300, -300, 300)
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(100, 100, 100))
+    cube.updateMatrixWorld(true)
+    const center = fitCameraToObjects(camera, new THREE.Vector3(), [cube])!
+    camera.updateMatrixWorld(true)
+    const eye = camera.position
+    const corner = new THREE.Vector3(50, -50, 50)
+    expect(eye.distanceTo(center)).toBeGreaterThan(corner.length())
+    for (const sx of [-50, 50]) for (const sy of [-50, 50]) for (const sz of [-50, 50]) {
+      const ndc = new THREE.Vector3(sx, sy, sz).project(camera)
+      expect(Math.abs(ndc.x)).toBeLessThanOrEqual(1)
+      expect(Math.abs(ndc.y)).toBeLessThanOrEqual(1)
+      expect(ndc.z).toBeLessThan(1)
+    }
+  })
+})
+
 describe("every element is drawn Z-up, the way the assistant and the toolpath see it", () => {
   const size = (element: Record<string, unknown>): THREE.Vector3 => {
     const object = buildElementObject({ id: "e", layerId: "layer", x: 0, y: 0, z: 0, ...element } as never)!
