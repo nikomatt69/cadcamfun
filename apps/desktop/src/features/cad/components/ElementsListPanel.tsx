@@ -34,6 +34,7 @@ export default function ElementsListPanel(props: ElementsListPanelProps): JSX.El
   const [showSettings, setShowSettings] = createSignal(false)
   const [focused, setFocused] = createSignal(0)
   let scroller: HTMLDivElement | undefined
+  let panel: HTMLDivElement | undefined
   let search: HTMLInputElement | undefined
   void showSettings
 
@@ -55,19 +56,23 @@ export default function ElementsListPanel(props: ElementsListPanelProps): JSX.El
     return Object.entries(by)
   })
 
+  // The list's own keys live on the panel (the search box included, as its hint says): arrows move, Enter selects. They used
+  // to be read from the whole window, so Enter (apply a transform) and Esc (cancel) reached the list wherever the focus was.
+  // Esc is the editor's `edit.cancel`.
   onMount(() => {
+    const list = panel
+    if (list === undefined) return
     const down = (e: KeyboardEvent) => {
-      if (search && document.activeElement === search) return
-      const list = processed()
+      const items = processed()
       switch (e.key) {
-        case "ArrowDown": e.preventDefault(); setFocused((p) => Math.min(p + 1, list.length - 1)); break
+        case "ArrowDown": e.preventDefault(); setFocused((p) => Math.min(p + 1, items.length - 1)); break
         case "ArrowUp": e.preventDefault(); setFocused((p) => Math.max(p - 1, 0)); break
-        case "Enter": { const item = list[focused()]; if (item) selection.selectElement(item.id); break }
-        case "Escape": selection.clearSelection(); setFocused(0); break
+        case "Enter": { const item = items[focused()]; if (item) { selection.selectElement(item.id); e.preventDefault() } break }
+        case "Escape": setFocused(0); break
       }
     }
-    window.addEventListener("keydown", down)
-    onCleanup(() => window.removeEventListener("keydown", down))
+    list.addEventListener("keydown", down)
+    onCleanup(() => list.removeEventListener("keydown", down))
   })
   createEffect(on([focused, processed], () => {
     if (scroller && processed()[focused()]) scroller.scrollTo({ top: focused() * 60, behavior: "smooth" })
@@ -132,7 +137,7 @@ export default function ElementsListPanel(props: ElementsListPanelProps): JSX.El
   }
 
   return (
-    <div class="bg-[#F8FBFF] dark:bg-gray-800 dark:text-white shadow-lg rounded-lg flex flex-col h-full max-h-[80vh]" style={{ width: `${props.width ?? 300}px` }}>
+    <div ref={panel} class="bg-[#F8FBFF] dark:bg-gray-800 dark:text-white shadow-lg rounded-lg flex flex-col h-full max-h-[80vh]" style={{ width: `${props.width ?? 300}px` }}>
       <div class="flex justify-between items-center p-3 border-b">
         <h3 class="font-medium text-md">Elements List ({elements.elements.length})</h3>
         <div class="flex items-center space-x-1">

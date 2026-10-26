@@ -47,6 +47,16 @@ One command catalog, one keymap, one keyboard listener. Code: `apps/desktop/src/
   (`CADCAMFUN_TOKEN`, `CADCAMFUN_DATA_DIR`, `CADCAMFUN_MIGRATIONS_DIR`, stdin kept open), `vite --port 5199` with
   `VITE_SIDECAR_URL/TOKEN`, playwright-core with the cached chromium headless shell and `--use-angle=swiftshader`.
 
+## Guards
+
+- No screen listens to the whole window for its own commands: `keybindings-ui.test.ts` scans the sources and fails on a new
+  window/document `keydown` listener outside an explicit list of widget listeners (modals, menus, the recorder, held
+  modifiers), each with its reason. The elements list used to read arrows/Enter/Esc from the window; it now keeps them on
+  its panel.
+- Persistence and sync were checked in a real browser: a rebind is saved locally and published to `ui.keybindings`,
+  survives a reload, is adopted by a machine with empty storage, and Reset all is published; with a Windows platform the
+  command key is Ctrl (title bar, dialog, palette, undo/redo, boolean chord) and the Windows key is not.
+
 ## Native menu
 
 `NATIVE_MENU` (catalog) lists the menu items that are commands. At boot and on every change the shell sends the keymap to
