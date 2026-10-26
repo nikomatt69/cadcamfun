@@ -29,6 +29,7 @@ import { listenToMenu, openLogsFolder, projectOfRecentId } from "./menu-events.t
 import { activeActivity, routeOf, type ActivityId } from "./layout.ts"
 import { COMMANDS, groupKeyOf, labelKeyOf, liveScopes, menuCommand } from "../shared/keybindings/catalog.ts"
 import { displayChord } from "../shared/keybindings/chord.ts"
+import { syncNativeMenu } from "./native-menu.ts"
 import { ShortcutsDialog } from "../shared/keybindings/shortcuts-dialog.tsx"
 
 import { listenForOpenedFiles, openDelivered, readDelivered } from "./open-file.ts"
@@ -102,6 +103,9 @@ export function Shell(props: ShellProps): JSX.Element {
     const stop = app.keys.attach()
     onCleanup(() => { stop(); off() })
   })
+
+  // The native menu bar shows and takes the user's chords, not the ones Rust shipped with.
+  createEffect(() => { void syncNativeMenu(app.keys.keymap()).catch(() => undefined) })
 
   // The sidecar keeps the keymap for the user: once it answers, take its copy if it is newer, or publish ours.
   createEffect(() => { if (app.sidecar() === "ready") void app.keys.reconcile() })

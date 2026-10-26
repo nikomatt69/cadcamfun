@@ -71,7 +71,7 @@ const make = (key: string, mods: Partial<Omit<Chord, "key">> = {}): Chord => {
  * Parses `Mod+Shift+Z`. Returns `undefined` for anything that is not a chord: an empty string, a lone modifier, an
  * unknown key name or a repeated modifier. A trailing `+` key (`Mod++`) is the plus key itself.
  */
-export const parseChord = (text: string): Chord | undefined => {
+export const parseChord = (text: string, platform: Platform = detectPlatform()): Chord | undefined => {
   const source = text.trim()
   if (source.length === 0) return undefined
   // `+` alone and a trailing `++` spell the plus key; a single trailing `+` is a dangling separator.
@@ -94,6 +94,14 @@ export const parseChord = (text: string): Chord | undefined => {
   }
   const key = normaliseKey(keyText)
   if (MODIFIER_KEYS.has(key) || !isKnownKey(key)) return undefined
+  // The platform's own command key is `Mod`: Ctrl on Windows/Linux, Cmd on macOS. Writing it by its name is the same key,
+  // and writing both it and `Mod` names one key twice.
+  const own = platform === "mac" ? "meta" : "ctrl"
+  if (mods[own] === true) {
+    if (mods.mod === true) return undefined
+    mods.mod = true
+    mods[own] = false
+  }
   return make(key, mods)
 }
 
@@ -110,9 +118,9 @@ export const formatChord = (chord: Chord): string => {
   return parts.join("+")
 }
 
-/** Canonical form of any chord text, or `undefined` when it is not one. */
-export const canonicalChord = (text: string): string | undefined => {
-  const chord = parseChord(text)
+/** Canonical form of any chord text on `platform`, or `undefined` when it is not one. */
+export const canonicalChord = (text: string, platform: Platform = detectPlatform()): string | undefined => {
+  const chord = parseChord(text, platform)
   return chord === undefined ? undefined : formatChord(chord)
 }
 

@@ -393,6 +393,15 @@ pub fn set_recent_projects(
     tray::set_recent_projects(&app, &projects).map_err(|e| CommandError::Io(e.to_string()))
 }
 
+/// The user's keymap for the native menu bar: menu id -> accelerator (`None` removes it).
+#[tauri::command]
+pub fn set_menu_accelerators(
+    app: AppHandle,
+    accelerators: std::collections::HashMap<String, Option<String>>,
+) -> Result<(), CommandError> {
+    crate::menu::set_accelerators(&app, &accelerators).map_err(|e| CommandError::Io(e.to_string()))
+}
+
 #[tauri::command]
 pub fn check_for_updates(
     state: tauri::State<'_, updater::UpdaterService>,

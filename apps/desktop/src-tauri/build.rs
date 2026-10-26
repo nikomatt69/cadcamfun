@@ -13,6 +13,7 @@ const COMMANDS: &[&str] = &[
     "take_opened_files",
     "read_opened_file",
     "set_recent_projects",
+    "set_menu_accelerators",
     "check_for_updates",
     "get_update_status",
     "install_update",

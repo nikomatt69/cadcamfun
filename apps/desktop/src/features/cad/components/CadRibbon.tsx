@@ -1,4 +1,4 @@
-import { For, Show, createSignal, type JSX } from "solid-js"
+import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench, FileText, Maximize2 } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useCADStore } from "../store/cadStore.ts"
@@ -9,6 +9,8 @@ import type { SurfacingOp } from "./SurfacingPanel.tsx"
 import type { BooleanOperation } from "../lib/sceneHelpers.ts"
 import { SvgIcon } from "./icons.tsx"
 import { ElementForm, formPositionFor } from "./ToolPanel.tsx"
+import { useAppOptional } from "../../../shared/state/context.ts"
+import { displayChord } from "../../../shared/keybindings/chord.ts"
 import { isSectionAxis } from "../lib/section.ts"
 import { isExplodeAxis } from "../lib/exploded-view.ts"
 
@@ -43,7 +45,26 @@ export default function CadRibbon(props: Props): JSX.Element {
   const layers = useLayerStore()
   const selection = useSelectionStore()
 
+  const keys = useAppOptional()?.keys
   const [createPart, setCreatePart] = createSignal<string | null>(null)
+  /** The creation commands of the keymap: one id per part the ribbon can start. */
+  const CREATE: Readonly<Record<string, string>> = {
+    line: "line", circle: "circle", rectangle: "rectangle", box: "cube", cylinder: "cylinder", sphere: "sphere", cone: "cone", torus: "torus", parametric: "parametric"
+  }
+  onMount(() => {
+    if (keys === undefined) return
+    const off = keys.register(Object.fromEntries(Object.entries(CREATE).map(([name, type]) => [`cad.create.${name}`, () => {
+      if (creationBlocked()) return false
+      setCreatePart(type)
+    }])))
+    onCleanup(off)
+  })
+  /** The tooltip of a creation button: its label and the user's chord for it. */
+  const hintFor = (type: string, label: string): string => {
+    const name = Object.entries(CREATE).find(([, part]) => part === type)?.[0]
+    const chord = name === undefined || keys === undefined ? undefined : keys.keymap().entry(`cad.create.${name}`)?.chords[0]
+    return chord === undefined || keys === undefined ? label : `${label} (${displayChord(chord, keys.platform)})`
+  }
   const activeLayer = () => layers.layers.find(layer => layer.id === layers.activeLayer)
   const creationBlocked = () => !props.ready || !activeLayer() || activeLayer()?.locked === true
   const singleSelected = () => {
@@ -103,14 +124,14 @@ export default function CadRibbon(props: Props): JSX.Element {
       <span class="cad-ribbon-heading">{t("cad.ribbon.create")}</span>
       <div class="cad-ribbon-actions">
         <Action label={t("cad.drawing.title")} icon={<FileText size={13} />} disabled={!props.ready || !elements.elements.some(e => e.type === "parametric")} onClick={() => props.onDrawing?.()} />
-        <Action label={t("cad.ribbon.parametric")} icon={<Box size={13} />} disabled={creationBlocked()} onClick={() => setCreatePart("parametric")} />
+        <Action label={t("cad.ribbon.parametric")} hint={hintFor("parametric", t("cad.ribbon.parametric"))} icon={<Box size={13} />} disabled={creationBlocked()} onClick={() => setCreatePart("parametric")} />
       </div>
     </div>
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.sketch")}>
       <span class="cad-ribbon-heading">{t("cad.ribbon.sketch")}</span>
       <div class="cad-ribbon-actions">
         <For each={[{ type: "line", label: t("cad.ribbon.line"), icon: <Minus size={13} /> }, { type: "circle", label: t("cad.ribbon.circle"), icon: <Circle size={13} /> }, { type: "rectangle", label: t("cad.ribbon.rectangle"), icon: <Square size={13} /> }] as const}>{tool =>
-          <Action label={tool.label} icon={tool.icon} disabled={creationBlocked()} onClick={() => setCreatePart(tool.type)} />
+          <Action label={tool.label} hint={hintFor(tool.type, tool.label)} icon={tool.icon} disabled={creationBlocked()} onClick={() => setCreatePart(tool.type)} />
         }</For>
       </div>
     </div>
@@ -118,7 +139,7 @@ export default function CadRibbon(props: Props): JSX.Element {
       <span class="cad-ribbon-heading">{t("cad.ribbon.solids")}</span>
       <div class="cad-ribbon-actions">
         <For each={[{ type: "cube", label: t("cad.ribbon.box"), icon: <Box size={13} /> }, { type: "cylinder", label: t("cad.ribbon.cylinder"), icon: <SvgIcon name="cylinder" size={13} /> }, { type: "sphere", label: t("cad.ribbon.sphere"), icon: <Circle size={13} /> }, { type: "cone", label: t("cad.ribbon.cone"), icon: <Triangle size={13} /> }, { type: "torus", label: t("cad.ribbon.torus"), icon: <SvgIcon name="torus" size={13} /> }] as const}>{tool =>
-          <Action label={tool.label} icon={tool.icon} disabled={creationBlocked()} onClick={() => setCreatePart(tool.type)} />
+          <Action label={tool.label} hint={hintFor(tool.type, tool.label)} icon={tool.icon} disabled={creationBlocked()} onClick={() => setCreatePart(tool.type)} />
         }</For>
       </div>
     </div>

@@ -17,6 +17,7 @@ import {
 } from "../src/shared/keybindings/service.ts"
 import { createKeybindings, isActivatable, isTextEntry } from "../src/shared/keybindings/controller.ts"
 import { en } from "../src/i18n/index.ts"
+import { menuAccelerators, toAccelerator } from "../src/app/native-menu.ts"
 
 const key = (k: string, mods: Partial<KeyEventLike> = {}): KeyEventLike =>
   ({ key: k, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...mods })
@@ -24,7 +25,13 @@ const key = (k: string, mods: Partial<KeyEventLike> = {}): KeyEventLike =>
 describe("chords", () => {
   test("parse and format round-trip every spelling to one canonical form", () => {
     expect(canonicalChord("cmd/ctrl+shift+z")).toBe("Mod+Shift+Z")
-    expect(canonicalChord("Control + Option + a")).toBe("Ctrl+Alt+A")
+    // Ctrl is the command key on Windows/Linux and a separate key on macOS, where Cmd is the command key.
+    expect(canonicalChord("Control + Option + a", "other")).toBe("Mod+Alt+A")
+    expect(canonicalChord("Control + Option + a", "mac")).toBe("Ctrl+Alt+A")
+    expect(canonicalChord("Cmd+Shift+z", "mac")).toBe("Mod+Shift+Z")
+    expect(canonicalChord("Win+L", "other")).toBe("Meta+L")
+    expect(canonicalChord("Ctrl+Mod+L", "other")).toBeUndefined()
+    expect(matchesChord(key("k", { ctrlKey: true, shiftKey: true, code: "KeyK" }), parseChord("Ctrl+Shift+K", "other")!, "other")).toBe(true)
     expect(canonicalChord("Mod+Escape")).toBe("Mod+Escape")
     expect(canonicalChord("esc")).toBe("Escape")
     expect(canonicalChord("Mod++")).toBe("Mod++")
@@ -362,10 +369,10 @@ const press = (target: EventTarget | null, k: string, mods: Partial<KeyEventLike
 const element = (tagName: string, extra: Record<string, unknown> = {}): HTMLElement =>
   ({ tagName, isContentEditable: false, getAttribute: () => null, ...extra }) as unknown as HTMLElement
 
-const controller = (activity: string = "cad", extra: { dialog?: boolean } = {}) => {
+const controller = (activity: string = "cad", extra: { dialog?: boolean; platform?: "mac" | "other" } = {}) => {
   const [current, setActivity] = createSignal(activity)
   const [dialog, setDialog] = createSignal(extra.dialog === true)
-  const keys = createRoot(() => createKeybindings({ activity: current, store: KeybindingStore.memory(), platform: "other", dialogOpen: dialog }))
+  const keys = createRoot(() => createKeybindings({ activity: current, store: KeybindingStore.memory(), platform: extra.platform ?? "other", dialogOpen: dialog }))
   return { keys, setActivity, setDialog }
 }
 
@@ -533,5 +540,141 @@ describe("the dispatcher", () => {
     expect(keys.run("app.shortcuts")).toBe(true)
     expect(opened).toBe(1)
     expect(keys.run("app.go.cam")).toBe(false)
+  })
+})
+
+describe("the native menu follows the keymap", () => {
+  // Ctrl is its own key on macOS (and the command key elsewhere), so the platform is explicit here.
+  const accel = (text: string): string | undefined => toAccelerator(parseChord(text, "mac")!)
+
+  test("chords become Tauri accelerators; plain keys and nameless symbols stay out of the menu", () => {
+    expect(accel("Mod+Shift+Z")).toBe("CmdOrCtrl+Shift+Z")
+    expect(accel("Mod+Alt+1")).toBe("CmdOrCtrl+Alt+1")
+    expect(accel("Mod+=")).toBe("CmdOrCtrl+=")
+    expect(accel("Mod++")).toBe("CmdOrCtrl+Plus")
+    expect(accel("Alt+Shift+T")).toBe("Alt+Shift+T")
+    expect(accel("Mod+Enter")).toBe("CmdOrCtrl+Enter")
+    expect(accel("Ctrl+ArrowUp")).toBe("Ctrl+Up")
+    expect(accel("Mod+F5")).toBe("CmdOrCtrl+F5")
+    // A bare key in the menu would be taken away from every text field.
+    for (const plain of ["F", "=", "Space", "Escape", "Shift+A", "?"]) expect(accel(plain), plain).toBeUndefined()
+  })
+
+  test("each menu item shows the first chord of its command, and loses it when the command is unbound", () => {
+    const defaults = menuAccelerators(buildKeymap())
+    expect(defaults["file.save"]).toBe("CmdOrCtrl+S")
+    expect(defaults["file.export_gcode"]).toBe("CmdOrCtrl+Shift+E")
+    expect(defaults["view.zoom_in"]).toBe("CmdOrCtrl+=")
+    expect(defaults["view.zoom_fit"]).toBe("CmdOrCtrl+0")
+    expect(defaults["view.preset_top"]).toBe("CmdOrCtrl+1")
+    expect(defaults["view.toggle_console"]).toBe("CmdOrCtrl+J")
+    // The shell's own items keep Rust's accelerators: they are not in the map.
+    for (const own of ["file.new", "file.open", "view.toggle_left_panel", "view.toggle_right_panel"]) expect(own in defaults).toBe(false)
+
+    const remapped = menuAccelerators(buildKeymap({ "file.save": ["Mod+Shift+K"], "view.zoomFit": [], "cad.view.top": ["T"] }))
+    expect(remapped["file.save"]).toBe("CmdOrCtrl+Shift+K")
+    expect(remapped["view.zoom_fit"]).toBeNull()
+    // A command whose only chord is a plain key has no menu accelerator.
+    expect(remapped["view.preset_top"]).toBeNull()
+  })
+})
+
+/** The event a keyboard produces for a chord on `platform`: the inverse of `chordFromEvent`. */
+const eventFor = (text: string, platform: "mac" | "other", target: EventTarget | null = element("DIV")): KeyboardEvent => {
+  const chord = parseChord(text)!
+  const named: Record<string, string> = { space: " ", escape: "Escape", enter: "Enter", tab: "Tab", backspace: "Backspace", delete: "Delete", home: "Home", end: "End", arrowup: "ArrowUp", arrowdown: "ArrowDown", arrowleft: "ArrowLeft", arrowright: "ArrowRight" }
+  const printed = named[chord.key] ?? (/^f\d+$/.test(chord.key) ? chord.key.toUpperCase() : chord.shift ? chord.key.toUpperCase() : chord.key)
+  const code = /^[a-z]$/.test(chord.key) ? `Key${chord.key.toUpperCase()}` : /^\d$/.test(chord.key) ? `Digit${chord.key}` : undefined
+  return press(target, printed, {
+    ...(code === undefined ? {} : { code }),
+    ctrlKey: platform === "mac" ? chord.ctrl : chord.mod || chord.ctrl,
+    metaKey: platform === "mac" ? chord.mod : chord.meta,
+    altKey: chord.alt, shiftKey: chord.shift
+  })
+}
+const phaseOf = (text: string): "capture" | "bubble" => (hasCommandModifier(parseChord(text)!) ? "capture" : "bubble")
+const pageOf = (scope: string): string => (scope === "global" ? "projects" : scope)
+
+describe("every command, every default chord, both platforms", () => {
+  for (const platform of ["mac", "other"] as const) {
+    test(`each default chord runs exactly its command on ${platform}`, () => {
+      const { keys, setActivity } = controller("projects", { platform })
+      const ran: string[] = []
+      keys.register(Object.fromEntries(COMMANDS.map((command) => [command.id, () => { ran.push(command.id) }])))
+      let tried = 0
+      for (const command of COMMANDS) {
+        setActivity(pageOf(command.scope))
+        for (const text of command.defaults) {
+          ran.length = 0
+          const event = eventFor(text, platform)
+          const handled = keys.dispatch(event, phaseOf(text))
+          expect(handled, `${command.id} ${text} on ${platform}`).toBe(true)
+          expect(ran, `${command.id} ${text} on ${platform}`).toEqual([command.id])
+          expect(event.defaultPrevented, `${command.id} ${text}`).toBe(true)
+          tried++
+        }
+      }
+      expect(tried).toBeGreaterThan(70)
+    })
+  }
+
+  test("a command of a page does nothing on the other page", () => {
+    const { keys, setActivity } = controller("cam")
+    const ran: string[] = []
+    keys.register(Object.fromEntries(COMMANDS.map((command) => [command.id, () => { ran.push(command.id) }])))
+    for (const command of COMMANDS.filter((candidate) => candidate.scope === "cad")) {
+      for (const text of command.defaults) {
+        const shared = COMMANDS.some((other) => other.scope !== "cad" && other.defaults.map((d) => canonicalChord(d)).includes(canonicalChord(text)))
+        if (shared) continue
+        ran.length = 0
+        expect(keys.dispatch(eventFor(text, "other"), phaseOf(text)), `${command.id} ${text} on CAM`).toBe(false)
+        expect(ran).toEqual([])
+      }
+    }
+    setActivity("cad")
+    expect(keys.dispatch(eventFor("Mod+C", "other"), "capture")).toBe(true)
+  })
+
+  test("typing in a field: only commands flagged inText answer, and only with a modifier", () => {
+    const { keys, setActivity } = controller("projects")
+    const ran: string[] = []
+    keys.register(Object.fromEntries(COMMANDS.map((command) => [command.id, () => { ran.push(command.id) }])))
+    const field = element("INPUT", { type: "text" })
+    for (const command of COMMANDS) {
+      setActivity(pageOf(command.scope))
+      for (const text of command.defaults) {
+        ran.length = 0
+        const handled = keys.dispatch(eventFor(text, "other", field), phaseOf(text))
+        const expected = command.inText === true && hasCommandModifier(parseChord(text)!)
+        expect(handled, `${command.id} ${text} in a field`).toBe(expected)
+      }
+    }
+  })
+
+  test("every command can be rebound to a free chord: the new one runs it and the old ones stop", () => {
+    const { keys, setActivity } = controller("projects")
+    const ran: string[] = []
+    keys.register(Object.fromEntries(COMMANDS.map((command) => [command.id, () => { ran.push(command.id) }])))
+    COMMANDS.forEach((command, index) => {
+      // F1..F24 under four modifier sets: 96 chords, none of them a default and none reserved.
+      const fresh = `${["Mod+Alt+Shift", "Mod+Alt", "Mod+Shift", "Alt+Shift"][Math.floor(index / 24)]}+F${(index % 24) + 1}`
+      const result = keys.rebind(command.id, [fresh])
+      expect(result.ok ? "ok" : JSON.stringify(result.error), `${command.id} → ${fresh}`).toBe("ok")
+      setActivity(pageOf(command.scope))
+      ran.length = 0
+      expect(keys.dispatch(eventFor(fresh, "other"), "capture"), `${command.id} ${fresh}`).toBe(true)
+      expect(ran).toEqual([command.id])
+      for (const old of command.defaults) {
+        ran.length = 0
+        keys.dispatch(eventFor(old, "other"), phaseOf(old))
+        expect(ran, `${command.id} still answers ${old}`).not.toContain(command.id)
+      }
+    })
+    // And back: resetting all restores every default.
+    keys.resetAll()
+    setActivity("projects")
+    ran.length = 0
+    expect(keys.dispatch(eventFor("Mod+K", "other"), "capture")).toBe(true)
+    expect(ran).toEqual(["app.palette"])
   })
 })

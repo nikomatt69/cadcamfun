@@ -38,13 +38,33 @@ One command catalog, one keymap, one keyboard listener. Code: `apps/desktop/src/
   its labels), keymap rules, the Effect service, the dispatcher (`test/keybindings.test.ts`).
 - Screens: every catalog command has a registered handler (`keybindings-ui.test.ts`); CAM and CAD pages over the real
   sidecar handlers with keys pressed on the window (`keybindings-pages.test.ts`).
-- Real browser (Chromium + WebGL, real sidecar): 36 checks on 2026-10-26 - CAD transform modes, select all/escape,
+- Exhaustive: every default chord of every command on macOS and Windows/Linux, the text-field and page guards, and a
+  rebind-then-reset of every command (`keybindings.test.ts`).
+- Rust: `cargo test --test native_menu` (accelerator update).
+- Real browser (Chromium + WebGL, real sidecar): 41 checks on 2026-10-26 - CAD transform modes, select all/escape,
   boolean union and undo/redo, duplicate/delete, views, grid, snap, help dialog, palette, Settings > Keyboard rebind and
   conflict, CAM tabs (also from inside the editor), simulation Space, library, save. Recipe: standalone sidecar
   (`CADCAMFUN_TOKEN`, `CADCAMFUN_DATA_DIR`, `CADCAMFUN_MIGRATIONS_DIR`, stdin kept open), `vite --port 5199` with
   `VITE_SIDECAR_URL/TOKEN`, playwright-core with the cached chromium headless shell and `--use-angle=swiftshader`.
 
+## Native menu
+
+`NATIVE_MENU` (catalog) lists the menu items that are commands. At boot and on every change the shell sends the keymap to
+the menu bar (`app/native-menu.ts` -> Rust `set_menu_accelerators`): each item shows, and takes, the first chord of its
+command that has a command modifier (a plain key would be taken away from text fields). The static Rust accelerators
+are only the pre-sync defaults. The in-window menu of Windows/Linux shows the same chords.
+
+## Creation keys
+
+`cad.create.*` (Shift+L line, C circle, R rectangle, B box, Y cylinder, O sphere, N cone, T torus, P parametric) open
+the same part form as the ribbon buttons, whose tooltips show the user's chord. Plain letters stay with the transform
+commands (G/R/S/X/Y/Z) and F (fit).
+
+## Platform keys
+
+`Mod` is the platform's command key. Typing `Ctrl+K` on Windows/Linux or `Cmd+K` on macOS names `Mod+K`; `Ctrl` on macOS
+and `Meta`/`Win` elsewhere are separate keys.
+
 ## Open
 
-- Native menu accelerators are fixed in Rust; rebinding does not change them.
-- Drawing-tool letter keys (L, C, …) are not commands yet (the old dialog listed keys nothing answered).
+- None known. Click-to-place after a creation key is not a mode (the form takes the position).

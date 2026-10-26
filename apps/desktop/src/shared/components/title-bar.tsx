@@ -14,6 +14,7 @@ import { t, type Key } from "../../i18n/index.ts"
 import { isTauri } from "../../app/sidecar.ts"
 import { useAppOptional } from "../state/context.ts"
 import { displayChord } from "../keybindings/chord.ts"
+import { menuCommand } from "../keybindings/catalog.ts"
 
 export type MenuId = "file" | "edit" | "view" | "window" | "help"
 
@@ -110,6 +111,13 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
   const paletteChord = (): string | undefined => {
     const chord = keys?.keymap().entry("app.palette")?.chords[0]
     return chord === undefined || keys === undefined ? undefined : displayChord(chord, keys.platform)
+  }
+  /** The key an item shows: the user's chord when the item runs a catalog command, the static one otherwise. */
+  const acceleratorOf = (item: MenuItem): string | undefined => {
+    const command = menuCommand(item.id)
+    if (command === undefined || keys === undefined) return item.accelerator
+    const chord = keys.keymap().entry(command)?.chords[0]
+    return chord === undefined ? undefined : displayChord(chord, keys.platform)
   }
   const [open, setOpen] = createSignal<MenuId | undefined>(undefined)
   const withMenus = (): boolean => needsMenuFallback(props.forceMenus)
@@ -223,8 +231,8 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
                               }}
                             >
                               <span>{t(item.labelKey)}</span>
-                              <Show when={item.accelerator !== undefined}>
-                                <kbd class="text-xs text-gray-500">{item.accelerator}</kbd>
+                              <Show when={acceleratorOf(item) !== undefined}>
+                                <kbd class="text-xs text-gray-500">{acceleratorOf(item)}</kbd>
                               </Show>
                             </button>
                           </li>

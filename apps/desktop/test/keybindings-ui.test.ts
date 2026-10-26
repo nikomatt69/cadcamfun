@@ -27,7 +27,10 @@ test("every command has a handler registered by the screen that owns it", () => 
     // Face views and snap kinds are registered from their tables, everything else by its literal id.
     const tabled = command.id.startsWith("cad.snap.type.") ? SNAP_TYPES.some(([type]) => `cad.snap.type.${type}` === command.id) && owners.some((file) => read(file).includes("SNAP_TYPES.map"))
       : /^cad\.view\.(front|back|left|right|top|bottom)$/.test(command.id) && owners.some((file) => read(file).includes("CUBE_FACES.map"))
-    const literal = owners.some((file) => read(file).includes(`"${command.id}"`))
+    // Creation commands are registered from the ribbon's table of parts.
+    const created = command.id.startsWith("cad.create.") &&
+      read("features/cad/components/CadRibbon.tsx").includes(`${command.id.slice("cad.create.".length)}: "`) && read("features/cad/components/CadRibbon.tsx").includes("`cad.create.${name}`")
+    const literal = created || owners.some((file) => read(file).includes(`"${command.id}"`))
     expect(literal || tabled, `${command.id} has no handler in ${owners.join(" / ")}`).toBe(true)
   }
 })

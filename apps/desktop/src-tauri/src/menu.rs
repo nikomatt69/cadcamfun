@@ -1,7 +1,7 @@
 //! Native application menu. Items emit a `menu` event to the webview carrying the
 //! stable item id (for example `file.new`); the UI maps ids to commands.
 
-use tauri::menu::{Menu, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{Menu, MenuItemBuilder, MenuItemKind, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use crate::updater;
@@ -71,6 +71,34 @@ pub fn is_forwarded_id(id: &str) -> bool {
         .flat_map(|items| items.iter())
         .any(|(item_id, _, _)| *item_id == id)
         || id.starts_with("tray.recent.")
+}
+
+/// Replaces the accelerators of the forwarded items with the ones in `accelerators` (id -> accelerator, `None` removes it): the webview
+/// sends the user's keymap, so the menu bar shows and takes the keys they chose. Unknown ids and ids the shell handles itself are
+/// ignored, and one item that refuses its accelerator does not stop the others.
+pub fn set_accelerators<R: Runtime>(
+    app: &AppHandle<R>,
+    accelerators: &std::collections::HashMap<String, Option<String>>,
+) -> tauri::Result<()> {
+    let Some(menu) = app.menu() else {
+        return Ok(());
+    };
+    for kind in menu.items()? {
+        let MenuItemKind::Submenu(submenu) = kind else {
+            continue;
+        };
+        for (id, accelerator) in accelerators {
+            if !is_forwarded_id(id) {
+                continue;
+            }
+            if let Some(MenuItemKind::MenuItem(item)) = submenu.get(id) {
+                if let Err(err) = item.set_accelerator(accelerator.as_deref()) {
+                    log::warn!("menu item {id} refused the accelerator {accelerator:?}: {err}");
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn add_items<'a, R: Runtime, M: tauri::Manager<R>>(

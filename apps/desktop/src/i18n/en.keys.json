@@ -117,5 +117,15 @@
   "keys.mouse.zoom": "Zoom toward the cursor",
   "keys.mouse.add": "Add to selection",
   "keys.mouse.fit": "Zoom to the clicked element",
-  "settings.tab.keyboard": "Keyboard"
+  "settings.tab.keyboard": "Keyboard",
+  "keys.cmd.cad.create.line": "New line",
+  "keys.cmd.cad.create.circle": "New circle",
+  "keys.cmd.cad.create.rectangle": "New rectangle",
+  "keys.cmd.cad.create.box": "New box",
+  "keys.cmd.cad.create.cylinder": "New cylinder",
+  "keys.cmd.cad.create.sphere": "New sphere",
+  "keys.cmd.cad.create.cone": "New cone",
+  "keys.cmd.cad.create.torus": "New torus",
+  "keys.cmd.cad.create.parametric": "New parametric part",
+  "keys.group.create": "Create"
 }

@@ -15,10 +15,10 @@ export type Scope = "global" | "cad" | "cam"
 export const SCOPES: ReadonlyArray<Scope> = ["global", "cad", "cam"]
 
 export type CommandGroup =
-  | "navigation" | "file" | "edit" | "selection" | "view" | "snap" | "transform" | "boolean" | "simulation" | "panels" | "help"
+  | "navigation" | "file" | "edit" | "selection" | "view" | "snap" | "create" | "transform" | "boolean" | "simulation" | "panels" | "help"
 
 export const GROUPS: ReadonlyArray<CommandGroup> = [
-  "navigation", "file", "edit", "selection", "view", "snap", "transform", "boolean", "simulation", "panels", "help"
+  "navigation", "file", "edit", "selection", "view", "snap", "create", "transform", "boolean", "simulation", "panels", "help"
 ]
 
 export interface CommandDef {
@@ -68,8 +68,8 @@ export const COMMANDS: ReadonlyArray<CommandDef> = [
   def("edit.undo", "global", "edit", ["Mod+Z"]),
   def("edit.redo", "global", "edit", ["Mod+Shift+Z", "Mod+Y"]),
   def("edit.cancel", "global", "edit", ["Escape"]),
-  def("view.zoomIn", "global", "view", ["=", "+"], { repeat: true }),
-  def("view.zoomOut", "global", "view", ["-"], { repeat: true }),
+  def("view.zoomIn", "global", "view", ["Mod+=", "=", "+"], { repeat: true }),
+  def("view.zoomOut", "global", "view", ["Mod+-", "-"], { repeat: true }),
   def("view.zoomFit", "global", "view", ["F", "Mod+0"]),
 
   // ------------------------------------------------------------------------------------------- CAD page
@@ -88,13 +88,13 @@ export const COMMANDS: ReadonlyArray<CommandDef> = [
   def("cad.transform.commit", "cad", "transform", ["Enter"]),
   def("cad.view.mode3d", "cad", "view", ["Alt+1"]),
   def("cad.view.mode2d", "cad", "view", ["Alt+2"]),
-  def("cad.view.front", "cad", "view", ["Alt+Shift+F"]),
+  def("cad.view.front", "cad", "view", ["Mod+2", "Alt+Shift+F"]),
   def("cad.view.back", "cad", "view", ["Alt+Shift+K"]),
   def("cad.view.left", "cad", "view", ["Alt+Shift+L"]),
-  def("cad.view.right", "cad", "view", ["Alt+Shift+R"]),
-  def("cad.view.top", "cad", "view", ["Alt+Shift+T"]),
+  def("cad.view.right", "cad", "view", ["Mod+3", "Alt+Shift+R"]),
+  def("cad.view.top", "cad", "view", ["Mod+1", "Alt+Shift+T"]),
   def("cad.view.bottom", "cad", "view", ["Alt+Shift+B"]),
-  def("cad.view.iso", "cad", "view", ["Alt+Shift+I"]),
+  def("cad.view.iso", "cad", "view", ["Mod+4", "Alt+Shift+I"]),
   def("cad.view.projection", "cad", "view", ["Alt+Shift+O"]),
   def("cad.view.fourViews", "cad", "view", ["Alt+Shift+4"]),
   def("cad.view.grid", "cad", "view", ["Mod+G"]),
@@ -102,6 +102,15 @@ export const COMMANDS: ReadonlyArray<CommandDef> = [
   def("cad.view.fullscreen", "cad", "view", ["F11", "Alt+F"]),
   def("cad.snap.toggle", "cad", "snap", ["Alt+S"]),
   ...SNAP_TYPES.map(([type, chord]) => def(`cad.snap.type.${type}`, "cad", "snap", chord === undefined ? [] : [chord])),
+  def("cad.create.line", "cad", "create", ["Shift+L"]),
+  def("cad.create.circle", "cad", "create", ["Shift+C"]),
+  def("cad.create.rectangle", "cad", "create", ["Shift+R"]),
+  def("cad.create.box", "cad", "create", ["Shift+B"]),
+  def("cad.create.cylinder", "cad", "create", ["Shift+Y"]),
+  def("cad.create.sphere", "cad", "create", ["Shift+O"]),
+  def("cad.create.cone", "cad", "create", ["Shift+N"]),
+  def("cad.create.torus", "cad", "create", ["Shift+T"]),
+  def("cad.create.parametric", "cad", "create", ["Shift+P"]),
   def("cad.boolean.union", "cad", "boolean", ["Mod+Alt+U"]),
   def("cad.boolean.subtract", "cad", "boolean", ["Mod+Alt+D"]),
   def("cad.boolean.intersect", "cad", "boolean", ["Mod+Alt+I"]),

@@ -159,6 +159,7 @@ pub fn run() {
             commands::take_opened_files,
             commands::read_opened_file,
             commands::set_recent_projects,
+            commands::set_menu_accelerators,
             commands::check_for_updates,
             commands::get_update_status,
             commands::install_update,
