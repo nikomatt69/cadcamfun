@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.31 (October 2026)
+
+## Desktop
+
+- The elements list keeps its keys on its panel; guards against stray key listeners; import/export tested
+
 ## v0.1.30 (October 2026)
 
 ## Mobile
