@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Text, View } from "react-native"
-import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { useLocalSearchParams, useRouter } from "expo-router"
+import { Trash2, UserRound } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
@@ -11,12 +12,14 @@ import type { OrganizationDetails } from "@/lib/client"
 import { PageScroll } from "@/components/layout/page-scroll"
 import { TextField } from "@/components/ui/TextField"
 import { ActionButton } from "@/components/ui/ActionButton"
-import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { Skeleton } from "@/components/ui/Skeleton"
-import { ListRow } from "@/components/ui/ListRow"
+import { Pill } from "@/components/ui/Pill"
 import { toast } from "@/components/ui/ToastHost"
 import { type } from "@/lib/typography"
+import { ChoiceRow, DividedRows, SheetSection, SheetSummary, TILE_INSET } from "@/components/chat/sheet-parts"
+import { FactRow, FactsCard, NavRow } from "@/components/manage/settings-parts"
+import { ScreenFrame } from "@/components/manage/ScreenFrame"
 
 /**
  * One organization at desktop parity: overview, members with roles, and settings.
@@ -64,44 +67,50 @@ export default function OrganizationScreen() {
   const canUpdate = org ? canUpdateOrganization(org.userRole) : false
   const canDelete = org ? canDeleteOrganization(org.userRole) : false
 
-  return <>
-    <Stack.Screen options={{ title: org?.name ?? "Organization" }} />
-    <PageScroll>
-      {loading && !org ? <Skeleton style={{ height: 220 }} /> : <>
-        {error ? <ErrorBanner message={error} actionLabel="Retry" onAction={() => void load()} /> : null}
-        {org ? <>
-          <SurfaceCard title="Overview" description={org.description ?? "No description."}>
-            <View style={{ padding: 16, gap: 6 }}>
-              {([["Your role", org.userRole], ["Members", String(org.members.length)], ["Projects", String(org.projectCount)], ["Created", relativeTime(org.createdAt)], ["Updated", relativeTime(org.updatedAt)]] as const).map(([label, value]) => (
-                <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", gap: 12, paddingVertical: 4 }}>
-                  <Text style={{ color: palette.muted, ...type(14) }}>{label}</Text>
-                  <Text selectable style={{ color: palette.ink, ...type(14, { weight: "600" }) }}>{value}</Text>
-                </View>))}
-            </View>
-          </SurfaceCard>
+  return (
+    <ScreenFrame title={org?.name ?? "Organization"} {...(org ? { subtitle: `Your role · ${org.userRole}` } : {})} backLabel="Back to organizations">
+      <PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ gap: 24 }}>
+        {loading && !org ? <Skeleton style={{ height: 220 }} /> : <>
+          {error ? <ErrorBanner message={error} actionLabel="Retry" onAction={() => void load()} /> : null}
+          {org ? <>
+            <SheetSummary eyebrow="Organization" title={org.name} description={org.description ?? "No description."} />
+            <SheetSection title="Overview">
+              <FactsCard>
+                {([["Your role", org.userRole], ["Members", String(org.members.length)], ["Projects", String(org.projectCount)], ["Created", relativeTime(org.createdAt)], ["Updated", relativeTime(org.updatedAt)]] as const).map(([label, value]) => (
+                  <FactRow key={label} label={label} value={value} />
+                ))}
+              </FactsCard>
+            </SheetSection>
 
-          <SurfaceCard title="Members" description="Roles as stored on the desktop. Invites and role changes are managed there.">
-            <View>
-              {org.members.map((member, index) => (
-                <View key={member.id}>
-                  {index > 0 ? <View style={{ height: 0.5, backgroundColor: palette.border, marginLeft: 16 }} /> : null}
-                  <ListRow title={member.name ?? member.email ?? "Unnamed member"} subtitle={member.email ?? undefined}
-                    trailing={<Text style={{ color: palette.accentStrong, ...type(12, { weight: "700" }) }}>{member.role}</Text>} showChevron={false} />
-                </View>))}
-              {org.members.length === 0 ? <Text style={{ color: palette.muted, padding: 16, ...type(14) }}>No members yet.</Text> : null}
-            </View>
-          </SurfaceCard>
+            <SheetSection title={`Members · ${org.members.length}`} footer="Roles as stored on the desktop. Invites and role changes are managed there.">
+              {org.members.length > 0 ? (
+                <DividedRows inset={TILE_INSET}>
+                  {org.members.map((member) => (
+                    <NavRow key={member.id} icon={UserRound} title={member.name ?? member.email ?? "Unnamed member"} {...(member.email && member.name ? { description: member.email } : {})}
+                      trailing={<Pill tone="accent">{member.role}</Pill>} />
+                  ))}
+                </DividedRows>
+              ) : <Text style={{ color: palette.muted, paddingHorizontal: 4, ...type(14) }}>No members yet.</Text>}
+            </SheetSection>
 
-          {canUpdate ? <SurfaceCard title="Settings" description={canDelete ? "You administer this organization." : "Managers can rename; only admins can delete."}>
-            <View style={{ gap: 14, padding: 16 }}>
-              <TextField label="Name" value={name} onChangeText={setName} placeholder="Organization name" />
-              <TextField label="Description" value={description} onChangeText={setDescription} placeholder="Optional" multiline />
-              <ActionButton label="Save changes" loading={busy} disabled={name.trim() === ""} onPress={() => { if (client && id) void run(() => client.updateOrganization(id, name.trim(), description || null), "Organization saved") }} />
-              {canDelete ? <ActionButton label="Delete organization" variant="danger" loading={busy} onPress={() => void remove()} /> : null}
-            </View>
-          </SurfaceCard> : <SurfaceCard title="Settings"><Text style={{ color: palette.muted, padding: 16, ...type(14) }}>Members can view this organization. Ask an admin to change it.</Text></SurfaceCard>}
-        </> : null}
-      </>}
-    </PageScroll>
-  </>
+            {canUpdate ? (
+              <SheetSection title="Settings" footer={canDelete ? "You administer this organization." : "Managers can rename; only admins can delete."}>
+                <View style={{ gap: 14 }}>
+                  <TextField label="Name" value={name} onChangeText={setName} placeholder="Organization name" />
+                  <TextField label="Description" value={description} onChangeText={setDescription} placeholder="Optional" multiline />
+                  <ActionButton label="Save changes" loading={busy} disabled={name.trim() === ""} onPress={() => { if (client && id) void run(() => client.updateOrganization(id, name.trim(), description || null), "Organization saved") }} />
+                </View>
+              </SheetSection>
+            ) : <Text style={{ color: palette.muted, paddingHorizontal: 4, ...type(13) }}>Members can view this organization. Ask an admin to change it.</Text>}
+
+            {canDelete ? (
+              <DividedRows inset={TILE_INSET}>
+                <ChoiceRow icon={Trash2} destructive title="Delete organization" description="Removes it from the desktop too" busy={busy} onPress={() => void remove()} />
+              </DividedRows>
+            ) : null}
+          </> : null}
+        </>}
+      </PageScroll>
+    </ScreenFrame>
+  )
 }

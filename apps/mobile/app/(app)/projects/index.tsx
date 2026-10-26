@@ -1,47 +1,63 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { RefreshControl, StyleSheet, Text, TextInput, View } from "react-native"
-import { FlashList } from "@shopify/flash-list"
-import { Stack, useRouter } from "expo-router"
-import { ArrowUpRight, FolderOpen, Plus, Search } from "lucide-react-native"
-import { useSyncExternalStore } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { KeyboardAvoidingView, Platform, TextInput, View } from "react-native"
+import { SafeAreaView } from "react-native-screens/experimental"
+import { useRouter } from "expo-router"
+import { ArrowRight, Check, Folder, FolderOpen, Funnel, Pencil, Search, Sparkles, Trash2 } from "lucide-react-native"
+import type { ProjectSummary } from "@/lib/client"
 import { useUIStore } from "@/lib/store"
 import { accountStore } from "@/lib/account"
-import { ActionButton } from "@/components/ui/ActionButton"
-import { BottomSheet } from "@/components/ui/BottomSheet"
-import { TextField } from "@/components/ui/TextField"
-import { toast } from "@/components/ui/ToastHost"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
 import { usePoll } from "@/lib/use-poll"
 import { useTheme } from "@/lib/theme"
-import { useContentLayout } from "@/components/layout/use-content-layout"
 import { haptic } from "@/lib/haptics"
-import { chooseAction, confirmDelete, promptText } from "@/lib/manage"
-import { PressableScale } from "@/components/ui/PressableScale"
+import { confirmDelete, promptText } from "@/lib/manage"
+import { relativeTime } from "@/lib/format"
+import { PROJECT_FILTERS, PROJECT_SORTS, listProjects, projectMeta, type ProjectFilter, type ProjectSort } from "@/lib/project-list"
+import { ActionButton } from "@/components/ui/ActionButton"
+import { BottomSheet } from "@/components/ui/BottomSheet"
 import { EmptyState } from "@/components/ui/EmptyState"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
-import { Skeleton } from "@/components/ui/Skeleton"
-import { SurfaceCard } from "@/components/ui/SurfaceCard"
-import { IconTile } from "@/components/ui/icon-tile"
+import { IconCircleButton } from "@/components/ui/IconCircleButton"
+import { ListRow } from "@/components/ui/ListRow"
+import { SearchDock } from "@/components/ui/SearchDock"
+import { TextField } from "@/components/ui/TextField"
+import { toast } from "@/components/ui/ToastHost"
 import { BrandMark } from "@/components/layout/BrandMark"
-import { Pill } from "@/components/ui/Pill"
-import { relativeTime } from "@/lib/format"
-import { caps, type } from "@/lib/typography"
-import { layout } from "@/lib/layout"
+import { CenteredScreenHeader } from "@/components/layout/CenteredScreenHeader"
+import { useContentLayout } from "@/components/layout/use-content-layout"
+import { ChoiceRow, DividedRows, SheetSection } from "@/components/chat/sheet-parts"
+import { RowList } from "@/components/project/RowList"
+import { FlatRow } from "@/components/project/rows"
 
+/** iOS cannot present an alert over a sheet that is still dismissing; the next step waits for it. */
+const AFTER_DISMISS_MS = 350
+
+/**
+ * The projects of the paired desktop, laid out like nikcli's sessions index and this app's conversations list:
+ * a centred header with a filter, flat rows under day headings, and one glass dock at the foot — search beside
+ * the primary action, "New".
+ */
 export default function ProjectsScreen() {
   const { client, config, connectivity } = useServer()
   const { palette } = useTheme()
-  const { gutter, fontScale, onLayout } = useContentLayout()
+  const { gutter, onLayout } = useContentLayout()
   const router = useRouter()
-  const [query, setQuery] = useState("")
   const account = useSyncExternalStore(accountStore.subscribe, accountStore.account)
+  const assistantProjectId = useUIStore((state) => state.assistantProjectId)
+  const setAssistantProject = useUIStore((state) => state.setAssistantProject)
+  const [query, setQuery] = useState("")
+  const [sort, setSort] = useState<ProjectSort>("recent")
+  const [filter, setFilter] = useState<ProjectFilter>("all")
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const [actionsFor, setActionsFor] = useState<ProjectSummary | null>(null)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState("")
   const [newDescription, setNewDescription] = useState("")
   const [createBusy, setCreateBusy] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const descriptionRef = useRef<TextInput>(null)
+
   const resource = useResource(
     useCallback((signal) => client ? client.projects(signal) : Promise.reject(new Error("Not connected")), [client]), "projects",
     { cacheKey: `projects:${config?.fingerprint ?? ""}:${account?.subject ?? "local"}` },
@@ -52,33 +68,47 @@ export default function ProjectsScreen() {
   useEffect(() => {
     if (resource.data && !resource.stale && !resource.error) useUIStore.getState().forgetMissingProjects(resource.data.map((project) => project.id))
   }, [resource.data, resource.stale, resource.error])
-  const projects = resource.data ?? []
-  const list = useMemo(() => [...projects]
-    .filter((project) => `${project.name} ${project.description ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()), [resource.data, query])
+
+  const sections = useMemo(() => listProjects(resource.data ?? [], { query, sort, filter }), [resource.data, query, sort, filter])
+  const customised = sort !== "recent" || filter !== "all"
+
+  const open = (project: ProjectSummary) => router.push(`/projects/${project.id}`)
+
+  const askAssistant = (project: ProjectSummary) => {
+    haptic("selection")
+    setAssistantProject(project.id)
+    router.navigate("/assistant")
+  }
 
   /** Rename or delete a project on the desktop; the list follows the desktop's answer. */
-  const manageProject = async (project: { id: string; name: string }) => {
+  const rename = async (project: ProjectSummary) => {
     if (!client) return
-    const choice = await chooseAction(project.name, ["Rename", "Delete"], "Delete")
     try {
-      if (choice === "Rename") {
-        const name = await promptText("Rename project", undefined, project.name)
-        if (!name || name === project.name) return
-        await client.renameProject(project.id, name)
-        toast("Project renamed", "success")
-      } else if (choice === "Delete") {
-        if (!await confirmDelete(`Delete “${project.name}”?`, "Its designs, components, toolpaths and history are removed from the desktop too. This cannot be undone.")) return
-        await client.deleteProject(project.id)
-        toast("Project deleted", "success")
-      } else return
+      const name = await promptText("Rename project", undefined, project.name)
+      if (!name || name === project.name) return
+      await client.renameProject(project.id, name)
       haptic("success")
+      toast("Project renamed", "success")
       await resource.reload()
     } catch (cause) {
       haptic("error")
       toast(cause instanceof Error ? cause.message : "The desktop refused the change", "error")
     }
   }
+  const remove = async (project: ProjectSummary) => {
+    if (!client) return
+    try {
+      if (!await confirmDelete(`Delete “${project.name}”?`, "Its designs, components, toolpaths and history are removed from the desktop too. This cannot be undone.")) return
+      await client.deleteProject(project.id)
+      haptic("success")
+      toast("Project deleted", "success")
+      await resource.reload()
+    } catch (cause) {
+      haptic("error")
+      toast(cause instanceof Error ? cause.message : "The desktop refused the change", "error")
+    }
+  }
+  const afterSheet = (step: () => void) => { setActionsFor(null); setTimeout(step, AFTER_DISMISS_MS) }
 
   const create = async () => {
     if (!client || !newName.trim()) return
@@ -99,66 +129,105 @@ export default function ProjectsScreen() {
       setCreateBusy(false)
     }
   }
+  const startCreate = () => { haptic("selection"); setCreateError(null); setCreating(true) }
 
-  return <>
-    <BottomSheet open={creating} onClose={() => setCreating(false)} title="New project">
-      <View style={{ paddingHorizontal: layout.gutter, gap: 16 }}>
+  const searching = query.trim() !== ""
+  const empty = searching ? (
+    <EmptyState title="No matches" description={`No project has “${query.trim()}” in its name or description.`} icon={<Search size={25} color={palette.muted} />}
+      action={<ActionButton variant="secondary" label="Clear search" onPress={() => { haptic("selection"); setQuery("") }} />} />
+  ) : filter !== "all" ? (
+    <EmptyState title="Nothing changed this week" description="Show every project, or pick another filter." icon={<Folder size={25} color={palette.muted} />}
+      action={<ActionButton variant="secondary" label="Show all" onPress={() => { haptic("selection"); setFilter("all") }} />} />
+  ) : (
+    <EmptyState title="Your workspace starts here" description="Create a project. Its designs, history and reviews will appear here." icon={<FolderOpen size={25} color={palette.accent} />}
+      action={<ActionButton label="New project" onPress={startCreate} />} />
+  )
+
+  return (
+    <SafeAreaView edges={{ top: true, bottom: true, left: true, right: true }} onLayout={onLayout} style={{ flex: 1, backgroundColor: palette.background }}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: gutter, paddingTop: 8, paddingBottom: 4 }}>
+          <CenteredScreenHeader
+            title="Projects"
+            {...(config?.name ? { subtitle: config.name } : {})}
+            left={<BrandMark size={32} wordmark={false} stacked={false} />}
+            right={
+              <IconCircleButton
+                tone="warm"
+                accessibilityLabel={customised ? "Sort and filter projects, changed" : "Sort and filter projects"}
+                accessibilityHint="Sorts by date or name and shows this week's projects"
+                onPress={() => { haptic("selection"); setOptionsOpen(true) }}
+              >
+                <Funnel size={18} color={palette.ink} strokeWidth={2.2} fill={customised ? palette.ink : "none"} />
+              </IconCircleButton>
+            }
+          />
+        </View>
+        <RowList<ProjectSummary>
+          source={resource}
+          sections={sections}
+          keyExtractor={(item) => item.id}
+          extraData={assistantProjectId}
+          loadingLabel="Loading projects"
+          failureTitle="Could not load projects"
+          empty={empty}
+          renderRow={(item) => {
+            const current = item.id === assistantProjectId
+            return (
+              <FlatRow
+                leading={<FolderOpen size={19} color={current ? palette.accent : palette.muted} strokeWidth={2} />}
+                title={item.name}
+                {...(item.description ? { subtitle: item.description } : {})}
+                meta={projectMeta([current && "In the assistant", relativeTime(item.updatedAt)])}
+                onPress={() => { haptic("selection"); open(item) }}
+                onLongPress={() => { haptic("selection"); setActionsFor(item) }}
+                accessibilityHint="Opens this project. Long press for actions."
+                selected={current}
+              />
+            )
+          }}
+        />
+        <SearchDock gutter={gutter} actionLabel="New" onAction={startCreate} value={query} onChangeText={setQuery} placeholder="Search projects" />
+      </KeyboardAvoidingView>
+
+      <BottomSheet open={optionsOpen} onClose={() => setOptionsOpen(false)} title="Sort and filter" padded>
+        <SheetSection title="Sort by">
+          <DividedRows>
+            {PROJECT_SORTS.map((item) => (
+              <ListRow key={item.id} title={item.label} subtitle={item.description} selected={item.id === sort} showChevron={false}
+                trailing={item.id === sort ? <Check size={18} color={palette.ink} strokeWidth={2.4} /> : undefined}
+                onPress={() => { if (item.id !== sort) haptic("selection"); setSort(item.id) }} />
+            ))}
+          </DividedRows>
+        </SheetSection>
+        <SheetSection title="Show">
+          <DividedRows>
+            {PROJECT_FILTERS.map((item) => (
+              <ListRow key={item.id} title={item.label} subtitle={item.description} selected={item.id === filter} showChevron={false}
+                trailing={item.id === filter ? <Check size={18} color={palette.ink} strokeWidth={2.4} /> : undefined}
+                onPress={() => { if (item.id !== filter) haptic("selection"); setFilter(item.id) }} />
+            ))}
+          </DividedRows>
+        </SheetSection>
+      </BottomSheet>
+
+      <BottomSheet open={actionsFor !== null} onClose={() => setActionsFor(null)} title={actionsFor?.name ?? "Project"} padded>
+        {actionsFor ? (
+          <DividedRows>
+            <ChoiceRow icon={ArrowRight} title="Open project" description="History, pull requests and the workspace" onPress={() => { const target = actionsFor; afterSheet(() => open(target)) }} />
+            <ChoiceRow icon={Sparkles} title="Ask the assistant" description="Work on this project in the Assistant tab" onPress={() => { const target = actionsFor; setActionsFor(null); askAssistant(target) }} />
+            <ChoiceRow icon={Pencil} title="Rename" description="Change the name on the desktop too" onPress={() => { const target = actionsFor; afterSheet(() => void rename(target)) }} />
+            <ChoiceRow icon={Trash2} destructive title="Delete" description="Removes the project from the desktop" onPress={() => { const target = actionsFor; afterSheet(() => void remove(target)) }} />
+          </DividedRows>
+        ) : null}
+      </BottomSheet>
+
+      <BottomSheet open={creating} onClose={() => setCreating(false)} title="New project" padded>
         <TextField label="Name" value={newName} onChangeText={setNewName} placeholder="Gripper assembly" autoCapitalize="sentences" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => descriptionRef.current?.focus()} editable={!createBusy} />
         <TextField ref={descriptionRef} label="Description" value={newDescription} onChangeText={setNewDescription} placeholder="Optional" returnKeyType="done" onSubmitEditing={() => { if (newName.trim() && !createBusy) void create() }} editable={!createBusy} />
         {createError ? <ErrorBanner message={createError} /> : null}
         <ActionButton label="Create project" loading={createBusy} disabled={createBusy || !newName.trim()} onPress={() => void create()} />
-      </View>
-    </BottomSheet>
-    <Stack.Screen options={{ title: "Projects", headerSearchBarOptions: {
-      placeholder: "Search projects", hideWhenScrolling: false,
-      onChangeText: (event) => setQuery(event.nativeEvent.text), onCancelButtonPress: () => setQuery(""),
-      tintColor: palette.accent,
-    } }} />
-    <FlashList data={list} keyExtractor={(item) => item.id} onLayout={onLayout} style={{ flex: 1, backgroundColor: palette.background }}
-      contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
-      contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 12, paddingBottom: 32 }}
-      refreshControl={<RefreshControl refreshing={resource.loading && Boolean(resource.data)} onRefresh={() => void resource.reload()} tintColor={palette.accent} />}
-      ListHeaderComponent={<View style={{ gap: 20, paddingBottom: 16 }}>
-        <SurfaceCard tone="surface">
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-            <BrandMark size={48} wordmark={false} />
-            <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-              <Text style={{ color: palette.muted, ...caps(12) }}>Your workspace</Text>
-              <Text style={{ color: palette.ink, ...type(20, { weight: "700" }) }} numberOfLines={fontScale > 1.2 ? undefined : 2}>{config?.name || "Desktop projects"}</Text>
-            </View>
-          </View>
-          <Text style={{ marginTop: 14, color: palette.soft, ...type(14, { leadingScale: 1.05 }) }}>Review designs, inspect toolpaths and move work forward with your assistant.</Text>
-          <View style={{ paddingTop: 14, gap: 12, alignItems: "flex-start" }}>
-            <View style={{ alignSelf: "flex-start" }}><ActionButton label="New project" icon={<Plus size={19} color={palette.onAccent} />} fullWidth={false} onPress={() => { haptic("selection"); setCreating(true) }} /></View>
-            <Pill>{projects.length} {projects.length === 1 ? "project" : "projects"}</Pill></View>
-        </SurfaceCard>
-        {resource.error ? <ErrorBanner message={resource.stale ? `Showing saved projects. ${resource.error}` : resource.error} actionLabel="Try again" onAction={() => void resource.reload()} /> : null}
-        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", columnGap: 12, rowGap: 4 }}>
-          <Text accessibilityRole="header" style={{ flexShrink: 1, color: palette.ink, ...type(19, { weight: "700" }) }}>{query ? "Search results" : "Recent projects"}</Text>
-          <Text style={{ color: palette.muted, ...type(12) }}>Last updated</Text>
-        </View>
-      </View>}
-      ListEmptyComponent={resource.loading && !resource.data ? <View accessible accessibilityLabel="Loading projects" style={{ gap: 12 }}>{[0, 1, 2].map((key) => <Skeleton key={key} style={{ height: 144, borderRadius: layout.cardRadius }} />)}</View> : !resource.error ?
-        <EmptyState title={query ? "No matching projects" : "Your workspace starts here"} description={query ? "Try another project name or description." : "Tap New project to create one. Its designs, history and reviews will appear here."} icon={query ? <Search size={25} color={palette.accent} /> : <FolderOpen size={25} color={palette.accent} />} /> : null}
-      ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-      renderItem={({ item }) => <PressableScale subtle tint accessibilityLabel={`Open project ${item.name}`}
-        onPress={() => { haptic("selection"); router.push(`/projects/${item.id}`) }}
-        onLongPress={() => { haptic("selection"); void manageProject(item) }}
-        style={{ padding: 18, borderRadius: layout.cardRadius, borderCurve: "continuous", borderWidth: 0.5, borderColor: palette.border, backgroundColor: palette.surface, gap: 14 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <IconTile><FolderOpen size={21} color={palette.accent} /></IconTile>
-          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-            <Text style={{ color: palette.ink, ...type(18, { weight: "600" }) }} numberOfLines={fontScale > 1.2 ? undefined : 2}>{item.name}</Text>
-            <Text style={{ color: palette.muted, ...type(12) }}>{relativeTime(item.updatedAt)}</Text>
-          </View>
-          <ArrowUpRight size={19} color={palette.muted} />
-        </View>
-        <Text style={{ color: palette.soft, ...type(14, { leadingScale: 1.05 }) }} numberOfLines={fontScale > 1.2 ? undefined : 2}>{item.description || "Open this workspace to explore designs, toolpaths and project history."}</Text>
-        <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border, paddingTop: 12, flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", columnGap: 12, rowGap: 6 }}>
-          <Text style={{ color: palette.muted, ...type(12) }}>Design · Manufacture · Review</Text>
-          <Text style={{ color: palette.accent, ...type(12, { weight: "600" }) }}>Open workspace</Text>
-        </View>
-      </PressableScale>}
-    />
-  </>
+      </BottomSheet>
+    </SafeAreaView>
+  )
 }

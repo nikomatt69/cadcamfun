@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { useLocalSearchParams, useRouter } from "expo-router"
 import { useServer } from "@/lib/server"
 import { useResource, useRetained } from "@/lib/use-resource"
 import { useUIStore } from "@/lib/store"
@@ -8,6 +8,7 @@ import { haptic } from "@/lib/haptics"
 import { defineComponentPrompt } from "@/lib/preview-math"
 import { MeshReview } from "@/components/workspace/MeshReview"
 import { routeParam } from "@/components/workspace/route"
+import { ScreenFrame } from "@/components/project/ScreenFrame"
 
 export default function DrawingPreviewScreen() {
   const params = useLocalSearchParams<{ id: string; drawingId: string; name?: string }>()
@@ -42,8 +43,7 @@ export default function DrawingPreviewScreen() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ title: name, headerLargeTitle: false }} />
+    <ScreenFrame title={name}>
       <MeshReview
         title={name}
         mesh={mesh}
@@ -56,6 +56,6 @@ export default function DrawingPreviewScreen() {
         actionLabel="Define with the assistant"
         onAction={defineWithAssistant}
       />
-    </>
+    </ScreenFrame>
   )
 }

@@ -18,6 +18,13 @@ export const layout = {
   controlRadius: 16,
   contentWidth: 760,
   touchTarget: 44,
+  /** Visible height of a chip; its hit area is `touchTarget`. */
+  chipHeight: 36,
+  /** Resting height of a list row with a subtitle; `rowMinHeightDense` is the single-line row. */
+  rowMinHeight: 64,
+  rowMinHeightDense: 48,
+  /** Default control heights: regular buttons and text fields share one height so a form row lines up. */
+  controlHeight: 52,
 } as const
 
 export function contentGutter(width: number): number {

@@ -1,24 +1,37 @@
 import { useCallback, useMemo, useState } from "react"
-import { RefreshControl, Text, View } from "react-native"
-import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { KeyboardAvoidingView, Platform } from "react-native"
+import { useLocalSearchParams, useRouter } from "expo-router"
+import { Boxes, Cpu, Layers, Library, Search, Wrench, type LucideIcon } from "lucide-react-native"
 import type { WorkspaceEntry } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
 import { useTheme } from "@/lib/theme"
 import { useCommitRevision } from "@/lib/use-commit-revision"
 import { haptic } from "@/lib/haptics"
-import { routeParam } from "@/components/workspace/route"
-import { EmptyState } from "@/components/ui/EmptyState"
-import { ErrorBanner } from "@/components/ui/ErrorBanner"
-import { ListRow } from "@/components/ui/ListRow"
-import { Divider, SectionHeader } from "@/components/ui/SectionHeader"
-import { type } from "@/lib/typography"
-import { Skeleton } from "@/components/ui/Skeleton"
-import { PageScroll } from "@/components/layout/page-scroll"
-import { SurfaceCard } from "@/components/ui/SurfaceCard"
-import { Library, Search } from "lucide-react-native"
 import { filterEntries } from "@/lib/workspace-filter"
+import { routeParam } from "@/components/workspace/route"
+import { ActionButton } from "@/components/ui/ActionButton"
+import { EmptyState } from "@/components/ui/EmptyState"
+import { useContentLayout } from "@/components/layout/use-content-layout"
+import { ScreenFrame } from "@/components/project/ScreenFrame"
+import { RowList, type RowSection } from "@/components/project/RowList"
+import { FlatRow } from "@/components/project/rows"
+import { Dock } from "@/components/project/Dock"
 
+type Kind = "materials" | "tools" | "machines" | "components"
+type Row = WorkspaceEntry & { readonly kind: Kind }
+
+const KINDS: ReadonlyArray<{ kind: Kind; title: string; icon: LucideIcon }> = [
+  { kind: "materials", title: "Materials", icon: Layers },
+  { kind: "tools", title: "Tools", icon: Wrench },
+  { kind: "machines", title: "Machines", icon: Cpu },
+  { kind: "components", title: "Components", icon: Boxes },
+]
+
+/**
+ * The project's library — materials, tools, machines and components — as flat rows under one heading per kind,
+ * with the dock's search at the foot. Components open their 3D preview; the rest are read-only here.
+ */
 export default function LibraryScreen() {
   const params = useLocalSearchParams<{ id: string }>()
   const id = routeParam(params.id)
@@ -27,6 +40,7 @@ export default function LibraryScreen() {
   const router = useRouter()
   const revision = useCommitRevision(id)
 
+  const { gutter } = useContentLayout()
   const library = useResource(
     useCallback(
       (signal) => (client ? client.workspaceLibrary(id, signal) : Promise.reject(new Error("Not connected"))),
@@ -42,76 +56,45 @@ export default function LibraryScreen() {
 
   const [query, setQuery] = useState("")
   const searching = query.trim() !== ""
-  const catalogue = useMemo(() => library.data ? {
-    materials: filterEntries(library.data.materials, query),
-    tools: filterEntries(library.data.tools, query),
-    machines: filterEntries(library.data.machines, query),
-    components: filterEntries(library.data.components, query),
-  } : undefined, [library.data, query])
-  const count = (value: typeof catalogue) => value ? value.materials.length + value.tools.length + value.machines.length + value.components.length : 0
-  const total = library.data ? library.data.materials.length + library.data.tools.length + library.data.machines.length + library.data.components.length : 0
-  const empty = catalogue && count(catalogue) === 0
+  const total = library.data ? KINDS.reduce((sum, { kind }) => sum + library.data![kind].length, 0) : 0
+  const sections = useMemo((): RowSection<Row>[] => library.data ? KINDS.flatMap(({ kind, title }) => {
+    const rows = filterEntries(library.data![kind], query).map((entry) => ({ ...entry, kind }))
+    return rows.length > 0 ? [{ title: `${title} · ${rows.length}`, data: rows }] : []
+  }) : [], [library.data, query])
+  const source = useMemo(() => ({ ...library, data: library.data ? sections.flatMap((section) => section.data) : undefined }), [library, sections])
 
-  return (
-    <View collapsable={false} style={{ flex: 1, backgroundColor: palette.background }}>
-      <Stack.Screen options={{ title: "Library", headerLargeTitle: false, headerSearchBarOptions: {
-        placeholder: "Search tools, materials, machines", hideWhenScrolling: false, tintColor: palette.accent,
-        onChangeText: (event) => setQuery(event.nativeEvent.text), onCancelButtonPress: () => setQuery(""),
-      } }} />
-      <PageScroll refreshControl={<RefreshControl refreshing={library.loading && Boolean(library.data)} onRefresh={() => void library.reload()} tintColor={palette.accent} />}>
-      {library.error && catalogue ? <ErrorBanner message={library.error} actionLabel="Retry" onAction={() => void library.reload()} /> : null}
-      {catalogue && total > 0 ? <Text style={{ color: palette.muted, fontVariant: ["tabular-nums"], ...type(13) }}>
-        {searching ? `${count(catalogue)} of ${total}` : `${total} ${total === 1 ? "entry" : "entries"}`} · Synced from your desktop
-      </Text> : null}
-      {library.loading && !catalogue ? (
-        <View style={{ gap: 12 }}>
-          {[0, 1, 2, 3].map((index) => (
-            <Skeleton key={index} style={{ height: 58 }} />
-          ))}
-        </View>
-      ) : library.error && !catalogue ? (
-        <ErrorBanner message={library.error} actionLabel="Retry" onAction={() => void library.reload()} />
-      ) : empty ? (
-        searching && total > 0
-          ? <EmptyState title="No matches" description={`Nothing in the library matches “${query.trim()}”.`} icon={<Search size={25} color={palette.accent} />} />
-          : <EmptyState title="Library is empty" description="Materials, tools, machines and components used by this project show up here." icon={<Library size={25} color={palette.accent} />} />
-      ) : catalogue ? (
-        <>
-          <Catalogue title="Materials" entries={catalogue.materials} />
-          <Catalogue title="Tools" entries={catalogue.tools} />
-          <Catalogue title="Machines" entries={catalogue.machines} />
-          <Catalogue title="Components" entries={catalogue.components} onOpen={openComponent} />
-        </>
-      ) : null}
-      </PageScroll>
-    </View>
+  const empty = searching && total > 0 ? (
+    <EmptyState title="No matches" description={`Nothing in the library matches “${query.trim()}”.`} icon={<Search size={25} color={palette.muted} />}
+      action={<ActionButton variant="secondary" label="Clear search" onPress={() => { haptic("selection"); setQuery("") }} />} />
+  ) : (
+    <EmptyState title="Library is empty" description="Materials, tools, machines and components used by this project show up here." icon={<Library size={25} color={palette.accent} />} />
   )
-}
 
-function Catalogue({
-  title,
-  entries,
-  onOpen,
-}: {
-  title: string
-  entries: readonly WorkspaceEntry[]
-  onOpen?: (entry: WorkspaceEntry) => void
-}) {
-  if (entries.length === 0) return null
   return (
-    <View>
-      <SectionHeader>{title} · {entries.length}</SectionHeader>
-      <SurfaceCard inset={false}>{entries.map((entry, index) => (
-        <View key={entry.id}>
-          {index > 0 ? <Divider inset={16} /> : null}
-          <ListRow
-            title={entry.name}
-            subtitle={entry.subtitle ?? undefined}
-            showChevron={Boolean(onOpen)}
-            onPress={onOpen ? () => onOpen(entry) : undefined}
-          />
-        </View>
-      ))}</SurfaceCard>
-    </View>
+    <ScreenFrame title="Library" {...(total > 0 ? { subtitle: `${total} ${total === 1 ? "entry" : "entries"} · Synced from your desktop` } : {})}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <RowList<Row>
+          source={source}
+          sections={sections}
+          keyExtractor={(item) => `${item.kind}:${item.id}`}
+          loadingLabel="Loading the library"
+          failureTitle="Could not load the library"
+          empty={empty}
+          renderRow={(item) => {
+            const Icon = KINDS.find((entry) => entry.kind === item.kind)?.icon ?? Library
+            const opens = item.kind === "components"
+            return (
+              <FlatRow
+                leading={<Icon size={19} color={palette.muted} strokeWidth={2} />}
+                title={item.name}
+                {...(item.subtitle ? { subtitle: item.subtitle } : {})}
+                {...(opens ? { onPress: () => openComponent(item), accessibilityHint: "Opens the 3D preview" } : {})}
+              />
+            )
+          }}
+        />
+        {total > 0 ? <Dock gutter={gutter} search={{ value: query, onChange: setQuery, placeholder: "Search tools, materials, machines" }} /> : null}
+      </KeyboardAvoidingView>
+    </ScreenFrame>
   )
 }

@@ -2,8 +2,9 @@ import { createContext, useContext, useMemo, type PropsWithChildren } from "reac
 import { View, useColorScheme } from "react-native"
 import { vars } from "nativewind"
 import { useUIStore } from "./store"
-import { PALETTES, GLASS, type ColorScheme, type Palette, type GlassTokens } from "./palette"
+import { PALETTES, GLASS, hexToRgba, type ColorScheme, type Palette, type GlassTokens } from "./palette"
 export type { ColorScheme, Palette, GlassTokens } from "./palette"
+export { hexToRgba }
 
 /**
  * The companion theme shares semantic colors across content and native navigation. Colors adapt to light/dark through CSS variables consumed by NativeWind
@@ -17,17 +18,6 @@ const channels = (color: string): string => {
   const rgba = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(color)
   if (rgba) return `${rgba[1] ?? "0"} ${rgba[2] ?? "0"} ${rgba[3] ?? "0"}`
   return "0 0 0"
-}
-
-/** `#RRGGBB` + alpha → `rgba(r, g, b, a)`. Theme tints are all derived this way, so every color
- * stays inside the active palette instead of carrying its own private hex. */
-export function hexToRgba(hex: string, alpha: number): string {
-  const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  if (!match) return hex
-  const r = parseInt(match[1] ?? "0", 16)
-  const g = parseInt(match[2] ?? "0", 16)
-  const b = parseInt(match[3] ?? "0", 16)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 interface ThemeValue {
@@ -64,6 +54,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       vars({
         "--color-background": channels(palette.background),
         "--color-surface": channels(palette.surface),
+        "--color-surface-raised": channels(palette.surfaceRaised),
         "--color-panel": channels(palette.panel),
         "--color-border": channels(palette.border),
         "--color-accent": channels(palette.accent),
@@ -83,6 +74,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
         "--color-glass-panel": channels(value.glass.panel),
         "--color-glass-border": channels(value.glass.border),
         "--color-overlay": channels(palette.overlay),
+        "--color-shadow": channels(palette.shadow),
         "--color-focus-ring": channels(palette.focusRing),
       }),
     [palette, value.glass],

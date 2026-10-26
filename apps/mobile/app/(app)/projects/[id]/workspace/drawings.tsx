@@ -1,9 +1,11 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { useLocalSearchParams, useRouter } from "expo-router"
 import type { CompanionClient } from "@/lib/client"
 import { useServer } from "@/lib/server"
 import { useCommitRevision } from "@/lib/use-commit-revision"
+import { DraftingCompass } from "lucide-react-native"
 import { EntryList } from "@/components/workspace/EntryList"
 import { routeParam } from "@/components/workspace/route"
+import { ScreenFrame } from "@/components/project/ScreenFrame"
 
 const loadDrawings = (client: CompanionClient, projectId: string, signal: AbortSignal) => client.workspaceDrawings(projectId, signal)
 
@@ -17,9 +19,9 @@ export default function DrawingsScreen() {
   if (!client) return null
 
   return (
-    <>
-      <Stack.Screen options={{ title: "Designs", headerLargeTitle: false }} />
+    <ScreenFrame title="Designs">
       <EntryList
+        icon={DraftingCompass}
         client={client}
         projectId={id}
         revision={revision}
@@ -32,6 +34,6 @@ export default function DrawingsScreen() {
           router.push(`/projects/${id}/workspace/drawings/${entry.id}?name=${encodeURIComponent(entry.name)}`)
         }}
       />
-    </>
+    </ScreenFrame>
   )
 }

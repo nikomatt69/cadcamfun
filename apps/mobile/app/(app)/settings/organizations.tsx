@@ -1,18 +1,23 @@
 import { useCallback, useMemo, useState } from "react"
-import { Pressable, Text, View } from "react-native"
-import { Stack, useRouter } from "expo-router"
-import { Building2, Plus } from "lucide-react-native"
+import { KeyboardAvoidingView, Platform } from "react-native"
+import { useRouter } from "expo-router"
+import { Building2, Plus, Search } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { promptText } from "@/lib/manage"
 import { filterOrganizations } from "@/lib/organizations"
-import { ResourceList } from "@/components/ui/resource-list"
-import { RecordCard } from "@/components/ui/record-card"
-import { TextField } from "@/components/ui/TextField"
+import { projectMeta } from "@/lib/project-list"
 import { toast } from "@/components/ui/ToastHost"
-import { type } from "@/lib/typography"
+import { ActionButton } from "@/components/ui/ActionButton"
+import { EmptyState } from "@/components/ui/EmptyState"
+import { Pill } from "@/components/ui/Pill"
+import { useContentLayout } from "@/components/layout/use-content-layout"
+import { ScreenFrame } from "@/components/manage/ScreenFrame"
+import { RowList } from "@/components/project/RowList"
+import { FlatRow } from "@/components/project/rows"
+import { Dock } from "@/components/project/Dock"
 
 /**
  * Organizations at desktop parity: the same list the desktop shows (your role and
@@ -22,6 +27,7 @@ import { type } from "@/lib/typography"
 export default function OrganizationsScreen() {
   const { client } = useServer()
   const { palette } = useTheme()
+  const { gutter } = useContentLayout()
   const router = useRouter()
   const [search, setSearch] = useState("")
   const [busy, setBusy] = useState(false)
@@ -50,26 +56,44 @@ export default function OrganizationsScreen() {
     } finally { setBusy(false) }
   }
 
-  return <>
-    <Stack.Screen options={{ title: "Organizations", headerRight: () => (
-      <Pressable accessibilityRole="button" accessibilityLabel="New organization" hitSlop={11} disabled={busy} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }} onPress={() => void create()}>
-        <Plus size={22} color={palette.accent} />
-      </Pressable>
-    ) }} />
-    <ResourceList resource={{ ...resource, data: filtered }} keyExtractor={(item) => item.id}
-      emptyTitle={(resource.data ?? []).length === 0 ? "No organizations" : "No matches"}
-      emptyDescription={(resource.data ?? []).length === 0 ? "Tap + to create one. It appears on the desktop at once." : "No organizations match your search."}
-      emptyIcon={<Building2 size={26} color={palette.accent} />}
-      header={<View style={{ gap: 12, paddingBottom: 12 }}>
-        <TextField label="Search" placeholder="Search organizations…" value={search} onChangeText={setSearch} autoCorrect={false} />
-        <Text style={{ color: palette.muted, ...type(13) }}>{filtered.length} of {(resource.data ?? []).length} organizations · synced with the desktop</Text>
-      </View>}
-      renderItem={({ item }) => <RecordCard title={item.name} subtitle={item.description ?? undefined}
-        meta={`${item.userCount} ${item.userCount === 1 ? "member" : "members"} · ${item.projectCount} ${item.projectCount === 1 ? "project" : "projects"}`}
-        status={<Text style={{ color: palette.accentStrong, ...type(12, { weight: "700" }) }}>{item.role}</Text>}
-        leading={<Building2 size={21} color={palette.accent} />}
-        accessibilityHint="Opens the organization."
-        {...{ onPress: () => router.push({ pathname: "/(app)/settings/organization", params: { id: item.id } } as never) }} />}
-    />
-  </>
+  const total = resource.data?.length ?? 0
+  const open = (id: string) => router.push({ pathname: "/(app)/settings/organization", params: { id } } as never)
+  const empty = total > 0 ? (
+    <EmptyState title="No matches" description="No organization matches your search." icon={<Search size={25} color={palette.muted} />}
+      action={<ActionButton variant="secondary" label="Clear search" onPress={() => { haptic("selection"); setSearch("") }} />} />
+  ) : (
+    <EmptyState title="No organizations" description="Create one. It appears on the desktop at once." icon={<Building2 size={25} color={palette.accent} />}
+      action={<ActionButton label="New organization" loading={busy} onPress={() => void create()} />} />
+  )
+
+  return (
+    <ScreenFrame title="Organizations" subtitle={total > 0 ? `${total} ${total === 1 ? "organization" : "organizations"} · synced with the desktop` : "Synced with the desktop"} backLabel="Back to settings">
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <RowList
+          source={resource}
+          sections={filtered.length > 0 ? [{ data: [...filtered] }] : []}
+          keyExtractor={(item) => item.id}
+          loadingLabel="Loading organizations"
+          failureTitle="Could not load organizations"
+          empty={empty}
+          renderRow={(item) => (
+            <FlatRow
+              leading={<Building2 size={19} color={palette.muted} strokeWidth={2} />}
+              title={item.name}
+              {...(item.description ? { subtitle: item.description } : {})}
+              meta={projectMeta([`${item.userCount} ${item.userCount === 1 ? "member" : "members"}`, `${item.projectCount} ${item.projectCount === 1 ? "project" : "projects"}`])}
+              trailing={<Pill tone="accent">{item.role}</Pill>}
+              onPress={() => { haptic("selection"); open(item.id) }}
+              accessibilityHint="Opens the organization"
+            />
+          )}
+        />
+        <Dock
+          gutter={gutter}
+          {...(total > 0 ? { search: { value: search, onChange: setSearch, placeholder: "Search organizations" } } : {})}
+          action={{ label: "New", icon: <Plus size={18} color={palette.onAccent} strokeWidth={2.4} />, onPress: () => void create(), loading: busy }}
+        />
+      </KeyboardAvoidingView>
+    </ScreenFrame>
+  )
 }

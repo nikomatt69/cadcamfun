@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
-import { Switch, Text, View } from "react-native"
-import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { Text, View } from "react-native"
+import { useLocalSearchParams, useRouter } from "expo-router"
+import { Copy, Cpu, Globe2, Layers3, Trash2, Wrench } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
@@ -10,14 +11,27 @@ import type { ResourceKind, ResourceRow } from "@/lib/client"
 import { PageScroll } from "@/components/layout/page-scroll"
 import { TextField } from "@/components/ui/TextField"
 import { ActionButton } from "@/components/ui/ActionButton"
-import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { toast } from "@/components/ui/ToastHost"
 import { type } from "@/lib/typography"
+import { checkNumber, numberError, type NumberRules } from "@/lib/field-number"
+import { ChoiceRow, DividedRows, SheetSection, SheetSummary, TILE_INSET } from "@/components/chat/sheet-parts"
+import { FactRow, FactsCard, SettingsSection, SwitchRow } from "@/components/manage/settings-parts"
+import { ScreenFrame } from "@/components/manage/ScreenFrame"
 
 const NOUN: Record<ResourceKind, string> = { materials: "Material", tools: "Tool", "machine-configs": "Machine" }
-const num = (value: string, fallback = 0): number => { const parsed = Number(value.replace(",", ".")); return Number.isFinite(parsed) ? parsed : fallback }
+/** The numeric fields of each kind, with their rules; a field that does not read as a number blocks the save. */
+const NUMBER_FIELDS: Record<ResourceKind, ReadonlyArray<{ key: "density" | "diameter" | "flutes" | "maxRPM"; label: string; rules: NumberRules }>> = {
+  materials: [{ key: "density", label: "Density", rules: { positive: true } }],
+  tools: [
+    { key: "diameter", label: "Diameter", rules: { positive: true } },
+    { key: "flutes", label: "Flutes", rules: { optional: true, integer: true, positive: true } },
+    { key: "maxRPM", label: "Max RPM", rules: { optional: true, integer: true, positive: true } },
+  ],
+  "machine-configs": [],
+}
+const KIND_ICON = { materials: Layers3, tools: Wrench, "machine-configs": Cpu } as const
 
 /**
  * One resource, at desktop parity: every field the desktop detail page edits, saved
@@ -78,18 +92,36 @@ export default function ResourceScreen() {
     finally { setBusy(false) }
   }
 
+  const numbers = { density, diameter, flutes, maxRPM }
+  /** Shown under a numeric field once a save was tried, so a half-typed value is not called wrong while it is typed. */
+  const [checked, setChecked] = useState(false)
+  const fieldError = (key: keyof typeof numbers): string | undefined => {
+    const field = NUMBER_FIELDS[kind].find((entry) => entry.key === key)
+    return checked && field ? numberError(numbers[key], field.label, field.rules) : undefined
+  }
+
   const save = (): void => {
     if (!client || busy || name.trim() === "") return
+    setChecked(true)
+    const values: Partial<Record<keyof typeof numbers, number | null>> = {}
+    for (const field of NUMBER_FIELDS[kind]) {
+      const check = checkNumber(numbers[field.key], field.label, field.rules)
+      if (!check.ok) { haptic("error"); toast(check.error, "error"); return }
+      values[field.key] = check.value
+    }
+    const material = { name: name.trim(), description: description || null, density: values.density ?? 0, hardness: hardness || undefined, isPublic }
+    const tool = { name: name.trim(), description: description || null, type: toolType || "endmill", diameter: values.diameter ?? 0, material: toolMaterial || "Carbide", numberOfFlutes: values.flutes ?? null, maxRPM: values.maxRPM ?? null, isPublic }
+    const machine = { name: name.trim(), description: description || null, type: machineType || "mill", controller: controller || "grbl", isPublic }
     if (creating) {
-      if (kind === "materials") void run(() => client.createMaterial({ name: name.trim(), description: description || null, density: num(density), hardness: hardness || undefined, isPublic }), "Material created", true)
-      else if (kind === "tools") void run(() => client.createTool({ name: name.trim(), description: description || null, type: toolType || "endmill", diameter: num(diameter, 6), material: toolMaterial || "Carbide", numberOfFlutes: flutes === "" ? null : num(flutes), maxRPM: maxRPM === "" ? null : num(maxRPM), isPublic }), "Tool created", true)
-      else void run(() => client.createMachine({ name: name.trim(), description: description || null, type: machineType || "mill", controller: controller || "grbl", isPublic }), "Machine created", true)
+      if (kind === "materials") void run(() => client.createMaterial(material), "Material created", true)
+      else if (kind === "tools") void run(() => client.createTool(tool), "Tool created", true)
+      else void run(() => client.createMachine(machine), "Machine created", true)
       return
     }
     if (!id) return
-    if (kind === "materials") void run(() => client.updateMaterial(id, { name: name.trim(), description: description || null, density: num(density), hardness: hardness || undefined, isPublic }), "Material saved")
-    else if (kind === "tools") void run(() => client.updateTool(id, { name: name.trim(), description: description || null, type: toolType || "endmill", diameter: num(diameter, 6), material: toolMaterial || "Carbide", numberOfFlutes: flutes === "" ? null : num(flutes), maxRPM: maxRPM === "" ? null : num(maxRPM), isPublic }), "Tool saved")
-    else void run(() => client.updateMachine(id, { name: name.trim(), description: description || null, type: machineType || "mill", controller: controller || "grbl", isPublic }, row?.config), "Machine saved")
+    if (kind === "materials") void run(() => client.updateMaterial(id, material), "Material saved")
+    else if (kind === "tools") void run(() => client.updateTool(id, tool), "Tool saved")
+    else void run(() => client.updateMachine(id, machine, row?.config), "Machine saved")
   }
 
   const remove = async (): Promise<void> => {
@@ -99,51 +131,58 @@ export default function ResourceScreen() {
     }
   }
 
-  return <>
-    <Stack.Screen options={{ title: creating ? `New ${NOUN[kind]}` : (row?.name ?? NOUN[kind]) }} />
-    <PageScroll>
-      {loading ? <Skeleton style={{ height: 220 }} /> : <>
-        {error ? <ErrorBanner message={error} actionLabel="Retry" onAction={() => void load()} /> : null}
-        {!creating && row ? <SurfaceCard title="Details" description="As stored on the desktop.">{resourceFacts(kind, row).map((fact) => (
-          <View key={fact.label} style={{ flexDirection: "row", justifyContent: "space-between", gap: 12, paddingVertical: 4 }}>
-            <Text style={{ color: palette.muted, ...type(14) }}>{fact.label}</Text>
-            <Text style={{ color: palette.ink, ...type(14, { weight: "600" }) }}>{fact.value}</Text>
-          </View>))}
-        </SurfaceCard> : null}
-        <SurfaceCard title={creating ? `New ${NOUN[kind]}` : `Edit ${NOUN[kind]}`} description="Saved on the desktop; every paired surface updates at once.">
-          <View style={{ gap: 14, padding: 16 }}>
-            <TextField label="Name" value={name} onChangeText={setName} placeholder={`${NOUN[kind]} name`} />
-            <TextField label="Description" value={description} onChangeText={setDescription} placeholder="Optional" multiline />
-            {kind === "materials" ? <>
-              <TextField label="Density (kg/m³)" value={density} onChangeText={setDensity} keyboardType="decimal-pad" />
-              <TextField label="Hardness" value={hardness} onChangeText={setHardness} placeholder="Optional, e.g. HB 95" />
-            </> : null}
-            {kind === "tools" ? <>
-              <TextField label="Type" value={toolType} onChangeText={setToolType} placeholder="endmill" autoCorrect={false} />
-              <TextField label="Diameter (mm)" value={diameter} onChangeText={setDiameter} keyboardType="decimal-pad" />
-              <TextField label="Tool material" value={toolMaterial} onChangeText={setToolMaterial} placeholder="Carbide" />
-              <TextField label="Flutes" value={flutes} onChangeText={setFlutes} keyboardType="number-pad" />
-              <TextField label="Max RPM" value={maxRPM} onChangeText={setMaxRPM} keyboardType="number-pad" />
-            </> : null}
-            {kind === "machine-configs" ? <>
-              <TextField label="Machine type" value={machineType} onChangeText={setMachineType} placeholder="mill, lathe, printer, laser" autoCorrect={false} />
-              <TextField label="Controller" value={controller} onChangeText={setController} placeholder="grbl" autoCorrect={false} />
-              {creating ? <Text style={{ color: palette.muted, ...type(13) }}>Work volume starts at 300×180×60 mm; adjust it on the desktop.</Text> : null}
-            </> : null}
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <Text style={{ color: palette.ink, flex: 1, ...type(15) }}>Public (visible to all users)</Text>
-              <Switch accessibilityLabel="Make public" value={isPublic} trackColor={{ true: palette.accent }} onValueChange={setIsPublic} />
+  const Icon = KIND_ICON[kind]
+  const title = creating ? `New ${NOUN[kind].toLowerCase()}` : (row?.name ?? NOUN[kind])
+  return (
+    <ScreenFrame title={title} subtitle={creating ? "Saved on the desktop" : NOUN[kind]} backLabel="Back to resources">
+      <PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ gap: 24 }}>
+        {loading ? <Skeleton style={{ height: 220 }} /> : <>
+          {error ? <ErrorBanner message={error} actionLabel="Retry" onAction={() => void load()} /> : null}
+          {!creating && row ? (
+            <SheetSection title="Details" footer="As stored on the desktop.">
+              <FactsCard>{resourceFacts(kind, row).map((fact) => <FactRow key={fact.label} label={fact.label} value={fact.value} />)}</FactsCard>
+            </SheetSection>
+          ) : creating ? <SheetSummary eyebrow={NOUN[kind]} title={title} description="Saved on the desktop; every paired surface updates at once." /> : null}
+
+          <SheetSection title={creating ? "Fields" : `Edit ${NOUN[kind].toLowerCase()}`} footer={creating ? undefined : "Saved on the desktop; every paired surface updates at once."}>
+            <View style={{ gap: 14 }}>
+              <TextField label="Name" value={name} onChangeText={setName} placeholder={`${NOUN[kind]} name`} />
+              <TextField label="Description" value={description} onChangeText={setDescription} placeholder="Optional" multiline />
+              {kind === "materials" ? <>
+                <TextField label="Density (kg/m³)" value={density} onChangeText={setDensity} keyboardType="decimal-pad" error={fieldError("density")} />
+                <TextField label="Hardness" value={hardness} onChangeText={setHardness} placeholder="Optional, e.g. HB 95" />
+              </> : null}
+              {kind === "tools" ? <>
+                <TextField label="Type" value={toolType} onChangeText={setToolType} placeholder="endmill" autoCorrect={false} />
+                <TextField label="Diameter (mm)" value={diameter} onChangeText={setDiameter} keyboardType="decimal-pad" error={fieldError("diameter")} />
+                <TextField label="Tool material" value={toolMaterial} onChangeText={setToolMaterial} placeholder="Carbide" />
+                <TextField label="Flutes" value={flutes} onChangeText={setFlutes} keyboardType="number-pad" placeholder="Optional" error={fieldError("flutes")} />
+                <TextField label="Max RPM" value={maxRPM} onChangeText={setMaxRPM} keyboardType="number-pad" placeholder="Optional" error={fieldError("maxRPM")} />
+              </> : null}
+              {kind === "machine-configs" ? <>
+                <TextField label="Machine type" value={machineType} onChangeText={setMachineType} placeholder="mill, lathe, printer, laser" autoCorrect={false} />
+                <TextField label="Controller" value={controller} onChangeText={setController} placeholder="grbl" autoCorrect={false} />
+                {creating ? <Text style={{ color: palette.muted, ...type(13) }}>Work volume starts at 300×180×60 mm; adjust it on the desktop.</Text> : null}
+              </> : null}
             </View>
-            <ActionButton label={creating ? `Create ${NOUN[kind]}` : "Save changes"} loading={busy} disabled={name.trim() === ""} onPress={save} />
-          </View>
-        </SurfaceCard>
-        {!creating ? <SurfaceCard title="Actions">
-          <View style={{ gap: 10, padding: 16 }}>
-            {kind === "machine-configs" ? <ActionButton label="Duplicate machine" variant="secondary" loading={busy} onPress={() => { if (client && id) void run(() => client.cloneMachine(id), "Machine duplicated", true) }} /> : null}
-            <ActionButton label={`Delete ${NOUN[kind]}`} variant="danger" loading={busy} onPress={() => void remove()} />
-          </View>
-        </SurfaceCard> : null}
-      </>}
-    </PageScroll>
-  </>
+          </SheetSection>
+
+          <SettingsSection title="Visibility">
+            <SwitchRow icon={Globe2} title="Public" description="Visible to every user of the desktop" value={isPublic} onValueChange={setIsPublic} />
+          </SettingsSection>
+
+          <ActionButton label={creating ? `Create ${NOUN[kind].toLowerCase()}` : "Save changes"} icon={creating ? <Icon size={17} color={palette.onAccent} strokeWidth={2.2} /> : undefined} loading={busy} disabled={name.trim() === ""} onPress={save} />
+
+          {!creating ? (
+            <SheetSection title="Actions">
+              <DividedRows inset={TILE_INSET}>
+                {kind === "machine-configs" ? <ChoiceRow icon={Copy} title="Duplicate machine" description="A copy with the same configuration" busy={busy} onPress={() => { if (client && id) void run(() => client.cloneMachine(id), "Machine duplicated", true) }} /> : null}
+                <ChoiceRow icon={Trash2} destructive title={`Delete ${NOUN[kind].toLowerCase()}`} description="Removes it from the desktop too" busy={busy} onPress={() => void remove()} />
+              </DividedRows>
+            </SheetSection>
+          ) : null}
+        </>}
+      </PageScroll>
+    </ScreenFrame>
+  )
 }

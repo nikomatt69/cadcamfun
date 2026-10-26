@@ -35,6 +35,8 @@ export type PressableScaleProps = Omit<PressableProps, "style" | "children"> &
     hitSlop?: PressableProps["hitSlop"]
     /** Opacity while disabled (default 0.45); a busy-but-not-dead control reads better closer to 1. */
     disabledOpacity?: number
+    /** Color of the pressed tint; defaults to the palette ink. Pass a light color on dark glass. */
+    tintColor?: string
   }>
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
@@ -53,6 +55,8 @@ export function PressableScale({
   dimOpacity = 0.72,
   hitSlop,
   disabledOpacity = 0.45,
+  tintColor,
+  accessibilityState,
   ...rest
 }: PressableScaleProps) {
   const { palette } = useTheme()
@@ -74,7 +78,7 @@ export function PressableScale({
       pressRetentionOffset={12}
       hitSlop={hitSlop ?? (tint || subtle ? 0 : 4)}
       disabled={disabled}
-      accessibilityState={{ disabled: Boolean(disabled) }}
+      accessibilityState={{ ...accessibilityState, disabled: Boolean(disabled ?? accessibilityState?.disabled) }}
       onPressIn={(event) => {
         onPressIn?.(event)
         if (!interactive) return
@@ -97,7 +101,7 @@ export function PressableScale({
           inset: 0,
           borderRadius: StyleSheet.flatten(style)?.borderRadius,
           borderCurve: "continuous",
-          backgroundColor: hexToRgba(palette.ink, tintStrength),
+          backgroundColor: hexToRgba(tintColor ?? palette.ink, tintStrength),
         }} />
       ) : null}
       {children}

@@ -1,7 +1,9 @@
 import { BlurView, type BlurTint } from "expo-blur"
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect"
-import { Platform, View, type StyleProp, type ViewStyle } from "react-native"
+import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { usePrefersReducedTransparency } from "@/lib/animation"
+import { PALETTES } from "@/lib/palette"
+import { hexToRgba, useTheme } from "@/lib/theme"
 
 /**
  * The app's blur layer (Apple §12 — materials & depth, iOS 26/27 Liquid Glass).
@@ -73,5 +75,52 @@ export function AdaptiveBlur({
     >
       {children}
     </BlurView>
+  )
+}
+
+/**
+ * A rounded glass surface with the app's chrome edge: continuous corners, a 1pt ink-tinted ring and the
+ * material inside (the header buttons, the dock capsules, the status over the camera).
+ *
+ * `over="camera"` is for chrome drawn on the live camera, which is black in both themes: the material is
+ * always dark and the ring white, taken from the dark palette so nothing here is a private colour.
+ * Reduce Transparency swaps the material for the solid palette surface (see `AdaptiveBlur`).
+ */
+export function GlassSurface({ radius = 26, over = "page", lifted = false, style, children }: {
+  radius?: number
+  over?: "page" | "camera"
+  /** A soft drop shadow, for chrome that floats over content (the dock). */
+  lifted?: boolean
+  style?: StyleProp<ViewStyle>
+  children?: React.ReactNode
+}) {
+  const { palette, isDark } = useTheme()
+  const camera = over === "camera"
+  const dark = camera || isDark
+  const base = camera ? PALETTES.dark : palette
+  return (
+    <View
+      style={[
+        {
+          overflow: "hidden",
+          borderRadius: radius,
+          borderCurve: "continuous",
+          borderWidth: 1,
+          borderColor: hexToRgba(base.ink, camera ? 0.2 : isDark ? 0.14 : 0.1),
+          ...(lifted ? { boxShadow: `0 4px 14px ${hexToRgba(base.overlay, dark ? 0.32 : 0.1)}` } : null),
+        },
+        style,
+      ]}
+    >
+      <AdaptiveBlur
+        tint={dark ? "dark" : "light"}
+        intensity={dark ? 80 : 70}
+        style={StyleSheet.absoluteFill}
+        fallbackColor={hexToRgba(camera ? base.background : base.surface, camera ? 0.72 : 0.92)}
+        opaqueFallbackColor={camera ? base.background : base.surface}
+        pointerEvents="none"
+      />
+      {children}
+    </View>
   )
 }

@@ -1,53 +1,39 @@
-import { ActivityIndicator, Pressable, Text, View } from "react-native"
-import { WifiOff } from "lucide-react-native"
-import { useServer, type Connectivity } from "@/lib/server"
+import { useEffect } from "react"
+import { AccessibilityInfo, View } from "react-native"
+import { useRouter } from "expo-router"
+import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useUIStore } from "@/lib/store"
-import { type } from "@/lib/typography"
+import { connectionBanner } from "@/lib/connection-banner"
+import { StatusPill } from "./StatusPill"
 
 /**
- * Connection state lives in the native tab accessory on iOS 26+, clear of titles and controls.
- * Older platforms reserve a footer row. No navigation target is covered by the status.
+ * Connection state lives in the native tab accessory on iOS 26+, clear of titles and controls; older platforms
+ * reserve a footer row. It is the assistant's status pill (dot or spinner, one line, one action), so the
+ * connection reads the same here, in the session line and in Settings. The words come from `connectionBanner`.
  */
 export function NetworkBanner({ accessory = false }: { accessory?: boolean }) {
   const { connectivity, connectionError, recheck } = useServer()
   const { palette } = useTheme()
+  const router = useRouter()
   const waiting = useUIStore((state) => state.offlineQueueCount)
+  const banner = connectionBanner({ connectivity, connectionError, waiting })
 
-  if (connectivity === "online" || connectivity === "disconnected") return null
+  // VoiceOver ignores a view that merely appears or changes; say each state once, never the changing counter.
+  const key = banner?.key
+  const announcement = banner?.announcement
+  useEffect(() => { if (announcement) AccessibilityInfo.announceForAccessibility(announcement) }, [key, announcement])
 
-  const config: Record<Exclude<Connectivity, "online" | "disconnected" | "background">, { color: string; label: string }> = {
-    connecting: { color: palette.warning, label: "Connecting…" },
-    // Messages written meanwhile wait in the outbox; saying so here keeps them from looking lost.
-    offline: { color: palette.muted, label: waiting > 0 ? `Desktop offline · ${waiting} ${waiting === 1 ? "message" : "messages"} waiting` : "Desktop offline" },
-    error: { color: palette.danger, label: connectionError ?? "Connection failed" },
-    "auth-required": { color: palette.danger, label: "Desktop revoked this phone — pair again" },
-  }
-  if (connectivity === "background") return null
-  const { color, label } = config[connectivity]
+  if (!banner) return null
+  const action = banner.action ? {
+    label: banner.action.label,
+    hint: banner.action.hint,
+    onPress: banner.action.kind === "settings" ? () => router.navigate("/settings") : () => void recheck(),
+  } : null
 
   return (
-    <View
-      style={{
-        minHeight: 44,
-        flex: accessory ? 1 : undefined,
-        paddingHorizontal: 16,
-        paddingVertical: accessory ? 0 : 6,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        backgroundColor: accessory ? "transparent" : palette.surface,
-      }}
-    >
-      {connectivity === "connecting" ? <ActivityIndicator size="small" color={color} /> : <WifiOff size={15} color={color} />}
-      <Text accessibilityLiveRegion="polite" style={{ flex: 1, minWidth: 0, color: palette.ink, ...type(13, { weight: "500" }) }} numberOfLines={accessory ? 1 : undefined}>
-        {label}
-      </Text>
-      {connectivity !== "connecting" ? (
-        <Pressable style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, opacity: pressed ? 0.55 : 1 })} onPress={() => void recheck()} accessibilityRole="button" accessibilityLabel="Retry the desktop connection">
-          <Text style={{ color: palette.accent, ...type(13, { weight: "600" }) }}>Retry</Text>
-        </Pressable>
-      ) : null}
+    <View style={{ minHeight: 44, flex: accessory ? 1 : undefined, justifyContent: "center", paddingHorizontal: accessory ? 12 : 16, paddingVertical: accessory ? 0 : 6, backgroundColor: accessory ? "transparent" : palette.background }}>
+      <StatusPill tone={banner.tone} label={banner.label} busy={banner.busy} action={action} bare={accessory} fill maxLines={accessory ? 1 : 2} />
     </View>
   )
 }

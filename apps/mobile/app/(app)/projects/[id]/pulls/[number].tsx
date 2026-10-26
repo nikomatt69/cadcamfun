@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react"
-import { Alert, Platform, RefreshControl, Text, View } from "react-native"
-import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { Alert, RefreshControl, Text, View } from "react-native"
+import { useLocalSearchParams } from "expo-router"
 import { GitMerge, MessageSquare } from "lucide-react-native"
 import type { ReviewRow } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
@@ -18,6 +18,7 @@ import { ActionButton } from "@/components/ui/ActionButton"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { TextField } from "@/components/ui/TextField"
 import { PageScroll } from "@/components/layout/page-scroll"
+import { ScreenFrame } from "@/components/project/ScreenFrame"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { conflictSummary, conflictsOf, type VcsConflict } from "@/lib/vcs-conflicts"
 import { errorMessage } from "@/lib/throttle"
@@ -49,7 +50,6 @@ export default function PullRequestScreen() {
   const { client } = useServer()
   const { palette } = useTheme()
   const { fontScale, width, onLayout } = useContentLayout()
-  const router = useRouter()
   const stacked = fontScale > 1.2 || width < 375
 
   const [busy, setBusy] = useState<string | null>(null)
@@ -123,11 +123,9 @@ export default function PullRequestScreen() {
   const stateTone: PillTone = pullRequest ? (STATE_TONE[pullRequest.state] ?? "neutral") : "neutral"
 
   return (
-    <View onLayout={onLayout} collapsable={false} style={{ flex: 1, backgroundColor: palette.background }}>
-      <Stack.Screen options={{ title: `Pull request #${number}` }} />
-      {Platform.OS === "ios" ? <Stack.Toolbar placement="right"><Stack.Toolbar.Button variant="done" onPress={() => router.back()}>Done</Stack.Toolbar.Button></Stack.Toolbar> : null}
+    <ScreenFrame title={`Pull request #${number}`} {...(pullRequest ? { subtitle: `${pullRequest.head} → ${pullRequest.base}` } : {})} sheet onLayout={onLayout}>
 
-      <PageScroll refreshControl={<RefreshControl refreshing={pull.loading && Boolean(pull.data)} onRefresh={() => void pull.reload()} tintColor={palette.accent} />}>
+      <PageScroll contentInsetAdjustmentBehavior="never" refreshControl={<RefreshControl refreshing={pull.loading && Boolean(pull.data)} onRefresh={() => void pull.reload()} tintColor={palette.accent} />}>
           {pull.error && pull.data ? <ErrorBanner message={pull.error} actionLabel="Retry" onAction={() => void pull.reload()} /> : null}
           {pull.loading && !pull.data ? (
             <Skeleton style={{ height: 220 }} />
@@ -287,6 +285,6 @@ export default function PullRequestScreen() {
             }} />
         </View>
       </BottomSheet>
-    </View>
+    </ScreenFrame>
   )
 }

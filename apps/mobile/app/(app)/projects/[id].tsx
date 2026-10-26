@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react"
-import { Platform, Text, View, useWindowDimensions } from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
-import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { KeyboardAvoidingView, Platform, Text, View, useWindowDimensions } from "react-native"
+import { useLocalSearchParams, useRouter } from "expo-router"
 import { Sparkles } from "lucide-react-native"
 import type { LiveEvent } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
@@ -24,6 +23,8 @@ import { PullsPanel } from "@/components/project/PullsPanel"
 import { ActionsPanel } from "@/components/project/ActionsPanel"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { PressableScale } from "@/components/ui/PressableScale"
+import { IconCircleButton } from "@/components/ui/IconCircleButton"
+import { ScreenFrame } from "@/components/project/ScreenFrame"
 
 type Tab = "overview" | "history" | "pulls" | "actions"
 
@@ -204,27 +205,19 @@ export default function ProjectScreen() {
   if (!client) return null
 
   return (
-    <View collapsable={false} style={{ flex: 1, backgroundColor: palette.background }}>
-      <Stack.Screen
-        options={{
-          title,
-          headerRight: Platform.OS === "ios" ? undefined : () => (
-            <PressableScale onPress={openAssistant} subtle accessibilityLabel="Open project assistant" style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
-              <Sparkles size={22} color={palette.accent} />
-            </PressableScale>
-          ),
-        }}
-      />
-
-      {Platform.OS === "ios" ? <Stack.Toolbar placement="right">
-        <Stack.Toolbar.Button icon="sparkles" accessibilityLabel="Open project assistant" onPress={openAssistant} tintColor={palette.accent} />
-      </Stack.Toolbar> : null}
-
-      <SafeAreaView edges={["left", "right"]}>
+    <ScreenFrame
+      title={title}
+      {...(project.data?.description ? { subtitle: project.data.description } : {})}
+      backLabel="Back to projects"
+      right={
+        <IconCircleButton tone="warm" accessibilityLabel="Ask the assistant" accessibilityHint="Works on this project in the Assistant tab" onPress={openAssistant}>
+          <Sparkles size={19} color={palette.accent} strokeWidth={2.2} />
+        </IconCircleButton>
+      }
+    >
       <View style={{ paddingHorizontal: contentGutter(width), paddingTop: 8, paddingBottom: 12 }}>
         <SegmentedControl segments={TABS} value={tab} onChange={setTab} />
       </View>
-      </SafeAreaView>
 
       {/* The project itself could not be read: the panels below would be empty without saying why. */}
       {project.error ? (
@@ -233,7 +226,8 @@ export default function ProjectScreen() {
         </View>
       ) : null}
 
-      <View style={{ flex: 1 }}>
+      {/* The History, Pulls and Actions panels end in a search dock; it rides up with the keyboard. */}
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         {tab === "overview" ? (
           <OverviewPanel
             client={client}
@@ -258,9 +252,9 @@ export default function ProjectScreen() {
         ) : tab === "pulls" ? (
           <PullsPanel client={client} projectId={id} refreshKey={refresh.pulls} />
         ) : (
-          <ActionsPanel client={client} projectId={id} refreshKey={refresh.actions} onDispatch={() => { haptic("selection"); setDispatchOpen(true) }} dispatching={dispatching} />
+          <ActionsPanel client={client} projectId={id} refreshKey={refresh.actions} onDispatch={() => setDispatchOpen(true)} dispatching={dispatching} />
         )}
-      </View>
+      </KeyboardAvoidingView>
 
       {/* Commit message sheet — a deliberate action; release is snappy, enter is the sheet spring. */}
       <BottomSheet open={commitOpen} onClose={() => setCommitOpen(false)} title="Commit changes">
@@ -340,6 +334,6 @@ export default function ProjectScreen() {
           </View>
         </View>
       </BottomSheet>
-    </View>
+    </ScreenFrame>
   )
 }

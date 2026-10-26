@@ -8,20 +8,21 @@ import { hexToRgba, useTheme } from "@/lib/theme"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { type } from "@/lib/typography"
 
-export type ToastKind = "info" | "success" | "error"
-interface ToastEntry { id: number; kind: ToastKind; message: string }
+import { enqueueToast, removeToast, toastAnnouncement, toastDwellMs, type ToastEntry, type ToastKind } from "@/lib/toast-queue"
+
+export type { ToastKind }
 type Listener = (entries: readonly ToastEntry[]) => void
-let queue: ToastEntry[] = []
+let queue: readonly ToastEntry[] = []
 let nextId = 1
 const listeners = new Set<Listener>()
 const emit = () => { for (const listener of listeners) listener(queue) }
 export function toast(message: string, kind: ToastKind = "info"): void {
-  queue = [...queue.slice(-2), { id: nextId++, kind, message }]
+  queue = enqueueToast(queue, { id: nextId++, kind, message })
   emit()
   // VoiceOver does not read a view that merely appears; announce once here, not per mounted host.
-  AccessibilityInfo.announceForAccessibility(message)
+  AccessibilityInfo.announceForAccessibility(toastAnnouncement(kind, message))
 }
-function dismiss(id: number) { queue = queue.filter((entry) => entry.id !== id); emit() }
+function dismiss(id: number) { queue = removeToast(queue, id); emit() }
 
 /** A readable, dismissible status surface. No gesture worklet calls React state setters. */
 export function ToastHost() {
@@ -46,10 +47,10 @@ function ToastItem({ entry }: { entry: ToastEntry }) {
   }, [])
   useEffect(() => {
     if (held || screenReader) return
-    const dwell = Math.min(10000, Math.max(3500, 1500 + entry.message.split(/\s+/).length * 350))
-    const timer = setTimeout(() => dismiss(entry.id), dwell)
+    // A repeat of the same toast bumps its stamp, which restarts the dwell instead of stacking a copy.
+    const timer = setTimeout(() => dismiss(entry.id), toastDwellMs(entry.message, entry.kind))
     return () => clearTimeout(timer)
-  }, [entry.id, entry.message, held, screenReader])
+  }, [entry.id, entry.message, entry.kind, entry.stamp, held, screenReader])
   const color = entry.kind === "success" ? palette.success : entry.kind === "error" ? palette.danger : palette.accent
   const Icon = entry.kind === "success" ? CheckCircle2 : entry.kind === "error" ? XCircle : Info
   return <Animated.View entering={reduced ? undefined : FadeIn.duration(150)} exiting={reduced ? undefined : FadeOut.duration(100)}

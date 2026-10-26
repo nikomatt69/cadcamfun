@@ -1,9 +1,11 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { useLocalSearchParams, useRouter } from "expo-router"
 import type { CompanionClient } from "@/lib/client"
 import { useServer } from "@/lib/server"
 import { useCommitRevision } from "@/lib/use-commit-revision"
+import { Boxes } from "lucide-react-native"
 import { EntryList } from "@/components/workspace/EntryList"
 import { routeParam } from "@/components/workspace/route"
+import { ScreenFrame } from "@/components/project/ScreenFrame"
 
 const loadComponents = (client: CompanionClient, projectId: string, signal: AbortSignal) => client.workspaceComponents(projectId, signal)
 
@@ -17,9 +19,9 @@ export default function ComponentsScreen() {
   if (!client) return null
 
   return (
-    <>
-      <Stack.Screen options={{ title: "Components", headerLargeTitle: false }} />
+    <ScreenFrame title="Components">
       <EntryList
+        icon={Boxes}
         client={client}
         projectId={id}
         revision={revision}
@@ -32,6 +34,6 @@ export default function ComponentsScreen() {
           router.push(`/projects/${id}/workspace/components/${entry.id}?name=${encodeURIComponent(entry.name)}`)
         }}
       />
-    </>
+    </ScreenFrame>
   )
 }

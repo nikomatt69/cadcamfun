@@ -1,53 +1,50 @@
 import type { ReactNode } from "react"
 import { Text, View } from "react-native"
-import { hexToRgba, useTheme } from "@/lib/theme"
-import { STATUS_FILL_ALPHA } from "@/lib/palette"
+import { useTheme } from "@/lib/theme"
+import { toneChip, type Tone } from "@/lib/tones"
 import { type } from "@/lib/typography"
-
-type Tone = "neutral" | "accent" | "success" | "danger" | "warning" | "info"
 
 export type PillTone = Tone
 
-const toneOf = (tone: Tone, palette: ReturnType<typeof useTheme>["palette"]): string => {
-  switch (tone) {
-    case "accent":
-      return palette.accent
-    case "success":
-      return palette.success
-    case "danger":
-      return palette.danger
-    case "warning":
-      return palette.warning
-    case "info":
-      return palette.info
-    default:
-      return palette.soft
-  }
-}
-
 /**
- * A small status chip — PR state, workflow result, AI-authored marker. Color is carried on the
- * text and the border; the fill stays a translucent tint so the chip reads as a label, not a
- * button (materials: light translucent surfaces draw attention; here we want calm).
+ * A small status chip - PR state, workflow result, AI-authored marker, a count. Borderless soft pill: a
+ * tinted fill with a medium-weight tabular label, exactly the assistant's InfoChip (both read their colors
+ * from `lib/tones`, so a Pill beside a chat chip is the same object). Calm on purpose: it reads as a label,
+ * not a button. Long text wraps instead of truncating, so a status never loses its last word at large sizes.
  */
-export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone?: Tone }) {
+export function Pill({ children, tone = "neutral", icon, accessibilityLabel }: {
+  children: ReactNode
+  tone?: Tone
+  /** A small leading glyph (12-14pt lucide icon) drawn in the tone's color by the caller. */
+  icon?: ReactNode
+  accessibilityLabel?: string
+}) {
   const { palette } = useTheme()
-  const color = toneOf(tone, palette)
+  const chip = toneChip(palette, tone)
   return (
     <View
+      accessible={accessibilityLabel ? true : undefined}
+      accessibilityLabel={accessibilityLabel}
       style={{
         alignSelf: "flex-start",
         maxWidth: "100%",
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
         borderRadius: 999,
-        borderWidth: 0.5,
-        borderColor: tone === "neutral" ? palette.border : hexToRgba(color, 0.55),
         borderCurve: "continuous",
-        backgroundColor: hexToRgba(color, STATUS_FILL_ALPHA),
+        backgroundColor: chip.background,
       }}
     >
-      <Text style={{ color, ...type(12, { weight: "600", leadingScale: 1.05 }) }}>{children}</Text>
+      {icon}
+      <Text style={{ flexShrink: 1, color: chip.color, fontVariant: ["tabular-nums"], ...type(12, { weight: "500", leadingScale: 1.05 }) }}>{children}</Text>
     </View>
   )
+}
+
+/** Same chip with the label as a prop - the API of the assistant's InfoChip, for screens that share its call sites. */
+export function InfoChip({ label, tone = "neutral", icon }: { label: string; tone?: Tone; icon?: ReactNode }) {
+  return <Pill tone={tone} icon={icon}>{label}</Pill>
 }

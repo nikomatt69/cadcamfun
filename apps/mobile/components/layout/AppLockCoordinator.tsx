@@ -10,10 +10,10 @@ import { type } from "@/lib/typography"
 import { biometricLabel, getBiometricCapability, type BiometricLabel } from "@/lib/biometrics"
 import { coverWhenInactive, lockOnResume, lockWhenBackgrounded, unlockFailureMessage } from "@/lib/app-lock"
 import { haptic } from "@/lib/haptics"
-import { ActionButton } from "@/components/ui/ActionButton"
-import { PageScroll } from "./page-scroll"
+import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { BrandMark } from "./BrandMark"
-import { SafeAreaView } from "react-native-safe-area-context"
+import { CapsuleButton } from "./CapsuleButton"
+import { EntryScreen } from "./EntryScreen"
 
 /**
  * The Face ID lock (nikcli: AppLockOverlay) — a full-screen overlay when a paired app returns from
@@ -127,20 +127,26 @@ export function AppLockCoordinator() {
   const needsReset = error !== null && error.includes("unpair")
   return (
     <Modal visible transparent={false} animationType="none" presentationStyle="fullScreen" onRequestClose={() => undefined}>
-    <SafeAreaView accessibilityViewIsModal style={{ flex: 1, backgroundColor: palette.background }}>
-      <PageScroll contentInsetAdjustmentBehavior="never" contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", gap: 20 }}>
-        <BrandMark size={64} wordmark={false} />
-        <View style={{ alignItems: "center", gap: 8 }}>
-          <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(22, { weight: "600" }) }}>CADCAMFUN is locked</Text>
-          <Text style={{ maxWidth: 300, color: palette.soft, textAlign: "center", ...type(15) }}>Unlock with {label} or your device passcode to continue.</Text>
+    <View accessibilityViewIsModal style={{ flex: 1 }}>
+      <EntryScreen
+        centered
+        footer={(
+          <>
+            {error ? <ErrorBanner message={error} /> : null}
+            <CapsuleButton label={checking ? "Unlocking…" : `Unlock with ${label}`} icon={<Lock size={17} color={palette.onAccent} strokeWidth={2.2} />} loading={checking} onPress={() => void unlock()} />
+            {needsReset ? <CapsuleButton variant="glass" label="Unpair this phone" hint="Removes the saved pairing so you can pair again" onPress={resetPairing} /> : null}
+          </>
+        )}
+      >
+        <View style={{ alignItems: "center", gap: 16 }}>
+          <BrandMark size={64} wordmark={false} />
+          <View style={{ alignItems: "center", gap: 8 }}>
+            <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(24, { weight: "700" }) }}>CADCAMFUN is locked</Text>
+            <Text style={{ maxWidth: 300, color: palette.soft, textAlign: "center", ...type(15, { leadingScale: 1.05 }) }}>Unlock with {label} or your device passcode to continue.</Text>
+          </View>
         </View>
-        <View style={{ alignSelf: "stretch", maxWidth: 360, width: "100%", gap: 10 }}>
-          <ActionButton label={checking ? "Unlocking…" : `Unlock with ${label}`} loading={checking} onPress={() => void unlock()} />
-          {needsReset ? <ActionButton label="Unpair this phone" variant="secondary" onPress={resetPairing} /> : null}
-        </View>
-        {error ? <Text selectable accessibilityLiveRegion="polite" style={{ maxWidth: 320, color: palette.danger, textAlign: "center", ...type(15) }}>{error}</Text> : null}
-      </PageScroll>
-    </SafeAreaView>
+      </EntryScreen>
+    </View>
     </Modal>
   )
 }

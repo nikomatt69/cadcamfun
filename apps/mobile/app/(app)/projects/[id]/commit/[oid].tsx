@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react"
 import { Alert, RefreshControl, Text, View } from "react-native"
-import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { useLocalSearchParams, useRouter } from "expo-router"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
 import { useTheme } from "@/lib/theme"
@@ -11,6 +11,7 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { Skeleton } from "@/components/ui/Skeleton"
 import { PageScroll } from "@/components/layout/page-scroll"
+import { ScreenFrame } from "@/components/project/ScreenFrame"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { haptic } from "@/lib/haptics"
 import { errorMessage } from "@/lib/throttle"
@@ -72,10 +73,9 @@ export default function CommitScreen() {
   if (!client) return null
 
   return (
-    <View collapsable={false} style={{ flex: 1, backgroundColor: palette.background }}>
-      <Stack.Screen options={{ title: oid ? shortOid(oid) : "Commit" }} />
+    <ScreenFrame title="Commit" {...(oid ? { subtitle: shortOid(oid) } : {})} backLabel="Back to the project">
 
-      <PageScroll refreshControl={<RefreshControl refreshing={(log.loading || diff.loading) && Boolean(diff.data)} onRefresh={() => { void log.reload(); void diff.reload() }} tintColor={palette.accent} />}>
+      <PageScroll contentInsetAdjustmentBehavior="never" refreshControl={<RefreshControl refreshing={(log.loading || diff.loading) && Boolean(diff.data)} onRefresh={() => { void log.reload(); void diff.reload() }} tintColor={palette.accent} />}>
           {log.loading && !log.data ? <Skeleton style={{ height: 120 }} /> : null}
           {log.error ? <ErrorBanner message={log.error} actionLabel="Retry" onAction={() => void log.reload()} /> : null}
           {commit ? (
@@ -109,6 +109,6 @@ export default function CommitScreen() {
             </View>
           ) : null}
       </PageScroll>
-    </View>
+    </ScreenFrame>
   )
 }

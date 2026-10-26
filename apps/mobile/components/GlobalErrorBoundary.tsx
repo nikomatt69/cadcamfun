@@ -8,18 +8,9 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { useTheme } from "@/lib/theme"
 import { type } from "@/lib/typography"
 import { layout } from "@/lib/layout"
-
-const MAX_RESTARTS = 3
+import { canRestart, crashReport, crashSummary } from "@/lib/crash-report"
 
 type State = { hasError: boolean; message: string; restartCount: number; details: string }
-
-/** What support needs to place a crash: the message, where React was rendering, and the build. Never user data. */
-export const crashReport = (error: { name?: string; message?: string; stack?: string }, componentStack: string | null | undefined, build: string, at: Date): string => [
-  `CADCAMFUN ${build} · ${Platform.OS} ${String(Platform.Version)} · ${at.toISOString()}`,
-  `${error.name ?? "Error"}: ${error.message ?? "Unknown error"}`,
-  ...(error.stack ? ["", error.stack.split("\n").slice(0, 12).join("\n")] : []),
-  ...(componentStack ? ["", "Components:", componentStack.trim().split("\n").slice(0, 12).join("\n")] : []),
-].join("\n")
 
 function CrashFallback({ message, restartCount, onRestart, details }: { message: string; restartCount: number; onRestart(): void; details: string }) {
   const { palette } = useTheme()
@@ -28,7 +19,7 @@ function CrashFallback({ message, restartCount, onRestart, details }: { message:
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: palette.background, paddingHorizontal: layout.gutter, gap: 16 }}>
       <Text accessibilityRole="header" style={{ color: palette.ink, textAlign: "center", ...type(20, { weight: "700" }) }}>Something went wrong</Text>
       <ErrorBanner message={message} />
-      {restartCount < MAX_RESTARTS ? (
+      {canRestart(restartCount) ? (
         <ActionButton label="Restart" onPress={onRestart} />
       ) : (
         <Text selectable style={{ textAlign: "center", color: palette.soft, ...type(14) }}>
@@ -45,12 +36,12 @@ export class GlobalErrorBoundary extends React.Component<{ children: React.React
   state: State = { hasError: false, message: "", restartCount: 0, details: "" }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
-    return { hasError: true, message: error.message || "An unexpected error occurred." }
+    return { hasError: true, message: crashSummary(error.message ?? "") }
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("[GlobalErrorBoundary]", error, info)
-    this.setState({ details: crashReport(error, info.componentStack, Constants.expoConfig?.version ?? "6.0.0", new Date()) })
+    this.setState({ details: crashReport(error, info.componentStack, Constants.expoConfig?.version ?? "6.0.0", `${Platform.OS} ${String(Platform.Version)}`, new Date()) })
   }
 
   render() {
