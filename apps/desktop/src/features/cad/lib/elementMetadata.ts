@@ -212,7 +212,8 @@ export const generateSuggestedTags = (element: any, elementType: string, specifi
   }
 
   // Add color-based tags
-  if (element.color) {
+  // A colour is a CSS string, but parts made by a boolean or a copy can carry a numeric (three.js) one.
+  if (typeof element.color === "string" && element.color) {
     // Common color names
     const colorMap: Record<string, string> = {
       "#ff0000": "red",

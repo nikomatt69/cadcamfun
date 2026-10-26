@@ -60,7 +60,7 @@ export interface CADCanvasApi {
   readonly camera: () => THREE.PerspectiveCamera | undefined
   readonly fitToView: () => void
   readonly zoom: (factor: number) => void
-  readonly boolean: (operation: BooleanOperation) => void
+  readonly boolean: (operation: BooleanOperation) => boolean
   readonly exportSTL: () => void
   readonly exportOBJ: () => void
   readonly exportGLTF: () => Promise<void>
@@ -509,16 +509,18 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     else void container.requestFullscreen?.()
   }
 
-  const runBoolean = (operation: BooleanOperation) => {
+  /** Combines the selection; false when there was nothing to combine (fewer than two parts, or no result). */
+  const runBoolean = (operation: BooleanOperation): boolean => {
     const ids = selectedIds()
-    if (ids.length < 2) return
+    if (ids.length < 2) return false
     const result = booleanElement(operation, ids.flatMap((id) => objectOf(id) ?? []), layers.activeLayer)
-    if (!result) return
+    if (!result) return false
     batch(() => {
       const id = elements.addElement(result)
       for (const original of ids) elements.deleteElement(original)
       selection.selectElement(id)
     })
+    return true
   }
 
   const api: CADCanvasApi = {
@@ -1047,7 +1049,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const lookFrom = (direction: readonly [number, number, number]) => { rig?.snapTo([...direction]); invalidate() }
   const transforming = () => transformStore.isTransforming && transformStore.currentSession !== undefined
   const needsSelection = (run: () => void) => (): boolean | void => { if (selectedIds().length === 0) return false; run() }
-  const needsTwo = (operation: BooleanOperation) => (): boolean | void => { if (selectedIds().length < 2) return false; runBoolean(operation) }
+  const needsTwo = (operation: BooleanOperation) => (): boolean => runBoolean(operation)
   const setTransformKind = (mode: TransformMode) => (): boolean | void => { if (cad.explodedView.enabled) return false; transformStore.setMode(mode) }
   const constrain = (axis: "x" | "y" | "z") => (): boolean | void => { if (transformStore.mode === "none") return false; transformStore.setActiveAxis(axis) }
   onMount(() => {

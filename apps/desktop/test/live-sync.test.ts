@@ -1,3 +1,4 @@
+import "./helpers/dom-global.ts"
 import { expect, test } from "bun:test"
 import { Effect, Stream } from "effect"
 import { startLiveSync } from "../src/app/live-sync.ts"

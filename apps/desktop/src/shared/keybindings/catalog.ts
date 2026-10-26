@@ -27,7 +27,10 @@ export interface CommandDef {
   readonly group: CommandGroup
   /** Canonical chords bound out of the box; the user's overrides replace the whole list. */
   readonly defaults: ReadonlyArray<string>
-  /** Fires while the user types in a field. Only meaningful for chords with a command modifier. */
+  /**
+   * Fires while the user types in a field. Only meaningful for chords with a command modifier, and only for commands
+   * that are not text editing (Mod+C/V/X/Z/A stay with the field).
+   */
   readonly inText?: boolean
   /** Fires while a dialog is open (the palette and the help dialog toggle themselves). */
   readonly overDialog?: boolean
@@ -50,18 +53,18 @@ export const SNAP_TYPES: ReadonlyArray<readonly [string, string | undefined]> = 
 export const COMMANDS: ReadonlyArray<CommandDef> = [
   // ------------------------------------------------------------------------------------------- shell
   def("app.palette", "global", "navigation", ["Mod+K"], { inText: true, overDialog: true }),
-  def("app.go.projects", "global", "navigation", ["Mod+Shift+P"]),
-  def("app.go.cad", "global", "navigation", ["Mod+Alt+1"]),
-  def("app.go.cam", "global", "navigation", ["Mod+Alt+2"]),
-  def("app.go.library", "global", "navigation", ["Mod+Alt+3"]),
-  def("app.go.settings", "global", "navigation", ["Mod+,"]),
+  def("app.go.projects", "global", "navigation", ["Mod+Shift+P"], { inText: true }),
+  def("app.go.cad", "global", "navigation", ["Mod+Alt+1"], { inText: true }),
+  def("app.go.cam", "global", "navigation", ["Mod+Alt+2"], { inText: true }),
+  def("app.go.library", "global", "navigation", ["Mod+Alt+3"], { inText: true }),
+  def("app.go.settings", "global", "navigation", ["Mod+,"], { inText: true }),
   def("app.toggleAi", "global", "panels", ["Mod+J"], { inText: true }),
   def("app.shortcuts", "global", "help", ["?", "F1"], { overDialog: true }),
 
   // ------------------------------------------------------------------------------------------- shared by both pages
   def("file.save", "global", "file", ["Mod+S"], { inText: true }),
-  def("file.import", "global", "file", ["Mod+Shift+O"]),
-  def("file.export", "global", "file", ["Mod+Shift+E"]),
+  def("file.import", "global", "file", ["Mod+Shift+O"], { inText: true }),
+  def("file.export", "global", "file", ["Mod+Shift+E"], { inText: true }),
   def("edit.undo", "global", "edit", ["Mod+Z"]),
   def("edit.redo", "global", "edit", ["Mod+Shift+Z", "Mod+Y"]),
   def("edit.cancel", "global", "edit", ["Escape"]),
@@ -104,17 +107,17 @@ export const COMMANDS: ReadonlyArray<CommandDef> = [
   def("cad.boolean.intersect", "cad", "boolean", ["Mod+Alt+I"]),
 
   // ------------------------------------------------------------------------------------------- CAM page
-  def("cam.tab.editor", "cam", "view", ["Alt+1"]),
-  def("cam.tab.toolpath", "cam", "view", ["Alt+2"]),
-  def("cam.tab.post", "cam", "view", ["Alt+3"]),
+  def("cam.tab.editor", "cam", "view", ["Alt+1"], { inText: true }),
+  def("cam.tab.toolpath", "cam", "view", ["Alt+2"], { inText: true }),
+  def("cam.tab.post", "cam", "view", ["Alt+3"], { inText: true }),
   def("cam.process", "cam", "file", ["Mod+Enter"], { inText: true }),
   def("cam.simulation.toggle", "cam", "simulation", ["Space"]),
   def("cam.simulation.rewind", "cam", "simulation", ["Home"]),
   def("cam.simulation.stepForward", "cam", "simulation", ["."], { repeat: true }),
   def("cam.simulation.stepBack", "cam", "simulation", [","], { repeat: true }),
-  def("cam.sidebar.toggle", "cam", "panels", ["Mod+Shift+B"]),
-  def("cam.library.open", "cam", "panels", ["Mod+L"]),
-  def("cam.history.open", "cam", "panels", ["Mod+Shift+H"])
+  def("cam.sidebar.toggle", "cam", "panels", ["Mod+Shift+B"], { inText: true }),
+  def("cam.library.open", "cam", "panels", ["Mod+L"], { inText: true }),
+  def("cam.history.open", "cam", "panels", ["Mod+Shift+H"], { inText: true })
 ]
 
 const BY_ID: ReadonlyMap<string, CommandDef> = new Map(COMMANDS.map((command) => [command.id, command]))

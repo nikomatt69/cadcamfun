@@ -167,6 +167,12 @@ const OTHER_SYMBOLS: Readonly<Record<string, string>> = {
   delete: "Del", tab: "Tab", arrowup: "↑", arrowdown: "↓", arrowleft: "←", arrowright: "→", space: "Space"
 }
 
+const WORDS: Readonly<Record<string, string>> = { pageup: "Page Up", pagedown: "Page Down", insert: "Insert" }
+
+/** A letter or symbol in capitals, a function key as `F5`, a named key (`Home`, `Page Up`) as a word. */
+const keyLabel = (key: string): string =>
+  key.length === 1 || /^f\d+$/.test(key) ? key.toUpperCase() : WORDS[key] ?? key.charAt(0).toUpperCase() + key.slice(1)
+
 /** The parts of a chord as the platform prints them: `["⇧", "⌘", "Z"]` on macOS, `["Ctrl", "Shift", "Z"]` elsewhere. */
 export const chordLabels = (chord: Chord, platform: Platform = detectPlatform()): ReadonlyArray<string> => {
   const table = platform === "mac" ? MAC_SYMBOLS : OTHER_SYMBOLS
@@ -175,7 +181,7 @@ export const chordLabels = (chord: Chord, platform: Platform = detectPlatform())
   if (chord.alt) modifiers.push(table["alt"]!)
   if (chord.shift) modifiers.push(table["shift"]!)
   if (chord.meta || (chord.mod && platform === "mac")) modifiers.push(table["meta"]!)
-  return [...modifiers, table[chord.key] ?? chord.key.toUpperCase()]
+  return [...modifiers, table[chord.key] ?? keyLabel(chord.key)]
 }
 
 /** One display string: `⌘⇧Z` on macOS, `Ctrl+Shift+Z` elsewhere. */

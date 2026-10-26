@@ -551,6 +551,12 @@ export const createAiStore = (): AiStore => {
     rememberActive()
   }
 
+  /** Deleting the conversation that is open closes it first: it must not stay on screen (or be saved again) after it is gone. */
+  const deleteSession: AiStore["deleteSession"] = (id) => {
+    if (id === sessionId()) newSession()
+    sessions.deleteSession(id)
+  }
+
   const openSession: AiStore["openSession"] = (id) => {
     if (id === sessionId() || !sessions.sessions().some((s) => s.id === id)) return
     detachStream()
@@ -779,7 +785,7 @@ export const createAiStore = (): AiStore => {
     status, error, sessionId, sessions: sessions.sessions, messages, toolCalls, permissions, plan, goal, activity, tasks,
     model, setModel, includeContext, setIncludeContext, stats, contextTokens, suggestions, dismissSuggestion,
     projectId, send, pending, abort, clear, newSession, openSession,
-    renameSession: sessions.renameSession, deleteSession: sessions.deleteSession, replyPermission,
+    renameSession: sessions.renameSession, deleteSession, replyPermission,
     permissionMode, setPermissionMode, agents, agent, setAgent, mode, setMode, pluginModes, refreshModes: controls.refreshModes,
     questions, hostContext, controlBusy, controlError,
     refreshControls: controls.refreshControls, loadContextBreakdown: controls.loadContextBreakdown, compact: controls.compact,

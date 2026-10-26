@@ -32,6 +32,18 @@ One command catalog, one keymap, one keyboard listener. Code: `apps/desktop/src/
   export/import.
 - CAD canvas/page, CAM page and the 3D viewer register handlers; none of them names a key.
 
+## Validation
+
+- Unit: chords, catalog invariants (no default clash, no reserved chord, no native-menu chord reused, every command has
+  its labels), keymap rules, the Effect service, the dispatcher (`test/keybindings.test.ts`).
+- Screens: every catalog command has a registered handler (`keybindings-ui.test.ts`); CAM and CAD pages over the real
+  sidecar handlers with keys pressed on the window (`keybindings-pages.test.ts`).
+- Real browser (Chromium + WebGL, real sidecar): 36 checks on 2026-10-26 - CAD transform modes, select all/escape,
+  boolean union and undo/redo, duplicate/delete, views, grid, snap, help dialog, palette, Settings > Keyboard rebind and
+  conflict, CAM tabs (also from inside the editor), simulation Space, library, save. Recipe: standalone sidecar
+  (`CADCAMFUN_TOKEN`, `CADCAMFUN_DATA_DIR`, `CADCAMFUN_MIGRATIONS_DIR`, stdin kept open), `vite --port 5199` with
+  `VITE_SIDECAR_URL/TOKEN`, playwright-core with the cached chromium headless shell and `--use-angle=swiftshader`.
+
 ## Open
 
 - Native menu accelerators are fixed in Rust; rebinding does not change them.

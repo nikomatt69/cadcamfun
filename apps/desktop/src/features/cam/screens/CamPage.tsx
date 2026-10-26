@@ -162,7 +162,7 @@ export default function CamPage(): JSX.Element {
   onMount(() => {
     const stopHistory = mountCamHistory()
     // One history for the whole page, including the G-code editor: it answers Undo/Redo even while that editor has the focus.
-    const inEditor = (target: EventTarget | null): boolean => target instanceof Element && target.closest(".monaco-editor") !== null
+    const inEditor = (target: EventTarget | null): boolean => target instanceof Element && target.closest(".cam-editor__code") !== null
     const step = (seconds: number) => (): boolean | void => {
       if (camStore.program.toolpaths.length === 0) return false
       camStore.setPlaybackTime(Math.min(Math.max(camStore.playbackTime + seconds, 0), duration()))
