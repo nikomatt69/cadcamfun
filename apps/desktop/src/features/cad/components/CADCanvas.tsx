@@ -24,11 +24,9 @@ import { useSelectionStore } from "../store/selectorStore.ts"
 import { useTransformControlsStore } from "../store/transformControlsStore.ts"
 import { createSnap } from "../hooks/createSnap.ts"
 import { createTransformControls } from "../hooks/createTransformControls.ts"
-import { createCadKeyboardShortcuts } from "../hooks/createCadKeyboardShortcuts.ts"
 import { applyControlPointDrag, beginControlPointDrag, createControlPointsForElement, endControlPointDrag } from "../lib/controlPoints.ts"
 import { createComponentPreview, transformLibraryItemToCADElement } from "../lib/libraryTransform.ts"
 import { predefinedComponents } from "../lib/predefinedLibraries.ts"
-import { ALL_SHORTCUTS } from "../lib/shortcutsData.ts"
 import {
   applyDragDelta, applyElementTransform, applyHighlight, booleanElement, buildElementObject, disposeObject, isDrawn, commitDrag,
   createCustomAxes, createOriginIndicator, deltaFrom, exportGLTF, exportOBJ, exportSTL, fitCameraToObjects,
@@ -47,7 +45,11 @@ import BoxSelection from "./BoxSelection.tsx"
 import ElementsListPanel from "./ElementsListPanel.tsx"
 import ElementInfo from "./ElementInfo.tsx"
 import ComponentCreationModal from "./ComponentCreationModal.tsx"
-import ShortcutsDialog from "./ShortcutsDialog.tsx"
+import { useApp } from "../../../shared/state/context.ts"
+import { SNAP_TYPES } from "../../../shared/keybindings/catalog.ts"
+import { displayChord } from "../../../shared/keybindings/chord.ts"
+import { CUBE_FACES } from "../../../viewport/view-cube-model.ts"
+import type { SnapType } from "../lib/enanchedSnapService.ts"
 
 type TransformMode = "translate" | "rotate" | "scale"
 type Point3 = { x: number; y: number; z: number }
@@ -99,6 +101,7 @@ const ISO_VIEW = new THREE.Vector3(300, -300, 240)
  * exports and the editor overlays. Port of the legacy `CADCanvas`.
  */
 export default function CADCanvas(props: CADCanvasProps): JSX.Element {
+  const app = useApp()
   const cad = useCADStore()
   const elements = useElementsStore()
   const layers = useLayerStore()
@@ -115,6 +118,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   /** Zoom toward the cursor, orbit about the selection or the surface under the pointer, near and far that follow the scene. */
   let rig: CameraRig | undefined
   let cubeApi: ViewCubeApi | undefined
+  /** Cancels a box selection in flight; set once the canvas is mounted. */
+  let cancelBox: () => boolean = () => false
   const [flatView, setFlatView] = createSignal(false)
   /** Top, front, right and the working perspective view at once; read-only, like the toolpath view's. */
   const [fourView, setFourView] = createSignal(false)
@@ -198,7 +203,6 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [showElementsList, setShowElementsList] = createSignal(false)
   const [showElementInfo, setShowElementInfo] = createSignal(false)
   const [showComponentModal, setShowComponentModal] = createSignal(false)
-  const [showShortcuts, setShowShortcuts] = createSignal(false)
   const [showPerformance, setShowPerformance] = createSignal(false)
   const [isPlacing, setPlacing] = createSignal(false)
   const [previewPosition, setPreviewPosition] = createSignal<Point3>({ x: 0, y: 0, z: 0 })
@@ -422,12 +426,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const cancelSelection = () => {
       if (screenBox()) { selection.endBoxSelection(); setScreenBox(undefined); pointerDown = undefined; if (orbit) orbit.enabled = !isPlacing() }
     }
-    const escapeSelection = (event: KeyboardEvent) => { if (event.key === "Escape") cancelSelection() }
+    cancelBox = () => { if (!screenBox()) return false; cancelSelection(); return true }
     container.addEventListener("pointerdown", stopOrbitSelection, true)
     window.addEventListener("mousemove", moveOutside)
     window.addEventListener("mouseup", release)
     window.addEventListener("blur", cancelSelection)
-    window.addEventListener("keydown", escapeSelection)
 
     onCleanup(() => {
       unregisterCapture()
@@ -455,7 +458,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       window.removeEventListener("mouseup", release)
       window.removeEventListener("mousemove", moveOutside)
       window.removeEventListener("blur", cancelSelection)
-      window.removeEventListener("keydown", escapeSelection)
+      cancelBox = () => false
       container.removeEventListener("pointerdown", stopOrbitSelection, true)
       if (screenBox()) selection.endBoxSelection()
       gizmo?.getHelper().removeFromParent()
@@ -523,7 +526,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     exportSTL: () => { if (scene) exploded.assembled(() => exportSTL(scene!)) },
     exportOBJ: () => { if (scene) exploded.assembled(() => exportOBJ(scene!)) },
     exportGLTF: () => (scene ? exploded.assembled(() => exportGLTF(scene!)) : Promise.resolve()),
-    toggleFullscreen, showShortcuts: () => setShowShortcuts(true)
+    toggleFullscreen, showShortcuts: () => app.keys.setHelpOpen(true)
   }
 
   // ---------------------------------------------------------------------------------------------------- scene sync
@@ -1037,38 +1040,63 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   }
 
   // ---------------------------------------------------------------------------------------------------- keyboard
-  createCadKeyboardShortcuts(props.keyboard === false ? {} : {
-    onDelete: () => { if (selectedIds().length > 0) selection.deleteSelection() },
-    onEscape: () => { if (isPlacing()) cancelPlacement(); else if (selectedIds().length > 0) selection.clearSelection() },
-    onSelectAll: () => selection.selectMultiple(elements.elements.filter((element) => !isLocked(element.id)).map((element) => element.id)),
-    onDeselectAll: () => selection.clearSelection(),
-    onCopy: () => elements.copySelectedElement(),
-    onPaste: () => elements.pasteElement(),
-    onDuplicate: () => selection.duplicateSelection(),
-    onUndo: () => elements.undo(),
-    onRedo: () => elements.redo(),
-    onZoomIn: () => zoom(1 / 1.2),
-    onZoomOut: () => zoom(1.2),
-    onZoomToFit: fitToView,
-    onViewModeToggle: (mode) => cad.setViewMode(mode),
-    onToggleGrid: () => cad.toggleGrid(),
-    onToggleAxis: () => cad.toggleAxis(),
-    onToggleFullscreen: toggleFullscreen,
-    onToggleSnap: () => snap.updateSnapSettings({ enabled: !snap.snapSettings().enabled }),
-    onShowShortcuts: () => setShowShortcuts(true),
-    onSave: () => props.onSave?.()
-  })
+  // The canvas answers the editor's commands (`shared/keybindings/catalog.ts`); the chords are the user's keymap, so
+  // nothing here names a key. A second canvas (a dialog's) leaves them to the main one.
+  const toggleFourViews = () => { fourViewOn = !fourViewOn; setFourView(fourViewOn); if (orbit) orbit.enabled = !fourViewOn && !isPlacing(); invalidate() }
+  const toggleProjection = () => { if (!rig) return; rig.setFlat(!rig.flat()); setFlatView(rig.flat()) }
+  const lookFrom = (direction: readonly [number, number, number]) => { rig?.snapTo([...direction]); invalidate() }
+  const transforming = () => transformStore.isTransforming && transformStore.currentSession !== undefined
+  const needsSelection = (run: () => void) => (): boolean | void => { if (selectedIds().length === 0) return false; run() }
+  const needsTwo = (operation: BooleanOperation) => (): boolean | void => { if (selectedIds().length < 2) return false; runBoolean(operation) }
+  const setTransformKind = (mode: TransformMode) => (): boolean | void => { if (cad.explodedView.enabled) return false; transformStore.setMode(mode) }
+  const constrain = (axis: "x" | "y" | "z") => (): boolean | void => { if (transformStore.mode === "none") return false; transformStore.setActiveAxis(axis) }
   onMount(() => {
     if (props.keyboard === false) return
-    const down = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
-      if (event.ctrlKey && event.key.toLowerCase() === "u") { event.preventDefault(); runBoolean("union") }
-      else if (event.ctrlKey && event.key.toLowerCase() === "i") { event.preventDefault(); runBoolean("intersect") }
-      else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") { event.preventDefault(); runBoolean("subtract") }
-      else if (event.ctrlKey && event.key.toLowerCase() === "t") { event.preventDefault() }
-    }
-    window.addEventListener("keydown", down)
-    onCleanup(() => window.removeEventListener("keydown", down))
+    const off = app.keys.register({
+      // Escape undoes whatever is in flight, then deselects: one press clears the whole editing state.
+      "edit.cancel": () => {
+        const busy = transforming() || transformStore.mode !== "none" || isPlacing() || selectedIds().length > 0 || cancelBox()
+        if (!busy) return false
+        if (transforming()) transformStore.cancelTransform(transformStore.currentSession!.id)
+        else transformStore.setMode("none")
+        cancelBox()
+        if (isPlacing()) cancelPlacement(); else if (selectedIds().length > 0) selection.clearSelection()
+      },
+      "file.save": () => { if (props.onSave === undefined) return false; props.onSave() },
+      "edit.undo": () => { elements.undo() },
+      "edit.redo": () => { elements.redo() },
+      "view.zoomIn": () => { zoom(1 / 1.2) },
+      "view.zoomOut": () => { zoom(1.2) },
+      "view.zoomFit": () => { fitToView() },
+      "cad.delete": needsSelection(() => selection.deleteSelection()),
+      "cad.copy": needsSelection(() => elements.copySelectedElement()),
+      "cad.paste": () => { elements.pasteElement() },
+      "cad.duplicate": needsSelection(() => selection.duplicateSelection()),
+      "cad.selectAll": () => { selection.selectMultiple(elements.elements.filter((element) => !isLocked(element.id)).map((element) => element.id)) },
+      "cad.deselectAll": needsSelection(() => selection.clearSelection()),
+      "cad.transform.translate": setTransformKind("translate"),
+      "cad.transform.rotate": setTransformKind("rotate"),
+      "cad.transform.scale": setTransformKind("scale"),
+      "cad.transform.axisX": constrain("x"),
+      "cad.transform.axisY": constrain("y"),
+      "cad.transform.axisZ": constrain("z"),
+      "cad.transform.commit": () => { if (!transforming()) return false; transformStore.commitTransform(transformStore.currentSession!.id) },
+      "cad.view.mode3d": () => { cad.setViewMode("3d") },
+      "cad.view.mode2d": () => { cad.setViewMode("2d") },
+      "cad.view.grid": () => { cad.toggleGrid() },
+      "cad.view.axes": () => { cad.toggleAxis() },
+      "cad.view.fullscreen": () => { toggleFullscreen() },
+      "cad.view.iso": () => { lookFrom([ISO_VIEW.x, ISO_VIEW.y, ISO_VIEW.z]) },
+      "cad.view.projection": () => { toggleProjection() },
+      "cad.view.fourViews": () => { toggleFourViews() },
+      ...Object.fromEntries(CUBE_FACES.map((face) => [`cad.view.${face.name}`, () => { lookFrom(face.normal) }])),
+      "cad.snap.toggle": () => { snap.updateSnapSettings({ enabled: !snap.snapSettings().enabled }) },
+      ...Object.fromEntries(SNAP_TYPES.map(([type]) => [`cad.snap.type.${type}`, () => { snap.toggleSnapType(type as SnapType) }])),
+      "cad.boolean.union": needsTwo("union"),
+      "cad.boolean.subtract": needsTwo("subtract"),
+      "cad.boolean.intersect": needsTwo("intersect")
+    })
+    onCleanup(off)
   })
 
   // ---------------------------------------------------------------------------------------------------- overlay data
@@ -1093,6 +1121,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     onCleanup(() => clearInterval(timer))
   })
 
+  const shortcutsTitle = () => {
+    const chords = app.keys.keymap().entry("app.shortcuts")?.chords ?? []
+    return `${t("keys.title")} (${chords.map((chord) => displayChord(chord, app.keys.platform)).join(" / ")})`
+  }
   const singleSelected = () => (selectedIds().length === 1 ? selectedIds()[0]! : undefined)
 
   return (
@@ -1224,9 +1256,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           onOrbit={(dAzimuth, dPolar) => rig?.orbitBy(dAzimuth, dPolar)}
           onIsometric={() => rig?.snapTo([ISO_VIEW.x, ISO_VIEW.y, ISO_VIEW.z])}
           onFit={() => fitToView()}
-          onProjection={() => { if (!rig) return; rig.setFlat(!rig.flat()); setFlatView(rig.flat()) }}
+          onProjection={toggleProjection}
           fourViews={fourView()}
-          onFourViews={() => { fourViewOn = !fourViewOn; setFourView(fourViewOn); if (orbit) orbit.enabled = !fourViewOn && !isPlacing(); invalidate() }}
+          onFourViews={toggleFourViews}
           register={(api) => { cubeApi = api; cubeStale = true }}
         />
       </div>
@@ -1281,11 +1313,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         </div>
       </div>
       <div class="absolute bottom-4 left-4">
-        <button onClick={() => setShowShortcuts(true)} class="p-2 bg-[#F8FBFF] dark:bg-gray-800 bg-opacity-80 rounded-full text-gray-700 dark:text-gray-200 hover:bg-opacity-100 shadow-md hover:shadow-lg transition-all duration-200" title="Show keyboard shortcuts (? or F2)">
+        <button onClick={() => app.keys.setHelpOpen(true)} class="p-2 bg-[#F8FBFF] dark:bg-gray-800 bg-opacity-80 rounded-full text-gray-700 dark:text-gray-200 hover:bg-opacity-100 shadow-md hover:shadow-lg transition-all duration-200" title={shortcutsTitle()}>
           <HelpCircle size={18} />
         </button>
       </div>
-      <ShortcutsDialog isOpen={showShortcuts()} onClose={() => setShowShortcuts(false)} shortcuts={ALL_SHORTCUTS} />
     </div>
   )
 }

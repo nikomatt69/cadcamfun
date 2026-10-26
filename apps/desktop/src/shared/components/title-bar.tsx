@@ -12,6 +12,8 @@ import ChevronDown from "lucide-solid/icons/chevron-down"
 import Search from "lucide-solid/icons/search"
 import { t, type Key } from "../../i18n/index.ts"
 import { isTauri } from "../../app/sidecar.ts"
+import { useAppOptional } from "../state/context.ts"
+import { displayChord } from "../keybindings/chord.ts"
 
 export type MenuId = "file" | "edit" | "view" | "window" | "help"
 
@@ -103,6 +105,12 @@ export const needsMenuFallback = (force?: boolean): boolean =>
   force === true || !isTauri() || typeof navigator === "undefined" || !navigator.userAgent.includes("Mac")
 
 export function TitleBar(props: TitleBarProps): JSX.Element {
+  const keys = useAppOptional()?.keys
+  /** The palette chord of the user's keymap; the title bar shows what they actually have. */
+  const paletteChord = (): string | undefined => {
+    const chord = keys?.keymap().entry("app.palette")?.chords[0]
+    return chord === undefined || keys === undefined ? undefined : displayChord(chord, keys.platform)
+  }
   const [open, setOpen] = createSignal<MenuId | undefined>(undefined)
   const withMenus = (): boolean => needsMenuFallback(props.forceMenus)
   const compact = (): boolean => props.minimal === true
@@ -240,11 +248,11 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
           type="button"
           class="ml-auto flex items-center gap-2 rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-600 dark:hover:bg-gray-700"
           aria-label={t("settings.shortcut.palette")}
-          aria-keyshortcuts="Meta+K Control+K"
+          aria-keyshortcuts={paletteChord() === undefined ? undefined : "Meta+K Control+K"}
           onClick={() => props.onOpenPalette()}
         >
           <Search size={14} aria-hidden="true" />
-          <kbd>Cmd/Ctrl+K</kbd>
+          <kbd>{paletteChord() ?? ""}</kbd>
         </button>
       </Show>
     </header>

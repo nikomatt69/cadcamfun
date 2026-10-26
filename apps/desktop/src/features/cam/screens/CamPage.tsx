@@ -161,24 +161,37 @@ export default function CamPage(): JSX.Element {
   })
   onMount(() => {
     const stopHistory = mountCamHistory()
-    const key = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented || !(event.ctrlKey || event.metaKey) || event.altKey || document.querySelector('[role="dialog"]')) return
-      const lower = event.key.toLowerCase(), history = useCamHistoryStore.getState()
-      if (lower === "s" && !event.shiftKey) {
-        // Save: a program that already has a stored copy is updated in place (with the drawing it belongs to); a new one, or
-        // the Post tab's processed text, goes through the save dialog.
-        event.preventDefault(); event.stopPropagation()
+    // One history for the whole page, including the G-code editor: it answers Undo/Redo even while that editor has the focus.
+    const inEditor = (target: EventTarget | null): boolean => target instanceof Element && target.closest(".monaco-editor") !== null
+    const step = (seconds: number) => (): boolean | void => {
+      if (camStore.program.toolpaths.length === 0) return false
+      camStore.setPlaybackTime(Math.min(Math.max(camStore.playbackTime + seconds, 0), duration()))
+    }
+    const off = app.keys.register({
+      // A program that already has a stored copy is updated in place (with the drawing it belongs to); a new one, or the
+      // Post tab's processed text, goes through the save dialog.
+      "file.save": () => {
         const saved = camStore.savedProgram
         if (saved && !saved.postProcessed && camStore.activeTab !== "post") void projectSession(app).saveInteractive()
         else saveGCode()
-        return
-      }
-      if (lower !== "z" && lower !== "y") return
-      event.preventDefault(); event.stopPropagation()
-      if (lower === "y" || event.shiftKey) history.redo(); else history.undo()
-    }
-    window.addEventListener("keydown", key, { capture: true })
-    onCleanup(() => { stopHistory(); window.removeEventListener("keydown", key, { capture: true }) })
+      },
+      "file.export": () => { saveGCode() },
+      "file.import": () => { ribbonFilePicker?.click() },
+      "edit.undo": { run: () => { useCamHistoryStore.getState().undo() }, inText: inEditor },
+      "edit.redo": { run: () => { useCamHistoryStore.getState().redo() }, inText: inEditor },
+      "cam.tab.editor": () => { camStore.setActiveTab("editor") },
+      "cam.tab.toolpath": () => { camStore.setActiveTab("toolpath") },
+      "cam.tab.post": () => { camStore.setActiveTab("post") },
+      "cam.process": () => { processGCode() },
+      "cam.simulation.toggle": () => { toggleSimulation() },
+      "cam.simulation.rewind": () => { camStore.setPlaying(false); camStore.setPlaybackTime(0) },
+      "cam.simulation.stepForward": step(1),
+      "cam.simulation.stepBack": step(-1),
+      "cam.sidebar.toggle": () => { camStore.toggleSidebar() },
+      "cam.library.open": () => { setShowLibrary(true) },
+      "cam.history.open": () => { setShowHistory(true) }
+    })
+    onCleanup(() => { stopHistory(); off() })
   })
 
   // Preview and Toolpath play a program; for any G-code text (imported, edited, generated) the sidecar parses it.

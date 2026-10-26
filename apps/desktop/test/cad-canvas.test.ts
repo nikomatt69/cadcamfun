@@ -15,11 +15,12 @@ test("the CAD canvas mounts without WebGL and keeps its overlays usable", async 
   const root = document.createElement("div")
   document.body.append(root)
   let saves = 0
+  const stopKeys = state.keys.attach()
   const dispose = render(() => AppProvider({ state, get children() { return CADCanvas({ onSave: () => { saves++ } }) } }), root)
   try {
     expect(root.textContent).toContain("needs WebGL")
     expect(root.querySelector("[title='Toggle Elements List']")).not.toBeNull()
-    expect(root.querySelector("[title='Show keyboard shortcuts (? or F2)']")).not.toBeNull()
+    expect(root.querySelector("[title^='Keyboard shortcuts (']")).not.toBeNull()
 
     // Selection state drives the overlays even though nothing is drawn.
     const id = useElementsStore.getState().addElement({ type: "cube", x: 0, y: 0, z: 0, width: 1, height: 1, depth: 1 })
@@ -39,5 +40,5 @@ test("the CAD canvas mounts without WebGL and keeps its overlays usable", async 
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(useElementsStore.getState().selectedElement).toBeNull()
     expect(root.textContent).not.toContain("Move (G)")
-  } finally { dispose(); state.dispose() }
+  } finally { stopKeys(); dispose(); state.dispose() }
 })

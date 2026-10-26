@@ -16,21 +16,19 @@ export interface Activity {
   readonly route: string
   /** i18n key for the label; never a literal in the component. */
   readonly labelKey: string
-  /** Shortcut hint shown next to the label. */
-  readonly shortcut: string | undefined
 }
 
 /** `ai` has no page of its own: it toggles the docked panel and stays on the last screen. */
 export const ACTIVITIES: ReadonlyArray<Activity> = [
-  { id: "projects", route: "/", labelKey: "activity.projects", shortcut: "Cmd/Ctrl+Shift+P" },
-  { id: "cad", route: "/cad", labelKey: "activity.cad", shortcut: "Cmd/Ctrl+1" },
-  { id: "cam", route: "/cam", labelKey: "activity.cam", shortcut: "Cmd/Ctrl+2" },
-  { id: "library", route: "/library", labelKey: "activity.library", shortcut: undefined },
-  { id: "manuals", route: "/manuals", labelKey: "activity.manuals", shortcut: undefined },
-  { id: "costs", route: "/costs", labelKey: "activity.costs", shortcut: undefined },
-  { id: "ai", route: "/ai", labelKey: "activity.ai", shortcut: "Cmd/Ctrl+J" },
-  { id: "plugins", route: "/plugins", labelKey: "activity.plugins", shortcut: undefined },
-  { id: "settings", route: "/settings", labelKey: "activity.settings", shortcut: "Cmd/Ctrl+," }
+  { id: "projects", route: "/", labelKey: "activity.projects" },
+  { id: "cad", route: "/cad", labelKey: "activity.cad" },
+  { id: "cam", route: "/cam", labelKey: "activity.cam" },
+  { id: "library", route: "/library", labelKey: "activity.library" },
+  { id: "manuals", route: "/manuals", labelKey: "activity.manuals" },
+  { id: "costs", route: "/costs", labelKey: "activity.costs" },
+  { id: "ai", route: "/ai", labelKey: "activity.ai" },
+  { id: "plugins", route: "/plugins", labelKey: "activity.plugins" },
+  { id: "settings", route: "/settings", labelKey: "activity.settings" }
 ]
 
 /** The route an activity id maps to; `ai` toggles the panel, so it has no page. */

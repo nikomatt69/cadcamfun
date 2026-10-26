@@ -1,6 +1,6 @@
 /**
  * Selection transforms driven by the transform store: modes, sessions, quick moves, alignment and distribution,
- * and the G / R / S / X / Y / Z / Esc / Enter keyboard shortcuts. Port of the legacy `useTransformControls` hook.
+ * and the held-modifier constraints (the G / R / S / X / Y / Z / Esc / Enter keys are keymap commands). Port of the legacy `useTransformControls` hook.
  * Read `mode`, `isTransforming`, `selectedCount` and `canTransform` inside a tracking scope.
  */
 import { onCleanup, onMount } from "solid-js"
@@ -34,32 +34,16 @@ export function createTransformControls(options: UseTransformControlsOptions = {
   onMount(() => {
     if (autoUpdateHandles && selectedCount() > 0) store.updateHandles()
     if (!enableKeyboardShortcuts) return
+    // G / R / S, the axis keys, Enter and Esc are keymap commands (`shared/keybindings`); what stays here is the held
+    // modifier: Shift snaps to the grid and Ctrl frees all axes for as long as they are down.
     const down = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || typing(event) || event.metaKey || event.altKey || document.querySelector('[role="dialog"]')) return
-      if (cad.explodedView.enabled) return
-      const { ctrlKey, shiftKey } = event
-      switch (event.key.toLowerCase()) {
-        case "g": if (!ctrlKey && !shiftKey) { event.preventDefault(); store.setMode("translate") } break
-        case "r": if (!ctrlKey && !shiftKey) { event.preventDefault(); store.setMode("rotate") } break
-        case "s": if (!ctrlKey && !shiftKey) { event.preventDefault(); store.setMode("scale") } break
-        case "escape":
-          event.preventDefault()
-          if (store.isTransforming && store.currentSession) store.cancelTransform(store.currentSession.id)
-          else store.setMode("none")
-          break
-        case "enter": if (store.isTransforming && store.currentSession) { event.preventDefault(); store.commitTransform(store.currentSession.id) } break
-        case "x": if (store.mode !== "none") { event.preventDefault(); store.setActiveAxis("x") } break
-        case "y": if (store.mode !== "none") { event.preventDefault(); store.setActiveAxis("y") } break
-        case "z": if (store.mode !== "none") { event.preventDefault(); store.setActiveAxis("z") } break
-        case "shift": store.setConstraints({ snapToGrid: true }); break
-        case "control": store.setActiveAxis("xyz"); break
-      }
+      if (event.defaultPrevented || typing(event) || event.altKey || cad.explodedView.enabled) return
+      if (event.key === "Shift") store.setConstraints({ snapToGrid: true })
+      else if (event.key === "Control") store.setActiveAxis("xyz")
     }
     const up = (event: KeyboardEvent) => {
-      switch (event.key.toLowerCase()) {
-        case "shift": if (enableSnapping) store.setConstraints({ snapToGrid: false }); break
-        case "control": store.setActiveAxis("none"); break
-      }
+      if (event.key === "Shift") { if (enableSnapping) store.setConstraints({ snapToGrid: false }) }
+      else if (event.key === "Control") store.setActiveAxis("none")
     }
     window.addEventListener("keydown", down)
     window.addEventListener("keyup", up)

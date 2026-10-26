@@ -24,6 +24,8 @@ import {
 } from "./recents.ts"
 import type { ActivityId } from "../../app/layout.ts"
 import { createNotificationCenter, type NotificationCenter } from "../../features/notifications/store.ts"
+import { createKeybindings, type KeybindingsController } from "../keybindings/controller.ts"
+import type { KeybindingKvClient } from "../keybindings/service.ts"
 
 /** Sidecar health as the status bar shows it. */
 export type SidecarStatus = "starting" | "ready" | "fake" | "stopped"
@@ -33,6 +35,8 @@ export interface AppState {
   readonly runtime: AppRuntime
   readonly cache: QueryCache
   readonly settings: SettingsStore
+  /** The keymap, the command handlers and the one keyboard listener (`shared/keybindings`). */
+  readonly keys: KeybindingsController
   readonly editor: EditorState
   readonly recents: Accessor<ReadonlyArray<RecentProject>>
   /** Records an opened project at the front of the recents list. */
@@ -77,6 +81,7 @@ export const createAppState = (options: CreateAppStateOptions): AppState => {
   const [sidecar, setSidecar] = createSignal<SidecarStatus>(options.sidecar ?? "ready")
   const editor = createEditorState(options.drawing ?? emptyDrawing("drawing-1", "Untitled"))
   const settings = options.settings ?? createSettings()
+  const keys = createKeybindings({ activity, client: options.client as unknown as KeybindingKvClient })
 
   const setRecentsAndPersist = (next: ReadonlyArray<RecentProject>): void => {
     setRecents(next)
@@ -89,6 +94,7 @@ export const createAppState = (options: CreateAppStateOptions): AppState => {
     notifications: createNotificationCenter({ client: options.client, runtime: options.runtime, nativeEnabled: () => settings.settings().nativeNotifications }),
     cache: options.cache ?? createQueryCache(),
     settings,
+    keys,
     editor,
     drawing: editor.drawing,
     tool: editor.tool,
@@ -110,7 +116,7 @@ export const createAppState = (options: CreateAppStateOptions): AppState => {
     setCursor,
     sidecar,
     setSidecar,
-    dispose: () => options.runtime.dispose()
+    dispose: () => { keys.dispose(); options.runtime.dispose() }
   }
 }
 
@@ -122,6 +128,9 @@ export const useApp = (): AppState => {
   if (state === undefined) throw new Error("useApp must be called inside <AppProvider>")
   return state
 }
+
+/** The app state when there is one; a viewer mounted on its own (a test, a dialog preview) has none and goes without keys. */
+export const useAppOptional = (): AppState | undefined => useContext(AppContext)
 
 export interface AppProviderProps {
   readonly state: AppState

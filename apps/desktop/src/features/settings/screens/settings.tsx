@@ -12,7 +12,7 @@
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
-import { Bell, Cpu, Globe, Lock, Shield, Smartphone, User } from "lucide-solid"
+import { Bell, Cpu, Globe, Keyboard, Lock, Shield, Smartphone, User } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { endSession } from "../../../shared/state/session.ts"
@@ -25,9 +25,10 @@ import { AISettingsPanel } from "../components/ai-settings-panel.tsx"
 import { CompanionPanel } from "../../companion/screens/companion.tsx"
 import { LanguageSelector, SUPPORTED_LANGUAGES } from "../components/language-selector.tsx"
 import { AutosaveSettings } from "../components/autosave-settings.tsx"
+import { KeybindingsSettings } from "../components/keybindings-settings.tsx"
 import { checkForUpdates, inDesktopShell, openReleaseNotes } from "../../../app/updates.ts"
 
-type TabId = "profile" | "account" | "security" | "notifications" | "ai" | "devices" | "language"
+type TabId = "profile" | "account" | "security" | "notifications" | "ai" | "devices" | "keyboard" | "language"
 
 interface Tab {
   readonly id: TabId
@@ -61,6 +62,7 @@ export function SettingsScreen(): JSX.Element {
     { id: "notifications", name: t("settings.tab.notifications"), Icon: Bell },
     { id: "ai", name: t("settings.tab.ai"), Icon: Cpu },
     { id: "devices", name: t("settings.tab.devices"), Icon: Smartphone },
+    { id: "keyboard", name: t("settings.tab.keyboard"), Icon: Keyboard },
     { id: "language", name: t("settings.tab.language"), Icon: Globe }
   ]
 
@@ -130,6 +132,8 @@ export function SettingsScreen(): JSX.Element {
       </Show>
 
       <Show when={tab === "devices"}><CompanionPanel /></Show>
+
+      <Show when={tab === "keyboard"}><KeybindingsSettings /></Show>
 
       <Show when={tab === "language"}>
         <div class="space-y-6">

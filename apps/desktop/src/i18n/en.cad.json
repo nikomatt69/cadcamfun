@@ -217,7 +217,7 @@
   "cad.status.size": "Size",
   "cad.status.sizeTitle": "Selection size, mm",
   "cad.status.cursor": "Cursor position, mm",
-  "cad.status.shortcuts": "G Move · R Rotate · S Scale · Esc Cancel",
+  "cad.status.shortcuts": "{move} Move · {rotate} Rotate · {scale} Scale · {cancel} Cancel",
   "cad.saveElement.title": "Save Element to Library",
   "cad.saveElement.subtitle": "Keep this element for reuse in other drawings",
   "cad.saveElement.name": "Component Name",

@@ -27,7 +27,9 @@ import { UpdatePrompt } from "./UpdatePrompt.tsx"
 import { checkForUpdates, openReleaseNotes } from "./updates.ts"
 import { listenToMenu, openLogsFolder, projectOfRecentId } from "./menu-events.ts"
 import { activeActivity, routeOf, type ActivityId } from "./layout.ts"
-import { findShortcut, shortcuts } from "./shortcuts.ts"
+import { COMMANDS, groupKeyOf, labelKeyOf, liveScopes, menuCommand } from "../shared/keybindings/catalog.ts"
+import { displayChord } from "../shared/keybindings/chord.ts"
+import { ShortcutsDialog } from "../shared/keybindings/shortcuts-dialog.tsx"
 
 import { listenForOpenedFiles, openDelivered, readDelivered } from "./open-file.ts"
 import { listenForSidecarNotices } from "./sidecar.ts"
@@ -41,9 +43,8 @@ export interface ShellProps {
   readonly children: JSX.Element
 }
 
-/** Groups the palette by shortcut group, using already-translated headings. */
-const groupKey = (group: "navigation" | "edit" | "view" | "ai"): Key =>
-  group === "navigation" ? "palette.group.navigation" : `palette.group.${group}`
+/** Destinations without a keyboard command of their own; the rest of the navigation comes from the keymap. */
+const PLAIN_DESTINATIONS = ["manuals", "costs", "plugins"] as const
 
 export function Shell(props: ShellProps): JSX.Element {
   const app = useApp()
@@ -82,54 +83,61 @@ export function Shell(props: ShellProps): JSX.Element {
     if (route !== undefined) go(route)
   }
 
-  // The palette lists shortcuts and destinations, so `Cmd/Ctrl+K` is a
-  // complete keyboard interface on its own.
-  const commands = (): ReadonlyArray<PaletteCommand> => {
-    const context = {
-      activity: app.activity(),
-      go,
-      togglePanel: () => app.setPanelOpen(!app.panelOpen()),
-      openPalette: () => app.setPaletteOpen(true),
-      newProject: () => go("/"),
-      undo: () => app.editor.undo(),
-      redo: () => app.editor.redo(),
-      zoomFit: () => {},
-      zoomIn: () => {},
-      zoomOut: () => {}
-    }
-    const fromShortcuts: ReadonlyArray<PaletteCommand> = shortcuts(context).map((shortcut) => ({
-      id: shortcut.id,
-      label: t(shortcut.labelKey as Key),
-      group: t(groupKey(shortcut.group)),
-      keys: shortcut.keys,
-      run: () => shortcut.run(context)
-    }))
-    const fromActivities: ReadonlyArray<PaletteCommand> = [
-      "projects",
-      "cad",
-      "cam",
-      "library",
-      "manuals",
-      "costs",
-      "settings",
-      "plugins"
-    ].flatMap((id) => {
-      const route = routeOf(id as ActivityId)
-      if (route === undefined) return []
-      return [
-        {
-          id: `go-${id}`,
-          label: t(`activity.${id}` as Key),
-          group: t("palette.group.navigation"),
-          run: () => selectActivity(id as ActivityId)
-        }
-      ]
+  // The shell answers the commands that belong to no page; a page that registers the same id (save, undo, redo)
+  // answers first and falls back to these.
+  onMount(() => {
+    const off = app.keys.register({
+      "app.palette": () => { app.setPaletteOpen(!app.paletteOpen()) },
+      "app.go.projects": () => { go("/") },
+      "app.go.cad": () => { go("/cad") },
+      "app.go.cam": () => { go("/cam") },
+      "app.go.library": () => { go("/library") },
+      "app.go.settings": () => { go("/settings") },
+      "app.toggleAi": () => { app.setPanelOpen(!app.panelOpen()) },
+      "app.shortcuts": () => { app.keys.setHelpOpen(!app.keys.helpOpen()) },
+      "file.save": () => { void projectSession(app).flush().catch(() => undefined) },
+      "edit.undo": () => { app.editor.undo() },
+      "edit.redo": () => { app.editor.redo() }
     })
-    return [...fromActivities, ...fromShortcuts]
+    const stop = app.keys.attach()
+    onCleanup(() => { stop(); off() })
+  })
+
+  // The sidecar keeps the keymap for the user: once it answers, take its copy if it is newer, or publish ours.
+  createEffect(() => { if (app.sidecar() === "ready") void app.keys.reconcile() })
+
+  // The palette lists every command that can run on this screen, with the user's own chord, and the plain destinations.
+  const commands = (): ReadonlyArray<PaletteCommand> => {
+    const live = liveScopes(app.activity())
+    const keymap = app.keys.keymap()
+    const fromKeymap: ReadonlyArray<PaletteCommand> = COMMANDS
+      .filter((command) => live.includes(command.scope) && app.keys.available(command.id))
+      .map((command) => {
+        const chord = keymap.entry(command.id)?.chords[0]
+        return {
+          id: command.id,
+          label: t(labelKeyOf(command.id) as Key),
+          group: t(groupKeyOf(command.group) as Key),
+          ...(chord === undefined ? {} : { keys: displayChord(chord, app.keys.platform) }),
+          run: () => { app.keys.run(command.id) }
+        }
+      })
+    const destinations: ReadonlyArray<PaletteCommand> = PLAIN_DESTINATIONS.flatMap((id) => {
+      const route = routeOf(id)
+      if (route === undefined) return []
+      return [{ id: `go-${id}`, label: t(`activity.${id}` as Key), group: t("keys.group.navigation"), run: () => selectActivity(id) }]
+    })
+    return [...fromKeymap, ...destinations]
   }
 
   // A menu id from the in-window fallback maps to the same actions as a shortcut.
   const onMenu = (id: string): void => {
+    // Menu items that are keyboard commands run the same handler as their keys (the open page answers first).
+    const command = menuCommand(id)
+    if (command !== undefined) {
+      app.keys.run(command)
+      return
+    }
     switch (id) {
       case "file.new":
         go("/projects/create")
@@ -137,20 +145,10 @@ export function Shell(props: ShellProps): JSX.Element {
       case "file.open":
         go("/projects")
         return
-      case "file.save":
-        void projectSession(app).flush().catch(() => undefined)
-        return
       case "help.open_logs":
         void openLogsFolder().catch(() => undefined)
         return
-      case "edit.undo":
-        app.editor.undo()
-        return
-      case "edit.redo":
-        app.editor.redo()
-        return
       case "view.toggle_right_panel":
-      case "view.toggle_console":
         app.setPanelOpen(!app.panelOpen())
         return
       case "view.toggle_left_panel":
@@ -216,43 +214,12 @@ export function Shell(props: ShellProps): JSX.Element {
     onCleanup(() => { gone = true; off?.() })
   })
 
-  const onKeyDown = (event: KeyboardEvent): void => {
-    const found = findShortcut(event, shortcuts({
-      activity: app.activity(),
-      go,
-      togglePanel: () => app.setPanelOpen(!app.panelOpen()),
-      openPalette: () => app.setPaletteOpen(true),
-      newProject: () => go("/"),
-      undo: () => app.editor.undo(),
-      redo: () => app.editor.redo(),
-      zoomFit: () => {},
-      zoomIn: () => {},
-      zoomOut: () => {}
-    }))
-    if (found === undefined) return
-    event.preventDefault()
-    found.run({
-      activity: app.activity(),
-      go,
-      togglePanel: () => app.setPanelOpen(!app.panelOpen()),
-      openPalette: () => app.setPaletteOpen(true),
-      newProject: () => go("/"),
-      undo: () => app.editor.undo(),
-      redo: () => app.editor.redo(),
-      zoomFit: () => {},
-      zoomIn: () => {},
-      zoomOut: () => {}
-    })
-  }
-
   onMount(() => {
     resize()
     window.addEventListener("resize", resize)
-    window.addEventListener("keydown", onKeyDown)
   })
   onCleanup(() => {
     window.removeEventListener("resize", resize)
-    window.removeEventListener("keydown", onKeyDown)
   })
 
   const settings = (): ReturnType<typeof app.settings.settings> => app.settings.settings()
@@ -301,6 +268,8 @@ export function Shell(props: ShellProps): JSX.Element {
       </Show>
 
       <UpdatePrompt />
+
+      <ShortcutsDialog />
 
       <Show when={app.paletteOpen()}>
         <CommandPalette commands={commands()} onClose={() => app.setPaletteOpen(false)} />

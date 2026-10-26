@@ -1,6 +1,8 @@
 import { Show, type JSX } from "solid-js"
 import { Seg, Sep, ShellSegs, Strip } from "../../../shared/components/workspace-strip.tsx"
 import { t } from "../../../i18n/index.ts"
+import { useApp } from "../../../shared/state/context.ts"
+import { displayChord } from "../../../shared/keybindings/chord.ts"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
@@ -15,6 +17,7 @@ const mm = (value: number | undefined): string => (value ?? 0).toFixed(2)
  * The shell's own footer keeps units, snap and the sidecar state.
  */
 export default function StatusBar(): JSX.Element {
+  const app = useApp()
   const cad = useCADStore()
   const elements = useElementsStore()
   const selection = useSelectionStore()
@@ -27,6 +30,14 @@ export default function StatusBar(): JSX.Element {
     depth: cad.workpiece?.depth || 20,
     material: cad.workpiece?.material || "aluminum"
   })
+  /** The transform keys of the user's keymap: `G Move · R Rotate · S Scale · Esc Cancel`. */
+  const hint = (): string => {
+    const first = (id: string): string => {
+      const chord = app.keys.keymap().entry(id)?.chords[0]
+      return chord === undefined ? "–" : displayChord(chord, app.keys.platform)
+    }
+    return t("cad.status.shortcuts", { move: first("cad.transform.translate"), rotate: first("cad.transform.rotate"), scale: first("cad.transform.scale"), cancel: first("edit.cancel") })
+  }
   const is2D = () => cad.viewMode === "2d"
   const selectedCount = () => selection.selectedElementIds?.length || 0
   const transformText = (): string => {
@@ -72,7 +83,7 @@ export default function StatusBar(): JSX.Element {
             <span class="text-fuchsia-400">Y</span><span class="text-fuchsia-200">{mm(elements.mousePosition?.y)}</span>
             <Show when={!is2D()}><span class="text-emerald-400">Z</span><span class="text-emerald-200">{mm(elements.mousePosition?.z)}</span></Show>
           </span>
-          <span class="hidden text-gray-500 2xl:inline">{t("cad.status.shortcuts")}</span>
+          <span class="hidden text-gray-500 2xl:inline">{hint()}</span>
           <Sep />
           <ShellSegs />
         </>

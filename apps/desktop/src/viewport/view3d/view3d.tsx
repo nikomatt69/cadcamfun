@@ -1,4 +1,5 @@
 import { createDisplayEdgeLines, createLines, setLineDrawRange, syncLineResolution } from "../lines.ts"
+import { useAppOptional } from "../../shared/state/context.ts"
 import { Outline } from "../outline.ts"
 import { GRID_COLORS, createAdaptiveGrid } from "../adaptive-grid.ts"
 import { FrameScheduler } from "../../features/cad/lib/frame-scheduler.ts"
@@ -704,13 +705,13 @@ export function View3D(props: View3DProps) {
       outline.set("selected", selectedMesh, selectedMesh ? "selected" : "none")
       setSelected(selectedMesh?.userData.solidIndex as number | undefined); props.onSolidSelect?.(selected()); transform()
     }
-    const key = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return
-      if (event.key.toLowerCase() === "f") { event.preventDefault(); fit() }
-      if (event.key === "Escape") { setTransformMode("none"); gizmo.detach(); invalidate() }
-    }
+    // Fit and Esc are keymap commands; the viewer answers them only while the pointer is over it or it has the focus.
+    const here = () => host !== undefined && (host.matches(":hover") || host.contains(document.activeElement))
+    const unregisterKeys = useAppOptional()?.keys.register({
+      "view.zoomFit": { run: () => { fit() }, enabled: here },
+      "edit.cancel": { run: () => { if (transformMode() === "none" && !gizmo.object) return false; setTransformMode("none"); gizmo.detach(); invalidate() }, enabled: here }
+    })
     renderer.domElement.addEventListener("pointerdown", down); renderer.domElement.addEventListener("pointerup", pick)
-    host.addEventListener("keydown", key)
     let previous: number | undefined
     controls.addEventListener("change", invalidate)
     gizmo.addEventListener("change", invalidate)
@@ -806,7 +807,7 @@ export function View3D(props: View3DProps) {
       renderFrame()
       return { canvas: renderer.domElement, camera: { position: [activeCamera.position.x, activeCamera.position.y, activeCamera.position.z], target: [controls.target.x, controls.target.y, controls.target.z] }, ...(props.visionMode === "cam" && props.program ? { programText: cam.programGeometryText(props.program) } : {}), ...(machineScene && props.machine ? { spatial: machineSpatial(props.machine, machineScene, seconds) } : {}) }
     })
-    onCleanup(() => { rig.dispose(); unregisterCapture(); disposeMachine(); disposeStock(); disposeVoxels(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); look.dispose(); outline.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
+    onCleanup(() => { rig.dispose(); unregisterCapture(); disposeMachine(); disposeStock(); disposeVoxels(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); unregisterKeys?.(); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); look.dispose(); outline.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />

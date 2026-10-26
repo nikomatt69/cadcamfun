@@ -142,10 +142,14 @@ export default function CadPage(): JSX.Element {
     window.addEventListener(FIT_VIEW_EVENT, onFit)
     onCleanup(() => { clearTimeout(timer); window.removeEventListener(FIT_VIEW_EVENT, onFit) })
   })
+  // Save, export and import are the commands of the page; the chords come from the keymap.
   onMount(() => {
-    const onKey = (event: KeyboardEvent) => { if (!event.defaultPrevented && !event.shiftKey && !event.altKey && !document.querySelector('[role="dialog"]') && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") { event.preventDefault(); save() } }
-    window.addEventListener("keydown", onKey)
-    onCleanup(() => window.removeEventListener("keydown", onKey))
+    const off = app.keys.register({
+      "file.save": () => { save() },
+      "file.export": () => { openExport() },
+      "file.import": () => { setDialogMode("import"); setShowImportExport(true) }
+    })
+    onCleanup(off)
   })
 
   // The legacy page set its document title through `MetaTags`.
