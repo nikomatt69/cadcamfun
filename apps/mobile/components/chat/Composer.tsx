@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native"
-import { ArrowUp, Camera, ChevronDown, Plus, Shield, Square, X } from "lucide-react-native"
+import { Image } from "expo-image"
+import { ArrowUp, ChevronDown, Plus, Square, X } from "lucide-react-native"
 import Animated, { FadeIn } from "react-native-reanimated"
-import { AdaptiveBlur } from "@/components/GlassView"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { EASE_OUT, usePrefersReducedMotion, usePressScale } from "@/lib/animation"
@@ -10,22 +10,20 @@ import { layout } from "@/lib/layout"
 import { type as typeStyle } from "@/lib/typography"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import type { PendingAttachment } from "@/lib/attachments"
+import { composerPlaceholder, modelPillLabel, type ComposerMode } from "@/lib/composer"
+import { ComposerContextSheet } from "./composer-context-sheet"
 
-export type AssistantMode = "general" | "cad" | "cam" | "gcode" | "toolpath"
+export type AssistantMode = ComposerMode
 
-const MODES: ReadonlyArray<{ value: AssistantMode; label: string }> = [
-  { value: "general", label: "General" },
-  { value: "cad", label: "CAD" },
-  { value: "cam", label: "CAM" },
-  { value: "toolpath", label: "Toolpath" },
-  { value: "gcode", label: "G-code" },
-]
+const CONTROL = 36
+const CARD_RADIUS = 28
 
 /**
  * The CADCAMFUN composer follows nikcli's mobile interaction model while staying domain-specific:
- * one floating material, a growing editor, a compact mode rail, and explicit live-turn controls.
+ * one solid card, a growing editor and a single line of controls — add context, model, send.
+ * Modes, the camera and permissions live in the "Add context" sheet behind the plus button.
  * A new message typed while the desktop is working steers that same session instead of being
- * blocked; Stop remains a separate target so the two actions can never be confused.
+ * blocked; Stop stays its own target so the two actions can never be confused.
  */
 export function Composer({
   busy,
@@ -73,15 +71,19 @@ export function Composer({
   /** Removes a picture the user no longer wants to send. */
   onRemoveAttachment?: (index: number) => void
 }) {
-  const { palette, glass, isDark } = useTheme()
+  const { palette, isDark } = useTheme()
   const content = useContentLayout()
   const [text, setText] = useState("")
+  const [contextOpen, setContextOpen] = useState(false)
   const inputRef = useRef<TextInput>(null)
   const sendScale = usePressScale()
   const stopScale = usePressScale()
   const reduced = usePrefersReducedMotion()
   const canSubmit = text.trim().length > 0 && !disabled
   const stacked = content.fontScale > 1.3
+  /** One slot on the right: Send while there is something to send, Stop while a turn runs with nothing typed. */
+  const showSend = canSubmit || !busy
+  const iconButton = { width: CONTROL, height: CONTROL, borderRadius: CONTROL / 2, alignItems: "center", justifyContent: "center" } as const
 
   useEffect(() => {
     if (seedToken === undefined || !seed) return
@@ -110,91 +112,110 @@ export function Composer({
 
       <View
         style={{
-          overflow: "hidden",
-          borderRadius: 24,
+          borderRadius: CARD_RADIUS,
           borderCurve: "continuous",
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: hexToRgba(palette.ink, isDark ? 0.16 : 0.1),
-          boxShadow: `0 10px 30px ${hexToRgba(palette.overlay, isDark ? 0.34 : 0.12)}`,
+          backgroundColor: palette.surface,
+          boxShadow: `0 8px 24px ${hexToRgba(palette.overlay, isDark ? 0.34 : 0.1)}`,
         }}
       >
-        <AdaptiveBlur
-          tint={isDark ? "dark" : "light"}
-          intensity={82}
-          fallbackColor={glass.shellStrong}
-          opaqueFallbackColor={palette.surface}
-          style={{ paddingTop: 5 }}
-        >
-          {/* The pictures that go with the next message: visible, and removable. */}
-          {attachments.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ gap: 8, paddingHorizontal: 12, paddingTop: 6 }}
-            >
-              {attachments.map((attachment, index) => (
-                <View key={`${attachment.name}-${index}`} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 10, paddingRight: 4, paddingVertical: 5, borderRadius: 999, backgroundColor: hexToRgba(palette.accent, 0.12) }}>
-                  <Camera size={14} color={palette.accent} style={{ flexShrink: 0 }} />
-                  <Text numberOfLines={1} maxFontSizeMultiplier={1.6} style={{ maxWidth: 150, color: palette.soft, ...typeStyle(12, { weight: "600" }) }}>{attachment.name}</Text>
-                  <Pressable
-                    onPress={() => { haptic("selection"); onRemoveAttachment?.(index) }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${attachment.name}`}
-                    hitSlop={8}
-                    style={({ pressed }) => ({ width: 28, height: 28, alignItems: "center", justifyContent: "center", borderRadius: 14, opacity: pressed ? 0.6 : 1 })}
-                  >
-                    <X size={13} color={palette.muted} />
-                  </Pressable>
-                </View>
-              ))}
-            </ScrollView>
-          ) : null}
-
-          <View style={{ minHeight: 52, flexDirection: stacked ? "column" : "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 10, paddingTop: 7, paddingBottom: 7 }}>
-            <View style={{ flex: stacked ? undefined : 1, alignSelf: stacked ? "stretch" : undefined, minWidth: 0, justifyContent: "center", paddingLeft: 6, paddingVertical: 5 }}>
-              {disabled ? (
-                <Text selectable style={{ color: palette.muted, ...typeStyle(15, { leadingScale: 1.05 }) }}>
-                  {disabledNote ?? "Configure the assistant on the desktop"}
-                </Text>
-              ) : (
-                <TextInput
-                  ref={inputRef}
-                  value={text}
-                  onChangeText={setText}
-                  placeholder={offline ? "Desktop offline · message waits to send" : busy ? "Steer the current turn…" : "Ask CADCAMFUN…"}
-                  placeholderTextColor={palette.muted}
-                  multiline
-                  scrollEnabled
-                  accessibilityLabel="Message to CADCAMFUN assistant"
-                  selectionColor={palette.accent}
-                  keyboardAppearance={isDark ? "dark" : "light"}
-                  style={{ color: palette.ink, maxHeight: Math.max(112, 66 * content.fontScale), padding: 0, ...typeStyle(16, { leadingScale: 1.05 }) }}
-                  submitBehavior="newline"
+        {/* The pictures that go with the next message: visible, and removable. */}
+        {attachments.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ gap: 10, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 2 }}
+          >
+            {attachments.map((attachment, index) => (
+              <View key={`${attachment.name}-${index}`} style={{ width: 60, height: 60 }}>
+                <Image
+                  source={{ uri: `data:${attachment.mime};base64,${attachment.data}` }}
+                  accessibilityLabel={attachment.name}
+                  contentFit="cover"
+                  style={{ width: 60, height: 60, borderRadius: 14, backgroundColor: palette.panel }}
                 />
-              )}
-            </View>
+                <Pressable
+                  onPress={() => { haptic("selection"); onRemoveAttachment?.(index) }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${attachment.name}`}
+                  hitSlop={12}
+                  style={({ pressed }) => ({ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: palette.ink, opacity: pressed ? 0.7 : 1 })}
+                >
+                  <X size={12} color={palette.background} strokeWidth={3} />
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        ) : null}
 
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            {busy ? (
-              <Animated.View entering={reduced ? undefined : FadeIn.duration(150).easing(EASE_OUT)}>
+        <View style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6 }}>
+          {disabled ? (
+            <Text selectable style={{ color: palette.muted, ...typeStyle(15, { leadingScale: 1.05 }) }}>
+              {disabledNote ?? "Configure the assistant on the desktop"}
+            </Text>
+          ) : (
+            <TextInput
+              ref={inputRef}
+              value={text}
+              onChangeText={setText}
+              placeholder={composerPlaceholder({ offline, busy, mode })}
+              placeholderTextColor={palette.muted}
+              multiline
+              scrollEnabled
+              accessibilityLabel="Message to CADCAMFUN assistant"
+              selectionColor={palette.accent}
+              keyboardAppearance={isDark ? "dark" : "light"}
+              style={{ color: palette.ink, maxHeight: Math.max(132, 80 * content.fontScale), padding: 0, ...typeStyle(16, { leadingScale: 1.05 }) }}
+              submitBehavior="newline"
+            />
+          )}
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, paddingTop: 2, paddingBottom: 10 }}>
+          <Pressable
+            onPress={() => { haptic("selection"); setContextOpen(true) }}
+            accessibilityRole="button"
+            accessibilityLabel="Add context, change focus and permissions"
+            hitSlop={4}
+            style={({ pressed }) => ({ ...iconButton, flexShrink: 0, backgroundColor: hexToRgba(palette.ink, pressed ? 0.14 : 0.07) })}
+          >
+            <Plus size={20} color={palette.soft} />
+          </Pressable>
+
+          <Pressable
+            onPress={onOpenModels}
+            accessibilityRole="button"
+            accessibilityLabel={`Model: ${modelLabel}. Focus: ${mode}. Change provider, model or thinking effort`}
+            style={({ pressed }) => ({ flexShrink: 1, minWidth: 0, minHeight: CONTROL, paddingHorizontal: 14, gap: 6, flexDirection: "row", alignItems: "center", borderRadius: CONTROL / 2, backgroundColor: hexToRgba(palette.ink, pressed ? 0.14 : 0.07) })}
+          >
+            <Text numberOfLines={stacked ? undefined : 1} style={{ flexShrink: 1, color: palette.soft, ...typeStyle(13, { weight: "600" }) }}>{modelPillLabel(modelLabel, mode)}</Text>
+            <ChevronDown size={14} color={palette.muted} style={{ flexShrink: 0 }} />
+          </Pressable>
+
+          <View style={{ flex: 1 }} />
+
+          {busy ? (
+            <Animated.View entering={reduced ? undefined : FadeIn.duration(150).easing(EASE_OUT)}>
               <Pressable
                 onPressIn={stopScale.onPressIn}
                 onPressOut={stopScale.onPressOut}
                 onPress={() => { haptic("light"); onStop() }}
                 disabled={stopping}
+                hitSlop={4}
                 accessibilityRole="button"
                 accessibilityLabel={stopping ? "Stopping the desktop assistant" : "Stop the desktop assistant"}
                 accessibilityState={{ disabled: stopping, busy: stopping }}
-                style={{ width: layout.touchTarget, height: layout.touchTarget, flexShrink: 0, alignItems: "center", justifyContent: "center" }}
               >
-                <Animated.View style={[{ width: layout.touchTarget, height: layout.touchTarget, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.danger, 0.14) }, stopScale.style]}>
+                <Animated.View style={[{ ...iconButton, backgroundColor: hexToRgba(palette.danger, 0.14) }, stopScale.style]}>
                   {stopping ? <ActivityIndicator size="small" color={palette.danger} /> : <Square size={13} color={palette.danger} fill={palette.danger} />}
                 </Animated.View>
               </Pressable>
-              </Animated.View>
-            ) : null}
+            </Animated.View>
+          ) : null}
 
+          {showSend ? (
             <Pressable
               onPressIn={sendScale.onPressIn}
               onPressOut={sendScale.onPressOut}
@@ -203,16 +224,12 @@ export function Composer({
               accessibilityLabel={offline ? "Save message to send when the desktop reconnects" : busy ? "Steer current assistant turn" : "Send message"}
               accessibilityState={{ disabled: !canSubmit }}
               disabled={!canSubmit}
-              style={{ width: layout.touchTarget, height: layout.touchTarget, flexShrink: 0, alignItems: "center", justifyContent: "center" }}
+              hitSlop={4}
             >
               <Animated.View
                 style={[
                   {
-                    width: layout.touchTarget,
-                    height: layout.touchTarget,
-                    borderRadius: 22,
-                    alignItems: "center",
-                    justifyContent: "center",
+                    ...iconButton,
                     backgroundColor: palette.accent,
                     opacity: canSubmit ? 1 : 0.32,
                     // Typing the first character wakes the button instead of snapping it on.
@@ -226,56 +243,19 @@ export function Composer({
                 <ArrowUp size={19} color={palette.onAccent} strokeWidth={2.6} />
               </Animated.View>
             </Pressable>
-            </View>
-          </View>
-
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingBottom: 5 }}>
-            <Pressable onPress={onOpenControls} accessibilityRole="button" accessibilityLabel="Tools, permissions and session controls" style={({ pressed }) => ({ minWidth: 44, minHeight: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.ink, pressed ? 0.13 : 0.06) })}><Plus size={20} color={palette.soft} /></Pressable>
-            {onAddAttachment ? (
-              <Pressable onPress={onAddAttachment} accessibilityRole="button" accessibilityLabel="Take a photo of the part" style={({ pressed }) => ({ minWidth: 44, minHeight: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.ink, pressed ? 0.13 : 0.06) })}><Camera size={19} color={palette.soft} /></Pressable>
-            ) : null}
-            <Pressable onPress={onOpenModels} accessibilityRole="button" accessibilityLabel={`Model: ${modelLabel}. Change provider, model or thinking effort`} style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 44, paddingHorizontal: 10, gap: 6, flexDirection: "row", alignItems: "center", borderRadius: 16, backgroundColor: pressed ? hexToRgba(palette.ink, 0.06) : "transparent" })}>
-              <Text numberOfLines={stacked ? undefined : 1} style={{ flexShrink: 1, color: palette.soft, ...typeStyle(12, { weight: "600" }) }}>{modelLabel}</Text><ChevronDown size={13} color={palette.muted} style={{ flexShrink: 0 }} />
-            </Pressable>
-            <Pressable onPress={onOpenControls} accessibilityRole="button" accessibilityLabel={`Permissions: ${permissionLabel}`} style={{ minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" }}><Shield size={17} color={palette.muted} /></Pressable>
-          </View>
-          <View style={{ height: StyleSheet.hairlineWidth, marginHorizontal: 12, backgroundColor: hexToRgba(palette.ink, 0.08) }} />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ gap: 4, paddingHorizontal: 10, paddingVertical: 8 }}
-          >
-            {MODES.map((item) => {
-              const active = item.value === mode
-              return (
-                <Pressable
-                  key={item.value}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${item.label} mode`}
-                  accessibilityHint="Focuses the assistant on this kind of work for your next message"
-                  accessibilityState={{ selected: active }}
-                  onPress={() => {
-                    if (active) return
-                    haptic("selection")
-                    onModeChange(item.value)
-                  }}
-                  hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
-                  style={({ pressed }) => ({
-                    minHeight: 32,
-                    justifyContent: "center",
-                    paddingHorizontal: 12,
-                    borderRadius: 999,
-                    backgroundColor: active ? hexToRgba(palette.accent, 0.14) : pressed ? hexToRgba(palette.ink, 0.06) : "transparent",
-                  })}
-                >
-                  <Text maxFontSizeMultiplier={1.6} style={{ color: active ? palette.accentStrong : palette.soft, ...typeStyle(12, { weight: active ? "700" : "500" }) }}>{item.label}</Text>
-                </Pressable>
-              )
-            })}
-          </ScrollView>
-        </AdaptiveBlur>
+          ) : null}
+        </View>
       </View>
+
+      <ComposerContextSheet
+        open={contextOpen}
+        onClose={() => setContextOpen(false)}
+        mode={mode}
+        onModeChange={onModeChange}
+        permissionLabel={permissionLabel}
+        onAddAttachment={onAddAttachment}
+        onOpenControls={onOpenControls}
+      />
     </View>
   )
 }
