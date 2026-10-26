@@ -114,3 +114,5 @@
 /* The spacing of the grid lines being read, in the corner: a number on the lines is worth more than the lines. */
 .vp-grid-scale { position: absolute; left: 12px; bottom: 44px; z-index: 3; padding: 2px 8px; border-radius: 999px; background: rgb(8 13 24 / .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: #cbd5e1; font-size: 10px; letter-spacing: .03em; font-variant-numeric: tabular-nums; pointer-events: none; }
 .cad-grid-scale { left: 56px; bottom: 18px; }
+/* A panel over the canvas scrolls itself: its wheel never chains on to the page or the scene behind it. */
+.cad-viewport-popover, .cad-viewport-tools, .toolpath-visualizer__panel, .toolpath-visualizer__stats { overscroll-behavior: contain; }

@@ -109,8 +109,10 @@ export const createCameraRig = (options: CameraRigOptions): CameraRig => {
   }
 
   // ---------------------------------------------------------------------------------------------------- wheel zoom
+  /** The rig navigates only what is drawn on the canvas: a panel, a dialog or a button on top of it keeps its own wheel and pointer. */
+  const onCanvas = (event: Event): boolean => event.target === options.canvas()
   const wheel = (event: WheelEvent): void => {
-    if (!controls.enabled || !controls.enableZoom || options.canNavigate?.() === false) return
+    if (!onCanvas(event) || !controls.enabled || !controls.enableZoom || options.canNavigate?.() === false) return
     event.preventDefault(); event.stopPropagation()
     transition = undefined
     const camera = options.camera()
@@ -152,6 +154,7 @@ export const createCameraRig = (options: CameraRigOptions): CameraRig => {
 
   // ---------------------------------------------------------------------------------------------------- orbit pivot
   const down = (event: PointerEvent): void => {
+    if (!onCanvas(event)) return
     pointerIsDown = true
     transition = undefined
     pivot = undefined
