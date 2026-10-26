@@ -3,6 +3,17 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.32 (October 2026)
+
+## Desktop
+
+- Two-click drawing tools (L line, C circle, B rectangle); snap tolerance in pixels; the line's start point reaches the relative snaps
+
+## Mobile
+
+- Assistant screen after nikcli's session screen — glass header, status line, photo previews in the transcript
+- Composer as a glass capsule with a bare-icon toolbar, after nikcli's SessionComposer
+
 ## v0.1.31 (October 2026)
 
 ## Desktop
