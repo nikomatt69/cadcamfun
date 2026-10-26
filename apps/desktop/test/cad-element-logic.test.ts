@@ -56,7 +56,8 @@ test("what the assistant reads as an element's bounds is what the editor draws",
 })
 
 test("architecture and standard parts stand on Z with the size the catalogue promises", () => {
-  const find = (type: string) => made().find((e) => e["type"] === type)!
+  const catalogue = made()
+  const find = (type: string) => catalogue.find((e) => e["type"] === type)!
   const size = (type: string) => drawn(find(type)).getSize(new THREE.Vector3())
   const wall = size("wall"), column = size("column"), spring = size("spring"), stair = size("stair"), floor = size("floor"), roof = size("roof")
   expect(wall.z).toBeCloseTo(Number(find("wall")["height"]), 3)

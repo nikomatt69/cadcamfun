@@ -4,9 +4,12 @@
  */
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
+import { Box3, Vector3 } from "three"
 import { predefinedComponents } from "../src/features/cad/lib/predefinedLibraries.ts"
 import { isLegacyPart, legacyPartElement } from "../src/features/cad/lib/library-parts.ts"
 import { transformLibraryItemToCADElement, createComponentPreview } from "../src/features/cad/lib/libraryTransform.ts"
+import { buildElementObject, disposeObject } from "../src/features/cad/lib/sceneHelpers.ts"
+import { componentBounds } from "../src/features/cad/lib/component-assembly.ts"
 
 const byName = (name: string) => predefinedComponents.find((part) => part.name === name)! as any
 const placed = (name: string, at = { x: 0, y: 0, z: 0 }) => transformLibraryItemToCADElement(byName(name), at)
@@ -20,6 +23,7 @@ describe("the built-in structural parts", () => {
   test("every one of them is a legacy part and becomes a parametric element that builds a solid", () => {
     const parts = predefinedComponents.filter((part) => isLegacyPart((part.data as any)?.geometry?.elements ?? []))
     expect(parts.length).toBeGreaterThanOrEqual(12)
+    expect(parts.length).toBe(predefinedComponents.length)
     for (const part of parts) {
       const element = legacyPartElement(part.name, (part.data as any).geometry.elements)
       expect(element, part.name).toBeDefined()
@@ -73,6 +77,7 @@ describe("the built-in structural parts", () => {
       const preview = createComponentPreview(part)
       expect(preview, `${part.name} has no preview`).not.toBeNull()
       expect(preview!.children.length, `${part.name} preview is empty`).toBeGreaterThan(0)
+      disposeObject(preview!)
     }
   })
 
@@ -82,5 +87,49 @@ describe("the built-in structural parts", () => {
     const own = { name: "mine", data: { geometry: { elements: [{ id: "c", type: "cube", x: 5, y: 5, z: 5, width: 10, height: 10, depth: 10 }] } } }
     expect(legacyPartElement("mine", own.data.geometry.elements)).toBeUndefined()
     expect(transformLibraryItemToCADElement(own, { x: 0, y: 0, z: 0 }).type).toBe("cube")
+  })
+
+  test("every preview matches the placed solid and is centred on the requested position", () => {
+    const target = new Vector3(173, -81, 29)
+    for (const part of predefinedComponents) {
+      const preview = createComponentPreview(part)!
+      const element = transformLibraryItemToCADElement(part, target)
+      const bounds = componentBounds([element])!
+      try {
+        const previewBounds = new Box3().setFromObject(preview)
+        const size = previewBounds.getSize(new Vector3())
+        expect(previewBounds.getCenter(new Vector3()).length(), part.name).toBeLessThan(1e-4)
+        for (const [actual, expected] of [[bounds.width, size.x], [bounds.height, size.y], [bounds.depth, size.z],
+          [bounds.centerX, target.x], [bounds.centerY, target.y], [bounds.centerZ, target.z]]) {
+          expect(actual!, part.name).toBeCloseTo(expected!, 4)
+        }
+      } finally { disposeObject(preview) }
+    }
+  })
+
+  test("repeated placements have independent ids and histories and leave the catalogue untouched", () => {
+    const part = byName("Rectangular Tube 60x40x3mm")
+    const original = JSON.stringify(part)
+    const first = transformLibraryItemToCADElement(part, { x: 20, y: 30, z: 40 })
+    const second = transformLibraryItemToCADElement(part, { x: -20, y: -30, z: -40 })
+    expect(first.id).not.toBe(second.id)
+    expect(first.history).not.toBe(second.history)
+    expect(first.history.features).not.toBe(second.history.features)
+    Object.assign(first.history.parameters, { edited: 123 })
+    expect(second.history.parameters.edited).toBeUndefined()
+    expect(JSON.stringify(part)).toBe(original)
+    const object = buildElementObject(second)!
+    try { expect(new Box3().setFromObject(object).isEmpty()).toBe(false) }
+    finally { disposeObject(object) }
+  })
+
+  test("malformed library solids are rejected instead of producing invalid parametric histories", () => {
+    const box = { type: "box", width: 10, height: 20, length: 30, position: { x: 0, y: 0, z: 0 } }
+    const tube = { type: "cylinder", outerDiameter: 30, innerDiameter: 26, height: 100, position: box.position }
+    const invalid = [[], [null], [{ ...box, position: { x: NaN, y: 0, z: 0 } }],
+      [{ ...box, width: -1 }], [{ ...box, height: 0 }], [{ ...box, length: Infinity }], [{ ...box, negative: true }],
+      [{ ...tube, innerDiameter: 31 }], [{ ...tube, innerDiameter: NaN }],
+      [{ type: "polygon", position: box.position, height: 5, points: [{ x: 0, y: 0, z: 0 }, null, {}] }]]
+    for (const solids of invalid) expect(legacyPartElement("invalid", solids)).toBeUndefined()
   })
 })

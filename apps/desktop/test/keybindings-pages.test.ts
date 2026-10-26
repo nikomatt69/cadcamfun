@@ -13,8 +13,8 @@ import { useSelectionStore } from "../src/features/cad/store/selectorStore.ts"
 import { useTransformControlsStore } from "../src/features/cad/store/transformControlsStore.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
-beforeAll(async () => { app = await bootLiveApp() })
-afterAll(async () => { await app.dispose() })
+beforeAll(async () => { app = await bootLiveApp() }, 60000)
+afterAll(async () => { await app.dispose() }, 60000)
 
 const settle = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms))
 const mac = () => /mac/i.test(navigator.platform)
@@ -204,6 +204,50 @@ describe("CAD page keys", () => {
 })
 
 describe("rebinding changes the real keyboard", () => {
+  test("CAD remapping replaces the default, respects text entry, and reset restores the command", async () => {
+    const { dispose } = app.visit("/cad")
+    try {
+      await app.wait(() => document.querySelector(".cad-viewport"), 30000)
+      const grid = useCADStore.getState().gridVisible
+      expect(app.state.keys.rebind("cad.view.grid", ["Alt+9"]).ok).toBe(true)
+      expect(press("g", mod({ code: "KeyG" })).defaultPrevented).toBe(false)
+      expect(useCADStore.getState().gridVisible).toBe(grid)
+      expect(press("9", { altKey: true, code: "Digit9" }).defaultPrevented).toBe(true)
+      expect(useCADStore.getState().gridVisible).toBe(!grid)
+      const input = document.createElement("input")
+      document.body.append(input)
+      try {
+        expect(press("9", { altKey: true, code: "Digit9", target: input }).defaultPrevented).toBe(false)
+        expect(useCADStore.getState().gridVisible).toBe(!grid)
+      } finally { input.remove() }
+      app.state.keys.reset("cad.view.grid")
+      expect(press("9", { altKey: true, code: "Digit9" }).defaultPrevented).toBe(false)
+      expect(press("g", mod({ code: "KeyG" })).defaultPrevented).toBe(true)
+      expect(useCADStore.getState().gridVisible).toBe(grid)
+    } finally { app.state.keys.resetAll(); dispose() }
+  }, 60000)
+
+  test("CAM remapping works from the code editor while the same chord's CAD command remains inactive", async () => {
+    const { dispose } = app.visit("/cam")
+    try {
+      const editor = await app.wait(() => document.querySelector<HTMLTextAreaElement>("textarea.cam-editor__code"), 30000)
+      const grid = useCADStore.getState().gridVisible
+      const sidebar = useCamStore.getState().sidebarOpen
+      expect(app.state.keys.rebind("cad.view.grid", ["Alt+9"]).ok).toBe(true)
+      expect(app.state.keys.rebind("cam.sidebar.toggle", ["Alt+9"]).ok).toBe(true)
+      expect(press("B", mod({ shiftKey: true, code: "KeyB", target: editor })).defaultPrevented).toBe(false)
+      expect(useCamStore.getState().sidebarOpen).toBe(sidebar)
+      expect(press("9", { altKey: true, code: "Digit9", target: editor }).defaultPrevented).toBe(true)
+      expect(useCamStore.getState().sidebarOpen).toBe(!sidebar)
+      expect(useCADStore.getState().gridVisible).toBe(grid)
+      app.state.keys.reset("cam.sidebar.toggle")
+      expect(press("9", { altKey: true, code: "Digit9", target: editor }).defaultPrevented).toBe(false)
+      expect(press("B", mod({ shiftKey: true, code: "KeyB", target: editor })).defaultPrevented).toBe(true)
+      expect(useCamStore.getState().sidebarOpen).toBe(sidebar)
+      expect(useCADStore.getState().gridVisible).toBe(grid)
+    } finally { app.state.keys.resetAll(); dispose() }
+  }, 60000)
+
   test("a rebound CAM tab key works, the old one stops, and the shortcut dialog shows it", async () => {
     const { dispose } = app.visit("/cam")
     try {

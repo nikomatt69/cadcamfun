@@ -285,8 +285,10 @@ describe("snapping a part that is moved with the gizmo", () => {
   test("where the drag began is the start point: perpendicular and parallel apply to a move", () => {
     const wall: any = line(0, 0, 100, 0)
     const settings = only(SnapType.PERPENDICULAR)
-    // Dragging along X from (30, 50): the foot of the perpendicular onto the wall is straight below the start, at x = 30.
-    expect(snapPointAlongAxes(at(33, 50), [wall], settings, ["x"], at(30, 50))).toMatchObject({ x: 30, type: SnapType.PERPENDICULAR })
+    // Dragging down Y from (30, 50) reaches the foot on the wall at (30, 0).
+    expect(snapPointAlongAxes(at(30, 3), [wall], settings, ["y"], at(30, 50))).toMatchObject({ x: 30, y: 0, type: SnapType.PERPENDICULAR })
+    // Along X the foot is unreachable: displaying a perpendicular marker here would be false.
+    expect(snapPointAlongAxes(at(33, 50), [wall], settings, ["x"], at(30, 50))).toBeUndefined()
     // Without a start point there is nothing to be perpendicular to.
     expect(snapPointAlongAxes(at(33, 50), [wall], settings, ["x"])).toBeUndefined()
     // Parallel to the wall, a move along X is already parallel: the cursor itself is the snap point.
@@ -294,6 +296,24 @@ describe("snapping a part that is moved with the gizmo", () => {
     // In the plane, a move that would run parallel to the wall is pulled onto the line through the start.
     const slanted: any = line(0, 0, 100, 100)
     expect(snapPointAlongAxes(at(60, 62), [slanted], only(SnapType.PARALLEL), ["x", "y"], at(10, 10))).toMatchObject({ type: SnapType.PARALLEL })
+    expect(snapPointAlongAxes(at(60, 10), [slanted], only(SnapType.PARALLEL), ["x"], at(10, 10))).toBeUndefined()
+    expect(snapPointAlongAxes(at(30, 50), [wall], only(SnapType.PARALLEL), ["x"], at(30, 50))).toBeUndefined()
+  })
+
+  test("a tangent is offered only when the dragged axes can reach its actual point", () => {
+    const target = circle(0, 0, 10) as never
+    const from = at(20, 0)
+    const y = Math.sqrt(75)
+    const hit = snapPointAlongAxes(at(6, y + 1), [target], only(SnapType.TANGENT), ["x", "y"], from)!
+    expect(hit.type).toBe(SnapType.TANGENT)
+    near(hit.x, 5); near(hit.y, y)
+    near(Math.hypot(hit.x, hit.y), 10)
+    near((hit.x - from.x) * hit.x + (hit.y - from.y) * hit.y, 0)
+    expect(snapPointAlongAxes(at(6, 0), [target], only(SnapType.TANGENT), ["x"], from)).toBeUndefined()
+    expect(snapPointAlongAxes(at(20, y), [target], only(SnapType.TANGENT), ["y"], from)).toBeUndefined()
+    const onAxis = snapPointAlongAxes(at(1, 0), [circle(0, 10, 10) as never], only(SnapType.TANGENT), ["x"], from)!
+    expect(onAxis.type).toBe(SnapType.TANGENT)
+    near(onAxis.x, 0); near(onAxis.y, 0)
   })
 
   test("the hook skips the parts being moved, publishes the marker and clears it", () => {

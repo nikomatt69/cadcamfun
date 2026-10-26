@@ -51,6 +51,7 @@ import { displayChord } from "../../../shared/keybindings/chord.ts"
 import { CUBE_FACES } from "../../../viewport/view-cube-model.ts"
 import { anchorOf, elementFromPoints, nextStart, previewOutline, type DrawTool, type Point3 as DrawPoint } from "../lib/draw-tools.ts"
 import type { SnapType } from "../lib/enanchedSnapService.ts"
+import { createPlacementReference } from "../lib/placement-reference.ts"
 
 type TransformMode = "translate" | "rotate" | "scale"
 type Point3 = { x: number; y: number; z: number }
@@ -184,6 +185,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const mouse = new THREE.Vector2()
   let controlPoints: THREE.Object3D[] = []
   let preview: THREE.Object3D | undefined
+  const placementReference = createPlacementReference()
   let dragStart: DragStart | undefined
   let activeDragPoint: { elementId: string; pointIndex: number } | undefined
   const [screenBox, setScreenBox] = createSignal<ScreenBox>()
@@ -645,7 +647,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       if (cached) {
         if (cached.shape === shape) {
           // Same geometry, new placement: replay the position and the gizmo transform.
-          applyElementTransform(cached.object, element as ElementTransformFields)
+          applyElementTransform(cached.object, element as ElementTransformFields, originOffset())
           object = cached.object
         } else {
           disposeObject(cached.object)
@@ -861,7 +863,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const untrackedPreviewPosition = () => previewPosition()
 
   const cancelPlacement = () => {
-    lastPlaced = undefined
+    placementReference.clear()
     if (preview) disposeObject(preview)
     preview = undefined
     setPlacing(false)
@@ -936,9 +938,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     raycaster.setFromCamera(mouse, camera)
     return step > 1e-9 ? step : fallback
   }
-  /** Where the last part was placed in this session: the next placement snaps relative to it (perpendicular, parallel...). */
-  let lastPlaced: Point3 | undefined
-  const snapped = (point: Point3): Point3 => (snap.snapSettings().enabled ? snap.snapToPoint(point, lastPlaced, unitsPerPixelOnPlane()) ?? point : point)
+  /** Resolve the previous placement's current pivot: undo/deletion removes the reference and moving it updates the anchor. */
+  const placementAnchor = () => placementReference.anchor(elements.elements, objectOf, originOffset())
+  const snapped = (point: Point3): Point3 => (snap.snapSettings().enabled ? snap.snapToPoint(point, placementAnchor(), unitsPerPixelOnPlane()) : point)
 
   /**
    * The cursor readout the status bar shows. Published once per frame at most: a pointer can emit
@@ -1133,7 +1135,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const model = { x: position.x - offset.x, y: position.y - offset.y, z: position.z - offset.z }
     const id = elements.addElement(transformLibraryItemToCADElement(component, model))
     if (!id) return
-    lastPlaced = model
+    placementReference.remember(id)
     selection.selectElement(id)
     props.onComponentPlaced?.(name, position)
     cancelPlacementKeepPreview()
@@ -1167,7 +1169,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     setDraggingComponent(false)
     if (!componentId) return
     const component = predefinedComponents.find((candidate: any) => candidate.data === componentId || candidate.name === componentId)
-    if (component) { elements.addElement(transformLibraryItemToCADElement(component, dropPosition())); lastPlaced = dropPosition() }
+    if (component) placementReference.remember(elements.addElement(transformLibraryItemToCADElement(component, dropPosition())))
   }
 
   // ---------------------------------------------------------------------------------------------------- keyboard

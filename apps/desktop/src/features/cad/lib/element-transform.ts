@@ -50,7 +50,7 @@ const placementOf = (element: ElementTransformFields): Placement => ({
  *
  * `userData.pivot` ends up holding the centre in world space, which is what the gizmo attaches to.
  */
-export function applyElementTransform(object: THREE.Object3D, element: ElementTransformFields): void {
+export function applyElementTransform(object: THREE.Object3D, element: ElementTransformFields, originOffset?: Placement): void {
   const base = object.userData.baseMatrix as THREE.Matrix4 | undefined
   const localPivot = object.userData.localPivot as THREE.Vector3 | undefined
   const placedAt = object.userData.placedAt as Placement | undefined
@@ -61,10 +61,17 @@ export function applyElementTransform(object: THREE.Object3D, element: ElementTr
   object.matrix.decompose(object.position, object.quaternion, object.scale)
 
   const at = placementOf(element)
+  const builtOrigin = object.userData.builtOrigin as Placement | undefined
+  const origin = originOffset ?? builtOrigin
+  const shift = new THREE.Vector3(
+    at.x - placedAt.x + (origin?.x ?? 0) - (builtOrigin?.x ?? 0),
+    at.y - placedAt.y + (origin?.y ?? 0) - (builtOrigin?.y ?? 0),
+    at.z - placedAt.z + (origin?.z ?? 0) - (builtOrigin?.z ?? 0)
+  )
   object.position.set(
-    object.position.x + at.x - placedAt.x,
-    object.position.y + at.y - placedAt.y,
-    object.position.z + at.z - placedAt.z
+    object.position.x + shift.x,
+    object.position.y + shift.y,
+    object.position.z + shift.z
   )
 
   const translate = new THREE.Vector3(element.translateX ?? 0, element.translateY ?? 0, element.translateZ ?? 0)
@@ -72,7 +79,8 @@ export function applyElementTransform(object: THREE.Object3D, element: ElementTr
   const rotation = rotationOf(element)
   const moved = translate.lengthSq() > 0 || scale.x !== 1 || scale.y !== 1 || scale.z !== 1 || !rotation.equals(IDENTITY_QUATERNION)
 
-  const pivot = localPivot.clone()
+  // The factory pivot belongs to the original placement; the current placement moves the rotation/scale centre too.
+  const pivot = localPivot.clone().add(shift)
   if (moved) {
     const matrix = new THREE.Matrix4()
       .makeTranslation(pivot.x + translate.x, pivot.y + translate.y, pivot.z + translate.z)
@@ -89,12 +97,13 @@ export function applyElementTransform(object: THREE.Object3D, element: ElementTr
 }
 
 /** Records the factory pose before applying the editable transform fields. */
-export function initializeElementTransform(object: THREE.Object3D, element: ElementTransformFields): void {
+export function initializeElementTransform(object: THREE.Object3D, element: ElementTransformFields, originOffset?: Placement): void {
   object.updateMatrixWorld(true)
   const box = new THREE.Box3().setFromObject(object)
   object.updateMatrix()
   object.userData.baseMatrix = object.matrix.clone()
   object.userData.localPivot = box.isEmpty() ? object.position.clone() : box.getCenter(new THREE.Vector3())
   object.userData.placedAt = placementOf(element)
+  object.userData.builtOrigin = { x: originOffset?.x ?? 0, y: originOffset?.y ?? 0, z: originOffset?.z ?? 0 }
   applyElementTransform(object, element)
 }

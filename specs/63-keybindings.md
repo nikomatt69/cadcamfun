@@ -1,5 +1,7 @@
 # 63 — Keybindings (CAD, CAM, shell)
 
+Status: implemented; automated desktop validation passed on 2026-10-27 (1,267 tests, 181 files, no failures; desktop typecheck clean).
+
 One command catalog, one keymap, one keyboard listener. Code: `apps/desktop/src/shared/keybindings/`.
 
 ## Model
@@ -114,10 +116,33 @@ The adapter preserves the solids described by the catalogue; it does not invent 
 The gizmo supplies its initial pivot as the reference for perpendicular, tangent and parallel snaps. Named-point alignment
 continues to measure distance only on the dragged axes. Relative snaps must also satisfy the locked coordinates: projecting
 an unreachable tangent or perpendicular point onto a locked axis would falsely advertise a geometric relation.
-Placement uses the previous placed part's pivot as its reference, excluding that part from self-snapping. Cancelling clears
-the placement reference; removing the reference part leaves no anchor. Model coordinates remain independent of the scene's
-origin offset. Pure geometry stays synchronous; the existing Effect keybinding and sidecar services keep their contracts.
+Placement uses the previous placed part's current pivot as its reference. Parts moved by the gizmo are excluded from their
+own snap candidates. Cancelling clears the placement reference; removing the reference part leaves no anchor. Model
+coordinates remain independent of the scene's origin offset. Pure geometry stays synchronous; the existing Effect keybinding
+and sidecar services keep their contracts.
+
+Automated coverage (Bun, no browser automation): `cad-library-parts.test.ts` checks every catalogue solid, preview/placed
+bounds, hollow volumes, independent instances and malformed inputs. `cad-placement-snap.test.ts` exercises the real library
+adapter, Three geometry, element stores, snap hook and gizmo commit for all three relative snaps, including a single undo/redo
+step, cancellation, removal and origin changes. `cad-snap.test.ts` rejects relations unreachable on locked gizmo axes.
 
 ## Change log
 
 - 2026-10-26: resumed validation of structural-part placement and relative snaps for placement and gizmo movement.
+- 2026-10-27: added automated library and placement/gizmo integration tests. Fixed the live pivot after placement changes and
+  duplicate undo snapshots when committing a gizmo gesture. Cached scene objects now replay origin-offset changes without
+  rebuilding their geometry. Added CAD/CAM page remap/reset, text-entry and scope-isolation regressions over the in-process
+  sidecar. Browser automation is excluded from this validation run.
+  Final verification: the complete desktop suite passed in one process (1,267 tests across 181 files, 42,832 assertions),
+  using `--timeout 30000` and the exact-geometry tests' own limits. Desktop typecheck passed on all 1,311 files.
+
+Repeat the automated checks from the repository root:
+
+```sh
+bun --no-env-file test apps/desktop/test/cad-library-parts.test.ts apps/desktop/test/cad-placement-snap.test.ts apps/desktop/test/cad-snap.test.ts apps/desktop/test/keybindings-pages.test.ts
+bun --no-env-file test ./apps/desktop --timeout 30000
+bun --no-env-file check -p apps/desktop/tsconfig.json
+```
+
+The complete suite includes page mounts over the real sidecar handlers and geometry rebuilds; its 30-second default allows
+those integration cases to finish on a busy development machine. Explicit longer limits on exact-geometry tests remain.

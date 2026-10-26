@@ -116,7 +116,7 @@ export { applyElementTransform, type ElementTransformFields } from "./element-tr
 export function buildElementObject(element: Element, onEdgesReady?: () => void): THREE.Object3D | null {
   const object = createThreeObject(element, undefined, onEdgesReady)
   if (!object) return null
-  initializeElementTransform(object, element as ElementTransformFields)
+  initializeElementTransform(object, element as ElementTransformFields, useCADStore.getState().originOffset)
   object.userData.isCADElement = true
   object.userData.elementId = element.id
   object.traverse((child) => {
@@ -223,7 +223,6 @@ export function commitDrag(start: DragStart, delta: THREE.Matrix4): void {
   }
   if (changes.size === 0) return
   // A finished gizmo drag is one history step (the same rule `updateElement` follows while `isEditing`).
-  useElementsStore.getState().endEdit()
   useElementsStore.setState((state) => {
     const elements = state.elements.map((element) => (changes.has(element.id) ? { ...element, ...changes.get(element.id)! } : element))
     const history = state.history.slice(0, state.currentHistoryIndex + 1)
@@ -231,7 +230,8 @@ export function commitDrag(start: DragStart, delta: THREE.Matrix4): void {
     // Keep the bounded length of the undo stack: a drawing can be edited for hours.
     const kept = history.length > HISTORY_LIMIT ? history.slice(history.length - HISTORY_LIMIT) : history
     const selected = state.selectedElement ? elements.find((element) => element.id === state.selectedElement!.id) ?? null : null
-    return { elements, selectedElement: selected, history: kept, currentHistoryIndex: kept.length - 1 }
+    // Commit the gesture atomically. Calling endEdit first would append an unchanged snapshot before this one.
+    return { elements, selectedElement: selected, isEditing: false, history: kept, currentHistoryIndex: kept.length - 1 }
   })
 }
 
