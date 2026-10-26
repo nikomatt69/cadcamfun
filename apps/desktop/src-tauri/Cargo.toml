@@ -1,6 +1,6 @@
 [package]
 name = "cadcamfun-desktop"
-version = "0.1.26"
+version = "0.1.27"
 description = "CADCAM FUN desktop shell"
 edition = "2021"
 rust-version = "1.90"

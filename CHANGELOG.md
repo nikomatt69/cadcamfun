@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.27 (October 2026)
+
+## Desktop
+
+- Keybindings validated on the real pages and in a real browser; fixes found on the way
+
 ## v0.1.26 (October 2026)
 
 ## Desktop
