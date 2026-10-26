@@ -3,6 +3,15 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.24 (October 2026)
+
+## Desktop
+
+- Both 3D views name the grid spacing in a corner label (Grid 10 cm, 1 mm...)
+- Toolpath view: the program readout folds to its three counts (remembered)
+- CAD canvas: orientation cube, four views, double click frames the selection
+- Toolpath view: the orientation cube replaces the row of view buttons
+
 ## v0.1.23 (October 2026)
 
 ## Core
