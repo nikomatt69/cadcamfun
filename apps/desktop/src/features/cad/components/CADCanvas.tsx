@@ -8,6 +8,7 @@ import { IdleAmbientOcclusion, aoRadiusFor } from "../../../viewport/ao.ts"
 import { Outline, type OutlineState } from "../../../viewport/outline.ts"
 import { createAdaptiveGrid } from "../../../viewport/adaptive-grid.ts"
 import { createCameraRig, type CameraRig } from "../../../viewport/camera-rig.ts"
+import { ViewCube, type ViewCubeApi } from "../../../viewport/view3d/view-cube.tsx"
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
 import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
@@ -112,6 +113,50 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   let orbit: OrbitControls | undefined
   /** Zoom toward the cursor, orbit about the selection or the surface under the pointer, near and far that follow the scene. */
   let rig: CameraRig | undefined
+  let cubeApi: ViewCubeApi | undefined
+  const [flatView, setFlatView] = createSignal(false)
+  /** Top, front, right and the working perspective view at once; read-only, like the toolpath view's. */
+  const [fourView, setFourView] = createSignal(false)
+  let fourViewOn = false
+  const quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 1e6)
+  const quadPerspective = new THREE.PerspectiveCamera(45, 1, 0.01, 1e6)
+  const QUADS: ReadonlyArray<{ readonly direction: readonly [number, number, number]; readonly up: readonly [number, number, number] }> = [
+    { direction: [0, 0, 1], up: [0, 1, 0] }, { direction: [0, -1, 0], up: [0, 0, 1] }, { direction: [1, 0, 0], up: [0, 0, 1] }
+  ]
+  /** The four panes: three orthographic views framing the drawing, and the perspective camera the person was working with. */
+  const renderFourViews = (view: THREE.WebGLRenderer, drawn: THREE.Scene, working: THREE.PerspectiveCamera, sphere: THREE.Sphere) => {
+    const width = container.clientWidth || 1, height = container.clientHeight || 1
+    const paneW = width / 2, paneH = height / 2
+    const half = Math.max(sphere.radius, 1) * 1.35
+    view.setScissorTest(true)
+    for (let index = 0; index < 4; index++) {
+      const x = (index % 2) * paneW, y = index < 2 ? paneH : 0
+      view.setViewport(x, y, paneW, paneH); view.setScissor(x, y, paneW, paneH)
+      if (index === 3) {
+        // The direction the person is looking from, at the distance that frames the whole drawing in this pane.
+        const away = working.position.clone().sub(orbit?.target ?? sphere.center).normalize()
+        const reach = (sphere.radius / Math.sin((Math.min(quadPerspective.fov, quadPerspective.fov * (paneW / paneH)) * Math.PI) / 360)) * 1.15
+        quadPerspective.aspect = paneW / paneH
+        quadPerspective.up.set(0, 0, 1)
+        quadPerspective.position.copy(sphere.center).addScaledVector(away, Math.max(reach, 1))
+        quadPerspective.near = Math.max(reach / 1000, 0.01); quadPerspective.far = reach * 20
+        quadPerspective.updateProjectionMatrix(); quadPerspective.lookAt(sphere.center)
+        view.render(drawn, quadPerspective)
+        continue
+      }
+      const quad = QUADS[index]!
+      const aspect = paneW / paneH
+      quadCamera.left = -half * Math.max(aspect, 1); quadCamera.right = half * Math.max(aspect, 1)
+      quadCamera.top = half * Math.max(1 / aspect, 1); quadCamera.bottom = -half * Math.max(1 / aspect, 1)
+      quadCamera.up.set(...quad.up)
+      quadCamera.position.set(sphere.center.x + quad.direction[0] * half * 4, sphere.center.y + quad.direction[1] * half * 4, sphere.center.z + quad.direction[2] * half * 4)
+      quadCamera.near = 0.01; quadCamera.far = half * 12
+      quadCamera.updateProjectionMatrix(); quadCamera.lookAt(sphere.center)
+      view.render(drawn, quadCamera)
+    }
+    view.setScissorTest(false)
+    view.setViewport(0, 0, width, height)
+  }
   let gizmo: TransformControls | undefined
   let frames: FrameScheduler | undefined
   let ambientOcclusion: IdleAmbientOcclusion | undefined
@@ -121,6 +166,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [explosionActive, setExplosionActive] = createSignal(false)
   let reducedMotion: MediaQueryList | undefined
   let dirty = true
+  let cubeStale = true
   const invalidate = (): void => { dirty = true; frames?.invalidate() }
   const pivot = new THREE.Object3D()
   const raycaster = new THREE.Raycaster()
@@ -301,11 +347,13 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       const rigAnimating = rig?.beforeUpdate(performance.now()) === true
       const moved = (orbit?.update() === true) || rigAnimating
       if (rig?.afterUpdate(moved) === true) dirty = true
+      if (cubeApi !== undefined && camera && (moved || cubeStale)) { camera.updateMatrixWorld(); cubeApi.setBasis(camera.matrixWorld.elements); cubeStale = false }
       if ((moved || dirty) && renderer && scene && camera) {
         dirty = false
-        renderer.render(scene, camera)
+        if (fourViewOn) renderFourViews(renderer, scene, camera, drawingSphere())
+        else renderer.render(scene, camera)
         // The occlusion is for a scene at rest: every frame restarts the quiet period, one extra frame is drawn after it.
-        ambientOcclusion?.arm()
+        if (!fourViewOn) ambientOcclusion?.arm()
       }
       return moved || animating
     }, (callback) => window.requestAnimationFrame(callback), (id) => window.cancelAnimationFrame(id))
@@ -313,7 +361,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       renderer, scene, camera,
       render: () => renderer?.render(scene!, camera!),
       quality: currentLookTier,
-      busy: () => dirty,
+      busy: () => dirty || fourViewOn,
       exclude: (object) => object === gizmo?.getHelper() || object.userData.isControlPoint === true,
       radius: () => {
         const box = new THREE.Box3()
@@ -1053,6 +1101,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       onMouseMove={onMouseMove}
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
+      onDblClick={(event) => {
+        // A double click on a selected part frames it (with the select tool: other tools use the double click themselves).
+        if (cad.activeTool !== "select" || selectedIds().length === 0 || (event.target as HTMLElement).closest("button, input, select, textarea, [role='dialog']")) return
+        if (elementIdAt() !== null) fitToView()
+      }}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragLeave={() => setDraggingComponent(false)}
@@ -1152,6 +1205,27 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           <div style="font-size:10px;margin-top:4px;color:#9ca3af">Press ENTER to confirm, ESC to cancel</div>
         </div>
       </Show>
+
+      <Show when={fourView()}>
+        <div class="cad-quadrants" data-testid="cad-four-views" onMouseDown={(event) => event.stopPropagation()} onMouseMove={(event) => event.stopPropagation()} onMouseUp={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onDblClick={(event) => event.stopPropagation()} onContextMenu={(event) => event.stopPropagation()}>
+          <span>{t("viewport.view.top")}</span><span>{t("viewport.view.front")}</span><span>{t("viewport.view.right")}</span><span>{t("viewport.view.perspective")}</span>
+        </div>
+      </Show>
+
+      <div class="cad-viewcube-dock">
+        <ViewCube
+          enabled={ready() && cad.viewMode === "3d"}
+          orthographic={flatView()}
+          onSnap={(direction) => { rig?.snapTo(direction); invalidate() }}
+          onOrbit={(dAzimuth, dPolar) => rig?.orbitBy(dAzimuth, dPolar)}
+          onIsometric={() => rig?.snapTo([ISO_VIEW.x, ISO_VIEW.y, ISO_VIEW.z])}
+          onFit={() => fitToView()}
+          onProjection={() => { if (!rig) return; rig.setFlat(!rig.flat()); setFlatView(rig.flat()) }}
+          fourViews={fourView()}
+          onFourViews={() => { fourViewOn = !fourViewOn; setFourView(fourViewOn); if (orbit) orbit.enabled = !fourViewOn && !isPlacing(); invalidate() }}
+          register={(api) => { cubeApi = api; cubeStale = true }}
+        />
+      </div>
 
       <SnapIndicator x={snapScreen().x} y={snapScreen().y} type={snapScreen().type} visible={snapScreen().visible} />
 

@@ -1,5 +1,5 @@
 import { For, createSignal, type JSX } from "solid-js"
-import { Box, Scan } from "lucide-solid"
+import { Box, LayoutGrid, Scan } from "lucide-solid"
 import { t, type Key } from "../../i18n/index.ts"
 import { alignedCubeKey, cubeDirection, type Vec3 } from "../camera-nav.ts"
 import { CUBE_FACES, CUBE_ZONES, basisElements, cubeMatrix, faceMatrix, matrix3dCss, signNames, type CubeFace, type CubeFaceName, type CubeZone } from "../view-cube-model.ts"
@@ -29,6 +29,9 @@ export interface ViewCubeProps {
   /** Whether the camera is orthographic; omit `onProjection` to hide the toggle. */
   readonly orthographic?: boolean
   readonly onProjection?: () => void
+  /** Whether the host shows its four views at once; omit `onFourViews` to hide the toggle. */
+  readonly fourViews?: boolean
+  readonly onFourViews?: () => void
   readonly register?: (api: ViewCubeApi) => void
 }
 
@@ -126,6 +129,9 @@ export function ViewCube(props: ViewCubeProps): JSX.Element {
     <div class="vp3-viewcube__tools" role="toolbar" aria-label={t("viewport.view")}>
       <button type="button" disabled={!props.enabled} title={t("viewport.cube.home")} aria-label={t("viewport.cube.home")} onClick={() => props.onIsometric?.()}><Box size={13} aria-hidden="true" /></button>
       <button type="button" disabled={!props.enabled} title={t("viewport.cube.fit")} aria-label={t("viewport.cube.fit")} onClick={() => props.onFit?.()}><Scan size={13} aria-hidden="true" /></button>
+      {props.onFourViews
+        ? <button type="button" disabled={!props.enabled} aria-pressed={!!props.fourViews} title={t("viewport.cube.fourViews")} aria-label={t("viewport.cube.fourViews")} onClick={() => props.onFourViews?.()}><LayoutGrid size={13} aria-hidden="true" /></button>
+        : null}
       {props.onProjection
         ? <button type="button" class="vp3-viewcube__projection" disabled={!props.enabled} aria-pressed={!!props.orthographic} title={t(props.orthographic ? "viewport.cube.orthographic" : "viewport.cube.perspective")} aria-label={t("viewport.cube.projection")} onClick={() => props.onProjection?.()}>{t(props.orthographic ? "viewport.cube.orthographicShort" : "viewport.cube.perspectiveShort")}</button>
         : null}

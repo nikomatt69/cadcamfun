@@ -102,3 +102,8 @@
 .vp3-viewcube-dock, .cad-viewcube-dock { position: absolute; top: 12px; right: 12px; z-index: 5; }
 .vp3-viewcube-dock .vp3-viewcube, .cad-viewcube-dock .vp3-viewcube { pointer-events: auto; }
 .vp3-viewcube .vp3-viewcube__zone--face { font-size: 8px; letter-spacing: 0.01em; text-overflow: clip; }
+/* In the CAD canvas the corners on top already carry the bars: the cube takes the bottom left, above the help button. */
+.cad-viewcube-dock { top: auto; right: auto; left: 12px; bottom: 56px; }
+/* The four views of the CAD canvas: labels in the corner of each pane, and a shield that keeps the pointer from editing through them. */
+.cad-quadrants { position: absolute; inset: 0; z-index: 4; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; pointer-events: auto; cursor: default; }
+.cad-quadrants span { border: 1px solid rgb(255 255 255 / .1); padding: 6px 10px; font-size: 11px; letter-spacing: .04em; color: #cbd5e1; text-transform: uppercase; }

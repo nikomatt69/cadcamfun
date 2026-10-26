@@ -589,5 +589,6 @@
   "viewport.cube.perspective": "Perspective camera",
   "viewport.cube.orthographic": "Orthographic camera",
   "viewport.cube.perspectiveShort": "Persp",
-  "viewport.cube.orthographicShort": "Ortho"
+  "viewport.cube.orthographicShort": "Ortho",
+  "viewport.cube.fourViews": "Four views"
 }
