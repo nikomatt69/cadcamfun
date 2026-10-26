@@ -107,3 +107,7 @@
 /* The four views of the CAD canvas: labels in the corner of each pane, and a shield that keeps the pointer from editing through them. */
 .cad-quadrants { position: absolute; inset: 0; z-index: 4; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; pointer-events: auto; cursor: default; }
 .cad-quadrants span { border: 1px solid rgb(255 255 255 / .1); padding: 6px 10px; font-size: 11px; letter-spacing: .04em; color: #cbd5e1; text-transform: uppercase; }
+.toolpath-visualizer__stats-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 0 0 2px; border: 0; background: transparent; color: #94a3b8; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.toolpath-visualizer__stats-head:hover { color: #e2e8f0; }
+/* Folded: the head and the three counts stay, the machine, tool and warning detail goes. */
+.toolpath-visualizer__stats[data-collapsed="true"] > :not(.toolpath-visualizer__stats-head):not(:nth-child(-n+4)) { display: none; }

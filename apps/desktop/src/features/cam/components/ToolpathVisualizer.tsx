@@ -8,7 +8,7 @@
  * timeline, simulator overlay).
  */
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, type JSX } from "solid-js"
-import { Eye, EyeOff, ListTree, Play, RotateCcw, Settings, X } from "lucide-solid"
+import { ChevronDown, ChevronUp, Eye, EyeOff, ListTree, Play, RotateCcw, Settings, X } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { View3D, toolpathOverlayModel, type MachineInfo, type RenderMode, type ToolpathPointKind, type ViewPreset } from "../../../viewport/view3d/index.ts"
 import { MACHINE_LABELS, SOURCE_LABELS, type MachineChoice, type OperationTool } from "../lib/machine-view.ts"
@@ -81,6 +81,13 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const [axesVisible, setAxesVisible] = createSignal(true)
   const [settingsOpen, setSettingsOpen] = createSignal(false)
   const [showStats, setShowStats] = createSignal(true)
+  // The readout's detail folds away to its three counts: the choice is remembered (a blocked storage only lasts the session).
+  const STATS_KEY = "cadcamfun.cam-stats-collapsed"
+  const [statsCollapsed, setStatsCollapsedSignal] = createSignal((() => { try { return globalThis.localStorage?.getItem(STATS_KEY) === "1" } catch { return false } })())
+  const setStatsCollapsed = (value: boolean): void => {
+    setStatsCollapsedSignal(value)
+    try { globalThis.localStorage?.setItem(STATS_KEY, value ? "1" : "0") } catch { /* private window */ }
+  }
   const [showDirection, setShowDirection] = createSignal(true)
   const [showPoints, setShowPoints] = createSignal(false)
   const [showPointLabels, setShowPointLabels] = createSignal(false)
@@ -423,7 +430,10 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
         </button>
         </div>
         <Show when={showStats()}>
-          <div class="toolpath-visualizer__stats rounded-lg bg-black/80 px-3 py-2 text-[11px] leading-5 text-slate-200" tabIndex={0} aria-label={t("cam.visualizer.showStats")}>
+          <div class="toolpath-visualizer__stats rounded-lg bg-black/80 px-3 py-2 text-[11px] leading-5 text-slate-200" tabIndex={0} aria-label={t("cam.visualizer.showStats")} data-collapsed={statsCollapsed() ? "true" : "false"}>
+            <button type="button" class="toolpath-visualizer__stats-head" aria-expanded={!statsCollapsed()} onClick={() => setStatsCollapsed(!statsCollapsed())}>
+              <span>{t("cam.visualizer.showStats")}</span>{statsCollapsed() ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+            </button>
             <div>{t("cam.visualizer.moves")}: <span class="text-white">{overlay().moveCount}</span></div>
             <div>{t("cam.visualizer.points")}: <span class="text-white">{overlay().points.length}</span></div>
             <div>{t("cam.visualizer.arcs")}: <span class="text-white">{overlay().arcs.length}</span></div>
