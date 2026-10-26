@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.30 (October 2026)
+
+## Mobile
+
+- Redesign chat composer as a single-row card with an Add context sheet
+
 ## v0.1.29 (October 2026)
 
 - No notable changes
