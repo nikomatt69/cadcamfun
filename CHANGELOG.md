@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.28 (October 2026)
+
+## Desktop
+
+- The native menu follows the keymap, creation keys, per-platform Ctrl/Cmd, exhaustive validation
+
 ## v0.1.27 (October 2026)
 
 ## Desktop
