@@ -19,9 +19,11 @@ export function createSnap() {
   const toggleSnapType = (type: SnapType) =>
     setSettings((prev) => ({ ...prev, types: { ...prev.types, [type]: !prev.types[type] } }))
 
-  const snapToPoint = (point: { x: number; y: number; z?: number }) => {
-    const snapped = snapPoint({ x: point.x, y: point.y, z: point.z || 0 }, elements.elements, settings())
-    if (snapped.type !== SnapType.NEAREST) {
+  /** `anchor` is the point the user draws or moves from; perpendicular, tangent and parallel are relative to it. */
+  const snapToPoint = (point: { x: number; y: number; z?: number }, anchor?: { x: number; y: number; z?: number }) => {
+    const snapped = snapPoint({ x: point.x, y: point.y, z: point.z || 0 }, elements.elements, settings(), anchor ? { x: anchor.x, y: anchor.y, z: anchor.z || 0 } : undefined)
+    // `nearest` is also what an unsnapped point reports; only one that sits on an element counts as a snap.
+    if (snapped.type !== SnapType.NEAREST || snapped.source !== undefined) {
       setIndicator({ x: snapped.x, y: snapped.y, z: snapped.z, type: snapped.type, visible: true })
       setIsSnapping(true)
     } else {

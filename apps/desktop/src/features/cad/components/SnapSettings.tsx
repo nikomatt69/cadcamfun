@@ -1,6 +1,7 @@
 import { For, Show, type JSX } from "solid-js"
 import { createSnap } from "../hooks/createSnap.ts"
 import type { SnapType } from "../lib/enanchedSnapService.ts"
+import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { displayChord } from "../../../shared/keybindings/chord.ts"
 
@@ -9,6 +10,8 @@ export default function SnapSettings(): JSX.Element {
   const app = useApp()
   const snap = createSnap()
   /** The chord the user's keymap gives a snap command, shown as a tooltip and next to the kind. */
+  /** Kinds that are relative to a start point: they only apply while something is drawn or moved from a point. */
+  const NEEDS_START: ReadonlySet<string> = new Set(["perpendicular", "tangent", "parallel"])
   const chordOf = (id: string): string | undefined => {
     const chord = app.keys.keymap().entry(id)?.chords[0]
     return chord === undefined ? undefined : displayChord(chord, app.keys.platform)
@@ -28,7 +31,7 @@ export default function SnapSettings(): JSX.Element {
         <For each={Object.entries(settings().types)}>{([type, enabled]) =>
           <label class="flex items-center">
             <input type="checkbox" checked={enabled} onChange={() => snap.toggleSnapType(type as SnapType)} disabled={!settings().enabled} class="mr-2 h-4 w-4 rounded text-blue-600" />
-            <span class="text-xs">{type}</span>
+            <span class="text-xs" title={NEEDS_START.has(type) ? t("cad.snap.needsStart") : undefined} classList={{ "opacity-60": NEEDS_START.has(type) }}>{type}{NEEDS_START.has(type) ? " ↦" : ""}</span>
             <Show when={chordOf(`cad.snap.type.${type}`)}>{(chord) => <kbd class="ml-auto text-[10px] text-gray-500">{chord()}</kbd>}</Show>
           </label>}
         </For>

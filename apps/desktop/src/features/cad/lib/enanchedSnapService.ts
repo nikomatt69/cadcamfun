@@ -40,7 +40,7 @@ interface SnapPoint {
 /**
  * Snap a point to the nearest valid snap location with intelligent snap
  */
-export function snapPoint(point: Point, elements: Element[], settings: SnapSettings): SnapPoint {
+export function snapPoint(point: Point, elements: Element[], settings: SnapSettings, anchor?: Point): SnapPoint {
   if (!settings.enabled) {
     return { ...point, type: SnapType.NEAREST };
   }
@@ -55,6 +55,9 @@ export function snapPoint(point: Point, elements: Element[], settings: SnapSetti
 
   // Get active element (typically the one being created/modified)
   const activeElement = elements.find(el => el.isActive);
+  // The point the user is drawing or moving from: perpendicular, tangent and parallel are relative to it. Without one
+  // (placing a part, dropping from the library) there is nothing to be perpendicular or parallel to.
+  const from = anchor ?? anchorOf(activeElement);
 
   // Collect basic snap points from elements
   elements.forEach(element => {
@@ -76,14 +79,16 @@ export function snapPoint(point: Point, elements: Element[], settings: SnapSetti
     snapPoints.push(...alignmentPoints);
   }
 
-  if (settings.types[SnapType.PERPENDICULAR]) {
-    const perpendicularPoints = findPerpendicularPoints(point, elements, activeElement, settings);
-    snapPoints.push(...perpendicularPoints);
+  if (settings.types[SnapType.PERPENDICULAR] && from) {
+    snapPoints.push(...findPerpendicularPoints(point, from, elements, activeElement));
   }
 
-  if (settings.types[SnapType.TANGENT] && activeElement) {
-    const tangentPoints = findTangentPoints(point, elements, activeElement, settings);
-    snapPoints.push(...tangentPoints);
+  if (settings.types[SnapType.TANGENT] && from) {
+    snapPoints.push(...findTangentPoints(point, from, elements, activeElement));
+  }
+
+  if (settings.types[SnapType.PARALLEL] && from) {
+    snapPoints.push(...findParallelPoints(point, from, elements, activeElement));
   }
 
   if (settings.types[SnapType.EQUIDISTANT]) {
@@ -96,6 +101,13 @@ export function snapPoint(point: Point, elements: Element[], settings: SnapSetti
 
   if (closestPoint) {
     return closestPoint;
+  }
+
+  // The point on an edge is always at least as close as the ends or the middle of that edge, so it would shadow them:
+  // it only applies when nothing more specific is within reach.
+  if (settings.types[SnapType.NEAREST]) {
+    const onEdge = findClosestSnapPoint(point, findNearestPoints(point, elements, activeElement), settings.tolerance);
+    if (onEdge) return onEdge;
   }
 
   // If no snap point is found within tolerance, return the original point
@@ -536,6 +548,41 @@ function getElementSnapPoints(element: Element, settings: SnapSettings): SnapPoi
       }
       break;
 
+    // Cylinder, cone and torus stand on the Z axis (see `createThreeObject`): the centre, the ends of the axis and the four
+    // quadrant points of each end circle (or, for the torus, of the ring's outer edge).
+    case "cylinder":
+    case "cone": {
+      const z = element.z || 0, half = (element.height || 0) / 2, r = element.radius || 0;
+      const add = (x: number, y: number, zz: number, type: SnapType, priority: number) => snapPoints.push({ x, y, z: zz, type, source: element, priority });
+      if (settings.types[SnapType.CENTER]) add(element.x, element.y, z, SnapType.CENTER, 9);
+      if (settings.types[SnapType.ENDPOINT]) {
+        add(element.x, element.y, z - half, SnapType.ENDPOINT, 10);
+        add(element.x, element.y, z + half, SnapType.ENDPOINT, 10);
+      }
+      if (settings.types[SnapType.QUADRANT]) {
+        // A cone's top is its apex: only the base circle has quadrants.
+        const ends = element.type === "cone" ? [z - half] : [z - half, z + half];
+        for (const level of ends) {
+          add(element.x + r, element.y, level, SnapType.QUADRANT, 7);
+          add(element.x - r, element.y, level, SnapType.QUADRANT, 7);
+          add(element.x, element.y + r, level, SnapType.QUADRANT, 7);
+          add(element.x, element.y - r, level, SnapType.QUADRANT, 7);
+        }
+      }
+      break;
+    }
+
+    case "torus": {
+      const z = element.z || 0, outer = (element.radius || 0) + (element.tubeRadius || element.tube || (element.radius || 0) / 4);
+      if (settings.types[SnapType.CENTER]) snapPoints.push({ x: element.x, y: element.y, z, type: SnapType.CENTER, source: element, priority: 9 });
+      if (settings.types[SnapType.QUADRANT]) {
+        for (const [dx, dy] of [[outer, 0], [-outer, 0], [0, outer], [0, -outer]] as const) {
+          snapPoints.push({ x: element.x + dx, y: element.y + dy, z, type: SnapType.QUADRANT, source: element, priority: 7 });
+        }
+      }
+      break;
+    }
+
     case "sphere":
       if (settings.types[SnapType.CENTER]) {
         snapPoints.push({
@@ -776,39 +823,18 @@ function findLineLineIntersection(
   p3: { x: number; y: number },
   p4: { x: number; y: number }
 ): { x: number; y: number } | null {
-  // Line 1 represented as a1x + b1y = c1
-  const a1 = p2.y - p1.y;
-  const b1 = p1.x - p2.x;
-  const c1 = a1 * p1.x + b1 * p1.y;
-
-  // Line 2 represented as a2x + b2y = c2
-  const a2 = p4.y - p3.y;
-  const b2 = p3.x - p4.x;
-  const c2 = a2 * p3.x + b2 * p3.y;
-
-  const determinant = a1 * b2 - a2 * b1;
-
-  // If lines are parallel, no intersection
-  if (Math.abs(determinant) < 1e-10) {
-    return null;
-  }
-
-  const x = (b2 * c1 - b1 * c2) / determinant;
-  const y = (a1 * c2 - a2 * c1) / determinant;
-
-  // Check if the intersection point is on both line segments
-  const onLine1 =
-    Math.min(p1.x, p2.x) <= x && x <= Math.max(p1.x, p2.x) && Math.min(p1.y, p2.y) <= y && y <= Math.max(p1.y, p2.y);
-
-  const onLine2 =
-    Math.min(p3.x, p4.x) <= x && x <= Math.max(p3.x, p4.x) && Math.min(p3.y, p4.y) <= y && y <= Math.max(p3.y, p4.y);
-
-  // Return intersection point only if it lies on both line segments
-  if (onLine1 && onLine2) {
-    return { x, y };
-  }
-
-  return null;
+  // p1 + t (p2 - p1) = p3 + u (p4 - p3), solved for t and u; both must lie on their segment.
+  const rx = p2.x - p1.x, ry = p2.y - p1.y;
+  const sx = p4.x - p3.x, sy = p4.y - p3.y;
+  const denominator = rx * sy - ry * sx;
+  // Parallel (or one of them has no length): no single crossing.
+  if (Math.abs(denominator) < 1e-12) return null;
+  const t = ((p3.x - p1.x) * sy - (p3.y - p1.y) * sx) / denominator;
+  const u = ((p3.x - p1.x) * ry - (p3.y - p1.y) * rx) / denominator;
+  // A little slack, so a crossing exactly at an end (a vertical line met at its corner) is not lost to rounding.
+  const eps = 1e-9;
+  if (t < -eps || t > 1 + eps || u < -eps || u > 1 + eps) return null;
+  return { x: p1.x + t * rx, y: p1.y + t * ry };
 }
 
 /**
@@ -820,73 +846,27 @@ function findLineCircleIntersections(
   circleCenter: { x: number; y: number },
   radius: number
 ): Array<{ x: number; y: number }> {
-  const intersections: Array<{ x: number; y: number }> = [];
-
-  // Vector representation of the line
   const dx = lineEnd.x - lineStart.x;
   const dy = lineEnd.y - lineStart.y;
+  const length = Math.hypot(dx, dy);
+  if (length === 0 || radius <= 0) return [];
+  const ux = dx / length, uy = dy / length;
 
-  // Line length squared
-  const lengthSquared = dx * dx + dy * dy;
+  // Where the line comes closest to the centre, and how far that is from the centre.
+  const along = (circleCenter.x - lineStart.x) * ux + (circleCenter.y - lineStart.y) * uy;
+  const closestX = lineStart.x + along * ux, closestY = lineStart.y + along * uy;
+  const distanceSquared = (closestX - circleCenter.x) ** 2 + (closestY - circleCenter.y) ** 2;
+  if (distanceSquared > radius * radius + 1e-9) return [];
 
-  // Vector from circle center to line start
-  const cx = circleCenter.x - lineStart.x;
-  const cy = circleCenter.y - lineStart.y;
-
-  // Project circle center onto line
-  const projection = (cx * dx + cy * dy) / lengthSquared;
-
-  // Closest point on line to circle center
-  const closestX = lineStart.x + projection * dx;
-  const closestY = lineStart.y + projection * dy;
-
-  // Distance from circle center to closest point
-  const distanceSquared = Math.pow(closestX - circleCenter.x, 2) + Math.pow(closestY - circleCenter.y, 2);
-
-  // Check if line intersects circle
-  if (distanceSquared > radius * radius) {
-    return intersections;
-  }
-
-  // Distance from closest point to intersection point
-  const distToIntersection = Math.sqrt(radius * radius - distanceSquared);
-
-  // First intersection point
-  const intersection1X = closestX + (distToIntersection * dy) / Math.sqrt(lengthSquared);
-  const intersection1Y = closestY - (distToIntersection * dx) / Math.sqrt(lengthSquared);
-
-  // Check if intersection is on the line segment
-  const onLine1 =
-    Math.min(lineStart.x, lineEnd.x) <= intersection1X &&
-    intersection1X <= Math.max(lineStart.x, lineEnd.x) &&
-    Math.min(lineStart.y, lineEnd.y) <= intersection1Y &&
-    intersection1Y <= Math.max(lineStart.y, lineEnd.y);
-
-  if (onLine1) {
-    intersections.push({ x: intersection1X, y: intersection1Y });
-  }
-
-  // If distance is exactly radius, there's only one intersection
-  if (Math.abs(distanceSquared - radius * radius) < 1e-10) {
-    return intersections;
-  }
-
-  // Second intersection point
-  const intersection2X = closestX - (distToIntersection * dy) / Math.sqrt(lengthSquared);
-  const intersection2Y = closestY + (distToIntersection * dx) / Math.sqrt(lengthSquared);
-
-  // Check if second intersection is on the line segment
-  const onLine2 =
-    Math.min(lineStart.x, lineEnd.x) <= intersection2X &&
-    intersection2X <= Math.max(lineStart.x, lineEnd.x) &&
-    Math.min(lineStart.y, lineEnd.y) <= intersection2Y &&
-    intersection2Y <= Math.max(lineStart.y, lineEnd.y);
-
-  if (onLine2) {
-    intersections.push({ x: intersection2X, y: intersection2Y });
-  }
-
-  return intersections;
+  // The crossings sit on the line itself, half a chord to either side of that closest point.
+  const half = Math.sqrt(Math.max(0, radius * radius - distanceSquared));
+  const offsets = half < 1e-9 ? [0] : [-half, half];
+  const eps = 1e-9;
+  return offsets
+    .map((offset) => ({ t: along + offset, x: closestX + offset * ux, y: closestY + offset * uy }))
+    // Only the part of the line that is drawn counts.
+    .filter(({ t }) => t >= -eps && t <= length + eps)
+    .map(({ x, y }) => ({ x, y }));
 }
 
 /**
@@ -1085,106 +1065,73 @@ function findAlignmentPoints(point: Point, elements: Element[], settings: SnapSe
 /**
  * Find perpendicular points for a given point and elements
  */
-function findPerpendicularPoints(
-  point: Point,
-  elements: Element[],
-  activeElement: Element | undefined,
-  settings: SnapSettings
-): SnapPoint[] {
+function findPerpendicularPoints(point: Point, from: Point, elements: Element[], activeElement: Element | undefined): SnapPoint[] {
   const snapPoints: SnapPoint[] = [];
-
-  if (
-    !activeElement ||
-    (activeElement.type !== "line" && !(activeElement.isCreating && activeElement.type === "line"))
-  ) {
-    return snapPoints;
+  for (const line of elements) {
+    if (line.type !== "line" || line === activeElement) continue;
+    // The foot of the perpendicular from the start point onto the line: drawing from `from` to it meets the line at 90 degrees.
+    const dx = line.x2 - line.x1, dy = line.y2 - line.y1;
+    const lengthSquared = dx * dx + dy * dy;
+    if (lengthSquared === 0) continue;
+    const t = ((from.x - line.x1) * dx + (from.y - line.y1) * dy) / lengthSquared;
+    if (t < 0 || t > 1) continue;
+    snapPoints.push({ x: line.x1 + t * dx, y: line.y1 + t * dy, z: point.z, type: SnapType.PERPENDICULAR, source: line, priority: 12 });
   }
-
-  // For lines being created, we need the first point and the current mouse position
-  const lineStartX = activeElement.x1 || activeElement.startX || 0;
-  const lineStartY = activeElement.y1 || activeElement.startY || 0;
-
-  // Filter for only line elements
-  const lineElements = elements.filter(el => el.type === "line" && el !== activeElement);
-
-  lineElements.forEach(line => {
-    // Calculate perpendicular point from the active line to this line
-    const perpPoint = findPerpendicularPointToLine(
-      { x: lineStartX, y: lineStartY },
-      point,
-      { x: line.x1, y: line.y1 },
-      { x: line.x2, y: line.y2 }
-    );
-
-    if (perpPoint) {
-      snapPoints.push({
-        x: perpPoint.x,
-        y: perpPoint.y,
-        z: point.z,
-        type: SnapType.PERPENDICULAR,
-        source: line,
-        priority: 12 // Very high priority
-      });
-    }
-  });
-
   return snapPoints;
 }
 
+/** The start of the line being drawn, when there is one. */
+function anchorOf(active: Element | undefined): Point | undefined {
+  if (!active || active.type !== "line") return undefined;
+  const x = active.x1 ?? active.startX, y = active.y1 ?? active.startY;
+  return typeof x === "number" && typeof y === "number" ? { x, y, z: active.z1 || 0 } : undefined;
+}
+
 /**
- * Calculate perpendicular point from a line to another line
+ * Points on the lines parallel to an existing line through the start point: the cursor projected onto that ray, so the line
+ * being drawn comes out parallel.
  */
-function findPerpendicularPointToLine(
-  lineAStart: { x: number; y: number },
-  lineAEnd: { x: number; y: number },
-  lineBStart: { x: number; y: number },
-  lineBEnd: { x: number; y: number }
-): { x: number; y: number } | null {
-  // Vector of line A
-  const dxA = lineAEnd.x - lineAStart.x;
-  const dyA = lineAEnd.y - lineAStart.y;
-
-  // Vector of line B
-  const dxB = lineBEnd.x - lineBStart.x;
-  const dyB = lineBEnd.y - lineBStart.y;
-
-  // Check if lines are already perpendicular
-  const dotProduct = dxA * dxB + dyA * dyB;
-  if (Math.abs(dotProduct) < 1e-10) {
-    // Lines are already perpendicular, find closest point on line B
-    return findClosestPointOnLine(lineAEnd, lineBStart, lineBEnd);
+function findParallelPoints(point: Point, from: Point, elements: Element[], activeElement: Element | undefined): SnapPoint[] {
+  const snapPoints: SnapPoint[] = [];
+  for (const line of elements) {
+    if (line.type !== "line" || line === activeElement) continue;
+    const dx = line.x2 - line.x1, dy = line.y2 - line.y1;
+    const length = Math.hypot(dx, dy);
+    if (length === 0) continue;
+    const ux = dx / length, uy = dy / length;
+    const along = (point.x - from.x) * ux + (point.y - from.y) * uy;
+    snapPoints.push({ x: from.x + along * ux, y: from.y + along * uy, z: point.z, type: SnapType.PARALLEL, source: line, priority: 11 });
   }
+  return snapPoints;
+}
 
-  // Calculate perpendicular vector to line B
-  const perpDxB = -dyB;
-  const perpDyB = dxB;
-
-  // Find intersection between a line from lineAEnd in the perpendicular direction
-  // and line B
-
-  // Parametric equation for line B: lineBStart + t * (dxB, dyB)
-  // Parametric equation for perp line: lineAEnd + s * (perpDxB, perpDyB)
-
-  // Solve for t where these lines intersect
-  const denominator = perpDxB * dyB - perpDyB * dxB;
-
-  if (Math.abs(denominator) < 1e-10) {
-    // Lines are parallel, no perpendicular intersection
-    return null;
+/** The closest point on the outline of each line, circle and rectangle: where the cursor sits on an edge. */
+function findNearestPoints(point: Point, elements: Element[], activeElement: Element | undefined): SnapPoint[] {
+  const snapPoints: SnapPoint[] = [];
+  const push = (x: number, y: number, z: number, source: Element) => snapPoints.push({ x, y, z, type: SnapType.NEAREST, source, priority: 1 });
+  for (const element of elements) {
+    if (element === activeElement) continue;
+    if (element.type === "line") {
+      const near = findClosestPointOnLine(point, { x: element.x1, y: element.y1 }, { x: element.x2, y: element.y2 });
+      if (near) push(near.x, near.y, point.z, element);
+    } else if (element.type === "circle" && element.radius > 0) {
+      const dx = point.x - element.x, dy = point.y - element.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > 0) push(element.x + (dx / distance) * element.radius, element.y + (dy / distance) * element.radius, point.z, element);
+    } else if (element.type === "rectangle") {
+      const hw = element.width / 2, hh = element.height / 2;
+      const corners = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([cx, cy]) => ({ x: element.x + cx!, y: element.y + cy! }));
+      let best: { x: number; y: number } | undefined, bestSq = Infinity;
+      for (let i = 0; i < 4; i++) {
+        const near = findClosestPointOnLine(point, corners[i]!, corners[(i + 1) % 4]!);
+        if (!near) continue;
+        const sq = (near.x - point.x) ** 2 + (near.y - point.y) ** 2;
+        if (sq < bestSq) { bestSq = sq; best = near; }
+      }
+      if (best) push(best.x, best.y, point.z, element);
+    }
   }
-
-  const t = ((lineAEnd.x - lineBStart.x) * perpDyB - (lineAEnd.y - lineBStart.y) * perpDxB) / denominator;
-
-  // Calculate the intersection point on line B
-  const intersectionX = lineBStart.x + t * dxB;
-  const intersectionY = lineBStart.y + t * dyB;
-
-  // Make sure it's on the line segment
-  if (t >= 0 && t <= 1) {
-    return { x: intersectionX, y: intersectionY };
-  }
-
-  return null;
+  return snapPoints;
 }
 
 /**
@@ -1228,40 +1175,15 @@ function findClosestPointOnLine(
 /**
  * Find tangent points from a point to circles
  */
-function findTangentPoints(
-  point: Point,
-  elements: Element[],
-  activeElement: Element | undefined,
-  settings: SnapSettings
-): SnapPoint[] {
+function findTangentPoints(_point: Point, from: Point, elements: Element[], activeElement: Element | undefined): SnapPoint[] {
   const snapPoints: SnapPoint[] = [];
-
-  // Only find tangent points when creating a line
-  if (
-    !activeElement ||
-    !(activeElement.type === "line" || (activeElement.isCreating && activeElement.type === "line"))
-  ) {
-    return snapPoints;
+  for (const circle of elements) {
+    if (circle.type !== "circle" || circle === activeElement) continue;
+    // The two points where a line from the start point just touches the circle.
+    for (const tangent of findTangentPointsToCircle(from, { x: circle.x, y: circle.y }, circle.radius)) {
+      snapPoints.push({ x: tangent.x, y: tangent.y, z: from.z, type: SnapType.TANGENT, source: circle, priority: 12 });
+    }
   }
-
-  // Filter for only circle elements
-  const circleElements = elements.filter(el => el.type === "circle");
-
-  circleElements.forEach(circle => {
-    const tangentPoints = findTangentPointsToCircle(point, { x: circle.x, y: circle.y }, circle.radius);
-
-    tangentPoints.forEach(tangentPoint => {
-      snapPoints.push({
-        x: tangentPoint.x,
-        y: tangentPoint.y,
-        z: point.z,
-        type: SnapType.TANGENT,
-        source: circle,
-        priority: 12
-      });
-    });
-  });
-
   return snapPoints;
 }
 
@@ -1287,8 +1209,8 @@ function findTangentPointsToCircle(
     return tangentPoints;
   }
 
-  // Calculate angle to tangent points using Pythagorean theorem
-  const angle = Math.asin(radius / distance);
+  // At the centre, the radius to a tangent point makes an angle acos(r / d) with the line to the external point.
+  const angle = Math.acos(radius / distance);
 
   // Angle from circle center to point
   const baseAngle = Math.atan2(dy, dx);
@@ -1313,9 +1235,8 @@ function findTangentPointsToCircle(
 /**
  * Find equidistant points between elements
  *
- * Quadratic in the number of significant points, and the only thing worth reporting is a midpoint
- * within `smartTolerance` of the cursor — which forces the two source points to be within twice that
- * distance of each other. Tested on squared distances, so no square root is taken to reject a pair.
+ * Quadratic in the number of significant points; the only thing worth reporting is a midpoint within `smartTolerance`
+ * of the cursor, wherever the two source points are. Tested on squared distances, so no square root is taken.
  */
 function findEquidistantPoints(point: Point, elements: Element[], settings: SnapSettings): SnapPoint[] {
   const snapPoints: SnapPoint[] = [];
@@ -1341,18 +1262,15 @@ function findEquidistantPoints(point: Point, elements: Element[], settings: Snap
     }
   });
 
-  const spanLimit = (2 * settings.smartTolerance) ** 2;
   const toleranceSq = settings.smartTolerance ** 2;
+  // The pairs are quadratic in the points, and this runs on every pointer move: a drawing this large has to switch it off.
+  if (significantPoints.length > 300) return snapPoints;
 
   // Check for equidistant points between pairs of points
   for (let i = 0; i < significantPoints.length; i++) {
     for (let j = i + 1; j < significantPoints.length; j++) {
       const p1 = significantPoints[i]!;
       const p2 = significantPoints[j]!;
-
-      // Their midpoint can only land near the cursor if the two are near each other.
-      const ex = p2.x - p1.x, ey = p2.y - p1.y;
-      if (ex * ex + ey * ey > spanLimit) continue;
 
       // Calculate midpoint
       const midpoint = {
