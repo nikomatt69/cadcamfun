@@ -49,6 +49,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { SNAP_TYPES } from "../../../shared/keybindings/catalog.ts"
 import { displayChord } from "../../../shared/keybindings/chord.ts"
 import { CUBE_FACES } from "../../../viewport/view-cube-model.ts"
+import { anchorOf, elementFromPoints, nextStart, previewOutline, type DrawTool, type Point3 as DrawPoint } from "../lib/draw-tools.ts"
 import type { SnapType } from "../lib/enanchedSnapService.ts"
 
 type TransformMode = "translate" | "rotate" | "scale"
@@ -205,6 +206,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [showComponentModal, setShowComponentModal] = createSignal(false)
   const [showPerformance, setShowPerformance] = createSignal(false)
   const [isPlacing, setPlacing] = createSignal(false)
+  /** The two-click drawing tool in use (line, circle, rectangle) and the first point of the shape being drawn. */
+  const [drawTool, setDrawTool] = createSignal<DrawTool | undefined>(undefined)
+  const [drawStart, setDrawStart] = createSignal<DrawPoint | undefined>(undefined)
+  let drawPreview: THREE.Line | undefined
   const [previewPosition, setPreviewPosition] = createSignal<Point3>({ x: 0, y: 0, z: 0 })
   const [isDraggingComponent, setDraggingComponent] = createSignal(false)
   const [dropPosition, setDropPosition] = createSignal<Point3>({ x: 0, y: 0, z: 0 })
@@ -433,6 +438,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     window.addEventListener("blur", cancelSelection)
 
     onCleanup(() => {
+      clearDrawPreview()
       unregisterCapture()
       reducedMotion?.removeEventListener("change", motionChange)
       exploded.dispose()
@@ -782,7 +788,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (axes.length === 0) { snap.clearIndicator(); return }
     const offset = originOffset()
     const model = { x: pivot.position.x - offset.x, y: pivot.position.y - offset.y, z: pivot.position.z - offset.z }
-    const hit = snap.snapAlongAxes(model, axes, new Set(selectedIds()))
+    const hit = snap.snapAlongAxes(model, axes, new Set(selectedIds()), unitsPerPixel())
     if (!hit) return
     for (const axis of axes) pivot.position[axis] = hit[axis] + offset[axis]
     pivot.updateMatrix()
@@ -897,7 +903,36 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     }).map(object => String(object.userData.elementId))
   }
 
-  const snapped = (point: Point3): Point3 => (snap.snapSettings().enabled ? snap.snapToPoint(point) ?? point : point)
+  /** How many model units one screen pixel covers at the orbit target: the snap tolerance of the panel is in pixels. */
+  const unitsPerPixel = (): number => {
+    if (!camera || !container || container.clientHeight === 0) return 1
+    if (camera instanceof THREE.PerspectiveCamera) {
+      const distance = orbit ? camera.position.distanceTo(orbit.target) : camera.position.length()
+      return Math.max((2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / container.clientHeight, 1e-6)
+    }
+    return 1
+  }
+  /**
+   * How many model units one pixel covers on the work plane right under the cursor. A tilted view stretches the plane, so
+   * it is measured on the plane itself (one pixel to the right, one down) and the larger step counts; the estimate from the
+   * orbit distance is the fallback when the cursor is off the plane.
+   */
+  const unitsPerPixelOnPlane = (): number => {
+    const fallback = unitsPerPixel()
+    if (!camera || !container) return fallback
+    const here = planePoint()
+    if (!here) return fallback
+    const rect = container.getBoundingClientRect()
+    const reach = (dx: number, dy: number): number => {
+      raycaster.setFromCamera(new THREE.Vector2(mouse.x + (dx * 2) / rect.width, mouse.y - (dy * 2) / rect.height), camera!)
+      const other = raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1)), new THREE.Vector3())
+      return other ? other.distanceTo(here) : 0
+    }
+    const step = Math.max(reach(1, 0), reach(0, 1))
+    raycaster.setFromCamera(mouse, camera)
+    return step > 1e-9 ? step : fallback
+  }
+  const snapped = (point: Point3): Point3 => (snap.snapSettings().enabled ? snap.snapToPoint(point, undefined, unitsPerPixelOnPlane()) ?? point : point)
 
   /**
    * The cursor readout the status bar shows. Published once per frame at most: a pointer can emit
@@ -948,6 +983,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     setPointer(event)
     const rect = container.getBoundingClientRect()
 
+    if (drawTool()) { drawMove(); return }
     if (isPlacing() && preview) {
       const hit = planePoint()
       if (!hit) return
@@ -974,6 +1010,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
   const onMouseDown = (event: MouseEvent) => {
     if (!container || !scene || !camera || event.target !== renderer?.domElement) return
+    if (drawTool()) { if (event.button === 0) { setPointer(event); drawClick() } return }
     if (isPlacing()) { placeComponent(); return }
     if (event.button !== 0) return
     if (gizmo && (gizmo.dragging || gizmo.axis)) return
@@ -998,6 +1035,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   }
 
   const onMouseUp = (event: MouseEvent) => {
+    // While a shape is drawn the clicks belong to the tool: they select nothing.
+    if (drawTool()) { pointerDown = undefined; return }
     const down = pointerDown
     const box = screenBox()
     if (box) updateScreenBox(event)
@@ -1012,6 +1051,67 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const id = elementIdAt()
     if (id && !isLocked(id)) selection.selectElement(id, down.additive)
     else if (!id && !down.additive) selection.clearSelection()
+  }
+
+  // ---------------------------------------------------------------------------------------------------- drawing tools
+  const canDraw = () => { const layer = layers.layers.find((candidate) => candidate.id === layers.activeLayer); return !!layer && layer.locked !== true }
+  const clearDrawPreview = () => {
+    if (drawPreview) { scene?.remove(drawPreview); disposeObject(drawPreview); drawPreview = undefined; invalidate() }
+  }
+  const stopDrawing = () => {
+    setDrawTool(undefined); setDrawStart(undefined); clearDrawPreview(); snap.clearIndicator()
+    if (orbit) orbit.enabled = !isPlacing()
+    if (container) container.style.cursor = "default"
+  }
+  const startDrawing = (tool: DrawTool): boolean => {
+    if (!canDraw() || !scene) return false
+    if (isPlacing()) cancelPlacement()
+    setDrawStart(undefined); clearDrawPreview()
+    setDrawTool(tool)
+    if (orbit) orbit.enabled = false
+    if (container) container.style.cursor = "crosshair"
+    return true
+  }
+  /** The point under the cursor on the work plane, in model units, snapped to the drawing's points when snapping is on. */
+  const drawPoint = (): DrawPoint | undefined => {
+    const hit = planePoint()
+    if (!hit) return undefined
+    const offset = originOffset()
+    const raw = { x: hit.x - offset.x, y: hit.y - offset.y, z: hit.z - offset.z }
+    const tool = drawTool()
+    if (!tool || !snap.snapSettings().enabled) return raw
+    const snappedPoint = snap.snapToPoint(raw, anchorOf(tool, drawStart()), unitsPerPixelOnPlane())
+    return { x: snappedPoint.x, y: snappedPoint.y, z: snappedPoint.z }
+  }
+  const showDrawPreview = (tool: DrawTool, start: DrawPoint, end: DrawPoint) => {
+    if (!scene) return
+    const offset = originOffset()
+    const points = previewOutline(tool, start, end).map((point) => new THREE.Vector3(point.x + offset.x, point.y + offset.y, point.z + offset.z))
+    if (!drawPreview) {
+      drawPreview = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x00bcd4, depthTest: false }))
+      drawPreview.renderOrder = 10
+      scene.add(drawPreview)
+    }
+    drawPreview.geometry.setFromPoints(points)
+    invalidate()
+  }
+  const drawMove = () => {
+    const tool = drawTool(), start = drawStart(), at = drawPoint()
+    if (!tool || !at) return
+    publishMousePosition({ x: round2(at.x), y: round2(at.y), z: round2(at.z) })
+    if (start) showDrawPreview(tool, start, at); else invalidate()
+  }
+  const drawClick = () => {
+    const tool = drawTool(), at = drawPoint()
+    if (!tool || !at) return
+    const start = drawStart()
+    if (!start) { setDrawStart(at); return }
+    const element = elementFromPoints(tool, start, at)
+    // Two clicks on the same spot make nothing: keep waiting for the second point.
+    if (!element) return
+    elements.addElement(element)
+    clearDrawPreview()
+    setDrawStart(nextStart(tool, at))
   }
 
   const placeComponent = () => {
@@ -1075,6 +1175,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const off = app.keys.register({
       // Escape undoes whatever is in flight, then deselects: one press clears the whole editing state.
       "edit.cancel": () => {
+        // A shape being drawn goes first: Esc drops the point, a second Esc leaves the tool, and only then the selection.
+        if (drawTool()) {
+          if (drawStart()) { setDrawStart(undefined); clearDrawPreview() } else stopDrawing()
+          return
+        }
         const busy = transforming() || transformStore.mode !== "none" || isPlacing() || selectedIds().length > 0 || cancelBox()
         if (!busy) return false
         if (transforming()) transformStore.cancelTransform(transformStore.currentSession!.id)
@@ -1088,6 +1193,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       "view.zoomIn": () => { zoom(1 / 1.2) },
       "view.zoomOut": () => { zoom(1.2) },
       "view.zoomFit": () => { fitToView() },
+      "cad.draw.line": () => startDrawing("line"),
+      "cad.draw.circle": () => startDrawing("circle"),
+      "cad.draw.rectangle": () => startDrawing("rectangle"),
       "cad.delete": needsSelection(() => selection.deleteSelection()),
       "cad.copy": needsSelection(() => elements.copySelectedElement()),
       "cad.paste": () => { elements.pasteElement() },
@@ -1284,6 +1392,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       </div>
 
       <SnapIndicator x={snapScreen().x} y={snapScreen().y} type={snapScreen().type} visible={snapScreen().visible} />
+
+      <Show when={drawTool()}>
+        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-cyan-700 text-white px-4 py-2 rounded-md shadow-lg z-100" data-testid="draw-hint">
+          <p class="text-sm font-medium">{drawStart() ? t("cad.draw.next") : t("cad.draw.first")}</p>
+        </div>
+      </Show>
 
       <Show when={isPlacing()}>
         <div class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-md shadow-lg z-100">

@@ -592,5 +592,7 @@
   "viewport.cube.orthographicShort": "Ortho",
   "viewport.cube.fourViews": "Four views",
   "viewport.gridSpacing": "Grid {step}",
-  "cad.snap.needsStart": "Relative to a start point: applies while you draw or move from a point"
+  "cad.snap.needsStart": "Relative to a start point: applies while you draw or move from a point",
+  "cad.draw.first": "Click the first point · Esc to stop",
+  "cad.draw.next": "Click the next point · Esc to cancel this one, Esc again to stop"
 }

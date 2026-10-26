@@ -301,3 +301,25 @@ describe("snapping a part that is moved with the gizmo", () => {
     })
   })
 })
+
+describe("the snap tolerance is in pixels", () => {
+  test("the same pixel tolerance pulls a longer way the further the view is zoomed out", () => {
+    createRoot((dispose) => {
+      useElementsStore.setState({ elements: [line(0, 0, 100, 0) as never] })
+      const snap = createSnap()
+      snap.updateSnapSettings({ enabled: true, tolerance: 10, smartTolerance: 15, types: { ...none, endpoint: true } as never })
+      // 1 unit per pixel: 10 px is 10 units, so an end 14 units away is out of reach...
+      expect(snap.snapToPoint({ x: 114, y: 0 }, undefined, 1).type).toBe(SnapType.NEAREST)
+      // ...zoomed out to 2 units per pixel the same 10 px reach 20 units, and it is caught.
+      expect(snap.snapToPoint({ x: 114, y: 0 }, undefined, 2)).toMatchObject({ x: 100, y: 0, type: SnapType.ENDPOINT })
+      // Zoomed in, 0.5 unit per pixel: 10 px is 5 units.
+      expect(snap.snapToPoint({ x: 106, y: 0 }, undefined, 0.5).type).toBe(SnapType.NEAREST)
+      expect(snap.snapToPoint({ x: 104, y: 0 }, undefined, 0.5)).toMatchObject({ x: 100, type: SnapType.ENDPOINT })
+      // A drag along an axis scales the same way.
+      expect(snap.snapAlongAxes({ x: 114, y: 50 }, ["x"], new Set(), 2)).toMatchObject({ x: 100, type: SnapType.ENDPOINT })
+      expect(snap.snapAlongAxes({ x: 114, y: 50 }, ["x"], new Set(), 1)).toBeUndefined()
+      useElementsStore.setState({ elements: [] })
+      dispose()
+    })
+  })
+})

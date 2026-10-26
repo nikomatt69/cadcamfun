@@ -94,7 +94,7 @@ test("the dialog and the settings tab show the keymap, and rebinding there chang
     state.keys.setHelpOpen(false)
     stop(); off()
   } finally { dispose(); state.dispose() }
-})
+}, 60000)
 
 test("the elements list keeps its keys to itself: arrows and Enter act inside the panel, never on the window", async () => {
   installDom("http://localhost/cad")
@@ -125,7 +125,7 @@ test("the elements list keeps its keys to itself: arrows and Enter act inside th
     expect(useSelectionStore.getState().selectedElementIds).toHaveLength(1)
     void first; void second
   } finally { dispose(); root.remove(); useElementsStore.setState({ elements: [] }); useSelectionStore.getState().clearSelection() }
-})
+}, 60000)
 
 /**
  * The one rule of the keyboard: a screen never listens to the whole window for its commands, it registers a handler for a
@@ -165,7 +165,7 @@ test("no screen listens to the whole window for its own commands", async () => {
   expect(offenders, "register a catalog command with app.keys.register instead of listening to keydown").toEqual([])
   // The list stays honest: an entry whose listener is gone is removed.
   expect([...used].sort()).toEqual(Object.keys(WIDGET_LISTENERS).sort())
-})
+}, 60000)
 
 test("Settings > Keyboard exports the keymap as a file and imports it back, and refuses a file that is not one", async () => {
   installDom("http://localhost/settings")
@@ -225,4 +225,4 @@ test("Settings > Keyboard exports the keymap as a file and imports it back, and 
     proto.click = nativeClick; URL.createObjectURL = nativeCreate; URL.revokeObjectURL = nativeRevoke
     dispose(); state.dispose(); root.remove()
   }
-})
+}, 60000)

@@ -75,14 +75,24 @@ commands (G/R/S/X/Y/Z) and F (fit).
 `Mod` is the platform's command key. Typing `Ctrl+K` on Windows/Linux or `Cmd+K` on macOS names `Mod+K`; `Ctrl` on macOS
 and `Meta`/`Win` elsewhere are separate keys.
 
+## Drawing tools
+
+`cad.draw.line` (L), `cad.draw.circle` (C), `cad.draw.rectangle` (B) start a two-click tool on the work plane
+(`features/cad/lib/draw-tools.ts`, handlers in `CADCanvas`): click the first point, a rubber band follows the cursor, click
+the second and the element is added (a line carries on from its end). Esc drops the point, a second Esc leaves the tool.
+The clicks snap; the start of a line is the anchor that perpendicular, tangent and parallel need, so those three now
+apply while drawing a line. Checked in a real browser: a line drawn from a start point with perpendicular on ends exactly
+on the wall (same x, y on the wall).
+
 ## Snap points
 
 Each kind of the Snap Settings panel is a command (`cad.snap.type.*`, Alt+G/E/M/I/C/Q/N/T/P; `Alt+S` is the master
 switch) and the panel shows the user's chord. The engine (`features/cad/lib/enanchedSnapService.ts`) is covered by
 `cad-snap.test.ts`: grid, endpoint, midpoint, centre, quadrant, nearest, intersection, horizontal/vertical, equidistant on
 lines, circles, rectangles, cubes, spheres, cylinders, cones and tori, plus perpendicular, tangent and parallel, which are
-relative to a start point (`snapPoint(point, elements, settings, anchor)`); the panel marks them with an arrow because
-nothing in the canvas supplies a start point yet (no interactive line drawing), so they never apply there. Snapping runs
+relative to a start point (`snapPoint(point, elements, settings, anchor)`); the panel marks them with an arrow, and the
+line tool supplies the start point. The tolerance of the panel is in pixels: the canvas converts it to model units with the
+scale of the work plane under the cursor, so a snap pulls the same distance on screen at any zoom. Snapping runs
 while a part is dragged over the canvas or placed, and while a part is moved with the gizmo: its pivot catches the named
 points of the other parts (`snapPointAlongAxes`, distance measured on the dragged axes only; the grid and `nearest` stay
 out of a drag) and the marker shows which one. Checked in a real browser: dragging a cube's X handle toward another cube
@@ -93,5 +103,5 @@ Fixed on the way: line-circle crossings (computed perpendicular to the line), ta
 ## Open
 
 - Click-to-place after a creation key is not a mode (the form takes the position).
-- Perpendicular/tangent/parallel need a start point: they apply once a flow supplies one (interactive line drawing).
+- Perpendicular/tangent/parallel apply only while drawing a line (the start point); a move or a placement has none.
 - The built-in library components of type `extrusion` have no 3D preview, so "Place" does not start a placement for them.

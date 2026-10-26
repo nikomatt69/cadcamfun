@@ -127,5 +127,8 @@
   "keys.cmd.cad.create.cone": "New cone",
   "keys.cmd.cad.create.torus": "New torus",
   "keys.cmd.cad.create.parametric": "New parametric part",
-  "keys.group.create": "Create"
+  "keys.group.create": "Create",
+  "keys.cmd.cad.draw.line": "Draw lines (click start, click end)",
+  "keys.cmd.cad.draw.circle": "Draw circles (centre, then a point on it)",
+  "keys.cmd.cad.draw.rectangle": "Draw rectangles (two corners)"
 }

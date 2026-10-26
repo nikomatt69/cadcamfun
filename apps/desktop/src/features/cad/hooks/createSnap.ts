@@ -19,9 +19,19 @@ export function createSnap() {
   const toggleSnapType = (type: SnapType) =>
     setSettings((prev) => ({ ...prev, types: { ...prev.types, [type]: !prev.types[type] } }))
 
+  /**
+   * The settings as the engine reads them: the tolerance of the panel is in pixels, the engine measures in model units, so it
+   * is scaled by how many units one pixel covers on screen (`unitsPerPixel`, 1 when the caller has no camera). A snap then
+   * pulls the same distance on screen at any zoom.
+   */
+  const inUnits = (unitsPerPixel: number) => {
+    const current = settings()
+    return unitsPerPixel === 1 ? current : { ...current, tolerance: current.tolerance * unitsPerPixel, smartTolerance: current.smartTolerance * unitsPerPixel }
+  }
+
   /** `anchor` is the point the user draws or moves from; perpendicular, tangent and parallel are relative to it. */
-  const snapToPoint = (point: { x: number; y: number; z?: number }, anchor?: { x: number; y: number; z?: number }) => {
-    const snapped = snapPoint({ x: point.x, y: point.y, z: point.z || 0 }, elements.elements, settings(), anchor ? { x: anchor.x, y: anchor.y, z: anchor.z || 0 } : undefined)
+  const snapToPoint = (point: { x: number; y: number; z?: number }, anchor?: { x: number; y: number; z?: number }, unitsPerPixel = 1) => {
+    const snapped = snapPoint({ x: point.x, y: point.y, z: point.z || 0 }, elements.elements, inUnits(unitsPerPixel), anchor ? { x: anchor.x, y: anchor.y, z: anchor.z || 0 } : undefined)
     // `nearest` is also what an unsnapped point reports; only one that sits on an element counts as a snap.
     if (snapped.type !== SnapType.NEAREST || snapped.source !== undefined) {
       setIndicator({ x: snapped.x, y: snapped.y, z: snapped.z, type: snapped.type, visible: true })
@@ -37,9 +47,9 @@ export function createSnap() {
    * The snap for a part that is being dragged along `axes`, skipping `exclude` (the parts being moved: they must not snap
    * to where they were). Publishes the indicator; returns `undefined` when nothing is within reach.
    */
-  const snapAlongAxes = (point: { x: number; y: number; z?: number }, axes: ReadonlyArray<SnapAxis>, exclude: ReadonlySet<string>) => {
+  const snapAlongAxes = (point: { x: number; y: number; z?: number }, axes: ReadonlyArray<SnapAxis>, exclude: ReadonlySet<string>, unitsPerPixel = 1) => {
     const others = elements.elements.filter((element) => !exclude.has(element.id))
-    const hit = snapPointAlongAxes({ x: point.x, y: point.y, z: point.z || 0 }, others, settings(), axes)
+    const hit = snapPointAlongAxes({ x: point.x, y: point.y, z: point.z || 0 }, others, inUnits(unitsPerPixel), axes)
     if (hit) {
       setIndicator({ x: hit.x, y: hit.y, z: hit.z, type: hit.type, visible: true })
       setIsSnapping(true)
