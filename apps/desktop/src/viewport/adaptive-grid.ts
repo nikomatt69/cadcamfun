@@ -19,6 +19,8 @@ export interface AdaptiveGridOptions {
   readonly half?: number
   /** Draw before and never write depth, so toolpaths below the plane stay visible (the CAM view). */
   readonly underlay?: boolean
+  /** Told the spacing of the lines the eye reads (the `mid` decade, the one drawn at full strength) whenever it changes. */
+  readonly onSpacing?: (step: number) => void
 }
 
 export interface AdaptiveGrid {
@@ -108,6 +110,7 @@ export const createAdaptiveGrid = (options: AdaptiveGridOptions): AdaptiveGrid =
   object.userData.noAO = true
   object.raycast = () => undefined
   const focus = new THREE.Vector3(), local = new THREE.Vector3()
+  let reported = 0
 
   const setPlane = (plane: GridPlane): void => {
     object.rotation.x = plane === "xz" ? Math.PI / 2 : 0
@@ -125,6 +128,7 @@ export const createAdaptiveGrid = (options: AdaptiveGridOptions): AdaptiveGrid =
     const levels = gridLevels(span)
     uniforms.uSteps.value.set(levels.minor, levels.mid, levels.major)
     uniforms.uMinorAlpha.value = levels.minorAlpha
+    if (levels.mid !== reported) { reported = levels.mid; options.onSpacing?.(levels.mid) }
     uniforms.uReach.value = gridReach(span)
     uniforms.uFar.value = camera instanceof THREE.OrthographicCamera ? 1e9 : (camera as THREE.PerspectiveCamera).far
     local.copy(focus)

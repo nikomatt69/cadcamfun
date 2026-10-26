@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { GRID_CELLS_ACROSS, GRID_MAX_STEP, GRID_MIN_STEP, gridLevels, gridReach, orthographicSpan, perspectiveSpan } from "./grid-lod.ts"
+import { GRID_CELLS_ACROSS, GRID_MAX_STEP, GRID_MIN_STEP, formatGridStep, gridLevels, gridReach, orthographicSpan, perspectiveSpan } from "./grid-lod.ts"
 
 test("the levels are three consecutive decades and the minor cell is about the width the zoom asks for", () => {
   for (const span of [0.5, 3, 24, 100, 777, 2400]) {
@@ -40,4 +40,15 @@ test("the span follows the shorter side of the viewport, for both camera kinds",
   expect(perspectiveSpan(100, 90, 0.5)).toBeCloseTo(100, 6)
   expect(orthographicSpan(200, 100, 2)).toBeCloseTo(50, 9)
   expect(gridReach(100)).toBeCloseTo(150, 9)
+})
+
+test("a step reads in the unit a person would use: millimetres, centimetres from 10 cm, metres from 1000 mm", () => {
+  expect(formatGridStep(0.01)).toBe("0.01 mm")
+  expect(formatGridStep(0.1)).toBe("0.1 mm")
+  expect(formatGridStep(1)).toBe("1 mm")
+  expect(formatGridStep(10)).toBe("10 mm")
+  expect(formatGridStep(100)).toBe("10 cm")
+  expect(formatGridStep(1000)).toBe("1 m")
+  expect(formatGridStep(10000)).toBe("10 m")
+  expect(formatGridStep(0)).toBe("")
 })

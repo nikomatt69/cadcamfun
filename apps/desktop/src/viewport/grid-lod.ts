@@ -42,5 +42,13 @@ export const gridLevels = (span: number): GridLevels => {
   return { minor, mid, major, minorAlpha }
 }
 
+/** A grid step as a person reads it: "0.1 mm", "10 mm", "1 m". The steps are powers of ten of a millimetre. */
+export const formatGridStep = (step: number): string => {
+  if (!(step > 0)) return ""
+  if (step >= 1000) return `${Number((step / 1000).toPrecision(3))} m`
+  if (step >= 10 && step < 1000 && step % 10 === 0 && step >= 100) return `${Number((step / 10).toPrecision(3))} cm`
+  return `${Number(step.toPrecision(3))} mm`
+}
+
 /** Distance from what the camera looks at past which the grid has faded out entirely. */
 export const gridReach = (span: number): number => Math.max(span, 1e-3) * 1.5

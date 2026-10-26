@@ -19,6 +19,7 @@ import { gaugeOfTool, previewToolFor } from "./tool-models.ts"
 import { createDirectionArrows, type DirectionArrows } from "./direction-arrows.ts"
 import { createCameraRig } from "../camera-rig.ts"
 import { ViewCube, type ViewCubeApi } from "./view-cube.tsx"
+import { formatGridStep } from "../grid-lod.ts"
 import { createVoxelStock, type VoxelStock } from "./voxel-stock.ts"
 import { classLookup, pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
@@ -174,6 +175,7 @@ export function View3D(props: View3DProps) {
   let toggleFlat = () => {}
   let cubeApi: ViewCubeApi | undefined
   const [flat, setFlatSignal] = createSignal(false)
+  const [gridStep, setGridStep] = createSignal(0)
   const orthographicView = () => flat() || !["perspective", "four-view"].includes(preset())
   let playback: Playback = emptyPlayback()
   let seconds = 0
@@ -230,7 +232,7 @@ export function View3D(props: View3DProps) {
     const content = new THREE.Group(), helpers = new THREE.Group()
     scene.add(content, helpers)
     // Toolpaths cut below Z0 in the CAM view: the grid there is an underlay, drawn first and never occluding them.
-    const ground = createAdaptiveGrid({ focus: () => controls.target, underlay: props.visionMode === "cam", half: 20000 })
+    const ground = createAdaptiveGrid({ focus: () => controls.target, underlay: props.visionMode === "cam", half: 20000, onSpacing: setGridStep })
     const grid = ground.object
     const axes = new THREE.Group()
     for (const [end, color] of [[new THREE.Vector3(500, 0, 0), GRID_COLORS.axisX], [new THREE.Vector3(0, 500, 0), GRID_COLORS.axisY], [new THREE.Vector3(0, 0, 500), GRID_COLORS.axisZ]] as const) {
@@ -809,6 +811,7 @@ export function View3D(props: View3DProps) {
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />
     <Show when={props.showControls !== false}><ViewportControls cube={<ViewCube enabled={!noWebGl()} orthographic={orthographicView()} onSnap={(direction) => snapView(direction)} onOrbit={(dAzimuth, dPolar) => orbitView(dAzimuth, dPolar)} onIsometric={() => snapView([1, -1, 1])} onFit={() => fit()} onProjection={() => toggleFlat()} fourViews={preset() === "four-view"} onFourViews={() => updatePreset(preset() === "four-view" ? "perspective" : "four-view")} register={(api) => { cubeApi = api }} />} footer={props.controlsFooter} preset={preset()} mode={mode()} grid={gridVisible()} axes={axesVisible()} enabled={!noWebGl()} transform={transformMode()} canTransform={selected() !== undefined && !!props.onTransformCommit && preset() !== "four-view"} onPreset={value => { updatePreset(value); props.onPresetChange?.(value) }} onMode={value => { updateMode(value); props.onRenderModeChange?.(value) }} onGrid={() => setGridVisible(v => !v)} onAxes={() => setAxesVisible(v => !v)} onFit={() => fit()} onTransform={setTransformMode} onFullscreen={() => { const root = host?.parentElement; if (document.fullscreenElement) void document.exitFullscreen(); else if (root?.requestFullscreen) void root.requestFullscreen() }} /></Show>
+    <Show when={gridVisible() && gridStep() > 0 && !noWebGl()}><div class="vp-grid-scale" data-testid="grid-scale">{t("viewport.gridSpacing", { step: formatGridStep(gridStep()) })}</div></Show>
     <Show when={preset() === "four-view"}><div class="vp3-quadrants"><span>{viewportLabels.top}</span><span>{viewportLabels.front}</span><span>{viewportLabels.right}</span><span>{viewportLabels.perspective}</span></div></Show>
     <Show when={meshError()}>{message => <p role="alert" class="vp3-alert">{message()}</p>}</Show>
     <Show when={noWebGl()}><p role="alert" class="vp3-alert">{t("viewport.noWebgl")}</p></Show>

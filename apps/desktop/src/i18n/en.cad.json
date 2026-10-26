@@ -590,5 +590,6 @@
   "viewport.cube.orthographic": "Orthographic camera",
   "viewport.cube.perspectiveShort": "Persp",
   "viewport.cube.orthographicShort": "Ortho",
-  "viewport.cube.fourViews": "Four views"
+  "viewport.cube.fourViews": "Four views",
+  "viewport.gridSpacing": "Grid {step}"
 }

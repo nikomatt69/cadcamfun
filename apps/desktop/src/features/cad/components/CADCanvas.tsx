@@ -7,6 +7,7 @@ import { attachRenderLook, currentLookTier, lookTier, setLookTier } from "../../
 import { IdleAmbientOcclusion, aoRadiusFor } from "../../../viewport/ao.ts"
 import { Outline, type OutlineState } from "../../../viewport/outline.ts"
 import { createAdaptiveGrid } from "../../../viewport/adaptive-grid.ts"
+import { formatGridStep } from "../../../viewport/grid-lod.ts"
 import { createCameraRig, type CameraRig } from "../../../viewport/camera-rig.ts"
 import { ViewCube, type ViewCubeApi } from "../../../viewport/view3d/view-cube.tsx"
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
@@ -117,6 +118,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [flatView, setFlatView] = createSignal(false)
   /** Top, front, right and the working perspective view at once; read-only, like the toolpath view's. */
   const [fourView, setFourView] = createSignal(false)
+  const [gridStep, setGridStep] = createSignal(0)
   let fourViewOn = false
   const quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 1e6)
   const quadPerspective = new THREE.PerspectiveCamera(45, 1, 0.01, 1e6)
@@ -324,7 +326,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
     // Studio environment, tone mapping and a key/fill/rim rig that follows the camera; the `low` tier keeps the old ambient + sun.
     const look = attachRenderLook(renderer, scene, { ambient: 0.5, hemisphere: 0, key: 0.8, keyPosition: [-5, -7.5, 10] }, invalidate)
-    const ground = createAdaptiveGrid({ focus: () => orbit?.target ?? ORIGIN, half: 5000 })
+    const ground = createAdaptiveGrid({ focus: () => orbit?.target ?? ORIGIN, half: 5000, onSpacing: setGridStep })
     ground.object.userData.setOpacity = ground.setOpacity
     scene.add(ground.object)
     scene.add(createCustomAxes(30))
@@ -1211,6 +1213,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           <span>{t("viewport.view.top")}</span><span>{t("viewport.view.front")}</span><span>{t("viewport.view.right")}</span><span>{t("viewport.view.perspective")}</span>
         </div>
       </Show>
+
+      <Show when={cad.gridVisible && gridStep() > 0}><div class="vp-grid-scale cad-grid-scale" data-testid="grid-scale">{t("viewport.gridSpacing", { step: formatGridStep(gridStep()) })}</div></Show>
 
       <div class="cad-viewcube-dock">
         <ViewCube
