@@ -97,3 +97,8 @@
 
 /* The program readout is a note beside the model, not a panel over it: narrow, small, translucent, clear of the navigation hint. */
 .toolpath-visualizer .toolpath-visualizer__stats { max-width: min(300px, 34%); max-height: 42%; margin: 8px 8px 30px; padding: 6px 9px; font-size: 10px; line-height: 1.4; border-radius: 10px; background: rgb(8 13 24 / .62); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+
+/* Where the orientation cube sits: the top right corner of a 3D viewport, below the host's own bars. */
+.vp3-viewcube-dock, .cad-viewcube-dock { position: absolute; top: 12px; right: 12px; z-index: 5; }
+.vp3-viewcube-dock .vp3-viewcube, .cad-viewcube-dock .vp3-viewcube { pointer-events: auto; }
+.vp3-viewcube .vp3-viewcube__zone--face { font-size: 8px; letter-spacing: 0.01em; text-overflow: clip; }

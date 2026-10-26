@@ -28,6 +28,8 @@ interface ControlsProps {
   readonly onFullscreen: () => void
   readonly onTransform: (mode: TransformMode) => void
   readonly footer?: JSX.Element
+  /** The orientation cube; when the host provides it, it takes the place of the row of view buttons. */
+  readonly cube?: JSX.Element
 }
 
 export function ViewportControls(props: ControlsProps): JSX.Element {
@@ -45,11 +47,13 @@ export function ViewportControls(props: ControlsProps): JSX.Element {
       <button type="button" disabled={!props.enabled} aria-pressed={props.grid} onClick={props.onGrid}>{viewportLabels.grid}</button>
       <button type="button" disabled={!props.enabled} aria-pressed={props.axes} onClick={props.onAxes}>{viewportLabels.axes}</button>
     </div>
-    <div class="vp3-cube" role="group" aria-label={viewportLabels.view}>
-      <For each={["top", "left", "front", "right", "back", "bottom", "isometric"] as ViewPreset[]}>{preset =>
-        <button type="button" disabled={!props.enabled} aria-pressed={props.preset === preset} onClick={() => props.onPreset(preset)}>{viewportLabels[preset]}</button>
-      }</For>
-    </div>
+    <Show when={props.cube} fallback={
+      <div class="vp3-cube" role="group" aria-label={viewportLabels.view}>
+        <For each={["top", "left", "front", "right", "back", "bottom", "isometric"] as ViewPreset[]}>{preset =>
+          <button type="button" disabled={!props.enabled} aria-pressed={props.preset === preset} onClick={() => props.onPreset(preset)}>{viewportLabels[preset]}</button>
+        }</For>
+      </div>
+    }><div class="vp3-viewcube-dock">{props.cube}</div></Show>
     <Show when={props.canTransform}>
       <div class="vp3-transform" role="toolbar" aria-label={viewportLabels.translate}>
         <For each={["none", "translate", "rotate", "scale"] as TransformMode[]}>{mode => <button type="button" aria-pressed={props.transform === mode} onClick={() => props.onTransform(mode)}>{viewportLabels[mode]}</button>}</For>

@@ -18,6 +18,7 @@ import { toolObject } from "./tool-object.ts"
 import { gaugeOfTool, previewToolFor } from "./tool-models.ts"
 import { createDirectionArrows, type DirectionArrows } from "./direction-arrows.ts"
 import { createCameraRig } from "../camera-rig.ts"
+import { ViewCube, type ViewCubeApi } from "./view-cube.tsx"
 import { createVoxelStock, type VoxelStock } from "./voxel-stock.ts"
 import { classLookup, pathBuffers, startedBy, type ColorMode, type LegendEntry } from "./toolpath-colors.ts"
 import { createMachineScene, DEFAULT_MACHINE_DISPLAY, fitBounds, machineSpatial, type MachineDisplay, type MachineInfo, type MachineScene } from "./machine-scene.ts"
@@ -167,6 +168,13 @@ export function View3D(props: View3DProps) {
   const [selected, setSelected] = createSignal<number>()
   let fit = () => {}, appearance = () => {}, transform = () => {}, applyLighting = () => {}, applyMaterial = () => {}, applySection = () => {}
   let rebuild = () => {}, setPreset = () => {}
+  // The orientation cube drives the camera rig (set up on mount) and is fed the camera's frame every frame it moves.
+  let snapView: (direction: readonly [number, number, number]) => void = () => {}
+  let orbitView: (dAzimuth: number, dPolar: number) => void = () => {}
+  let toggleFlat = () => {}
+  let cubeApi: ViewCubeApi | undefined
+  const [flat, setFlatSignal] = createSignal(false)
+  const orthographicView = () => flat() || !["perspective", "four-view"].includes(preset())
   let playback: Playback = emptyPlayback()
   let seconds = 0
   createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
@@ -194,6 +202,7 @@ export function View3D(props: View3DProps) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     host.append(renderer.domElement)
     let dirty = true
+    let cubeStale = true
     let frames: FrameScheduler | undefined
     invalidate = () => { dirty = true; frames?.invalidate() }
     const controls = new OrbitControls(camera, renderer.domElement)
@@ -673,6 +682,13 @@ export function View3D(props: View3DProps) {
       reducedMotion: () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true,
       canNavigate: () => preset() !== "four-view" && !gizmo.dragging && !gizmo.axis
     })
+    snapView = (direction) => rig.snapTo([direction[0], direction[1], direction[2]])
+    orbitView = (dAzimuth, dPolar) => rig.orbitBy(dAzimuth, dPolar)
+    toggleFlat = () => {
+      // An orthographic preset goes back to the perspective camera; a perspective one is flattened (narrow field of view, same framing).
+      if (!["perspective", "four-view"].includes(preset())) { setFlatSignal(false); updatePreset("perspective"); return }
+      rig.setFlat(!rig.flat()); setFlatSignal(rig.flat())
+    }
     let pointerStart: readonly [number, number] = [0, 0]
     const down = (event: PointerEvent) => { pointerStart = [event.clientX, event.clientY] }
     const pick = (event: PointerEvent) => {
@@ -773,6 +789,7 @@ export function View3D(props: View3DProps) {
       const rigAnimating = rig.beforeUpdate(performance.now())
       const cameraMoved = controls.update() || rigAnimating
       if (rig.afterUpdate(cameraMoved)) dirty = true
+      if (cubeApi !== undefined && (cameraMoved || cubeStale)) { activeCamera.updateMatrixWorld(); cubeApi.setBasis(activeCamera.matrixWorld.elements); cubeStale = false }
       if (!document.hidden && (dirty || cameraMoved || props.playing)) { dirty = false; renderFrame() }
       const playing = !!props.playing && seconds < playback.duration && (props.playbackRate ?? 1) > 0
       if (!playing && !cameraMoved) previous = undefined
@@ -791,7 +808,7 @@ export function View3D(props: View3DProps) {
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />
-    <Show when={props.showControls !== false}><ViewportControls footer={props.controlsFooter} preset={preset()} mode={mode()} grid={gridVisible()} axes={axesVisible()} enabled={!noWebGl()} transform={transformMode()} canTransform={selected() !== undefined && !!props.onTransformCommit && preset() !== "four-view"} onPreset={value => { updatePreset(value); props.onPresetChange?.(value) }} onMode={value => { updateMode(value); props.onRenderModeChange?.(value) }} onGrid={() => setGridVisible(v => !v)} onAxes={() => setAxesVisible(v => !v)} onFit={() => fit()} onTransform={setTransformMode} onFullscreen={() => { const root = host?.parentElement; if (document.fullscreenElement) void document.exitFullscreen(); else if (root?.requestFullscreen) void root.requestFullscreen() }} /></Show>
+    <Show when={props.showControls !== false}><ViewportControls cube={<ViewCube enabled={!noWebGl()} orthographic={orthographicView()} onSnap={(direction) => snapView(direction)} onOrbit={(dAzimuth, dPolar) => orbitView(dAzimuth, dPolar)} onIsometric={() => snapView([1, -1, 1])} onFit={() => fit()} onProjection={() => toggleFlat()} register={(api) => { cubeApi = api }} />} footer={props.controlsFooter} preset={preset()} mode={mode()} grid={gridVisible()} axes={axesVisible()} enabled={!noWebGl()} transform={transformMode()} canTransform={selected() !== undefined && !!props.onTransformCommit && preset() !== "four-view"} onPreset={value => { updatePreset(value); props.onPresetChange?.(value) }} onMode={value => { updateMode(value); props.onRenderModeChange?.(value) }} onGrid={() => setGridVisible(v => !v)} onAxes={() => setAxesVisible(v => !v)} onFit={() => fit()} onTransform={setTransformMode} onFullscreen={() => { const root = host?.parentElement; if (document.fullscreenElement) void document.exitFullscreen(); else if (root?.requestFullscreen) void root.requestFullscreen() }} /></Show>
     <Show when={preset() === "four-view"}><div class="vp3-quadrants"><span>{viewportLabels.top}</span><span>{viewportLabels.front}</span><span>{viewportLabels.right}</span><span>{viewportLabels.perspective}</span></div></Show>
     <Show when={meshError()}>{message => <p role="alert" class="vp3-alert">{message()}</p>}</Show>
     <Show when={noWebGl()}><p role="alert" class="vp3-alert">{t("viewport.noWebgl")}</p></Show>
