@@ -59553,6 +59553,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     ],
                     "type": "string",
                   },
+                  "smoothing": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 1,
+                    "type": "number",
+                  },
                   "stock": {
                     "additionalProperties": false,
                     "properties": {
@@ -59972,6 +59977,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "haas",
                                     "siemens",
                                     "heidenhain",
+                                    "okuma",
+                                    "mazak",
                                   ],
                                   "type": "string",
                                 },

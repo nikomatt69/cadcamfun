@@ -1484,6 +1484,7 @@ export type ToolpathGeneratorManufacturePayload = {
   }>
   readonly deburr?: number
   readonly subprograms?: boolean
+  readonly smoothing?: number
   readonly postDefinition?: JsonValue
   readonly print?: {
     readonly layerHeight?: number
@@ -6124,6 +6125,7 @@ export type ToolpathGeneratorManufactureInput = {
   readonly tools?: ToolpathGeneratorManufacturePayload["tools"]
   readonly deburr?: ToolpathGeneratorManufacturePayload["deburr"]
   readonly subprograms?: ToolpathGeneratorManufacturePayload["subprograms"]
+  readonly smoothing?: ToolpathGeneratorManufacturePayload["smoothing"]
   readonly postDefinition?: ToolpathGeneratorManufacturePayload["postDefinition"]
   readonly print?: ToolpathGeneratorManufacturePayload["print"]
   readonly progress?: ToolpathGeneratorManufacturePayload["progress"]
@@ -6139,7 +6141,7 @@ export type ToolpathGeneratorManufactureOutput =
         machine: {
           id: string
           name: string
-          post: "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain"
+          post: "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak"
         }
         setupOrientation?: "+Z" | "-Z" | "+X" | "-X" | "+Y" | "-Y"
         origin: { x: number; y: number; z: number }
