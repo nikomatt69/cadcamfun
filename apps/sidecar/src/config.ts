@@ -1,4 +1,4 @@
-import type { LanguageModelFactory } from "@cadcamfun/ai"
+import { LocaleEnvConfig, type LanguageModelFactory, type LocaleEnv } from "@cadcamfun/ai"
 import { Config, Context, Effect, Layer, Redacted } from "effect"
 
 export interface AppConfig {
@@ -30,6 +30,12 @@ export interface AppConfig {
   readonly aiMinimaxBaseUrl?: string
   /** OTLP/HTTP collector base URL (standard `OTEL_EXPORTER_OTLP_ENDPOINT`); telemetry is off without it. */
   readonly otlpEndpoint?: string
+  /** The locale variables of the environment (`LANG`, `TZ`, nikcli's `NIKCLI_LOCALE`…): the assistant's reply language. */
+  readonly localeEnv: LocaleEnv
+  /** A save keeps a restore point of the replaced drawing when the newest is older than this, ms (`CADCAMFUN_VERSION_INTERVAL_MS`). */
+  readonly versionIntervalMs?: number
+  /** Restore points kept per drawing (`CADCAMFUN_VERSION_LIMIT`). */
+  readonly versionLimit?: number
   /** Test hook: replaces the vendor SDK model construction (never set in production). */
   readonly aiModelFactory?: LanguageModelFactory
 }
@@ -58,6 +64,9 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
       const cronSecret = yield* Config.option(Config.string("CRON_SECRET"))
       const adminEmail = yield* Config.option(Config.string("ADMIN_EMAIL"))
       const otlpEndpoint = yield* Config.option(Config.string("OTEL_EXPORTER_OTLP_ENDPOINT"))
+      const localeEnv = yield* LocaleEnvConfig
+      const versionIntervalMs = yield* Config.option(Config.number("CADCAMFUN_VERSION_INTERVAL_MS"))
+      const versionLimit = yield* Config.option(Config.int("CADCAMFUN_VERSION_LIMIT"))
       return AppConfigService.of({
         ...(adminEmail._tag === "Some" ? { adminEmail: adminEmail.value } : {}),
         ...(stripeWebhookSecret._tag === "Some" ? { stripeWebhookSecret: stripeWebhookSecret.value } : {}),
@@ -74,7 +83,10 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
         token,
         dataDir,
         migrationsDir: migrationsDir._tag === "Some" ? migrationsDir.value : undefined,
-        version: "6.0.0"
+        version: "6.0.0",
+        localeEnv,
+        ...(versionIntervalMs._tag === "Some" && versionIntervalMs.value >= 0 ? { versionIntervalMs: versionIntervalMs.value } : {}),
+        ...(versionLimit._tag === "Some" && versionLimit.value >= 1 ? { versionLimit: versionLimit.value } : {})
       })
     })
   )

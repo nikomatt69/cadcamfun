@@ -225,13 +225,22 @@ class Writer {
   rapid(to: Vec3, rotary?: Rotary): void {
     this.endCycle()
     const a = this.axes(to)
+    // Tip control first: switching it on checks the rotary axes where they stand, before this move turns them.
+    this.ensureTcp(rotary !== undefined)
     const r = this.rotaryWords(rotary)
-    if (a.words.length === 0 && r.length === 0) {
-      this.ir = { ...to }
-      this.ensureTcp(rotary !== undefined)
+    if (r.length > 0 && this.tcpOn && this.dialect.tcpLimits?.noRapidRotary === true) {
+      // The tip is kept only on feed moves: the same straight line, as G1.
+      const feed = this.options.tcpRapidFeed ?? 5000
+      if (!(Number.isFinite(feed) && feed > 0)) throw new RangeError(`tcpRapidFeed must be a positive feed, not ${feed}`)
+      this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, this.feedWord(feed))
+      this.motion = "G1"
+      this.commit(to, a.x, a.y, a.z)
       return
     }
-    this.ensureTcp(rotary !== undefined)
+    if (a.words.length === 0 && r.length === 0) {
+      this.ir = { ...to }
+      return
+    }
     this.block(this.motion === "G0" ? undefined : "G0", ...a.words, ...r)
     this.motion = "G0"
     this.commit(to, a.x, a.y, a.z)
@@ -240,13 +249,12 @@ class Writer {
   linear(to: Vec3, feed: number, rotary?: Rotary): void {
     this.endCycle()
     const a = this.axes(to)
+    this.ensureTcp(rotary !== undefined)
     const r = this.rotaryWords(rotary)
     if (a.words.length === 0 && r.length === 0) {
       this.ir = { ...to }
-      this.ensureTcp(rotary !== undefined)
       return
     }
-    this.ensureTcp(rotary !== undefined)
     this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, this.feedWord(feed))
     this.motion = "G1"
     this.commit(to, a.x, a.y, a.z)
@@ -276,6 +284,10 @@ class Writer {
     const code = this.dialect.tcp
     if (code === undefined || this.options.tcp === false || want === this.tcpOn) return
     if (want) {
+      const turned = Object.entries(this.rotary).filter(([, text]) => Number(text) !== 0)
+      if (turned.length > 0 && this.dialect.tcpLimits?.rotaryZeroAtOn === true) {
+        throw new RangeError(`${this.dialect.id}: tool-centre-point control must be switched on with the rotary axes at 0, they stand at ${turned.map(([l, t]) => `${l}${t}`).join(" ")}: position them at 0 first, or post with tcp: false`)
+      }
       if (typeof code === "string") this.block(code, `H${this.tool}`)
       else this.block(code.on(this.tool))
       this.tcpOn = true
@@ -672,7 +684,8 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     }
     if (tp.coolant !== w.coolant) {
       if (w.coolant !== "off") w.block("M9")
-      if (tp.coolant !== "off") w.block(tp.coolant === "flood" ? "M8" : "M7")
+      if (tp.coolant === "mist" && dialect.noMist === true) w.comment("MIST REQUESTED: THIS CONTROL HAS FLOOD COOLANT M8 ONLY")
+      if (tp.coolant !== "off") w.block(tp.coolant === "flood" || dialect.noMist === true ? "M8" : "M7")
       w.coolant = tp.coolant
     }
     w.smoothing(true)

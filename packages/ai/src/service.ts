@@ -360,7 +360,7 @@ export class AiService extends Context.Service<AiService, {
             // locally because the SDK does not expose it). English is the silent default; every
             // other language becomes a deterministic instruction in the system prompt.
             const reply: ReplyLanguage = (() => {
-              const locale = resolveLocale()
+              const locale = resolveLocale(undefined, config.localeEnv)
               return { tag: locale.replyLanguage, name: locale.replyLanguage ? locale.languageName : "" }
             })()
             // The modes enabled plugins contribute, read per chat so a plugin toggle applies from the next turn.

@@ -5,7 +5,7 @@ import { ObservabilityLive, otlpUrl } from "../src/observability.ts"
 
 const config = (extra: Partial<AppConfig>) =>
   Layer.succeed(AppConfigService, AppConfigService.of({
-    token: Redacted.make("t"), dataDir: "/tmp/unused", migrationsDir: undefined, version: "6.0.0", ...extra
+    token: Redacted.make("t"), dataDir: "/tmp/unused", migrationsDir: undefined, version: "6.0.0", localeEnv: {}, ...extra
   }))
 
 describe("otlpUrl", () => {

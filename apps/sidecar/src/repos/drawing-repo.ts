@@ -3,6 +3,7 @@ import { Database, DatabaseError, schema, type Db } from "@cadcamfun/db"
 import { and, desc, eq } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
+import { AppConfigService } from "../config.ts"
 import { cam } from "@cadcamfun/core"
 import { createHash } from "node:crypto"
 
@@ -44,14 +45,10 @@ export const DEFAULT_VERSION_INTERVAL_MS = 10 * 60_000
 /** Restore points kept per drawing; the oldest are dropped (default 30). */
 export const DEFAULT_VERSION_LIMIT = 30
 
-const envNumber = (name: string, fallback: number): number => {
-  const value = Number(process.env[name])
-  return process.env[name] !== undefined && process.env[name] !== "" && Number.isFinite(value) && value >= 0 ? value : fallback
-}
-/** The retention policy, read at use so it can be tuned with `CADCAMFUN_VERSION_INTERVAL_MS` / `CADCAMFUN_VERSION_LIMIT` (and tested). */
-export const versionPolicy = (): { readonly intervalMs: number; readonly limit: number } => ({
-  intervalMs: envNumber("CADCAMFUN_VERSION_INTERVAL_MS", DEFAULT_VERSION_INTERVAL_MS),
-  limit: Math.max(1, Math.floor(envNumber("CADCAMFUN_VERSION_LIMIT", DEFAULT_VERSION_LIMIT)))
+/** The retention policy: the configured one (`CADCAMFUN_VERSION_INTERVAL_MS` / `CADCAMFUN_VERSION_LIMIT`), else the defaults. */
+export const versionPolicy = (config: { readonly versionIntervalMs?: number; readonly versionLimit?: number }): { readonly intervalMs: number; readonly limit: number } => ({
+  intervalMs: config.versionIntervalMs ?? DEFAULT_VERSION_INTERVAL_MS,
+  limit: Math.max(1, Math.floor(config.versionLimit ?? DEFAULT_VERSION_LIMIT))
 })
 
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value)
@@ -96,6 +93,7 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
     Effect.gen(function*() {
       const { query } = yield* Database
       const events = yield* LiveEvents
+      const policy = versionPolicy(yield* AppConfigService)
       const T = schema.drawingTable
       const announceDrawing = (id: string) => query("drawings.changedProject", async (db) =>
         (await db.select({ projectId: T.projectId }).from(T).where(eq(T.id, id)))[0]
@@ -106,7 +104,6 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
       const keepVersion = (tx: Tx, id: string, previous: unknown, force: boolean, now = Date.now()): void => {
         if (previous === null || typeof previous !== "object" || Object.keys(previous as object).length === 0) return
         const newest = tx.select().from(V).where(eq(V.drawingId, id)).orderBy(desc(V.version)).limit(1).get()
-        const policy = versionPolicy()
         if (!force && newest && now - newest.createdAt.getTime() < policy.intervalMs) return
         if (newest && drawingContentHash(newest.data) === drawingContentHash(previous)) return
         tx.insert(V).values({ version: (newest?.version ?? 0) + 1, data: previous, drawingId: id, createdAt: new Date(now) }).run()

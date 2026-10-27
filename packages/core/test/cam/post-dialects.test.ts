@@ -286,3 +286,40 @@ describe("Klartext inch programs and presets", () => {
     expect(read.program!.workOffset).toBe("G57")
   })
 })
+
+describe("rules from the controls' own references", () => {
+  const five = (moves: Program["toolpaths"][number]["moves"]): Program => makeProgram("five", [{ id: "f", name: "F", toolId: "6", spindleRpm: 8000, coolant: "off", moves }])
+
+  test("Haas G234: a rapid that turns a rotary axis under TCPC is written as G1 (the tip is kept on feed moves only)", () => {
+    const text = haasPost.emit(five([
+      { _tag: "Rapid", to: { x: 0, y: 0, z: 40 } },
+      { _tag: "Rapid", to: { x: 0, y: 0, z: 40 }, rotary: { b: 30 } },
+      { _tag: "Linear", to: { x: 5, y: 0, z: -2 }, feed: 1200, rotary: { b: 32 } }
+    ]), { tcpRapidFeed: 3000 })
+    const l = blocks(text)
+    expect(l.indexOf("G234 H6")).toBeLessThan(l.findIndex((b) => b.includes("B30.000")))
+    expect(l.find((b) => b.includes("B30.000"))).toBe("G1 B30.000 F3000")
+    expect(l.some((b) => /^G0\b.*\bB/.test(b))).toBe(false)
+    expect(l.find((b) => b.includes("B32.000"))).toMatch(/F1200$/)
+  })
+
+  test("Haas G234: switched on with the rotary axes away from 0 is refused", () => {
+    // An indexed operation leaves B at 15; the next operation is simultaneous, so G234 would be commanded at B15.
+    const twoSetups = makeProgram("two", [
+      { id: "a", name: "A", toolId: "6", spindleRpm: 8000, coolant: "off", moves: [{ _tag: "Orient", b: 15 }, { _tag: "Rapid", to: { x: 0, y: 0, z: 40 } }] },
+      { id: "b", name: "B", toolId: "6", spindleRpm: 8000, coolant: "off", moves: [{ _tag: "Linear", to: { x: 5, y: 0, z: -2 }, feed: 900, rotary: { b: 20 } }] }
+    ])
+    expect(() => haasPost.emit(twoSetups)).toThrow(/rotary axes at 0/)
+    // Fanuc G43.4 has no such rule.
+    expect(() => fanucPost.emit(twoSetups)).not.toThrow()
+  })
+
+  test("GRBL: mist is written as M8 with a note (M7 needs the ENABLE_M7 build option)", () => {
+    const p = makeProgram("mist", [{ id: "m", name: "M", toolId: "1", spindleRpm: 10000, coolant: "mist", moves: [{ _tag: "Rapid", to: { x: 0, y: 0, z: 5 } }, { _tag: "Linear", to: { x: 0, y: 0, z: -1 }, feed: 300 }] }])
+    const text = grblPost.emit(p)
+    expect(text).not.toMatch(/\bM7\b/)
+    expect(text).toMatch(/^M8$/m)
+    expect(text).toMatch(/flood coolant M8 only/i)
+    expect(fanucPost.emit(p)).toMatch(/^M7$/m)
+  })
+})

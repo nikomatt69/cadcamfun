@@ -9,10 +9,14 @@ import type { Dialect, Post } from "./types.ts"
  * The `smoothing` option writes the path-blending tolerance `G64 P<tol>` per operation and restores exact path (`G61`) before
  * a tool change and at the end.
  *
- * What it deliberately leaves out: rigid tapping (LinuxCNC taps with `G33.1`, a spindle-synchronised move with its own
- * semantics, not `G84`: the planner mills the thread), subprograms (`o<n> sub` must be defined before the `M2` that ends the
+ * What it deliberately leaves out: rigid tapping (LinuxCNC's `G84` "does not use synchronized motion": it is for a floating
+ * tapping holder, while the kernel's tap is rigid; rigid tapping is `G33.1`, a spindle-synchronised move: the planner mills the
+ * thread), subprograms (`o<n> sub` must be defined before the `M2` that ends the
  * file, while the shared writer places bodies after it), tool-centre-point control (only in a TCP kinematics configuration:
  * the program is written in machine coordinates). A rotary word is written as the axis letter the configuration names A/B/C.
+ *
+ * Source: LinuxCNC G-code reference (linuxcnc.org/docs/html/gcode/g-code.html): G4 and G82 P in seconds, G64 P tolerance and
+ * G61 exact path, G43 H<n>, G73 G81-G86 G89 with G98 / G99, I/J incremental by default, no G43.4.
  */
 export const linuxcncDialect: Dialect = {
   id: "linuxcnc",

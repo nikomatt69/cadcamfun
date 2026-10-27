@@ -16,6 +16,7 @@
  * instruction ("Reply in <English name of language>.") so a multilingual model
  * does not silently fall back to English.
  */
+import { Config, Option } from "effect"
 
 export interface LocaleConfig {
   /** Explicit ISO 639-1/BCP-47 primary subtag override, e.g. `"it"`. */
@@ -84,7 +85,8 @@ const REGION_CURRENCY: Readonly<Record<string, string>> = {
 
 const currencyForRegion = (region: string): string => REGION_CURRENCY[region] ?? "USD"
 
-let signalsCache: SystemSignals | null = null
+/** Intl's view of the system, read once: it cannot change while the process runs. */
+let intlCache: { readonly locale?: string; readonly timezone?: string } | null = null
 let displayNames: Intl.DisplayNames | null = null
 
 /** Parse a POSIX/BCP-47 string like `"it_IT.UTF-8"`, `"it-IT"`, `"C"`, `"POSIX"`. */
@@ -98,20 +100,23 @@ const parseLocaleString = (value: string): { language?: string; region?: string 
   }
 }
 
-const detectSystemSignals = (): SystemSignals => {
-  const envRaw = process.env.LC_ALL ?? process.env.LC_MESSAGES ?? process.env.LANG ?? process.env.LANGUAGE ?? ""
-  const fromEnv = parseLocaleString(envRaw.split(":")[0] ?? "")
-  const envTimezone = process.env.TZ
-
-  let intlLocale: string | undefined
-  let intlTimezone: string | undefined
+const intlSignals = (): { readonly locale?: string; readonly timezone?: string } => {
+  if (intlCache) return intlCache
   try {
     const opts = Intl.DateTimeFormat().resolvedOptions()
-    intlLocale = opts.locale
-    intlTimezone = opts.timeZone
+    intlCache = Object.freeze({ locale: opts.locale, timezone: opts.timeZone })
   } catch {
     // Intl is unavailable in some constrained runtimes; degrade gracefully.
+    intlCache = Object.freeze({})
   }
+  return intlCache
+}
+
+const detectSystemSignals = (env: LocaleEnv): SystemSignals => {
+  const envRaw = env.LC_ALL ?? env.LC_MESSAGES ?? env.LANG ?? env.LANGUAGE ?? ""
+  const fromEnv = parseLocaleString(envRaw.split(":")[0] ?? "")
+  const envTimezone = env.TZ
+  const { locale: intlLocale, timezone: intlTimezone } = intlSignals()
 
   const intlParsed = intlLocale ? parseLocaleString(intlLocale) : {}
   const language = fromEnv.language ?? intlParsed.language
@@ -131,10 +136,6 @@ const detectSystemSignals = (): SystemSignals => {
   }
 }
 
-const getSignals = (): SystemSignals => {
-  if (!signalsCache) signalsCache = Object.freeze(detectSystemSignals())
-  return signalsCache
-}
 
 /** English name of a language tag, via Intl (no static table). Memoised. */
 const languageNameOf = (language: string): string => {
@@ -149,12 +150,12 @@ const languageNameOf = (language: string): string => {
 const ENGLISH_OVERRIDE_KEYS = ["NIKCLI_LOCALE", "NIKCLI_LANGUAGE", "NIKCLI_REGION"] as const
 
 /** Read env-only overrides nikcli ships with (`NIKCLI_LOCALE`/LANGUAGE/REGION). */
-const readEnvOverrides = (): { language?: string; region?: string; locale?: string } => {
-  const raw = process.env.NIKCLI_LOCALE
+const readEnvOverrides = (env: LocaleEnv): { language?: string; region?: string; locale?: string } => {
+  const raw = env.NIKCLI_LOCALE
   const parsed = raw ? parseLocaleString(raw) : {}
   return {
-    ...(process.env.NIKCLI_LANGUAGE ? { language: process.env.NIKCLI_LANGUAGE.toLowerCase() } : parsed.language ? { language: parsed.language } : {}),
-    ...(process.env.NIKCLI_REGION ? { region: process.env.NIKCLI_REGION.toUpperCase() } : parsed.region ? { region: parsed.region } : {}),
+    ...(env.NIKCLI_LANGUAGE ? { language: env.NIKCLI_LANGUAGE.toLowerCase() } : parsed.language ? { language: parsed.language } : {}),
+    ...(env.NIKCLI_REGION ? { region: env.NIKCLI_REGION.toUpperCase() } : parsed.region ? { region: parsed.region } : {}),
     ...(raw ? { locale: raw } : {})
   }
 }
@@ -172,10 +173,10 @@ const readEnvOverrides = (): { language?: string; region?: string; locale?: stri
  * are skipped, the only sources of language/region/timezone are the override,
  * the config, or the fallback.
  */
-export const resolveLocale = (cfg?: LocaleConfig): ResolvedLocale => {
+export const resolveLocale = (cfg?: LocaleConfig, env: LocaleEnv = {}): ResolvedLocale => {
   const autoDetect = cfg?.autoDetect !== false
-  const signals: SystemSignals = autoDetect ? getSignals() : { source: "fallback" }
-  const override = readEnvOverrides()
+  const signals: SystemSignals = autoDetect ? detectSystemSignals(env) : { source: "fallback" }
+  const override = readEnvOverrides(env)
   const cfgParsed = cfg?.locale ? parseLocaleString(cfg.locale) : {}
 
   const language = (
@@ -221,11 +222,30 @@ export const resolveLocale = (cfg?: LocaleConfig): ResolvedLocale => {
   }
 }
 
-/** Test seam: clear the memoised system signals so env/Intl can be re-detected. */
+/** Test seam: clear the memoised Intl signals and display names so they are read again. */
 export const __resetLocaleCache = (): void => {
-  signalsCache = null
+  intlCache = null
   displayNames = null
 }
 
-/** The env vars that participate in resolution; cleared by tests. */
-export const LOCALE_ENV_KEYS: ReadonlyArray<string> = [...ENGLISH_OVERRIDE_KEYS, "LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE", "TZ"]
+/** The environment variables that participate in resolution. */
+export const LOCALE_ENV_KEYS = [...ENGLISH_OVERRIDE_KEYS, "LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE", "TZ"] as const
+export type LocaleEnvKey = typeof LOCALE_ENV_KEYS[number]
+
+/**
+ * The locale variables of the environment, as values: this module never reads `process.env`. The host reads them once with
+ * its configuration (`LocaleEnvConfig`) and passes them through `AiConfig.localeEnv`.
+ */
+export type LocaleEnv = { readonly [K in LocaleEnvKey]?: string }
+
+/** Reads the locale variables through Effect `Config` (the environment by default; a `ConfigProvider` in tests). */
+export const LocaleEnvConfig: Config.Config<LocaleEnv> = Config.all(
+  Object.fromEntries(LOCALE_ENV_KEYS.map((key) => [key, Config.option(Config.string(key))]))
+).pipe(Config.map((values) => {
+  const env: Partial<Record<LocaleEnvKey, string>> = {}
+  for (const key of LOCALE_ENV_KEYS) {
+    const value = (values as Record<string, Option.Option<string>>)[key]
+    if (value !== undefined && Option.isSome(value) && value.value !== "") env[key] = value.value
+  }
+  return env
+}))

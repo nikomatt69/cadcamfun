@@ -129,19 +129,18 @@ describe("the title block stored with a drawing", () => {
 })
 
 describe("restore point retention", () => {
-  test("the interval and the number kept follow the policy (CADCAMFUN_VERSION_*): every save is kept when the interval is 0, only the newest N survive", async () => {
-    process.env["CADCAMFUN_VERSION_INTERVAL_MS"] = "0"
-    process.env["CADCAMFUN_VERSION_LIMIT"] = "3"
+  test("the interval and the number kept follow the configured policy (CADCAMFUN_VERSION_*): every save is kept when the interval is 0, only the newest N survive", async () => {
+    const tuned = await makeApp({ versionIntervalMs: 0, versionLimit: 3 })
     try {
-      const { body: d } = await app.call(`/api/projects/${projectId}/drawings`, { method: "POST", json: { name: "Retention", data: { elements: [{ id: "0" }] } } })
-      for (let n = 1; n <= 6; n++) await app.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: { elements: Array.from({ length: n + 1 }, (_, i) => ({ id: String(i) })) } } })
-      const versions = (await app.call(`/api/drawings/${d.id}/versions`)).body as Array<{ version: number; elements: number }>
+      const project = (await tuned.call("/api/projects", { method: "POST", json: { name: "Retention" } })).body.id
+      const { body: d } = await tuned.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Retention", data: { elements: [{ id: "0" }] } } })
+      for (let n = 1; n <= 6; n++) await tuned.call(`/api/drawings/${d.id}`, { method: "PUT", json: { data: { elements: Array.from({ length: n + 1 }, (_, i) => ({ id: String(i) })) } } })
+      const versions = (await tuned.call(`/api/drawings/${d.id}/versions`)).body as Array<{ version: number; elements: number }>
       // Six saves replaced documents of 1..6 elements; the three newest restore points remain, newest first.
       expect(versions.map((v) => v.elements)).toEqual([6, 5, 4])
       expect(versions.map((v) => v.version)).toEqual([6, 5, 4])
     } finally {
-      delete process.env["CADCAMFUN_VERSION_INTERVAL_MS"]
-      delete process.env["CADCAMFUN_VERSION_LIMIT"]
+      await tuned.dispose()
     }
   })
 })

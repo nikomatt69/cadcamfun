@@ -1714,7 +1714,7 @@ const AiBackgroundLive = Layer.unwrap(Effect.gen(function*() {
 const policyFile = (dataDir: string): string => `${dataDir}/ai/policy.json`
 
 const AiConfigLive = Layer.unwrap(AppConfigService.use((c) => readPolicyFile(policyFile(c.dataDir)).pipe(
-  Effect.map((policies) => AiConfig.layer({ dataDir: c.dataDir, forceGateway: false, ...(policies.length > 0 ? { policies } : {}) }))
+  Effect.map((policies) => AiConfig.layer({ dataDir: c.dataDir, forceGateway: false, localeEnv: c.localeEnv, ...(policies.length > 0 ? { policies } : {}) }))
 )))
 
 /** Publishes the assistant's one workflow step (`ai/prompt`) to the runner that is already in scope. */

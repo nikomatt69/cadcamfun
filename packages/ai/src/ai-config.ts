@@ -1,5 +1,6 @@
 import { Context, Layer } from "effect"
 import type { IsolationOptions } from "./nikcli/isolation.ts"
+import type { LocaleEnv } from "./nikcli/locale.ts"
 import type { HostLogSink } from "./nikcli/logs.ts"
 import type { PolicyStatement } from "./nikcli/policy.ts"
 
@@ -13,6 +14,8 @@ export interface AiConfigShape {
   readonly hostLogs?: HostLogSink
   /** nikcli resource policy (`provider.use`, `tool.use`); the direct route and the host both honour it. Omitted: allow all. */
   readonly policies?: ReadonlyArray<PolicyStatement>
+  /** The locale variables of the environment (`LocaleEnvConfig`), read once by the host; the reply language follows them. */
+  readonly localeEnv?: LocaleEnv
 }
 
 /**

@@ -54,6 +54,11 @@ export interface PostOptions {
    * Ignored on a dialect without it (`Dialect.smoothing`). Absent by default so existing output stays byte-identical.
    */
   readonly smoothing?: number
+  /**
+   * Feed (mm/min) of a rapid that turns a rotary axis inside a tool-centre-point section, on a control that keeps the tip only on
+   * feed moves (`Dialect.tcpLimits.noRapidRotary`, Haas). Default 5000; the control clamps it to its own maximum cutting feed.
+   */
+  readonly tcpRapidFeed?: number
 }
 
 export const defaultPostOptions: PostOptions = {
@@ -100,6 +105,12 @@ export interface Dialect {
    */
   readonly tcp?: string | TcpCodes
   /**
+   * What the control's tool-centre-point mode forbids (Haas G234): `rotaryZeroAtOn` — the rotary axes must stand at 0 when it is
+   * switched on (a program that breaks it is refused); `noRapidRotary` — the tool tip is not kept on a rapid that turns a rotary
+   * axis, so such a rapid is written as a feed move (`G1` at `PostOptions.tcpRapidFeed`), which keeps the tip on the same line.
+   */
+  readonly tcpLimits?: { readonly rotaryZeroAtOn?: boolean; readonly noRapidRotary?: boolean }
+  /**
    * Rigid tapping (`G84` with the feed = pitch x speed). Absent on controls without it: a tapping cycle is then refused, since no
    * expansion into plain moves reverses the spindle. `prefix` is the block the control needs before the cycle (Fanuc `M29 S<rpm>`).
    */
@@ -118,6 +129,11 @@ export interface Dialect {
   readonly workOffset?: (offset: WorkOffset) => string
   /** Canned-cycle codes that differ from the ISO ones (Mazak synchronous tapping `G84.2`). */
   readonly cycleCodes?: Partial<Record<CycleMove["cycle"], string>>
+  /**
+   * The control has no mist coolant word (`M7`): mist is written as flood (`M8`) with a comment saying so. GRBL builds `M7` only
+   * with the `ENABLE_M7` compile option.
+   */
+  readonly noMist?: boolean
   /** Upper-case comments (some controls reject lower case). */
   readonly uppercaseComments: boolean
   /** How a comment line is written: `(text)` (default) or `;text` (Siemens). */

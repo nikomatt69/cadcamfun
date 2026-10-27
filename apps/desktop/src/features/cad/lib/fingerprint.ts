@@ -25,6 +25,15 @@ export const PLACEMENT_KEYS: ReadonlySet<string> = new Set([
   "originalData",
 ])
 
+/**
+ * Timeline display fields of a parametric history (spec 58): the history's `groups` and each feature's `group` fold the timeline and
+ * never change a replay. They are skipped only inside a history (an object with `parameters` and `features`), where they mean that;
+ * `suppressed` and `rollback` do change the model and stay in. A feature's `name` is already a bookkeeping key above.
+ */
+const HISTORY_DISPLAY_KEYS: ReadonlySet<string> = new Set(["groups"])
+const FEATURE_DISPLAY_KEYS: ReadonlySet<string> = new Set(["group"])
+const isHistory = (record: Record<string, unknown>): boolean => Array.isArray(record["features"]) && typeof record["parameters"] === "object" && record["parameters"] !== null
+
 /** How deep to walk before giving up: a nested group inside a component inside a group is already deep. */
 const MAX_DEPTH = 12
 
@@ -46,7 +55,7 @@ const mixNumber = (hash: number, value: number): number => {
   return mix(mix(hash, numberWords[0]!), numberWords[1]!)
 }
 
-const hash = (value: unknown, seen: WeakSet<object>, depth: number): number => {
+const hash = (value: unknown, seen: WeakSet<object>, depth: number, skip: ReadonlySet<string> = PLACEMENT_KEYS): number => {
   if (value === null) return mix(0, 1)
   switch (typeof value) {
     case "number": return mixNumber(0, value)
@@ -74,7 +83,7 @@ const hash = (value: unknown, seen: WeakSet<object>, depth: number): number => {
     }
     if (Array.isArray(object)) {
       let next = mix(0, 9 + object.length)
-      for (const item of object as readonly unknown[]) next = mix(next, hash(item, seen, depth + 1))
+      for (const item of object as readonly unknown[]) next = mix(next, hash(item, seen, depth + 1, skip))
       return next
     }
     if (object instanceof Set || object instanceof Map) {
@@ -89,11 +98,16 @@ const hash = (value: unknown, seen: WeakSet<object>, depth: number): number => {
     }
     const record = object as Record<string, unknown>
     // Sorted, so `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` are the same shape.
-    const keys = Object.keys(record).filter((key) => !PLACEMENT_KEYS.has(key)).sort()
+    const history = isHistory(record)
+    const keys = Object.keys(record).filter((key) => !PLACEMENT_KEYS.has(key) && !skip.has(key) && !(history && HISTORY_DISPLAY_KEYS.has(key))).sort()
     let next = mix(0, 11 + keys.length)
     for (const key of keys) {
       next = mix(next, hash(key, seen, depth + 1))
-      next = mix(next, hash(record[key], seen, depth + 1))
+      // The features of a history are hashed without their display fields; below them the ordinary rule applies again.
+      const inner = history && key === "features" ? new Set([...PLACEMENT_KEYS, ...FEATURE_DISPLAY_KEYS]) : PLACEMENT_KEYS
+      next = mix(next, Array.isArray(record[key]) && inner !== PLACEMENT_KEYS
+        ? (record[key] as readonly unknown[]).reduce<number>((h, item) => mix(h, hash(item, seen, depth + 2, inner)), mix(0, 9 + (record[key] as readonly unknown[]).length))
+        : hash(record[key], seen, depth + 1))
     }
     return next
   } finally {

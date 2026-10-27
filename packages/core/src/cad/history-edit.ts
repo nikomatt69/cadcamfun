@@ -303,6 +303,101 @@ export const insertFeature = (history: History, feature: Feature, after: string 
   return { history: { ...history, features } }
 }
 
+/** A feature's display name, or back to its id with `undefined` / an empty name (display only: the replay never reads it). */
+export const renameFeature = (history: History, id: string, name: string | undefined): History => {
+  if (!history.features.some((f) => f.id === id)) throw new RangeError(`no feature '${id}' in the history`)
+  const trimmed = name?.trim() ?? ""
+  if (trimmed.length > 100) throw new RangeError("a feature name has at most 100 characters")
+  return {
+    ...history,
+    features: history.features.map((f) => {
+      if (f.id !== id) return f
+      if (trimmed !== "") return { ...f, name: trimmed }
+      const { name: _name, ...rest } = f
+      return rest as Feature
+    })
+  }
+}
+
+/** Positions of a group's members, in timeline order. */
+const membersOf = (history: History, group: string): ReadonlyArray<number> =>
+  history.features.flatMap((f, i) => (f.group === group ? [i] : []))
+
+const contiguous = (positions: ReadonlyArray<number>): boolean => positions.every((p, i) => i === 0 || p === positions[i - 1]! + 1)
+
+/**
+ * `ids` put in the group `group` (created, or renamed when it exists). A group is a run of consecutive features, as in the
+ * timelines of Fusion 360 and SolidWorks: the members together with the group's present members must be contiguous, and a
+ * feature is in one group at most. Display only: a grouped history replays exactly as the same history without groups.
+ */
+export const groupFeatures = (history: History, group: { readonly id: string; readonly name: string }, ids: ReadonlyArray<string>): TimelineEdit => {
+  if (ids.length === 0) return { history, refusal: "a group needs at least one feature" }
+  const unknown = ids.find((id) => !history.features.some((f) => f.id === id))
+  if (unknown !== undefined) return { history, refusal: `no feature '${unknown}' in the history` }
+  const elsewhere = history.features.find((f) => ids.includes(f.id) && f.group !== undefined && f.group !== group.id)
+  if (elsewhere !== undefined) return { history, refusal: `'${elsewhere.id}' is already in the group '${elsewhere.group}'` }
+  const positions = history.features.flatMap((f, i) => (ids.includes(f.id) || f.group === group.id ? [i] : []))
+  if (!contiguous(positions)) return { history, refusal: `the features of '${group.name}' must be consecutive in the timeline (move them next to each other first)` }
+  const existing = history.groups ?? []
+  const groups = existing.some((g) => g.id === group.id)
+    ? existing.map((g) => (g.id === group.id ? { ...g, name: group.name } : g))
+    : [...existing, { id: group.id, name: group.name }]
+  return { history: { ...history, groups, features: history.features.map((f) => (ids.includes(f.id) ? { ...f, group: group.id } : f)) } }
+}
+
+/** The group removed; its features stay where they are, out of any group. */
+export const ungroupFeatures = (history: History, group: string): History => {
+  const groups = (history.groups ?? []).filter((g) => g.id !== group)
+  const { groups: _groups, ...rest } = history
+  return {
+    ...(groups.length > 0 ? { ...rest, groups } : rest),
+    features: history.features.map((f) => {
+      if (f.group !== group) return f
+      const { group: _group, ...plain } = f
+      return plain as Feature
+    })
+  }
+}
+
+/** A group folded or unfolded in the timeline. */
+export const setGroupCollapsed = (history: History, group: string, collapsed: boolean): History => {
+  if (!(history.groups ?? []).some((g) => g.id === group)) throw new RangeError(`no group '${group}' in the history`)
+  return {
+    ...history,
+    groups: (history.groups ?? []).map((g) => {
+      if (g.id !== group) return g
+      if (collapsed) return { ...g, collapsed: true }
+      const { collapsed: _collapsed, ...rest } = g
+      return rest
+    })
+  }
+}
+
+/**
+ * The whole group moved so its first feature ends at `index`. Valid only when every dependency still points backwards (the same
+ * rule as `moveFeatureTo`, for every member at once) and no other group is split; otherwise the history comes back unchanged with
+ * the reason.
+ */
+export const moveGroupTo = (history: History, group: string, index: number, graph: ReadonlyMap<string, ReadonlyMap<string, DependencyReason>> = dependencyGraph(history)): TimelineEdit => {
+  const members = membersOf(history, group)
+  if (members.length === 0) return { history, refusal: `the group '${group}' has no features` }
+  const block = members.map((i) => history.features[i]!)
+  const rest = history.features.filter((f) => f.group !== group)
+  if (!Number.isInteger(index) || index < 0 || index > rest.length) return { history, refusal: `position ${index} is outside the timeline (0 to ${rest.length})` }
+  const features = [...rest.slice(0, index), ...block, ...rest.slice(index)]
+  const at = new Map(features.map((f, i) => [f.id, i] as const))
+  const inBlock = new Set(block.map((f) => f.id))
+  for (const f of features) {
+    for (const [need, reason] of graph.get(f.id) ?? []) {
+      if (!(inBlock.has(f.id) || inBlock.has(need))) continue
+      if (at.get(need)! > at.get(f.id)!) return { history, refusal: `the group '${group}' cannot move there: '${f.id}' needs '${need}' (${because(reason)})` }
+    }
+  }
+  const before = rest[index - 1], after = rest[index]
+  if (before?.group !== undefined && before.group === after?.group) return { history, refusal: `the group '${group}' cannot move into the group '${before.group}'` }
+  return { history: { ...history, features } }
+}
+
 /**
  * A starting part: a rectangular plate with a hole in the middle, driven by the parameters `width`, `depth`, `thick` and `hole`.
  * A person edits the numbers and watches it change; the assistant builds on it.

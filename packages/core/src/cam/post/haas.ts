@@ -16,6 +16,10 @@ import type { Dialect, Post } from "./types.ts"
  *    `G234 H<n>` and closes it with `G43 H<n>`, and the program ends with `G49`.
  *    The machine's MRZP settings (255/256/257) tell the control where the table
  *    turns, which is why the program is written in the work offset.
+ *
+ * Sources: Haas mill G-code reference (haascnc.com): G04 ("G04 P10. is a dwell of 10 seconds; G04 P10 is a dwell of 10
+ * milliseconds"), G84 (no spindle start or M29 needed), G187 Pn E (a bare G187 restores Setting 191), G234 (H on the same
+ * block; the rotary axes at 0 when it is commanded; no rapid rotary moves while it is active: written as G1).
  */
 export const haasDialect: Dialect = {
   id: "haas",
@@ -27,6 +31,8 @@ export const haasDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   tcp: "G234",
+  // Haas G234 page: "The rotary axes must be at 0 before commanding G234"; "Do not program rapid moves while TCPC is active".
+  tcpLimits: { rotaryZeroAtOn: true, noRapidRotary: true },
   // G187 accuracy control: P1 rough / P2 medium / P3 finish, E the corner tolerance; a bare G187 restores setting 191.
   smoothing: { on: (tol) => [`G187 P${Number(tol) <= 0.01 ? 3 : Number(tol) <= 0.05 ? 2 : 1} E${tol}`], off: ["G187"] },
   begin: (program) => ["%", `O${String(fanucProgramNumber(program)).padStart(4, "0")}`],

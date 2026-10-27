@@ -2,7 +2,7 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { holeSites } from "./dfm.ts"
 import { CELLS } from "./history-cells.ts"
 import { rebuildExact } from "./history-brep.ts"
-import { dependencyGraph, dependentsOf, insertFeature, moveFeature, moveFeatureTo, plateTemplate, removeFeature } from "./history-edit.ts"
+import { dependencyGraph, dependentsOf, groupFeatures, insertFeature, moveFeature, moveFeatureTo, moveGroupTo, plateTemplate, removeFeature, renameFeature, setGroupCollapsed, ungroupFeatures } from "./history-edit.ts"
 import { activeHistory, bodyCreator, bodyRefs, declaredNeeds, withRollback, withSuppressed } from "./history-timeline.ts"
 import { rebuild, type Feature, type History } from "./history.ts"
 import { RECIPES, buildRecipe } from "./recipes.ts"
@@ -222,5 +222,62 @@ describe("failures (spec 58 T5)", () => {
     expect(r.bodies.map((b) => b.id)).toEqual(["plate"])
     // The exact replay builds nothing of a skipped feature either.
     expect(rebuildExact(h, r).bodies.map((b) => b.id)).toEqual(["plate"])
+  })
+})
+
+describe("names and groups (spec 58 T6)", () => {
+  const sameBits = (a: History, b: History, label: string) => {
+    const ra = rebuild(a), rb = rebuild(b)
+    expect({ label, states: ra.states }).toEqual({ label, states: rb.states })
+    expect({ label, ids: ra.bodies.map((x) => x.id) }).toEqual({ label, ids: rb.bodies.map((x) => x.id) })
+    ra.bodies.forEach((body, i) => expect({ label, same: Buffer.from(body.mesh.positions.buffer).equals(Buffer.from(rb.bodies[i]!.mesh.positions.buffer)) }).toEqual({ label, same: true }))
+    const ea = rebuildExact(a, ra).bodies.map((x) => JSON.stringify(x.brep ?? x.reason)), eb = rebuildExact(b, rb).bodies.map((x) => JSON.stringify(x.brep ?? x.reason))
+    expect({ label, exact: ea }).toEqual({ label, exact: eb })
+  }
+
+  test("a grouped, renamed and folded history replays bit for bit like the plain one, mesh and exact", () => {
+    for (const kind of KINDS) {
+      const h = kind.history
+      let grouped = groupFeatures(h, { id: "g1", name: "All of it" }, h.features.map((f) => f.id)).history
+      grouped = setGroupCollapsed(renameFeature(grouped, h.features[0]!.id, "Base sketch"), "g1", true)
+      expect(grouped.groups).toEqual([{ id: "g1", name: "All of it", collapsed: true }])
+      sameBits(grouped, h, kind.id)
+      // Taking it apart again gives the identical history.
+      expect(JSON.stringify(renameFeature(ungroupFeatures(grouped, "g1"), h.features[0]!.id, undefined))).toBe(JSON.stringify(h))
+    }
+  })
+
+  test("a group is a run of consecutive features, and a feature is in one group at most", () => {
+    const h = plateTemplate()
+    expect(groupFeatures(h, { id: "g", name: "Ends" }, ["sketch1", "hole1"]).refusal).toContain("consecutive")
+    const one = groupFeatures(h, { id: "g", name: "Base" }, ["sketch1", "plate"])
+    expect(one.refusal).toBeUndefined()
+    expect(groupFeatures(one.history, { id: "h", name: "Other" }, ["plate", "hole1"]).refusal).toContain("already in the group 'g'")
+    // Growing a group keeps it consecutive; renaming it keeps its members.
+    const grown = groupFeatures(one.history, { id: "g", name: "Plate" }, ["hole1"])
+    expect(grown.history.features.map((f) => f.group)).toEqual(["g", "g", "g"])
+    expect(grown.history.groups).toEqual([{ id: "g", name: "Plate" }])
+  })
+
+  test("a group moves as a whole when every dependency still points backwards, and is refused with the reason otherwise", () => {
+    const h = historyOf((m) => {
+      m.extrude(m.sketch("XY").rectangle([0, 0], 40, 30), { depth: 10 })
+      m.hole({ plane: "XY", offset: 10, at: [20, 15], diameter: 8, depth: 10 })
+      m.extrude(m.sketch("XY").rectangle([200, 0], 10, 10), { depth: 5, operation: "new" })
+    })
+    const [s1, plate, hole, s2, block] = h.features.map((f) => f.id)
+    const grouped = groupFeatures(h, { id: "side", name: "Side block" }, [s2!, block!]).history
+    const moved = moveGroupTo(grouped, "side", 0)
+    expect(moved.refusal).toBeUndefined()
+    expect(moved.history.features.map((f) => f.id)).toEqual([s2!, block!, s1!, plate!, hole!])
+    const volume = (x: History) => rebuild(x).bodies.reduce((v, b) => v + Math.abs(meshVolume(b.mesh)), 0)
+    expect(volume(moved.history)).toBeCloseTo(volume(h), 3)
+    const holeGroup = groupFeatures(h, { id: "cut", name: "Cut" }, [hole!]).history
+    const refused = moveGroupTo(holeGroup, "cut", 0)
+    expect(refused.history).toBe(holeGroup)
+    expect(refused.refusal).toContain(`'${hole}' needs '${plate}'`)
+    // Into the middle of another group: refused.
+    const two = groupFeatures(groupFeatures(h, { id: "base", name: "Base" }, [s1!, plate!]).history, { id: "side", name: "Side" }, [s2!, block!]).history
+    expect(moveGroupTo(two, "side", 1).refusal).toContain("into the group 'base'")
   })
 })

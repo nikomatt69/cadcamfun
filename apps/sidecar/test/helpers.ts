@@ -30,6 +30,7 @@ const testConfig = (dataDir: string, extra: Partial<AppConfig> = {}) => Layer.su
   // Tests read the e-mail links out of the response, as there is no mail transport.
   debugLinks: true,
   aiHost: "direct",
+  localeEnv: {},
   ...extra
 }))
 
