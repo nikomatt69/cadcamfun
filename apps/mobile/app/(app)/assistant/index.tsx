@@ -44,6 +44,7 @@ import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ModelPickerSheet } from "@/components/chat/model-picker-sheet"
 import { AssistantInspectorSheet } from "@/components/chat/assistant-inspector-sheet"
 import { CameraSheet } from "@/components/chat/camera-sheet"
+import { SessionActionsSheet } from "@/components/chat/session-actions-sheet"
 import { acceptAttachments, attachmentPreviews, type PendingAttachment } from "@/lib/attachments"
 import { assistantModels, formatVariantLabel, resolveAssistantPreferences, PERMISSION_MODES, selectedAssistantModel, type AssistantPreferences } from "@/lib/assistant-preferences"
 
@@ -101,6 +102,7 @@ export default function AssistantScreen() {
   const setSelectedAgentId = (agent: string) => setPreferences({ agent })
   const [modelsOpen, setModelsOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
   /** Pictures waiting to go with the next message; the desktop's assistant reads them. */
   const [attachments, setAttachments] = useState<readonly PendingAttachment[]>([])
@@ -657,6 +659,14 @@ export default function AssistantScreen() {
     setTimeout(() => listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 80)
   }, [])
 
+  // An open conversation owns the screen: the tab bar hides while it is on screen and comes back with the list.
+  const inConversation = Boolean(followed) || transcript.length > 0
+  useEffect(() => {
+    const { setTabBarHidden } = useUIStore.getState()
+    setTabBarHidden(inConversation && screenFocused)
+    return () => setTabBarHidden(false)
+  }, [inConversation, screenFocused])
+
   const notice = linkNotice({ online, link, busy })
   const composeReady = Boolean(currentProject) && !modelUnavailable && (online ? aiReady : true)
   const composeNote = modelUnavailable ? "Choose an available desktop model"
@@ -672,10 +682,11 @@ export default function AssistantScreen() {
         project={currentProject ? currentProject.name : "Choose a project"}
         detail={`${currentAgent?.title ?? "CAD/CAM assistant"} · ${modelLabel}${thinkingLabel ? ` · ${thinkingLabel}` : ""}`}
         hasProject={Boolean(projectId)}
+        inConversation={inConversation}
         onChooseProject={() => setPickerOpen(true)}
-        onChooseAgent={() => setAgentPickerOpen(true)}
-        onHistory={() => router.push("/assistant/conversations")}
+        onBack={() => router.push("/assistant/conversations")}
         onNew={newConversation}
+        onMore={() => setActionsOpen(true)}
       />
 
       {notice ? <LinkStrip gutter={content.gutter} offline={notice.tone === "offline"} text={notice.text} /> : null}
@@ -827,6 +838,22 @@ export default function AssistantScreen() {
           setAttachments(accepted)
           for (const item of refused) toast(item.reason, "error")
         }}
+      />
+
+      <SessionActionsSheet
+        open={actionsOpen}
+        onClose={() => setActionsOpen(false)}
+        sessionId={followed}
+        project={currentProject?.name}
+        agent={currentAgent?.title ?? "CAD/CAM assistant"}
+        model={`${modelLabel}${thinkingLabel ? ` · ${thinkingLabel}` : ""}`}
+        permission={permissionLabel}
+        onNew={newConversation}
+        onHistory={() => router.push("/assistant/conversations")}
+        onControls={() => setInspectorOpen(true)}
+        onAgent={() => setAgentPickerOpen(true)}
+        onModel={() => setModelsOpen(true)}
+        onProject={() => setPickerOpen(true)}
       />
 
       {/* Project picker */}

@@ -12,7 +12,7 @@ import { type as typeStyle } from "@/lib/typography"
 import { COMPOSER_MODES, cameraRowSubtitle, canAttachMore, type ComposerMode } from "@/lib/composer"
 
 /** iOS cannot present a modal over a modal that is still dismissing, so the next one waits for it. */
-const AFTER_DISMISS_MS = 350
+export const AFTER_DISMISS_MS = 350
 
 type Icon = ComponentType<{ size?: number; color?: string; strokeWidth?: number }>
 

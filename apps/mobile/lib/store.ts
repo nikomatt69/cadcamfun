@@ -43,6 +43,8 @@ export interface UIState {
    * its stored history once, so a reopened conversation shows the desktop's own past.
    */
   assistantOpened: AssistantOpened | null
+  /** A conversation fills the assistant: the tab bar steps aside, like a pushed screen. Not persisted. */
+  tabBarHidden: boolean
   setThemeMode: (mode: UIState["themeMode"]) => void
   setHaptics: (patch: Partial<UIState["haptics"]>) => void
   setSecurity: (patch: Partial<UIState["security"]>) => void
@@ -60,6 +62,7 @@ export interface UIState {
   openAssistantConversation: (projectId: string, sessionId: string | null) => void
   setOfflineQueue: (count: number) => void
   setUnreadCount: (count: number) => void
+  setTabBarHidden: (hidden: boolean) => void
   showToast: (message: string, kind?: "info" | "success" | "error") => void
 }
 
@@ -99,6 +102,7 @@ export const useUIStore = create<UIState>()(
       unreadCount: 0,
       assistantDraft: null,
       assistantOpened: null,
+      tabBarHidden: false,
       setThemeMode: (themeMode) => set({ themeMode }),
       setHaptics: (patch) => set((s) => ({ haptics: { ...s.haptics, ...patch } })),
       setSecurity: (patch) => set((s) => ({ security: { ...s.security, ...patch } })),
@@ -127,6 +131,7 @@ export const useUIStore = create<UIState>()(
       setOfflineQueue: (offlineQueueCount) =>
         set((s) => ({ offlineQueueCount, offlineQueueRevision: s.offlineQueueRevision + 1 })),
       setUnreadCount: (unreadCount) => set((s) => (s.unreadCount === unreadCount ? s : { unreadCount })),
+      setTabBarHidden: (tabBarHidden) => set((s) => (s.tabBarHidden === tabBarHidden ? s : { tabBarHidden })),
       showToast: (message, kind = "info") => {
         // ToastHost owns rendering; lazy-require avoids a store→component import cycle.
         void import("@/components/ui/ToastHost").then(({ toast }) => toast(message, kind)).catch(() => undefined)

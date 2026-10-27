@@ -1,3 +1,4 @@
+import "@/lib/pressable-interop"
 import { useEffect } from "react"
 import { usePathname, useRouter } from "expo-router"
 import { GestureHandlerRootView } from "react-native-gesture-handler"

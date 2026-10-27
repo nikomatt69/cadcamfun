@@ -23,6 +23,7 @@ export default function AppLayout() {
   const showConnection = !["online", "disconnected", "background"].includes(connectivity)
   const unread = useUIStore((state) => state.unreadCount)
   const setUnreadCount = useUIStore((state) => state.setUnreadCount)
+  const tabBarHidden = useUIStore((state) => state.tabBarHidden)
   const nativeAccessory = Platform.OS === "ios" && Number.parseInt(String(Platform.Version), 10) >= 26
 
   // The badge tells the user there is something to read without opening the app: one cheap read of the
@@ -35,6 +36,7 @@ export default function AppLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
       <NativeTabs
+        hidden={tabBarHidden}
         tintColor={palette.accent}
         iconColor={{ default: palette.muted, selected: palette.accent }}
         backgroundColor={palette.background}

@@ -44,6 +44,7 @@ export function AdaptiveBlur({
   intensity = 72,
 }: AdaptiveBlurProps) {
   const prefersReducedTransparency = usePrefersReducedTransparency()
+  const { colorScheme } = useTheme()
 
   if (prefersReducedTransparency) {
     return (
@@ -58,6 +59,8 @@ export function AdaptiveBlur({
       <GlassView
         glassEffectStyle="regular"
         isInteractive={false}
+        // The glass follows the system appearance unless told otherwise; the app can be dark on a light phone.
+        colorScheme={tint === "default" ? colorScheme : tint}
         style={[style, { backgroundColor: fallbackColor }]}
         pointerEvents={pointerEvents}
       >
