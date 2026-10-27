@@ -3,6 +3,43 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.39 (October 2026)
+
+## Core
+
+- Core/cad: failed features with checked remedies, skipped dependents (spec 58 T5)
+- Core/cam/post: Klartext checked against the TNC 640 manuals; sources on the Okuma and Mazak posts
+- Core/cam/post: Okuma OSP and Mazak EIA posts, Klartext inch and presets, smoothing end to end
+- Core/cad: timeline suppress, rollback and lineage (spec 58 T1-T3)
+- Core/cam/post: NC conversion kernel replaces the fake advanced post-processor
+- Corpus, bench and parity scorecard (spec 55 E1-E3)
+- Core/cam/post: LinuxCNC post, native Klartext circles, contour smoothing
+- Ai/sidecar: kernel jobs run on Effect; tool handlers share one runtime bridge
+- Core/cam/post: Klartext label subprograms
+- Core/brep: IGES transformation matrices (124)
+- Core/cad: one exact replay per rebuild, advanced on demand
+
+## Desktop
+
+- Spec 58 T7: timeline in the desktop panel, assistant action, sidecar
+- Desktop/cam: picking a target no longer resets what the program is written for
+- Desktop/cam: one post selection across ribbon, page and Post-Processor tab
+- Desktop/cam: post-processor panel on the panel design system
+
+## Sidecar
+
+- Fallible promises are typed failures; silent catches log or narrow
+- Api/sidecar: live events are defined once, as an API schema
+- The turn enters Effect as CurrentTurn at the nikcli edge; a cancelled turn is TurnCancelled
+
+## API
+
+- Document smoothing, regenerate clients, snapshot and harness inventory; spec 58 T7 state
+
+## AI
+
+- Provider retries are an Effect Schedule; the chat turn's pauses are Effect sleeps
+
 ## v0.1.38 (October 2026)
 
 ## Mobile
