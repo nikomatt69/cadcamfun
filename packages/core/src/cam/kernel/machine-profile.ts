@@ -25,7 +25,7 @@ export const POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemen
  */
 const POSTS: Readonly<Record<string, (typeof POST_IDS)[number]>> = {
   fanuc: "fanuc", "fanuc 0i": "fanuc", "fanuc 0i-md": "fanuc", mazatrol: "fanuc", smoothai: "fanuc", mazak: "fanuc",
-  haas: "haas", grbl: "grbl", linuxcnc: "generic", generic: "generic", iso: "generic",
+  haas: "haas", grbl: "grbl", linuxcnc: "linuxcnc", emc2: "linuxcnc", generic: "generic", iso: "generic",
   sinumerik: "siemens", "840d": "siemens", siemens: "siemens",
   osp: "fanuc", okuma: "fanuc", doosan: "fanuc", dmgmori: "fanuc", dmu: "fanuc",
   heidenhain: "heidenhain", tnc: "heidenhain", tnc7: "heidenhain", klartext: "heidenhain"

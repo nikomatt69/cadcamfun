@@ -130,6 +130,8 @@ class Writer {
   private retractMode: string | undefined
   /** Tool-centre-point control (`G234` on Haas) active over a simultaneous 5-axis section. */
   private tcpOn = false
+  /** High-speed smoothing (`PostOptions.smoothing`) switched on. */
+  private smoothingOn = false
   private cycle: { code: string; z?: string; r?: string; q?: string; p?: string } | undefined
   /**
    * Incremental output (`G91`) for the body of a subprogram: the axis words are the change of the rounded position, which
@@ -324,7 +326,9 @@ class Writer {
     }
     const full = isFullCircle(move, from)
     const collapsed = !full && Number(this.num(move.to.x)) === this.px && Number(this.num(move.to.y)) === this.py
-    if (this.arcMode === "linearize" || collapsed) {
+    // A control without helical interpolation in one block gets the helix as lines (its Z changes after rounding).
+    const helix = this.dialect.arcLimits?.helical === false && Number(this.num(move.to.z)) !== (this.pz ?? Number(this.num(from.z)))
+    if (this.arcMode === "linearize" || collapsed || helix) {
       const n = arcSegmentCount(radius, sweep, this.options.tolerance, full ? 8 : 1)
       const a0 = Math.atan2(from.y - move.center.y, from.x - move.center.x)
       const dir = move.clockwise ? -1 : 1
@@ -345,7 +349,7 @@ class Writer {
       }
       return
     }
-    if (this.arcMode === "radius" && full) {
+    if (full && (this.arcMode === "radius" || this.dialect.arcLimits?.fullCircle === false)) {
       // A full circle has no unique R form: two half circles.
       const mid: Vec3 = {
         x: 2 * move.center.x - from.x,
@@ -520,6 +524,22 @@ class Writer {
     if (end !== undefined) this.ir = { ...end }
   }
 
+  /** Switches the control's contour smoothing on (once per operation) or off (before a tool change, at the end). */
+  smoothing(want: boolean): void {
+    const spec = this.dialect.smoothing
+    const tolerance = this.options.smoothing
+    if (spec === undefined || tolerance === undefined || want === this.smoothingOn) return
+    if (want) {
+      if (!(Number.isFinite(tolerance) && tolerance > 0)) throw new RangeError(`Smoothing tolerance must be a positive number of millimetres, not ${tolerance}`)
+      // The tolerance in program units, never rounded to zero by a coarse output format.
+      const text = String(Number((tolerance * this.scale).toPrecision(3)))
+      for (const b of spec.on(text)) this.block(b)
+    } else {
+      for (const b of spec.off) this.block(b)
+    }
+    this.smoothingOn = want
+  }
+
   /**
    * Closes a simultaneous 5-axis section at the end of the program: the control must not be left with
    * tool-centre-point control active (it is cancelled at `M30` on Haas, but a reader expects to see it).
@@ -627,6 +647,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     const n = numbers.get(tp.toolId) ?? 1
     if (n !== w.tool) {
       w.finishMotion()
+      w.smoothing(false)
       // A changer pulls the tool out of the spindle: it must be above the deepest point the
       // program has already reached, not inside the previous operation's cut.
       if (options.retractBeforeToolChange && w.ir !== undefined && w.ir.z < zMax - 1e-9) w.rapid({ x: w.ir.x, y: w.ir.y, z: zMax })
@@ -654,6 +675,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
       if (tp.coolant !== "off") w.block(tp.coolant === "flood" ? "M8" : "M7")
       w.coolant = tp.coolant
     }
+    w.smoothing(true)
     const call = plan?.callOf.get(ti)
     if (call === undefined) {
       for (const move of tp.moves) {
@@ -684,6 +706,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
   // Leave the control with tool length compensation, never with tool-centre-point control still on
   // (Haas cancels it at M30 too, but a clean end block is what an operator expects to read).
   w.endTcp()
+  w.smoothing(false)
   w.block("M5")
   if (w.coolant !== "off") w.block("M9")
   w.block(dialect.end)

@@ -48,6 +48,12 @@ export interface PostOptions {
    * existing output stays byte-identical.
    */
   readonly subprograms?: boolean
+  /**
+   * Contour tolerance (mm) of the control's high-speed smoothing (Fanuc AICC `G5.1 Q1`, Haas `G187`, Siemens `CYCLE832`,
+   * Heidenhain cycle 32, LinuxCNC `G64 P`), switched on for each operation and off before each tool change and at the end.
+   * Ignored on a dialect without it (`Dialect.smoothing`). Absent by default so existing output stays byte-identical.
+   */
+  readonly smoothing?: number
 }
 
 export const defaultPostOptions: PostOptions = {
@@ -98,6 +104,16 @@ export interface Dialect {
    * expansion into plain moves reverses the spindle. `prefix` is the block the control needs before the cycle (Fanuc `M29 S<rpm>`).
    */
   readonly rigidTap?: { readonly prefix?: (rpm: number) => string }
+  /**
+   * Arcs the control cannot take as one block (default: both allowed). `helical: false` writes an arc that changes Z as line
+   * segments within `tolerance`; `fullCircle: false` writes a full circle as two half circles.
+   */
+  readonly arcLimits?: { readonly helical?: boolean; readonly fullCircle?: boolean }
+  /**
+   * High-speed contour smoothing (`PostOptions.smoothing`): the blocks that switch it on with a tolerance in program units,
+   * and those that switch it off (empty when the control keeps it until the program ends).
+   */
+  readonly smoothing?: { readonly on: (tolerance: string) => ReadonlyArray<string>; readonly off: ReadonlyArray<string> }
   /** Upper-case comments (some controls reject lower case). */
   readonly uppercaseComments: boolean
   /** How a comment line is written: `(text)` (default) or `;text` (Siemens). */

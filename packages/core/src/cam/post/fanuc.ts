@@ -10,6 +10,7 @@ import type { Dialect, Post } from "./types.ts"
  *
  * A simultaneous five-axis section is opened with `G43.4 H<n>` (tool tip control, a Fanuc option the machine builder enables) and closed
  * with `G43 H<n>`, like Haas does with `G234`; the program is then in the work offset, the control keeps the tool tip on the path.
+ * The `smoothing` option switches AI contour control on per operation (`G5.1 Q1`) and off before each tool change (`G5.1 Q0`).
  */
 /** The program number of the main program (`metadata.programNumber`, default 1000). */
 export const fanucProgramNumber = (program: Program): number => {
@@ -36,6 +37,8 @@ export const fanucDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   tcp: "G43.4",
+  // AI contour control (AICC II / AI APC): the precision level and tolerance are the machine's parameters, not words of the block.
+  smoothing: { on: () => ["G5.1 Q1"], off: ["G5.1 Q0"] },
   begin: (program) => ["%", `O${String(fanucProgramNumber(program)).padStart(4, "0")}`],
   subprograms: fanucSubprograms,
   setup: ["G90", "G17", "G94", "G40", "G49", "G80"],

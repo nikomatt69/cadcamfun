@@ -29,6 +29,8 @@ export const siemensDialect: Dialect = {
   unitCodes: { mm: "G71", inch: "G70" },
   rotary: true,
   tcp: { on: () => "TRAORI", off: () => "TRAFOOF" },
+  // High Speed Settings cycle (SINUMERIK Operate): contour tolerance, finishing technology, deselection with `_OFF`.
+  smoothing: { on: (tol) => [`CYCLE832(${tol},_FINISH,1)`], off: ["CYCLE832(0,_OFF,1)"] },
   begin: (program) => [`%_N_${siemensProgramName(program)}_MPF`, ";$PATH=/_N_MPF_DIR"],
   setup: ["G90", "G17", "G94", "G40", "G64"],
   toolChange: (n) => [`T${n} M6`, "D1"],

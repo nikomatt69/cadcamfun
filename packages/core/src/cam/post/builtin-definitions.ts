@@ -35,4 +35,10 @@ export const GRBL_DEFINITION: PostDefinition = {
   begin: [], setup: ["G90", "G17", "G94"], firstToolChange: ["(TOOL T{tool})"], toolChange: ["(CHANGE TO TOOL T{tool})", "M0"], end: "M2", finish: []
 }
 
-export const BUILTIN_DEFINITIONS = { generic: GENERIC_DEFINITION, fanuc: FANUC_DEFINITION, haas: HAAS_DEFINITION, grbl: GRBL_DEFINITION } as const
+export const LINUXCNC_DEFINITION: PostDefinition = {
+  ...of("linuxcnc"), name: "LinuxCNC",
+  canned: true, rigidTap: false, arcModes: ["ijk", "radius"], dwell: "seconds", uppercaseComments: false, rotary: true, tcp: false, subprograms: "none",
+  begin: ["%"], setup: ["G90", "G17", "G94", "G40", "G49", "G80"], toolChange: ["T{tool} M6", "G43 H{tool}"], end: "M2", finish: ["%"]
+}
+
+export const BUILTIN_DEFINITIONS = { generic: GENERIC_DEFINITION, fanuc: FANUC_DEFINITION, haas: HAAS_DEFINITION, grbl: GRBL_DEFINITION, linuxcnc: LINUXCNC_DEFINITION } as const

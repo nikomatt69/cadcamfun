@@ -5,6 +5,7 @@ import { grblDialect, grblPost } from "./grbl.ts"
 import { haasDialect, haasPost } from "./haas.ts"
 import { siemensDialect, siemensPost } from "./siemens.ts"
 import { heidenhainDialect, heidenhainPost } from "./heidenhain.ts"
+import { linuxcncDialect, linuxcncPost } from "./linuxcnc.ts"
 import type { Dialect, Post, PostId } from "./types.ts"
 
 export * from "./types.ts"
@@ -16,13 +17,15 @@ export { grblDialect, grblPost } from "./grbl.ts"
 export { haasDialect, haasPost } from "./haas.ts"
 export { siemensDialect, siemensPost } from "./siemens.ts"
 export { heidenhainDialect, heidenhainPost } from "./heidenhain.ts"
+export { linuxcncDialect, linuxcncPost } from "./linuxcnc.ts"
 export { PostDefinitionSchema, BASE_POSTS, compileDefinition, definitionIssues, type PostDefinition, type DefinitionIssue } from "./definition.ts"
 export { samplePostProgram } from "./sample.ts"
-export { BUILTIN_DEFINITIONS, GENERIC_DEFINITION, FANUC_DEFINITION, HAAS_DEFINITION, GRBL_DEFINITION } from "./builtin-definitions.ts"
+export { BUILTIN_DEFINITIONS, GENERIC_DEFINITION, FANUC_DEFINITION, HAAS_DEFINITION, GRBL_DEFINITION, LINUXCNC_DEFINITION } from "./builtin-definitions.ts"
 
-/** Implemented posts by id (`linuxcnc` is a reserved id, not implemented yet). */
-export const posts: Readonly<Partial<Record<PostId, Post>>> = {
+/** Implemented posts by id: every `PostId`. */
+export const posts: Readonly<Record<PostId, Post>> = {
   generic: genericPost,
+  linuxcnc: linuxcncPost,
   fanuc: fanucPost,
   grbl: grblPost,
   haas: haasPost,
@@ -30,8 +33,8 @@ export const posts: Readonly<Partial<Record<PostId, Post>>> = {
   heidenhain: heidenhainPost
 }
 
-export const getPost = (id: PostId): Post | undefined => posts[id]
+export const getPost = (id: PostId): Post | undefined => posts[id] as Post | undefined
 
 /** The dialect of an implemented post: what its control can do (canned cycles, rigid tapping, rotary axes). */
 export const dialectOf = (id: PostId): Dialect | undefined =>
-  ({ generic: genericDialect, fanuc: fanucDialect, grbl: grblDialect, haas: haasDialect, siemens: siemensDialect, heidenhain: heidenhainDialect } as Partial<Record<PostId, Dialect>>)[id]
+  ({ generic: genericDialect, linuxcnc: linuxcncDialect, fanuc: fanucDialect, grbl: grblDialect, haas: haasDialect, siemens: siemensDialect, heidenhain: heidenhainDialect } as Partial<Record<PostId, Dialect>>)[id]

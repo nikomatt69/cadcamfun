@@ -580,8 +580,10 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if (g === 21 || g === 71) unit = 1
         else if (g === 98 || g === 99) retractMode = g
         else if (g === 4) {
-          const p = get("P") ?? get("X") ?? 0
-          segments.push({ kind: "dwell", seconds: p * dwellFactor, line: lineNo, ...inSub() })
+          const f = get("F")
+          // Siemens writes seconds on F; P (and Fanuc's X) follow the configured unit.
+          const seconds = get("P") !== undefined || get("X") !== undefined ? (get("P") ?? get("X") ?? 0) * dwellFactor : f ?? 0
+          segments.push({ kind: "dwell", seconds, line: lineNo, ...inSub() })
           sample(lineNo, pos)
         } else if (g === 90) { absolute = true; eAbsolute = true }
         else if (g === 91) { absolute = false; eAbsolute = false }
@@ -634,7 +636,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         tools.push(Math.round(w.value))
         tool = Math.round(w.value)
       } else if (w.letter === "F") {
-        feed = w.value * unit
+        // In a dwell block F is the time (Siemens `G4 F<s>`), never the feed: the modal feed stays.
+        if (!words.some((v) => v.letter === "G" && Math.round(v.value * 10) === 40)) feed = w.value * unit
       } else if ((w.letter === "A" || w.letter === "B" || w.letter === "C") && !(polar && w.letter === "C")) {
         // Rotary angles are degrees in both unit systems; they persist until changed. Under G112 C is a length (face Y).
         rotary = { ...rotary, [w.letter.toLowerCase()]: w.value }

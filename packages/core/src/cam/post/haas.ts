@@ -27,6 +27,8 @@ export const haasDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   tcp: "G234",
+  // G187 accuracy control: P1 rough / P2 medium / P3 finish, E the corner tolerance; a bare G187 restores setting 191.
+  smoothing: { on: (tol) => [`G187 P${Number(tol) <= 0.01 ? 3 : Number(tol) <= 0.05 ? 2 : 1} E${tol}`], off: ["G187"] },
   begin: (program) => ["%", `O${String(fanucProgramNumber(program)).padStart(4, "0")}`],
   subprograms: fanucSubprograms,
   setup: ["G90", "G17", "G94", "G40", "G49", "G80"],

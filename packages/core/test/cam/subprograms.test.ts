@@ -217,7 +217,8 @@ interface KlartextStep { readonly x: number; readonly y: number; readonly z: num
 
 /**
  * Runs the `L` blocks of a Klartext program: absolute and incremental (`IX`) axes, `R0 FMAX` / `F`, `CALL LBL n` jumping to
- * `LBL n` and back at `LBL 0`, the main program ending at `M30`. Enough of the control to compare two texts' motion.
+ * `LBL n` and back at `LBL 0`, the main program ending at the block that carries `M30`. Enough of the control to compare two
+ * texts' motion.
  */
 const runKlartext = (text: string): KlartextStep[] => {
   const blocks = lines(text).map((l) => l.replace(/^\d+ /, ""))
@@ -230,17 +231,22 @@ const runKlartext = (text: string): KlartextStep[] => {
     for (let i = from; i < blocks.length; i++) {
       const b = blocks[i]!
       if (inLabel && b === "LBL 0") return
-      if (!inLabel && (b === "M30" || b.startsWith("END PGM"))) return
+      if (!inLabel && b.startsWith("END PGM")) return
       const call = /^CALL LBL (\d+)$/.exec(b)
       if (call) { run(labels.get(Number(call[1]))! + 1, true); continue }
-      if (!b.startsWith("L ")) continue
+      // A `C` arc is a step to its end point (its centre, `CC`, does not move the tool).
+      if (!b.startsWith("L ") && !b.startsWith("C ")) continue
       for (const w of b.matchAll(/(I?)([XYZ])([+-][\d.]+)/g)) {
         const axis = w[2]!.toLowerCase() as "x" | "y" | "z"
         at[axis] = w[1] === "I" ? at[axis] + Number(w[3]) : Number(w[3])
       }
       const f = /\bF(\d+(?:\.\d*)?)/.exec(b)
       if (f) feed = Number(f[1])
-      steps.push({ ...at, rapid: b.includes("FMAX"), feed: b.includes("FMAX") ? undefined : feed })
+      const step = { ...at, rapid: b.includes("FMAX"), feed: b.includes("FMAX") ? undefined : feed }
+      // A block that carries only M functions at the current position (Klartext has no M block of its own) is no step.
+      const last = steps[steps.length - 1]
+      if (last === undefined || last.x !== step.x || last.y !== step.y || last.z !== step.z || last.rapid !== step.rapid) steps.push(step)
+      if (!inLabel && /\bM30\b/.test(b)) return
     }
   }
   run(0, false)
@@ -263,7 +269,8 @@ describe("Klartext label subprograms", () => {
     const l = lines(text).map((x) => x.replace(/^\d+ /, ""))
     expect(l.filter((x) => x === "CALL LBL 1")).toHaveLength(4)
     expect(l.filter((x) => x === "LBL 1")).toHaveLength(1)
-    expect(l.indexOf("LBL 1")).toBeGreaterThan(l.indexOf("M30"))
+    // M30 ends the main program on its last positioning block; the label bodies follow it.
+    expect(l.indexOf("LBL 1")).toBeGreaterThan(l.findIndex((x) => /^L .*\bM30\b/.test(x)))
     expect(l.indexOf("LBL 0")).toBeLessThan(l.findIndex((x) => x.startsWith("END PGM")))
     // The body is incremental, so one text serves every copy; nothing of the ISO subprogram syntax is left.
     const body = l.slice(l.indexOf("LBL 1") + 1, l.indexOf("LBL 0"))

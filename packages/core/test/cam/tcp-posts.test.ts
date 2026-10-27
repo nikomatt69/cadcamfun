@@ -49,15 +49,19 @@ describe("tool-centre-point commands, post by post", () => {
     expect(text).not.toContain("G43")
   })
 
-  test("Heidenhain Klartext: M128 before the section, M129 after it, each on its own block", () => {
+  test("Heidenhain Klartext: M128 on the first block of the section, M129 on its last, both on positioning blocks", () => {
     const text = heidenhainPost.emit(program(simultaneous))
     const lines = text.trimEnd().split("\n").map((l) => l.replace(/^\d+ /, ""))
-    const on = lines.indexOf("M128"), off = lines.indexOf("M129")
+    // Klartext has no block for an M function alone: M128 acts at the start of its block, M129 at the end of its block.
+    const on = lines.findIndex((l) => /\bM128\b/.test(l)), off = lines.findIndex((l) => /\bM129\b/.test(l))
     expect(on).toBeGreaterThan(-1)
     expect(off).toBeGreaterThan(on)
+    expect(lines[on]).toMatch(/^L /)
+    expect(lines[off]).toMatch(/^L /)
     const firstTilted = lines.findIndex((l) => l.includes("B+30"))
-    expect(on).toBeLessThan(firstTilted)
-    expect(lines.findIndex((l) => l.includes("B+32"))).toBeLessThan(off)
+    expect(on).toBeLessThanOrEqual(firstTilted)
+    expect(lines.findIndex((l) => l.includes("B+32"))).toBeLessThanOrEqual(off)
+    expect(lines.some((l) => /^M\d+$/.test(l))).toBe(false)
   })
 
   test("Haas keeps G234 exactly as before", () => {
