@@ -72,6 +72,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
     if (state.state === "suppressed") return { text: "suppressed", tone: "text-gray-500" }
     if (state.state === "suppressed-by") return { text: `suppressed by ${state.by}`, tone: "text-gray-500" }
     if (state.state === "rolled-back") return { text: "rolled back", tone: "text-gray-500" }
+    if (state.state === "skipped") return { text: `not built: ${state.by} failed`, tone: "text-red-700" }
     return { text: "failed", tone: "text-red-700" }
   }
   const inactive = (id: string): boolean => { const s = built()?.states[id]?.state; return s !== undefined && s !== "ok" && s !== "failed" }
@@ -418,7 +419,7 @@ export default function ParametricPanel(props: { readonly element: Element; read
               </div>
               <Show when={issuesOf(feature.id).length > 0}>
                 <ul class="mt-1 space-y-0.5" data-testid={`issues-${feature.id}`}>
-                  <For each={issuesOf(feature.id)}>{(issue) => <li class={`text-xs ${issue.severity === "error" ? "text-red-700" : "text-amber-700"}`} role={issue.severity === "error" ? "alert" : undefined}>{issue.message}</li>}</For>
+                  <For each={issuesOf(feature.id)}>{(issue) => <li class={`text-xs ${issue.severity === "error" ? "text-red-700" : "text-amber-700"}`} role={issue.severity === "error" ? "alert" : undefined}>{issue.message}<Show when={issue.remedy}>{(remedy) => <span class="block text-gray-600 dark:text-gray-300" data-testid={`remedy-${feature.id}`}>{remedy()}</span>}</Show></li>}</For>
                 </ul>
               </Show>
             </li>

@@ -97,4 +97,16 @@ describe("the timeline", () => {
     expect(alert).toContain("'plate'")
     dispose()
   }, 60_000)
+
+  test("a fillet that does not fit shows the checked remedy under it, and the hole after it still builds", async () => {
+    const base = plateTemplate()
+    const history: History = { ...base, features: [...base.features.slice(0, 2), { id: "round", type: "fillet", radius: 30, targets: ["plate"] }, base.features[2]!] }
+    const { id, dispose } = mountPanel(history)
+    await tick()
+    expect(byId("state-round")?.textContent).toBe("failed")
+    expect(byId("remedy-round")?.textContent).toMatch(/at most [\d.]+ mm/)
+    expect(byId("state-hole1")).toBeNull()
+    expect(volume(id)).toBeLessThan(PLATE - 500)
+    dispose()
+  }, 60_000)
 })

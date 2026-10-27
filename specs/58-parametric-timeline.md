@@ -1,6 +1,6 @@
 # 58 — The parametric timeline: suppress, rollback, reorder, groups, edit-in-place, incremental rebuild
 
-Status: specified 2026-10-25; T1–T3 and T7 built 2026-10-27; T4, T5, T6, T8 (beyond `withSuppressed` / `withRollback`) open. Part of [spec 39](39-professional-parity-master-plan.md); gap G1 of [spec 57](57-parity-ledger-2026-10-25.md).
+Status: specified 2026-10-25; T1–T3, T5 and T7 built 2026-10-27; T4, T6, T8 (beyond `withSuppressed` / `withRollback`) open. Part of [spec 39](39-professional-parity-master-plan.md); gap G1 of [spec 57](57-parity-ledger-2026-10-25.md).
 Owner: WP1 (`packages/core/src/cad/{history.ts,history-brep.ts,history-edit.ts}`); adapters WP3 (`packages/api/src/ai-parametric.ts`),
 WP6 (`apps/desktop/src/features/cad`), WP8 (`packages/ai`, `cad_parametric`). Interacts with [spec 40](40-single-exact-brep-truth.md) (the two replays),
 [41](41-persistent-topological-naming.md) (refs follow the timeline) and [46](46-assembly-and-configurations.md) (configurations are built on suppression).
@@ -129,3 +129,10 @@ T1 → T2 → T3 → T5 → T6 → T7 → T4 → T8. T4 is last because it touch
   `editTimeline` (refused when it makes a feature fail that built before); the parametric report lists the features not built. The exact
   route already follows the stored timeline (`elementBrep` → `rebuildExact`); `ai-parametric-timeline.test.ts` proves it on the stored part.
   Open from T7: the fingerprint still includes `group` (a rename rebuilds the viewport needlessly).
+- 2026-10-27: T5 built. A fillet / chamfer that does not fit every selected edge fails as a whole (body left as it was, per-edge
+  warnings kept) with `Issue.remedy`: the largest size every selected edge takes, by bisection on the same meshes, rounded down and
+  checked again; the gate rebuilds with it. Behaviour change: a partly fitting fillet used to blend the edges it could and only warn.
+  A feature naming a failed (or skipped) one is `skipped` with the failed root and an error issue saying so; features that only act on
+  the remaining bodies still build; the exact replay skips the same. Panel: "not built: X failed" and the remedy under the issue; the
+  assistant report lists skipped features with their cause. Remedies for shell, Boolean and thread failures are not built yet (their
+  errors keep today's text).

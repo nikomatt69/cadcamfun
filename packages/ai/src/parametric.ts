@@ -85,7 +85,7 @@ const computeParametricReport = (history: History) => {
       return left.length === 0 && history.rollback === undefined ? {} : {
         timeline: {
           ...(history.rollback !== undefined ? { rollback: history.rollback } : {}),
-          notBuilt: left.map(([id, state]) => ({ id, state: state.state, ...(state.state === "suppressed-by" ? { by: state.by } : {}) }))
+          notBuilt: left.map(([id, state]) => ({ id, state: state.state, ...(state.state === "suppressed-by" || state.state === "skipped" ? { by: state.by } : {}) }))
         }
       }
     })(),

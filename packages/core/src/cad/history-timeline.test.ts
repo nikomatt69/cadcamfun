@@ -173,3 +173,54 @@ describe("lineage and reorder (spec 58 T3)", () => {
     expect(insertFeature(h, { ...fillet, id: "hole1" }, "plate").refusal).toContain("already used")
   })
 })
+
+describe("failures (spec 58 T5)", () => {
+  const filleted = (radius: number): History => historyOf((m) => {
+    const plate = m.extrude(m.sketch("XY").rectangle([0, 0], 40, 30), { depth: 10 })
+    m.fillet({ radius, targets: [plate] })
+    m.hole({ plane: "XY", offset: 10, at: [20, 15], diameter: 4, depth: 10 })
+  })
+
+  test("a fillet radius larger than the faces fails only that feature, leaves the body as it was, and later features build", () => {
+    const h = filleted(20)
+    const r = rebuild(h)
+    const [, plate, fillet, hole] = h.features.map((f) => f.id)
+    expect(r.states[fillet!]).toEqual({ state: "failed" })
+    expect(r.states[hole!]).toEqual({ state: "ok" })
+    const box = 40 * 30 * 10, bore = Math.PI * 2 ** 2 * 10
+    expect(Math.abs(meshVolume(r.bodies[0]!.mesh))).toBeCloseTo(box - bore, -1)
+    expect(r.bodies.map((b) => b.id)).toEqual([plate!])
+  })
+
+  test("the remedy names a size that works, checked by rebuilding with it", () => {
+    const failed = rebuild(filleted(20)).issues.find((i) => i.severity === "error")!
+    expect(failed.remedy).toMatch(/at most [\d.]+ mm/)
+    const size = Number(/at most ([\d.]+) mm/.exec(failed.remedy!)![1])
+    expect(size).toBeGreaterThan(0)
+    expect(size).toBeLessThan(20)
+    const fixed = rebuild(filleted(size))
+    expect(fixed.issues.filter((i) => i.feature === failed.feature)).toEqual([])
+    expect(Object.values(fixed.states).every((s) => s.state === "ok")).toBe(true)
+  })
+
+  test("what names a failed feature is skipped, naming the failed root; what does not name it still builds", () => {
+    const h: History = {
+      parameters: plateTemplate().parameters,
+      features: [
+        { id: "s", type: "sketch", plane: "XY", sketch: { entities: [{ id: "a", kind: "point", x: 0, y: 0 }, { id: "b", kind: "point", x: 10, y: 0 }, { id: "l", kind: "line", p1: "a", p2: "b" }], constraints: [{ type: "fixed", point: "a" }, { type: "horizontal", line: "l" }, { type: "length", line: "l", value: 10 }, { type: "length", line: "l", value: 20 }] } },
+        { id: "e", type: "extrude", sketch: "s", depth: 5, operation: "new" },
+        { id: "copies", type: "pattern", feature: "e", kind: "linear", count: 2, step: [20, 0, 0] },
+        ...plateTemplate().features
+      ]
+    }
+    const r = rebuild(h)
+    expect(r.states["s"]).toEqual({ state: "failed" })
+    expect(r.states["e"]).toEqual({ state: "skipped", by: "s" })
+    expect(r.states["copies"]).toEqual({ state: "skipped", by: "s" })
+    expect(r.issues.find((i) => i.feature === "copies")?.message).toContain("'s' failed")
+    expect(["sketch1", "plate", "hole1"].map((id) => r.states[id]?.state)).toEqual(["ok", "ok", "ok"])
+    expect(r.bodies.map((b) => b.id)).toEqual(["plate"])
+    // The exact replay builds nothing of a skipped feature either.
+    expect(rebuildExact(h, r).bodies.map((b) => b.id)).toEqual(["plate"])
+  })
+})

@@ -700,7 +700,7 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
   const advance = (end: number): void => {
     while (next < end && stopped === undefined) {
       const f = history.features[next++]!
-      if (active[f.id]?.state !== "active" || failed(f.id)) continue
+      if (active[f.id]?.state !== "active" || failed(f.id) || result.states?.[f.id]?.state === "skipped") continue
       featureId = f.id
       try {
         checkBudget()

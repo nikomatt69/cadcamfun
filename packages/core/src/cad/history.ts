@@ -37,7 +37,7 @@ import { blendEdges, blendEdgesVariable, findEdges, selectEdges } from "./edge-b
 import { expandSketch, type SketchShape } from "./sketch-shapes.ts"
 import { elementMesh } from "../cam/model/element-mesh.ts"
 import { exactReplay, type ExactReplay } from "./history-brep.ts"
-import { bodyRefs, timelinePlan } from "./history-timeline.ts"
+import { bodyCreator, bodyRefs, declaredNeeds, timelinePlan } from "./history-timeline.ts"
 import { blendBrep, blendCandidates, faceByName, faceCentre, isConePlaneRim, meshEdgeDefects, selectBlendEdges, tessellateBrep, withBudget } from "./brep/index.ts"
 import { isSpherePlaneRim } from "./brep/blend-sphere-plane.ts"
 
@@ -534,8 +534,16 @@ export interface History {
 export type FeatureState =
   | { readonly state: "ok" | "failed" | "suppressed" | "rolled-back" }
   | { readonly state: "suppressed-by"; readonly by: string }
+  /** Not built because a feature it names failed (`by` is the failed feature); later features that do not name it still build. */
+  | { readonly state: "skipped"; readonly by: string }
 
-export interface Issue { readonly feature: string; readonly severity: "error" | "warning"; readonly message: string }
+export interface Issue {
+  readonly feature: string
+  readonly severity: "error" | "warning"
+  readonly message: string
+  /** What would make the feature build, checked by the kernel (spec 58 T5): e.g. the largest radius every selected edge takes. */
+  readonly remedy?: string
+}
 
 export interface Body { readonly id: string; readonly mesh: Mesh; readonly feature: string }
 
@@ -957,9 +965,20 @@ export const rebuild = (history: History): RebuildResult => {
   const plan = timelinePlan(history)
   for (const message of plan.problems) issues.push({ feature: "timeline", severity: "warning", message })
   const lastWriter = new Map<string, string>()
+  // Failed and skipped features, each with the failed feature at its root.
+  const broken = new Map<string, string>()
   for (const [featureIndex, f] of history.features.entries()) {
     const planned = plan.states[f.id]!
     if (planned.state !== "active") { states[f.id] = planned.state === "suppressed-by" ? planned : { state: planned.state }; continue }
+    // A feature that names a failed (or skipped) one is not built: its input is not what was designed (spec 58 T5).
+    const brokenNeed = [...declaredNeeds(f), ...bodyRefs(f).map(bodyCreator)].find((id) => broken.has(id))
+    if (brokenNeed !== undefined) {
+      const root = broken.get(brokenNeed)!
+      states[f.id] = { state: "skipped", by: root }
+      broken.set(f.id, root)
+      issues.push({ feature: f.id, severity: "error", message: `Not built: it needs '${brokenNeed}', which ${brokenNeed === root ? "failed" : `was not built because '${root}' failed`}` })
+      continue
+    }
     const issuesBefore = issues.length
     const before = new Map(bodies.map((b) => [b.id, b.mesh] as const))
     const named = bodyRefs(f).flatMap((id) => lastWriter.get(id) ?? [])
@@ -1210,6 +1229,9 @@ export const rebuild = (history: History): RebuildResult => {
           if (chosen.length === 0) { issues.push({ feature: f.id, severity: "error", message: "There is no body for this operation to act on" }); break }
           let blended = 0
           let nativeAttempts = 0
+          // A fillet that does not fit every selected edge fails as a whole (spec 58 T5): the bodies are put back as they were.
+          const unfilleted = new Map(chosen.map((b) => [b.id, b.mesh] as const))
+          const tooSmall: Array<{ readonly mesh: Mesh; readonly edges: ReturnType<typeof selectEdges> }> = []
           // The prefix already has its solved sketches and mesh bodies. Giving it to the exact adapter avoids re-entering
           // this rebuild. A selection made only of sphere/plane or cone/plane rims uses that exact solid for the mesh.
           const exactBefore = f.edges?.curved === true && style === "fillet" && radiusEnd === undefined
@@ -1244,6 +1266,7 @@ export const rebuild = (history: History): RebuildResult => {
             const picked = selectEdges(found.edges, selector)
             if (radiusEnd === undefined) {
               const result = blendEdges(b.mesh, picked, radius, style, chamfer)
+              if (result.rejected.length > 0) tooSmall.push({ mesh: b.mesh, edges: picked })
               blended += result.blended
               for (const why of result.rejected.slice(0, 4)) issues.push({ feature: f.id, severity: "warning", message: `Not blended: ${why}` })
               bodies[bodies.indexOf(b)] = { ...b, mesh: result.mesh }
@@ -1253,6 +1276,7 @@ export const rebuild = (history: History): RebuildResult => {
               for (const edge of picked) {
                 const flip = edge.b.x < edge.a.x || (edge.b.x === edge.a.x && (edge.b.y < edge.a.y || (edge.b.y === edge.a.y && edge.b.z < edge.a.z)))
                 const result = blendEdgesVariable(mesh, [edge], flip ? radiusEnd : radius, flip ? radius : radiusEnd)
+                if (result.rejected.length > 0) tooSmall.push({ mesh, edges: [edge] })
                 blended += result.blended
                 for (const why of result.rejected.slice(0, 4)) issues.push({ feature: f.id, severity: "warning", message: `Not blended: ${why}` })
                 mesh = result.mesh
@@ -1260,7 +1284,22 @@ export const rebuild = (history: History): RebuildResult => {
               bodies[bodies.indexOf(b)] = { ...b, mesh }
             }
           }
-          if (blended === 0 && nativeAttempts === 0) issues.push({ feature: f.id, severity: "error", message: "No edge matched the selection (edges are found between planar faces that meet at 25 degrees or more)" })
+          if (tooSmall.length > 0) {
+            for (const b of chosen) { const i = bodies.findIndex((x) => x.id === b.id); if (i >= 0) bodies[i] = { ...bodies[i]!, mesh: unfilleted.get(b.id)! } }
+            const word = style === "chamfer" ? "chamfer" : "fillet"
+            // The largest size every selected edge takes, by bisection on the same meshes, then rounded down and checked again.
+            const fits = (r: number) => tooSmall.every((t) => blendEdges(t.mesh, t.edges, r, style, chamfer).rejected.length === 0)
+            let lo = 0, hi = radiusEnd === undefined ? radius : Math.max(radius, radiusEnd)
+            for (let k = 0; k < 14; k++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid }
+            const step = lo >= 10 ? 1 : lo >= 1 ? 0.1 : 0.01
+            const safe = Math.floor(lo / step) * step
+            const remedy = safe > 0 && fits(safe)
+              ? `Use a ${word} size of at most ${Number(safe.toFixed(2))} mm (checked on every selected edge), or select fewer edges.`
+              : `No ${word} size fits every selected edge: select fewer edges.`
+            issues.push({ feature: f.id, severity: "error", message: `The ${word} does not fit: some selected edges cannot take ${radiusEnd === undefined ? `${radius} mm` : `${radius} to ${radiusEnd} mm`} (the body is left as it was)`, remedy })
+          } else if (blended === 0 && nativeAttempts === 0) {
+            issues.push({ feature: f.id, severity: "error", message: "No edge matched the selection (edges are found between planar faces that meet at 25 degrees or more)" })
+          }
           break
         }
         case "shell": {
@@ -1856,7 +1895,9 @@ export const rebuild = (history: History): RebuildResult => {
       for (const id of after.keys()) if (!before.has(id)) lastWriter.set(id, f.id)
       touched.delete(f.id)
       lineage[f.id] = [...touched]
-      states[f.id] = { state: issues.slice(issuesBefore).some((i) => i.feature === f.id && i.severity === "error") ? "failed" : "ok" }
+      const failed = issues.slice(issuesBefore).some((i) => i.feature === f.id && i.severity === "error")
+      states[f.id] = { state: failed ? "failed" : "ok" }
+      if (failed) broken.set(f.id, f.id)
     }
   }
   return { bodies, parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues, states, lineage }
