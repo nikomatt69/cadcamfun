@@ -1,12 +1,14 @@
 /**
  * IGES 5.3 B-rep exchange: fixed 80-column S/G/D/P/T records, analytic/rational geometry and explicit shared topology.
+ * Transformation matrices (entity 124, chained through their own directory field) place geometry, vertex lists and whole
+ * solids; one on the topology between them (edge list, loop, face, shell) is refused, because its edges are shared.
  * Unsupported entities and transformations are diagnosed instead of interpreting an unrelated format as IGES.
  * Entity layouts: STEP Tools IGES EXPRESS schemas and the IGES 5.3 specification (spec 33 exchange references).
  */
 import { arcControl, curveDomain, surfaceDomain, type NurbsCurveData, type NurbsSurfaceData } from "./nurbs.ts"
-import { curvePoint, type Curve3, type Surface } from "./geom.ts"
-import { add3, frame, scale3, sub3, normalize3, type Vec3 } from "./math.ts"
-import { compactBrep, type Brep, type Coedge, type Face, type Shell } from "./topology.ts"
+import { curvePoint, transformCurve, transformSurface, type Curve3, type Surface } from "./geom.ts"
+import { add3, applyDir, applyPoint, compose, frame, length3, scale3, sub3, normalize3, type Transform, type Vec3 } from "./math.ts"
+import { compactBrep, transformBrep, type Brep, type Coedge, type Face, type Shell } from "./topology.ts"
 import { validateBrep } from "./validate.ts"
 import { nurbsSurfaceProblem } from "./surface-patch.ts"
 
@@ -136,24 +138,56 @@ export const readIgesBreps = (text: string): IgesRead => {
   if (directory.length % 2 !== 0) throw new RangeError("unpaired IGES directory record")
   const parameters = new Map<number, string>()
   for (const line of lines.filter((l) => l[72] === "P")) { const id = Number(line.slice(64, 72)); parameters.set(id, (parameters.get(id) ?? "") + line.slice(0, 64)) }
-  const entities = new Map<number, { type: number; form: number; values: Array<string | number>; label: string }>()
+  const entities = new Map<number, { type: number; form: number; values: Array<string | number>; label: string; transform: number }>()
   for (let i = 0; i < directory.length; i += 2) {
     const a = directory[i]!, b = directory[i + 1]!, id = Number(a.slice(73)), type = Number(a.slice(0, 8)), transform = Number(a.slice(48, 56))
-    if (transform !== 0) throw new RangeError(`IGES transformation ${transform} on entity ${id} is not supported; bake placements before exchange`)
     const raw = parameters.get(id)
     if (raw === undefined) throw new RangeError(`missing IGES parameters for entity ${id}`)
     const values = tokens(raw, delimiter, terminator)
     if (values.shift() !== type) throw new RangeError(`IGES directory/parameter type mismatch at ${id}`)
-    entities.set(id, { type, form: Number(b.slice(32, 40)), values, label: b.slice(56, 64).trim() })
+    if (!Number.isInteger(transform) || transform < 0) throw new RangeError(`invalid IGES transformation pointer at ${id}`)
+    entities.set(id, { type, form: Number(b.slice(32, 40)), values, label: b.slice(56, 64).trim(), transform })
   }
   const entity = (id: number, type?: number) => { const e = entities.get(id); if (e === undefined || (type !== undefined && e.type !== type)) throw new RangeError(`IGES reference ${id}: expected type ${type ?? "supported"}`); return e }
   const nums = (id: number, type?: number) => entity(id, type).values.map((v) => { if (typeof v !== "number" || !Number.isFinite(v)) throw new RangeError(`non-numeric IGES geometry at ${id}`); return v })
   const vec = (v: ReadonlyArray<number>, at = 0, scale = lengthScale): Vec3 => { if (v.length < at + 3) throw new RangeError("truncated IGES vector"); return { x: v[at]! * scale, y: v[at + 1]! * scale, z: v[at + 2]! * scale } }
-  const point = (id: number) => vec(nums(id, 116))
-  const direction = (id: number) => normalize3(vec(nums(id, 123), 0, 1))
-  const curve = (id: number): { curve: Curve3; t0: number; t1: number } => {
+  /**
+   * The rigid motion a 124 entity applies (rotation R and translation T, in model units), followed by the one its own
+   * directory entry points to: IGES chains transformations that way. A matrix that is not a rotation or reflection (a
+   * scale or shear) is refused: the kernel's analytic surfaces could not carry it exactly.
+   */
+  const matrix = (id: number, depth = 0): Transform => {
+    if (depth > 32) throw new RangeError(`IGES transformation chain at ${id} is circular or deeper than 32`)
+    const e = entity(id, 124), v = nums(id, 124)
+    if (v.length < 12) throw new RangeError(`truncated IGES transformation ${id}`)
+    const m = [v[0]!, v[1]!, v[2]!, v[4]!, v[5]!, v[6]!, v[8]!, v[9]!, v[10]!] as const
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+      const dot = m[3 * i]! * m[3 * j]! + m[3 * i + 1]! * m[3 * j + 1]! + m[3 * i + 2]! * m[3 * j + 2]!
+      if (Math.abs(dot - (i === j ? 1 : 0)) > 1e-6) throw new RangeError(`IGES transformation ${id} is not a rigid motion (its matrix scales or shears)`)
+    }
+    const own: Transform = { m, t: { x: v[3]! * lengthScale, y: v[7]! * lengthScale, z: v[11]! * lengthScale } }
+    return e.transform === 0 ? own : compose(own, matrix(e.transform, depth + 1))
+  }
+  /** Where an entity's definition space goes: its own transformation, then the one of the entity that refers to it. */
+  const placement = (id: number, outer: Transform | undefined): Transform | undefined => {
+    const own = entity(id).transform === 0 ? undefined : matrix(entity(id).transform)
+    return own === undefined ? outer : outer === undefined ? own : compose(own, outer)
+  }
+  const placed = (tr: Transform | undefined, p: Vec3): Vec3 => (tr === undefined ? p : applyPoint(tr, p))
+  const point = (id: number, outer?: Transform) => placed(placement(id, outer), vec(nums(id, 116)))
+  const direction = (id: number, outer?: Transform) => { const tr = placement(id, outer), d = normalize3(vec(nums(id, 123), 0, 1)); return tr === undefined ? d : normalize3(applyDir(tr, d)) }
+  const curve = (id: number, outer?: Transform): { curve: Curve3; t0: number; t1: number } => {
+    const tr = placement(id, outer), read = definedCurve(id)
+    return tr === undefined ? read : { ...read, curve: transformCurve(read.curve, tr) }
+  }
+  const definedCurve = (id: number): { curve: Curve3; t0: number; t1: number } => {
     const e = entity(id), v = nums(id)
-    if (e.type === 110) return { curve: { kind: "line", origin: vec(v), dir: sub3(vec(v, 3), vec(v)) }, t0: 0, t1: 1 }
+    if (e.type === 110) {
+      // The kernel's lines run along a unit direction with the parameter in mm (what transformBrep and the offsets expect).
+      const from = vec(v), span = sub3(vec(v, 3), from), length = length3(span)
+      if (!(length > 0)) throw new RangeError(`IGES line ${id} has zero length`)
+      return { curve: { kind: "line", origin: from, dir: scale3(span, 1 / length) }, t0: 0, t1: length }
+    }
     if (e.type === 100) {
       const center = { x: v[1]! * lengthScale, y: v[2]! * lengthScale, z: v[0]! * lengthScale }
       const radius = Math.hypot(v[3]! - v[1]!, v[4]! - v[2]!) * lengthScale
@@ -173,18 +207,24 @@ export const readIgesBreps = (text: string): IgesRead => {
     if (!(t1 > t0) || weights.some((w) => w <= 0) || knots.some((k, i) => i > 0 && k < knots[i - 1]!)) throw new RangeError("invalid IGES rational curve parameters")
     return { curve: { kind: "nurbs", data: { degree, knots, weights, points } }, t0, t1 }
   }
-  const surface = (id: number): Surface => {
-    const e = entity(id), v = nums(id)
+  const surface = (id: number, outer?: Transform): Surface => {
+    const e = entity(id), v = nums(id), tr = placement(id, outer)
     if ([190, 192, 194, 196, 198].includes(e.type)) {
-      const f = e.type === 196 ? frame(point(v[0]!), e.form === 1 ? direction(v[2]!) : { x: 0, y: 0, z: 1 }, e.form === 1 ? direction(v[3]!) : undefined) : frame(point(v[0]!), direction(v[1]!), e.form === 1 ? direction(v[e.type === 190 ? 2 : e.type === 192 ? 3 : 4]!) : undefined)
+      // The location and axes are entities of their own, placed by this surface's transformation as well as their own.
+      const axis = (ref: number) => direction(ref, tr), unplaced = (d: Vec3) => (tr === undefined ? d : normalize3(applyDir(tr, d)))
+      const f = e.type === 196 ? frame(point(v[0]!, tr), e.form === 1 ? axis(v[2]!) : unplaced({ x: 0, y: 0, z: 1 }), e.form === 1 ? axis(v[3]!) : undefined) : frame(point(v[0]!, tr), axis(v[1]!), e.form === 1 ? axis(v[e.type === 190 ? 2 : e.type === 192 ? 3 : 4]!) : undefined)
       if (e.type === 190) return { kind: "plane", frame: f }
       if (e.type === 192) return { kind: "cylinder", frame: f, radius: v[2]! * lengthScale }
       if (e.type === 194) return { kind: "cone", frame: f, radius: v[2]! * lengthScale, semiAngle: v[3]! * Math.PI / 180 }
       if (e.type === 196) return { kind: "sphere", frame: f, radius: v[1]! * lengthScale }
       return { kind: "torus", frame: f, major: v[2]! * lengthScale, minor: v[3]! * lengthScale }
     }
-    if (e.type === 120) { const axis = nums(v[0]!, 110); return { kind: "revolution", origin: vec(axis), axis: normalize3(sub3(vec(axis, 3), vec(axis))), curve: curve(v[1]!).curve } }
-    if (e.type === 122) { const c = curve(v[0]!); return { kind: "extrusion", curve: c.curve, dir: sub3(vec(v, 1), curvePoint(c.curve, c.t0)) } }
+    if (e.type === 120) {
+      const axis = curve(v[0]!, tr)
+      if (axis.curve.kind !== "line") throw new RangeError(`IGES reference ${v[0]}: expected type 110`)
+      return { kind: "revolution", origin: axis.curve.origin, axis: normalize3(axis.curve.dir), curve: curve(v[1]!, tr).curve }
+    }
+    if (e.type === 122) { const c = curve(v[0]!, tr); return { kind: "extrusion", curve: c.curve, dir: sub3(placed(tr, vec(v, 1)), curvePoint(c.curve, c.t0)) } }
     if (e.type !== 128) throw new RangeError(`unsupported IGES surface type ${e.type} at ${id}`)
     const n = v[0]! + 1, m = v[1]! + 1, degreeU = v[2]!, degreeV = v[3]!
     if (![n, m, degreeU, degreeV].every(Number.isInteger) || n < 2 || m < 2 || n > 64 || m > 64 || degreeU < 1 || degreeV < 1 || degreeU > 8 || degreeV > 8) throw new RangeError("invalid IGES rational surface dimensions")
@@ -197,7 +237,7 @@ export const readIgesBreps = (text: string): IgesRead => {
     const data: NurbsSurfaceData = { degreeU, degreeV, knotsU, knotsV, weights, points }
     const problem = nurbsSurfaceProblem(data)
     if (problem !== undefined) throw new RangeError(problem)
-    return { kind: "nurbs", data }
+    return tr === undefined ? { kind: "nurbs", data } : transformSurface({ kind: "nurbs", data }, tr)
   }
   const count = (value: number | undefined, max: number, label: string): number => {
     if (value === undefined || !Number.isInteger(value) || value < 0 || value > max) throw new RangeError(`invalid IGES ${label} count`)
@@ -208,16 +248,21 @@ export const readIgesBreps = (text: string): IgesRead => {
     if (e.type !== 186) continue
     try {
       const v = nums(id), shellIds = [{ id: v[0]!, forward: v[1] === 1 }, ...Array.from({ length: count(v[2], entities.size, "void shell") }, (_, i) => ({ id: v[3 + i * 2]!, forward: v[4 + i * 2] === 1 }))]
+      const placedTopology = (ref: number, type: number): number => {
+        const t = entity(ref, type).transform
+        if (t !== 0) throw new RangeError(`IGES transformation ${t} on topology entity ${ref} (type ${type}) is not supported: its edges are shared with other faces; place the solid (186) or the geometry instead`)
+        return ref
+      }
       const vertices: Array<{ point: Vec3; tol: number }> = [], edges: Brep["edges"][number][] = [], faces: Face[] = [], shells: Shell[] = []
       const vertexMap = new Map<string, number>(), edgeMap = new Map<string, number>()
-      const vertex = (ref: number, index: number) => { const key = `${ref}:${index}`; let to = vertexMap.get(key); if (to !== undefined) return to; const list = nums(ref, 502); if (!Number.isInteger(index) || index < 1 || index > list[0]!) throw new RangeError("IGES vertex index outside list"); to = vertices.length; vertices.push({ point: vec(list, 1 + (index - 1) * 3), tol: 1e-7 }); vertexMap.set(key, to); return to }
-      const edge = (ref: number, index: number) => { const key = `${ref}:${index}`; let to = edgeMap.get(key); if (to !== undefined) return to; const list = nums(ref, 504); if (!Number.isInteger(index) || index < 1 || index > list[0]!) throw new RangeError("IGES edge index outside list"); const at = 1 + (index - 1) * 5; const c = curve(list[at]!); to = edges.length; edges.push({ ...c, v0: vertex(list[at + 1]!, list[at + 2]!), v1: vertex(list[at + 3]!, list[at + 4]!), tol: 1e-7 }); edgeMap.set(key, to); return to }
+      const vertex = (ref: number, index: number) => { const key = `${ref}:${index}`; let to = vertexMap.get(key); if (to !== undefined) return to; const list = nums(ref, 502); if (!Number.isInteger(index) || index < 1 || index > list[0]!) throw new RangeError("IGES vertex index outside list"); to = vertices.length; vertices.push({ point: placed(placement(ref, undefined), vec(list, 1 + (index - 1) * 3)), tol: 1e-7 }); vertexMap.set(key, to); return to }
+      const edge = (ref: number, index: number) => { const key = `${ref}:${index}`; let to = edgeMap.get(key); if (to !== undefined) return to; const list = nums(placedTopology(ref, 504), 504); if (!Number.isInteger(index) || index < 1 || index > list[0]!) throw new RangeError("IGES edge index outside list"); const at = 1 + (index - 1) * 5; const c = curve(list[at]!); to = edges.length; edges.push({ ...c, v0: vertex(list[at + 1]!, list[at + 2]!), v1: vertex(list[at + 3]!, list[at + 4]!), tol: 1e-7 }); edgeMap.set(key, to); return to }
       for (const sh of shellIds) {
-        const sv = nums(sh.id, 514), faceIds: number[] = []
+        const sv = nums(placedTopology(sh.id, 514), 514), faceIds: number[] = []
         for (let i = 0; i < count(sv[0], Math.floor((sv.length - 1) / 2), "face"); i++) {
-          const ref = sv[1 + i * 2]!, fv = nums(ref, 510), reversed = (sv[2 + i * 2] === 0) !== !sh.forward
+          const ref = sv[1 + i * 2]!, fv = nums(placedTopology(ref, 510), 510), reversed = (sv[2 + i * 2] === 0) !== !sh.forward
           const loops = Array.from({ length: count(fv[1], fv.length - 3, "loop") }, (_, j) => {
-            const lv = nums(fv[3 + j]!, 508), coedges: Coedge[] = []; let at = 1
+            const lv = nums(placedTopology(fv[3 + j]!, 508), 508), coedges: Coedge[] = []; let at = 1
             for (let k = 0; k < count(lv[0], Math.floor((lv.length - 1) / 5), "coedge"); k++) {
               if (lv[at] !== 0) throw new RangeError("IGES vertex-only loops are not supported")
               coedges.push({ edge: edge(lv[at + 1]!, lv[at + 2]!), reversed: lv[at + 3] === 0 })
@@ -230,12 +275,13 @@ export const readIgesBreps = (text: string): IgesRead => {
         }
         shells.push({ faces: faceIds, closed: true })
       }
-      const brep = compactBrep({ vertices, edges, faces, shells }), report = validateBrep(brep)
+      // The solid's own transformation moves all of it; a reflection turns its faces inside out, which transformBrep handles.
+      const defined = compactBrep({ vertices, edges, faces, shells }), brep = e.transform === 0 ? defined : transformBrep(defined, matrix(e.transform)), report = validateBrep(brep)
       if (!report.valid || !report.manifoldSolid) throw new RangeError(report.issues[0]?.message ?? "not a solid")
       parts.push({ name: e.label || `IGES solid ${id}`, brep })
     } catch (cause) { warnings.push(`solid ${id} refused: ${cause instanceof Error ? cause.message : String(cause)}`) }
   }
-  const supported = new Set([100, 110, 116, 120, 122, 123, 126, 128, 186, 190, 192, 194, 196, 198, 502, 504, 508, 510, 514])
+  const supported = new Set([100, 110, 116, 120, 122, 123, 124, 126, 128, 186, 190, 192, 194, 196, 198, 502, 504, 508, 510, 514])
   for (const type of new Set([...entities.values()].map((e) => e.type))) if (!supported.has(type)) warnings.push(`unsupported IGES entity type ${type}`)
   if (parts.length === 0) warnings.push("no supported closed manifold IGES solid was found")
   return { parts, warnings, lengthScale }

@@ -103,7 +103,7 @@ stale "Status" lines of specs 40–55 as the single place that says what is buil
 | 50 X1 | partial | STEP write (AP214 product structure) and read of assemblies through `MAPPED_ITEM` / `NEXT_ASSEMBLY_USAGE_OCCURRENCE`; no colours, ids / names round trip n/v |
 | 50 X2, X3 | open | no semantic PMI, no conformance corpus |
 | 50 X4, X5 | n/v | extra surface entity coverage and external validator not judged |
-| 50 X6 | partial | IGES reader / writer `brep/iges.ts` (`76256b6f`); depth against the spec's entity list n/v |
+| 50 X6 | partial | IGES reader / writer `brep/iges.ts` (`76256b6f`); transformation matrices (124, chained) on geometry, vertex lists and solids, reflections included, refused on shared topology and when they scale (2026-10-27); lines read with an arc-length parameter so a moved IGES body stays valid; 102 / 118 / 140 / 142 / 143 and subfigures (308 / 408) open |
 | 50 X7 | partial | `cad/dxf.ts`; no blocks / hatches / dimensions both ways verified; DWG decision D2 |
 | 50 X8, X9 | open | `mesh-clean.ts` (weld, topology) exists but there is no STL / OBJ / 3MF **import** into a body and no faceted-to-analytic recovery |
 | 50 X10 | partial | STL, OBJ, glTF, 3MF export of exact bodies (`470d04ae`); no faceted STEP |
@@ -208,3 +208,4 @@ No answer to D1–D7 is recorded in the repository or in the project notes as of
 ## 6. Change log
 
 - 2026-10-25: created. Ledger of 16 specs, eight gaps outside them (specs 58–61), decisions D8–D12.
+- 2026-10-27: X6 row (IGES 124). Outside any spec: the history rebuild keeps one exact replay advanced on demand (`exactReplay`), so named faces and curved fillets no longer replay the exact prefix each time.
