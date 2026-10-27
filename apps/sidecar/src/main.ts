@@ -1,7 +1,7 @@
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun"
 import { Cause, Effect, Layer, Logger, Runtime, Schedule } from "effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
-import { shutdownKernelJobs } from "@cadcamfun/ai"
+import { KernelJobsLive } from "@cadcamfun/ai"
 import { AppConfigService } from "./config.ts"
 import { ApiRoutes, DatabaseLive } from "./layers.ts"
 import { ObservabilityLive } from "./observability.ts"
@@ -63,9 +63,9 @@ const teardown: Runtime.Teardown = (exit, onExit) => {
 }
 
 Effect.gen(function*() {
-  // Registered first, so it runs after the server has stopped taking requests: the kernel workers are stopped, not waited for
+  // Built first, so its release runs after the server has stopped taking requests: the kernel workers are stopped, not waited for
   // (the shell's kill deadline is 2 s).
-  yield* Effect.addFinalizer(() => Effect.sync(shutdownKernelJobs))
+  yield* Layer.build(KernelJobsLive)
   yield* Layer.build(Server)
   yield* awaitShutdown
 }).pipe(

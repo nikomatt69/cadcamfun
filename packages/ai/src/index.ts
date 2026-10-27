@@ -81,7 +81,7 @@ export { describeBridge, bridgeAdmission, bridgeAllowed, scopeBridge, BRIDGE_EXC
 export { definePluginTool, pluginToolId, pluginParameters, MAX_PLUGIN_SCHEMA_CHARS, type PluginToolListing } from "./tools/plugin-tool.ts"
 export { hostPatchesPlugin, patchHostSource, applyHostPatches, HostPatchError, HOST_PATCHES, MEDIA_RULE_MARKER, STEP_INSTRUCTIONS_MARKER, hostPatchesApplied, hostPatchReport } from "./nikcli/host-patches.ts"
 export { acceptPart, type AcceptanceCheck, type AcceptanceReport, type CheckResult } from "./acceptance.ts"
-export { KERNEL_CACHE_BYTES, KERNEL_CACHE_ENTRIES, KERNEL_HISTORY_SIZE, KERNEL_JOB_DEADLINE_MS, KERNEL_LEAK_GRACE_MS, KERNEL_MEMORY_SHARE, KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, clearKernelJobCache, kernelJobHistory, kernelJobStats, reopenKernelJobs, shutdownKernelJobs, kernelWorkerUrl, runKernelJob, runKernelJobEffect, runKernelJobInline } from "./kernel-job.ts"
+export { KERNEL_CACHE_BYTES, KERNEL_CACHE_ENTRIES, KERNEL_HISTORY_SIZE, KERNEL_JOB_DEADLINE_MS, KERNEL_LEAK_GRACE_MS, KERNEL_MEMORY_SHARE, KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, KernelJobsLive, clearKernelJobCache, kernelJobHistory, kernelJobStats, reopenKernelJobs, shutdownKernelJobs, kernelWorkerUrl, runKernelJob, runKernelJobEffect, runKernelJobInline, type JobOptions, type KernelJobFailure, type RunOptions } from "./kernel-job.ts"
 export type { KernelJobOutcome, KernelJobRecord } from "./kernel-job.ts"
 export { featureEditOf } from "./kernel-jobs.ts"
 export type { CadFeatureEdit, CadFeatureRequest, KernelJobName, KernelJobProgress, KernelJobs } from "./kernel-jobs.ts"

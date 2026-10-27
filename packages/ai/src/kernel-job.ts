@@ -6,22 +6,29 @@
  *
  * Around the worker: at most `KERNEL_WORKERS` run at once and a few more wait; identical requests share one run and the last
  * results are kept; every job leaves a line in a short history; a shutdown stops what runs.
+ *
+ * The engine is Effect: a worker is a resource of the fiber that runs it (interrupting the fiber terminates it), the slots are
+ * an Effect `Semaphore`, and a shared run is a detached fiber that is interrupted when its last caller leaves. `runKernelJob`
+ * is the Promise edge for callers that are not Effect code yet; the result cache stays byte-bounded (`BoundedCache`), which
+ * Effect's `Cache` (bounded by entries only) cannot express.
  */
 import { availableParallelism, totalmem } from "node:os"
-import { Effect } from "effect"
+import { Data, Duration, Effect, Fiber, Layer, Semaphore } from "effect"
 import { cam } from "@cadcamfun/core"
 import { BoundedCache } from "@cadcamfun/util/bounded-cache"
-import { Semaphore } from "@cadcamfun/util/semaphore"
-import { SingleFlight } from "@cadcamfun/util/single-flight"
 import { KERNEL_JOBS, type KernelJobName, type KernelJobProgress, type KernelJobs } from "./kernel-jobs.ts"
 
 // ---------------------------------------------------------------- errors
 
-export class KernelJobError extends Error {
-  readonly _tag = "KernelJobError"
-  constructor(readonly job: KernelJobName, readonly reason: "deadline" | "cancelled" | "failed" | "crashed" | "busy", message: string) {
-    super(message)
-    this.name = "KernelJobError"
+export type KernelJobFailure = "deadline" | "cancelled" | "failed" | "crashed" | "busy"
+
+export class KernelJobError extends Data.TaggedError("KernelJobError")<{
+  readonly job: KernelJobName
+  readonly reason: KernelJobFailure
+  readonly message: string
+}> {
+  constructor(job: KernelJobName, reason: KernelJobFailure, message: string) {
+    super({ job, reason, message })
   }
 
   /**
@@ -101,8 +108,23 @@ export const kernelJobHistory = (): ReadonlyArray<KernelJobRecord> => [...histor
 
 // ---------------------------------------------------------------- queue, shared runs and cache
 
-const slots = new Semaphore(KERNEL_WORKERS)
-const flights = new SingleFlight<string, unknown, KernelJobProgress>()
+/** The workers are a resource of the machine, not of a request: one set of slots per process. */
+const slots = Semaphore.makeUnsafe(KERNEL_WORKERS)
+/** Jobs holding a slot and jobs waiting for one (the semaphore does not count its waiters). */
+let running = 0
+let waiting = 0
+
+/**
+ * A run shared by every caller of the same request: a detached fiber, so no single caller owns it. `callers` counts the ones
+ * still waiting; the last one to leave interrupts the run. `listeners` receive its progress.
+ */
+interface Flight {
+  readonly listeners: Set<(progress: KernelJobProgress) => void>
+  callers: number
+  fiber?: Fiber.Fiber<unknown, KernelJobError>
+}
+const flights = new Map<string, Flight>()
+
 const results = new BoundedCache<string, { readonly value: unknown; readonly bytes: number }>({ maxEntries: KERNEL_CACHE_ENTRIES, maxBytes: KERNEL_CACHE_BYTES, sizeOf: (e) => e.bytes })
 /** Workers running now, so a shutdown can stop them; and whether the process is going down. */
 const active = new Set<() => void>()
@@ -140,7 +162,7 @@ const keyOf = (name: KernelJobName, input: unknown): string | undefined => {
 
 /** What the job queue and the result cache are doing: for diagnostics and tests. */
 export const kernelJobStats = () => ({
-  workers: KERNEL_WORKERS, running: slots.active, waiting: slots.waiting, inFlight: flights.running,
+  workers: KERNEL_WORKERS, running, waiting, inFlight: flights.size,
   cached: results.size, cachedBytes: results.bytes, hits: results.hits, misses: results.misses,
   counters: { ...counters }, rssBytes: process.memoryUsage().rss, closing
 })
@@ -161,6 +183,15 @@ export const shutdownKernelJobs = (): void => {
 /** Takes jobs again after `shutdownKernelJobs` (a host that restarts its services, and the tests). */
 export const reopenKernelJobs = (): void => { closing = false }
 
+/**
+ * The kernel jobs' lifecycle as a layer: jobs are taken while it lives, and its release stops the ones running. A host builds it
+ * before its server, so the release runs after the server has stopped taking requests.
+ */
+export const KernelJobsLive: Layer.Layer<never> = Layer.effectDiscard(Effect.acquireRelease(
+  Effect.sync(reopenKernelJobs),
+  () => Effect.sync(shutdownKernelJobs)
+))
+
 // ---------------------------------------------------------------- the worker
 
 /**
@@ -175,92 +206,157 @@ export const kernelWorkerUrl = (moduleUrl: string = import.meta.url): string => 
 export const runKernelJobInline = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"]): KernelJobs[K]["output"] =>
   (KERNEL_JOBS[name] as (value: KernelJobs[K]["input"]) => KernelJobs[K]["output"])(input)
 
-export interface RunOptions {
+export interface JobOptions {
   readonly deadlineMs?: number
-  readonly signal?: AbortSignal
   readonly onProgress?: (progress: KernelJobProgress) => void
   /** A different worker module (tests of a worker that dies); the kernel's own by default. */
   readonly workerUrl?: string
 }
 
-const spawn = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"], options: RunOptions, id: string): Promise<KernelJobs[K]["output"]> => new Promise((resolve, reject) => {
-  if (options.signal?.aborted) return reject(new KernelJobError(name, "cancelled", `Kernel job ${name} was cancelled before it started.`))
-  // The job's id and name in the worker's environment, so a line the worker logs can be tied to the record of its job.
-  const worker = new Worker(options.workerUrl ?? kernelWorkerUrl(), { env: { ...process.env, CADCAMFUN_JOB_ID: id, CADCAMFUN_JOB_NAME: name } as Record<string, string> })
-  let done = false
-  let closed = false
-  let leakTimer: ReturnType<typeof setTimeout> | undefined
-  const stop = (): void => finish(() => reject(new KernelJobError(name, "cancelled", `Kernel job ${name} was stopped: the server is shutting down.`)))
-  active.add(stop)
-  const finish = (settle: () => void) => {
-    if (done) return
-    done = true
-    clearTimeout(timer)
-    active.delete(stop)
-    options.signal?.removeEventListener("abort", onAbort)
-    worker.terminate()
-    // A terminated worker closes within moments; one that has not after the grace is a leak, counted so a diagnostics view shows it.
-    if (!closed) {
-      leakTimer = setTimeout(() => { counters.workerLeaks++ }, KERNEL_LEAK_GRACE_MS)
-      leakTimer.unref?.()
-    }
-    settle()
-  }
-  const deadlineMs = options.deadlineMs ?? KERNEL_JOB_DEADLINE_MS
-  const timer = setTimeout(() => finish(() => reject(new KernelJobError(name, "deadline", `Kernel job ${name} passed its ${deadlineMs} ms deadline and was stopped.`))), deadlineMs)
-  const onAbort = () => finish(() => reject(new KernelJobError(name, "cancelled", `Kernel job ${name} was cancelled.`)))
-  options.signal?.addEventListener("abort", onAbort, { once: true })
-  worker.onmessage = (event: MessageEvent<{ progress: KernelJobProgress } | { ok: true; value: KernelJobs[K]["output"] } | { ok: false; error: string }>) => {
-    const message = event.data
-    if ("progress" in message) { if (!done) options.onProgress?.(message.progress); return }
-    finish(() => message.ok ? resolve(message.value) : reject(new KernelJobError(name, "failed", message.error)))
-  }
-  worker.onerror = (event) => finish(() => reject(new KernelJobError(name, "crashed", `Kernel job ${name} crashed: ${event.message}`)))
-  // A worker the system kills (out of memory) closes without an answer or an error event: say so now, not at the deadline.
-  worker.addEventListener("close", (event) => {
-    closed = true
-    clearTimeout(leakTimer)
-    if (done) return
-    counters.workerExited++
-    const code = (event as unknown as { readonly code?: number }).code ?? "unknown"
-    finish(() => reject(new KernelJobError(name, "crashed", `Kernel job ${name} stopped before it answered (worker exit code ${code}): it ran out of memory or crashed. Reduce the part, the layer height or the stepover, or split the job.`)))
-  })
-  worker.postMessage({ name, input })
-})
-
-/** One job in its own worker, in a slot: the deadline counts from the moment the worker starts, not from the wait for a slot. */
-const execute = async <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"], options: RunOptions): Promise<KernelJobs[K]["output"]> => {
-  const id = `k${++jobSequence}`
-  const queuedAt = performance.now()
-  const refuse = (reason: "cancelled" | "busy", message: string): never => {
-    counters[reason === "busy" ? "busy" : "aborted"]++
-    record(name, reason, { waitedMs: Math.round(performance.now() - queuedAt), ranMs: 0 }, undefined, id)
-    throw new KernelJobError(name, reason, message)
-  }
-  if (closing) refuse("cancelled", `Kernel job ${name} was refused: the server is shutting down.`)
-  if (slots.waiting >= KERNEL_QUEUE_LIMIT) refuse("busy", `Kernel job ${name} was refused: ${slots.waiting} jobs are already waiting for one of the ${KERNEL_WORKERS} workers. Try again when one has finished.`)
-  if (slots.active >= KERNEL_WORKERS) options.onProgress?.({ stage: "queued", ahead: slots.waiting })
-  const release = await slots.acquire(options.signal).catch(() => refuse("cancelled", `Kernel job ${name} was cancelled while it waited for a worker.`))
-  const ranFrom = performance.now()
-  const times = () => ({ waitedMs: Math.round(ranFrom - queuedAt), ranMs: Math.round(performance.now() - ranFrom) })
-  try {
-    if (closing) throw new KernelJobError(name, "cancelled", `Kernel job ${name} was stopped: the server is shutting down.`)
-    // A worker is about to take memory: when the process already holds more than its share, the cached programs go first.
-    if (results.size > 0 && process.memoryUsage().rss > totalmem() * KERNEL_MEMORY_SHARE) { results.clear(); counters.memoryEvictions++ }
-    counters.started++
-    const value = await spawn(name, input, options, id)
-    counters.completed++
-    record(name, "completed", times(), value, id)
-    return value
-  } catch (error) {
-    const reason = error instanceof KernelJobError ? error.reason : "failed"
-    counters[reason === "deadline" ? "timedOut" : reason === "cancelled" ? "aborted" : "failed"]++
-    record(name, reason, times(), undefined, id)
-    throw error
-  } finally {
-    release()
-  }
+export interface RunOptions extends JobOptions {
+  readonly signal?: AbortSignal
 }
+
+type Output<K extends KernelJobName> = KernelJobs[K]["output"]
+
+/**
+ * One job in its own worker. The worker belongs to the fiber: an interruption terminates it before the effect ends, so a dropped
+ * request has released its thread by the time its fiber is gone. A shutdown fails it with `cancelled`.
+ */
+const spawn = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"], options: JobOptions, id: string): Effect.Effect<Output<K>, KernelJobError> =>
+  Effect.callback<Output<K>, KernelJobError>((resume) => {
+    // The job's id and name in the worker's environment, so a line the worker logs can be tied to the record of its job.
+    const worker = new Worker(options.workerUrl ?? kernelWorkerUrl(), { env: { ...process.env, CADCAMFUN_JOB_ID: id, CADCAMFUN_JOB_NAME: name } as Record<string, string> })
+    let done = false
+    let closed = false
+    let leakTimer: ReturnType<typeof setTimeout> | undefined
+    const release = (): void => {
+      done = true
+      active.delete(stop)
+      worker.terminate()
+      // A terminated worker closes within moments; one that has not after the grace is a leak, counted so a diagnostics view shows it.
+      if (!closed) {
+        leakTimer = setTimeout(() => { counters.workerLeaks++ }, KERNEL_LEAK_GRACE_MS)
+        leakTimer.unref?.()
+      }
+    }
+    const fail = (reason: KernelJobFailure, message: string): void => {
+      if (done) return
+      release()
+      resume(Effect.fail(new KernelJobError(name, reason, message)))
+    }
+    const stop = (): void => fail("cancelled", `Kernel job ${name} was stopped: the server is shutting down.`)
+    active.add(stop)
+    worker.onmessage = (event: MessageEvent<{ progress: KernelJobProgress } | { ok: true; value: Output<K> } | { ok: false; error: string }>) => {
+      const message = event.data
+      if ("progress" in message) { if (!done) options.onProgress?.(message.progress); return }
+      if (!message.ok) return fail("failed", message.error)
+      if (done) return
+      release()
+      resume(Effect.succeed(message.value))
+    }
+    worker.onerror = (event) => fail("crashed", `Kernel job ${name} crashed: ${event.message}`)
+    // A worker the system kills (out of memory) closes without an answer or an error event: say so now, not at the deadline.
+    worker.addEventListener("close", (event) => {
+      closed = true
+      clearTimeout(leakTimer)
+      if (done) return
+      counters.workerExited++
+      const code = (event as unknown as { readonly code?: number }).code ?? "unknown"
+      fail("crashed", `Kernel job ${name} stopped before it answered (worker exit code ${code}): it ran out of memory or crashed. Reduce the part, the layer height or the stepover, or split the job.`)
+    })
+    worker.postMessage({ name, input })
+    // Interrupted (the deadline, or every caller left): terminate the worker now.
+    return Effect.sync(() => { if (!done) release() })
+  }).pipe(Effect.timeoutOrElse({
+    duration: Duration.millis(options.deadlineMs ?? KERNEL_JOB_DEADLINE_MS),
+    orElse: () => Effect.fail(new KernelJobError(name, "deadline", `Kernel job ${name} passed its ${options.deadlineMs ?? KERNEL_JOB_DEADLINE_MS} ms deadline and was stopped.`))
+  }))
+
+/** One job in a slot: the deadline counts from the moment the worker starts, not from the wait for a slot. */
+const execute = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"], options: JobOptions): Effect.Effect<Output<K>, KernelJobError> =>
+  Effect.suspend(() => {
+    const id = `k${++jobSequence}`
+    const queuedAt = performance.now()
+    let ranFrom: number | undefined
+    const times = () => ranFrom === undefined
+      ? { waitedMs: Math.round(performance.now() - queuedAt), ranMs: 0 }
+      : { waitedMs: Math.round(ranFrom - queuedAt), ranMs: Math.round(performance.now() - ranFrom) }
+    const refuse = (reason: "cancelled" | "busy", message: string) => Effect.suspend(() => {
+      counters[reason === "busy" ? "busy" : "aborted"]++
+      record(name, reason, times(), undefined, id)
+      return Effect.fail(new KernelJobError(name, reason, message))
+    })
+    if (closing) return refuse("cancelled", `Kernel job ${name} was refused: the server is shutting down.`)
+    if (waiting >= KERNEL_QUEUE_LIMIT) return refuse("busy", `Kernel job ${name} was refused: ${waiting} jobs are already waiting for one of the ${KERNEL_WORKERS} workers. Try again when one has finished.`)
+    if (running >= KERNEL_WORKERS) options.onProgress?.({ stage: "queued", ahead: waiting })
+    waiting++
+    const inSlot = Effect.suspend(() => {
+      waiting--
+      running++
+      ranFrom = performance.now()
+      if (closing) return Effect.fail(new KernelJobError(name, "cancelled", `Kernel job ${name} was stopped: the server is shutting down.`))
+      // A worker is about to take memory: when the process already holds more than its share, the cached programs go first.
+      if (results.size > 0 && process.memoryUsage().rss > totalmem() * KERNEL_MEMORY_SHARE) { results.clear(); counters.memoryEvictions++ }
+      counters.started++
+      return spawn(name, input, options, id)
+    }).pipe(
+      Effect.tap((value) => Effect.sync(() => { counters.completed++; record(name, "completed", times(), value, id) })),
+      Effect.tapError((error) => Effect.sync(() => {
+        counters[error.reason === "deadline" ? "timedOut" : error.reason === "cancelled" ? "aborted" : "failed"]++
+        record(name, error.reason, times(), undefined, id)
+      })),
+      Effect.onInterrupt(() => Effect.sync(() => { counters.aborted++; record(name, "cancelled", times(), undefined, id) })),
+      Effect.ensuring(Effect.sync(() => { running-- }))
+    )
+    // Interrupted while still waiting for a slot: it leaves the queue without ever holding one.
+    return slots.withPermits(1)(inSlot).pipe(Effect.onInterrupt(() => Effect.sync(() => {
+      if (ranFrom !== undefined) return
+      waiting--
+      counters.aborted++
+      record(name, "cancelled", times(), undefined, id)
+    })))
+  })
+
+/**
+ * Joins the shared run of `key`, starting it when there is none. The run is detached from every caller and started before this
+ * caller can leave, with this caller already listening (its first frame is not lost); the last caller to leave interrupts it.
+ */
+const shared = <K extends KernelJobName>(key: string, name: K, input: KernelJobs[K]["input"], options: JobOptions): Effect.Effect<Output<K>, KernelJobError> =>
+  Effect.uninterruptibleMask((restore) => Effect.gen(function*() {
+    const listen = options.onProgress ?? (() => undefined)
+    let flight = flights.get(key)
+    if (flight === undefined) {
+      const created: Flight = { listeners: new Set([listen]), callers: 1 }
+      flight = created
+      flights.set(key, created)
+      const run = execute(name, input, {
+        ...(options.deadlineMs !== undefined ? { deadlineMs: options.deadlineMs } : {}),
+        ...(options.workerUrl !== undefined ? { workerUrl: options.workerUrl } : {}),
+        onProgress: (progress) => { for (const to of [...created.listeners]) to(progress) }
+      }).pipe(
+        Effect.tap((value) => Effect.sync(() => results.set(key, { value, bytes: bytesOf(name, value) }))),
+        Effect.ensuring(Effect.sync(() => { if (flights.get(key) === created) flights.delete(key) }))
+      )
+      created.fiber = yield* Effect.forkDetach(run, { startImmediately: true })
+    } else {
+      counters.joined++
+      flight.callers++
+      flight.listeners.add(listen)
+    }
+    const joined = flight
+    const fiber = joined.fiber as Fiber.Fiber<Output<K>, KernelJobError>
+    return yield* restore(Fiber.join(fiber)).pipe(
+      Effect.onInterrupt(() => Effect.suspend(() => {
+        joined.listeners.delete(listen)
+        joined.callers--
+        if (joined.callers > 0) return Effect.void
+        // A run every caller has left is dying: the next caller starts its own instead of joining it.
+        if (flights.get(key) === joined) flights.delete(key)
+        return Fiber.interrupt(fiber)
+      }))
+    )
+  }))
 
 // ---------------------------------------------------------------- running a job
 
@@ -269,44 +365,29 @@ const execute = async <K extends KernelJobName>(name: K, input: KernelJobs[K]["i
  * (the CAM and exact CAD jobs) and is already running for another caller is joined, not run again, and the caller gets the same
  * progress; one that ran lately is answered from the result cache. The result is shared between callers: read it, never change
  * it. A deadline or a crash is never cached. The deadline of a joined run is the one its first caller gave.
+ *
+ * Interrupting the effect leaves the job: a run nobody else waits for is stopped, and its worker is terminated before the
+ * interruption completes.
  */
-export const runKernelJob = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"], options: RunOptions = {}): Promise<KernelJobs[K]["output"]> => {
-  if (options.signal?.aborted) return Promise.reject(new KernelJobError(name, "cancelled", `Kernel job ${name} was cancelled before it started.`))
-  const key = keyOf(name, input)
-  if (key === undefined) return execute(name, input, options)
-  const hit = results.get(key)
-  if (hit !== undefined) {
-    counters.cacheHits++
-    record(name, "cached", { waitedMs: 0, ranMs: 0 }, hit.value)
-    return Promise.resolve(hit.value as KernelJobs[K]["output"])
-  }
-  if (flights.has(key)) counters.joined++
-  const shared = flights.join(key, (flight) => execute(name, input, { ...(options.deadlineMs !== undefined ? { deadlineMs: options.deadlineMs } : {}), signal: flight.signal, onProgress: flight.emit }).then((value) => {
-    results.set(key, { value, bytes: bytesOf(name, value) })
-    return value
-  }), { ...(options.signal !== undefined ? { signal: options.signal } : {}), ...(options.onProgress !== undefined ? { onProgress: options.onProgress } : {}) })
-  // A caller that leaves is told it was cancelled, in the job's own error type.
-  return shared.then(
-    (value) => value as KernelJobs[K]["output"],
-    (error: unknown) => { throw options.signal?.aborted === true && !(error instanceof KernelJobError) ? new KernelJobError(name, "cancelled", `Kernel job ${name} was cancelled.`) : error }
-  )
-}
-
-/**
- * `runKernelJob` as an Effect: the failure is a typed `KernelJobError`, and interrupting the effect stops the job and waits until
- * its worker is terminated, so a request that is dropped has released its worker by the time the fiber is gone.
- */
-export const runKernelJobEffect = <K extends KernelJobName>(
-  name: K,
-  input: KernelJobs[K]["input"],
-  options: Pick<RunOptions, "deadlineMs" | "onProgress"> = {}
-): Effect.Effect<KernelJobs[K]["output"], KernelJobError> =>
-  Effect.callback<KernelJobs[K]["output"], KernelJobError>((resume, signal) => {
-    const job = runKernelJob(name, input, { ...options, signal })
-    job.then(
-      (value) => resume(Effect.succeed(value)),
-      (error: unknown) => resume(Effect.fail(error instanceof KernelJobError ? error : new KernelJobError(name, "failed", error instanceof Error ? error.message : String(error))))
-    )
-    // On interruption the signal aborts the job; the effect finishes only once the job has settled (its worker terminated).
-    return Effect.promise(() => job.then(() => undefined, () => undefined))
+export const runKernelJobEffect = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"], options: JobOptions = {}): Effect.Effect<Output<K>, KernelJobError> =>
+  Effect.suspend(() => {
+    const key = keyOf(name, input)
+    if (key === undefined) return execute(name, input, options)
+    const hit = results.get(key)
+    if (hit !== undefined) {
+      counters.cacheHits++
+      record(name, "cached", { waitedMs: 0, ranMs: 0 }, hit.value)
+      return Effect.succeed(hit.value as Output<K>)
+    }
+    return shared(key, name, input, options)
   })
+
+/** `runKernelJobEffect` for Promise callers. A caller whose signal aborts is told it was cancelled, in the job's own error type. */
+export const runKernelJob = <K extends KernelJobName>(name: K, input: KernelJobs[K]["input"], options: RunOptions = {}): Promise<Output<K>> => {
+  const { signal, ...job } = options
+  const cancelled = () => new KernelJobError(name, "cancelled", `Kernel job ${name} was cancelled.`)
+  if (signal?.aborted) return Promise.reject(new KernelJobError(name, "cancelled", `Kernel job ${name} was cancelled before it started.`))
+  return Effect.runPromise(runKernelJobEffect(name, input, job), signal === undefined ? undefined : { signal }).catch((error: unknown) => {
+    throw signal?.aborted === true && !(error instanceof KernelJobError) ? cancelled() : error
+  })
+}

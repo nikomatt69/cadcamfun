@@ -52,6 +52,7 @@ export class Companion extends Context.Service<Companion, {
     let touches = new Map<string, string>()
     // The gateway runs outside Effect; its request lines go through this layer's logger (stderr JSON in the app, never stdout).
     const runLog = Effect.runForkWith(yield* Effect.context<never>())
+    const runTokens = Effect.runPromiseWith(yield* Effect.context<never>())
     const logRequest = (entry: GatewayRequestLog): void => {
       const line = entry.status >= 500 ? Effect.logWarning("Companion request") : Effect.logInfo("Companion request")
       runLog(line.pipe(Effect.annotateLogs({
@@ -116,7 +117,7 @@ export class Companion extends Context.Service<Companion, {
             certificate: cert,
             port,
             upstream: () => ({ port: getLocalPort() ?? local, token: Redacted.value(config.token) }),
-            tokens: () => Effect.runPromise(tokens),
+            tokens: () => runTokens(tokens),
             touch: (id) => void touches.set(id, new Date().toISOString()),
             session: (record) => record.userId === undefined ? undefined : authTokens.sign({ userId: record.userId, email: "", type: "session" }, SESSION_SECONDS),
             log: logRequest,

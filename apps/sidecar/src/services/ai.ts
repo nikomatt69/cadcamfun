@@ -19,6 +19,7 @@ import { captureViewport } from "./ai-vision.ts"
 import { assemblyForModel, exactForModel, setupsForModel } from "./ai-exact.ts"
 import { changeParameters, historyRevision, inspectParametric, testParametric } from "./ai-parametric.ts"
 import { ActingUser } from "./acting-user.ts"
+import { DrawingUnavailable, ProjectNotAccessible, ToolCancelled, WriteForbidden, toolRefusal } from "./ai-tool-errors.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
 import { ComponentRepo } from "../repos/component-repo.ts"
 import { DrawingConflict, DrawingRepo, drawingContentHash } from "../repos/drawing-repo.ts"
@@ -134,67 +135,94 @@ const toolHandlers = Effect.gen(function*() {
   }
 
   /**
-   * Reads never provision a workspace. Only an authorized write may create the default project or drawing.
+   * The one bridge from the tool handlers (Promises: the nikcli host contract) into Effect. It runs with the services this layer
+   * was built with (the JSON logger on stderr, the tracer, every reference), where a bare `Effect.runPromise` runs on an empty
+   * context: no spans, and logs printed unformatted on stdout, the channel the shell parses for the ready event.
    */
-  const assertWrite = async (projectId: string) => {
-    actingCell.assertActive()
+  const run = Effect.runPromiseWith(yield* Effect.context<never>())
+
+  /** Fails with `ToolCancelled` when the turn that called the tool has been cancelled. */
+  const turnActive = Effect.try({
+    try: () => actingCell.assertActive(),
+    catch: (error) => new ToolCancelled(error instanceof Error ? error.message : undefined)
+  })
+  /** The acting account's access to a project, or `ProjectNotAccessible`. */
+  const requireProject = Effect.fn("AiTools.requireProject")(function*(projectId: string) {
+    const access = yield* projects.find(acting().id, projectId)
+    if (access === undefined) return yield* new ProjectNotAccessible(projectId)
+    return access
+  })
+  /** Reads never provision a workspace. Only an authorized write may create the default project or drawing. */
+  const requireWrite = Effect.fn("AiTools.requireWrite")(function*(projectId: string) {
+    yield* turnActive
     const actor = acting()
-    const access = await Effect.runPromise(projects.find(actor.id, projectId))
-    if (!access || (access.project.ownerId !== actor.id && access.orgRole !== "ADMIN" && access.orgRole !== "MANAGER")) throw new Error("You do not have permission to write this project.")
-    actingCell.assertActive()
-  }
+    const access = yield* projects.find(actor.id, projectId)
+    if (!access || (access.project.ownerId !== actor.id && access.orgRole !== "ADMIN" && access.orgRole !== "MANAGER")) return yield* new WriteForbidden(projectId)
+    yield* turnActive
+  })
+  const assertWrite = (projectId: string): Promise<void> => run(requireWrite(projectId))
+  /** The answer a tool gives when the project is not accessible; undefined when it is. */
+  const refused = (projectId: string) =>
+    run(requireProject(projectId).pipe(Effect.as(undefined), Effect.catchTag("ProjectNotAccessible", (error) => Effect.succeed(toolRefusal(error)))))
+
   /**
    * The drawing a tool acts on. Inside an admitted turn that named its drawing, it is that drawing and nothing else: the
    * editor snapshot another window wrote cannot redirect it, and a bound drawing that is gone is refused, never replaced.
    * Without a binding (older clients, the compatibility path) the editor snapshot or an unambiguous project resolves it.
    */
-  const load = async (projectId: string, write = false): Promise<{ id: string; projectId: string; name: string; data: Record<string, unknown>; elements: Element[]; created: boolean; contentHash: string }> => {
+  const loadDrawing = Effect.fn("AiTools.load")(function*(projectId: string, write: boolean) {
     const actor = acting()
-    let project: { id: string } | undefined = (await Effect.runPromise(projects.find(actor.id, projectId)))?.project
+    let project: { id: string } | undefined = (yield* projects.find(actor.id, projectId))?.project
     let created = false
     if (!project) {
-      if (projectId !== "default") throw new Error("Project not found or not accessible; no other workspace was modified.")
-      const own = (await Effect.runPromise(projects.list(acting().id))).find((candidate) => candidate.ownerId === acting().id)
-      if (!own && !write) throw new Error("Open a project before inspecting the workspace.")
-      project = own ?? await Effect.runPromise(projects.create(actor.id, { name: "Untitled project" }))
+      if (projectId !== "default") return yield* new ProjectNotAccessible(projectId, "Project not found or not accessible; no other workspace was modified.")
+      const own = (yield* projects.list(acting().id)).find((candidate) => candidate.ownerId === acting().id)
+      if (!own && !write) return yield* new DrawingUnavailable({ message: "Open a project before inspecting the workspace." })
+      project = own ?? (yield* projects.create(actor.id, { name: "Untitled project" }))
       created = own === undefined
     }
-    if (write) await assertWrite(project.id)
-    const rows = await Effect.runPromise(drawings.listByProject(project.id))
+    if (write) yield* requireWrite(project.id)
+    const rows = yield* drawings.listByProject(project.id)
     const turnDrawing = actingCell.drawing()
     if (turnDrawing !== undefined) {
       const row = rows.find((drawing) => drawing.id === turnDrawing)
-      if (!row) throw new Error("The drawing this conversation works on is not in this project any more; open a drawing and send the request again. Nothing was changed.")
+      if (!row) return yield* new DrawingUnavailable({ message: "The drawing this conversation works on is not in this project any more; open a drawing and send the request again. Nothing was changed." })
       const data = row.data !== null && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {}
       return { id: row.id, projectId: project.id, name: row.name, data, elements: elementsOf(data), created, contentHash: drawingContentHash(row.data) }
     }
-    const snapshot = (await Effect.runPromise(kv.get(`ai.context.${project.id}`)))?.value as { projectId?: unknown; drawingId?: unknown } | undefined
+    const snapshot = (yield* kv.get(`ai.context.${project.id}`))?.value as { projectId?: unknown; drawingId?: unknown } | undefined
     // Resolve only inside the accessible project: a snapshot cannot redirect a tool to another project. A bound drawing
     // that is gone is refused, never replaced by another one; without a binding only an unambiguous project resolves.
     const bound = snapshot?.projectId === project.id && typeof snapshot.drawingId === "string" ? snapshot.drawingId : undefined
     let row = bound !== undefined ? rows.find((drawing) => drawing.id === bound) : rows.length === 1 ? rows[0] : undefined
-    if (!row && bound !== undefined) throw new Error("The drawing open in the editor no longer exists in this project; open a drawing and retry. Nothing was changed.")
-    if (!row && rows.length > 1) throw new Error(`The project has ${rows.length} drawings and none is open in the editor; open the one to work on and retry. Nothing was changed.`)
+    if (!row && bound !== undefined) return yield* new DrawingUnavailable({ message: "The drawing open in the editor no longer exists in this project; open a drawing and retry. Nothing was changed." })
+    if (!row && rows.length > 1) return yield* new DrawingUnavailable({ message: `The project has ${rows.length} drawings and none is open in the editor; open the one to work on and retry. Nothing was changed.` })
     if (!row) {
-      if (!write) throw new Error("The project has no drawing. Create a drawing before inspection.")
-      row = await Effect.runPromise(drawings.create(project.id, { name: "Drawing 1", data: { elements: [], version: "1.0" } }))
+      if (!write) return yield* new DrawingUnavailable({ message: "The project has no drawing. Create a drawing before inspection." })
+      row = yield* drawings.create(project.id, { name: "Drawing 1", data: { elements: [], version: "1.0" } })
       created = true
     }
     const data = row.data !== null && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {}
     return { id: row.id, projectId: project.id, name: row.name, data, elements: elementsOf(data), created, contentHash: drawingContentHash(row.data) }
-  }
+  })
+  const load = (projectId: string, write = false): Promise<{ id: string; projectId: string; name: string; data: Record<string, unknown>; elements: Element[]; created: boolean; contentHash: string }> =>
+    run(loadDrawing(projectId, write))
+
   /**
    * Writes the document a tool read back, only if it is still the content the tool read (`loaded.contentHash`): the check and
    * the write are one transaction. A concurrent save is a `DrawingConflict` and is not overwritten. Answers the receipt.
    */
-  const save = async (loaded: { readonly id: string; readonly contentHash: string }, data: Record<string, unknown>, elements: ReadonlyArray<Element>) => {
-    const drawing = await Effect.runPromise(drawings.find(acting().id, loaded.id))
-    if (!drawing) throw new Error("Drawing no longer exists.")
-    await assertWrite(drawing.project.id)
-    const receipt = await Effect.runPromise(drawings.writeIfUnchanged(loaded.id, loaded.contentHash, { ...data, elements, version: "1.0" }))
-    if (!receipt.ok) throw receipt.reason === "missing" ? new Error("Drawing no longer exists.") : new DrawingConflict(loaded.id)
-    return receipt
-  }
+  const saveDrawing = Effect.fn("AiTools.save")(function*(loaded: { readonly id: string; readonly contentHash: string }, data: Record<string, unknown>, elements: ReadonlyArray<Element>) {
+    const drawing = yield* drawings.find(acting().id, loaded.id)
+    if (!drawing) return yield* new DrawingUnavailable({ message: "Drawing no longer exists." })
+    yield* requireWrite(drawing.project.id)
+    const receipt = yield* drawings.writeIfUnchanged(loaded.id, loaded.contentHash, { ...data, elements, version: "1.0" })
+    if (receipt.ok) return receipt
+    if (receipt.reason === "missing") return yield* new DrawingUnavailable({ message: "Drawing no longer exists." })
+    return yield* Effect.fail(new DrawingConflict(loaded.id))
+  })
+  const save = (loaded: { readonly id: string; readonly contentHash: string }, data: Record<string, unknown>, elements: ReadonlyArray<Element>) =>
+    run(saveDrawing(loaded, data, elements))
   /** What the UI needs to mirror a change in the open editor: where it went and the resulting elements. */
   const where = (loaded: { id: string; projectId: string; created: boolean }) => ({ drawingId: loaded.id, projectId: loaded.projectId, ...(loaded.created ? { createdDrawing: true } : {}) })
 
@@ -202,7 +230,7 @@ const toolHandlers = Effect.gen(function*() {
   const operation = async (drawingId: string, operationId: string | undefined): Promise<{ id: string; request: Record<string, unknown> } | { error: string }> => {
     const { id, projectId, elements, data } = await load(drawingId)
     if (!operationId) return { error: "operationId is required" }
-    const found = await Effect.runPromise(toolpaths.find(acting().id, operationId))
+    const found = await run(toolpaths.find(acting().id, operationId))
     if (!found || found.row.drawingId !== id || found.project.id !== projectId) return { error: "Operation not found in the active drawing" }
     const stored = found.row.data as { request?: { settings?: unknown; geometry?: unknown; printer?: unknown } } | null
     if (!stored?.request) return { error: "Operation has no generation settings" }
@@ -260,7 +288,7 @@ const toolHandlers = Effect.gen(function*() {
     const named = given ?? (typeof input.machineConfig?.config["postDefinitionId"] === "string" ? input.machineConfig.config["postDefinitionId"] : undefined)
     let definition: unknown = input.postDefinition
     if (definition === undefined && named !== undefined) {
-      const found = await Effect.runPromise(libraryItems.find(acting().id, named))
+      const found = await run(libraryItems.find(acting().id, named))
       if (found === undefined || found.item.category !== "post" || found.item.type !== "definition") return `The post '${named}' is not a post definition of the library.`
       definition = found.item.data
     }
@@ -272,7 +300,7 @@ const toolHandlers = Effect.gen(function*() {
 
   /** One row of the project's audit trail (`ActivityLog`) for a change the assistant made; a failure to log never fails the change. */
   const audit = (projectId: string, action: string, details: Record<string, unknown>): Promise<void> =>
-    Effect.runPromise(misc.logActivity(acting().id, projectId, "project", action, { via: "assistant", ...details })).then(() => undefined, () => undefined)
+    run(misc.logActivity(acting().id, projectId, "project", action, { via: "assistant", ...details })).then(() => undefined, () => undefined)
   const storeKernelBody = async (loaded: Awaited<ReturnType<typeof load>>, brep: cad.brep.Brep, name: string, change: { readonly action: string; readonly details?: Record<string, unknown> } = { action: "ai.cad.store_body" }) => {
     if (!loaded.id) return { ok: false, error: "No drawing is open." }
     const created: Element = { id: crypto.randomUUID(), type: "brep", name, brep, x: 0, y: 0, z: 0, layerId: "default" }
@@ -320,7 +348,7 @@ const toolHandlers = Effect.gen(function*() {
       if (current.id !== loaded.id || drawingRevision(current) !== revision) return { ok: false, status: "stale", error: "The drawing changed during turning. Plan again." }
       signal?.throwIfAborted()
       await assertWrite(loaded.projectId)
-      const row = await Effect.runPromise(toolpaths.create(acting().id, {
+      const row = await run(toolpaths.create(acting().id, {
         name: "Native turning preview", description: "Ideal point-tool external turning; unqualified workholding and controller",
         projectId: loaded.projectId, drawingId: loaded.id, type: "lathe", operationType: "turning", gcode: plan.nc,
         data: { ...document, turningPlan: Schema.decodeUnknownSync(CamTurningPlan)(plan), turningRequest: request, sourceRevision: revision, identity }
@@ -377,11 +405,11 @@ const toolHandlers = Effect.gen(function*() {
         ...(loaded.data["stock"] !== undefined ? { stock: loaded.data["stock"] } : {})
       })
       // Recheck the original drawing and authority after computation, immediately before the existing repository write.
-      const current = await Effect.runPromise(drawings.find(acting().id, loaded.id))
+      const current = await run(drawings.find(acting().id, loaded.id))
       const data = record(current?.data)
       if (!current || drawingRevision({ id: current.id, data, elements: elementsOf(data) }) !== revision) return { ok: false, status: "stale", error: "The drawing changed during manufacturing. Generate again." }
       await assertWrite(loaded.projectId)
-      const row = await Effect.runPromise(toolpaths.create(acting().id, {
+      const row = await run(toolpaths.create(acting().id, {
         name: input.setupOrientation !== undefined && input.setupOrientation !== "+Z" ? `Native CAM ${input.setupOrientation} setup` : "Native CAM program", description: "Generated by the native CAM kernel",
         projectId: loaded.projectId, drawingId: loaded.id, type: "mill", operationType: "kernel", gcode: artifact.nc,
         data: { kernelArtifact: artifact, kernelRequest, sourceRevision: revision }
@@ -433,7 +461,7 @@ const toolHandlers = Effect.gen(function*() {
     },
     setupSheetOperation: async (projectId, operationId) => {
       const loaded = await load(projectId)
-      const stored = await Effect.runPromise(toolpaths.find(acting().id, operationId))
+      const stored = await run(toolpaths.find(acting().id, operationId))
       if (!stored || stored.project.id !== loaded.projectId) return { ok: false, error: "Operation not found in the active drawing" }
       const artifactData = record(stored.row.data)["kernelArtifact"]
       if (artifactData === undefined) return { ok: false, error: "Only a program the CAM kernel generated has a setup sheet; this operation has none." }
@@ -451,7 +479,7 @@ const toolHandlers = Effect.gen(function*() {
     },
     reviewOperation: async (projectId, operationId) => {
       const loaded = await load(projectId)
-      const stored = await Effect.runPromise(toolpaths.find(acting().id, operationId))
+      const stored = await run(toolpaths.find(acting().id, operationId))
       if (!stored || stored.project.id !== loaded.projectId) return { ok: false, error: "Operation not found in the active drawing" }
       const data = record(stored?.row.data)
       if (stored.row.drawingId !== loaded.id && !(stored.row.drawingId === null && data["format"] === "cadcamfun-cam")) return { ok: false, error: "Operation not found in the active drawing" }
@@ -482,7 +510,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: status === "pass", status, operationId, drawingId: loaded.id, revision, verifiedRevision: evidence["revision"] ?? null, refinements: { used: rounds, remaining: Math.max(0, 3 - rounds) }, ...(status === "pass" || status === "failed" ? { issues: report["issues"], stats: report["stats"], modelled: evidence["modelled"], start: record(evidence["request"])["start"] } : {}), note: "A pass covers only the saved simulation model at this drawing and program revision." }
     },
     stock: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId, input.action === "set")
       /** The raw piece as the CAD scene draws it, when the drawing holds one. */
       const workpieceOf = (elements: ReadonlyArray<Element>, id?: string) => {
@@ -504,7 +532,7 @@ const toolHandlers = Effect.gen(function*() {
       const stock = Schema.decodeUnknownSync(cam.generator.StockSchema)(input.stock)
       const referenced = stock.elementId === undefined ? undefined : loaded.elements.find((e) => e.id === stock.elementId)
       if (stock.elementId !== undefined && referenced === undefined) return { ok: false, error: "Stock reference element does not exist in the active drawing." }
-      const invalidated = await Effect.runPromise(drawings.configureStock(loaded.id, stock, loaded.contentHash)).catch((error: unknown) => {
+      const invalidated = await run(drawings.configureStock(loaded.id, stock, loaded.contentHash)).catch((error: unknown) => {
         // The repository reports a conflict through its DatabaseError; the tool reports the conflict itself.
         for (let cause: unknown = error; cause !== null && typeof cause === "object"; cause = (cause as { cause?: unknown }).cause) if (cause instanceof DrawingConflict) throw cause
         throw error
@@ -538,10 +566,10 @@ const toolHandlers = Effect.gen(function*() {
       }
     },
     cadInspect: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       if (input.action === "layers") {
-        const snapshot = await Effect.runPromise(kv.get(`ai.context.${projectId}`))
+        const snapshot = await run(kv.get(`ai.context.${projectId}`))
         const value = snapshot?.value as { layers?: unknown; activeLayer?: unknown; projectId?: unknown } | undefined
         return { ok: true, layers: Array.isArray(value?.layers) ? value.layers : [], activeLayer: value?.activeLayer ?? null, source: "desktop workspace snapshot", capturedAt: snapshot?.updatedAt ?? null, available: Array.isArray(value?.layers), ...where(loaded) }
       }
@@ -580,7 +608,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, total: matched.length, offset: input.offset, nextOffset: input.offset + page.length < matched.length ? input.offset + page.length : null, elements: page.map((e) => ({ properties: inspectProperties(e), bounds: elementBounds(e, loaded.elements) ?? null })), missingIds: input.ids?.filter((id) => !loaded.elements.some((e) => e.id === id)) ?? [], note: input.offset + page.length < matched.length ? `More elements: call again with offset ${input.offset + page.length}.` : undefined, ...where(loaded) }
     },
     cadComponentRelations: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       const first = loaded.elements.find((e) => e.id === input.firstId), second = loaded.elements.find((e) => e.id === input.secondId)
       if (!first || !second || first.id === second.id) return { ok: false, error: "Choose two different existing element/component ids." }
@@ -591,14 +619,14 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, first: { id: first.id, placement: p, bounds: a ?? null, parametric: componentParameters(first) }, second: { id: second.id, placement: q, bounds: b ?? null, parametric: componentParameters(second) }, originDistanceMm: Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z), originConvention: "Nominal x,y,z placement fields; actual renderer origins and pivots are available in cad_vision spatial evidence", boundingGapsMm: gaps, explicitReferences: [first, second].flatMap((e) => Array.isArray(e["operands"]) ? e["operands"].filter((id) => id === first.id || id === second.id).map((id) => ({ from: e.id, to: id, kind: "boolean operand" })) : []), note: "Nominal bounding measurements only. Equal parameter names are not shared bindings; bounding overlap does not prove interference.", ...where(loaded) }
     },
     cadExact: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
         return exactForModel(await runKernelJob("cad-analyze", { elements: loaded.elements, options: { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.machining !== undefined ? { machining: input.machining } : {}) } }), where(loaded))
       } catch (error) { return kernelFailed("The exact analysis failed", error) }
     },
     cadTitleBlock: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId, input.action === "set")
       // What the drawing knows about itself, to complete the fields nobody wrote: the same completion the screens and the sheet use.
       const workpiece = loaded.elements.find((e) => e["type"] === "workpiece")
@@ -622,7 +650,7 @@ const toolHandlers = Effect.gen(function*() {
       return reply(complete)
     },
     cadSetups: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
         return setupsForModel(await runKernelJob("cad-setups", {
@@ -632,20 +660,20 @@ const toolHandlers = Effect.gen(function*() {
       } catch (error) { return kernelFailed("The setup planning failed", error) }
     },
     cadAssembly: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
         return assemblyForModel(await runKernelJob("cad-assembly", { elements: loaded.elements, options: input.washers !== undefined ? { washers: input.washers } : {} }), where(loaded))
       } catch (error) { return kernelFailed("The assembly analysis failed", error) }
     },
     cadShell: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try { return { ...cad.sceneShell(loaded.elements, input.id, input.thickness, input.open ?? [], input.wallByFace ?? []), ...where(loaded) } }
       catch (error) { return { ok: false, error: `The shell analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadStoreBodies: async (projectId, bodies) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       if (bodies.length === 0 || bodies.length > 40) return { ok: false, error: "Store 1..40 bodies per call." }
       for (const body of bodies) {
         const report = cad.brep.validateBrep(body.brep)
@@ -657,7 +685,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, ids: created.map((e) => e.id), elements: created, ...where(loaded) }
     },
     cadExchange: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       if (input.format === "parasolid") return cad.brep.parasolidDiagnostic()
       const loaded = await load(projectId)
       try {
@@ -670,19 +698,19 @@ const toolHandlers = Effect.gen(function*() {
       } catch (error) { return { ok: false, error: `Exact export failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadOffset: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try { const r = cad.sceneOffsetBody(loaded.elements, input.id, input.distance); return { ...(r.ok ? r.report : r), ...where(loaded) } }
       catch (error) { return { ok: false, error: `The offset analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadMotion: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try { return { ...cad.sceneMotion(loaded.elements, input.model, input.sweep), ...where(loaded) } }
       catch (error) { return { ok: false, error: `The motion study failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadBuildShell: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
         const r = cad.sceneShellBody(loaded.elements, input.id, input.thickness, input.open ?? [], input.wallByFace ?? [])
@@ -691,7 +719,7 @@ const toolHandlers = Effect.gen(function*() {
       } catch (error) { return { ok: false, error: `The shell construction failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadHole: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
         const edit = featureEditOf(input)
@@ -702,7 +730,7 @@ const toolHandlers = Effect.gen(function*() {
       catch (error) { return kernelFailed("The hole edit failed", error) }
     },
     cadBuildHole: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
         if (input.nurbs !== undefined) {
@@ -737,7 +765,7 @@ const toolHandlers = Effect.gen(function*() {
       } catch (error) { return { ok: false, error: `The hole edit failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadBuildOffset: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try {
         const r = cad.sceneOffsetBody(loaded.elements, input.id, input.distance)
@@ -746,22 +774,22 @@ const toolHandlers = Effect.gen(function*() {
       } catch (error) { return { ok: false, error: `The offset construction failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     cadDistance: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       try { return { ...cad.sceneDistance(loaded.elements, input.firstId, input.secondId), ...where(loaded) } }
       catch (error) { return { ok: false, error: `The distance analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     webSearch: async (input, signal) => appConfig.aiOffline ? { ok: false, error: "Web search is disabled in offline mode." } : searchWeb(input, signal),
     vision: async (projectId, mode, focus, signal) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       return captureViewport({
-        set: (key, value) => Effect.runPromise(kv.set(key, value)),
-        get: async (key) => (await Effect.runPromise(kv.get(key)))?.value,
-        delete: (key) => Effect.runPromise(kv.delete(key))
+        set: (key, value) => run(kv.set(key, value)),
+        get: async (key) => (await run(kv.get(key)))?.value,
+        delete: (key) => run(kv.delete(key))
       }, { projectId, mode, ...(focus !== undefined ? { focus } : {}), ...(signal !== undefined ? { signal } : {}) }, async (capture) => {
         const loaded = await load(projectId)
         const camContext = capture.context["cam"] as { selectedOperationId?: unknown; toolpaths?: unknown } | undefined
-        const selected = mode === "cam" && typeof camContext?.selectedOperationId === "string" ? await Effect.runPromise(toolpaths.find(acting().id, camContext.selectedOperationId)) : undefined
+        const selected = mode === "cam" && typeof camContext?.selectedOperationId === "string" ? await run(toolpaths.find(acting().id, camContext.selectedOperationId)) : undefined
         const programError = camContext?.selectedOperationId && mode === "cam" && (!selected || selected.row.drawingId !== loaded.id || !selected.row.gcode) ? "The selected CAM operation has no saved program in the active drawing." : undefined
         const programRevision = selected?.row.gcode && selected.row.drawingId === loaded.id ? createHash("sha256").update(cam.programGeometryText((await runKernelJob("cam-parse", { gcode: selected.row.gcode, name: "Program" })).program)).digest("hex") : undefined
         // The toolpaths of the program on screen: what the capture draws, in the model's words.
@@ -777,7 +805,7 @@ const toolHandlers = Effect.gen(function*() {
       })
     },
     grep: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       const needle = input.query.trim().toLowerCase()
       if (needle === "") return { ok: false, error: "The query is empty after trimming." }
@@ -809,7 +837,7 @@ const toolHandlers = Effect.gen(function*() {
       }
     },
     parametric: async (projectId, input) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       if (input.action === "validate") return inspectParametric(input.history)
       if (input.action === "create") {
         const report = inspectParametric(input.history)
@@ -961,7 +989,7 @@ const toolHandlers = Effect.gen(function*() {
         ...(data["stock"] !== undefined ? { stock: data["stock"] } : {})
       }
       const request = { settings, geometry, printer }
-      const row = await Effect.runPromise(toolpaths.create(acting().id, {
+      const row = await run(toolpaths.create(acting().id, {
         name: `${operation.type} operation`, description: "Created by the nikcli CAD/CAM agent",
         data: { request }, projectId, drawingId: id, type: settings.machineType, operationType: settings.operationType
       }))
@@ -969,9 +997,9 @@ const toolHandlers = Effect.gen(function*() {
     },
     listOperations: async (drawingId) => {
       const { id, projectId } = await load(drawingId)
-      const projectRows = Schema.decodeUnknownSync(Schema.Array(ToolpathRow))(await Effect.runPromise(toolpaths.listForProject(acting().id, projectId)))
+      const projectRows = Schema.decodeUnknownSync(Schema.Array(ToolpathRow))(await run(toolpaths.listForProject(acting().id, projectId)))
       const rows = [
-        ...await Effect.runPromise(toolpaths.listForDrawing(id)),
+        ...await run(toolpaths.listForDrawing(id)),
         ...projectRows.filter((row) => row.drawingId === null && record(row.data)["format"] === "cadcamfun-cam")
       ]
       return rows.map((row) => {
@@ -988,7 +1016,7 @@ const toolHandlers = Effect.gen(function*() {
       const { id, projectId } = loaded
       const revision = drawingRevision(loaded)
       if (expectedRevision !== undefined && expectedRevision !== revision) return { ok: false, status: "stale", error: "The drawing changed since plan validation. Validate the plan again." }
-      const found = await Effect.runPromise(toolpaths.find(acting().id, operationId))
+      const found = await run(toolpaths.find(acting().id, operationId))
       if (!found || found.row.drawingId !== id || found.project.id !== projectId) return { ok: false, error: "Operation not found in the active drawing" }
       const stored = found.row.data as { request?: { settings?: Record<string, unknown>; geometry?: unknown; printer?: unknown } } | null
       if (!stored?.request) return { ok: false, error: "Operation has no generation settings" }
@@ -1005,7 +1033,7 @@ const toolHandlers = Effect.gen(function*() {
       const request = { ...stored.request, settings, printer }
       // The stored G-code no longer matches the settings: drop it so nothing exports a stale program.
       const { verification: _verification, response: _response, refinement: _refinement, ...metadata } = previous
-      await Effect.runPromise(toolpaths.update(operationId, { data: { ...metadata, request, ...(refining ? { refinement: { revision, rounds: rounds + 1 } } : {}) }, gcode: null, operationType: settings.operationType }))
+      await run(toolpaths.update(operationId, { data: { ...metadata, request, ...(refining ? { refinement: { revision, rounds: rounds + 1 } } : {}) }, gcode: null, operationType: settings.operationType }))
       return { ok: true, operationId, settings: { operationType: settings.operationType, toolDiameter: settings.toolDiameter, depth: settings.depth, stepdown: settings.stepdown, feedrate: settings.feedrate }, note: "Generate G-code again, then verify it." }
     },
     suggestParameters: async (drawingId, params) => {
@@ -1015,15 +1043,15 @@ const toolHandlers = Effect.gen(function*() {
       return cam.generator.suggestFor(settings, geometry as never)
     },
     compareSetups: async (projectId, candidates) => {
-      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      { const denied = await refused(projectId); if (denied) return denied }
       const loaded = await load(projectId)
       if (loaded.data["stock"] === undefined) return { ok: false, error: "Configure explicit stock with cam_stock before comparing removal and cutter setups." }
       const geometry = Schema.decodeUnknownSync(cam.generator.GeometrySchema)({ geometryType: "selected", selectedElements: loaded.elements.filter((e) => e.type !== "workpiece"), stock: loaded.data["stock"] })
       const results: unknown[] = []
       for (const candidate of candidates) {
         try {
-          const tool = candidate.toolId ? (await Effect.runPromise(tools.find(acting().id, candidate.toolId)))?.detail : undefined
-          const material = candidate.materialId ? (await Effect.runPromise(materials.find(acting().id, candidate.materialId)))?.material : undefined
+          const tool = candidate.toolId ? (await run(tools.find(acting().id, candidate.toolId)))?.detail : undefined
+          const material = candidate.materialId ? (await run(materials.find(acting().id, candidate.materialId)))?.material : undefined
           if ((candidate.toolId && !tool) || (candidate.materialId && !material)) { results.push({ name: candidate.name, ok: false, error: "Library tool or material is missing or inaccessible." }); continue }
           const settings = cam.generator.decodeSettings({ ...candidate.params, ...(tool ? { toolType: tool.type, toolDiameter: tool.diameter, ...(tool.numberOfFlutes ? { flutes: tool.numberOfFlutes } : {}) } : {}) })
           if (tool?.maxRPM && settings.rpm > tool.maxRPM) { results.push({ name: candidate.name, ok: false, error: `Requested RPM ${settings.rpm} exceeds the cutter limit ${tool.maxRPM}.` }); continue }
@@ -1047,14 +1075,14 @@ const toolHandlers = Effect.gen(function*() {
       const { response, error } = await runKernelJob("cam-generate", found.request as never).catch((cause: unknown) => ({ response: undefined, error: kernelFailed("Generation failed", cause).error }))
       if (error || response === undefined) return { gcode: "", stats: { error: error ?? "Generation failed" } }
       await assertWrite(drawingId)
-      const previous = record((await Effect.runPromise(toolpaths.find(acting().id, found.id)))?.row.data)
+      const previous = record((await run(toolpaths.find(acting().id, found.id)))?.row.data)
       const { verification: _verification, ...metadata } = previous
-      await Effect.runPromise(toolpaths.update(found.id, { data: { ...metadata, request: found.request, response }, gcode: response.gcode }))
+      await run(toolpaths.update(found.id, { data: { ...metadata, request: found.request, response }, gcode: response.gcode }))
       return { gcode: response.gcode, stats: response.stats }
     },
     operationProgram: async (drawingId, operationId) => {
       const { id, projectId } = await load(drawingId)
-      const found = await Effect.runPromise(toolpaths.find(acting().id, operationId))
+      const found = await run(toolpaths.find(acting().id, operationId))
       if (!found || found.project.id !== projectId) return { ok: false, error: "Operation not found in the active drawing" }
       const data = record(found.row.data)
       if (found.row.drawingId !== id && !(found.row.drawingId === null && data["format"] === "cadcamfun-cam")) return { ok: false, error: "Operation not found in the active drawing" }
@@ -1092,7 +1120,7 @@ const toolHandlers = Effect.gen(function*() {
       const revision = drawingRevision(loaded)
       const found = await operation(drawingId, operationId)
       if ("error" in found) return { ok: false, error: found.error, operationId }
-      const stored = await Effect.runPromise(toolpaths.find(acting().id, found.id))
+      const stored = await run(toolpaths.find(acting().id, found.id))
       const program = stored?.row.gcode
       if (!stored || !program) return { ok: false, error: "The operation has no stored program: run cam_edit generate first, then verify that program.", operationId }
       const requestRevision = identity(found.request)
@@ -1119,7 +1147,7 @@ const toolHandlers = Effect.gen(function*() {
       }
       await assertWrite(drawingId)
       // The full report (with the height map) is kept on the operation for the CAM page; the program column is not touched.
-      const recorded = await Effect.runPromise(toolpaths.updateWhere(found.id,
+      const recorded = await run(toolpaths.updateWhere(found.id,
         (row, drawingData) => {
           const data = record(drawingData)
           return row.gcode === program && identity(record(row.data)["request"]) === requestRevision && drawingRevision({ id: loaded.id, data, elements: elementsOf(data) }) === revision
@@ -1141,32 +1169,32 @@ const toolHandlers = Effect.gen(function*() {
         note: "The stored program was replayed unchanged. A passing report covers only what is modelled at this program, drawing and stock revision; it is not a machine certification."
       }
     },
-    remember: async (key, value) => { actingCell.assertActive(); await Effect.runPromise(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
-    recall: async (prefix) => (await Effect.runPromise(kv.list(`ai.memory.${prefix ?? ""}`))).map((e) => ({ key: e.key.slice("ai.memory.".length), value: e.value })),
+    remember: async (key, value) => { actingCell.assertActive(); await run(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
+    recall: async (prefix) => (await run(kv.list(`ai.memory.${prefix ?? ""}`))).map((e) => ({ key: e.key.slice("ai.memory.".length), value: e.value })),
     projectContext: async (projectId) => {
-      const entry = await Effect.runPromise(kv.get(projectContextKey(projectId)))
+      const entry = await run(kv.get(projectContextKey(projectId)))
       // An absent row is an empty document, not a failure: a project that never had rules reads as blank.
       return entry === undefined ? { text: "" } : parseProjectContext(entry.value)
     },
     saveProjectContext: async (projectId, text) => {
       await assertWrite(projectId)
-      const entry = await Effect.runPromise(kv.set(projectContextKey(projectId), text))
+      const entry = await run(kv.set(projectContextKey(projectId), text))
       return parseProjectContext(entry.value)
     },
-    lookupMaterial: async (query) => (await Effect.runPromise(materials.list(acting().id, { search: query }))).slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, properties: m.properties, updatedAt: m.updatedAt })),
-    lookupTool: async (query) => (await Effect.runPromise(tools.list(acting().id, { search: query }))).slice(0, 10).map((t) => ({ id: t.id, name: t.name, diameter: t.diameter, type: t.type, material: t.material, numberOfFlutes: t.numberOfFlutes, maxRPM: t.maxRPM, coolantType: t.coolantType, cuttingLength: t.cuttingLength, totalLength: t.totalLength, shankDiameter: t.shankDiameter, cornerRadius: t.cornerRadius, tipAngle: t.tipAngle, threadPitch: t.threadPitch, holderDiameter: t.holderDiameter, holderLength: t.holderLength, stickout: t.stickout, notes: t.notes })),
+    lookupMaterial: async (query) => (await run(materials.list(acting().id, { search: query }))).slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, properties: m.properties, updatedAt: m.updatedAt })),
+    lookupTool: async (query) => (await run(tools.list(acting().id, { search: query }))).slice(0, 10).map((t) => ({ id: t.id, name: t.name, diameter: t.diameter, type: t.type, material: t.material, numberOfFlutes: t.numberOfFlutes, maxRPM: t.maxRPM, coolantType: t.coolantType, cuttingLength: t.cuttingLength, totalLength: t.totalLength, shankDiameter: t.shankDiameter, cornerRadius: t.cornerRadius, tipAngle: t.tipAngle, threadPitch: t.threadPitch, holderDiameter: t.holderDiameter, holderLength: t.holderLength, stickout: t.stickout, notes: t.notes })),
     lookupComponent: async (query) => {
       const needle = query.trim().toLowerCase()
-      const rows = await Effect.runPromise(components.listVisible(acting().id))
+      const rows = await run(components.listVisible(acting().id))
       return rows
         .filter((c) => needle === "" || c.name.toLowerCase().includes(needle) || (c.description ?? "").toLowerCase().includes(needle) || c.project.name.toLowerCase().includes(needle))
         .slice(0, 20)
         .map((c) => ({ id: c.id, name: c.name, description: c.description, type: c.type, projectId: c.projectId, projectName: c.project.name, isPublic: c.isPublic, updatedAt: c.updatedAt }))
     },
-    lookupMachineConfig: async (query) => (await Effect.runPromise(machines.list(acting().id, { ...(query === "" ? {} : { search: query }), page: 1, limit: 10 }))).rows.slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, type: m.type, config: m.config, isPublic: m.isPublic, isOwner: m.isOwner, usageCount: m.usageCount, updatedAt: m.updatedAt })),
+    lookupMachineConfig: async (query) => (await run(machines.list(acting().id, { ...(query === "" ? {} : { search: query }), page: 1, limit: 10 }))).rows.slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, type: m.type, config: m.config, isPublic: m.isPublic, isOwner: m.isOwner, usageCount: m.usageCount, updatedAt: m.updatedAt })),
     // The machines the person configured, as machines the kernel plans against: the configuration becomes a machine.
     machines: async (projectId) => {
-      const rows = (await Effect.runPromise(machines.list(acting().id, { page: 1, limit: 100 }))).rows
+      const rows = (await run(machines.list(acting().id, { page: 1, limit: 100 }))).rows
       return rows.flatMap((row) => {
         const machine = cam.kernel.kernelMachineOfConfig({ id: row.id, name: row.name, type: row.type, config: row.config as never })
         if (machine === undefined) return []
@@ -1182,27 +1210,27 @@ const toolHandlers = Effect.gen(function*() {
       const { kind, id } = input
       if (kind === "material" || kind === "tool") {
         // Same rule as the library HTTP routes: visible to the acting user, and writable (owner or organisation write access).
-        const found = kind === "material" ? await Effect.runPromise(materials.find(acting().id, id)) : await Effect.runPromise(tools.find(acting().id, id))
+        const found = kind === "material" ? await run(materials.find(acting().id, id)) : await run(tools.find(acting().id, id))
         if (!found) return { ok: false, error: `Unknown ${kind} id: ${id}.` }
         if (!found.canWrite) return { ok: false, error: `The acting user may not delete this ${kind}.` }
         actingCell.assertActive()
-        await Effect.runPromise(kind === "material" ? materials.remove(id) : tools.remove(id))
+        await run(kind === "material" ? materials.remove(id) : tools.remove(id))
         return { ok: true, kind, id, note: "Toolpaths that referenced it keep their stored parameters; re-check them with cam_verify_toolpath." }
       }
       if (kind === "library_item") {
-        const found = await Effect.runPromise(libraryItems.find(acting().id, id))
+        const found = await run(libraryItems.find(acting().id, id))
         if (!found) return { ok: false, error: `Unknown library item id: ${id}.` }
         if (found.item.ownerId !== acting().id) return { ok: false, error: "Only the owner may delete this library item." }
         actingCell.assertActive()
-        await Effect.runPromise(libraryItems.remove(id))
+        await run(libraryItems.remove(id))
         return { ok: true, kind, id }
       }
-      const found = await Effect.runPromise(machines.find(acting().id, id))
+      const found = await run(machines.find(acting().id, id))
       if (!found) return { ok: false, error: `Unknown machine config id: ${id}.` }
       if (!found.permission.isOwner) return { ok: false, error: "Only the owner may delete this machine config." }
       if (found.usageCount > 0) return { ok: false, error: `This machine config is still used by ${found.usageCount} toolpath(s); reassign or delete them first.` }
       actingCell.assertActive()
-      await Effect.runPromise(machines.remove(id))
+      await run(machines.remove(id))
       return { ok: true, kind, id }
     },
     listComponents: async (projectId) => {
@@ -1231,7 +1259,7 @@ const toolHandlers = Effect.gen(function*() {
       const data = { name, type: "custom", version: "1.0", elements: [component], geometry: { type: "custom", elements: [component] }, metadata: { createdAt: new Date().toISOString() }, properties: {} }
       await assertWrite(loaded.projectId)
       // One insert carries the metadata too: a failure cannot leave a component without its kind and visibility.
-      const created = await Effect.runPromise(components.create(loaded.projectId, {
+      const created = await run(components.create(loaded.projectId, {
         name, description: metadata?.description ?? null, data,
         ...(metadata?.type !== undefined && metadata.type !== "" ? { type: metadata.type } : {}),
         ...(metadata?.isPublic !== undefined ? { isPublic: metadata.isPublic } : {})
@@ -1240,7 +1268,7 @@ const toolHandlers = Effect.gen(function*() {
     },
     insertComponent: async (projectId, componentId, transform) => {
       const loaded = await load(projectId, true)
-      const found = await Effect.runPromise(components.find(acting().id, componentId))
+      const found = await run(components.find(acting().id, componentId))
       if (!found) return { ok: false, error: `Unknown component id: ${componentId}.` }
       const data = found.data as { elements?: ReadonlyArray<Record<string, unknown>> } | null
       const stored = Array.isArray(data?.elements) ? data.elements : []
@@ -1257,12 +1285,12 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, ids: placed.map((e) => e.id), component: { id: found.id, name: found.name }, elements: placed, ...where(loaded) }
     },
     deleteComponent: async (componentId) => {
-      const found = await Effect.runPromise(components.find(acting().id, componentId))
+      const found = await run(components.find(acting().id, componentId))
       if (!found) return { ok: false, error: `Unknown component id: ${componentId}.` }
-      const access = await Effect.runPromise(projects.find(acting().id, found.projectId))
+      const access = await run(projects.find(acting().id, found.projectId))
       if (!access || (access.project.ownerId !== acting().id && access.orgRole !== "ADMIN" && access.orgRole !== "MANAGER")) return { ok: false, error: "You do not have permission to delete this component." }
       actingCell.assertActive()
-      await Effect.runPromise(components.remove(componentId))
+      await run(components.remove(componentId))
       return { ok: true, deleted: componentId }
     },
     upsertMaterial: async (input) => {
@@ -1271,16 +1299,16 @@ const toolHandlers = Effect.gen(function*() {
       const name = String(input["name"])
       const properties = (input["properties"] !== null && typeof input["properties"] === "object" ? input["properties"] : {}) as Record<string, unknown>
       if (id !== undefined) {
-        const existing = await Effect.runPromise(materials.find(acting().id, id))
+        const existing = await run(materials.find(acting().id, id))
         if (!existing) return { ok: false, error: "Material not found or not accessible; no replacement was created." }
         if (existing) {
           if (!existing.canWrite) return { ok: false, error: "You do not have permission to update this material." }
           actingCell.assertActive()
-          const row = await Effect.runPromise(materials.update(id, { name, properties, ...(typeof input["description"] === "string" ? { description: input["description"] } : {}), ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }))
+          const row = await run(materials.update(id, { name, properties, ...(typeof input["description"] === "string" ? { description: input["description"] } : {}), ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }))
           return { ok: true, id: row.id, created: false }
         }
       }
-      const row = await Effect.runPromise(materials.create(acting().id, { name, properties, ...(typeof input["description"] === "string" ? { description: input["description"] } : {}), ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }))
+      const row = await run(materials.create(acting().id, { name, properties, ...(typeof input["description"] === "string" ? { description: input["description"] } : {}), ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }))
       return { ok: true, id: row.id, created: true }
     },
     upsertTool: async (input) => {
@@ -1303,16 +1331,16 @@ const toolHandlers = Effect.gen(function*() {
         holderLength: typeof input["holderLength"] === "number" ? input["holderLength"] : null, stickout: typeof input["stickout"] === "number" ? input["stickout"] : null,
         notes: typeof input["notes"] === "string" ? input["notes"] : null, ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }
       if (id !== undefined) {
-        const existing = await Effect.runPromise(tools.find(acting().id, id))
+        const existing = await run(tools.find(acting().id, id))
         if (!existing) return { ok: false, error: "Tool not found or not accessible; no replacement was created." }
         if (existing) {
           if (!existing.canWrite) return { ok: false, error: "You do not have permission to update this tool." }
           actingCell.assertActive()
-          const row = await Effect.runPromise(tools.update(id, fields))
+          const row = await run(tools.update(id, fields))
           return { ok: true, id: row.id, created: false }
         }
       }
-      const row = await Effect.runPromise(tools.create(acting().id, fields))
+      const row = await run(tools.create(acting().id, fields))
       return { ok: true, id: row.id, created: true }
     },
     upsertMachineConfig: async (input) => {
@@ -1324,16 +1352,16 @@ const toolHandlers = Effect.gen(function*() {
       const config = cam.kernel.configOfProfile(cam.kernel.profileOfConfig(input, String(input["kind"])))
       const type = String(input["kind"])
       if (id !== undefined) {
-        const existing = await Effect.runPromise(machines.find(acting().id, id))
+        const existing = await run(machines.find(acting().id, id))
         if (!existing) return { ok: false, error: "Machine config not found or not accessible; no replacement was created." }
         if (existing) {
           if (!existing.permission.isOwner) return { ok: false, error: "Only the owner may update this machine config." }
           actingCell.assertActive()
-          const res = await Effect.runPromise(machines.update(id, { name: String(input["name"]), description: typeof input["description"] === "string" ? input["description"] : null, type, config, isPublic: input["isPublic"] === true }))
+          const res = await run(machines.update(id, { name: String(input["name"]), description: typeof input["description"] === "string" ? input["description"] : null, type, config, isPublic: input["isPublic"] === true }))
           return { ok: true, id: res.view.id, created: false }
         }
       }
-      const view = await Effect.runPromise(machines.create(acting().id, { name: String(input["name"]), description: typeof input["description"] === "string" ? input["description"] : null, type, config, isPublic: input["isPublic"] === true }))
+      const view = await run(machines.create(acting().id, { name: String(input["name"]), description: typeof input["description"] === "string" ? input["description"] : null, type, config, isPublic: input["isPublic"] === true }))
       return { ok: true, id: view.id, created: true }
     },
     upsertLibraryItem: async (input) => {
@@ -1347,14 +1375,14 @@ const toolHandlers = Effect.gen(function*() {
         ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {})
       }
       if (id !== undefined) {
-        const existing = await Effect.runPromise(libraryItems.find(acting().id, id))
+        const existing = await run(libraryItems.find(acting().id, id))
         if (!existing) return { ok: false, error: "Library item not found or not accessible; no replacement was created." }
         if (existing.item.ownerId !== acting().id) return { ok: false, error: "Only the owner may update this library item." }
         actingCell.assertActive()
-        const row = await Effect.runPromise(libraryItems.update(existing.item, fields))
+        const row = await run(libraryItems.update(existing.item, fields))
         return { ok: true, id: row.id, created: false }
       }
-      const row = await Effect.runPromise(libraryItems.create(acting().id, fields))
+      const row = await run(libraryItems.create(acting().id, fields))
       return { ok: true, id: row.id, created: true }
     },
     setCost: async (input) => {
@@ -1369,56 +1397,56 @@ const toolHandlers = Effect.gen(function*() {
       if (kind === "material") {
         const patch = pick({ costPerUnit: num("costPerUnit"), wasteFactor: num("wasteFactor"), minimumCharge: num("minimumCharge"), currencyCode })
         if (id !== undefined) {
-          const existing = await Effect.runPromise(costs.findMaterialCost(userId, id))
+          const existing = await run(costs.findMaterialCost(userId, id))
           if (!existing) return { ok: false, error: "Material cost not found or not accessible; no replacement was created." }
           actingCell.assertActive()
-          return { ok: true, id: (await Effect.runPromise(costs.updateMaterialCost(userId, id, patch))).id, created: false }
+          return { ok: true, id: (await run(costs.updateMaterialCost(userId, id, patch))).id, created: false }
         }
         const materialId = typeof input["materialId"] === "string" ? input["materialId"] : undefined
         if (materialId === undefined) return missing("materialId")
         if (patch.costPerUnit === undefined) return missing("costPerUnit")
-        const material = await Effect.runPromise(materials.find(userId, materialId))
+        const material = await run(materials.find(userId, materialId))
         if (!material) return { ok: false, error: `Unknown material id: ${materialId}.` }
         actingCell.assertActive()
-        return { ok: true, id: (await Effect.runPromise(costs.createMaterialCost(userId, { ...patch, materialId, costPerUnit: patch.costPerUnit }))).id, created: true }
+        return { ok: true, id: (await run(costs.createMaterialCost(userId, { ...patch, materialId, costPerUnit: patch.costPerUnit }))).id, created: true }
       }
       if (kind === "tool_wear") {
         const patch = pick({ wearRatePerMeter: num("wearRatePerMeter"), replacementCost: num("replacementCost"), replacementThreshold: num("replacementThreshold"), currencyCode })
         if (id !== undefined) {
-          const existing = await Effect.runPromise(costs.findToolWear(userId, id))
+          const existing = await run(costs.findToolWear(userId, id))
           if (!existing) return { ok: false, error: "Tool wear cost not found or not accessible; no replacement was created." }
           actingCell.assertActive()
-          return { ok: true, id: (await Effect.runPromise(costs.updateToolWear(userId, id, patch))).id, created: false }
+          return { ok: true, id: (await run(costs.updateToolWear(userId, id, patch))).id, created: false }
         }
         const toolId = typeof input["toolId"] === "string" ? input["toolId"] : undefined
         if (toolId === undefined) return missing("toolId")
         if (patch.wearRatePerMeter === undefined || patch.replacementCost === undefined) return missing("wearRatePerMeter and replacementCost")
-        const tool = await Effect.runPromise(tools.find(userId, toolId))
+        const tool = await run(tools.find(userId, toolId))
         if (!tool) return { ok: false, error: `Unknown tool id: ${toolId}.` }
         actingCell.assertActive()
-        return { ok: true, id: (await Effect.runPromise(costs.createToolWear(userId, { ...patch, toolId, wearRatePerMeter: patch.wearRatePerMeter, replacementCost: patch.replacementCost }))).id, created: true }
+        return { ok: true, id: (await run(costs.createToolWear(userId, { ...patch, toolId, wearRatePerMeter: patch.wearRatePerMeter, replacementCost: patch.replacementCost }))).id, created: true }
       }
       const patch = pick({ name: typeof input["name"] === "string" ? input["name"] : undefined, machineHourlyRate: num("machineHourlyRate"), operatorHourlyRate: num("operatorHourlyRate"), setupTime: num("setupTime"), currencyCode })
       if (id !== undefined) {
-        const existing = await Effect.runPromise(costs.findOperationCost(userId, id))
+        const existing = await run(costs.findOperationCost(userId, id))
         if (!existing) return { ok: false, error: "Operation cost not found or not accessible; no replacement was created." }
         actingCell.assertActive()
-        return { ok: true, id: (await Effect.runPromise(costs.updateOperationCost(userId, id, patch))).id, created: false }
+        return { ok: true, id: (await run(costs.updateOperationCost(userId, id, patch))).id, created: false }
       }
       if (patch.name === undefined || patch.machineHourlyRate === undefined || patch.operatorHourlyRate === undefined) return missing("name, machineHourlyRate and operatorHourlyRate")
       actingCell.assertActive()
-      return { ok: true, id: (await Effect.runPromise(costs.createOperationCost(userId, { ...patch, name: patch.name, machineHourlyRate: patch.machineHourlyRate, operatorHourlyRate: patch.operatorHourlyRate }))).id, created: true }
+      return { ok: true, id: (await run(costs.createOperationCost(userId, { ...patch, name: patch.name, machineHourlyRate: patch.machineHourlyRate, operatorHourlyRate: patch.operatorHourlyRate }))).id, created: true }
     },
     setProjectDefault: async (input) => {
       // Defaults are project-scoped notes, like the memory keys; resolved from the open project, or the newest one.
       const loaded = await load(input.projectId ?? "default", true)
       const { projectId: _ignored, ...defaults } = input
-      await Effect.runPromise(kv.set(`ai.defaults.${loaded.projectId}`, defaults))
+      await run(kv.set(`ai.defaults.${loaded.projectId}`, defaults))
       return { ok: true, projectId: loaded.projectId, defaults }
     },
     suggestChain: async (input) => {
       const loaded = await load(input.projectId)
-      const rows = chainOrder(await Effect.runPromise(toolpaths.listForDrawing(loaded.id)))
+      const rows = chainOrder(await run(toolpaths.listForDrawing(loaded.id)))
       const rowsById = new Map(rows.map((r) => [r.id, r]))
       const from = input.fromOperationId ? rowsById.get(input.fromOperationId) : rows[rows.length - 1]
       const settingsOf = (row: typeof rows[number] | undefined): Record<string, unknown> => ((row?.data as { request?: { settings?: Record<string, unknown> } } | null)?.request?.settings ?? {})
@@ -1432,7 +1460,7 @@ const toolHandlers = Effect.gen(function*() {
     },
     chainStatus: async (input) => {
       const loaded = await load(input.projectId)
-      const rows = chainOrder(await Effect.runPromise(toolpaths.listForDrawing(loaded.id)))
+      const rows = chainOrder(await run(toolpaths.listForDrawing(loaded.id)))
       const row = rows.find((r) => r.id === input.operationId)
       if (!row) return { ok: false, error: `Unknown operation id: ${input.operationId}.` }
       const settings = (row.data as { request?: { settings?: Record<string, unknown> } } | null)?.request?.settings ?? {}

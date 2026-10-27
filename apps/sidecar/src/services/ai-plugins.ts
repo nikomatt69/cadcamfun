@@ -167,10 +167,12 @@ export const AiPluginsLive = Layer.effect(AiPlugins, Effect.gen(function*() {
   )
   yield* loadPlugins(host, join(config.dataDir, "plugins"))
   const root = join(config.dataDir, "plugins")
+  /** Runs the host's effects with this layer's services (logger, tracer), never on an empty context. */
+  const runHost = Effect.runPromiseWith(yield* Effect.context<never>())
   const lock = yield* Semaphore.make(1)
   const attempt = <A>(run: () => Promise<A>) => Effect.tryPromise({ try: run, catch: (cause) => new AiPluginError({ message: toolFailure(cause).error }) })
   const manifestFor = async (text: string) => {
-    const manifest = await Effect.runPromise(parseManifest(text))
+    const manifest = await runHost(parseManifest(text))
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(manifest.id)) throw new Error("Invalid plugin id")
     const incoherent = contributionProblems(manifest)
     if (incoherent.length > 0) throw new Error(incoherent.join("; "))
@@ -178,7 +180,7 @@ export const AiPluginsLive = Layer.effect(AiPlugins, Effect.gen(function*() {
   }
   const installed = attempt(async () => {
     await mkdir(root, { recursive: true })
-    const live = await Effect.runPromise(host.list())
+    const live = await runHost(host.list())
     const plugins = []
     for (const entry of await readdir(root, { withFileTypes: true })) {
       if (!entry.isDirectory() || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(entry.name)) continue
@@ -201,8 +203,8 @@ export const AiPluginsLive = Layer.effect(AiPlugins, Effect.gen(function*() {
     installed,
     remove: (id) => lock.withPermit(attempt(async () => {
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(id)) throw new Error("Invalid plugin id")
-      const records = await Effect.runPromise(host.list())
-      if (records.some((record) => record.id === id)) await Effect.runPromise(host.uninstall(id))
+      const records = await runHost(host.list())
+      if (records.some((record) => record.id === id)) await runHost(host.uninstall(id))
       const ids = readEnabledPlugins(join(root, "enabled.json")).filter((candidate) => candidate !== id)
       const temp = join(root, `.enabled-${crypto.randomUUID()}.tmp`)
       try {
@@ -242,11 +244,11 @@ export const AiPluginsLive = Layer.effect(AiPlugins, Effect.gen(function*() {
       const directory = join(root, id)
       const manifest = await manifestFor(await readFile(join(directory, "plugin.json"), "utf8"))
       if (manifest.id !== id) throw new Error("Plugin id does not match its folder")
-      const records = await Effect.runPromise(host.list())
+      const records = await runHost(host.list())
       if (enabled) {
-        if (!records.some((record) => record.id === id)) await Effect.runPromise(host.install({ manifest, directory }))
-        await Effect.runPromise(host.enable(id))
-      } else if (records.some((record) => record.id === id)) await Effect.runPromise(host.disable(id))
+        if (!records.some((record) => record.id === id)) await runHost(host.install({ manifest, directory }))
+        await runHost(host.enable(id))
+      } else if (records.some((record) => record.id === id)) await runHost(host.disable(id))
       const ids = new Set(readEnabledPlugins(join(root, "enabled.json")))
       if (enabled) ids.add(id)
       else ids.delete(id)
@@ -255,7 +257,7 @@ export const AiPluginsLive = Layer.effect(AiPlugins, Effect.gen(function*() {
         await writeFile(temp, JSON.stringify([...ids]), { mode: 0o600 })
         await rename(temp, join(root, "enabled.json"))
       } catch (cause) {
-        if (enabled) await Effect.runPromise(host.disable(id))
+        if (enabled) await runHost(host.disable(id))
         throw cause
       } finally { await rm(temp, { force: true }) }
     })),
@@ -265,7 +267,7 @@ export const AiPluginsLive = Layer.effect(AiPlugins, Effect.gen(function*() {
     modes: () => pluginModes(root),
     tools: () => listing().map((entry) => definePluginTool(entry, async (args) => {
       // A call that throws, times out or finds the plugin gone is a result the assistant can read, not a crash of the turn.
-      return await Effect.runPromise(host.callTool(entry.pluginId, entry.id, args).pipe(Effect.catch((cause) => Effect.succeed(toolFailure(cause)))))
+      return await runHost(host.callTool(entry.pluginId, entry.id, args).pipe(Effect.catch((cause) => Effect.succeed(toolFailure(cause)))))
     }))
   })
 }))

@@ -1,8 +1,8 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { KERNEL_HISTORY_SIZE, KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, clearKernelJobCache, kernelJobHistory, kernelJobStats, kernelWorkerUrl, reopenKernelJobs, runKernelJob, runKernelJobInline, shutdownKernelJobs } from "../src/kernel-job.ts"
+import { KERNEL_HISTORY_SIZE, KERNEL_QUEUE_LIMIT, KERNEL_WORKERS, KernelJobError, KernelJobsLive, clearKernelJobCache, kernelJobHistory, kernelJobStats, kernelWorkerUrl, reopenKernelJobs, runKernelJob, runKernelJobEffect, runKernelJobInline, shutdownKernelJobs } from "../src/kernel-job.ts"
 import type { AcceptanceCheck } from "../src/acceptance.ts"
 import { cam } from "@cadcamfun/core"
-import { Schema } from "effect"
+import { Effect, Exit, Fiber, Layer, Schema, Scope } from "effect"
 
 setDefaultTimeout(120_000)
 
@@ -292,5 +292,59 @@ describe("the job history, the worker id and the shutdown", () => {
     reopenKernelJobs()
     expect((await runKernelJob("cam-plan", { ...base, id: "after" })).status).toBe("ok")
     expect(kernelJobStats().running).toBe(0)
+  })
+})
+
+describe("the kernel jobs as Effect", () => {
+  const base = {
+    schemaVersion: 1 as const, id: "fx", name: "Plate", material: "6061", part: { kind: "elements" as const, elements: [{ id: "plate", type: "cube", width: 30, height: 20, depth: 5 }] },
+    machine: cam.kernel.findMachine("vmc-standard")!, quality: { resolution: 0.4 }
+  }
+
+  test("a failure is a typed KernelJobError in the error channel", async () => {
+    const exit = await Effect.runPromise(Effect.exit(runKernelJobEffect("parametric-report", { history: plate, mode: "exit" } as never, { workerUrl: testWorker })))
+    expect(exit._tag).toBe("Failure")
+    const error = await Effect.runPromise(Effect.flip(runKernelJobEffect("parametric-report", { history: plate, mode: "exit" } as never, { workerUrl: testWorker })))
+    expect(error._tag).toBe("KernelJobError")
+    expect(error.reason).toBe("crashed")
+  })
+
+  test("interrupting the effect stops its worker before the interruption completes", async () => {
+    clearKernelJobCache()
+    const fiber = Effect.runFork(runKernelJobEffect("parametric-report", { history: heavy }))
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(kernelJobStats().running).toBe(1)
+    await Effect.runPromise(Fiber.interrupt(fiber))
+    expect(kernelJobStats().running).toBe(0)
+    expect(kernelJobHistory().at(-1)).toMatchObject({ job: "parametric-report", outcome: "cancelled" })
+  })
+
+  test("interrupting the last caller of a shared run stops the run", async () => {
+    clearKernelJobCache()
+    const a = Effect.runFork(runKernelJobEffect("cam-manufacture", { ...base, id: "fx-shared" }))
+    const b = Effect.runFork(runKernelJobEffect("cam-manufacture", { ...base, id: "fx-shared" }))
+    expect(kernelJobStats().inFlight).toBe(1)
+    await Effect.runPromise(Fiber.interrupt(a))
+    expect(kernelJobStats().inFlight).toBe(1)
+    await Effect.runPromise(Fiber.interrupt(b))
+    expect(kernelJobStats().inFlight).toBe(0)
+    expect(kernelJobStats().running).toBe(0)
+    expect(kernelJobStats().cached).toBe(0)
+  })
+
+  test("releasing the lifecycle layer stops the running job; building it again takes jobs", async () => {
+    clearKernelJobCache()
+    const scope = await Effect.runPromise(Scope.make())
+    await Effect.runPromise(Layer.buildWithScope(KernelJobsLive, scope))
+    const running = runKernelJob("parametric-report", { history: heavy })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    await Effect.runPromise(Scope.close(scope, Exit.void))
+    await expect(running).rejects.toMatchObject({ reason: "cancelled" })
+    expect(kernelJobStats().closing).toBe(true)
+    const again = await Effect.runPromise(Scope.make())
+    await Effect.runPromise(Layer.buildWithScope(KernelJobsLive, again))
+    expect((await runKernelJob("cam-plan", { ...base, id: "fx-after" })).status).toBe("ok")
+    await Effect.runPromise(Scope.close(again, Exit.void))
+    reopenKernelJobs()
   })
 })
