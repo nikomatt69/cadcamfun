@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { APICallError } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
-import { Effect, Exit, Layer, Redacted } from "effect"
+import { Clock, Effect, Exit, Layer, Redacted } from "effect"
+import { recordingClock } from "./helpers/recording-clock.ts"
 import { AiConfig } from "../src/ai-config.ts"
 import { AiCredentials } from "../src/credentials.ts"
 import { DirectModel } from "../src/direct-model.ts"
@@ -29,7 +30,7 @@ const flaky = (failures: ReadonlyArray<unknown>) => {
 }
 
 const run = (model: MockLanguageModelV4, waits: number[] = []) => {
-  const layer = DirectModel.layerWith(() => model, { sleep: async (ms) => void waits.push(ms) }).pipe(
+  const layer = DirectModel.layerWith(() => model).pipe(
     Layer.provideMerge(AiCredentials.layer),
     Layer.provide(AiConfig.layer({ dataDir: "/unused", forceGateway: false }))
   )
@@ -37,7 +38,7 @@ const run = (model: MockLanguageModelV4, waits: number[] = []) => {
     yield* (yield* AiCredentials).set("anthropic", Redacted.make("sk-retry-sentinel-1234"))
     return yield* (yield* DirectModel).generateText({ prompt: "hi" })
   })
-  return Effect.runPromiseExit(program.pipe(Effect.provide(layer)))
+  return Effect.runPromiseExit(program.pipe(Effect.provide(layer), Effect.provideService(Clock.Clock, recordingClock(waits))))
 }
 
 describe("DirectModel retries the way nikcli does", () => {

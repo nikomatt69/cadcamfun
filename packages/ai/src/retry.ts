@@ -1,8 +1,10 @@
 /**
  * When and how long to wait before asking a provider again (nikcli's `session/retry.ts`): a delay that grows
  * from 2 s, honours the provider's own `retry-after`, and a message a user can read for every kind of
- * transient failure.
+ * transient failure. `providerRetry` is that policy as an Effect `Schedule`, so a retry is `Effect.retry`: it
+ * sleeps on Effect's `Clock` (a test provides one that does not wait) and stops when the fiber is interrupted.
  */
+import { Duration, Effect, Schedule } from "effect"
 import { parseApiFailure, type ApiFailure } from "./provider-error.ts"
 
 export const RETRY_INITIAL_DELAY = 2_000
@@ -10,22 +12,6 @@ export const RETRY_BACKOFF_FACTOR = 2
 export const RETRY_MAX_DELAY_NO_HEADERS = 30_000
 export const RETRY_MAX_DELAY = 2_147_483_647
 export const RETRY_MAX_ATTEMPTS = 5
-
-/** Sleeps `ms` (at most {@link RETRY_MAX_DELAY}); rejects with an `AbortError` as soon as `signal` fires. */
-export const sleep = (ms: number, signal: AbortSignal): Promise<void> => {
-  if (signal.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"))
-  return new Promise((resolve, reject) => {
-    const onAbort = () => {
-      clearTimeout(timer)
-      reject(new DOMException("Aborted", "AbortError"))
-    }
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort)
-      resolve()
-    }, Math.min(ms, RETRY_MAX_DELAY))
-    signal.addEventListener("abort", onAbort, { once: true })
-  })
-}
 
 /** Milliseconds to wait before attempt `attempt + 1` (`attempt` counts from 1). */
 export const delay = (attempt: number, failure?: ApiFailure): number => {
@@ -85,3 +71,18 @@ export const retryable = (failure: ApiFailure): string | undefined => {
   }
   return mapPlainRetryMessage(parsed.message) ?? mapJsonRetryMessage(parsed.message) ?? (parsed.message || "Provider error")
 }
+
+/**
+ * The retry policy for provider calls failing with `E`: at most `attempts` calls in all, only while `failure` says the error is
+ * transient (it answers `undefined` for errors that are not provider failures, such as an abort), each pause the one `delay`
+ * gives for that attempt and that failure, so a provider's `retry-after` sets it.
+ */
+export const providerRetry = <E>(attempts: number, failure: (error: E) => ApiFailure | undefined): Schedule.Schedule<number, E> =>
+  Schedule.recurs(Math.max(0, attempts - 1)).pipe(
+    Schedule.setInputType<E>(),
+    Schedule.while(({ input }) => {
+      const parsed = failure(input)
+      return parsed !== undefined && retryable(parsed) !== undefined
+    }),
+    Schedule.modifyDelay(({ input, attempt }) => Effect.succeed(Duration.millis(Math.min(delay(attempt, failure(input)), RETRY_MAX_DELAY))))
+  )

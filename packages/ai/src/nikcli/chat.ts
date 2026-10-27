@@ -1,5 +1,5 @@
 /// <reference path="./sdk-next.d.ts" />
-import { Effect, Queue, Stream } from "effect"
+import { Duration, Effect, Queue, Stream } from "effect"
 import type { HostClient, HostPromptResult, HostSession } from "@nikcli-ai/sdk-next"
 import { AiConfigError, AiProviderError } from "../errors.ts"
 import type { AiEvent } from "../events.ts"
@@ -334,6 +334,11 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       const controller = new AbortController()
       const subscriber = new AbortController()
       yield* Effect.addFinalizer(() => Effect.sync(() => subscriber.abort()))
+      // The turn below is Promise code driven by the host's events; its pauses and host reads run with this stream's services
+      // (logger, tracer, Clock) instead of an empty runtime.
+      const runHere = Effect.runPromiseWith(yield* Effect.context<never>())
+      /** A pause on Effect's clock. Not tied to the client's connection: the turn goes on when the client leaves. */
+      const pause = (ms: number): Promise<void> => runHere(Effect.sleep(Duration.millis(ms)))
 
       // The turn belongs to the host session, not to this stream: when the client's connection drops (a closed laptop lid, a
       // restarted webview, an idle proxy) the assistant keeps working and finishes what it started, as nikcli does. Only an
@@ -394,14 +399,14 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       const finishFromSession = async (answers: ReadonlyArray<string>): Promise<boolean> => {
         const until = Date.now() + 15 * 60_000
         while (!controller.signal.aborted && Date.now() < until) {
-          const current = await Effect.runPromise(readHostSessionState(host, sessionId)).catch(() => undefined)
+          const current = await runHere(readHostSessionState(host, sessionId)).catch(() => undefined)
           if (current !== undefined && !current.busy) {
             if (current.error !== undefined) offer({ type: "error", sessionId, code: "provider", message: current.error })
             else offer({ type: "done", sessionId, text: [...answers, current.text].filter((t) => t.trim() !== "").join("\n\n") })
             controller.abort()
             return true
           }
-          await new Promise((r) => setTimeout(r, 500))
+          await pause(500)
         }
         return false
       }
@@ -429,7 +434,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       }
 
       const run = (async () => {
-        await Promise.race([connectedPromise, new Promise((r) => setTimeout(r, CONNECT_TIMEOUT_MS))])
+        await Promise.race([connectedPromise, pause(CONNECT_TIMEOUT_MS)])
         offer({ type: "turn", sessionId, phase: "start" })
         const resumes = input.continues ?? DEFAULT_RESUMES
         let attempt = 0
@@ -452,7 +457,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         const recoverInterruption = async (): Promise<"retry" | "finished"> => {
           const messages = await readMessages(40)
           const progressed = beforePromptKnown && messages !== undefined && messages.at(-1)?.info.id !== beforePrompt
-          const current = progressed ? await Effect.runPromise(readHostSessionState(host, sessionId)).catch(() => undefined) : undefined
+          const current = progressed ? await runHere(readHostSessionState(host, sessionId)).catch(() => undefined) : undefined
           // Prompt waiters can be rejected after the host already saved a complete answer.
           if (current && !current.busy && !current.error && current.text.trim() !== "") {
             offer({ type: "done", sessionId, text: [...answers, current.text].filter((text) => text.trim() !== "").join("\n\n"), recovered: true, ...(current.usage ? { usage: current.usage } : {}) })
@@ -466,7 +471,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           if (beforePromptKnown && messages !== undefined && !progressed && !ranTools && attempt < resumes && !controller.signal.aborted) {
             attempt += 1
             offer({ type: "retry", sessionId, attempt, message: `The previous answer was still finishing. Sending your message again (${attempt}/${resumes}).` })
-            await new Promise((resolve) => setTimeout(resolve, INTERRUPT_BACKOFF_MS * attempt))
+            await pause(INTERRUPT_BACKOFF_MS * attempt)
             state.sessionError = undefined
             state.idle = false
             return "retry"
@@ -541,7 +546,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
               attempt += 1
               offer({ type: "turn", sessionId, phase: "recovering", reason: message })
               offer({ type: "retry", sessionId, attempt, message: `${message} Resuming automatically (${attempt}/${resumes}).` })
-              await new Promise((r) => setTimeout(r, resumeDelay(attempt)))
+              await pause(resumeDelay(attempt))
               parts = [{ type: "text", text: RESUME_PROMPT, synthetic: true }]
               continue
             }
@@ -552,7 +557,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           if (result.info === undefined && result.name === STEP_LIMIT_NAME) {
             // Keep moving: the host session was aborted by the pump; wait for it to settle, then start the next run.
             const settle = Date.now() + 5_000
-            while (!subscriber.signal.aborted && !state.idle && Date.now() < settle) await new Promise((r) => setTimeout(r, 25))
+            while (!subscriber.signal.aborted && !state.idle && Date.now() < settle) await pause(25)
             const progressed = state.toolCalls > (callsAtStepLimit ?? 0)
             if (controller.signal.aborted || subscriber.signal.aborted) return
             if (!progressed || stepResumes >= MAX_STEP_RESUMES) {
@@ -575,7 +580,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           }
           // Let trailing bus events (final deltas, session.idle) reach the subscriber.
           const deadline = Date.now() + IDLE_GRACE_MS
-          while (!subscriber.signal.aborted && !state.idle && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10))
+          while (!subscriber.signal.aborted && !state.idle && Date.now() < deadline) await pause(10)
           // Detached UI subscribers no longer update tool/todo state; use the host record, never stale live evidence.
           let continuationState: EventMapperState | undefined = state
           if (subscriber.signal.aborted) continuationState = await readContinuationState(host, sessionId).catch(() => undefined)
@@ -586,7 +591,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             attempt += 1
             offer({ type: "turn", sessionId, phase: "recovering", reason: failure.message })
             offer({ type: "retry", sessionId, attempt, message: `${failure.message} Resuming automatically (${attempt}/${resumes}).` })
-            await new Promise((r) => setTimeout(r, resumeDelay(attempt)))
+            await pause(resumeDelay(attempt))
             state.retry = undefined
             state.sessionError = undefined
             state.idle = false
@@ -649,7 +654,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         try: async () => {
           await run
           subscriber.abort()
-          await Promise.race([pump, new Promise((r) => setTimeout(r, 150))])
+          await Promise.race([pump, pause(150)])
         },
         catch: (cause) => new AiProviderError({ message: cause instanceof Error ? cause.message : String(cause) })
       }).pipe(

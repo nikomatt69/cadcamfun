@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { formatOverflowMessage, isContextOverflowError, parseApiFailure, parseStreamError } from "../src/provider-error.ts"
-import { RETRY_MAX_DELAY_NO_HEADERS, delay, retryable, sleep } from "../src/retry.ts"
+import { RETRY_MAX_DELAY_NO_HEADERS, delay, providerRetry, retryable } from "../src/retry.ts"
+import type { ApiFailure } from "../src/provider-error.ts"
+import { Clock, Effect, Fiber } from "effect"
+import { recordingClock } from "./helpers/recording-clock.ts"
 import { isTransientFailure } from "../src/nikcli/chat.ts"
 
 describe("provider failures are classified like nikcli does", () => {
@@ -79,12 +82,43 @@ describe("retry", () => {
     expect(retryable({ message: "prompt is too long", statusCode: 400, isRetryable: true })).toBeUndefined()
   })
 
-  test("sleep ends early and rejects when aborted", async () => {
-    const controller = new AbortController()
-    const pending = sleep(60_000, controller.signal)
-    controller.abort()
-    await expect(pending).rejects.toMatchObject({ name: "AbortError" })
-    await expect(sleep(10, controller.signal)).rejects.toMatchObject({ name: "AbortError" })
-    await sleep(5, new AbortController().signal)
+  test("the retry schedule asks again while the failure is transient, with nikcli's pauses, up to the attempt limit", async () => {
+    const failures: ReadonlyArray<ApiFailure> = [
+      { message: "busy", statusCode: 503 },
+      { message: "slow down", statusCode: 429, isRetryable: true, responseHeaders: { "retry-after": "7" } },
+      { message: "busy", statusCode: 503 }
+    ]
+    let calls = 0
+    const waits: number[] = []
+    const call = Effect.suspend(() => {
+      const failure = failures[calls++]
+      return failure === undefined ? Effect.succeed("ok") : Effect.fail(failure)
+    })
+    const answer = await Effect.runPromise(call.pipe(Effect.retry(providerRetry<ApiFailure>(5, (f) => f)), Effect.provideService(Clock.Clock, recordingClock(waits))))
+    expect(answer).toBe("ok")
+    expect(calls).toBe(4)
+    expect(waits).toHaveLength(3)
+    expect(waits[0]!).toBeGreaterThanOrEqual(2_000)
+    expect(waits[1]).toBe(7_000)
+    expect(waits[2]!).toBeGreaterThanOrEqual(8_000)
+
+    // Not transient: no second call. Out of attempts: the last failure is the answer.
+    calls = 0
+    const denied = await Effect.runPromise(Effect.flip(Effect.suspend(() => { calls++; return Effect.fail<ApiFailure>({ message: "invalid api key", statusCode: 401 }) })
+      .pipe(Effect.retry(providerRetry<ApiFailure>(5, (f) => f)), Effect.provideService(Clock.Clock, recordingClock()))))
+    expect(denied.statusCode).toBe(401)
+    expect(calls).toBe(1)
+    calls = 0
+    await Effect.runPromise(Effect.flip(Effect.suspend(() => { calls++; return Effect.fail<ApiFailure>({ message: "busy", statusCode: 503 }) })
+      .pipe(Effect.retry(providerRetry<ApiFailure>(3, (f) => f)), Effect.provideService(Clock.Clock, recordingClock()))))
+    expect(calls).toBe(3)
+  })
+
+  test("interrupting a retry ends its pause at once", async () => {
+    const fiber = Effect.runFork(Effect.fail<ApiFailure>({ message: "busy", statusCode: 503 }).pipe(Effect.retry(providerRetry<ApiFailure>(5, (f) => f))))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const started = performance.now()
+    await Effect.runPromise(Fiber.interrupt(fiber))
+    expect(performance.now() - started).toBeLessThan(500)
   })
 })

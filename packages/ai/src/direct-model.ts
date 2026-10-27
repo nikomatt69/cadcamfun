@@ -17,7 +17,7 @@ import {
   type ResolvedModel
 } from "./models.ts"
 import { formatOverflowMessage, parseApiFailure, type ApiFailure } from "./provider-error.ts"
-import { RETRY_MAX_ATTEMPTS, delay as retryDelay, retryable, sleep as retrySleep } from "./retry.ts"
+import { RETRY_MAX_ATTEMPTS, providerRetry, retryable } from "./retry.ts"
 import { prepareCall, schema as transformSchema, transformModelFor, type PreparedCall } from "./transform.ts"
 
 export interface DirectCallBase {
@@ -123,8 +123,6 @@ const isAbort = (error: unknown, signal?: AbortSignal): boolean =>
 export interface DirectModelSettings {
   /** Calls per request including the first; default {@link RETRY_MAX_ATTEMPTS}. */
   readonly retryAttempts?: number
-  /** Replaced in tests so a retry does not wait. */
-  readonly sleep?: (ms: number, signal: AbortSignal) => Promise<void>
   /** Deadline for one stateless call; also bounds first-chunk and inter-chunk waits. Default two minutes. */
   readonly requestTimeoutMs?: number
 }
@@ -145,7 +143,6 @@ export class DirectModel extends Context.Service<
         const credentials = yield* AiCredentials
         const config = yield* AiConfig
         const retryAttempts = settings.retryAttempts ?? RETRY_MAX_ATTEMPTS
-        const sleepFor = settings.sleep ?? retrySleep
         const requestTimeoutMs = settings.requestTimeoutMs ?? 120_000
 
         const prepare = Effect.fn("DirectModel.prepare")(function* (selector: ModelSelector | undefined) {
@@ -177,28 +174,22 @@ export class DirectModel extends Context.Service<
           return new AiProviderError({ message: scrubSecret(raw, secrets), provider, retryable: retryable({ ...failure, message: raw }) !== undefined })
         }
 
-        /** nikcli's retry: transient failures are asked again after a growing pause, up to {@link RETRY_MAX_ATTEMPTS}. */
-        const withRetry = async <A>(call: (signal: AbortSignal) => Promise<A>, signal: AbortSignal): Promise<A> => {
-          for (let attempt = 1; ; attempt += 1) {
-            try {
-              return await call(signal)
-            } catch (error) {
-              if (attempt >= retryAttempts || isAbort(error, signal) || retryable(failureOf(error)) === undefined) throw error
-              await sleepFor(retryDelay(attempt, failureOf(error)), signal)
-            }
-          }
-        }
+        /**
+         * One provider call, asked again on transient failures after nikcli's growing pause (`providerRetry`). The pause is an
+         * Effect sleep: interrupting the request stops it, and a test's `Clock` decides how long it lasts. The call's abort signal
+         * is the attempt's own, so an interrupted attempt cancels its HTTP request. The raw failure stays for `toError`.
+         */
+        const retried = <A>(call: (signal: AbortSignal) => Promise<A>): Effect.Effect<A, unknown> =>
+          Effect.tryPromise({ try: call, catch: (error): unknown => error }).pipe(
+            Effect.retry(providerRetry<unknown>(retryAttempts, (error) => isAbort(error) ? undefined : failureOf(error)))
+          )
 
         const generateTextImpl = Effect.fn("DirectModel.generateText")(function* (input: DirectCallBase & { readonly prompt: string }) {
           const { resolved, model, secrets } = yield* prepare(input.model)
-          return yield* Effect.tryPromise({
-            try: (signal): Promise<TextResult> =>
-              withRetry(async (abortSignal) => {
-                const result = await generateText({ model, ...callSettings(prepareDirectCall(resolved, input)), abortSignal, timeout: requestTimeoutMs, maxRetries: 0 })
-                return { text: result.text, model: resolved.modelId, provider: resolved.provider, usage: usageOf(result.usage) }
-              }, signal),
-            catch: (error) => toError(error, undefined, resolved.provider, secrets, resolved.modelId)
-          })
+          return yield* retried(async (abortSignal): Promise<TextResult> => {
+            const result = await generateText({ model, ...callSettings(prepareDirectCall(resolved, input)), abortSignal, timeout: requestTimeoutMs, maxRetries: 0 })
+            return { text: result.text, model: resolved.modelId, provider: resolved.provider, usage: usageOf(result.usage) }
+          }).pipe(Effect.mapError((error) => toError(error, undefined, resolved.provider, secrets, resolved.modelId)))
         })
 
         const streamOnce = (input: DirectCallBase & { readonly prompt: string }, onResolved?: (provider: ProviderId) => void): Stream.Stream<DirectStreamPart, AiError> =>
@@ -272,21 +263,17 @@ export class DirectModel extends Context.Service<
                   ...(Object.keys(document.definitions).length > 0 ? { $defs: document.definitions } : {})
                 }) as Parameters<typeof jsonSchema>[0]
               )
-              const raw = yield* Effect.tryPromise({
-                try: (signal) =>
-                  withRetry(async (abortSignal) => {
-                    const result = await generateText({
-                      model,
-                      ...callSettings(prepareDirectCall(resolved, input)),
-                      output: Output.object({ schema: aiSchema }),
-                      abortSignal,
-                      timeout: requestTimeoutMs,
-                      maxRetries: 0
-                    })
-                    return result.output as unknown
-                  }, signal),
-                catch: (error) => toError(error, undefined, resolved.provider, secrets, resolved.modelId)
-              })
+              const raw = yield* retried(async (abortSignal) => {
+                const result = await generateText({
+                  model,
+                  ...callSettings(prepareDirectCall(resolved, input)),
+                  output: Output.object({ schema: aiSchema }),
+                  abortSignal,
+                  timeout: requestTimeoutMs,
+                  maxRetries: 0
+                })
+                return result.output as unknown
+              }).pipe(Effect.mapError((error) => toError(error, undefined, resolved.provider, secrets, resolved.modelId)))
               return yield* Schema.decodeUnknownEffect(input.schema)(raw).pipe(
                 Effect.mapError(
                   () => new AiProviderError({ message: "The model returned data that does not match the requested schema.", provider: resolved.provider })

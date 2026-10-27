@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { APICallError, simulateReadableStream } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
-import { Effect, Layer, Redacted, Stream } from "effect"
+import { Clock, Effect, Layer, Redacted, Stream } from "effect"
+import { recordingClock } from "./helpers/recording-clock.ts"
 import { AiConfig } from "../src/ai-config.ts"
 import { AiCredentials } from "../src/credentials.ts"
 import { DirectModel, type DirectStreamPart, type LanguageModelFactory } from "../src/direct-model.ts"
@@ -54,7 +55,7 @@ const run = async (models: Record<string, MockLanguageModelV4>, selector?: Model
     used.push(resolved.provider)
     return models[resolved.provider]!
   }
-  const layer = DirectModel.layerWith(factory, { sleep: async () => undefined }).pipe(
+  const layer = DirectModel.layerWith(factory).pipe(
     Layer.provideMerge(AiCredentials.layer),
     Layer.provide(AiConfig.layer({ dataDir: "/unused", forceGateway: false }))
   )
@@ -63,7 +64,7 @@ const run = async (models: Record<string, MockLanguageModelV4>, selector?: Model
     for (const provider of Object.keys(models)) yield* credentials.set(provider, Redacted.make(`sk-${provider}-sentinel-1234`))
     return yield* (yield* DirectModel).streamText({ prompt: "hi", ...(selector ? { model: selector } : {}) }).pipe(Stream.runCollect, Effect.exit)
   })
-  const exit = await Effect.runPromise(program.pipe(Effect.provide(layer)))
+  const exit = await Effect.runPromise(program.pipe(Effect.provide(layer), Effect.provideService(Clock.Clock, recordingClock())))
   return { exit, used }
 }
 
