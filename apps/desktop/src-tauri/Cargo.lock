@@ -401,7 +401,7 @@ dependencies = [
 
 [[package]]
 name = "cadcamfun-desktop"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "block2",
  "getrandom 0.3.4",
