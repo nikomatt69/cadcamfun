@@ -28,7 +28,9 @@ export interface RibbonTab {
 
 export interface RibbonActionSpec {
   readonly id: string
-  readonly labelKey: Key
+  /** Translated label; the post selector entries carry the control's own name in `label` instead (controller names are not translated). */
+  readonly labelKey?: Key
+  readonly label?: string
   readonly accent: RibbonAccent
   /** Callsite the action routes to. Mirrors the legacy page's `onClick` handlers. */
   readonly route:
@@ -44,7 +46,11 @@ export interface RibbonActionSpec {
     | "right-verify"
     | "operation-change"
     | "post-fanuc"
+    | "post-haas"
+    | "post-siemens"
     | "post-heidenhain"
+    | "post-linuxcnc"
+    | "post-grbl"
     | "post-gcode"
     | "sidebar-workpiece"
     | "sidebar-machine"
@@ -179,8 +185,12 @@ export const RIBBON_GROUPS: Readonly<Record<RibbonTabId, ReadonlyArray<RibbonGro
       accent: "neutral",
       actions: [
         { id: "post-fanuc", labelKey: "cam.ribbon.fanuc", accent: "blue", route: "post-fanuc" },
+        { id: "post-haas", label: "Haas NGC", accent: "blue", route: "post-haas" },
+        { id: "post-siemens", label: "Siemens 840D sl", accent: "cyan", route: "post-siemens" },
         { id: "post-heidenhain", labelKey: "cam.ribbon.heidenhain", accent: "purple", route: "post-heidenhain" },
-        { id: "post-gcode", labelKey: "cam.ribbon.generic", accent: "neutral", route: "post-gcode" },
+        { id: "post-linuxcnc", label: "LinuxCNC", accent: "green", route: "post-linuxcnc" },
+        { id: "post-grbl", label: "GRBL", accent: "amber", route: "post-grbl" },
+        { id: "post-generic", labelKey: "cam.ribbon.generic", accent: "neutral", route: "post-gcode" },
         { id: "open-post-tab", labelKey: "cam.ribbon.openPost", accent: "neutral", route: "active-post" }
       ]
     }
@@ -211,7 +221,11 @@ export const RIBBON_ROUTES = new Set<RibbonActionSpec["route"]>([
   "right-verify",
   "operation-change",
   "post-fanuc",
+  "post-haas",
+  "post-siemens",
   "post-heidenhain",
+  "post-linuxcnc",
+  "post-grbl",
   "post-gcode",
   "sidebar-workpiece",
   "sidebar-machine",

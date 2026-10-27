@@ -36,12 +36,15 @@ import { useGeneratorStore } from "../store/generatorStore.ts"
 import { paletteToCoreOperation } from "./generator/StrategyPalette.data.ts"
 import { cam } from "@cadcamfun/core"
 import { t, type Key } from "../../../i18n/index.ts"
+import { POST_PROCESSORS, type PostProcessorType } from "./PostProcessorTab.tsx"
 
 export type RibbonTabId = "home" | "setup" | "machining" | "simulation" | "post" | "tools"
 
 export interface RibbonAction {
   readonly id: string
-  readonly labelKey: Key
+  readonly labelKey?: Key
+  /** Untranslated label (a controller's own name); used when there is no `labelKey`. */
+  readonly label?: string
   /** Compact inline SVG icon for the action. */
   readonly icon: (size: number, klass: string) => JSX.Element
   readonly onClick: () => void
@@ -70,9 +73,15 @@ export interface CamRibbonProps {
   readonly onSelectRightTab?: (tab: "generator" | "cycles" | "verify") => void
   /** Receives a request to show a sidebar tab; workpiece and origin live in the machine tab. */
   readonly onSelectSidebarTab?: (tab: "explorer" | "settings" | "machine") => void
-  /** Receives the post-processor type the user picked in the ribbon. */
-  readonly onSelectPostProcessor?: (next: "fanuc" | "heidenhain" | "gcode") => void
-  readonly postProcessor?: "fanuc" | "heidenhain" | "gcode"
+  /** Receives the post the user picked in the ribbon (every post the core writes). */
+  readonly onSelectPostProcessor?: (next: PostProcessorType) => void
+  /** The post selected on the page; the matching ribbon entry shows as pressed. */
+  readonly postProcessor?: PostProcessorType
+}
+
+/** Ribbon chip colour per post (the controls of one family share a colour). */
+const POST_ACCENT: Record<PostProcessorType, RibbonAction["accent"]> = {
+  fanuc: "blue", haas: "blue", siemens: "cyan", heidenhain: "purple", linuxcnc: "green", grbl: "amber", generic: "neutral"
 }
 
 const SVG = (path: string) => (size = 18, klass = ""): JSX.Element => (
@@ -238,9 +247,10 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
           {
             titleKey: "cam.ribbon.group.post",
             actions: [
-              { id: "post-fanuc", labelKey: "cam.ribbon.fanuc", icon: (s, k) => <Cog size={s} class={k} />, accent: "blue", active: () => props.postProcessor === "fanuc", onClick: () => props.onSelectPostProcessor?.("fanuc") },
-              { id: "post-heidenhain", labelKey: "cam.ribbon.heidenhain", icon: (s, k) => <Sparkles size={s} class={k} />, accent: "purple", active: () => props.postProcessor === "heidenhain", onClick: () => props.onSelectPostProcessor?.("heidenhain") },
-              { id: "post-gcode", labelKey: "cam.ribbon.generic", icon: (s, k) => <Library size={s} class={k} />, accent: "neutral", active: () => props.postProcessor === "gcode", onClick: () => props.onSelectPostProcessor?.("gcode") },
+              ...POST_PROCESSORS.map(({ id, label }): RibbonAction => ({
+                id: `post-${id}`, label, icon: (s, k) => <Cog size={s} class={k} />, accent: POST_ACCENT[id],
+                active: () => props.postProcessor === id, onClick: () => props.onSelectPostProcessor?.(id)
+              })),
               { id: "open-post-tab", labelKey: "cam.ribbon.openPost", icon: (s, k) => <Download size={s} class={k} />, accent: "neutral", onClick: () => props.onSelectActiveTab?.("post") }
             ]
           }
@@ -276,6 +286,7 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
                   ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-b-2 border-b-blue-500"
                   : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               }`}
+              data-ribbon-tab={entry.id}
               onClick={() => setTab(entry.id)}
               aria-pressed={tab() === entry.id}
             >
@@ -296,18 +307,19 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
               <div class="flex flex-wrap gap-1">
                 <For each={group.actions}>
                   {(action) => {
-                    const active = action.active?.() ?? false
+                    const active = (): boolean => action.active?.() ?? false
+                    const label = (): string => action.labelKey !== undefined ? t(action.labelKey) : action.label ?? action.id
                     return (
                       <button
                         type="button"
                         data-ribbon-action={action.id}
-                        class={`flex items-center gap-[5px] min-h-[26px] px-[7px] py-[3px] rounded-[5px] text-[11px] leading-[18px] font-medium border transition-colors ${chipClass(action.accent)} ${active ? "ring-2 ring-blue-300 dark:ring-blue-700 bg-blue-50 dark:bg-blue-900/30" : "bg-[var(--workspace-panel)]"}`}
+                        class={`flex items-center gap-[5px] min-h-[26px] px-[7px] py-[3px] rounded-[5px] text-[11px] leading-[18px] font-medium border transition-colors ${chipClass(action.accent)} ${active() ? "ring-2 ring-blue-300 dark:ring-blue-700 bg-blue-50 dark:bg-blue-900/30" : "bg-[var(--workspace-panel)]"}`}
                         onClick={action.onClick}
-                        title={t(action.labelKey)}
-                        aria-pressed={active}
+                        title={label()}
+                        aria-pressed={active()}
                       >
-                        {action.icon(14, active ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300")}
-                        <span class="whitespace-nowrap">{t(action.labelKey)}</span>
+                        {action.icon(14, active() ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300")}
+                        <span class="whitespace-nowrap">{label()}</span>
                       </button>
                     )
                   }}

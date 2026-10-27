@@ -55,8 +55,11 @@ const RAPID_RATE_MM_PER_MIN = 5000
 
 
 
-/** Maps the seven legacy controller names onto the three the CAM store knows. */
+/** Maps the seven posts onto the three controller families the CAM store knows. */
 const storeController = (post: PostProcessorType): "gcode" | "grbl" | "fanuc" => (post === "fanuc" ? "fanuc" : post === "grbl" ? "grbl" : "gcode")
+
+/** The file extension of a program written by `post`: Klartext `.h`, Sinumerik main program `.mpf`, everything else `.nc`. */
+const postExtension = (post: PostProcessorType): string => (post === "heidenhain" ? ".h" : post === "siemens" ? ".mpf" : ".nc")
 
 export default function CamPage(): JSX.Element {
   const app = useApp()
@@ -305,7 +308,7 @@ export default function CamPage(): JSX.Element {
   const saveGCode = (projectOnly = false): void => {
     const code = camStore.activeTab === "post" && processedGcode() ? processedGcode() : gcode()
     if (!code) return
-    const extension = selectedPostProcessor() === "heidenhain" ? ".h" : ".nc"
+    const extension = postExtension(selectedPostProcessor())
     setSaveRequest({ code, extension, projectOnly })
   }
 
@@ -362,6 +365,11 @@ export default function CamPage(): JSX.Element {
     gen.updateSettings("useAI", next)
   }
 
+  /** One selection for the page: the ribbon, the Post-Processor tab and the store's controller family all follow it. */
+  const selectPost = (next: PostProcessorType): void => {
+    setSelectedPostProcessor(next)
+    camStore.setController(storeController(next))
+  }
   const cycleController = (): "fanuc" | "heidenhain" => (selectedPostProcessor() === "heidenhain" ? "heidenhain" : "fanuc")
 
 
@@ -398,17 +406,15 @@ export default function CamPage(): JSX.Element {
             setSidebarTab(next)
             if (!camStore.sidebarOpen) camStore.toggleSidebar()
           }}
-          onSelectPostProcessor={(next) => {
-            setSelectedPostProcessor(next === "heidenhain" ? "heidenhain" : next === "gcode" ? "generic" : "fanuc")
-          }}
-          postProcessor={selectedPostProcessor() === "heidenhain" ? "heidenhain" : selectedPostProcessor() === "fanuc" ? "fanuc" : "gcode"}
+          onSelectPostProcessor={selectPost}
+          postProcessor={selectedPostProcessor()}
         />
 
         <input
           ref={ribbonFilePicker}
           type="file"
           class="hidden"
-          accept=".nc,.gcode,.cnc,.txt,.h,.json"
+          accept=".nc,.gcode,.cnc,.txt,.h,.mpf,.json"
           aria-label="Import G-Code"
           onChange={(event) => {
             const file = event.currentTarget.files?.[0]
@@ -462,7 +468,7 @@ export default function CamPage(): JSX.Element {
                 gcode={gcode()}
                 program={camStore.program}
                 controller={selectedPostProcessor()}
-                onControllerChange={(next) => { setSelectedPostProcessor(next); camStore.setController(storeController(next)) }}
+                onControllerChange={selectPost}
                 onProcessedGcode={setProcessedGcode}
               />
             </Show>
