@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
-import { ArrowLeft, ChevronDown, Ellipsis, History, Plus } from "lucide-react-native"
+import { ArrowLeft, ChevronDown, Ellipsis, Plus } from "lucide-react-native"
 import { AdaptiveBlur } from "@/components/GlassView"
 import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
@@ -51,20 +51,17 @@ function ChromeButton({ label, hint, disabled, onPress, children }: { label: str
 }
 
 /**
- * The assistant's header, laid out like nikcli's session header: back to the conversations on the left (the
- * conversations themselves before one is open), the working context in the middle (the project the turn runs
+ * The conversation's header, laid out like nikcli's session header: back to the conversations on the left, the working context in the middle (the project the turn runs
  * in; the agent and model that run it), a new conversation and ⋯ for everything else on the right. Tapping the
  * context chooses the project.
  */
-export function AssistantHeader({ gutter, project, detail, hasProject, inConversation, onChooseProject, onBack, onNew, onMore }: {
+export function AssistantHeader({ gutter, project, detail, hasProject, onChooseProject, onBack, onNew, onMore }: {
   gutter: number
   /** The project name, or a prompt to choose one. */
   project: string
   /** Agent and model, the line under the project. */
   detail: string
   hasProject: boolean
-  /** A conversation is on screen: the leading button goes back to the list instead of opening it. */
-  inConversation: boolean
   onChooseProject: () => void
   onBack: () => void
   onNew: () => void
@@ -73,15 +70,9 @@ export function AssistantHeader({ gutter, project, detail, hasProject, inConvers
   const { palette } = useTheme()
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: gutter, paddingTop: 8, paddingBottom: 12 }}>
-      {inConversation ? (
-        <ChromeButton label="Back" hint="Back to the conversations of this project" onPress={onBack}>
-          <ArrowLeft size={18} color={palette.ink} strokeWidth={2.2} />
-        </ChromeButton>
-      ) : (
-        <ChromeButton label="Conversations" hint="Opens the conversations of this project" disabled={!hasProject} onPress={onBack}>
-          <History size={18} color={palette.ink} strokeWidth={2.1} />
-        </ChromeButton>
-      )}
+      <ChromeButton label="Back" hint="Back to the conversations of this project" onPress={onBack}>
+        <ArrowLeft size={18} color={palette.ink} strokeWidth={2.2} />
+      </ChromeButton>
 
       <Pressable
         onPress={() => { haptic("selection"); onChooseProject() }}

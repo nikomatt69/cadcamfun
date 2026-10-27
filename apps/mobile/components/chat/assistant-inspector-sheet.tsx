@@ -163,7 +163,7 @@ export function AssistantInspectorSheet({ open, onClose, client, sessionId, pref
           <ChoiceRow icon={Plus} emphasis title="New conversation" description="Start fresh on this project; the current one stays in your history"
             onPress={() => { onNewConversation(); onClose() }} />
           <ChoiceRow icon={History} title="All conversations" description="Reopen a conversation from this project"
-            onPress={() => after(() => router.push("/assistant/conversations"))} />
+            onPress={() => after(() => router.navigate("/assistant"))} />
           <ChoiceRow icon={FoldVertical} title="Compact conversation" description="Summarise older turns to free the context window"
             disabled={!sessionId || !client || Boolean(controls?.busy) || acting} busy={acting}
             onPress={() => { if (client && sessionId) void act(() => client.compactSession(sessionId)) }} />

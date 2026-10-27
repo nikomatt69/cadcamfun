@@ -199,7 +199,7 @@ export default function ProjectScreen() {
   const openAssistant = () => {
     haptic("selection")
     setAssistantProject(id)
-    router.navigate("/assistant")
+    router.navigate("/assistant/chat")
   }
 
   if (!client) return null

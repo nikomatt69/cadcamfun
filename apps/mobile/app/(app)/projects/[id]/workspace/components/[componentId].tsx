@@ -39,7 +39,7 @@ export default function ComponentPreviewScreen() {
       mode: "cad",
       text: changeComponentPrompt({ id: componentId, name }),
     })
-    router.navigate("/assistant")
+    router.navigate("/assistant/chat")
   }
 
   return (

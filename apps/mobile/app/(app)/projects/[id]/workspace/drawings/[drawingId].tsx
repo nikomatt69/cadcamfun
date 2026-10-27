@@ -39,7 +39,7 @@ export default function DrawingPreviewScreen() {
       mode: "cad",
       text: defineComponentPrompt({ id: drawingId, name }, selected ? [selected] : []),
     })
-    router.navigate("/assistant")
+    router.navigate("/assistant/chat")
   }
 
   return (

@@ -77,7 +77,7 @@ export default function ProjectsScreen() {
   const askAssistant = (project: ProjectSummary) => {
     haptic("selection")
     setAssistantProject(project.id)
-    router.navigate("/assistant")
+    router.navigate("/assistant/chat")
   }
 
   /** Rename or delete a project on the desktop; the list follows the desktop's answer. */
