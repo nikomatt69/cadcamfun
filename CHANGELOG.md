@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.38 (October 2026)
+
+## Mobile
+
+- Add tag management and filtering for projects and conversations; implement keyboard avoidance in chat screen
+
 ## v0.1.37 (October 2026)
 
 ## Sidecar
