@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { KeyboardAvoidingView, Platform, TextInput, View } from "react-native"
 import { SafeAreaView } from "react-native-screens/experimental"
 import { useRouter } from "expo-router"
-import { ArrowRight, Check, Folder, FolderOpen, Funnel, Pencil, Search, Sparkles, Trash2 } from "lucide-react-native"
+import { ArrowRight, Check, Folder, FolderOpen, Funnel, Pencil, Search, Sparkles, Tag, Trash2 } from "lucide-react-native"
+import { assignedTags, matchesTag, tagScope, tagTarget } from "@/lib/list-tags"
+import { useListTags } from "@/lib/use-list-tags"
+import { TagBadges, TagFilter, TagSheet } from "@/components/ui/ListTags"
 import type { ProjectSummary } from "@/lib/client"
 import { useUIStore } from "@/lib/store"
 import { accountStore } from "@/lib/account"
@@ -44,6 +47,11 @@ export default function ProjectsScreen() {
   const { gutter, onLayout } = useContentLayout()
   const router = useRouter()
   const account = useSyncExternalStore(accountStore.subscribe, accountStore.account)
+  const { collection, update } = useListTags(tagScope(config?.fingerprint ?? "", account?.subject ?? "local"))
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [tagsOpen, setTagsOpen] = useState(false)
+  const [taggingTarget, setTaggingTarget] = useState<string | null>(null)
+  const activeTagFilter = tagFilter === "untagged" || collection.tags.some((tag) => tag.id === tagFilter) ? tagFilter : null
   const assistantProjectId = useUIStore((state) => state.assistantProjectId)
   const setAssistantProject = useUIStore((state) => state.setAssistantProject)
   const [query, setQuery] = useState("")
@@ -69,8 +77,8 @@ export default function ProjectsScreen() {
     if (resource.data && !resource.stale && !resource.error) useUIStore.getState().forgetMissingProjects(resource.data.map((project) => project.id))
   }, [resource.data, resource.stale, resource.error])
 
-  const sections = useMemo(() => listProjects(resource.data ?? [], { query, sort, filter }), [resource.data, query, sort, filter])
-  const customised = sort !== "recent" || filter !== "all"
+  const sections = useMemo(() => listProjects((resource.data ?? []).filter((item) => matchesTag(collection, tagTarget("project", item.id), activeTagFilter)), { query, sort, filter }), [resource.data, query, sort, filter, collection, activeTagFilter])
+  const customised = sort !== "recent" || filter !== "all" || activeTagFilter !== null
 
   const open = (project: ProjectSummary) => router.push(`/projects/${project.id}`)
 
@@ -135,9 +143,9 @@ export default function ProjectsScreen() {
   const empty = searching ? (
     <EmptyState title="No matches" description={`No project has “${query.trim()}” in its name or description.`} icon={<Search size={25} color={palette.muted} />}
       action={<ActionButton variant="secondary" label="Clear search" onPress={() => { haptic("selection"); setQuery("") }} />} />
-  ) : filter !== "all" ? (
-    <EmptyState title="Nothing changed this week" description="Show every project, or pick another filter." icon={<Folder size={25} color={palette.muted} />}
-      action={<ActionButton variant="secondary" label="Show all" onPress={() => { haptic("selection"); setFilter("all") }} />} />
+  ) : filter !== "all" || activeTagFilter !== null ? (
+    <EmptyState title="No matching projects" description="Show every project, or pick another filter." icon={<Folder size={25} color={palette.muted} />}
+      action={<ActionButton variant="secondary" label="Show all" onPress={() => { haptic("selection"); setFilter("all"); setTagFilter(null) }} />} />
   ) : (
     <EmptyState title="Your workspace starts here" description="Create a project. Its designs, history and reviews will appear here." icon={<FolderOpen size={25} color={palette.accent} />}
       action={<ActionButton label="New project" onPress={startCreate} />} />
@@ -155,7 +163,7 @@ export default function ProjectsScreen() {
               <IconCircleButton
                 tone="warm"
                 accessibilityLabel={customised ? "Sort and filter projects, changed" : "Sort and filter projects"}
-                accessibilityHint="Sorts by date or name and shows this week's projects"
+                 accessibilityHint="Sorts by date or name and filters by date or tag"
                 onPress={() => { haptic("selection"); setOptionsOpen(true) }}
               >
                 <Funnel size={18} color={palette.ink} strokeWidth={2.2} fill={customised ? palette.ink : "none"} />
@@ -167,7 +175,7 @@ export default function ProjectsScreen() {
           source={resource}
           sections={sections}
           keyExtractor={(item) => item.id}
-          extraData={assistantProjectId}
+          extraData={{ assistantProjectId, collection }}
           loadingLabel="Loading projects"
           failureTitle="Could not load projects"
           empty={empty}
@@ -182,8 +190,9 @@ export default function ProjectsScreen() {
                 onPress={() => { haptic("selection"); open(item) }}
                 onLongPress={() => { haptic("selection"); setActionsFor(item) }}
                 accessibilityHint="Opens this project. Long press for actions."
-                selected={current}
-              />
+                 selected={current}
+                 accessibilityLabel={[item.name, item.description, ...assignedTags(collection, tagTarget("project", item.id)).map((tag) => `Tag: ${tag.name}`)].filter(Boolean).join(". ")}
+              ><TagBadges collection={collection} target={tagTarget("project", item.id)} /></FlatRow>
             )
           }}
         />
@@ -209,6 +218,7 @@ export default function ProjectsScreen() {
             ))}
           </DividedRows>
         </SheetSection>
+        <TagFilter collection={collection} value={activeTagFilter} onChange={setTagFilter} onManage={() => { setOptionsOpen(false); setTaggingTarget(null); setTimeout(() => setTagsOpen(true), AFTER_DISMISS_MS) }} />
       </BottomSheet>
 
       <BottomSheet open={actionsFor !== null} onClose={() => setActionsFor(null)} title={actionsFor?.name ?? "Project"} padded>
@@ -217,10 +227,13 @@ export default function ProjectsScreen() {
             <ChoiceRow icon={ArrowRight} title="Open project" description="History, pull requests and the workspace" onPress={() => { const target = actionsFor; afterSheet(() => open(target)) }} />
             <ChoiceRow icon={Sparkles} title="Ask the assistant" description="Work on this project in the Assistant tab" onPress={() => { const target = actionsFor; setActionsFor(null); askAssistant(target) }} />
             <ChoiceRow icon={Pencil} title="Rename" description="Change the name on the desktop too" onPress={() => { const target = actionsFor; afterSheet(() => void rename(target)) }} />
+            <ChoiceRow icon={Tag} title="Tags" description="Set colors and labels for this project" onPress={() => { setTaggingTarget(tagTarget("project", actionsFor.id)); afterSheet(() => setTagsOpen(true)) }} />
             <ChoiceRow icon={Trash2} destructive title="Delete" description="Removes the project from the desktop" onPress={() => { const target = actionsFor; afterSheet(() => void remove(target)) }} />
           </DividedRows>
         ) : null}
       </BottomSheet>
+
+      <TagSheet open={tagsOpen} onClose={() => setTagsOpen(false)} collection={collection} update={update} target={taggingTarget} />
 
       <BottomSheet open={creating} onClose={() => setCreating(false)} title="New project" padded>
         <TextField label="Name" value={newName} onChangeText={setNewName} placeholder="Gripper assembly" autoCapitalize="sentences" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => descriptionRef.current?.focus()} editable={!createBusy} />

@@ -3,7 +3,10 @@ import { KeyboardAvoidingView, Platform, RefreshControl, SectionList, Text, View
 import { SafeAreaView } from "react-native-screens/experimental"
 import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated"
 import { Stack, useRouter } from "expo-router"
-import { ArrowRight, Check, CloudOff, FolderOpen, Funnel, MessageSquare, Search, Square } from "lucide-react-native"
+import { ArrowRight, Check, CloudOff, FolderOpen, Funnel, MessageSquare, Search, Square, Tag } from "lucide-react-native"
+import { assignedTags, matchesTag, tagScope, tagTarget, type TagCollection } from "@/lib/list-tags"
+import { useListTags } from "@/lib/use-list-tags"
+import { TagBadges, TagFilter, TagSheet } from "@/components/ui/ListTags"
 import type { AiSessionSummary } from "@cadcamfun/api"
 import { useServer } from "@/lib/server"
 import { useResource } from "@/lib/use-resource"
@@ -52,6 +55,11 @@ export default function ConversationsScreen() {
   const router = useRouter()
   const { gutter, fontScale, onLayout } = useContentLayout()
   const account = useSyncExternalStore(accountStore.subscribe, accountStore.account)
+  const { collection, update } = useListTags(tagScope(config?.fingerprint ?? "", account?.subject ?? "local"))
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [tagsOpen, setTagsOpen] = useState(false)
+  const [taggingTarget, setTaggingTarget] = useState<string | null>(null)
+  const activeTagFilter = tagFilter === "untagged" || collection.tags.some((tag) => tag.id === tagFilter) ? tagFilter : null
   const projectId = useUIStore((state) => state.assistantProjectId)
   const currentSession = useUIStore((state) => projectId ? state.assistantSessions[projectId] : undefined)
   const setAssistantSession = useUIStore((state) => state.setAssistantSession)
@@ -82,9 +90,9 @@ export default function ConversationsScreen() {
   const all = resource.data
   const sections = useMemo(() => {
     const now = Date.now()
-    const kept = (all ?? []).filter((item) => matchesConversationFilter(item, filter, now))
+    const kept = (all ?? []).filter((item) => matchesConversationFilter(item, filter, now) && matchesTag(collection, tagTarget("session", item.id), activeTagFilter))
     return sectionConversations(filterConversations(kept, query, (item) => sessionTitle(item)), now)
-  }, [all, filter, query])
+  }, [all, filter, query, collection, activeTagFilter])
   const initialLoading = resource.loading && all === undefined
   const failed = resource.error !== undefined && (all === undefined || all.length === 0)
 
@@ -126,10 +134,10 @@ export default function ConversationsScreen() {
           <IconCircleButton
             tone="warm"
             accessibilityLabel={filter === "all" ? "Filter conversations" : `Filter conversations, ${CONVERSATION_FILTERS.find((item) => item.id === filter)?.label}`}
-            accessibilityHint="Shows running conversations or this week's"
+             accessibilityHint="Filters conversations by status, date or tag"
             onPress={() => { haptic("selection"); setFilterOpen(true) }}
           >
-            <Funnel size={18} color={palette.ink} strokeWidth={2.2} fill={filter === "all" ? "none" : palette.ink} />
+            <Funnel size={18} color={palette.ink} strokeWidth={2.2} fill={filter === "all" && activeTagFilter === null ? "none" : palette.ink} />
           </IconCircleButton>
         ) : undefined}
       />
@@ -166,9 +174,9 @@ export default function ConversationsScreen() {
     ) : query.trim() ? (
       <EmptyState title="No matches" description={`No conversation has “${query.trim()}” in its title.`} icon={<Search size={25} color={palette.muted} />}
         action={<ActionButton variant="secondary" label="Clear search" onPress={() => { haptic("selection"); setQuery("") }} />} />
-    ) : filter !== "all" ? (
-      <EmptyState title={`No ${CONVERSATION_FILTERS.find((item) => item.id === filter)?.label.toLowerCase() ?? "matching conversations"}`} description="Try another filter, or show everything in this project."
-        action={<ActionButton variant="secondary" label="Show all" onPress={() => { haptic("selection"); setFilter("all") }} />} />
+    ) : filter !== "all" || activeTagFilter !== null ? (
+      <EmptyState title="No matching conversations" description="Try another filter, or show everything in this project."
+        action={<ActionButton variant="secondary" label="Show all" onPress={() => { haptic("selection"); setFilter("all"); setTagFilter(null) }} />} />
     ) : (
       <EmptyState title="No conversations yet" description="Ask the assistant about this project and the conversation will appear here." icon={<MessageSquare size={25} color={palette.accent} />}
         action={<ActionButton label="Start a conversation" onPress={startNew} />} />
@@ -184,7 +192,7 @@ export default function ConversationsScreen() {
           style={{ flex: 1 }}
           sections={sections}
           keyExtractor={(item) => item.id}
-          extraData={{ currentSession, filter }}
+          extraData={{ currentSession, filter, collection }}
           contentInsetAdjustmentBehavior="never"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
@@ -202,7 +210,7 @@ export default function ConversationsScreen() {
           )}
           ItemSeparatorComponent={() => <View style={{ height: 1, marginLeft: 32, backgroundColor: hexToRgba(palette.ink, 0.06) }} />}
           renderItem={({ item }: ListRenderItemInfo<Conversation>) => (
-            <ConversationRow item={item} current={item.id === currentSession} wrap={fontScale > 1.3} onPress={() => open(item.id)} onActions={() => { haptic("selection"); setActionsFor(item) }} />
+            <ConversationRow collection={collection} item={item} current={item.id === currentSession} wrap={fontScale > 1.3} onPress={() => open(item.id)} onActions={() => { haptic("selection"); setActionsFor(item) }} />
           )}
         />
         <SearchDock gutter={gutter} actionLabel="New" onAction={startNew} value={query} onChangeText={setQuery} placeholder="Search conversations" />
@@ -224,11 +232,13 @@ export default function ConversationsScreen() {
             />
           ))}
         </DividedRows>
+        <TagFilter collection={collection} value={activeTagFilter} onChange={setTagFilter} onManage={() => { setFilterOpen(false); setTaggingTarget(null); setTimeout(() => setTagsOpen(true), AFTER_DISMISS_MS) }} />
       </BottomSheet>
 
       <BottomSheet open={actionsFor !== null} onClose={() => setActionsFor(null)} title={actionsFor ? sessionTitle(actionsFor) : "Conversation"} padded>
         {actionsFor ? (
           <DividedRows>
+            <ListRow leading={<Tag size={20} color={palette.soft} />} title="Tags" subtitle="Set colors and labels for this conversation" onPress={() => { setTaggingTarget(tagTarget("session", actionsFor.id)); setActionsFor(null); setTimeout(() => setTagsOpen(true), AFTER_DISMISS_MS) }} />
             <ListRow
               leading={<ArrowRight size={20} color={palette.soft} />}
               title="Open conversation"
@@ -246,12 +256,13 @@ export default function ConversationsScreen() {
           </DividedRows>
         ) : null}
       </BottomSheet>
+      <TagSheet open={tagsOpen} onClose={() => setTagsOpen(false)} collection={collection} update={update} target={taggingTarget} />
     </SafeAreaView>
   )
 }
 
 /** One conversation: glyph, title and a meta line ("Running · 3m ago"). Flat on the page, like nikcli's session rows. */
-function ConversationRow({ item, current, wrap, onPress, onActions }: { item: Conversation; current: boolean; wrap: boolean; onPress: () => void; onActions: () => void }) {
+function ConversationRow({ item, collection, current, wrap, onPress, onActions }: { item: Conversation; collection: TagCollection; current: boolean; wrap: boolean; onPress: () => void; onActions: () => void }) {
   const { palette } = useTheme()
   const title = sessionTitle(item)
   const time = conversationTime(item) > 0 ? relativeTime(item.updatedAt ?? item.createdAt ?? "") : undefined
@@ -265,7 +276,7 @@ function ConversationRow({ item, current, wrap, onPress, onActions }: { item: Co
       tint
       subtle
       accessibilityRole="button"
-      accessibilityLabel={`${title}${meta ? `. ${meta}` : ""}`}
+      accessibilityLabel={[title, meta, ...assignedTags(collection, tagTarget("session", item.id)).map((tag) => `Tag: ${tag.name}`)].filter(Boolean).join(". ")}
       accessibilityHint="Opens this conversation. Long press for actions."
       accessibilityState={{ selected: current }}
       style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 44, paddingVertical: 13, paddingHorizontal: 4, borderRadius: 12, borderCurve: "continuous" }}
@@ -276,6 +287,7 @@ function ConversationRow({ item, current, wrap, onPress, onActions }: { item: Co
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <Text style={{ color: palette.ink, ...type(17, { weight: "600" }) }} numberOfLines={wrap ? undefined : 1}>{title}</Text>
         {meta ? <Text style={{ color: item.busy ? palette.accentStrong : palette.muted, ...type(13) }} numberOfLines={wrap ? undefined : 1}>{meta}</Text> : null}
+        <TagBadges collection={collection} target={tagTarget("session", item.id)} />
       </View>
     </PressableScale>
   )

@@ -37,6 +37,7 @@ import { EmptyState } from "@/components/ui/EmptyState"
 import { ActionButton } from "@/components/ui/ActionButton"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { contentGutter } from "@/lib/layout"
+import { chatKeyboardOffset } from "@/lib/chat-keyboard"
 import { useContentLayout } from "@/components/layout/use-content-layout"
 import { ModelPickerSheet } from "@/components/chat/model-picker-sheet"
 import { AssistantInspectorSheet } from "@/components/chat/assistant-inspector-sheet"
@@ -83,6 +84,17 @@ export default function AssistantScreen() {
   const content = useContentLayout()
   const router = useRouter()
   const { width } = content
+  const keyboardContainerRef = useRef<View>(null)
+  const [keyboardOffset, setKeyboardOffset] = useState(0)
+  const measureKeyboardOrigin = useCallback(() => {
+    keyboardContainerRef.current?.measureInWindow((_x, y) => {
+      setKeyboardOffset(chatKeyboardOffset(y))
+    })
+  }, [])
+  useFocusEffect(useCallback(() => {
+    const frame = requestAnimationFrame(measureKeyboardOrigin)
+    return () => cancelAnimationFrame(frame)
+  }, [measureKeyboardOrigin]))
 
   const projectId = useUIStore((state) => state.assistantProjectId)
   const draft = useUIStore((state) => state.assistantDraft)
@@ -674,7 +686,9 @@ export default function AssistantScreen() {
   return (
     <SafeAreaView edges={{ top: true, bottom: true, left: true, right: true }} style={{ flex: 1, backgroundColor: palette.background }}>
     <Stack.Screen options={{ headerShown: false }} />
-    <KeyboardAvoidingView onLayout={content.onLayout} behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+    {/* Keyboard frames are window-relative; this native view gives the local layout a matching origin. */}
+    <View ref={keyboardContainerRef} collapsable={false} onLayout={measureKeyboardOrigin} style={{ flex: 1 }}>
+    <KeyboardAvoidingView onLayout={(event) => { content.onLayout(event); measureKeyboardOrigin() }} keyboardVerticalOffset={keyboardOffset} behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
       <AssistantHeader
         gutter={content.gutter}
         project={currentProject ? currentProject.name : "Choose a project"}
@@ -894,6 +908,7 @@ export default function AssistantScreen() {
         </View>
       </BottomSheet>
     </KeyboardAvoidingView>
+    </View>
     </SafeAreaView>
   )
 }
