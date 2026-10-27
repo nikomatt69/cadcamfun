@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.36 (October 2026)
+
+## Mobile
+
+- The conversation is a pushed page without the tab bar — Assistant tab opens on the conversations list (project picker, filter, New); chat moves to assistant/chat with back on the left; shared ProjectPickerSheet
+
 ## v0.1.35 (October 2026)
 
 - No notable changes
