@@ -7494,8 +7494,6 @@ export type EventsSubscribeOutput =
       ahead?: number | undefined
     }
   | { type: "workspace.changed"; at: string; projectId: string }
-  | { type: "server.connected"; at: string }
-  | { type: "server.heartbeat"; at: string }
   | { type: "resources.changed"; userId: string; organizationId?: string | undefined; at: string }
   | { type: "catalogue.updated"; at: string }
   | {
@@ -7559,6 +7557,8 @@ export type EventsSubscribeOutput =
   | { type: "notification.deleted"; at: string; notificationId: string; userId: string }
   | { type: "notification.readAll"; at: string; userId: string; count: number }
   | { type: "organizations.changed"; at: string; userId: string; organizationId: string }
+  | { type: "server.connected"; at: string }
+  | { type: "server.heartbeat"; at: string }
 
 export type EventsSubscribeAllOutput =
   | {
@@ -7632,8 +7632,6 @@ export type EventsSubscribeAllOutput =
       ahead?: number | undefined
     }
   | { type: "workspace.changed"; at: string; projectId: string }
-  | { type: "server.connected"; at: string }
-  | { type: "server.heartbeat"; at: string }
   | { type: "resources.changed"; userId: string; organizationId?: string | undefined; at: string }
   | { type: "catalogue.updated"; at: string }
   | {
@@ -7697,6 +7695,8 @@ export type EventsSubscribeAllOutput =
   | { type: "notification.deleted"; at: string; notificationId: string; userId: string }
   | { type: "notification.readAll"; at: string; userId: string; count: number }
   | { type: "organizations.changed"; at: string; userId: string; organizationId: string }
+  | { type: "server.connected"; at: string }
+  | { type: "server.heartbeat"; at: string }
 
 export type CompanionStatusOutput = {
   enabled: boolean

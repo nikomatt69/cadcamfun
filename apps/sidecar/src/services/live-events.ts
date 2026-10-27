@@ -9,30 +9,14 @@
  * shell badge. Persisting the user-visible subset is a separate problem — that is what the
  * `Notification` table does; this bus is the delivery channel, not the source of truth.
  *
- * The schema of these events is mirrored in `packages/api/src/groups/events.ts`; the two must
- * stay in step or the SSE client loses its types.
+ * The events are defined once, as the `PublishedLiveEvent` schema of `packages/api/src/groups/events.ts`: the bus carries
+ * exactly the type the SSE contract decodes, so a publisher cannot send a frame a client has no schema for.
  */
-import type { NotificationRow } from "@cadcamfun/api"
+import type { PublishedLiveEvent } from "@cadcamfun/api"
 import { Context, Effect, Layer, PubSub, Scope, Stream } from "effect"
 
-export type LiveEvent =
-  | { readonly type: "pr.opened"; readonly projectId: string; readonly number: number; readonly title: string; readonly authorKind: "user" | "ai"; readonly head: string; readonly base: string; readonly at: string }
-  | { readonly type: "pr.merged"; readonly projectId: string; readonly number: number; readonly title: string; readonly at: string }
-  | { readonly type: "pr.closed"; readonly projectId: string; readonly number: number; readonly at: string }
-  | { readonly type: "pr.reviewed"; readonly projectId: string; readonly number: number; readonly verdict: "comment" | "approve" | "request-changes"; readonly at: string }
-  | { readonly type: "commit"; readonly projectId: string; readonly oid: string; readonly branch: string; readonly authorKind: "user" | "ai"; readonly message: string; readonly at: string }
-  | { readonly type: "workflow.started"; readonly projectId: string; readonly runId: string; readonly workflow: string; readonly event: "push" | "pull-request" | "manual"; readonly at: string }
-  | { readonly type: "workflow.finished"; readonly projectId: string; readonly runId: string; readonly workflow: string; readonly status: "success" | "failure" | "cancelled"; readonly at: string }
-  | { readonly type: "ai.session"; readonly projectId: string; readonly sessionId: string; readonly phase: "started" | "finished" | "aborted"; readonly at: string }
-  | { readonly type: "cam.progress"; readonly projectId: string; readonly runId: string; readonly phase: "running" | "done" | "cancelled"; readonly stage?: "queued" | "operations" | "post" | "replay" | "evidence" | "toolpath" | "optimize" | "arcs" | "feeds" | "analysis" | "cycles" | "record"; readonly operationId?: string; readonly index?: number; readonly count?: number; readonly ahead?: number; readonly at: string }
-  | { readonly type: "workspace.changed"; readonly projectId: string; readonly at: string }
-  | { readonly type: "resources.changed"; readonly userId: string; readonly organizationId?: string; readonly at: string }
-  | { readonly type: "catalogue.updated"; readonly at: string }
-  | { readonly type: "notification.created"; readonly notification: NotificationRow; readonly at: string }
-  | { readonly type: "notification.updated"; readonly notification: NotificationRow; readonly at: string }
-  | { readonly type: "notification.deleted"; readonly notificationId: string; readonly userId: string; readonly at: string }
-  | { readonly type: "notification.readAll"; readonly userId: string; readonly count: number; readonly at: string }
-  | { readonly type: "organizations.changed"; readonly userId: string; readonly organizationId: string; readonly at: string }
+/** An event on the bus: the type of the API's `PublishedLiveEvent` schema. */
+export type LiveEvent = PublishedLiveEvent
 
 /** How many past events a fresh subscriber is caught up with before it starts receiving live ones. */
 export const LIVE_EVENT_REPLAY = 20

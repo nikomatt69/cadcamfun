@@ -8,7 +8,9 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { makeApp } from "./helpers.ts"
-import { liveEventMatches } from "../src/services/live-events.ts"
+import { LiveEvents, liveEventMatches } from "../src/services/live-events.ts"
+import { LiveEvent as ApiLiveEvent, PublishedLiveEvent } from "@cadcamfun/api"
+import { Effect, Fiber, Schema, Stream } from "effect"
 import type { LiveEvent } from "../src/services/live-events.ts"
 
 let app: Awaited<ReturnType<typeof makeApp>>
@@ -101,5 +103,30 @@ describe("live events", () => {
     // The companion gateway forwards the stream, so the phone never needs a different path.
     const { isCompanionRoute } = await import("../src/services/companion-gateway.ts")
     expect(isCompanionRoute("GET", v("/events"))).toBe(true)
+  })
+})
+
+describe("one schema for the bus and the stream", () => {
+  test("what the bus publishes encodes with the API's schema; the stream's own frames never go on the bus", async () => {
+    const published: LiveEvent[] = []
+    await Effect.runPromise(Effect.gen(function*() {
+      const events = yield* LiveEvents
+      yield* Effect.scoped(Effect.gen(function*() {
+        const stream = yield* events.subscribe({})
+        const collected = yield* Stream.runCollect(Stream.take(stream, 3)).pipe(Effect.forkChild)
+        yield* events.workspaceChanged("p1")
+        yield* events.resourcesChanged("u1", "org1")
+        yield* events.publish({ type: "cam.progress", projectId: "p1", runId: "r1", phase: "running", stage: "queued", ahead: 2, at: new Date().toISOString() })
+        published.push(...(yield* Fiber.join(collected)))
+      }))
+    }).pipe(Effect.provide(LiveEvents.layer)))
+    expect(published.map((e) => e.type)).toEqual(["workspace.changed", "resources.changed", "cam.progress"])
+    for (const event of published) {
+      expect(Schema.decodeUnknownSync(PublishedLiveEvent)(Schema.encodeUnknownSync(PublishedLiveEvent)(event))).toEqual(event)
+      expect(Schema.is(ApiLiveEvent)(event)).toBe(true)
+    }
+    const greeting = { type: "server.connected", at: new Date().toISOString() }
+    expect(Schema.is(ApiLiveEvent)(greeting)).toBe(true)
+    expect(Schema.is(PublishedLiveEvent)(greeting)).toBe(false)
   })
 })

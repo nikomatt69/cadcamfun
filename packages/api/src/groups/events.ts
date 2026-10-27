@@ -7,8 +7,9 @@ import { NotificationRow } from "./notifications.ts"
  * Live cross-cutting event stream (vcs, pull requests, workflow runs, AI sessions). One channel
  * per project; the sidecar serves it as SSE and the companion gateway forwards it unchanged.
  *
- * The schema mirrors `apps/sidecar/src/services/live-events.ts` so a typed client and the
- * mobile SSE parser can both consume it.
+ * This module is the single definition of the frames: the sidecar's bus publishes `PublishedLiveEvent` (its type is derived
+ * from this schema, not declared again), and the stream adds the greeting and keep-alive frames of `LiveEvent`, which the typed
+ * client and the mobile SSE parser decode.
  */
 export const PrOpened = Schema.Struct({
   type: Schema.Literal("pr.opened"),
@@ -145,11 +146,19 @@ export const ServerHeartbeat = Schema.Struct({ type: Schema.Literal("server.hear
 export const ResourcesChanged = Schema.Struct({ type: Schema.Literal("resources.changed"), userId: Schema.String, organizationId: Schema.optional(Schema.String), at: Schema.String })
 export const CatalogueUpdated = Schema.Struct({ type: Schema.Literal("catalogue.updated"), at: Schema.String })
 
-export const LiveEvent = Schema.Union([
+/** Every frame a publisher may put on the sidecar's bus. */
+const PUBLISHED = [
   PrOpened, PrMerged, PrClosed, PrReviewed, Commit,
-  WorkflowStarted, WorkflowFinished, AiSession, CamProgress, WorkspaceChanged, ServerConnected, ServerHeartbeat, ResourcesChanged, CatalogueUpdated,
+  WorkflowStarted, WorkflowFinished, AiSession, CamProgress, WorkspaceChanged, ResourcesChanged, CatalogueUpdated,
   NotificationCreated, NotificationUpdated, NotificationDeleted, NotificationReadAll, OrganizationsChanged
-] as const)
+] as const
+
+/** An event published on the sidecar's live bus: what happened, never the stream's own greeting or keep-alive. */
+export const PublishedLiveEvent = Schema.Union(PUBLISHED)
+export type PublishedLiveEvent = typeof PublishedLiveEvent.Type
+
+/** A frame of the SSE stream: a published event, or the stream's greeting (`server.connected`) and keep-alive (`server.heartbeat`). */
+export const LiveEvent = Schema.Union([...PUBLISHED, ServerConnected, ServerHeartbeat])
 export type LiveEvent = typeof LiveEvent.Type
 
 const project = { id: Schema.String }
