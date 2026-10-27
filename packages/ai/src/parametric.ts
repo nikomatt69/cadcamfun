@@ -79,6 +79,16 @@ const computeParametricReport = (history: History) => {
       try { return [[f.id, flatPatternDxf(developed, dimensionValue(f.width, result.parameters), f.id)] as const] } catch { return [] }
     })),
     sketches: Object.entries(result.sketches).map(([id, s]) => ({ id, status: s.solve.status, degreesOfFreedom: s.solve.dof, residual: s.solve.residual })),
+    // The features that are kept but not built (spec 58), so the assistant knows what the person left out; absent when all are built.
+    ...(() => {
+      const left = Object.entries(result.states).filter(([, state]) => state.state !== "ok" && state.state !== "failed")
+      return left.length === 0 && history.rollback === undefined ? {} : {
+        timeline: {
+          ...(history.rollback !== undefined ? { rollback: history.rollback } : {}),
+          notBuilt: left.map(([id, state]) => ({ id, state: state.state, ...(state.state === "suppressed-by" ? { by: state.by } : {}) }))
+        }
+      }
+    })(),
     // What each body is as a solid (welded first): closed or with open/non-manifold edges, its shells and through holes (genus), so a
     // defect the CAM or an STL export would trip on is reported, and the hole count can be checked against what was asked.
     solids: result.bodies.map((b) => {

@@ -23,6 +23,7 @@ export type ParametricHandlerInput =
   | { action: "test"; elementId: string; cases: Input<"cad.parametric_test">["cases"] }
   | { action: "create"; history: History; name: string; x?: number; y?: number; z?: number; layer?: string }
   | { action: "update"; elementId: string; parameters: Input<"cad_edit.parametric_update">["parameters"]; expectedRevision: string }
+  | ({ action: "timeline" } & Input<"cad_edit.parametric_timeline">)
 
 /** Where a new parametric part is placed, in mm. */
 type Placement = { readonly x?: number; readonly y?: number; readonly z?: number; readonly layer?: string }
@@ -127,6 +128,9 @@ export const runParametricCreate = (input: Input<"cad_edit.parametric_create">, 
   }, context)
 export const runParametricUpdate = (input: Input<"cad_edit.parametric_update">, context: ActionContext) =>
   of({ action: "update", elementId: input.elementId, parameters: input.parameters, expectedRevision: input.expectedRevision }, context)
+
+/** Suppress / release / roll back / move on a stored part (spec 58); the host applies core's timeline functions and checks the revision. */
+export const runParametricTimeline = (input: Input<"cad_edit.parametric_timeline">, context: ActionContext) => of({ action: "timeline", ...input }, context)
 
 /** The history given inline, or read from an existing parametric part; an error result when neither works. */
 const historyOf = async (input: { elementId?: string; history?: unknown }, context: ActionContext): Promise<{ readonly history: History } | { readonly error: unknown }> => {

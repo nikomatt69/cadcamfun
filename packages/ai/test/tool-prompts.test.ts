@@ -67,7 +67,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // Raised to 31 800 when cam setup_sheet (the shop sheet of a saved kernel program) joined the cam tool.
     // Raised to 32 000 when the swarf operation (a flank cut of a cone or cylinder wall) joined the cam tool, to 32 300 with the post definition input.
     // Raised to 32 500 when cad title_block / title_block_set (the drawing's title block, read and set) joined cad and cad_edit.
-    expect(total).toBeLessThan(32_500)
+    // +300: cad_edit parametric_timeline (spec 58 T7: suppress, release, rollback, move).
+    expect(total).toBeLessThan(32_800)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

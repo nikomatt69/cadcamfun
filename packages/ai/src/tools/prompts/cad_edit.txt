@@ -11,6 +11,7 @@ Actions and Parameters (mm; rotation/history angles degrees)
 - import: attachment (preferred) or content, format? dxf|svg|step|iges|parasolid|mesh, depth? (required dxf/svg), up? (STEP), scale?, gap?, tolerance?, name?, color?, layer?. IGES stores exact solids; incomplete imports store nothing. Parasolid x_t text/x_b binary are unsupported. STEP/IGES imports recover geometry, not history.
 - parametric_create: history, name, x?, y?, z?, layer?. Store a validated history; sketches use shapes or point/line/arc entities and constraints. See fusion-360-modelling.
 - parametric_update: elementId, parameters, expectedRevision from the last inspection; retain features.
+- parametric_timeline: elementId, expectedRevision, suppress? release? (feature ids), rollback? (last built feature) | rollForward?, move? {feature,to}. Nothing is deleted; refused moves say why.
 - parametric_recipe_create: recipe, params?, name?, x?, y?, z?, layer?. Build and store a standard part.
 - parametric_convert: elementId, depth? (flat shapes), name?. Store a parametric twin preserving shape, placement and properties; original remains.
 - shell: id, thickness, open? (face names), wallByFace? [{face,thickness}]. Store a checked exact copy. Preview cad.shell; names cad.exact.

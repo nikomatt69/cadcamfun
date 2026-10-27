@@ -164,6 +164,7 @@ const deleted = Schema.Struct({ ok: Schema.Literal(true), deleted: int, ids: str
 const editor = Schema.Struct({ ok: Schema.Literal(true), actions: Schema.Array(Schema.StructWithRest(Schema.Struct({ action: str }), [record])) })
 const parametricCreated = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("add"), ids: strings, elements, ...drawingRef })
 const parametricUpdated = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("update"), ids: strings, elements, revision: str, report: record, ...drawingRef })
+const parametricTimeline = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("timeline"), ids: strings, elements, revision: str, report: record, ...drawingRef })
 const recipeCreated = Schema.Struct({ ok: Schema.Literal(true), recipe: str, history: record, report: Schema.Struct(parametricReport), created: parametricCreated })
 const converted = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("add"), ids: strings, elements, source: Schema.Struct({ id: str, type: str }), notes: strings, ...drawingRef })
 
@@ -338,6 +339,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad_edit.import": write(["drawing"], added),
   "cad_edit.parametric_create": write(["drawing"], parametricCreated),
   "cad_edit.parametric_update": write(["drawing"], parametricUpdated),
+  "cad_edit.parametric_timeline": write(["drawing"], parametricTimeline),
   "cad_edit.parametric_recipe_create": write(["drawing"], recipeCreated),
   "cad_edit.parametric_convert": write(["drawing"], converted),
 

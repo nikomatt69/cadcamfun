@@ -15,7 +15,9 @@ const ROUTES: Readonly<Record<string, readonly [tool: "cad" | "cad_edit", action
   from_element: ["cad", "parametric_from_element"],
   convert: ["cad_edit", "parametric_convert"],
   create: ["cad_edit", "parametric_create"],
-  update: ["cad_edit", "parametric_update"]
+  update: ["cad_edit", "parametric_update"],
+  timeline: ["cad_edit", "parametric_timeline"],
+  exact: ["cad", "parametric_exact"]
 }
 
 export const parametricRoute = (input: { action?: unknown; create?: unknown }): readonly [string, string] => {

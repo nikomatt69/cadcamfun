@@ -3,7 +3,7 @@ import { PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import {
-  RECIPES, analyzeManufacturability, buildRecipe, runModelScript, dimensionValue, dimensionsOf, flatPatternDxf, historyVolume, meshBounds, moveFeature, rebuild, removeFeature, removeParameter, renameParameter, resolveParameters, setDimension, setParameter, usesOf,
+  RECIPES, analyzeManufacturability, buildRecipe, runModelScript, dimensionValue, dimensionsOf, flatPatternDxf, historyVolume, meshBounds, moveFeatureTo, rebuild, removeFeature, withRollback, withSuppressed, removeParameter, renameParameter, resolveParameters, setDimension, setParameter, usesOf,
   type DfmMaterial, type DfmProcess, type DfmReport, type Feature, type History, type RecipeResult
 } from "@cadcamfun/core"
 import { useElementsStore, type Element } from "../store/elementsStore.ts"
@@ -59,6 +59,22 @@ export default function ParametricPanel(props: { readonly element: Element; read
       return false
     }
   }
+  /** A move one place up or down; a refused move shows why (the feature in the way), it does not silently do nothing. */
+  const move = (id: string, to: number) => {
+    const result = moveFeatureTo(history(), id, to)
+    if (result.refusal !== undefined) { setError(`Not moved: ${result.refusal}`); return }
+    edit(() => result.history)
+  }
+  /** What the timeline shows of a feature's state (spec 58): nothing for a built one. */
+  const stateOf = (id: string): { readonly text: string; readonly tone: string } | undefined => {
+    const state = built()?.states[id]
+    if (state === undefined || state.state === "ok") return undefined
+    if (state.state === "suppressed") return { text: "suppressed", tone: "text-gray-500" }
+    if (state.state === "suppressed-by") return { text: `suppressed by ${state.by}`, tone: "text-gray-500" }
+    if (state.state === "rolled-back") return { text: "rolled back", tone: "text-gray-500" }
+    return { text: "failed", tone: "text-red-700" }
+  }
+  const inactive = (id: string): boolean => { const s = built()?.states[id]?.state; return s !== undefined && s !== "ok" && s !== "failed" }
   const asValue = (text: string): number | string => { const t = text.trim(); return t !== "" && Number.isFinite(Number(t)) ? Number(t) : t }
 
   const addParameter = () => {
@@ -278,12 +294,15 @@ export default function ParametricPanel(props: { readonly element: Element; read
       <div>
         <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Features</h5>
         <ol class="space-y-3">
-          <For each={history().features}>{(feature, index) =>
-            <li class="rounded-md border border-gray-200 p-2 dark:border-gray-600" data-testid={`feature-${feature.id}`}>
+          <For each={history().features}>{(feature, index) => <>
+            <li class={`rounded-md border border-gray-200 p-2 dark:border-gray-600 ${inactive(feature.id) ? "opacity-60" : ""}`} data-testid={`feature-${feature.id}`}>
               <div class="mb-1 flex items-center justify-between gap-2">
                 <div class="min-w-0">
-                  <span class="text-sm font-medium">{feature.id}</span>
+                  <span class={`text-sm font-medium ${feature.suppressed === true ? "line-through" : ""}`}>{feature.name ?? feature.id}</span>
                   <span class="ml-2 text-xs text-gray-500">{describe(feature)}</span>
+                  <Show when={stateOf(feature.id)}>{(state) =>
+                    <span class={`ml-2 text-xs ${state().tone}`} data-testid={`state-${feature.id}`}>{state().text}</span>}
+                  </Show>
                   <Show when={feature.type === "sketch" ? built()?.sketches[feature.id] : undefined}>{(sketch) =>
                     <span class={`ml-2 text-xs ${STATUS[sketch().solve.status]?.tone ?? ""}`}>
                       {STATUS[sketch().solve.status]?.text ?? sketch().solve.status}{sketch().solve.dof > 0 ? `, ${sketch().solve.dof} free` : ""}
@@ -291,8 +310,13 @@ export default function ParametricPanel(props: { readonly element: Element; read
                   </Show>
                 </div>
                 <div class="flex shrink-0 gap-1">
-                  <button type="button" class={SMALL} disabled={props.locked || index() === 0} onClick={() => edit((h) => moveFeature(h, feature.id, -1))} title="Earlier">↑</button>
-                  <button type="button" class={SMALL} disabled={props.locked || index() === history().features.length - 1} onClick={() => edit((h) => moveFeature(h, feature.id, 1))} title="Later">↓</button>
+                  <button type="button" class={SMALL} disabled={props.locked} aria-label={`${feature.suppressed === true ? "Release" : "Suppress"} ${feature.id}`}
+                    title={feature.suppressed === true ? "Release: build it again" : "Suppress: leave it, and what needs it, out of the model (nothing is deleted)"}
+                    onClick={() => edit((h) => withSuppressed(h, [feature.id], feature.suppressed !== true))}>{feature.suppressed === true ? "◉" : "◌"}</button>
+                  <button type="button" class={SMALL} disabled={props.locked || history().rollback === feature.id} aria-label={`Roll back to ${feature.id}`}
+                    title="Roll back here: build only up to this feature" onClick={() => edit((h) => withRollback(h, feature.id))}>⤒</button>
+                  <button type="button" class={SMALL} disabled={props.locked || index() === 0} onClick={() => move(feature.id, index() - 1)} title="Earlier">↑</button>
+                  <button type="button" class={SMALL} disabled={props.locked || index() === history().features.length - 1} onClick={() => move(feature.id, index() + 1)} title="Later">↓</button>
                   <button type="button" class={SMALL} disabled={props.locked} title="Delete (with what depends on it)"
                     onClick={() => { if (window.confirm(`Delete ${feature.id} and what depends on it?`)) edit((h) => removeFeature(h, feature.id)) }}>✕</button>
                 </div>
@@ -397,7 +421,14 @@ export default function ParametricPanel(props: { readonly element: Element; read
                   <For each={issuesOf(feature.id)}>{(issue) => <li class={`text-xs ${issue.severity === "error" ? "text-red-700" : "text-amber-700"}`} role={issue.severity === "error" ? "alert" : undefined}>{issue.message}</li>}</For>
                 </ul>
               </Show>
-            </li>}
+            </li>
+            <Show when={history().rollback === feature.id}>
+              <li class="flex items-center justify-between gap-2 rounded-md border-2 border-dashed border-sky-500 px-2 py-1 text-xs text-sky-700 dark:text-sky-300" data-testid="rollback-bar">
+                <span>Rolled back here: the features below are kept but not built</span>
+                <button type="button" class={SMALL} disabled={props.locked} onClick={() => edit((h) => withRollback(h, undefined))}>Roll to end</button>
+              </li>
+            </Show>
+          </>}
           </For>
         </ol>
         <div class="mt-2" data-testid="add-feature">

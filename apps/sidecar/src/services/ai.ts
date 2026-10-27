@@ -17,7 +17,7 @@ import { z } from "zod"
 import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
 import { assemblyForModel, exactForModel, setupsForModel } from "./ai-exact.ts"
-import { changeParameters, historyRevision, inspectParametric, testParametric } from "./ai-parametric.ts"
+import { changeParameters, editTimeline, historyRevision, inspectParametric, testParametric } from "./ai-parametric.ts"
 import { ActingUser, CurrentTurn, ensureTurnActive } from "./acting-user.ts"
 import { DrawingUnavailable, ProjectNotAccessible, WriteForbidden, toolRefusal } from "./ai-tool-errors.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
@@ -874,6 +874,13 @@ const toolHandlers = Effect.gen(function*() {
       if (input.action === "inspect") return { ...inspectParametric(history), elementId: element.id, ...where(loaded) }
       if (input.action === "test") return { ...(await testParametric(history, input)), elementId: element.id, ...where(loaded) }
       if (input.expectedRevision !== historyRevision(history)) return { ok: false, error: "The part changed since inspection. Inspect it again before updating.", ...where(loaded) }
+      if (input.action === "timeline") {
+        const edited = editTimeline(history, input)
+        if (!edited.ok) return { ...edited, ...where(loaded) }
+        const updated = { ...element, history: edited.history }
+        await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
+        return { ok: true, mutation: "timeline", elements: [updated], ids: [element.id], revision: historyRevision(edited.history), report: edited.report, ...where(loaded) }
+      }
       const changed = changeParameters(history, input.parameters)
       if (!changed.ok) return changed
       if (!changed.report.ok) return { ...changed.report, error: "Parameters were not changed because the variant failed validation.", ...where(loaded) }

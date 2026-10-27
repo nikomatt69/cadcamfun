@@ -460,6 +460,19 @@ export const PARAMETRIC_ACTION_INPUTS = {
   "cad.parametric_from_element": Schema.Struct({ elementId, depth: optional(length) }),
   "cad_edit.parametric_create": Schema.Struct({ history: ParametricHistory, name, ...placement }),
   "cad_edit.parametric_update": Schema.Struct({ elementId, parameters: ParametricParameters, expectedRevision: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)) }),
+  /**
+   * Timeline edits (spec 58): suppress or release features (nothing is deleted; what needs a suppressed feature leaves the model too),
+   * roll back to a feature or forward to the end, move one feature to a position. A move across a dependency is refused with the reason.
+   */
+  "cad_edit.parametric_timeline": Schema.Struct({
+    elementId, expectedRevision: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+    suppress: optional(between(Schema.Array(id), 1, 80)), release: optional(between(Schema.Array(id), 1, 80)),
+    rollback: optional(id), rollForward: optional(Schema.Literal(true)),
+    move: optional(Schema.Struct({ feature: id, to: intBetween(0, 79) }))
+  }).check(Schema.makeFilter((input) =>
+    input.suppress === undefined && input.release === undefined && input.rollback === undefined && input.rollForward === undefined && input.move === undefined
+      ? "Send at least one of suppress, release, rollback, rollForward or move"
+      : input.rollback !== undefined && input.rollForward === true ? "Send rollback or rollForward, not both" : true)),
   "cad_edit.parametric_recipe_create": Schema.Struct({ recipe, params: recipeParams, name: optional(name), ...placement }),
   "cad_edit.parametric_convert": Schema.Struct({ elementId, depth: optional(length), name: optional(name) })
 } as const
