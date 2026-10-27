@@ -12,7 +12,7 @@ import { POST_TARGETS } from "./AdvancedPostProcessorPanel.tsx"
 
 export type PostProcessorType = cam.PostId
 
-export const POST_PROCESSORS: ReadonlyArray<{ readonly id: PostProcessorType; readonly label: string }> = POST_TARGETS.map(({ id, label }) => ({ id, label }))
+export const POST_PROCESSORS: ReadonlyArray<{ readonly id: PostProcessorType; readonly label: string }> = POST_TARGETS
 
 export interface PostProcessorTabProps {
   readonly gcode: string

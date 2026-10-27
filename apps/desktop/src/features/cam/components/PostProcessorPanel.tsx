@@ -15,8 +15,6 @@ export interface PostProcessorPanelProps {
 
 export default function PostProcessorPanel(props: PostProcessorPanelProps): JSX.Element {
   return (
-    <div class="rounded-lg overflow-hidden">
-      <AdvancedPostProcessorPanel initialGcode={props.initialGcode} controllerType={props.controllerType} onProcessedGcode={props.onProcessedGcode} onControllerChange={props.onControllerChange} />
-    </div>
+    <AdvancedPostProcessorPanel initialGcode={props.initialGcode} controllerType={props.controllerType} onProcessedGcode={props.onProcessedGcode} onControllerChange={props.onControllerChange} />
   )
 }

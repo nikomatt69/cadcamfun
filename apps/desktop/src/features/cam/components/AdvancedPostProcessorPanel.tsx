@@ -1,4 +1,3 @@
-import { downloadFile } from "../../../shared/lib/save-file.ts"
 /**
  * Post-processor panel: converts the editor's NC text into the program of another control (or rewrites it for the same one with
  * other output options).
@@ -9,25 +8,32 @@ import { downloadFile } from "../../../shared/lib/save-file.ts"
  * what cannot be converted without changing the cut. Nothing here edits text on its own.
  */
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
-import { AlertTriangle, Check, Cpu, Eye, Loader, Save, Settings, Sliders } from "lucide-solid"
+import { AlertTriangle, Check, Cpu, Eye, EyeOff, Loader, Save, Settings, Sliders } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
-import { t } from "../../../i18n/index.ts"
-import { CheckRow, Field, Note, NumberField, PanelSection, Segmented, Stat } from "../../../shared/components/panel/ui.tsx"
+import { t, type Key } from "../../../i18n/index.ts"
+import { Badge, CheckRow, Field, Grid, Group, Note, NumberField, PanelCard, PanelSection, Segmented, Stat } from "../../../shared/components/panel/ui.tsx"
+import { downloadFile } from "../../../shared/lib/save-file.ts"
 import { gcodeSummary } from "../lib/gcode-summary.ts"
 import "../../../styles/cam-panels.css"
 
 type PostId = cam.PostId
 type Result = cam.ConvertResult
 
-/** Every post the core writes, with the control it is for. */
+/** Every post the core writes, with the control it is for. Label and description are read from the string table on access. */
+const postTarget = (id: PostId, label: Key, about: Key): { readonly id: PostId; readonly label: string; readonly about: string } => ({
+  id,
+  get label() { return t(label) },
+  get about() { return t(about) }
+})
+
 export const POST_TARGETS: ReadonlyArray<{ readonly id: PostId; readonly label: string; readonly about: string }> = [
-  { id: "fanuc", label: "Fanuc", about: "Fanuc 0i / 30i: % and O number, G43 H, canned cycles with M29 rigid tapping, G43.4 tool tip control, M98 subprograms, AICC smoothing (G5.1 Q1)." },
-  { id: "haas", label: "Haas NGC", about: "Haas Next Generation Control: Fanuc family, G234 TCPC, M98 subprograms, G187 accuracy control." },
-  { id: "siemens", label: "Siemens 840D sl", about: "Sinumerik native language: MPF header, ; comments, G71, T then D1, TRAORI, CYCLE832; drilling as moves, threads milled." },
-  { id: "heidenhain", label: "Heidenhain Klartext", about: "TNC 640 / TNC7 conversational: L, CC + C circles, TOOL CALL, cycle 9 dwell, cycle 32 tolerance, M128, LBL subprograms; millimetres, G54 preset." },
-  { id: "linuxcnc", label: "LinuxCNC", about: "LinuxCNC 2.8 / 2.9: % delimiters, G43 H, seconds on G4 / G82, canned drilling, G64 P blending, M2; threads milled." },
-  { id: "grbl", label: "GRBL", about: "GRBL 1.1: three axes, no tool changer (M0 pause), no canned cycles, M2." },
-  { id: "generic", label: "Generic ISO", about: "Plain ISO G-code: the reference output the other posts are compared with." }
+  postTarget("fanuc", "cam.post.target.fanuc.label", "cam.post.target.fanuc.about"),
+  postTarget("haas", "cam.post.target.haas.label", "cam.post.target.haas.about"),
+  postTarget("siemens", "cam.post.target.siemens.label", "cam.post.target.siemens.about"),
+  postTarget("heidenhain", "cam.post.target.heidenhain.label", "cam.post.target.heidenhain.about"),
+  postTarget("linuxcnc", "cam.post.target.linuxcnc.label", "cam.post.target.linuxcnc.about"),
+  postTarget("grbl", "cam.post.target.grbl.label", "cam.post.target.grbl.about"),
+  postTarget("generic", "cam.post.target.generic.label", "cam.post.target.generic.about")
 ]
 
 export interface AdvancedPostProcessorPanelProps {
@@ -108,137 +114,165 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
   const smoothingCodes = (): boolean => cam.dialectOf(target())?.smoothing !== undefined || target() === "heidenhain"
   const subprogramCodes = (): boolean => cam.dialectOf(target())?.subprograms !== undefined || target() === "heidenhain"
 
+  const figures: ReadonlyArray<readonly [Key, (f: cam.NcFigures) => string]> = [
+    ["cam.post.panel.lines", (f) => String(f.lines)],
+    ["cam.post.panel.bytes", (f) => String(f.bytes)],
+    ["cam.post.panel.cutLength", (f) => f.cutLength.toFixed(1)],
+    ["cam.post.panel.rapidLength", (f) => f.rapidLength.toFixed(1)],
+    ["cam.post.panel.dwell", (f) => f.dwellSeconds.toFixed(2)],
+    ["cam.post.panel.time", (f) => minutes(f.seconds)],
+    ["cam.post.panel.toolsFigure", (f) => f.tools.map((n) => `T${n}`).join(" ") || "-"]
+  ]
+  const outputLines = (): number => outputGcode().split("\n").filter((line) => line.trim() !== "").length
+
   return (
     <div class="panel cam-post__panel" data-testid="advanced-post-processor">
-      <div class="cam-post__setup">
-        <h2 class="panel-header__title cam-panel-heading">
-          <Cpu size={15} />
-          Post-Processor
-        </h2>
+      <header class="panel-header">
+        <div class="cam-post__title">
+          <h2 class="panel-header__title cam-panel-heading"><Cpu size={15} />{t("cam.post.panel.title")}</h2>
+          <p class="panel-header__sub">{t("cam.post.panel.subtitle")}</p>
+        </div>
+        <div class="panel-header__tools">
+          <Show when={result()}>
+            {(current) => (
+              <Badge tone={current().ok ? "ok" : "bad"}>
+                {current().ok ? t("cam.post.panel.verifiedBadge") : t("cam.post.panel.refusedBadge")}
+              </Badge>
+            )}
+          </Show>
+        </div>
+      </header>
 
+      <div class="cam-post__setup">
         <div class="cam-program-summary" data-testid="post-input-summary">
           <Stat label={t("cam.panel.blocks")} value={String(summary().blocks)} />
           <Stat label={t("cam.panel.tools")} value={summary().tools.map(n => `T${n}`).join(" · ") || t("cam.panel.notSpecified")} />
           <Stat label={t("cam.panel.offsets")} value={summary().offsets.join(" · ") || t("cam.panel.notSpecified")} />
         </div>
-        <Show when={summary().blocks === 0}><Note>{t("cam.panel.noInput")}</Note></Show>
+        <Show when={summary().blocks === 0}><Note kind="warn">{t("cam.panel.noInput")}</Note></Show>
         <div class="cam-post__controls">
-          <Field label="Written for" for="post-processor-source">
+          <Field label={t("cam.post.panel.source")} for="post-processor-source">
             <select id="post-processor-source" class="panel-input" value={source()} data-testid="post-source"
               onChange={(event) => setSource(event.currentTarget.value as PostId)}>
               <For each={POST_TARGETS}>{(p) => <option value={p.id}>{p.label}</option>}</For>
             </select>
           </Field>
-          <Field label={t("cam.panel.controller")} for="post-processor-target">
+          <Field label={t("cam.post.panel.target")} for="post-processor-target">
             <select id="post-processor-target" class="panel-input" value={target()} data-testid="advanced-controller"
               onChange={(event) => { const value = event.currentTarget.value as PostId; setTarget(value); props.onControllerChange?.(value) }}>
               <For each={POST_TARGETS}>{(p) => <option value={p.id}>{p.label}</option>}</For>
             </select>
           </Field>
-          <button class="panel-btn panel-btn--primary" onClick={() => void processGcode()} disabled={isProcessing() || summary().blocks === 0} data-testid="process-gcode">
-            {isProcessing() ? <Loader size={18} class="mr-2 animate-spin" /> : <Settings size={18} class="mr-2" />}
-            {isProcessing() ? "Converting..." : "Convert"}
+          <button type="button" class="panel-btn panel-btn--primary" onClick={() => void processGcode()} disabled={isProcessing() || summary().blocks === 0} data-testid="process-gcode">
+            {isProcessing() ? <Loader class="cam-post__spin" /> : <Settings />}
+            {isProcessing() ? t("cam.post.panel.converting") : t("cam.post.panel.convert")}
           </button>
         </div>
         <Note>{about(target())}</Note>
       </div>
 
-      <PanelSection id="post-options" title={`${label(target())} output`} icon={Sliders} open={expanded().options} onToggle={() => toggleSection("options")}>
-        <Show when={expanded().options}>
-          <div class="cam-post__grid">
-            <div class="space-y-2">
-              <Field label="Decimals" for="post-decimals">
+      <PanelSection id="post-options" title={t("cam.post.panel.output", { post: label(target()) })} icon={Sliders} open={expanded().options} onToggle={() => toggleSection("options")}>
+        <div class="cam-post__grid">
+          <Group title={t("cam.post.panel.format")}>
+            <Grid cols={2}>
+              <Field label={t("cam.post.panel.decimals")} for="post-decimals">
                 <NumberField id="post-decimals" value={decimals()} int accept={(v) => Number.isInteger(v) && v >= 0 && v <= 6} onValue={setDecimals} />
               </Field>
-              <Segmented label="Arcs" testId="post-arcs" value={arcMode()} onChange={setArcMode}
-                options={[["ijk", "I J K"], ["radius", "R"], ["linearize", "Lines"]]} />
-              <CheckRow id="post-numbered" checked={numbered()} onChange={setNumbered}>Block numbers (N10, step 10)</CheckRow>
-              <CheckRow id="post-header" checked={header()} onChange={setHeader}>Header comments (program, units, operations)</CheckRow>
-              <CheckRow id="post-comments" checked={comments()} onChange={setComments}>Keep the program's comments</CheckRow>
-            </div>
-            <div class="space-y-2">
-              <CheckRow id="post-canned" checked={canned()} onChange={setCanned}>Canned cycles where the control has them</CheckRow>
-              <Show when={subprogramCodes()}>
-                <CheckRow id="post-subprograms" checked={subprograms()} onChange={setSubprograms}>Repeated toolpaths as subprograms</CheckRow>
+              <Field label={t("cam.post.panel.arcs")}>
+                <Segmented label={t("cam.post.panel.arcs")} testId="post-arcs" value={arcMode()} onChange={setArcMode}
+                  options={[["ijk", "I J K"], ["radius", "R"], ["linearize", t("cam.post.panel.arcs.lines")]]} />
+              </Field>
+            </Grid>
+            <CheckRow id="post-numbered" checked={numbered()} onChange={setNumbered}>{t("cam.post.panel.numbered")}</CheckRow>
+            <CheckRow id="post-header" checked={header()} onChange={setHeader}>{t("cam.post.panel.header")}</CheckRow>
+            <CheckRow id="post-comments" checked={comments()} onChange={setComments}>{t("cam.post.panel.comments")}</CheckRow>
+          </Group>
+          <Group title={t("cam.post.panel.features")}>
+            <CheckRow id="post-canned" checked={canned()} onChange={setCanned}>{t("cam.post.panel.canned")}</CheckRow>
+            <Show when={subprogramCodes()}>
+              <CheckRow id="post-subprograms" checked={subprograms()} onChange={setSubprograms}>{t("cam.post.panel.subprograms")}</CheckRow>
+            </Show>
+            <Show when={smoothingCodes()}>
+              <CheckRow id="post-smoothing" checked={smoothing()} onChange={setSmoothing}>{t("cam.post.panel.smoothing")}</CheckRow>
+              <Show when={smoothing()}>
+                <Field label={t("cam.post.panel.tolerance")} unit="mm" for="post-tolerance">
+                  <NumberField id="post-tolerance" value={tolerance()} accept={(v) => v > 0 && v <= 1} onValue={setTolerance} />
+                </Field>
               </Show>
-              <Show when={smoothingCodes()}>
-                <CheckRow id="post-smoothing" checked={smoothing()} onChange={setSmoothing}>High-speed contour smoothing</CheckRow>
-                <Show when={smoothing()}>
-                  <Field label="Contour tolerance" unit="mm" for="post-tolerance">
-                    <NumberField id="post-tolerance" value={tolerance()} accept={(v) => v > 0 && v <= 1} onValue={setTolerance} />
-                  </Field>
-                </Show>
-              </Show>
-            </div>
-          </div>
-        </Show>
+            </Show>
+          </Group>
+        </div>
       </PanelSection>
 
       <Show when={result()}>
         {(current) => (
-          <PanelSection id="post-results-section" testId="post-results" title={current().ok ? "Converted and verified" : "Not converted"} icon={current().ok ? Check : AlertTriangle} open={expanded().results} onToggle={() => toggleSection("results")}>
-            <Show when={expanded().results}>
-              <div class="p-4 pt-0 space-y-3">
-                <Show when={current().errors.length > 0}>
-                  <Note kind="bad" role="alert" testId="post-errors">
-                    <ul class="list-disc list-inside"><For each={current().errors}>{(error) => <li>{error}</li>}</For></ul>
-                  </Note>
-                </Show>
-                <Show when={current().ok}>
-                  <Note kind="ok" testId="post-verified">
-                    The output replays to the same feed path: largest distance {current().deviation!.toFixed(4)} mm (rounding allows {current().allowed!.toFixed(4)} mm).
-                  </Note>
-                </Show>
-                <Show when={current().before}>
-                  {(before) => (
-                    <table class="panel-table" data-testid="post-figures">
-                      <thead><tr><th /><th>Input</th><th>Output</th></tr></thead>
-                      <tbody>
-                        <For each={[
-                          ["Lines", (f: cam.NcFigures) => String(f.lines)],
-                          ["Bytes", (f: cam.NcFigures) => String(f.bytes)],
-                          ["Cut length (mm)", (f: cam.NcFigures) => f.cutLength.toFixed(1)],
-                          ["Rapid length (mm)", (f: cam.NcFigures) => f.rapidLength.toFixed(1)],
-                          ["Dwell (s)", (f: cam.NcFigures) => f.dwellSeconds.toFixed(2)],
-                          ["Estimated time", (f: cam.NcFigures) => minutes(f.seconds)],
-                          ["Tools", (f: cam.NcFigures) => f.tools.map((n) => `T${n}`).join(" ") || "-"]
-                        ] as const}>
-                          {([name, show]) => (
-                            <tr><td>{name}</td><td>{show(before())}</td><td>{current().after !== undefined ? show(current().after!) : "-"}</td></tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </table>
-                  )}
-                </Show>
-                <Show when={current().notes.length > 0}>
-                  <Note testId="post-notes">
-                    <ul class="list-disc list-inside"><For each={current().notes}>{(note) => <li>{note}</li>}</For></ul>
-                  </Note>
-                </Show>
-                <div class="cam-post__result-actions">
-                  <button type="button" class="panel-btn" onClick={() => toggleSection("preview")} disabled={!outputGcode()}>
-                    <Eye size={16} class="mr-2" />
-                    {expanded().preview ? "Hide Preview" : "Show Preview"}
-                  </button>
-                  <button type="button" class="panel-btn" onClick={saveGcode} disabled={!current().ok}>
-                    <Save size={16} class="mr-2" />
-                    Save program
-                  </button>
-                </div>
-              </div>
+          <PanelSection id="post-results-section" testId="post-results"
+            title={current().ok ? t("cam.post.panel.verified") : t("cam.post.panel.refused")}
+            icon={current().ok ? Check : AlertTriangle} open={expanded().results} onToggle={() => toggleSection("results")}>
+            <Show when={current().ok}>
+              <Note kind="ok" testId="post-verified">
+                {t("cam.post.panel.verifiedNote", { deviation: current().deviation!.toFixed(4), allowed: current().allowed!.toFixed(4) })}
+              </Note>
             </Show>
+            <Show when={current().errors.length > 0}>
+              <Note kind="bad" role="alert" testId="post-errors">
+                <ul class="cam-post__list"><For each={current().errors}>{(error) => <li>{error}</li>}</For></ul>
+              </Note>
+            </Show>
+            <Show when={current().before}>
+              {(before) => (
+                <div class="cam-post__figures-wrap">
+                  <table class="cam-post__figures" data-testid="post-figures">
+                    <caption>{t("cam.post.panel.figures")}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">{t("cam.post.panel.figure")}</th>
+                        <th scope="col">{t("cam.post.panel.input")}</th>
+                        <th scope="col">{t("cam.post.panel.outputColumn")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={figures}>
+                        {([name, show]) => {
+                          const after = (): string => current().after !== undefined ? show(current().after!) : "-"
+                          return (
+                            <tr data-changed={after() !== show(before())}>
+                              <td>{t(name)}</td>
+                              <td>{show(before())}</td>
+                              <td>{after()}</td>
+                            </tr>
+                          )
+                        }}
+                      </For>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Show>
+            <Show when={current().notes.length > 0}>
+              <Note testId="post-notes">
+                <p class="cam-post__note-title">{t("cam.post.panel.notes")}</p>
+                <ul class="cam-post__list"><For each={current().notes}>{(note) => <li>{note}</li>}</For></ul>
+              </Note>
+            </Show>
+            <div class="cam-post__result-actions">
+              <button type="button" class="panel-btn" onClick={() => toggleSection("preview")} disabled={!outputGcode()} aria-pressed={expanded().preview}>
+                {expanded().preview ? <EyeOff /> : <Eye />}
+                {expanded().preview ? t("cam.post.panel.hidePreview") : t("cam.post.panel.showPreview")}
+              </button>
+              <button type="button" class="panel-btn" onClick={saveGcode} disabled={!current().ok}>
+                <Save />
+                {t("cam.post.panel.save")}
+              </button>
+            </div>
           </PanelSection>
         )}
       </Show>
 
       <Show when={result() && expanded().preview && outputGcode()}>
-        <div class="p-4">
-          <h3 class="text-lg font-medium mb-2">{label(target())} program</h3>
-          <div class="panel-code">
-            <pre class="text-sm font-mono whitespace-pre-wrap" data-testid="post-preview">{outputGcode()}</pre>
-          </div>
-        </div>
+        <PanelCard title={t("cam.post.panel.program", { post: label(target()) })} actions={<Badge>{t("cam.post.panel.lineCount", { count: outputLines() })}</Badge>}>
+          <pre class="panel-code cam-post__code" data-testid="post-preview">{outputGcode()}</pre>
+        </PanelCard>
       </Show>
     </div>
   )
