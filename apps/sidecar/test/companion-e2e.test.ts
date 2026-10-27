@@ -130,6 +130,43 @@ describe("companion end to end", () => {
     }
   }, 60_000)
 
+  test("a phone paired by a signed-in desktop sees that account's projects, and older devices follow the account", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "cadcamfun-companion-account-"))
+    const sidecar = await boot(dataDir)
+    try {
+      const gatewayPort = 20_000 + Math.floor(Math.random() * 20_000)
+      await sidecar.local("/api/companion/enable", { method: "POST", body: JSON.stringify({ port: gatewayPort }) })
+      const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
+      const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
+      const phoneFor = async (name: string, headers: Record<string, string> = {}) => {
+        const paired = await (await sidecar.local("/api/companion/pair", { method: "POST", headers, body: JSON.stringify({ name, host: "127.0.0.1" }) })).json()
+        return new CompanionClient(createFetchTransport(parsePairingLink(paired.link), pinned))
+      }
+      // Paired while the desktop still runs as the local profile.
+      const older = await phoneFor("Older iPhone")
+      const account = { email: "ada@example.com", name: "Ada", password: "longpassword", confirmPassword: "longpassword" }
+      expect((await sidecar.local("/api/auth/signup", { method: "POST", body: JSON.stringify(account) })).status).toBe(201)
+      const signin = await (await sidecar.local("/api/auth/signin-direct", { method: "POST", body: JSON.stringify({ email: account.email, password: account.password }) })).json()
+      const desktop = { "x-session-token": signin.token as string }
+      await sidecar.local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Local scratch" }) })
+      await sidecar.local("/api/projects", { method: "POST", headers: desktop, body: JSON.stringify({ name: "Ada bracket" }) })
+
+      const phone = await phoneFor("Ada iPhone", desktop)
+      expect((await phone.projects()).map((p) => p.name)).toEqual(["Ada bracket"])
+      const created = await phone.createProject("From the phone")
+      expect((await (await sidecar.local("/api/projects", { headers: desktop })).json()).map((p: { id: string }) => p.id)).toContain(created.id)
+
+      expect((await older.projects()).map((p) => p.name)).toEqual(["Local scratch"])
+      // Opening the companion screen signed in gives the device paired without an account to that account.
+      await sidecar.local("/api/companion", { headers: desktop })
+      expect((await older.projects()).map((p) => p.name).sort()).toEqual(["Ada bracket", "From the phone"])
+    } finally {
+      sidecar.child.kill("SIGTERM")
+      await sidecar.child.exited
+      rmSync(dataDir, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   test("a paired phone receives live frames as the desktop writes, over the forwarded SSE stream", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "cadcamfun-companion-"))
     const sidecar = await boot(dataDir)

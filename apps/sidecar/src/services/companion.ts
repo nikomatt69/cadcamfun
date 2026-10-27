@@ -1,3 +1,4 @@
+import type { SessionUser } from "@cadcamfun/api"
 import { Context, Data, Effect, Layer, Redacted } from "effect"
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -7,6 +8,7 @@ import {
   defaultHost, fingerprintOf, generateCertificate, hashToken, newToken, pairingHosts, pairingLink, startGateway,
   type CompanionCertificate, type Gateway, type GatewayRequestLog, type TokenRecord,
 } from "./companion-gateway.ts"
+import { AuthTokens } from "./auth-tokens.ts"
 import { KvStore } from "./kv.ts"
 
 export class CompanionError extends Data.TaggedError("CompanionError")<{ readonly code: "unavailable" | "invalid" | "not-found"; readonly message: string }> {}
@@ -23,19 +25,27 @@ export interface CompanionState {
 const SETTINGS = "companion.settings"
 const TOKEN_PREFIX = "companion.token."
 const DEFAULT_PORT = 8443
+/** Lifetime of the session token the gateway mints for each forwarded request. */
+const SESSION_SECONDS = 300
 
 /** Lifecycle of the phone-facing gateway: certificate, scoped device tokens, on/off. Off by default. */
 export class Companion extends Context.Service<Companion, {
   status: Effect.Effect<CompanionState>
   enable(port?: number): Effect.Effect<CompanionState, CompanionError>
   disable: Effect.Effect<CompanionState, CompanionError>
-  /** Creates a device token (shown once, inside the link) and returns the pairing link for the QR code. */
-  pair(name: string, host?: string): Effect.Effect<{ id: string; link: string }, CompanionError>
+  /**
+   * Creates a device token (shown once, inside the link) and returns the pairing link for the QR code. `user` is the signed-in
+   * desktop account the device will act as; undefined for the local profile.
+   */
+  pair(name: string, host?: string, user?: SessionUser): Effect.Effect<{ id: string; link: string }, CompanionError>
+  /** Gives devices paired before devices had an account (or while signed out) to the signed-in desktop account. */
+  adopt(user: SessionUser): Effect.Effect<void>
   revoke(id: string): Effect.Effect<CompanionState, CompanionError>
 }>()("cadcamfun/Companion") {
   static readonly layer = Layer.effect(Companion, Effect.gen(function*() {
     const config = yield* AppConfigService
     const kv = yield* KvStore
+    const authTokens = yield* AuthTokens
     const dir = join(config.dataDir, "companion")
     let gateway: Gateway | undefined
     let certificate: CompanionCertificate | undefined
@@ -108,6 +118,7 @@ export class Companion extends Context.Service<Companion, {
             upstream: () => ({ port: getLocalPort() ?? local, token: Redacted.value(config.token) }),
             tokens: () => Effect.runPromise(tokens),
             touch: (id) => void touches.set(id, new Date().toISOString()),
+            session: (record) => record.userId === undefined ? undefined : authTokens.sign({ userId: record.userId, email: "", type: "session" }, SESSION_SECONDS),
             log: logRequest,
           }),
           catch: (e) => new CompanionError({ code: "unavailable", message: `Could not start the gateway on port ${port}: ${String(e)}` }),
@@ -141,12 +152,18 @@ export class Companion extends Context.Service<Companion, {
         gateway = undefined
         return yield* state
       }),
-      pair: (name, host) => Effect.gen(function*() {
+      adopt: (user) => Effect.gen(function*() {
+        for (const entry of yield* kv.list(TOKEN_PREFIX)) {
+          const record = entry.value as TokenRecord
+          if (record.userId === undefined) yield* kv.set(entry.key, { ...record, userId: user.id })
+        }
+      }).pipe(Effect.catchTag("KvError", (e) => Effect.logWarning("Unable to assign companion devices", e))),
+      pair: (name, host, user) => Effect.gen(function*() {
         const label = name.trim()
         if (!label || label.length > 60) return yield* new CompanionError({ code: "invalid", message: "Device name is required (up to 60 characters)" })
         const cert = yield* loadCertificate
         const { id, token } = newToken()
-        const record: TokenRecord = { id, name: label, hash: hashToken(token), createdAt: new Date().toISOString(), lastSeen: null }
+        const record: TokenRecord = { id, name: label, hash: hashToken(token), createdAt: new Date().toISOString(), lastSeen: null, ...(user ? { userId: user.id } : {}) }
         yield* kv.set(`${TOKEN_PREFIX}${id}`, record).pipe(Effect.mapError((e) => new CompanionError({ code: "unavailable", message: `Could not save the device token: ${e.operation}` })))
         const s = yield* settings
         const hosts = pairingHosts(host)

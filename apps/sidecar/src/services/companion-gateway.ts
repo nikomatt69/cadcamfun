@@ -171,6 +171,8 @@ export interface TokenRecord {
   readonly hash: string
   readonly createdAt: string
   readonly lastSeen: string | null
+  /** The desktop account that paired the device; the phone sees that account's projects and conversations. */
+  readonly userId?: string
 }
 
 export const hashToken = (token: string): string => createHash("sha256").update(token).digest("hex")
@@ -271,6 +273,10 @@ export const DEFAULT_DEVICE_LIMITS: DeviceLimits = {
 
 /** The header that tells the sidecar which paired device a forwarded request came from (never accepted from outside). */
 export const COMPANION_DEVICE_HEADER = "x-cadcamfun-companion-device"
+/** The sidecar's session header (`http/authorization.ts`): set by the gateway for the device's account, never taken from the phone. */
+const SESSION_HEADER = "x-session-token"
+/** The phone's own CADCAMFUN account (`apps/mobile/lib/account.ts`), verified by the sidecar against the identity issuer. */
+const IDENTITY_HEADER = "x-identity-token"
 
 /** One line per phone request: who, what, outcome, how long. Never the token, a body or a query string. */
 export interface GatewayRequestLog {
@@ -294,6 +300,8 @@ export interface GatewayOptions {
   readonly upstream: () => { readonly port: number; readonly token: string }
   readonly tokens: () => Promise<readonly TokenRecord[]>
   readonly touch?: (id: string) => void
+  /** A short-lived session token for the account that paired the device, so a forwarded request acts as that account. */
+  readonly session?: (record: TokenRecord) => string | undefined
   readonly limits?: DeviceLimits
   readonly log?: (entry: GatewayRequestLog) => void
   /** Overrides the per-kind timeouts, for tests. */
@@ -454,6 +462,10 @@ export const startGateway = (options: GatewayOptions): Gateway => {
       headers.delete("cookie")
       // Attribution for the audit trail; whatever the phone sent under this name is replaced, never trusted.
       headers.set(COMPANION_DEVICE_HEADER, record.id)
+      // The device acts as the account that paired it, like the desktop webview, unless the phone signed in to its own.
+      headers.delete(SESSION_HEADER)
+      const session = headers.has(IDENTITY_HEADER) ? undefined : options.session?.(record)
+      if (session) headers.set(SESSION_HEADER, session)
 
       const controller = new AbortController()
       const abort = () => controller.abort()

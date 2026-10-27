@@ -6,7 +6,7 @@ let gateway: Gateway
 let cert: CompanionCertificate
 let tokens: TokenRecord[]
 let valid: string
-const seen: Array<{ method: string; path: string; auth: string | null; body: string; device: string | null }> = []
+const seen: Array<{ method: string; path: string; auth: string | null; body: string; device: string | null; session: string | null }> = []
 const logs: GatewayRequestLog[] = []
 const touched: string[] = []
 
@@ -16,7 +16,7 @@ beforeAll(async () => {
     hostname: "127.0.0.1",
     async fetch(req) {
       const url = new URL(req.url)
-      seen.push({ method: req.method, path: url.pathname + url.search, auth: req.headers.get("authorization"), body: await req.text(), device: req.headers.get(COMPANION_DEVICE_HEADER) })
+      seen.push({ method: req.method, path: url.pathname + url.search, auth: req.headers.get("authorization"), body: await req.text(), device: req.headers.get(COMPANION_DEVICE_HEADER), session: req.headers.get("x-session-token") })
       if (url.pathname === "/api/projects/slow") {
         await Bun.sleep(400)
         return Response.json({ late: true })
@@ -219,6 +219,27 @@ describe("companion gateway", () => {
   test("the device id reaches the sidecar for the audit trail and cannot be spoofed by the phone", async () => {
     await call("/api/projects", { headers: { [COMPANION_DEVICE_HEADER]: "someone-else" } })
     expect(seen.at(-1)?.device).toBe(tokens[0]!.id)
+  })
+
+  test("the device acts as the account that paired it; a session token from the phone is never forwarded", async () => {
+    await call("/api/projects", { headers: { "x-session-token": "forged" } })
+    expect(seen.at(-1)?.session).toBeNull()
+    const owned = newToken()
+    const g = startGateway({
+      certificate: cert, port: 0, upstream: () => ({ port: upstream.port!, token: "t" }),
+      tokens: async () => [{ id: owned.id, name: "p", hash: hashToken(owned.token), createdAt: "", lastSeen: null, userId: "u1" }],
+      session: (record) => record.userId === undefined ? undefined : `session-of-${record.userId}`,
+    })
+    try {
+      const get = (headers: Record<string, string>) => fetch(`https://127.0.0.1:${g.port}/api/projects`, { headers: { authorization: `Bearer ${owned.token}`, ...headers }, tls: { rejectUnauthorized: false } } as RequestInit)
+      await get({ "x-session-token": "forged" })
+      expect(seen.at(-1)?.session).toBe("session-of-u1")
+      // The phone's own signed-in account (verified by the sidecar) takes precedence over the pairing account.
+      await get({ "x-identity-token": "phone-account" })
+      expect(seen.at(-1)?.session).toBeNull()
+    } finally {
+      g.stop()
+    }
   })
 
   test("every request is logged with device, route, status and duration, never the token or the query", async () => {
