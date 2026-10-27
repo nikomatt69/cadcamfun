@@ -1,6 +1,6 @@
 {
   "name": "@cadcamfunv2/cadcamfun-nikcli-plugin",
-  "version": "0.1.36",
+  "version": "0.1.37",
   "description": "Drive a running CADCAMFUN instance from a standalone nikcli: the application's CAD/CAM action catalogue as nikcli tools.",
   "type": "module",
   "repository": {

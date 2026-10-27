@@ -3,6 +3,16 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.37 (October 2026)
+
+## Sidecar
+
+- A paired phone acts as the desktop account that paired it — the gateway forwards a short-lived session token for the device's account (the phone's own identity token still wins), devices paired signed out are adopted when the signed-in desktop opens the companion screen; projects and conversations now match the desktop
+
+## Mobile
+
+- IOS project points REACT_NATIVE_PATH at the installed react-native build
+
 ## v0.1.36 (October 2026)
 
 ## Mobile
