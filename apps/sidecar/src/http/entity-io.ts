@@ -49,7 +49,7 @@ export const exportEntities = <Row extends { id: string; name: string }>(io: Ent
           exported_at: new Date().toISOString(),
           [io.plural]: rows.map((r) => ({ id: r.id, name: r.name, filename: safeName(r.name) }))
         }, null, 2))
-        const bytes = yield* Effect.promise(() => zip.generateAsync({ type: "uint8array" }))
+        const bytes = yield* Effect.tryPromise({ try: () => zip.generateAsync({ type: "uint8array" }), catch: (cause) => cause }).pipe(Effect.catch(internal))
         return HttpServerResponse.uint8Array(bytes, {
           contentType: "application/zip",
           headers: { "content-disposition": `attachment; filename="${io.plural}-export-${stamp}.zip"` }

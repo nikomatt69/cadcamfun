@@ -126,16 +126,23 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     }))
   })
   const skillStore = createUserSkillStore(join(appConfig.dataDir, "ai", "skills"))
-  const skillInfos = Effect.promise(async () => {
-    const user = await skillStore.list()
-    return [
-      ...CADCAM_SKILLS.map((s) => ({ name: s.name, description: s.description, builtIn: true, category: s.category })),
-      ...user.map((s) => ({ name: s.name, description: s.description, builtIn: false, category: "user" }))
-    ]
-  })
-  /** Live hosts re-read the skills; false when there is no embedded host (the next start loads them). */
+  /** The user skill folder on disk: a read or write that fails is a server fault, logged, never a defect. */
+  const skillFiles = <A>(what: string, run: () => Promise<A>) =>
+    Effect.tryPromise({ try: run, catch: (cause) => cause }).pipe(
+      Effect.catch((cause) => Effect.logError(`Skill store: ${what} failed`, cause).pipe(
+        Effect.andThen(Effect.fail(new InternalError({ message: `The skill store could not ${what}.` })))
+      ))
+    )
+  const skillInfos = skillFiles("list the skills", () => skillStore.list()).pipe(Effect.map((user) => [
+    ...CADCAM_SKILLS.map((s) => ({ name: s.name, description: s.description, builtIn: true, category: s.category })),
+    ...user.map((s) => ({ name: s.name, description: s.description, builtIn: false, category: "user" }))
+  ]))
+  /** Live hosts re-read the skills; false when there is no embedded host or the reload failed (the next start loads them). */
   const reloadSkills = Option.isSome(host)
-    ? host.value.runtime.reloadSkills().pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false)))
+    ? host.value.runtime.reloadSkills().pipe(
+      Effect.as(true),
+      Effect.catch((cause) => Effect.logWarning("Skills saved but the live host did not reload them", cause).pipe(Effect.as(false)))
+    )
     : Effect.succeed(false)
 
   const extensionAccess = Effect.gen(function*() {
@@ -493,7 +500,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
             return problems.length > 0 ? { ok: false as const, problems } : { ok: true as const, value: skill }
           })()
       if (!parsed.ok) return yield* new BadRequest({ message: `Skill not loaded: ${parsed.problems.join("; ")}` })
-      const saved = yield* Effect.promise(() => skillStore.save(parsed.value))
+      const saved = yield* skillFiles("save the skill", () => skillStore.save(parsed.value))
       if (!saved.ok) return yield* new BadRequest({ message: `Skill not loaded: ${saved.problems.join("; ")}` })
       const live = yield* reloadSkills
       const skills = yield* skillInfos
@@ -502,7 +509,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     .handle("deleteSkill", ({ params }) => Effect.gen(function*() {
       if (!SKILL_NAME_PATTERN.test(params.name)) return yield* new BadRequest({ message: "Invalid skill name" })
       if (CADCAM_SKILLS.some((s) => s.name === params.name)) return yield* new BadRequest({ message: "Built-in skills cannot be removed" })
-      const removed = yield* Effect.promise(() => skillStore.remove(params.name))
+      const removed = yield* skillFiles("remove the skill", () => skillStore.remove(params.name))
       if (!removed) return yield* new BadRequest({ message: `No loaded skill called ${params.name}` })
       yield* reloadSkills
       const skills = yield* skillInfos

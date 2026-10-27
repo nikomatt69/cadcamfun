@@ -23,7 +23,11 @@ export const ToolpathGeneratorHandlers = HttpApiBuilder.group(Api, "toolpathGene
   // Progress frames go only to a project the caller can open: the same check the stream applies when it delivers them.
   const progressTarget = (projectId: string) => Effect.gen(function*() {
     const user = yield* CurrentUser
-    const project = yield* projects.find(user.id, projectId).pipe(Effect.catch(() => Effect.succeed(undefined)))
+    const project = yield* projects.find(user.id, projectId).pipe(
+      Effect.catchTag("DatabaseError", (cause) => Effect.logError("Progress target: project lookup failed", cause).pipe(
+        Effect.andThen(Effect.fail(new InternalError({ message: "Progress target: project lookup failed" })))
+      ))
+    )
     if (project === undefined) return yield* new BadRequest({ message: "Progress target: project not found" })
   })
   return handlers

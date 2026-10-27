@@ -9,6 +9,7 @@ import { MiscRepo } from "../repos/misc-repo.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { NotificationService } from "../services/notifications.ts"
 import { AuthTokens } from "../services/auth-tokens.ts"
+import { signInPasswordMatches } from "../services/passwords.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -55,7 +56,7 @@ export const MiscHandlers = HttpApiBuilder.group(Api, "misc", Effect.fn(function
       const user = yield* auth.findForSignin(payload.email)
       const invalid = new DesktopUnauthorized({ success: false, error: "Invalid credentials" })
       if (!user || !user.password) return yield* invalid
-      if (!(yield* Effect.promise(() => Bun.password.verify(payload.password!, user.password!).catch(() => false)))) return yield* invalid
+      if (!(yield* signInPasswordMatches(payload.password, user.password, user.id))) return yield* invalid
       const token = tokens.sign({ userId: user.id, email: user.email ?? "", type: "desktop" }, 7 * 24 * 3600)
       yield* repo.logActivity(user.id, user.id, "desktop_signin", "signin", { platform: payload.platform ?? "desktop", deviceId: payload.deviceId ?? "unknown" })
       const profile = yield* auth.profile(user.id)

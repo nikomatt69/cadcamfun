@@ -61,7 +61,11 @@ export class StorageService extends Context.Service<StorageService, {
         deletePrefix: (prefix) => run("deletePrefix", () => rm(pathOf(prefix), { recursive: true, force: true })),
         listByPrefix: (prefix) => run("list", async () => {
           const dir = pathOf(prefix.includes("/") ? prefix.slice(0, prefix.lastIndexOf("/")) : "")
-          const names = await readdir(dir, { recursive: true }).catch(() => [] as string[])
+          // A folder that does not exist yet holds no objects; any other read failure is the request's error.
+          const names = await readdir(dir, { recursive: true }).catch((error: unknown) => {
+            if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return [] as string[]
+            throw error
+          })
           return names.map((n) => join(prefix.includes("/") ? prefix.slice(0, prefix.lastIndexOf("/")) : "", n)).filter((k) => k.startsWith(prefix))
         })
       })

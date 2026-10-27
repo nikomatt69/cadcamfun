@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { SessionUser } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { adoptChildSession } from "@cadcamfun/ai"
-import { ActingUser, CurrentTurn, TurnCancelled, TurnUnowned, ensureTurnActive } from "../src/services/acting-user.ts"
+import { ActingUser, CurrentTurn, TurnCancelled, TurnUnowned, ensureTurnActive, invocationFailureText, isInvocationRefusal } from "../src/services/acting-user.ts"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -88,4 +88,13 @@ test("the turn is read once at the edge: inside an invocation it is the admitted
     expect(seen.user.id).toBe("alice")
     expect(Object.isFrozen(inside)).toBe(true)
   }).pipe(Effect.provide(ActingUser.layer)))
+})
+
+test("a refused invocation says so; any other failure keeps its own message", () => {
+  expect(isInvocationRefusal(new TurnUnowned())).toBe(true)
+  expect(isInvocationRefusal(new TurnCancelled())).toBe(true)
+  expect(invocationFailureText(new TurnCancelled())).toBe("AI invocation denied or interrupted.")
+  const conflict = new Error("The drawing changed while this tool was working.")
+  expect(isInvocationRefusal(conflict)).toBe(false)
+  expect(invocationFailureText(conflict)).toBe("The drawing changed while this tool was working.")
 })

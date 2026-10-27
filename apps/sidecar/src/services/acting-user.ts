@@ -52,6 +52,17 @@ export class TurnUnowned extends Data.TaggedError("TurnUnowned")<{ readonly mess
   }
 }
 
+/** A refusal of the invocation itself (no admitted owner, or the turn was cancelled), as opposed to a failure of the work. */
+export const isInvocationRefusal = (error: unknown): error is TurnUnowned | TurnCancelled =>
+  error instanceof TurnUnowned || error instanceof TurnCancelled
+
+/**
+ * What a caller is told when an invocation does not answer: a refusal says so, any other failure keeps its own message (a
+ * drawing conflict must reach the model as such, not as "denied").
+ */
+export const invocationFailureText = (error: unknown): string =>
+  isInvocationRefusal(error) ? "AI invocation denied or interrupted." : error instanceof Error ? error.message : String(error)
+
 /** Fails with `TurnCancelled` once the current turn is cancelled: checked before every mutation. */
 export const ensureTurnActive: Effect.Effect<void, TurnCancelled, CurrentTurn> = Effect.gen(function*() {
   const turn = yield* CurrentTurn

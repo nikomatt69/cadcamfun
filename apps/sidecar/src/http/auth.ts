@@ -9,6 +9,7 @@ import { AppConfigService } from "../config.ts"
 import { AuthRepo } from "../repos/auth-repo.ts"
 import { IdentityOAuth } from "../services/identity-oauth.ts"
 import { AuthTokens } from "../services/auth-tokens.ts"
+import { hashPassword, signInPasswordMatches } from "../services/passwords.ts"
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const bad = (error: string, details: string) => new AuthBadRequest({ error, details })
@@ -81,7 +82,7 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function
       const user = yield* repo.findById(claims.userId)
       if (!user) return yield* notFound("Utente non trovato", "L'account associato a questo reset token non esiste più")
       if (user.email !== claims.email) return yield* bad("Token non valido", "L'email associata al token non corrisponde")
-      const hash = yield* Effect.promise(() => Bun.password.hash(newPassword, { algorithm: "bcrypt", cost: 12 }))
+      const hash = yield* hashPassword(newPassword)
       yield* repo.setPassword(user.id, hash)
       yield* tokens.revoke(token) // a reset link works once
       return {
@@ -89,7 +90,10 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function
         message: "Password resettata con successo! Ora puoi effettuare il login con la nuova password.",
         user: { id: user.id, email: user.email ?? "", name: user.name }
       }
-    }).pipe(Effect.catchTag("DatabaseError", internal("Reset password error", "Errore durante il reset della password"))))
+    }).pipe(Effect.catchTags({
+      DatabaseError: internal("Reset password error", "Errore durante il reset della password"),
+      PasswordHashError: internal("Reset password error", "Errore durante il reset della password")
+    })))
     .handle("sendVerificationEmail", ({ payload }) => Effect.gen(function*() {
       const { email } = payload
       if (!email) return yield* bad("Email mancante", "L'indirizzo email è richiesto")
@@ -134,7 +138,7 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function
       const user = yield* repo.findForSignin(email.trim())
       if (!user) return yield* notFound("Utente non trovato", "Nessun account registrato con questa email")
       if (!user.password) return yield* bad("Password non impostata", "Questo account non ha una password. Usa un metodo di login alternativo.")
-      if (!(yield* Effect.promise(() => Bun.password.verify(password, user.password!).catch(() => false)))) {
+      if (!(yield* signInPasswordMatches(password, user.password, user.id))) {
         return yield* new AuthUnauthorized({ error: "Credenziali non valide", details: "Email o password non corretti" })
       }
       const token = tokens.sign({ userId: user.id, email: user.email ?? "", type: "session" }, 7 * 24 * 3600)
@@ -150,19 +154,25 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function
       if (name.trim().length < 2) return yield* bad("Nome troppo corto", "Il nome deve essere di almeno 2 caratteri")
       if (password.length < 8) return yield* bad("Password troppo corta", "La password deve essere di almeno 8 caratteri")
       if (password !== confirmPassword) return yield* bad("Le password non corrispondono", "La password e la conferma devono essere identiche")
-      const passwordHash = yield* Effect.promise(() => Bun.password.hash(password, { algorithm: "bcrypt", cost: 12 }))
+      const passwordHash = yield* hashPassword(password)
       const user = yield* repo.createUser({ email: email.trim(), name: name.trim(), passwordHash })
       if (!user) return yield* bad("Email già in uso", "Questo indirizzo email è già registrato")
       return { success: true as const, message: "Account creato con successo! Ora puoi effettuare il login.", user: fullUser(user) }
-    }).pipe(Effect.catchTag("DatabaseError", internal("Signup error", "Errore durante la registrazione"))))
+    }).pipe(Effect.catchTags({
+      DatabaseError: internal("Signup error", "Errore durante la registrazione"),
+      PasswordHashError: internal("Signup error", "Errore durante la registrazione")
+    })))
     .handle("testDirectCreate", ({ payload }) => Effect.gen(function*() {
       const { email, password, name } = payload
       if (!email || !password || !name) return yield* new TestCreateBadRequest({ error: "Missing required fields" })
-      const passwordHash = yield* Effect.promise(() => Bun.password.hash(password, { algorithm: "bcrypt", cost: 12 }))
+      const passwordHash = yield* hashPassword(password)
       const user = yield* repo.createUser({ email: email.trim(), name: name.trim(), passwordHash })
       if (!user) return yield* new TestCreateFailure({ error: "Direct creation failed", message: "Unique constraint failed on the fields: (`email`)" })
       return { success: true as const, message: "User created successfully with Prisma", user: fullUser(user) }
-    }).pipe(Effect.catchTag("DatabaseError", (e) => Effect.fail(new TestCreateFailure({ error: "Direct creation failed", message: String(e) })))))
+    }).pipe(Effect.catchTags({
+      DatabaseError: (e) => Effect.fail(new TestCreateFailure({ error: "Direct creation failed", message: String(e) })),
+      PasswordHashError: (e) => Effect.fail(new TestCreateFailure({ error: "Direct creation failed", message: e.message }))
+    })))
     .handle("verifyMagicLink", ({ payload }) => Effect.gen(function*() {
       if (!payload.token) return yield* bad("Token mancante", "Il token di verifica è richiesto")
       const claims = yield* tokens.verify(payload.token).pipe(Effect.mapError((kind) => kind === "expired"

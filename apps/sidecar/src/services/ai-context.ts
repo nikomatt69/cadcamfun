@@ -51,9 +51,10 @@ export const makeAiContext = ({ kv, projects, host }: AiContextDeps) => {
       out.push({ id: "project-rules", kind: "requirement", label: "project rules", text: renderProjectContext(document === undefined ? undefined : parseProjectContext(document.value).text) })
       // Brain's files live in the project's scratch folder; without an embedded host there is no Brain and no habits file.
       if (Option.isSome(host)) {
-        const projectHost = yield* host.value.runtime.host(projectId).pipe(Effect.catch(() => Effect.succeed(undefined)))
-        if (projectHost !== undefined) {
-          const files = yield* Effect.promise(() => readProjectMemoryFiles(projectHost))
+        const projectHost = yield* read("the project's AI host", host.value.runtime.host(projectId), undefined)
+        const files = projectHost === undefined ? undefined
+          : yield* read("the project memory files", Effect.tryPromise({ try: () => readProjectMemoryFiles(projectHost), catch: (cause) => cause }), undefined)
+        if (files !== undefined) {
           out.push({ id: "brain-memory", kind: "memory", label: "project memory", text: renderProjectMemory(files.memory) })
           out.push({ id: "user-habits", kind: "memory", label: "user habits", text: renderUserHabits(files.habits) })
         }

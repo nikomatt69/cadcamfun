@@ -6,6 +6,7 @@ import { extname, join } from "node:path"
 import { AppConfigService } from "../config.ts"
 import { UserRepo } from "../repos/user-repo.ts"
 import { ProjectVcs, VcsFailure } from "../services/project-vcs.ts"
+import { hashPassword, verifyPassword } from "../services/passwords.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -99,11 +100,11 @@ export const UserHandlers = HttpApiBuilder.group(Api, "user", Effect.fn(function
       const cred = yield* repo.credential(user.id)
       if (!cred.userExists) return yield* new NotFound({ message: "User not found" })
       if (!cred.accountId || !cred.hash) return yield* new NotFound({ message: "No password set for this account" })
-      const valid = yield* Effect.promise(() => Bun.password.verify(currentPassword, cred.hash!))
+      const valid = yield* verifyPassword(currentPassword, cred.hash)
       if (!valid) return yield* new BadRequest({ message: "Current password is invalid" })
-      yield* repo.setPassword(user.id, cred.accountId, yield* Effect.promise(() => Bun.password.hash(newPassword, { algorithm: "bcrypt", cost: 12 })))
+      yield* repo.setPassword(user.id, cred.accountId, yield* hashPassword(newPassword))
       return { message: "Password updated successfully" }
-    }).pipe(Effect.catchTag("DatabaseError", fail("Error updating password"))))
+    }).pipe(Effect.catchTags({ DatabaseError: fail("Error updating password"), PasswordHashError: fail("Error updating password") })))
     // The legacy route answers with fixed demo tokens (it never stored them); the wire shape is kept as is.
     .handle("tokens", () => Effect.sync(() => ({
       tokens: [

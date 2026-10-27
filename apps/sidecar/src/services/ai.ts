@@ -18,7 +18,7 @@ import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
 import { assemblyForModel, exactForModel, setupsForModel } from "./ai-exact.ts"
 import { changeParameters, editTimeline, historyRevision, inspectParametric, testParametric } from "./ai-parametric.ts"
-import { ActingUser, CurrentTurn, ensureTurnActive } from "./acting-user.ts"
+import { ActingUser, CurrentTurn, ensureTurnActive, invocationFailureText, isInvocationRefusal } from "./acting-user.ts"
 import { DrawingUnavailable, ProjectNotAccessible, WriteForbidden, toolRefusal } from "./ai-tool-errors.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
 import { ComponentRepo } from "../repos/component-repo.ts"
@@ -271,8 +271,11 @@ const toolHandlers = Effect.gen(function*() {
         part: { kind: "elements", elements: elements as never }, ...(stored !== undefined ? { stockFromPartBottom: { x: stored.x, y: stored.y, width: stored.width, height: stored.height, depth: stored.depth } } : {}),
         ...(machine !== undefined ? { machine } : {}), ...(input.origin !== undefined ? { origin: input.origin } : {}),
         ...(input.operations !== undefined ? { operations: input.operations } : {}), ...(input.tools !== undefined ? { tools: input.tools } : {}),
-        ...(input.subprograms === true || input.postDefinition !== undefined
-          ? { post: { ...(input.subprograms === true ? { options: { subprograms: true } } : {}), ...(input.postDefinition !== undefined ? { definition: input.postDefinition } : {}) } }
+        ...(input.subprograms === true || input.smoothing !== undefined || input.postDefinition !== undefined
+          ? { post: {
+            ...(input.subprograms === true || input.smoothing !== undefined ? { options: { ...(input.subprograms === true ? { subprograms: true } : {}), ...(input.smoothing !== undefined ? { smoothing: input.smoothing } : {}) } } : {}),
+            ...(input.postDefinition !== undefined ? { definition: input.postDefinition } : {})
+          } }
           : {}),
         ...(input.print !== undefined ? { print: input.print } : {}),
         quality: { ...(input.finishAllowance !== undefined ? { finishAllowance: input.finishAllowance } : {}), ...(input.scallop !== undefined ? { scallop: input.scallop } : {}), ...(input.deburr !== undefined ? { deburr: input.deburr } : {}) }
@@ -303,7 +306,9 @@ const toolHandlers = Effect.gen(function*() {
 
   /** One row of the project's audit trail (`ActivityLog`) for a change the assistant made; a failure to log never fails the change. */
   const audit = (projectId: string, action: string, details: Record<string, unknown>): Promise<void> =>
-    run(misc.logActivity(acting().id, projectId, "project", action, { via: "assistant", ...details })).then(() => undefined, () => undefined)
+    run(misc.logActivity(acting().id, projectId, "project", action, { via: "assistant", ...details }).pipe(
+      Effect.catch((cause) => Effect.logWarning("Assistant audit row not written", cause).pipe(Effect.annotateLogs({ projectId, action })))
+    ))
   const storeKernelBody = async (loaded: Awaited<ReturnType<typeof load>>, brep: cad.brep.Brep, name: string, change: { readonly action: string; readonly details?: Record<string, unknown> } = { action: "ai.cad.store_body" }) => {
     if (!loaded.id) return { ok: false, error: "No drawing is open." }
     const created: Element = { id: crypto.randomUUID(), type: "brep", name, brep, x: 0, y: 0, z: 0, layerId: "default" }
@@ -1619,9 +1624,14 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
       // One session per account and project: the owner file and the in-memory binding make a second account's call fail closed.
       // The drawing is part of the session's identity, so two concurrent calls on different drawings never share a binding.
       const sessionId = drawingId === undefined ? `bridge:${projectId}:${user.id}` : `bridge:${projectId}:${user.id}:${drawingId}`
-      const bound = yield* Effect.promise(() => acting.bind(projectId, sessionId, user, `${tool}.${admission.action} (standalone nikcli)`, drawingId))
+      const bound = yield* Effect.tryPromise({
+        try: () => acting.bind(projectId, sessionId, user, `${tool}.${admission.action} (standalone nikcli)`, drawingId),
+        catch: (cause) => cause
+      }).pipe(Effect.catch((cause) => Effect.logError("Bridge session could not be bound", cause).pipe(
+        Effect.andThen(Effect.fail({ message: "The bridge session could not be opened; try again." }))
+      )))
       if (!bound) return yield* Effect.fail({ message: "This project's bridge session belongs to another account." })
-      const result = yield* Effect.promise((abort) => {
+      const result = yield* Effect.tryPromise({ try: (abort) => {
         const cancel = signal ?? abort
         return acting.invoke(projectId, sessionId, async () => {
           const call = { sessionId, projectId, signal: cancel }
@@ -1631,7 +1641,9 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
           if ("value" in answer && answer.value !== undefined) return JSON.parse(JSON.stringify(answer.value)) as unknown
           try { return JSON.parse(answer.output) as unknown } catch { return answer.output }
         }, cancel)
-      }).pipe(Effect.catchDefect(() => Effect.fail({ message: "The call was denied or interrupted." })))
+      }, catch: (cause) => cause }).pipe(Effect.catch((cause) => isInvocationRefusal(cause)
+        ? Effect.fail({ message: "The call was denied or interrupted." })
+        : Effect.logWarning("Bridge tool call failed", cause).pipe(Effect.andThen(Effect.fail({ message: invocationFailureText(cause) })))))
       return { tool, action: admission.action, result }
     })
   })
@@ -1652,6 +1664,12 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   // it (no second scheduler, no second scheduler across projects).
   // Tasks are journalled in the key-value store, so a restart neither loses an outcome nor replays a document change.
   const scheduler = new BackgroundTaskManager({ journal: kvTaskJournal(yield* KvStore) })
+  const logInLayer = Effect.runForkWith(yield* Effect.context<never>())
+  /** The model's answer for a tool call that did not answer; a failure that is not a refusal is logged with the tool's id. */
+  const reportToolFailure = (toolId: string, error: unknown): string => {
+    if (!isInvocationRefusal(error)) logInLayer(Effect.logWarning("AI tool call failed", error).pipe(Effect.annotateLogs({ toolId })))
+    return invocationFailureText(error)
+  }
   // Delegation is the host's to implement, for as long as the host lives; with it the registry holds every implementation
   // the catalogue names, and the guard keeps the two sides in step.
   yield* registry.contributeScoped(backgroundToolContributionsFor(scheduler))
@@ -1672,8 +1690,9 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
     toolChanges: registry.subscribe,
     toolsFor: (projectId) => registry.snapshot(projectId).map((spec): HostToolSpec => ({
       ...spec,
-      execute: (input, ctx) => actingCell.invoke(projectId, ctx.sessionId, () => spec.execute(input, ctx), ctx.signal).catch(() => JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." })),
-      ...(spec.executeWithFiles ? { executeWithFiles: (input: unknown, ctx: { sessionId: string; projectId: string; signal: AbortSignal }) => actingCell.invoke(projectId, ctx.sessionId, () => spec.executeWithFiles!(input, ctx), ctx.signal).catch(() => ({ output: JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." }) })) } : {})
+      execute: (input, ctx) => actingCell.invoke(projectId, ctx.sessionId, () => spec.execute(input, ctx), ctx.signal)
+        .catch((error: unknown) => JSON.stringify({ ok: false, error: reportToolFailure(spec.id, error) })),
+      ...(spec.executeWithFiles ? { executeWithFiles: (input: unknown, ctx: { sessionId: string; projectId: string; signal: AbortSignal }) => actingCell.invoke(projectId, ctx.sessionId, () => spec.executeWithFiles!(input, ctx), ctx.signal).catch((error: unknown) => ({ output: JSON.stringify({ ok: false, error: reportToolFailure(spec.id, error) }) })) } : {})
     }))
   })
   yield* registry.contributeScoped(modToolContributions(runtime))
