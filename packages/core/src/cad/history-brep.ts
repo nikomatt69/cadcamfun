@@ -600,11 +600,25 @@ export const catalogueBrep = (
  * an exact model carries the reason. With `budgetMs` the exact work stops once that time is spent (`brep/budget.ts`), and
  * every body says so: the caller's thread is never held longer.
  */
-export const rebuildExact = (history: History, given?: RebuildResult, options: { readonly budgetMs?: number } = {}): ExactRebuild =>
-  options.budgetMs === undefined ? replayExact(history, given) : withBudget(options.budgetMs, () => replayExact(history, given))
-
-const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
+export const rebuildExact = (history: History, given?: RebuildResult, options: { readonly budgetMs?: number } = {}): ExactRebuild => {
   const result = given ?? rebuild(history)
+  return exactReplay(history, result).at(history.features.length, result.bodies, options)
+}
+
+/**
+ * An exact replay advanced on demand. `at(index, bodies)` replays the features before `index` it has not replayed yet and
+ * answers the exact model at that point, aligned with the mesh `bodies` of that point. The replay is sequential, so the
+ * model after the first `index` features is the same whether it was reached in one call or in several: the mesh rebuild
+ * asks one replay for every named face and curved fillet instead of replaying the prefix again each time (which was
+ * quadratic in the history length). `result` may still be growing (the mesh rebuild's sketches and issues): a feature's
+ * entries are read when that feature is replayed. Once a budget ran out the replay stays stopped and every answer says so.
+ * Indices are asked in history order: an earlier index answers the model already reached, the replay never runs backwards.
+ */
+export interface ExactReplay {
+  readonly at: (index: number, bodies: RebuildResult["bodies"], options?: { readonly budgetMs?: number }) => ExactRebuild
+}
+
+export const exactReplay = (history: History, result: RebuildResult): ExactReplay => {
   const warnings: string[] = []
   let featureId = "history"
   const combine = (a: Brep, b: Brep, operation: "union" | "subtract" | "intersect"): Brep => {
@@ -616,7 +630,7 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
   // Why the replay stopped early (its time budget ran out), for the bodies it never reached.
   let stopped: string | undefined
   const values = result.parameters
-  const failed = new Set(result.issues.filter((i) => i.severity === "error").map((i) => i.feature))
+  const failed = (id: string): boolean => result.issues.some((i) => i.feature === id && i.severity === "error")
   const dim = (d: Dimension): number => dimensionValue(d, values)
   const bodies: Array<{ id: string; feature: string; exact: Exact }> = []
   const tools = new Map<string, { readonly exact: ReadonlyArray<Exact>; readonly operation: "new" | "union" | "subtract" | "intersect"; readonly targets?: ReadonlyArray<string> }>()
@@ -679,860 +693,875 @@ const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
     return sk === undefined || sk.solve.status === "conflicting" || sk.solve.status === "failed" ? undefined : sk
   }
 
-  for (const f of history.features) {
-    if (failed.has(f.id)) continue
-    featureId = f.id
-    try {
-      checkBudget()
-      switch (f.type) {
-        case "sketch":
-          break
-        case "extrude": {
-          const sk = sketchOf(f.sketch)
-          if (sk === undefined) break
-          const depth = dim(f.depth)
-          // A draft angle leans the walls: the top profile is inset by depth * tan(angle), as the mesh's tapered prism.
-          const inset = f.taper === undefined ? 0 : depth * Math.tan((dim(f.taper) * Math.PI) / 180)
-          const dir = f.direction ?? "up"
-          const from = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
-          let { loops } = exactSketchLoops(sk.solve.sketch)
-          // Rounded or bevelled profile corners: exact tangent arcs or lines between the sketch's lines.
-          if (f.corner !== undefined) {
-            const size = dim(f.corner.size)
-            try {
-              loops = loops.map((l) => treatLoopCorners(l, f.corner!.style, size))
-            } catch (e) {
-              unsupported(f, e instanceof Error ? e.message : String(e))
-              break
-            }
-          }
-          // The rebuild already resolved the sketch's plane (base or work plane, offset applied).
-          const F = sk.frame
-          const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
-          let solids: Brep[]
-          try {
-            solids = profilesOfLoops(loops).map((p) => extrudeProfile(p, depth, { placement, name: f.id, ...(inset !== 0 ? { inset } : {}) }))
-          } catch (e) {
-            unsupported(f, e instanceof Error ? e.message : String(e))
+  let next = 0
+  const advance = (end: number): void => {
+    while (next < end && stopped === undefined) {
+      const f = history.features[next++]!
+      if (failed(f.id)) continue
+      featureId = f.id
+      try {
+        checkBudget()
+        switch (f.type) {
+          case "sketch":
             break
-          }
-          if (solids.length === 0) break
-          extrusions.set(f.id, { loops, frame: F, from, to: from + depth })
-          let united = unionAll(solids)
-          if (f.edge !== undefined) {
-            const treated = treatEndRims(united, f.id, f.edge.ends ?? "both", f.edge.holes === true, dim(f.edge.size), f.edge.style)
-            if (typeof treated === "string") { unsupported(f, treated); break }
-            united = treated
-          }
-          const tool = ok(united)
-          tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, tool, f.operation, f.targets, f.id)
-          break
-        }
-        case "revolve": {
-          const sk = sketchOf(f.sketch)
-          if (sk === undefined) break
-          const degrees = f.angle === undefined ? 360 : dim(f.angle)
-          const { loops } = exactSketchLoops(sk.solve.sketch)
-          if (loops.length !== 1) break
-          let a0: Vec2, dirA: Vec2
-          if (f.axis === "x") { a0 = { x: 0, y: 0 }; dirA = { x: 1, y: 0 } }
-          else if (f.axis === "y") { a0 = { x: 0, y: 0 }; dirA = { x: 0, y: 1 } }
-          else {
-            const axisId = f.axis.line
-            const line = sk.solve.sketch.entities.find((e) => e.id === axisId && e.kind === "line")
-            if (line === undefined || line.kind !== "line") break
-            const pts = new Map(sk.solve.sketch.entities.flatMap((e) => (e.kind === "point" ? [[e.id, e] as const] : [])))
-            const p1 = pts.get(line.p1)!, p2 = pts.get(line.p2)!
-            const len = Math.hypot(p2.x - p1.x, p2.y - p1.y)
-            a0 = { x: p1.x, y: p1.y }
-            dirA = { x: (p2.x - p1.x) / len, y: (p2.y - p1.y) / len }
-          }
-          // The axis line itself may be an edge of the profile; drop it from the loop only if it is not.
-          const side = (d: Vec2, p: Vec2) => (p.x - a0.x) * -d.y + (p.y - a0.y) * d.x
-          const loop0 = loops[0]!
-          const samples = loop0.flatMap((s) => [segmentPoint(s, 0), segmentPoint(s, 0.5)])
-          if (samples.every((p) => side(dirA, p) <= 1e-6)) dirA = { x: -dirA.x, y: -dirA.y }
-          const n2 = { x: -dirA.y, y: dirA.x }
-          // (radial, axial) coordinates are a reflection of the sketch's: arcs change their sense.
-          const mapped = mapProfileLoop(loop0, [n2.x, n2.y, dirA.x, dirA.y], { x: -a0.x * n2.x - a0.y * n2.y, y: -a0.x * dirA.x - a0.y * dirA.y })
-          const P = sk.frame
-          const w = (p: Vec2): Vec3 => ({ x: P.origin.x + P.u.x * p.x + P.v.x * p.y, y: P.origin.y + P.u.y * p.x + P.v.y * p.y, z: P.origin.z + P.u.z * p.x + P.v.z * p.y })
-          const o3 = w(a0)
-          const d3 = { x: P.u.x * dirA.x + P.v.x * dirA.y, y: P.u.y * dirA.x + P.v.y * dirA.y, z: P.u.z * dirA.x + P.v.z * dirA.y }
-          const r3 = { x: P.u.x * n2.x + P.v.x * n2.y, y: P.u.y * n2.x + P.v.y * n2.y, z: P.u.z * n2.x + P.v.z * n2.y }
-          normalizeProfile({ loops: [mapped] })
-          const brep = revolveProfile({ loops: [mapped] }, (degrees * Math.PI) / 180, { origin: o3, axis: d3, radial: r3, name: f.id })
-          revolutions.set(f.id, { loop: mapped, full: degrees >= 360 - 1e-9, origin: o3, axis: d3, radial: r3 })
-          const tool = ok(brep)
-          tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, tool, f.operation, f.targets, f.id)
-          break
-        }
-        case "hole": {
-          const offset = f.offset === undefined ? 0 : dim(f.offset)
-          const x = dim(f.at[0]), y = dim(f.at[1]), d = dim(f.diameter), depth = dim(f.depth)
-          // The plane the hole lies on: one of the three base planes, or a work plane a `plane` feature made (a tilted or a
-          // face plane). The hole goes into the part, against the plane's normal.
-          const P = planeFrame(f.plane, offset)
-          if (P === undefined) {
-            // A hole always subtracts: the bodies it cuts lose their exact model, no new body appears.
-            unsupported({ ...f, operation: "subtract" }, `a hole on the work plane '${f.plane}' has no exact model yet`)
-            break
-          }
-          const origin = {
-            x: P.origin.x + P.u.x * x + P.v.x * y,
-            y: P.origin.y + P.u.y * x + P.v.y * y,
-            z: P.origin.z + P.u.z * x + P.v.z * y
-          }
-          const e = 0.01
-          let profile: Vec2[]
-          if (f.kind === undefined || f.kind === "simple") profile = [{ x: 0, y: e }, { x: d / 2, y: e }, { x: d / 2, y: -depth }, { x: 0, y: -depth }]
-          else if (f.kind === "counterbore") {
-            const head = dim(f.headDiameter!), headDepth = dim(f.headDepth!)
-            profile = [{ x: 0, y: e }, { x: head / 2, y: e }, { x: head / 2, y: -headDepth }, { x: d / 2, y: -headDepth }, { x: d / 2, y: -depth }, { x: 0, y: -depth }]
-          } else {
-            const head = dim(f.headDiameter!)
-            const included = f.angle === undefined ? 90 : dim(f.angle)
-            const slope = Math.tan((included * Math.PI) / 360)
-            const coneDepth = (head / 2 - d / 2) / slope
-            profile = [{ x: 0, y: e }, { x: head / 2 + e * slope, y: e }, { x: d / 2, y: -coneDepth }, { x: d / 2, y: -depth }, { x: 0, y: -depth }]
-          }
-          const loop: ProfileLoop = profile.map((a, i) => ({ kind: "line", a, b: profile[(i + 1) % profile.length]! }) as const)
-          const tool = ok(revolveProfile({ loops: [loop] }, 2 * Math.PI, { origin, axis: P.n, radial: P.u, name: f.id }))
-          tools.set(f.id, { exact: [tool], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, tool, "subtract", f.targets, f.id)
-          break
-        }
-        case "mirror": {
-          const value = f.offset === undefined ? 0 : dim(f.offset)
-          const axis = f.plane === "XY" ? 2 : f.plane === "YZ" ? 0 : 1
-          const m = [axis === 0 ? -1 : 1, 0, 0, 0, axis === 1 ? -1 : 1, 0, 0, 0, axis === 2 ? -1 : 1] as const
-          const tr: Transform = { m, t: { x: axis === 0 ? 2 * value : 0, y: axis === 1 ? 2 * value : 0, z: axis === 2 ? 2 * value : 0 } }
-          if (f.bodies !== undefined) {
-            const chosen = bodies.filter((b) => f.bodies!.includes(b.id))
-            for (const b of chosen) {
-              const image: Exact = b.exact.brep === undefined ? b.exact : ok(transformBrep(b.exact.brep, tr))
-              if (f.join !== true) { bodies.push({ id: chosen.length === 1 ? f.id : `${f.id}#${b.id}`, feature: f.id, exact: image }); continue }
-              // The two halves of a symmetric part share their face on the mirror plane: sewn when the Boolean declines them.
-              let joined = boolean(b.exact, image, "union")
-              if (joined.brep === undefined && b.exact.brep !== undefined && image.brep !== undefined) {
-                const sewn = sewSolids(b.exact.brep, image.brep)
-                if (sewn !== undefined) joined = ok(sewn)
+          case "extrude": {
+            const sk = sketchOf(f.sketch)
+            if (sk === undefined) break
+            const depth = dim(f.depth)
+            // A draft angle leans the walls: the top profile is inset by depth * tan(angle), as the mesh's tapered prism.
+            const inset = f.taper === undefined ? 0 : depth * Math.tan((dim(f.taper) * Math.PI) / 180)
+            const dir = f.direction ?? "up"
+            const from = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
+            let { loops } = exactSketchLoops(sk.solve.sketch)
+            // Rounded or bevelled profile corners: exact tangent arcs or lines between the sketch's lines.
+            if (f.corner !== undefined) {
+              const size = dim(f.corner.size)
+              try {
+                loops = loops.map((l) => treatLoopCorners(l, f.corner!.style, size))
+              } catch (e) {
+                unsupported(f, e instanceof Error ? e.message : String(e))
+                break
               }
-              bodies[bodies.indexOf(b)] = { ...b, exact: joined }
             }
-            break
-          }
-          const source = tools.get(f.feature!)
-          if (source === undefined) break
-          const exact = source.exact.map((x) => (x.brep === undefined ? x : ok(transformBrep(x.brep, tr))))
-          tools.set(f.id, { exact, operation: source.operation, ...(source.targets !== undefined ? { targets: source.targets } : {}) })
-          const missing = exact.find((x) => x.brep === undefined)
-          apply(f.id, missing ?? ok(unionAll(exact.map((x) => x.brep!))), source.operation, source.targets, f.id)
-          break
-        }
-        case "primitive": {
-          const params: Record<string, number> = {}
-          for (const [k, v] of Object.entries(f.params ?? {})) params[k] = dim(v)
-          const at = (f.at ?? [0, 0, 0]).map(dim)
-          const outline = f.profile?.map(([x, y]) => ({ x: dim(x), y: dim(y) }))
-          const built = catalogueBrep(f.element, params, f.options ?? {}, { x: at[0]!, y: at[1]!, z: at[2]! }, outline)
-          let exact: Exact
-          if (typeof built === "string") exact = no(built)
-          else {
-            const turn = f.rotation?.map(dim)
-            exact = ok(turn === undefined || turn.every((a) => a === 0) ? built.brep : transformBrep(built.brep, gizmo(turn[0]!, turn[1]!, turn[2]!, built.centre)))
-          }
-          tools.set(f.id, { exact: [exact], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, exact, f.operation, f.targets, f.id)
-          break
-        }
-        case "move": {
-          const shift = f.translate?.map(dim)
-          let tr: Transform = { m: [1, 0, 0, 0, 1, 0, 0, 0, 1], t: { x: 0, y: 0, z: 0 } }
-          if (f.rotate !== undefined) {
-            const axis = f.rotate.axis === "x" ? { x: 1, y: 0, z: 0 } : f.rotate.axis === "y" ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 }
-            const about = f.rotate.about?.map(dim)
-            tr = rotation(axis, (dim(f.rotate.angle) * Math.PI) / 180, about === undefined ? { x: 0, y: 0, z: 0 } : { x: about[0]!, y: about[1]!, z: about[2]! })
-          }
-          if (shift !== undefined) tr = compose(tr, translation({ x: shift[0]!, y: shift[1]!, z: shift[2]! }))
-          transformTargets(f, tr, "", f.copy === true)
-          break
-        }
-        case "scale": {
-          const factors = (Array.isArray(f.factor) ? f.factor : [f.factor, f.factor, f.factor]).map((d) => dim(d as Dimension))
-          const about = f.about?.map(dim)
-          const centre = about === undefined ? { x: 0, y: 0, z: 0 } : { x: about[0]!, y: about[1]!, z: about[2]! }
-          const uniform = factors.every((v) => Math.abs(v - factors[0]!) < 1e-12)
-          const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
-          for (const b of chosen) {
-            if (b.exact.brep === undefined) continue
-            if (uniform) {
-              bodies[bodies.indexOf(b)] = { ...b, exact: ok(transformBrep(b.exact.brep, uniformScale(factors[0]!, centre))) }
-              continue
-            }
-            // A scale with three different factors is an affine map: the kernel has an exact image for planes, NURBS
-            // surfaces and cylinders along a coordinate axis, and refuses the rest with a reason.
-            const scaled = scaleBrep(b.exact.brep, { x: factors[0]!, y: factors[1]!, z: factors[2]! }, centre)
-            bodies[bodies.indexOf(b)] = { ...b, exact: typeof scaled === "string" ? no(scaled) : ok(scaled) }
-          }
-          break
-        }
-        case "split": {
-          const value = f.offset === undefined ? 0 : dim(f.offset)
-          const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
-          // The half-space on one side of the plane, as a box a little larger than the body (a huge box would coarsen the
-          // Boolean's size-relative tolerances).
-          const half = (body: Brep, above: boolean): Brep => {
-            const P = PLANES[f.plane]
-            const box = brepBox(body)
-            const big = 2 * Math.hypot(box.hi.x - box.lo.x, box.hi.y - box.lo.y, box.hi.z - box.lo.z) + 2 * Math.abs(value) + 1
-            const c = { x: (box.lo.x + box.hi.x) / 2, y: (box.lo.y + box.hi.y) / 2, z: (box.lo.z + box.hi.z) / 2 }
-            const cu = c.x * P.u.x + c.y * P.u.y + c.z * P.u.z, cv = c.x * P.v.x + c.y * P.v.y + c.z * P.v.z
-            const along = above ? value : value - big
-            const o = {
-              x: P.n.x * along + P.u.x * (cu - big) + P.v.x * (cv - big),
-              y: P.n.y * along + P.u.y * (cu - big) + P.v.y * (cv - big),
-              z: P.n.z * along + P.u.z * (cu - big) + P.v.z * (cv - big)
-            }
-            return makeBox(2 * big, 2 * big, big, frame(o, P.n, P.u))
-          }
-          for (const b of chosen) {
-            const kept = f.keep === "below" ? [false] : f.keep === "above" ? [true] : [true, false]
-            const parts = kept.map((above) => (b.exact.brep === undefined ? b.exact : boolean(b.exact, ok(half(b.exact.brep, above)), "intersect")))
-            bodies[bodies.indexOf(b)] = { ...b, exact: parts[0]! }
-            if (parts.length > 1) bodies.push({ id: `${f.id}:${b.id}:below`, feature: f.id, exact: parts[1]! })
-          }
-          break
-        }
-        case "combine": {
-          const target = bodies.find((b) => b.id === f.target)
-          if (target === undefined) break
-          const toolBodies = f.tools.map((id) => bodies.find((b) => b.id === id)!)
-          const op = f.operation === "join" ? "union" : f.operation === "cut" ? "subtract" : "intersect"
-          let exact = target.exact
-          for (const t of toolBodies) exact = boolean(exact, t.exact, op)
-          bodies[bodies.indexOf(target)] = { ...target, exact }
-          if (f.keepTools !== true) for (const t of toolBodies) bodies.splice(bodies.indexOf(t), 1)
-          break
-        }
-        case "pattern": {
-          const source = f.feature === undefined ? undefined : tools.get(f.feature)
-          if (f.feature !== undefined && source === undefined) break
-          const count = dim(f.count)
-          const placements: Array<{ tr: Transform; label: string }> = []
-          const emit = (tr: Transform, label: string) => placements.push({ tr, label })
-          if (f.kind === "grid") {
-            const rows = dim(f.countB!)
-            const a = (f.step ?? [0, 0, 0]).map(dim), bb = (f.stepB ?? [0, 0, 0]).map(dim)
-            for (let i = 0; i < count; i++) for (let j = 0; j < rows; j++) {
-              if (i === 0 && j === 0) continue
-              emit(translation({ x: a[0]! * i + bb[0]! * j, y: a[1]! * i + bb[1]! * j, z: a[2]! * i + bb[2]! * j }), `${f.id}#${i}.${j}`)
-            }
-          } else if (f.kind === "linear") {
-            const step = (f.step ?? [0, 0, 0]).map(dim)
-            for (let i = 1; i < count; i++) emit(translation({ x: step[0]! * i, y: step[1]! * i, z: step[2]! * i }), `${f.id}#${i}`)
-          } else if (f.kind === "path") {
-            const routeSketch = f.path === undefined ? undefined : sketchOf(f.path)
-            if (routeSketch === undefined) break
-            const { open } = sketchProfiles(routeSketch.solve.sketch)
-            if (open.length === 0) break
-            const chain = open[0]!
-            const F = routeSketch.frame
-            const at3 = (p: Vec2): Vec3 => ({ x: F.origin.x + F.u.x * p.x + F.v.x * p.y, y: F.origin.y + F.u.y * p.x + F.v.y * p.y, z: F.origin.z + F.u.z * p.x + F.v.z * p.y })
-            const segLens = chain.slice(1).map((p, i) => Math.hypot(p.x - chain[i]!.x, p.y - chain[i]!.y))
-            const total = segLens.reduce((a, b) => a + b, 0)
-            if (!(total > 0)) break
-            const sample = (s: number): { point: Vec2; angle: number } => {
-              let left = s
-              for (let i = 0; i < segLens.length; i++) {
-                const a = chain[i]!, b = chain[i + 1]!
-                if (left <= segLens[i]! || i === segLens.length - 1) {
-                  const t = segLens[i]! === 0 ? 0 : Math.min(1, Math.max(0, left / segLens[i]!))
-                  return { point: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, angle: Math.atan2(b.y - a.y, b.x - a.x) }
-                }
-                left -= segLens[i]!
-              }
-              return { point: chain[chain.length - 1]!, angle: 0 }
-            }
-            const startAngle = Math.atan2(chain[1]!.y - chain[0]!.y, chain[1]!.x - chain[0]!.x)
-            const p0 = at3(chain[0]!)
-            for (let i = 1; i < count; i++) {
-              const { point, angle } = sample((total * i) / (count - 1))
-              const pi = at3(point)
-              emit(compose(rotation(F.n, angle - startAngle, p0), translation({ x: pi.x - p0.x, y: pi.y - p0.y, z: pi.z - p0.z })), `${f.id}#${i}`)
-            }
-          } else {
-            const c = (f.centre ?? [0, 0]).map(dim)
-            const span = f.span === undefined ? 360 : dim(f.span)
-            const each = span >= 360 - 1e-9 ? span / count : span / (count - 1)
-            for (let i = 1; i < count; i++) emit(rotation({ x: 0, y: 0, z: 1 }, (each * i * Math.PI) / 180, { x: c[0]!, y: c[1]!, z: 0 }), `${f.id}#${i}`)
-          }
-          const moved = (x: Exact, tr: Transform): Exact => (x.brep === undefined ? x : ok(transformBrep(x.brep, tr)))
-          if (source === undefined) {
-            const chosen = bodies.filter((b) => f.bodies!.includes(b.id))
-            for (const b of chosen) for (const p of placements) bodies.push({ id: chosen.length === 1 ? p.label : `${p.label}:${b.id}`, feature: f.id, exact: moved(b.exact, p.tr) })
-            break
-          }
-          const base = source.exact.find((x) => x.brep === undefined) ?? ok(unionAll(source.exact.map((x) => x.brep!)))
-          const copies = placements.map((p) => ({ exact: moved(base, p.tr), label: p.label }))
-          // The mesh rebuild applies disjoint copies in one Boolean (one body label); the exact replay applies them one by one,
-          // which gives the same solid.
-          if (source.operation === "new") for (const c of copies) apply(f.id, c.exact, "new", source.targets, c.label)
-          else for (const c of copies) apply(f.id, c.exact, source.operation, source.targets, c.label)
-          break
-        }
-        case "fillet": {
-          // The mesh rebuild's selection (edges between faces meeting at 25 degrees or more, convex by default, rims only when
-          // `curved`) on the exact solid; an edge the exact blend fails on leaves the body without an exact model.
-          const style = f.style ?? "fillet"
-          const size = dim(f.radius)
-          // The chamfer's callout: the second setback, or the angle that fixes it.
-          const secondDistance = f.secondDistance === undefined ? undefined : dim(f.secondDistance)
-          const angle = f.angle === undefined ? undefined : dim(f.angle)
-          if (f.secondDistance !== undefined && secondDistance === undefined) break
-          if (f.angle !== undefined && angle === undefined) break
-          if (style === "fillet" && (secondDistance !== undefined || angle !== undefined)) {
-            unsupported(f, "a fillet has one radius: a second distance or an angle belongs to a chamfer")
-            break
-          }
-          if (secondDistance !== undefined && angle !== undefined) {
-            unsupported(f, "a chamfer takes either two distances or a distance and an angle, not both")
-            break
-          }
-          const chamfer = style === "chamfer" && (secondDistance !== undefined || angle !== undefined)
-            ? { ...(secondDistance !== undefined ? { secondDistance } : {}), ...(angle !== undefined ? { angle: angle * Math.PI / 180 } : {}) }
-            : undefined
-          const sel = f.edges
-          const selector = {
-            ...(sel?.parallel !== undefined ? { parallel: sel.parallel } : {}), ...(sel?.kind !== undefined ? { kind: sel.kind } : {}),
-            ...(sel?.minLength !== undefined ? { minLength: dim(sel.minLength) } : {}), ...(sel?.curved === true ? { curved: true } : {}),
-            ...(sel?.within !== undefined ? { within: { min: sel.within.min.map(dim) as [number, number, number], max: sel.within.max.map(dim) as [number, number, number] } } : {})
-          }
-          const radiusEnd = f.radiusEnd === undefined ? undefined : dim(f.radiusEnd)
-          if (f.radiusEnd !== undefined && radiusEnd === undefined) break
-          if (radiusEnd !== undefined && style !== "fillet") { unsupported(f, "a variable radius belongs to a fillet, not a chamfer"); break }
-          for (const b of bodies.filter((x) => f.targets === undefined || f.targets.includes(x.id))) {
-            if (b.exact.brep === undefined) continue
-            const picked = selectBlendEdges(blendCandidates(b.exact.brep, 25), selector)
-            if (picked.length === 0) continue
-            if (radiusEnd === undefined) {
-              const res = blendBrep(b.exact.brep, picked, size, style, chamfer === undefined ? {} : { chamfer })
-              for (const why of res.rejected.slice(0, 4)) warnings.push(`${f.id}: not blended: ${why}`)
-              bodies[bodies.indexOf(b)] = { ...b, exact: res.failures.length > 0 ? no(`exact ${style} failed: ${res.failures[0]}`) : ok(res.brep) }
-            } else {
-              // One edge at a time (each cut changes the edge indices), matched again by its end points on the current body;
-              // the radius runs from the lexicographically smaller end, as in the mesh rebuild.
-              let current = b.exact.brep
-              let failed: string | undefined
-              for (const want of picked) {
-                const flip = want.b.x < want.a.x || (want.b.x === want.a.x && (want.b.y < want.a.y || (want.b.y === want.a.y && want.b.z < want.a.z)))
-                const near = (p: { x: number; y: number; z: number }, q: { x: number; y: number; z: number }) => Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) < 1e-6
-                const cand = blendCandidates(current, 25).find((c) => (near(c.a, want.a) && near(c.b, want.b)) || (near(c.a, want.b) && near(c.b, want.a)))
-                if (cand === undefined) { failed = "a variable fillet edge was not found again after the previous cut"; break }
-                const sameWay = near(cand.a, want.a)
-                const rA = (flip !== !sameWay) ? radiusEnd : size
-                const rB = (flip !== !sameWay) ? size : radiusEnd
-                const res = variableFillet(current, cand, rA, rB)
-                if (res.rejected !== undefined) { failed = res.rejected; break }
-                current = res.brep
-              }
-              bodies[bodies.indexOf(b)] = { ...b, exact: failed !== undefined ? no(`exact variable fillet failed: ${failed}`) : ok(current) }
-            }
-          }
-          break
-        }
-        case "shell": {
-          // The mesh rebuild's cavity, exact: each region of the extrusion's profile moved inwards by the wall (its holes
-          // outwards), from a wall above the bottom to a wall below the top, or through an open end; then subtracted.
-          const ex = extrusions.get(f.feature)
-          const t = dim(f.thickness)
-          const open = f.open ?? "none"
-          const rev = revolutions.get(f.feature)
-          const sw = sweeps.get(f.feature)
-          if (ex === undefined && sw !== undefined) {
-            // The mesh's cavity: every loop moved by the wall (the outline in, the holes out), swept along the path shortened by
-            // the wall at a closed end and carried 1 mm past an open one.
-            let cavity: Brep
-            try {
-              const inner = sw.loops.map((l, i) => offsetLoop(l, i === 0 ? t : -t))
-              let pieces: ReadonlyArray<PathPiece> = sw.pieces, start = sw.start
-              if (!sw.closed) {
-                const s0 = open === "bottom" || open === "both" ? -1 : t, s1 = open === "top" || open === "both" ? -1 : t
-                const a = trimPathStart(pieces, s0, start)
-                if (typeof a === "string") throw new RangeError(a)
-                const b = trimPathStart(reversePath(a.pieces), s1, { x: { x: 0, y: 0, z: 1 }, y: { x: 0, y: 1, z: 0 } })
-                if (typeof b === "string") throw new RangeError(b)
-                pieces = reversePath(b.pieces); start = a.start
-                // An extension at the start turns nothing; a trim may have carried the frame round a bend.
-              }
-              cavity = sweepPath({ loops: inner }, start, pieces, { closed: sw.closed, name: `${f.id}.cavity` })
-            } catch (e) {
-              unsupported({ ...f, operation: "subtract" }, e instanceof Error ? e.message : String(e))
-              break
-            }
-            tools.set(f.id, { exact: [ok(cavity)], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-            apply(f.id, ok(cavity), "subtract", f.targets, f.id)
-            break
-          }
-          if (ex === undefined && rev !== undefined) {
-            if (!rev.full) { unsupported({ ...f, operation: "subtract" }, "only a full revolution (360 degrees) can be shelled"); break }
-            let cavity: Brep
-            try {
-              cavity = revolveProfile({ loops: [revolveShellLoop(rev.loop, t, open)] }, 2 * Math.PI, { origin: rev.origin, axis: rev.axis, radial: rev.radial, name: `${f.id}.cavity` })
-            } catch (e) {
-              unsupported({ ...f, operation: "subtract" }, e instanceof Error ? e.message : String(e))
-              break
-            }
-            tools.set(f.id, { exact: [ok(cavity)], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-            apply(f.id, ok(cavity), "subtract", f.targets, f.id)
-            break
-          }
-          if (ex === undefined) { unsupported({ ...f, operation: "subtract" }, `a shell of '${f.feature}' has no exact model yet (extrusions and full revolutions are shelled exactly)`); break }
-          const z0 = ex.from + (open === "bottom" || open === "both" ? -1 : t)
-          const z1 = ex.to + (open === "top" || open === "both" ? 1 : -t)
-          let cavity: Brep
-          try {
-            const at = (z: number) => frame({ x: ex.frame.origin.x + ex.frame.n.x * z, y: ex.frame.origin.y + ex.frame.n.y * z, z: ex.frame.origin.z + ex.frame.n.z * z }, ex.frame.n, ex.frame.u)
-            const pieces = profilesOfLoops(ex.loops).map((p) => {
-              const [outer, ...holes] = p.loops
-              let piece = extrudeProfile({ loops: [offsetLoop(outer!, t)] }, z1 - z0, { placement: at(z0), name: `${f.id}.cavity` })
-              for (const h of holes) piece = combine(piece, extrudeProfile({ loops: [offsetLoop(h, -t)] }, z1 - z0 + 2, { placement: at(z0 - 1), name: `${f.id}.wall` }), "subtract")
-              return piece
-            })
-            cavity = unionAll(pieces)
-          } catch (e) {
-            unsupported({ ...f, operation: "subtract" }, e instanceof Error ? e.message : String(e))
-            break
-          }
-          tools.set(f.id, { exact: [ok(cavity)], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, ok(cavity), "subtract", f.targets, f.id)
-          break
-        }
-        case "draft": {
-          // The face nearest `near` among the candidate bodies (the mesh rebuild's choice); a curved one leans by moving its
-          // vertices in the mesh rebuild, which has no exact counterpart yet. A named face is that face, and `near` is only a hint.
-          let near = { x: dim(f.near[0]), y: dim(f.near[1]), z: dim(f.near[2]) }
-          let hint = f.normal === undefined ? undefined : { x: dim(f.normal[0]), y: dim(f.normal[1]), z: dim(f.normal[2]) }
-          const raw = f.pull === undefined ? { x: 0, y: 0, z: 1 } : { x: dim(f.pull[0]), y: dim(f.pull[1]), z: dim(f.pull[2]) }
-          const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
-          let pool = candidates
-          if (f.name !== undefined) {
-            let named: { body: (typeof bodies)[number]; face: number } | undefined
-            for (const b of candidates) {
-              if (b.exact.brep === undefined) continue
-              const face = faceByName(b.exact.brep, f.name)
-              if (face !== undefined) { named = { body: b, face }; break }
-            }
-            if (named === undefined) {
-              for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no(`the face '${f.name}' does not exist any more`) }
-              break
-            }
-            near = faceCentre(named.body.exact.brep!, named.face)
-            hint = undefined
-            pool = [named.body]
-          }
-          let chosen: { body: (typeof bodies)[number]; distance: number; planar: boolean } | undefined
-          for (const b of pool) {
-            if (b.exact.brep === undefined) continue
-            const closest = brepLocator(b.exact.brep).closest(near)
-            const planar = closest.face !== undefined && b.exact.brep.faces[closest.face]!.surface.kind === "plane"
-            const pick = hint === undefined ? undefined : pickPlanarFace(b.exact.brep, near, hint)
-            const distance = pick?.distance ?? closest.distance
-            if (chosen === undefined || distance < chosen.distance) chosen = { body: b, distance, planar: hint !== undefined ? pick !== undefined : planar }
-          }
-          if (chosen === undefined) {
-            for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no("the drafted face could not be found on the exact model") }
-            break
-          }
-          const target = chosen.body
-          const len = Math.hypot(raw.x, raw.y, raw.z)
-          if (!chosen.planar) {
-            // The wall of a hole or the side of a boss along the pull is a cone (`brep/draft-curved.ts`); any other curved face keeps the mesh.
-            const cone = draftCurvedFace(target.exact.brep!, { near, pull: { x: raw.x / len, y: raw.y / len, z: raw.z / len }, neutral: f.neutral === undefined ? 0 : dim(f.neutral), angle: dim(f.angle) })
-            bodies[bodies.indexOf(target)] = { ...target, exact: typeof cone === "string" ? no(cone) : ok(cone) }
-            break
-          }
-          const drafted = draftPlanarFace(target.exact.brep!, { near, ...(hint !== undefined ? { normal: hint } : {}), pull: { x: raw.x / len, y: raw.y / len, z: raw.z / len }, neutral: f.neutral === undefined ? 0 : dim(f.neutral), angle: dim(f.angle) })
-          bodies[bodies.indexOf(target)] = { ...target, exact: typeof drafted === "string" ? no(drafted) : ok(drafted) }
-          break
-        }
-        case "plane": {
-          // Construction geometry: no body changes, but the frame it defines is what the holes, texts and threads on it use.
-          const d = f.from
-          let made: { readonly u: Vec3; readonly v: Vec3; readonly n: Vec3; readonly origin: Vec3 } | undefined
-          if (d.kind === "offset") {
-            const distance = dim(d.distance)
-            if (distance === undefined) break
-            made = planeFrame(d.base, distance)
-          } else if (d.kind === "angle") {
-            const angle = dim(d.angle), at = d.at === undefined ? 0 : dim(d.at)
-            const base = planeFrame(d.base, 0)
-            if (angle === undefined || at === undefined || base === undefined) break
-            const axis = d.about === "u" ? base.u : base.v
-            const across = d.about === "u" ? base.v : base.u
-            const turn = (vec: Vec3): Vec3 => {
-              const c = Math.cos((angle * Math.PI) / 180), sn = Math.sin((angle * Math.PI) / 180)
-              return add3(add3(scale3(vec, c), scale3(cross3(axis, vec), sn)), scale3(axis, dot3(axis, vec) * (1 - c)))
-            }
-            const origin = add3(base.origin, scale3(across, at))
-            made = d.about === "u" ? { u: base.u, v: turn(base.v), n: turn(base.n), origin } : { u: turn(base.u), v: base.v, n: turn(base.n), origin }
-          } else if (d.kind === "points") {
-            const raw = d.points.map((q) => q.map(dim))
-            if (raw.some((q) => q.some((v) => v === undefined))) break
-            const p = raw as ReadonlyArray<ReadonlyArray<number>>
-            const p1 = { x: p[0]![0]!, y: p[0]![1]!, z: p[0]![2]! }
-            const p2 = { x: p[1]![0]!, y: p[1]![1]!, z: p[1]![2]! }
-            const p3 = { x: p[2]![0]!, y: p[2]![1]!, z: p[2]![2]! }
-            const e1 = sub3(p2, p1), nn = cross3(e1, sub3(p3, p1))
-            if (length3(e1) < 1e-9 || length3(nn) < 1e-9) break
-            const u = normalize3(e1), n = normalize3(nn)
-            made = { u, v: cross3(n, u), n, origin: p1 }
-          } else {
-            // A face of a body: the nearest planar face to `near` (`normal` tells which side), square to it.
-            const nx = dim(d.near[0]), ny = dim(d.near[1]), nz = dim(d.near[2])
-            const hx = d.normal === undefined ? undefined : dim(d.normal[0])
-            const hy = d.normal === undefined ? undefined : dim(d.normal[1])
-            const hz = d.normal === undefined ? undefined : dim(d.normal[2])
-            const lift = d.offset === undefined ? 0 : dim(d.offset)
-            if (nx === undefined || ny === undefined || nz === undefined || lift === undefined) break
-            if (d.normal !== undefined && (hx === undefined || hy === undefined || hz === undefined)) break
-            const near = { x: nx, y: ny, z: nz }
-            const hint = hx === undefined || hy === undefined || hz === undefined ? undefined : { x: hx, y: hy, z: hz }
-            const candidates = bodies.filter((b) => d.body === undefined || b.id === d.body)
-            let best: { readonly frame: { readonly normal: Vec3; readonly centroid: Vec3; readonly u: Vec3; readonly v: Vec3 }; readonly distance: number } | undefined
-            for (const b of candidates) {
-              if (b.exact.brep === undefined) continue
-              const pick = pickPlanarFace(b.exact.brep, near, hint)
-              if (pick === undefined) continue
-              const found = planarFaceFrame(b.exact.brep, pick)
-              if (typeof found === "string") continue
-              if (best === undefined || pick.distance < best.distance) best = { frame: found, distance: pick.distance }
-            }
-            if (best === undefined) break
-            made = {
-              u: best.frame.u, v: best.frame.v, n: best.frame.normal,
-              origin: add3(best.frame.centroid, scale3(best.frame.normal, lift))
-            }
-          }
-          if (made !== undefined) planes.set(f.id, made)
-          break
-        }
-        case "sweep": {
-          const prof = sketchOf(f.profile), route = sketchOf(f.path)
-          if (prof === undefined || route === undefined) break
-          let path = exactSketchPath(route.solve.sketch, route.frame)
-          if (typeof path === "string") { unsupported(f, path); break }
-          const bend = f.bendRadius === undefined ? 0 : dim(f.bendRadius)
-          if (bend > 0 && !path.closed) {
-            const rounded = roundExactPath(path.pieces, bend)
-            if (typeof rounded === "string") { unsupported(f, rounded); break }
-            path = { pieces: rounded, closed: false }
-          }
-          // The mesh sweep carries the profile by its outer ring's vertex mean (the polygon `sketchProfiles` draws).
-          const { loops } = exactSketchLoops(prof.solve.sketch)
-          const polys = sketchProfiles(prof.solve.sketch).loops
-          if (polys.length === 0 || loops.length === 0) break
-          const outerPoly = polys.reduce((a, b) => (Math.abs(polygonArea(b)) > Math.abs(polygonArea(a)) ? b : a))
-          const c2 = { x: outerPoly.reduce((s, p) => s + p.x, 0) / outerPoly.length, y: outerPoly.reduce((s, p) => s + p.y, 0) / outerPoly.length }
-          const groups = profilesOfLoops(loops)
-          if (groups.length !== 1) { unsupported(f, "a sweep of several separate profiles has no exact model yet"); break }
-          const shift = (l: ProfileLoop): ProfileLoop => l.map((s): ProfileSegment => s.kind === "line" ? { kind: "line", a: { x: s.a.x - c2.x, y: s.a.y - c2.y }, b: { x: s.b.x - c2.x, y: s.b.y - c2.y } } : s.kind === "arc" ? { ...s, center: { x: s.center.x - c2.x, y: s.center.y - c2.y } } : s)
-          const profileLoops = groups[0]!.loops.map(shift)
-          const start = sweepStartFrame(prof.frame, pieceTangent(path.pieces[0]!, false))
-          let solid: Brep
-          try {
-            solid = sweepPath({ loops: profileLoops }, start, path.pieces, { closed: path.closed, name: f.id })
-          } catch (e) {
-            unsupported(f, e instanceof Error ? e.message : String(e))
-            break
-          }
-          sweeps.set(f.id, { loops: profileLoops, start, pieces: path.pieces, closed: path.closed })
-          tools.set(f.id, { exact: [ok(solid)], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, ok(solid), f.operation, f.targets, f.id)
-          break
-        }
-        case "loft": {
-          // Each section's largest loop (as the mesh rebuild lofts), started where the mesh's ring starts.
-          const sections: LoftSegment[][] = [], starts: Vec3[] = []
-          let reason: string | undefined
-          for (const id of f.sections) {
-            const sk = sketchOf(id)
-            if (sk === undefined) { reason = `section '${id}' is not available`; break }
-            const { loops } = exactSketchLoops(sk.solve.sketch)
-            const polys = sketchProfiles(sk.solve.sketch).loops
-            if (loops.length === 0 || polys.length === 0) { reason = `section '${id}' has no closed loop`; break }
+            // The rebuild already resolved the sketch's plane (base or work plane, offset applied).
             const F = sk.frame
-            const placed = { origin: F.origin, x: F.u, y: F.v, z: F.n }
-            const outer = loops.reduce((a, b) => (Math.abs(loopArea(b)) > Math.abs(loopArea(a)) ? b : a))
-            const first = polys.reduce((a, b) => (Math.abs(polygonArea(b)) > Math.abs(polygonArea(a)) ? b : a))[0]!
-            try { sections.push(loftSection(outer, placed)) } catch (e) { reason = e instanceof Error ? e.message : String(e); break }
-            starts.push({ x: F.origin.x + F.u.x * first.x + F.v.x * first.y, y: F.origin.y + F.u.y * first.x + F.v.y * first.y, z: F.origin.z + F.u.z * first.x + F.v.z * first.y })
-          }
-          if (reason !== undefined) { unsupported(f, reason); break }
-          let solid: Brep
-          try {
-            solid = loftBrep(sections, { smooth: f.smooth === true, starts, name: f.id })
-          } catch (e) {
-            unsupported(f, e instanceof Error ? e.message : String(e))
-            break
-          }
-          tools.set(f.id, { exact: [ok(solid)], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, ok(solid), f.operation, f.targets, f.id)
-          break
-        }
-        case "rib": {
-          const sk = sketchOf(f.sketch)
-          if (sk === undefined) break
-          const thickness = dim(f.thickness), depth = dim(f.depth)
-          if (!(thickness > 0 && depth > 0)) break
-          const { open } = sketchProfiles(sk.solve.sketch)
-          if (open.length === 0) break
-          const dir = f.direction ?? "up"
-          const from = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
-          const F = sk.frame
-          const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
-          let webs: Brep[]
-          try {
-            webs = open.map((line) => {
-              const ring = thickenPath(line, -thickness / 2, thickness / 2)
-              const loop: ProfileLoop = ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! }))
-              return extrudeProfile({ loops: [loop] }, depth, { placement, name: f.id })
-            })
-          } catch (e) {
-            unsupported(f, e instanceof Error ? e.message : String(e))
-            break
-          }
-          const tool = ok(unionAll(webs))
-          const operation = f.operation ?? "union"
-          tools.set(f.id, { exact: [tool], operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, tool, operation, f.targets, f.id)
-          break
-        }
-        case "sheet": {
-          const sk = sketchOf(f.sketch)
-          if (sk === undefined) break
-          const thickness = dim(f.thickness), width = dim(f.width)
-          const radius = f.bendRadius === undefined ? 0 : dim(f.bendRadius)
-          if (!(thickness > 0 && width > 0)) break
-          const { open } = sketchProfiles(sk.solve.sketch)
-          if (open.length !== 1) break
-          const side = f.side ?? "centre"
-          let line = open[0]!
-          if (f.hems !== undefined && f.hems.length > 0) {
-            const specs = f.hems.map((h) => ({ end: h.end, length: dim(h.length), gap: h.gap === undefined ? 0 : dim(h.gap), fold: h.fold ?? "left" as const }))
+            const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
+            let solids: Brep[]
             try {
-              line = withHems(cornersOf(line), thickness, specs)
+              solids = profilesOfLoops(loops).map((p) => extrudeProfile(p, depth, { placement, name: f.id, ...(inset !== 0 ? { inset } : {}) }))
             } catch (e) {
               unsupported(f, e instanceof Error ? e.message : String(e))
               break
             }
-          }
-          const dir = f.direction ?? "up"
-          const from = dir === "up" ? 0 : dir === "down" ? -width : -width / 2
-          const F = sk.frame
-          const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
-          let solid: Brep
-          let reliefs: ReturnType<typeof edgeFlangeReliefs> = []
-          try {
-            if (f.flanges !== undefined) {
-              if (f.flanges.some((flange) => f.hems?.some((hem) => hem.end === flange.end))) throw new RangeError("An edge cannot carry both a hem and an edge flange")
-              const resolved = f.flanges.map((flange) => ({ end: flange.end, length: dim(flange.length), angle: dim(flange.angle) * Math.PI / 180, ...(flange.relief !== undefined ? { relief: { width: dim(flange.relief.width), depth: dim(flange.relief.depth) } } : {}) }))
-              reliefs = edgeFlangeReliefs(cornersOf(line), thickness, width, radius, side, resolved)
-              line = withEdgeFlanges(cornersOf(line), resolved)
+            if (solids.length === 0) break
+            extrusions.set(f.id, { loops, frame: F, from, to: from + depth })
+            let united = unionAll(solids)
+            if (f.edge !== undefined) {
+              const treated = treatEndRims(united, f.id, f.edge.ends ?? "both", f.edge.holes === true, dim(f.edge.size), f.edge.style)
+              if (typeof treated === "string") { unsupported(f, treated); break }
+              united = treated
             }
-            const outline = sheetOutline(line, thickness, side, radius)
-            const loop: ProfileLoop = outline.map((a, i) => ({ kind: "line", a, b: outline[(i + 1) % outline.length]! }))
-            solid = extrudeProfile({ loops: [loop] }, width, { placement, name: f.id })
-            for (const relief of reliefs) for (const [z0, z1] of [[from - 1, from + relief.inset], [from + width - relief.inset, from + width + 1]]) {
-              const R = frame({ x: F.origin.x + F.n.x * z0!, y: F.origin.y + F.n.y * z0!, z: F.origin.z + F.n.z * z0! }, F.n, F.u)
-              const cut = extrudeProfile({ loops: [relief.outline.map((a, i) => ({ kind: "line" as const, a, b: relief.outline[(i + 1) % relief.outline.length]! }))] }, z1! - z0!, { placement: R })
-              solid = combine(solid, cut, "subtract")
+            const tool = ok(united)
+            tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, tool, f.operation, f.targets, f.id)
+            break
+          }
+          case "revolve": {
+            const sk = sketchOf(f.sketch)
+            if (sk === undefined) break
+            const degrees = f.angle === undefined ? 360 : dim(f.angle)
+            const { loops } = exactSketchLoops(sk.solve.sketch)
+            if (loops.length !== 1) break
+            let a0: Vec2, dirA: Vec2
+            if (f.axis === "x") { a0 = { x: 0, y: 0 }; dirA = { x: 1, y: 0 } }
+            else if (f.axis === "y") { a0 = { x: 0, y: 0 }; dirA = { x: 0, y: 1 } }
+            else {
+              const axisId = f.axis.line
+              const line = sk.solve.sketch.entities.find((e) => e.id === axisId && e.kind === "line")
+              if (line === undefined || line.kind !== "line") break
+              const pts = new Map(sk.solve.sketch.entities.flatMap((e) => (e.kind === "point" ? [[e.id, e] as const] : [])))
+              const p1 = pts.get(line.p1)!, p2 = pts.get(line.p2)!
+              const len = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+              a0 = { x: p1.x, y: p1.y }
+              dirA = { x: (p2.x - p1.x) / len, y: (p2.y - p1.y) / len }
             }
-          } catch (e) {
-            unsupported(f, e instanceof Error ? e.message : String(e))
+            // The axis line itself may be an edge of the profile; drop it from the loop only if it is not.
+            const side = (d: Vec2, p: Vec2) => (p.x - a0.x) * -d.y + (p.y - a0.y) * d.x
+            const loop0 = loops[0]!
+            const samples = loop0.flatMap((s) => [segmentPoint(s, 0), segmentPoint(s, 0.5)])
+            if (samples.every((p) => side(dirA, p) <= 1e-6)) dirA = { x: -dirA.x, y: -dirA.y }
+            const n2 = { x: -dirA.y, y: dirA.x }
+            // (radial, axial) coordinates are a reflection of the sketch's: arcs change their sense.
+            const mapped = mapProfileLoop(loop0, [n2.x, n2.y, dirA.x, dirA.y], { x: -a0.x * n2.x - a0.y * n2.y, y: -a0.x * dirA.x - a0.y * dirA.y })
+            const P = sk.frame
+            const w = (p: Vec2): Vec3 => ({ x: P.origin.x + P.u.x * p.x + P.v.x * p.y, y: P.origin.y + P.u.y * p.x + P.v.y * p.y, z: P.origin.z + P.u.z * p.x + P.v.z * p.y })
+            const o3 = w(a0)
+            const d3 = { x: P.u.x * dirA.x + P.v.x * dirA.y, y: P.u.y * dirA.x + P.v.y * dirA.y, z: P.u.z * dirA.x + P.v.z * dirA.y }
+            const r3 = { x: P.u.x * n2.x + P.v.x * n2.y, y: P.u.y * n2.x + P.v.y * n2.y, z: P.u.z * n2.x + P.v.z * n2.y }
+            normalizeProfile({ loops: [mapped] })
+            const brep = revolveProfile({ loops: [mapped] }, (degrees * Math.PI) / 180, { origin: o3, axis: d3, radial: r3, name: f.id })
+            revolutions.set(f.id, { loop: mapped, full: degrees >= 360 - 1e-9, origin: o3, axis: d3, radial: r3 })
+            const tool = ok(brep)
+            tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, tool, f.operation, f.targets, f.id)
             break
           }
-          const tool = ok(solid)
-          tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, tool, f.operation, f.targets, f.id)
-          break
-        }
-        case "text": {
-          const height = dim(f.height), depth = dim(f.depth)
-          const stroke = f.strokeWidth === undefined ? undefined : dim(f.strokeWidth)
-          const offset = f.offset === undefined ? 0 : dim(f.offset)
-          const at = f.at === undefined ? [0, 0] : [dim(f.at[0]), dim(f.at[1])]
-          const spacing = f.spacing === undefined ? 1 : dim(f.spacing)
-          if (!(height > 0 && depth > 0) || f.text.trim().length === 0 || f.text.length > 200) break
-          let bars: ReturnType<typeof textBars>["bars"]
-          try {
-            bars = textBars({ text: f.text, height, strokeWidth: stroke ?? height / 9, depth, spacing, align: f.align ?? "left" }).bars
-          } catch (e) {
-            unsupported(f, e instanceof Error ? e.message : String(e))
-            break
-          }
-          if (bars.length === 0) break
-          const P = planeFrame(f.plane, offset)
-          if (P === undefined) { unsupported(f, `a text on the work plane '${f.plane}' has no exact model yet`); break }
-          const dir = f.direction ?? "up"
-          const z0 = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
-          const origin = {
-            x: P.origin.x + P.u.x * at[0]! + P.v.x * at[1]! + P.n.x * z0,
-            y: P.origin.y + P.u.y * at[0]! + P.v.y * at[1]! + P.n.y * z0,
-            z: P.origin.z + P.u.z * at[0]! + P.v.z * at[1]! + P.n.z * z0
-          }
-          const placement = frame(origin, P.n, P.u)
-          let solid: Brep
-          try {
-            const pieces = bars.map((ring) => {
-              const loop: ProfileLoop = ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! }))
-              return extrudeProfile({ loops: [loop] }, depth, { placement, name: f.id })
-            })
-            solid = pieces.slice(1).reduce((acc, p) => {
-              try { return combine(acc, p, "union") } catch { return mergeBreps([acc, p]) }
-            }, pieces[0]!)
-          } catch (e) {
-            unsupported(f, e instanceof Error ? e.message : String(e))
-            break
-          }
-          const tool = ok(solid)
-          tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, tool, f.operation, f.targets, f.id)
-          break
-        }
-        case "coil": {
-          const radius = dim(f.radius), pitch = dim(f.pitch), turns = dim(f.turns), wire = dim(f.wireDiameter)
-          const cx = f.centre === undefined ? 0 : dim(f.centre[0]), cy = f.centre === undefined ? 0 : dim(f.centre[1])
-          const z0 = f.offset === undefined ? 0 : dim(f.offset)
-          if (!(wire > 0 && radius > 0 && pitch > 0 && turns > 0) || !(radius > wire / 2 + 1e-9) || !(pitch > wire + 1e-9)) break
-          const g = coilGeometry({ cx, cy, z0, radius, pitch, turns, wire, square: f.section === "square", left: f.handedness === "left" })
-          const pieces: PathPiece[] = g.path.slice(1).map((b, i) => ({ kind: "line", a: g.path[i]!, b }))
-          // The wire profile is the polygon `coilGeometry` cuts the mesh from: a true helicoid is not an analytic
-          // surface of this kernel, so the exact coil carries the same chords and says so by construction.
-          const loop: ProfileLoop = g.ring2d.map((a, i) => ({ kind: "line", a, b: g.ring2d[(i + 1) % g.ring2d.length]! }))
-          const t = g.normal, radial = { x: 1, y: 0, z: 0 }
-          const binormal = { x: t.y * radial.z - t.z * radial.y, y: t.z * radial.x - t.x * radial.z, z: t.x * radial.y - t.y * radial.x }
-          const start = sweepStartFrame({ origin: g.centre, u: radial, v: binormal, n: t }, pieceTangent(pieces[0]!, false))
-          let solid: Brep
-          try {
-            solid = sweepPath({ loops: [loop] }, start, pieces, { closed: false, name: f.id })
-          } catch (e) {
-            unsupported(f, e instanceof Error ? e.message : String(e))
-            break
-          }
-          const tool = ok(solid)
-          tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, tool, f.operation, f.targets, f.id)
-          break
-        }
-        case "thread": {
-          const diameter = dim(f.diameter), pitch = dim(f.pitch), length = dim(f.length)
-          const cx = f.at === undefined ? 0 : dim(f.at[0]), cy = f.at === undefined ? 0 : dim(f.at[1])
-          const z0 = f.offset === undefined ? 0 : dim(f.offset)
-          const operation = f.cut === true ? "subtract" : f.operation ?? (f.kind === "internal" ? "subtract" : "new")
-          const spec = { diameter, pitch, length, internal: f.kind === "internal", left: f.handedness === "left", cx, cy, z0 }
-          // The mesh rebuild reports a thread that cannot be built (and a cut that is wrong); the exact one only has to follow it.
-          if (threadProblem(spec) !== undefined || (f.cut === true && (f.kind === "internal" || (f.operation !== undefined && f.operation !== "subtract")))) break
-          // Built along Z, then carried to the axis: x runs on the YZ frame, y on ZX (the mesh rebuild's `place`).
-          const e = { x: { x: 1, y: 0, z: 0 }, y: { x: 0, y: 1, z: 0 }, z: { x: 0, y: 0, z: 1 } }
-          const [u, v, n] = f.axis === "x" ? [e.y, e.z, e.x] : f.axis === "y" ? [e.z, e.x, e.y] : [e.x, e.y, e.z]
-          const place = (p: { x: number; y: number; z: number }) => ({ x: u.x * p.x + v.x * p.y + n.x * p.z, y: u.y * p.x + v.y * p.y + n.y * p.z, z: u.z * p.x + v.z * p.y + n.z * p.z })
-          let solid: Brep
-          try {
-            solid = f.cut === true ? makeThreadGrooveBrep(spec, place) : makeThreadBrep(spec, place)
-          } catch (e2) {
-            unsupported({ ...f, operation }, e2 instanceof Error ? e2.message : String(e2))
-            break
-          }
-          const tool = ok(solid)
-          tools.set(f.id, { exact: [tool], operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
-          apply(f.id, tool, operation, f.targets, f.id)
-          break
-        }
-        case "pushpull": {
-          const distance = dim(f.distance)
-          if (distance === 0) break
-          const near = { x: dim(f.near[0]), y: dim(f.near[1]), z: dim(f.near[2]) }
-          const hint = f.normal === undefined ? undefined : { x: dim(f.normal[0]), y: dim(f.normal[1]), z: dim(f.normal[2]) }
-          const query = { near, ...(hint !== undefined ? { normal: hint } : {}) }
-          const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
-          // A named face is the one that is moved: the point it was authored with may be stale after an edit, and a name
-          // that no longer exists is reported rather than replaced by a nearby face.
-          if (f.name !== undefined) {
-            let target: { body: (typeof bodies)[number]; face: number } | undefined
-            for (const b of candidates) {
-              if (b.exact.brep === undefined) continue
-              const face = faceByName(b.exact.brep, f.name)
-              if (face !== undefined) { target = { body: b, face }; break }
-            }
-            if (target === undefined) {
-              for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no(`the face '${f.name}' does not exist any more`) }
+          case "hole": {
+            const offset = f.offset === undefined ? 0 : dim(f.offset)
+            const x = dim(f.at[0]), y = dim(f.at[1]), d = dim(f.diameter), depth = dim(f.depth)
+            // The plane the hole lies on: one of the three base planes, or a work plane a `plane` feature made (a tilted or a
+            // face plane). The hole goes into the part, against the plane's normal.
+            const P = planeFrame(f.plane, offset)
+            if (P === undefined) {
+              // A hole always subtracts: the bodies it cuts lose their exact model, no new body appears.
+              unsupported({ ...f, operation: "subtract" }, `a hole on the work plane '${f.plane}' has no exact model yet`)
               break
             }
-            const pushed = pushPullFace(target.body.exact.brep!, { ...query, distance, face: target.face })
-            bodies[bodies.indexOf(target.body)] = { ...target.body, exact: typeof pushed === "string" ? no(pushed) : ok(pushed) }
+            const origin = {
+              x: P.origin.x + P.u.x * x + P.v.x * y,
+              y: P.origin.y + P.u.y * x + P.v.y * y,
+              z: P.origin.z + P.u.z * x + P.v.z * y
+            }
+            const e = 0.01
+            let profile: Vec2[]
+            if (f.kind === undefined || f.kind === "simple") profile = [{ x: 0, y: e }, { x: d / 2, y: e }, { x: d / 2, y: -depth }, { x: 0, y: -depth }]
+            else if (f.kind === "counterbore") {
+              const head = dim(f.headDiameter!), headDepth = dim(f.headDepth!)
+              profile = [{ x: 0, y: e }, { x: head / 2, y: e }, { x: head / 2, y: -headDepth }, { x: d / 2, y: -headDepth }, { x: d / 2, y: -depth }, { x: 0, y: -depth }]
+            } else {
+              const head = dim(f.headDiameter!)
+              const included = f.angle === undefined ? 90 : dim(f.angle)
+              const slope = Math.tan((included * Math.PI) / 360)
+              const coneDepth = (head / 2 - d / 2) / slope
+              profile = [{ x: 0, y: e }, { x: head / 2 + e * slope, y: e }, { x: d / 2, y: -coneDepth }, { x: d / 2, y: -depth }, { x: 0, y: -depth }]
+            }
+            const loop: ProfileLoop = profile.map((a, i) => ({ kind: "line", a, b: profile[(i + 1) % profile.length]! }) as const)
+            const tool = ok(revolveProfile({ loops: [loop] }, 2 * Math.PI, { origin, axis: P.n, radial: P.u, name: f.id }))
+            tools.set(f.id, { exact: [tool], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, tool, "subtract", f.targets, f.id)
             break
           }
-          // The body whose face is nearest (the mesh rebuild's choice); a body without an exact model could have been it.
-          if (candidates.length > 1 && candidates.some((b) => b.exact.brep === undefined)) {
-            for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no("the pushed face may lie on a body without an exact model") }
+          case "mirror": {
+            const value = f.offset === undefined ? 0 : dim(f.offset)
+            const axis = f.plane === "XY" ? 2 : f.plane === "YZ" ? 0 : 1
+            const m = [axis === 0 ? -1 : 1, 0, 0, 0, axis === 1 ? -1 : 1, 0, 0, 0, axis === 2 ? -1 : 1] as const
+            const tr: Transform = { m, t: { x: axis === 0 ? 2 * value : 0, y: axis === 1 ? 2 * value : 0, z: axis === 2 ? 2 * value : 0 } }
+            if (f.bodies !== undefined) {
+              const chosen = bodies.filter((b) => f.bodies!.includes(b.id))
+              for (const b of chosen) {
+                const image: Exact = b.exact.brep === undefined ? b.exact : ok(transformBrep(b.exact.brep, tr))
+                if (f.join !== true) { bodies.push({ id: chosen.length === 1 ? f.id : `${f.id}#${b.id}`, feature: f.id, exact: image }); continue }
+                // The two halves of a symmetric part share their face on the mirror plane: sewn when the Boolean declines them.
+                let joined = boolean(b.exact, image, "union")
+                if (joined.brep === undefined && b.exact.brep !== undefined && image.brep !== undefined) {
+                  const sewn = sewSolids(b.exact.brep, image.brep)
+                  if (sewn !== undefined) joined = ok(sewn)
+                }
+                bodies[bodies.indexOf(b)] = { ...b, exact: joined }
+              }
+              break
+            }
+            const source = tools.get(f.feature!)
+            if (source === undefined) break
+            const exact = source.exact.map((x) => (x.brep === undefined ? x : ok(transformBrep(x.brep, tr))))
+            tools.set(f.id, { exact, operation: source.operation, ...(source.targets !== undefined ? { targets: source.targets } : {}) })
+            const missing = exact.find((x) => x.brep === undefined)
+            apply(f.id, missing ?? ok(unionAll(exact.map((x) => x.brep!))), source.operation, source.targets, f.id)
             break
           }
-          let chosen: { body: (typeof bodies)[number]; distance: number } | undefined
-          for (const b of candidates) {
-            if (b.exact.brep === undefined) continue
-            const found = nearestFace(b.exact.brep, query)
-            if (found === undefined) continue
-            const d = "pick" in found ? found.pick.distance : found.distance
-            if (chosen === undefined || d < chosen.distance) chosen = { body: b, distance: d }
+          case "primitive": {
+            const params: Record<string, number> = {}
+            for (const [k, v] of Object.entries(f.params ?? {})) params[k] = dim(v)
+            const at = (f.at ?? [0, 0, 0]).map(dim)
+            const outline = f.profile?.map(([x, y]) => ({ x: dim(x), y: dim(y) }))
+            const built = catalogueBrep(f.element, params, f.options ?? {}, { x: at[0]!, y: at[1]!, z: at[2]! }, outline)
+            let exact: Exact
+            if (typeof built === "string") exact = no(built)
+            else {
+              const turn = f.rotation?.map(dim)
+              exact = ok(turn === undefined || turn.every((a) => a === 0) ? built.brep : transformBrep(built.brep, gizmo(turn[0]!, turn[1]!, turn[2]!, built.centre)))
+            }
+            tools.set(f.id, { exact: [exact], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, exact, f.operation, f.targets, f.id)
+            break
           }
-          if (chosen === undefined) break
-          const pushed = pushPullFace(chosen.body.exact.brep!, { ...query, distance })
-          bodies[bodies.indexOf(chosen.body)] = { ...chosen.body, exact: typeof pushed === "string" ? no(pushed) : ok(pushed) }
+          case "move": {
+            const shift = f.translate?.map(dim)
+            let tr: Transform = { m: [1, 0, 0, 0, 1, 0, 0, 0, 1], t: { x: 0, y: 0, z: 0 } }
+            if (f.rotate !== undefined) {
+              const axis = f.rotate.axis === "x" ? { x: 1, y: 0, z: 0 } : f.rotate.axis === "y" ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 }
+              const about = f.rotate.about?.map(dim)
+              tr = rotation(axis, (dim(f.rotate.angle) * Math.PI) / 180, about === undefined ? { x: 0, y: 0, z: 0 } : { x: about[0]!, y: about[1]!, z: about[2]! })
+            }
+            if (shift !== undefined) tr = compose(tr, translation({ x: shift[0]!, y: shift[1]!, z: shift[2]! }))
+            transformTargets(f, tr, "", f.copy === true)
+            break
+          }
+          case "scale": {
+            const factors = (Array.isArray(f.factor) ? f.factor : [f.factor, f.factor, f.factor]).map((d) => dim(d as Dimension))
+            const about = f.about?.map(dim)
+            const centre = about === undefined ? { x: 0, y: 0, z: 0 } : { x: about[0]!, y: about[1]!, z: about[2]! }
+            const uniform = factors.every((v) => Math.abs(v - factors[0]!) < 1e-12)
+            const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
+            for (const b of chosen) {
+              if (b.exact.brep === undefined) continue
+              if (uniform) {
+                bodies[bodies.indexOf(b)] = { ...b, exact: ok(transformBrep(b.exact.brep, uniformScale(factors[0]!, centre))) }
+                continue
+              }
+              // A scale with three different factors is an affine map: the kernel has an exact image for planes, NURBS
+              // surfaces and cylinders along a coordinate axis, and refuses the rest with a reason.
+              const scaled = scaleBrep(b.exact.brep, { x: factors[0]!, y: factors[1]!, z: factors[2]! }, centre)
+              bodies[bodies.indexOf(b)] = { ...b, exact: typeof scaled === "string" ? no(scaled) : ok(scaled) }
+            }
+            break
+          }
+          case "split": {
+            const value = f.offset === undefined ? 0 : dim(f.offset)
+            const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
+            // The half-space on one side of the plane, as a box a little larger than the body (a huge box would coarsen the
+            // Boolean's size-relative tolerances).
+            const half = (body: Brep, above: boolean): Brep => {
+              const P = PLANES[f.plane]
+              const box = brepBox(body)
+              const big = 2 * Math.hypot(box.hi.x - box.lo.x, box.hi.y - box.lo.y, box.hi.z - box.lo.z) + 2 * Math.abs(value) + 1
+              const c = { x: (box.lo.x + box.hi.x) / 2, y: (box.lo.y + box.hi.y) / 2, z: (box.lo.z + box.hi.z) / 2 }
+              const cu = c.x * P.u.x + c.y * P.u.y + c.z * P.u.z, cv = c.x * P.v.x + c.y * P.v.y + c.z * P.v.z
+              const along = above ? value : value - big
+              const o = {
+                x: P.n.x * along + P.u.x * (cu - big) + P.v.x * (cv - big),
+                y: P.n.y * along + P.u.y * (cu - big) + P.v.y * (cv - big),
+                z: P.n.z * along + P.u.z * (cu - big) + P.v.z * (cv - big)
+              }
+              return makeBox(2 * big, 2 * big, big, frame(o, P.n, P.u))
+            }
+            for (const b of chosen) {
+              const kept = f.keep === "below" ? [false] : f.keep === "above" ? [true] : [true, false]
+              const parts = kept.map((above) => (b.exact.brep === undefined ? b.exact : boolean(b.exact, ok(half(b.exact.brep, above)), "intersect")))
+              bodies[bodies.indexOf(b)] = { ...b, exact: parts[0]! }
+              if (parts.length > 1) bodies.push({ id: `${f.id}:${b.id}:below`, feature: f.id, exact: parts[1]! })
+            }
+            break
+          }
+          case "combine": {
+            const target = bodies.find((b) => b.id === f.target)
+            if (target === undefined) break
+            const toolBodies = f.tools.map((id) => bodies.find((b) => b.id === id)!)
+            const op = f.operation === "join" ? "union" : f.operation === "cut" ? "subtract" : "intersect"
+            let exact = target.exact
+            for (const t of toolBodies) exact = boolean(exact, t.exact, op)
+            bodies[bodies.indexOf(target)] = { ...target, exact }
+            if (f.keepTools !== true) for (const t of toolBodies) bodies.splice(bodies.indexOf(t), 1)
+            break
+          }
+          case "pattern": {
+            const source = f.feature === undefined ? undefined : tools.get(f.feature)
+            if (f.feature !== undefined && source === undefined) break
+            const count = dim(f.count)
+            const placements: Array<{ tr: Transform; label: string }> = []
+            const emit = (tr: Transform, label: string) => placements.push({ tr, label })
+            if (f.kind === "grid") {
+              const rows = dim(f.countB!)
+              const a = (f.step ?? [0, 0, 0]).map(dim), bb = (f.stepB ?? [0, 0, 0]).map(dim)
+              for (let i = 0; i < count; i++) for (let j = 0; j < rows; j++) {
+                if (i === 0 && j === 0) continue
+                emit(translation({ x: a[0]! * i + bb[0]! * j, y: a[1]! * i + bb[1]! * j, z: a[2]! * i + bb[2]! * j }), `${f.id}#${i}.${j}`)
+              }
+            } else if (f.kind === "linear") {
+              const step = (f.step ?? [0, 0, 0]).map(dim)
+              for (let i = 1; i < count; i++) emit(translation({ x: step[0]! * i, y: step[1]! * i, z: step[2]! * i }), `${f.id}#${i}`)
+            } else if (f.kind === "path") {
+              const routeSketch = f.path === undefined ? undefined : sketchOf(f.path)
+              if (routeSketch === undefined) break
+              const { open } = sketchProfiles(routeSketch.solve.sketch)
+              if (open.length === 0) break
+              const chain = open[0]!
+              const F = routeSketch.frame
+              const at3 = (p: Vec2): Vec3 => ({ x: F.origin.x + F.u.x * p.x + F.v.x * p.y, y: F.origin.y + F.u.y * p.x + F.v.y * p.y, z: F.origin.z + F.u.z * p.x + F.v.z * p.y })
+              const segLens = chain.slice(1).map((p, i) => Math.hypot(p.x - chain[i]!.x, p.y - chain[i]!.y))
+              const total = segLens.reduce((a, b) => a + b, 0)
+              if (!(total > 0)) break
+              const sample = (s: number): { point: Vec2; angle: number } => {
+                let left = s
+                for (let i = 0; i < segLens.length; i++) {
+                  const a = chain[i]!, b = chain[i + 1]!
+                  if (left <= segLens[i]! || i === segLens.length - 1) {
+                    const t = segLens[i]! === 0 ? 0 : Math.min(1, Math.max(0, left / segLens[i]!))
+                    return { point: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, angle: Math.atan2(b.y - a.y, b.x - a.x) }
+                  }
+                  left -= segLens[i]!
+                }
+                return { point: chain[chain.length - 1]!, angle: 0 }
+              }
+              const startAngle = Math.atan2(chain[1]!.y - chain[0]!.y, chain[1]!.x - chain[0]!.x)
+              const p0 = at3(chain[0]!)
+              for (let i = 1; i < count; i++) {
+                const { point, angle } = sample((total * i) / (count - 1))
+                const pi = at3(point)
+                emit(compose(rotation(F.n, angle - startAngle, p0), translation({ x: pi.x - p0.x, y: pi.y - p0.y, z: pi.z - p0.z })), `${f.id}#${i}`)
+              }
+            } else {
+              const c = (f.centre ?? [0, 0]).map(dim)
+              const span = f.span === undefined ? 360 : dim(f.span)
+              const each = span >= 360 - 1e-9 ? span / count : span / (count - 1)
+              for (let i = 1; i < count; i++) emit(rotation({ x: 0, y: 0, z: 1 }, (each * i * Math.PI) / 180, { x: c[0]!, y: c[1]!, z: 0 }), `${f.id}#${i}`)
+            }
+            const moved = (x: Exact, tr: Transform): Exact => (x.brep === undefined ? x : ok(transformBrep(x.brep, tr)))
+            if (source === undefined) {
+              const chosen = bodies.filter((b) => f.bodies!.includes(b.id))
+              for (const b of chosen) for (const p of placements) bodies.push({ id: chosen.length === 1 ? p.label : `${p.label}:${b.id}`, feature: f.id, exact: moved(b.exact, p.tr) })
+              break
+            }
+            const base = source.exact.find((x) => x.brep === undefined) ?? ok(unionAll(source.exact.map((x) => x.brep!)))
+            const copies = placements.map((p) => ({ exact: moved(base, p.tr), label: p.label }))
+            // The mesh rebuild applies disjoint copies in one Boolean (one body label); the exact replay applies them one by one,
+            // which gives the same solid.
+            if (source.operation === "new") for (const c of copies) apply(f.id, c.exact, "new", source.targets, c.label)
+            else for (const c of copies) apply(f.id, c.exact, source.operation, source.targets, c.label)
+            break
+          }
+          case "fillet": {
+            // The mesh rebuild's selection (edges between faces meeting at 25 degrees or more, convex by default, rims only when
+            // `curved`) on the exact solid; an edge the exact blend fails on leaves the body without an exact model.
+            const style = f.style ?? "fillet"
+            const size = dim(f.radius)
+            // The chamfer's callout: the second setback, or the angle that fixes it.
+            const secondDistance = f.secondDistance === undefined ? undefined : dim(f.secondDistance)
+            const angle = f.angle === undefined ? undefined : dim(f.angle)
+            if (f.secondDistance !== undefined && secondDistance === undefined) break
+            if (f.angle !== undefined && angle === undefined) break
+            if (style === "fillet" && (secondDistance !== undefined || angle !== undefined)) {
+              unsupported(f, "a fillet has one radius: a second distance or an angle belongs to a chamfer")
+              break
+            }
+            if (secondDistance !== undefined && angle !== undefined) {
+              unsupported(f, "a chamfer takes either two distances or a distance and an angle, not both")
+              break
+            }
+            const chamfer = style === "chamfer" && (secondDistance !== undefined || angle !== undefined)
+              ? { ...(secondDistance !== undefined ? { secondDistance } : {}), ...(angle !== undefined ? { angle: angle * Math.PI / 180 } : {}) }
+              : undefined
+            const sel = f.edges
+            const selector = {
+              ...(sel?.parallel !== undefined ? { parallel: sel.parallel } : {}), ...(sel?.kind !== undefined ? { kind: sel.kind } : {}),
+              ...(sel?.minLength !== undefined ? { minLength: dim(sel.minLength) } : {}), ...(sel?.curved === true ? { curved: true } : {}),
+              ...(sel?.within !== undefined ? { within: { min: sel.within.min.map(dim) as [number, number, number], max: sel.within.max.map(dim) as [number, number, number] } } : {})
+            }
+            const radiusEnd = f.radiusEnd === undefined ? undefined : dim(f.radiusEnd)
+            if (f.radiusEnd !== undefined && radiusEnd === undefined) break
+            if (radiusEnd !== undefined && style !== "fillet") { unsupported(f, "a variable radius belongs to a fillet, not a chamfer"); break }
+            for (const b of bodies.filter((x) => f.targets === undefined || f.targets.includes(x.id))) {
+              if (b.exact.brep === undefined) continue
+              const picked = selectBlendEdges(blendCandidates(b.exact.brep, 25), selector)
+              if (picked.length === 0) continue
+              if (radiusEnd === undefined) {
+                const res = blendBrep(b.exact.brep, picked, size, style, chamfer === undefined ? {} : { chamfer })
+                for (const why of res.rejected.slice(0, 4)) warnings.push(`${f.id}: not blended: ${why}`)
+                bodies[bodies.indexOf(b)] = { ...b, exact: res.failures.length > 0 ? no(`exact ${style} failed: ${res.failures[0]}`) : ok(res.brep) }
+              } else {
+                // One edge at a time (each cut changes the edge indices), matched again by its end points on the current body;
+                // the radius runs from the lexicographically smaller end, as in the mesh rebuild.
+                let current = b.exact.brep
+                let failed: string | undefined
+                for (const want of picked) {
+                  const flip = want.b.x < want.a.x || (want.b.x === want.a.x && (want.b.y < want.a.y || (want.b.y === want.a.y && want.b.z < want.a.z)))
+                  const near = (p: { x: number; y: number; z: number }, q: { x: number; y: number; z: number }) => Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) < 1e-6
+                  const cand = blendCandidates(current, 25).find((c) => (near(c.a, want.a) && near(c.b, want.b)) || (near(c.a, want.b) && near(c.b, want.a)))
+                  if (cand === undefined) { failed = "a variable fillet edge was not found again after the previous cut"; break }
+                  const sameWay = near(cand.a, want.a)
+                  const rA = (flip !== !sameWay) ? radiusEnd : size
+                  const rB = (flip !== !sameWay) ? size : radiusEnd
+                  const res = variableFillet(current, cand, rA, rB)
+                  if (res.rejected !== undefined) { failed = res.rejected; break }
+                  current = res.brep
+                }
+                bodies[bodies.indexOf(b)] = { ...b, exact: failed !== undefined ? no(`exact variable fillet failed: ${failed}`) : ok(current) }
+              }
+            }
+            break
+          }
+          case "shell": {
+            // The mesh rebuild's cavity, exact: each region of the extrusion's profile moved inwards by the wall (its holes
+            // outwards), from a wall above the bottom to a wall below the top, or through an open end; then subtracted.
+            const ex = extrusions.get(f.feature)
+            const t = dim(f.thickness)
+            const open = f.open ?? "none"
+            const rev = revolutions.get(f.feature)
+            const sw = sweeps.get(f.feature)
+            if (ex === undefined && sw !== undefined) {
+              // The mesh's cavity: every loop moved by the wall (the outline in, the holes out), swept along the path shortened by
+              // the wall at a closed end and carried 1 mm past an open one.
+              let cavity: Brep
+              try {
+                const inner = sw.loops.map((l, i) => offsetLoop(l, i === 0 ? t : -t))
+                let pieces: ReadonlyArray<PathPiece> = sw.pieces, start = sw.start
+                if (!sw.closed) {
+                  const s0 = open === "bottom" || open === "both" ? -1 : t, s1 = open === "top" || open === "both" ? -1 : t
+                  const a = trimPathStart(pieces, s0, start)
+                  if (typeof a === "string") throw new RangeError(a)
+                  const b = trimPathStart(reversePath(a.pieces), s1, { x: { x: 0, y: 0, z: 1 }, y: { x: 0, y: 1, z: 0 } })
+                  if (typeof b === "string") throw new RangeError(b)
+                  pieces = reversePath(b.pieces); start = a.start
+                  // An extension at the start turns nothing; a trim may have carried the frame round a bend.
+                }
+                cavity = sweepPath({ loops: inner }, start, pieces, { closed: sw.closed, name: `${f.id}.cavity` })
+              } catch (e) {
+                unsupported({ ...f, operation: "subtract" }, e instanceof Error ? e.message : String(e))
+                break
+              }
+              tools.set(f.id, { exact: [ok(cavity)], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+              apply(f.id, ok(cavity), "subtract", f.targets, f.id)
+              break
+            }
+            if (ex === undefined && rev !== undefined) {
+              if (!rev.full) { unsupported({ ...f, operation: "subtract" }, "only a full revolution (360 degrees) can be shelled"); break }
+              let cavity: Brep
+              try {
+                cavity = revolveProfile({ loops: [revolveShellLoop(rev.loop, t, open)] }, 2 * Math.PI, { origin: rev.origin, axis: rev.axis, radial: rev.radial, name: `${f.id}.cavity` })
+              } catch (e) {
+                unsupported({ ...f, operation: "subtract" }, e instanceof Error ? e.message : String(e))
+                break
+              }
+              tools.set(f.id, { exact: [ok(cavity)], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+              apply(f.id, ok(cavity), "subtract", f.targets, f.id)
+              break
+            }
+            if (ex === undefined) { unsupported({ ...f, operation: "subtract" }, `a shell of '${f.feature}' has no exact model yet (extrusions and full revolutions are shelled exactly)`); break }
+            const z0 = ex.from + (open === "bottom" || open === "both" ? -1 : t)
+            const z1 = ex.to + (open === "top" || open === "both" ? 1 : -t)
+            let cavity: Brep
+            try {
+              const at = (z: number) => frame({ x: ex.frame.origin.x + ex.frame.n.x * z, y: ex.frame.origin.y + ex.frame.n.y * z, z: ex.frame.origin.z + ex.frame.n.z * z }, ex.frame.n, ex.frame.u)
+              const pieces = profilesOfLoops(ex.loops).map((p) => {
+                const [outer, ...holes] = p.loops
+                let piece = extrudeProfile({ loops: [offsetLoop(outer!, t)] }, z1 - z0, { placement: at(z0), name: `${f.id}.cavity` })
+                for (const h of holes) piece = combine(piece, extrudeProfile({ loops: [offsetLoop(h, -t)] }, z1 - z0 + 2, { placement: at(z0 - 1), name: `${f.id}.wall` }), "subtract")
+                return piece
+              })
+              cavity = unionAll(pieces)
+            } catch (e) {
+              unsupported({ ...f, operation: "subtract" }, e instanceof Error ? e.message : String(e))
+              break
+            }
+            tools.set(f.id, { exact: [ok(cavity)], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, ok(cavity), "subtract", f.targets, f.id)
+            break
+          }
+          case "draft": {
+            // The face nearest `near` among the candidate bodies (the mesh rebuild's choice); a curved one leans by moving its
+            // vertices in the mesh rebuild, which has no exact counterpart yet. A named face is that face, and `near` is only a hint.
+            let near = { x: dim(f.near[0]), y: dim(f.near[1]), z: dim(f.near[2]) }
+            let hint = f.normal === undefined ? undefined : { x: dim(f.normal[0]), y: dim(f.normal[1]), z: dim(f.normal[2]) }
+            const raw = f.pull === undefined ? { x: 0, y: 0, z: 1 } : { x: dim(f.pull[0]), y: dim(f.pull[1]), z: dim(f.pull[2]) }
+            const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
+            let pool = candidates
+            if (f.name !== undefined) {
+              let named: { body: (typeof bodies)[number]; face: number } | undefined
+              for (const b of candidates) {
+                if (b.exact.brep === undefined) continue
+                const face = faceByName(b.exact.brep, f.name)
+                if (face !== undefined) { named = { body: b, face }; break }
+              }
+              if (named === undefined) {
+                for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no(`the face '${f.name}' does not exist any more`) }
+                break
+              }
+              near = faceCentre(named.body.exact.brep!, named.face)
+              hint = undefined
+              pool = [named.body]
+            }
+            let chosen: { body: (typeof bodies)[number]; distance: number; planar: boolean } | undefined
+            for (const b of pool) {
+              if (b.exact.brep === undefined) continue
+              const closest = brepLocator(b.exact.brep).closest(near)
+              const planar = closest.face !== undefined && b.exact.brep.faces[closest.face]!.surface.kind === "plane"
+              const pick = hint === undefined ? undefined : pickPlanarFace(b.exact.brep, near, hint)
+              const distance = pick?.distance ?? closest.distance
+              if (chosen === undefined || distance < chosen.distance) chosen = { body: b, distance, planar: hint !== undefined ? pick !== undefined : planar }
+            }
+            if (chosen === undefined) {
+              for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no("the drafted face could not be found on the exact model") }
+              break
+            }
+            const target = chosen.body
+            const len = Math.hypot(raw.x, raw.y, raw.z)
+            if (!chosen.planar) {
+              // The wall of a hole or the side of a boss along the pull is a cone (`brep/draft-curved.ts`); any other curved face keeps the mesh.
+              const cone = draftCurvedFace(target.exact.brep!, { near, pull: { x: raw.x / len, y: raw.y / len, z: raw.z / len }, neutral: f.neutral === undefined ? 0 : dim(f.neutral), angle: dim(f.angle) })
+              bodies[bodies.indexOf(target)] = { ...target, exact: typeof cone === "string" ? no(cone) : ok(cone) }
+              break
+            }
+            const drafted = draftPlanarFace(target.exact.brep!, { near, ...(hint !== undefined ? { normal: hint } : {}), pull: { x: raw.x / len, y: raw.y / len, z: raw.z / len }, neutral: f.neutral === undefined ? 0 : dim(f.neutral), angle: dim(f.angle) })
+            bodies[bodies.indexOf(target)] = { ...target, exact: typeof drafted === "string" ? no(drafted) : ok(drafted) }
+            break
+          }
+          case "plane": {
+            // Construction geometry: no body changes, but the frame it defines is what the holes, texts and threads on it use.
+            const d = f.from
+            let made: { readonly u: Vec3; readonly v: Vec3; readonly n: Vec3; readonly origin: Vec3 } | undefined
+            if (d.kind === "offset") {
+              const distance = dim(d.distance)
+              if (distance === undefined) break
+              made = planeFrame(d.base, distance)
+            } else if (d.kind === "angle") {
+              const angle = dim(d.angle), at = d.at === undefined ? 0 : dim(d.at)
+              const base = planeFrame(d.base, 0)
+              if (angle === undefined || at === undefined || base === undefined) break
+              const axis = d.about === "u" ? base.u : base.v
+              const across = d.about === "u" ? base.v : base.u
+              const turn = (vec: Vec3): Vec3 => {
+                const c = Math.cos((angle * Math.PI) / 180), sn = Math.sin((angle * Math.PI) / 180)
+                return add3(add3(scale3(vec, c), scale3(cross3(axis, vec), sn)), scale3(axis, dot3(axis, vec) * (1 - c)))
+              }
+              const origin = add3(base.origin, scale3(across, at))
+              made = d.about === "u" ? { u: base.u, v: turn(base.v), n: turn(base.n), origin } : { u: turn(base.u), v: base.v, n: turn(base.n), origin }
+            } else if (d.kind === "points") {
+              const raw = d.points.map((q) => q.map(dim))
+              if (raw.some((q) => q.some((v) => v === undefined))) break
+              const p = raw as ReadonlyArray<ReadonlyArray<number>>
+              const p1 = { x: p[0]![0]!, y: p[0]![1]!, z: p[0]![2]! }
+              const p2 = { x: p[1]![0]!, y: p[1]![1]!, z: p[1]![2]! }
+              const p3 = { x: p[2]![0]!, y: p[2]![1]!, z: p[2]![2]! }
+              const e1 = sub3(p2, p1), nn = cross3(e1, sub3(p3, p1))
+              if (length3(e1) < 1e-9 || length3(nn) < 1e-9) break
+              const u = normalize3(e1), n = normalize3(nn)
+              made = { u, v: cross3(n, u), n, origin: p1 }
+            } else {
+              // A face of a body: the nearest planar face to `near` (`normal` tells which side), square to it.
+              const nx = dim(d.near[0]), ny = dim(d.near[1]), nz = dim(d.near[2])
+              const hx = d.normal === undefined ? undefined : dim(d.normal[0])
+              const hy = d.normal === undefined ? undefined : dim(d.normal[1])
+              const hz = d.normal === undefined ? undefined : dim(d.normal[2])
+              const lift = d.offset === undefined ? 0 : dim(d.offset)
+              if (nx === undefined || ny === undefined || nz === undefined || lift === undefined) break
+              if (d.normal !== undefined && (hx === undefined || hy === undefined || hz === undefined)) break
+              const near = { x: nx, y: ny, z: nz }
+              const hint = hx === undefined || hy === undefined || hz === undefined ? undefined : { x: hx, y: hy, z: hz }
+              const candidates = bodies.filter((b) => d.body === undefined || b.id === d.body)
+              let best: { readonly frame: { readonly normal: Vec3; readonly centroid: Vec3; readonly u: Vec3; readonly v: Vec3 }; readonly distance: number } | undefined
+              for (const b of candidates) {
+                if (b.exact.brep === undefined) continue
+                const pick = pickPlanarFace(b.exact.brep, near, hint)
+                if (pick === undefined) continue
+                const found = planarFaceFrame(b.exact.brep, pick)
+                if (typeof found === "string") continue
+                if (best === undefined || pick.distance < best.distance) best = { frame: found, distance: pick.distance }
+              }
+              if (best === undefined) break
+              made = {
+                u: best.frame.u, v: best.frame.v, n: best.frame.normal,
+                origin: add3(best.frame.centroid, scale3(best.frame.normal, lift))
+              }
+            }
+            if (made !== undefined) planes.set(f.id, made)
+            break
+          }
+          case "sweep": {
+            const prof = sketchOf(f.profile), route = sketchOf(f.path)
+            if (prof === undefined || route === undefined) break
+            let path = exactSketchPath(route.solve.sketch, route.frame)
+            if (typeof path === "string") { unsupported(f, path); break }
+            const bend = f.bendRadius === undefined ? 0 : dim(f.bendRadius)
+            if (bend > 0 && !path.closed) {
+              const rounded = roundExactPath(path.pieces, bend)
+              if (typeof rounded === "string") { unsupported(f, rounded); break }
+              path = { pieces: rounded, closed: false }
+            }
+            // The mesh sweep carries the profile by its outer ring's vertex mean (the polygon `sketchProfiles` draws).
+            const { loops } = exactSketchLoops(prof.solve.sketch)
+            const polys = sketchProfiles(prof.solve.sketch).loops
+            if (polys.length === 0 || loops.length === 0) break
+            const outerPoly = polys.reduce((a, b) => (Math.abs(polygonArea(b)) > Math.abs(polygonArea(a)) ? b : a))
+            const c2 = { x: outerPoly.reduce((s, p) => s + p.x, 0) / outerPoly.length, y: outerPoly.reduce((s, p) => s + p.y, 0) / outerPoly.length }
+            const groups = profilesOfLoops(loops)
+            if (groups.length !== 1) { unsupported(f, "a sweep of several separate profiles has no exact model yet"); break }
+            const shift = (l: ProfileLoop): ProfileLoop => l.map((s): ProfileSegment => s.kind === "line" ? { kind: "line", a: { x: s.a.x - c2.x, y: s.a.y - c2.y }, b: { x: s.b.x - c2.x, y: s.b.y - c2.y } } : s.kind === "arc" ? { ...s, center: { x: s.center.x - c2.x, y: s.center.y - c2.y } } : s)
+            const profileLoops = groups[0]!.loops.map(shift)
+            const start = sweepStartFrame(prof.frame, pieceTangent(path.pieces[0]!, false))
+            let solid: Brep
+            try {
+              solid = sweepPath({ loops: profileLoops }, start, path.pieces, { closed: path.closed, name: f.id })
+            } catch (e) {
+              unsupported(f, e instanceof Error ? e.message : String(e))
+              break
+            }
+            sweeps.set(f.id, { loops: profileLoops, start, pieces: path.pieces, closed: path.closed })
+            tools.set(f.id, { exact: [ok(solid)], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, ok(solid), f.operation, f.targets, f.id)
+            break
+          }
+          case "loft": {
+            // Each section's largest loop (as the mesh rebuild lofts), started where the mesh's ring starts.
+            const sections: LoftSegment[][] = [], starts: Vec3[] = []
+            let reason: string | undefined
+            for (const id of f.sections) {
+              const sk = sketchOf(id)
+              if (sk === undefined) { reason = `section '${id}' is not available`; break }
+              const { loops } = exactSketchLoops(sk.solve.sketch)
+              const polys = sketchProfiles(sk.solve.sketch).loops
+              if (loops.length === 0 || polys.length === 0) { reason = `section '${id}' has no closed loop`; break }
+              const F = sk.frame
+              const placed = { origin: F.origin, x: F.u, y: F.v, z: F.n }
+              const outer = loops.reduce((a, b) => (Math.abs(loopArea(b)) > Math.abs(loopArea(a)) ? b : a))
+              const first = polys.reduce((a, b) => (Math.abs(polygonArea(b)) > Math.abs(polygonArea(a)) ? b : a))[0]!
+              try { sections.push(loftSection(outer, placed)) } catch (e) { reason = e instanceof Error ? e.message : String(e); break }
+              starts.push({ x: F.origin.x + F.u.x * first.x + F.v.x * first.y, y: F.origin.y + F.u.y * first.x + F.v.y * first.y, z: F.origin.z + F.u.z * first.x + F.v.z * first.y })
+            }
+            if (reason !== undefined) { unsupported(f, reason); break }
+            let solid: Brep
+            try {
+              solid = loftBrep(sections, { smooth: f.smooth === true, starts, name: f.id })
+            } catch (e) {
+              unsupported(f, e instanceof Error ? e.message : String(e))
+              break
+            }
+            tools.set(f.id, { exact: [ok(solid)], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, ok(solid), f.operation, f.targets, f.id)
+            break
+          }
+          case "rib": {
+            const sk = sketchOf(f.sketch)
+            if (sk === undefined) break
+            const thickness = dim(f.thickness), depth = dim(f.depth)
+            if (!(thickness > 0 && depth > 0)) break
+            const { open } = sketchProfiles(sk.solve.sketch)
+            if (open.length === 0) break
+            const dir = f.direction ?? "up"
+            const from = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
+            const F = sk.frame
+            const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
+            let webs: Brep[]
+            try {
+              webs = open.map((line) => {
+                const ring = thickenPath(line, -thickness / 2, thickness / 2)
+                const loop: ProfileLoop = ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! }))
+                return extrudeProfile({ loops: [loop] }, depth, { placement, name: f.id })
+              })
+            } catch (e) {
+              unsupported(f, e instanceof Error ? e.message : String(e))
+              break
+            }
+            const tool = ok(unionAll(webs))
+            const operation = f.operation ?? "union"
+            tools.set(f.id, { exact: [tool], operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, tool, operation, f.targets, f.id)
+            break
+          }
+          case "sheet": {
+            const sk = sketchOf(f.sketch)
+            if (sk === undefined) break
+            const thickness = dim(f.thickness), width = dim(f.width)
+            const radius = f.bendRadius === undefined ? 0 : dim(f.bendRadius)
+            if (!(thickness > 0 && width > 0)) break
+            const { open } = sketchProfiles(sk.solve.sketch)
+            if (open.length !== 1) break
+            const side = f.side ?? "centre"
+            let line = open[0]!
+            if (f.hems !== undefined && f.hems.length > 0) {
+              const specs = f.hems.map((h) => ({ end: h.end, length: dim(h.length), gap: h.gap === undefined ? 0 : dim(h.gap), fold: h.fold ?? "left" as const }))
+              try {
+                line = withHems(cornersOf(line), thickness, specs)
+              } catch (e) {
+                unsupported(f, e instanceof Error ? e.message : String(e))
+                break
+              }
+            }
+            const dir = f.direction ?? "up"
+            const from = dir === "up" ? 0 : dir === "down" ? -width : -width / 2
+            const F = sk.frame
+            const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
+            let solid: Brep
+            let reliefs: ReturnType<typeof edgeFlangeReliefs> = []
+            try {
+              if (f.flanges !== undefined) {
+                if (f.flanges.some((flange) => f.hems?.some((hem) => hem.end === flange.end))) throw new RangeError("An edge cannot carry both a hem and an edge flange")
+                const resolved = f.flanges.map((flange) => ({ end: flange.end, length: dim(flange.length), angle: dim(flange.angle) * Math.PI / 180, ...(flange.relief !== undefined ? { relief: { width: dim(flange.relief.width), depth: dim(flange.relief.depth) } } : {}) }))
+                reliefs = edgeFlangeReliefs(cornersOf(line), thickness, width, radius, side, resolved)
+                line = withEdgeFlanges(cornersOf(line), resolved)
+              }
+              const outline = sheetOutline(line, thickness, side, radius)
+              const loop: ProfileLoop = outline.map((a, i) => ({ kind: "line", a, b: outline[(i + 1) % outline.length]! }))
+              solid = extrudeProfile({ loops: [loop] }, width, { placement, name: f.id })
+              for (const relief of reliefs) for (const [z0, z1] of [[from - 1, from + relief.inset], [from + width - relief.inset, from + width + 1]]) {
+                const R = frame({ x: F.origin.x + F.n.x * z0!, y: F.origin.y + F.n.y * z0!, z: F.origin.z + F.n.z * z0! }, F.n, F.u)
+                const cut = extrudeProfile({ loops: [relief.outline.map((a, i) => ({ kind: "line" as const, a, b: relief.outline[(i + 1) % relief.outline.length]! }))] }, z1! - z0!, { placement: R })
+                solid = combine(solid, cut, "subtract")
+              }
+            } catch (e) {
+              unsupported(f, e instanceof Error ? e.message : String(e))
+              break
+            }
+            const tool = ok(solid)
+            tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, tool, f.operation, f.targets, f.id)
+            break
+          }
+          case "text": {
+            const height = dim(f.height), depth = dim(f.depth)
+            const stroke = f.strokeWidth === undefined ? undefined : dim(f.strokeWidth)
+            const offset = f.offset === undefined ? 0 : dim(f.offset)
+            const at = f.at === undefined ? [0, 0] : [dim(f.at[0]), dim(f.at[1])]
+            const spacing = f.spacing === undefined ? 1 : dim(f.spacing)
+            if (!(height > 0 && depth > 0) || f.text.trim().length === 0 || f.text.length > 200) break
+            let bars: ReturnType<typeof textBars>["bars"]
+            try {
+              bars = textBars({ text: f.text, height, strokeWidth: stroke ?? height / 9, depth, spacing, align: f.align ?? "left" }).bars
+            } catch (e) {
+              unsupported(f, e instanceof Error ? e.message : String(e))
+              break
+            }
+            if (bars.length === 0) break
+            const P = planeFrame(f.plane, offset)
+            if (P === undefined) { unsupported(f, `a text on the work plane '${f.plane}' has no exact model yet`); break }
+            const dir = f.direction ?? "up"
+            const z0 = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
+            const origin = {
+              x: P.origin.x + P.u.x * at[0]! + P.v.x * at[1]! + P.n.x * z0,
+              y: P.origin.y + P.u.y * at[0]! + P.v.y * at[1]! + P.n.y * z0,
+              z: P.origin.z + P.u.z * at[0]! + P.v.z * at[1]! + P.n.z * z0
+            }
+            const placement = frame(origin, P.n, P.u)
+            let solid: Brep
+            try {
+              const pieces = bars.map((ring) => {
+                const loop: ProfileLoop = ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! }))
+                return extrudeProfile({ loops: [loop] }, depth, { placement, name: f.id })
+              })
+              solid = pieces.slice(1).reduce((acc, p) => {
+                try { return combine(acc, p, "union") } catch { return mergeBreps([acc, p]) }
+              }, pieces[0]!)
+            } catch (e) {
+              unsupported(f, e instanceof Error ? e.message : String(e))
+              break
+            }
+            const tool = ok(solid)
+            tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, tool, f.operation, f.targets, f.id)
+            break
+          }
+          case "coil": {
+            const radius = dim(f.radius), pitch = dim(f.pitch), turns = dim(f.turns), wire = dim(f.wireDiameter)
+            const cx = f.centre === undefined ? 0 : dim(f.centre[0]), cy = f.centre === undefined ? 0 : dim(f.centre[1])
+            const z0 = f.offset === undefined ? 0 : dim(f.offset)
+            if (!(wire > 0 && radius > 0 && pitch > 0 && turns > 0) || !(radius > wire / 2 + 1e-9) || !(pitch > wire + 1e-9)) break
+            const g = coilGeometry({ cx, cy, z0, radius, pitch, turns, wire, square: f.section === "square", left: f.handedness === "left" })
+            const pieces: PathPiece[] = g.path.slice(1).map((b, i) => ({ kind: "line", a: g.path[i]!, b }))
+            // The wire profile is the polygon `coilGeometry` cuts the mesh from: a true helicoid is not an analytic
+            // surface of this kernel, so the exact coil carries the same chords and says so by construction.
+            const loop: ProfileLoop = g.ring2d.map((a, i) => ({ kind: "line", a, b: g.ring2d[(i + 1) % g.ring2d.length]! }))
+            const t = g.normal, radial = { x: 1, y: 0, z: 0 }
+            const binormal = { x: t.y * radial.z - t.z * radial.y, y: t.z * radial.x - t.x * radial.z, z: t.x * radial.y - t.y * radial.x }
+            const start = sweepStartFrame({ origin: g.centre, u: radial, v: binormal, n: t }, pieceTangent(pieces[0]!, false))
+            let solid: Brep
+            try {
+              solid = sweepPath({ loops: [loop] }, start, pieces, { closed: false, name: f.id })
+            } catch (e) {
+              unsupported(f, e instanceof Error ? e.message : String(e))
+              break
+            }
+            const tool = ok(solid)
+            tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, tool, f.operation, f.targets, f.id)
+            break
+          }
+          case "thread": {
+            const diameter = dim(f.diameter), pitch = dim(f.pitch), length = dim(f.length)
+            const cx = f.at === undefined ? 0 : dim(f.at[0]), cy = f.at === undefined ? 0 : dim(f.at[1])
+            const z0 = f.offset === undefined ? 0 : dim(f.offset)
+            const operation = f.cut === true ? "subtract" : f.operation ?? (f.kind === "internal" ? "subtract" : "new")
+            const spec = { diameter, pitch, length, internal: f.kind === "internal", left: f.handedness === "left", cx, cy, z0 }
+            // The mesh rebuild reports a thread that cannot be built (and a cut that is wrong); the exact one only has to follow it.
+            if (threadProblem(spec) !== undefined || (f.cut === true && (f.kind === "internal" || (f.operation !== undefined && f.operation !== "subtract")))) break
+            // Built along Z, then carried to the axis: x runs on the YZ frame, y on ZX (the mesh rebuild's `place`).
+            const e = { x: { x: 1, y: 0, z: 0 }, y: { x: 0, y: 1, z: 0 }, z: { x: 0, y: 0, z: 1 } }
+            const [u, v, n] = f.axis === "x" ? [e.y, e.z, e.x] : f.axis === "y" ? [e.z, e.x, e.y] : [e.x, e.y, e.z]
+            const place = (p: { x: number; y: number; z: number }) => ({ x: u.x * p.x + v.x * p.y + n.x * p.z, y: u.y * p.x + v.y * p.y + n.y * p.z, z: u.z * p.x + v.z * p.y + n.z * p.z })
+            let solid: Brep
+            try {
+              solid = f.cut === true ? makeThreadGrooveBrep(spec, place) : makeThreadBrep(spec, place)
+            } catch (e2) {
+              unsupported({ ...f, operation }, e2 instanceof Error ? e2.message : String(e2))
+              break
+            }
+            const tool = ok(solid)
+            tools.set(f.id, { exact: [tool], operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, tool, operation, f.targets, f.id)
+            break
+          }
+          case "pushpull": {
+            const distance = dim(f.distance)
+            if (distance === 0) break
+            const near = { x: dim(f.near[0]), y: dim(f.near[1]), z: dim(f.near[2]) }
+            const hint = f.normal === undefined ? undefined : { x: dim(f.normal[0]), y: dim(f.normal[1]), z: dim(f.normal[2]) }
+            const query = { near, ...(hint !== undefined ? { normal: hint } : {}) }
+            const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
+            // A named face is the one that is moved: the point it was authored with may be stale after an edit, and a name
+            // that no longer exists is reported rather than replaced by a nearby face.
+            if (f.name !== undefined) {
+              let target: { body: (typeof bodies)[number]; face: number } | undefined
+              for (const b of candidates) {
+                if (b.exact.brep === undefined) continue
+                const face = faceByName(b.exact.brep, f.name)
+                if (face !== undefined) { target = { body: b, face }; break }
+              }
+              if (target === undefined) {
+                for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no(`the face '${f.name}' does not exist any more`) }
+                break
+              }
+              const pushed = pushPullFace(target.body.exact.brep!, { ...query, distance, face: target.face })
+              bodies[bodies.indexOf(target.body)] = { ...target.body, exact: typeof pushed === "string" ? no(pushed) : ok(pushed) }
+              break
+            }
+            // The body whose face is nearest (the mesh rebuild's choice); a body without an exact model could have been it.
+            if (candidates.length > 1 && candidates.some((b) => b.exact.brep === undefined)) {
+              for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no("the pushed face may lie on a body without an exact model") }
+              break
+            }
+            let chosen: { body: (typeof bodies)[number]; distance: number } | undefined
+            for (const b of candidates) {
+              if (b.exact.brep === undefined) continue
+              const found = nearestFace(b.exact.brep, query)
+              if (found === undefined) continue
+              const d = "pick" in found ? found.pick.distance : found.distance
+              if (chosen === undefined || d < chosen.distance) chosen = { body: b, distance: d }
+            }
+            if (chosen === undefined) break
+            const pushed = pushPullFace(chosen.body.exact.brep!, { ...query, distance })
+            bodies[bodies.indexOf(chosen.body)] = { ...chosen.body, exact: typeof pushed === "string" ? no(pushed) : ok(pushed) }
+            break
+          }
+          case "mate": {
+            // The moving body is laid on the fixed one by the rigid motion of the mesh rebuild, built from the exact faces.
+            const moving = bodies.find((b) => b.id === f.body), fixed = bodies.find((b) => b.id === f.to.body)
+            if (moving === undefined || fixed === undefined || moving.exact.brep === undefined) break
+            const at = (p: readonly [Dimension, Dimension, Dimension]) => ({ x: dim(p[0]), y: dim(p[1]), z: dim(p[2]) })
+            const faceOf = (b: Brep, near: readonly [Dimension, Dimension, Dimension], normal: readonly [Dimension, Dimension, Dimension] | undefined) => {
+              const found = nearestFace(b, { near: at(near), ...(normal !== undefined ? { normal: at(normal) } : {}) })
+              if (found === undefined) return "the mated face could not be found on the exact model"
+              if (!("pick" in found)) return "a joint on a curved face has no exact model yet"
+              return planarFaceFrame(b, found.pick)
+            }
+            if (fixed.exact.brep === undefined) { bodies[bodies.indexOf(moving)] = { ...moving, exact: no(`the body it is mated to ('${fixed.id}') has no exact model`) }; break }
+            const mine = faceOf(moving.exact.brep, f.face.near, f.face.normal), theirs = faceOf(fixed.exact.brep, f.to.near, f.to.normal)
+            if (typeof mine === "string" || typeof theirs === "string") { bodies[bodies.indexOf(moving)] = { ...moving, exact: no(typeof mine === "string" ? mine : theirs as string) }; break }
+            const slide = (f.slide ?? [0, 0]).map(dim)
+            const tr = mateTransform(mine, theirs, { offset: f.offset === undefined ? 0 : dim(f.offset), spin: f.spin === undefined ? 0 : (dim(f.spin) * Math.PI) / 180, slideU: slide[0]!, slideV: slide[1]! })
+            bodies[bodies.indexOf(moving)] = { ...moving, exact: ok(transformBrep(moving.exact.brep, tr)) }
+            break
+          }
+        }
+      } catch (e) {
+        // Out of time: every body says so (a later feature could have changed any of them), and the replay stops.
+        if (e instanceof BudgetExceeded) {
+          warnings.push(`${f.id}: ${e.message}`)
+          stopped = `${e.message} (stopped at ${f.id}); ask for the exact model alone`
+          for (const b of bodies) b.exact = no(stopped)
           break
         }
-        case "mate": {
-          // The moving body is laid on the fixed one by the rigid motion of the mesh rebuild, built from the exact faces.
-          const moving = bodies.find((b) => b.id === f.body), fixed = bodies.find((b) => b.id === f.to.body)
-          if (moving === undefined || fixed === undefined || moving.exact.brep === undefined) break
-          const at = (p: readonly [Dimension, Dimension, Dimension]) => ({ x: dim(p[0]), y: dim(p[1]), z: dim(p[2]) })
-          const faceOf = (b: Brep, near: readonly [Dimension, Dimension, Dimension], normal: readonly [Dimension, Dimension, Dimension] | undefined) => {
-            const found = nearestFace(b, { near: at(near), ...(normal !== undefined ? { normal: at(normal) } : {}) })
-            if (found === undefined) return "the mated face could not be found on the exact model"
-            if (!("pick" in found)) return "a joint on a curved face has no exact model yet"
-            return planarFaceFrame(b, found.pick)
-          }
-          if (fixed.exact.brep === undefined) { bodies[bodies.indexOf(moving)] = { ...moving, exact: no(`the body it is mated to ('${fixed.id}') has no exact model`) }; break }
-          const mine = faceOf(moving.exact.brep, f.face.near, f.face.normal), theirs = faceOf(fixed.exact.brep, f.to.near, f.to.normal)
-          if (typeof mine === "string" || typeof theirs === "string") { bodies[bodies.indexOf(moving)] = { ...moving, exact: no(typeof mine === "string" ? mine : theirs as string) }; break }
-          const slide = (f.slide ?? [0, 0]).map(dim)
-          const tr = mateTransform(mine, theirs, { offset: f.offset === undefined ? 0 : dim(f.offset), spin: f.spin === undefined ? 0 : (dim(f.spin) * Math.PI) / 180, slideU: slide[0]!, slideV: slide[1]! })
-          bodies[bodies.indexOf(moving)] = { ...moving, exact: ok(transformBrep(moving.exact.brep, tr)) }
-          break
-        }
+        warnings.push(`${f.id}: ${e instanceof Error ? e.message : String(e)}`)
+        for (const b of bodies) if (b.feature === f.id) b.exact = no(`exact model of ${f.id} failed: ${e instanceof Error ? e.message : String(e)}`)
       }
-    } catch (e) {
-      // Out of time: every body says so (a later feature could have changed any of them), and the replay stops.
-      if (e instanceof BudgetExceeded) {
-        warnings.push(`${f.id}: ${e.message}`)
-        stopped = `${e.message} (stopped at ${f.id}); ask for the exact model alone`
-        for (const b of bodies) b.exact = no(stopped)
-        break
-      }
-      warnings.push(`${f.id}: ${e instanceof Error ? e.message : String(e)}`)
-      for (const b of bodies) if (b.feature === f.id) b.exact = no(`exact model of ${f.id} failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
   // Align with the mesh bodies by id.
-  const byId = new Map(bodies.map((b) => [b.id, b]))
-  const out: ExactBody[] = result.bodies.map((mb) => {
-    const b = byId.get(mb.id)
-    if (b === undefined) return { id: mb.id, feature: mb.feature, reason: stopped ?? "the exact replay has no body of this id" }
-    return b.exact.brep !== undefined ? { id: mb.id, feature: mb.feature, brep: uniqueFaceNames(b.exact.brep) } : { id: mb.id, feature: mb.feature, reason: b.exact.reason ?? "no exact model" }
-  })
-  return { result, bodies: out, warnings }
+  const snapshot = (meshBodies: RebuildResult["bodies"]): ExactRebuild => {
+    const byId = new Map(bodies.map((b) => [b.id, b]))
+    const out: ExactBody[] = meshBodies.map((mb) => {
+      const b = byId.get(mb.id)
+      if (b === undefined) return { id: mb.id, feature: mb.feature, reason: stopped ?? "the exact replay has no body of this id" }
+      return b.exact.brep !== undefined ? { id: mb.id, feature: mb.feature, brep: uniqueFaceNames(b.exact.brep) } : { id: mb.id, feature: mb.feature, reason: b.exact.reason ?? "no exact model" }
+    })
+    return { result: meshBodies === result.bodies ? result : { ...result, bodies: meshBodies }, bodies: out, warnings: [...warnings] }
+  }
+  return {
+    at: (index, meshBodies, options = {}) => {
+      const run = (): ExactRebuild => {
+        advance(Math.min(index, history.features.length))
+        return snapshot(meshBodies)
+      }
+      return options.budgetMs === undefined ? run() : withBudget(options.budgetMs, run)
+    }
+  }
 }
 
 /** Bounding box of a B-rep from a coarse tessellation (within its chord of the true box). */

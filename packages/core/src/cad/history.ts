@@ -36,7 +36,7 @@ export { COIL_STEPS_PER_TURN, coilGeometry } from "./helix.ts"
 import { blendEdges, blendEdgesVariable, findEdges, selectEdges } from "./edge-blend.ts"
 import { expandSketch, type SketchShape } from "./sketch-shapes.ts"
 import { elementMesh } from "../cam/model/element-mesh.ts"
-import { rebuildExact } from "./history-brep.ts"
+import { exactReplay, type ExactReplay } from "./history-brep.ts"
 import { blendBrep, blendCandidates, faceByName, faceCentre, isConePlaneRim, meshEdgeDefects, selectBlendEdges, tessellateBrep, withBudget } from "./brep/index.ts"
 import { isSpherePlaneRim } from "./brep/blend-sphere-plane.ts"
 
@@ -821,6 +821,14 @@ export const rebuild = (history: History): RebuildResult => {
   }
   const bodies: Body[] = []
   const flatPatterns: Record<string, Developed> = {}
+  // The exact model of the features before one that needs it (a named face, a curved fillet): one replay per rebuild,
+  // advanced to that feature on demand and reading this rebuild's sketches and issues as they grow, so a history with many
+  // such features replays each exact feature once instead of the whole prefix every time.
+  let exactSoFar: ExactReplay | undefined
+  const exactAt = (index: number) => {
+    exactSoFar ??= exactReplay(history, { bodies, parameters: values, sketches, flatPatterns, get planes() { return Object.fromEntries(planes) }, issues })
+    return exactSoFar.at(index, [...bodies], { budgetMs: 10_000 })
+  }
   const tools = new Map<string, { readonly meshes: ReadonlyArray<Mesh>; readonly operation: Operation; readonly targets?: ReadonlyArray<string> }>()
   /** What a shell needs from an extrusion: its profile after the corner treatment, its depths and its plane. */
   const extrusions = new Map<string, { readonly loops: ReadonlyArray<Vec2[]>; readonly from: number; readonly to: number; readonly frame: PlaneFrame; readonly tapered: boolean }>()
@@ -889,9 +897,9 @@ export const rebuild = (history: History): RebuildResult => {
    */
   const namedFacePoint = (index: number, bodyId: string | undefined, name: string): { readonly point: V3 } | { readonly error: string } => {
     if (index <= 0) return { error: `the face '${name}' cannot be resolved: no feature builds a body before it` }
-    let exact: ReturnType<typeof rebuildExact> | undefined
+    let exact: ReturnType<typeof exactAt> | undefined
     try {
-      exact = rebuildExact({ ...history, features: history.features.slice(0, index) }, { bodies: [...bodies], parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues: [...issues] }, { budgetMs: 10_000 })
+      exact = exactAt(index)
     } catch {
       return { error: `the face '${name}' cannot be resolved: the exact model of the earlier features did not build` }
     }
@@ -1155,7 +1163,7 @@ export const rebuild = (history: History): RebuildResult => {
           // The prefix already has its solved sketches and mesh bodies. Giving it to the exact adapter avoids re-entering
           // this rebuild. A selection made only of sphere/plane or cone/plane rims uses that exact solid for the mesh.
           const exactBefore = f.edges?.curved === true && style === "fillet" && radiusEnd === undefined
-            ? rebuildExact({ ...history, features: history.features.slice(0, history.features.indexOf(f)) }, { bodies: [...bodies], parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues: [...issues] }, { budgetMs: 10_000 })
+            ? exactAt(history.features.indexOf(f))
             : undefined
           for (const b of chosen) {
             const exact = exactBefore?.bodies.find((body) => body.id === b.id)?.brep
