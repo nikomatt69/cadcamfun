@@ -1,0 +1,19 @@
+{
+  "$comment": "Bench budgets (spec 55 §3): the median each case should reach on a developer machine, set as targets for interactive use, not copied from a run. A median over budget under a load per CPU above maxLoadPerCpu is inconclusive. A change that grows a median by more than `tolerance` of its budget against a comparable baseline is a regression and needs a recorded justification.",
+  "runs": 5,
+  "tolerance": 0.2,
+  "maxLoadPerCpu": 1.0,
+  "maxLoadRatio": 1.5,
+  "budgets": {
+    "boolean.box-minus-cylinder": 100,
+    "boolean.box-and-sphere": 250,
+    "history.exact-flange": 1000,
+    "history.exact-rounded-box": 3000,
+    "tessellate.rounded-box": 200,
+    "step.write-flange": 100,
+    "step.read-flange": 300,
+    "cam.stock-removal": 300,
+    "cam.drop-cutter-grid": 300,
+    "cam.gcode-verification": 1000
+  }
+}

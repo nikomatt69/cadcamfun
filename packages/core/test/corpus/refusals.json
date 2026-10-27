@@ -1,0 +1,12 @@
+{
+  "$comment": "Refusal registry (spec 55 §2): a corpus entry may end refused only with a reason listed here. `match` is a substring of the kernel's text; each refusal is a decision of the named spec or module, not a bug left open.",
+  "refusals": [
+    { "id": "shell-partial-revolution", "match": "only a full revolution (360 degrees) can be shelled", "spec": "cad/history-brep.ts shell; spec 43 O3", "note": "the exact shell of a revolution needs its closed profile; a partial revolve has end caps the offset does not carry yet" },
+    { "id": "sweep-several-profiles", "match": "a sweep of several separate profiles has no exact model yet", "spec": "cad/history-brep.ts sweep; spec 44 S5", "note": "one exact sweep per profile group" },
+    { "id": "hole-on-work-plane", "match": "a hole on the work plane", "spec": "cad/history-brep.ts hole", "note": "holes on a work plane that does not resolve to a frame" },
+    { "id": "text-on-work-plane", "match": "a text on the work plane", "spec": "cad/history-brep.ts text", "note": "texts on a work plane that does not resolve to a frame" },
+    { "id": "ellipsoid", "match": "an ellipsoid has no exact model yet", "spec": "spec 39 §2 refusal over approximation", "note": "the kernel has no rational ellipsoid surface" },
+    { "id": "involute-gear", "match": "an involute gear has no exact model yet", "spec": "spec 39 §2 refusal over approximation", "note": "involute flanks are not among the kernel's exact curves" },
+    { "id": "exact-time-budget", "match": "exceeded its time budget", "spec": "cad/brep/budget.ts", "note": "the exact replay stopped at its deadline; the entry is also over its own budget" }
+  ]
+}

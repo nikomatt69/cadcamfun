@@ -14,6 +14,8 @@ CADCAMFUN is under active development. The capabilities below are grounded in th
 
 Implementation depth varies by operation. Exact solids and derived meshes follow distinct paths; machining results carry explicit verification outcomes. A configured build target or passing unit test establishes a narrower result than installation, device or machine qualification.
 
+The level of each capability is recorded only in the generated [parity scorecard](specs/assets/parity-scorecard.md) (spec 55 §5), from its tests and the corpus; this README does not restate levels.
+
 ## Get started
 
 ### Desktop builds
@@ -201,6 +203,14 @@ bun --no-env-file check -p packages/core/tsconfig.json
 bun --no-env-file test packages/core
 bun --no-env-file test packages/db
 bun --no-env-file test scripts
+```
+
+Evidence (spec 55): the corpus runs every manifest entry against its analytic oracle and fails on a wrong result; the bench judges medians against their budgets and the machine load; the scorecard is regenerated from both.
+
+```bash
+bun --no-env-file run corpus
+bun --no-env-file run bench
+bun --no-env-file run scorecard
 ```
 
 To validate the Rust shell, first stage the sidecar and migration resources:

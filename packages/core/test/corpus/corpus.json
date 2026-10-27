@@ -1,0 +1,68 @@
+{
+  "$comment": "Corpus manifest (spec 55 §2). Oracles are analytic: `formula` is how `volume` was derived, by hand, from the part's definition and the ISO 273 medium clearance holes (M6 6.6, M8 9, M10 11 mm). `hash` is over the input history: when a recipe or fixture changes it, re-derive the oracle before updating the hash. Budgets are what an interactive rebuild (mesh + exact) of the part should take on a developer machine; the 200-hole plate budget is the spec 55 §4 Boolean target scaled to its face count.",
+  "entries": [
+    {
+      "id": "a-mounting-plate-m8", "set": "a", "kind": "history", "licence": "project",
+      "source": { "recipe": "mounting_plate", "input": { "width": 100, "depth": 60, "thickness": 10, "fastener": "M8" } },
+      "hash": "sha256:79ea332c105e76e522e44453ac6f0cf42a2924ae3cf876935b7ab41b1176920f",
+      "budgetMs": 2000, "capabilities": ["history.exact-rebuild", "boolean.planar-cylindrical"],
+      "expected": { "outcome": "pass", "bodies": 1, "volume": 57455.3099506, "formula": "100*60*10 - 4*pi*4.5^2*10", "volumeRelTol": 1e-9, "meshRelTol": 0.005 }
+    },
+    {
+      "id": "a-flange-m10", "set": "a", "kind": "history", "licence": "project",
+      "source": { "recipe": "flange", "input": { "outerDiameter": 120, "boreDiameter": 40, "thickness": 14, "boltCount": 6, "fastener": "M10" } },
+      "hash": "sha256:49ef27da6e5dba357f15725b454d66008747c41cd55351b2fe1f5ba5f6bdcb4b",
+      "budgetMs": 2000, "capabilities": ["history.exact-rebuild", "history.pattern", "boolean.planar-cylindrical"],
+      "expected": { "outcome": "pass", "bodies": 1, "volume": 132760.563948, "formula": "pi/4*14*(120^2 - 40^2 - 6*11^2)", "volumeRelTol": 1e-9, "meshRelTol": 0.005 }
+    },
+    {
+      "id": "a-l-bracket-m6", "set": "a", "kind": "history", "licence": "project",
+      "source": { "recipe": "l_bracket", "input": { "baseLength": 60, "legHeight": 50, "thickness": 5, "width": 40, "fastener": "M6", "holesPerLeg": 1 } },
+      "hash": "sha256:44fe5d0d60f66be8c851b19cb7cc43361d1adae77124cc2e13891e1bc8042bcc",
+      "budgetMs": 2000, "capabilities": ["history.exact-rebuild", "boolean.planar-cylindrical"],
+      "expected": { "outcome": "pass", "bodies": 1, "volume": 20657.88056, "formula": "(60*5 + 45*5)*40 - 2*pi*3.3^2*5", "volumeRelTol": 1e-9, "meshRelTol": 0.005 }
+    },
+    {
+      "id": "a-stepped-shaft", "set": "a", "kind": "history", "licence": "project",
+      "source": { "recipe": "stepped_shaft", "input": { "sections": [{ "diameter": 30, "length": 40 }, { "diameter": 20, "length": 30 }], "chamfer": 0 } },
+      "hash": "sha256:b05c8c8cd160a739829993e6e9d8a2a0ee6ccd2c8dbe2b1d3007798543d8a0e5",
+      "budgetMs": 2000, "capabilities": ["history.exact-rebuild", "revolve.exact"],
+      "expected": { "outcome": "pass", "bodies": 1, "volume": 37699.1118431, "formula": "pi/4*(30^2*40 + 20^2*30)", "volumeRelTol": 1e-9, "meshRelTol": 0.005 }
+    },
+    {
+      "id": "a-round-duct", "set": "a", "kind": "history", "licence": "project",
+      "source": { "recipe": "duct_transition", "input": { "shape": "round", "width1": 80, "width2": 40, "length": 120, "wall": 2 } },
+      "hash": "sha256:69a917ecb48ffe6e2f33e6ddc0e1397aa1b600c6bd59cd72a016945399580edc",
+      "budgetMs": 2000, "capabilities": ["history.exact-rebuild", "loft.exact"],
+      "expected": { "outcome": "pass", "bodies": 1, "volume": 43730.969738, "formula": "pi*120/12*((80^2+80*40+40^2) - (76^2+76*36+36^2))  (outer frustum less the bore frustum inside the ends)", "volumeRelTol": 1e-9, "meshRelTol": 0.005 }
+    },
+    {
+      "id": "a-mitred-elbow", "set": "a", "kind": "history", "licence": "project",
+      "source": { "recipe": "pipe_bend", "input": { "outerDiameter": 30, "wall": 3, "legA": 100, "legB": 100, "bendAngle": 90, "bendRadius": 0 } },
+      "hash": "sha256:81e2fda5dbc672958425deb43c33f2631f4cca83203d463088f4aeaded2f3082",
+      "budgetMs": 2000, "capabilities": ["history.exact-rebuild", "sweep.exact"],
+      "expected": { "outcome": "pass", "bodies": 1, "volume": 50893.8009882, "formula": "pi/4*(30^2 - 24^2)*(100 + 100)  (a mitred tube is its section times the centre-line length to the corner)", "volumeRelTol": 1e-9, "meshRelTol": 0.005 }
+    },
+    {
+      "id": "c-rounded-box", "set": "c", "kind": "history", "licence": "project",
+      "source": { "fixture": "rounded-box" },
+      "hash": "sha256:66d7bd26dc621ab4d9d58c86d8a9c0908dc992d8cba5cba8241bcdb720df5001",
+      "budgetMs": 5000, "capabilities": ["history.exact-rebuild", "blend.constant-radius"],
+      "expected": { "outcome": "pass", "bodies": 1, "volume": 23340.8493751, "formula": "Minkowski sum of a 34x24x14 box and a 3 mm ball: 34*24*14 + 2*3*(34*24 + 24*14 + 34*14) + pi*3^2*(34+24+14) + 4/3*pi*3^3", "volumeRelTol": 1e-8, "meshRelTol": 0.005 }
+    },
+    {
+      "id": "c-plate-200-holes", "set": "c", "kind": "history", "licence": "project",
+      "source": { "fixture": "plate-200-holes" },
+      "hash": "sha256:32a429fa43f71bf9a10ee98d55963f823b7a6e3dbcb2532242b9391ab6f43b93",
+      "budgetMs": 10000, "capabilities": ["history.exact-rebuild", "boolean.planar-cylindrical", "boolean.scale"],
+      "expected": { "outcome": "pass", "bodies": 1, "volume": 160730.09183, "formula": "200*100*10 - 200*pi*2.5^2*10", "volumeRelTol": 1e-8, "meshRelTol": 0.005 }
+    },
+    {
+      "id": "c-half-revolve-shell", "set": "c", "kind": "history", "licence": "project",
+      "source": { "fixture": "half-revolve-shell" },
+      "hash": "sha256:8d522eb6f3c7aa5bd6fcced1a3ea0f600a1030525a169009c21e02b6bce78e72",
+      "budgetMs": 2000, "capabilities": ["shell.exact"],
+      "expected": { "outcome": "refused", "refusal": "shell-partial-revolution" }
+    }
+  ]
+}

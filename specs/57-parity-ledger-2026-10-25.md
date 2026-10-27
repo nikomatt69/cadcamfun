@@ -156,9 +156,9 @@ stale "Status" lines of specs 40–55 as the single place that says what is buil
 
 | ID | State | Evidence / what remains |
 |---|---|---|
-| E1 | open | no `packages/core/test/corpus/`, no manifest, no `bun run corpus` |
-| E2 | partial | `bun run bench:cam` (`scripts/cam-performance.ts`, informational, three CAM seams, machine fingerprint) is spec 55 §3.1; no `bun run bench`, no budgets file, no comparison rule |
-| E3 | open | no scorecard; the honest baseline is not recorded |
+| E1 | partial | `packages/core/test/corpus/` (2026-10-27): manifest of 9 history entries, sets (a) six recipes and (c) rounded box, 200-hole plate, half-revolve shell; analytic oracles with their formula; input hashes; refusal registry; `bun run corpus` writes `data/corpus-report.json`, exit 1 on `wrong`. Baseline: 8 pass, 1 slow (200-hole plate 43.8 s against 10 s). Set (c) fuzz seeds and the long thread, STEP / IGES / NC entry kinds and the CI job (E8) open |
+| E2 | built | `bun run bench` (2026-10-27): ten cases (Booleans, exact history, tessellation, STEP write / read, the three `bench:cam` workloads, now shared), budgets in `packages/core/test/bench/bench.config.json`, `data/bench.json` with median / p95 and fingerprint; over-budget under load per CPU above 1 is `inconclusive`; `--baseline` regression = growth over 20 % of the budget, refused across machines or loads 1.5x apart. Drawing, CAM plan and interference cases and the nightly job (E8) open |
+| E3 | built | `bun run scorecard` (2026-10-27) writes `specs/assets/parity-scorecard.md` from `parity.json` (46 capabilities, state copied from this ledger, evidence files checked) and the corpus report. Baseline: level 3: 2 (one corpus entry each), 2: 7, 1: 17, 0: 20. Vendor columns not researched; levels 4 impossible until a qualification record exists |
 | E4–E8 | open | no public STEP / IGES set, no CAM reference set, no scale fixtures, no qualification schema, no nightly corpus / bench job in `.github/workflows` (`ci.yml`, `ci-pipeline.yml`, `build-platforms.yml`, `release.yml`, `publish*.yml`, `ios.yml`) |
 
 ## 3. Gaps that no spec in 39–56 covers
@@ -209,3 +209,4 @@ No answer to D1–D7 is recorded in the repository or in the project notes as of
 
 - 2026-10-25: created. Ledger of 16 specs, eight gaps outside them (specs 58–61), decisions D8–D12.
 - 2026-10-27: X6 row (IGES 124). Outside any spec: the history rebuild keeps one exact replay advanced on demand (`exactReplay`), so named faces and curved fillets no longer replay the exact prefix each time. Heidenhain Klartext writes repeated toolpaths as label subprograms (`CALL LBL n`, incremental bodies after `M30`); a post definition with `base: "heidenhain"` still writes ISO text through the shared writer, not Klartext (open).
+- 2026-10-27: E1 partial, E2 and E3 built (spec 55 wave 0 of spec 62); first scorecard generated.
