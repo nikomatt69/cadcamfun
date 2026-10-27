@@ -29,7 +29,7 @@ export interface KernelSnapshot {
   readonly tolerance?: number
   readonly resolution?: number
   readonly deburr?: number
-  /** Write toolpaths that repeat translated as `M98` subprograms (Fanuc and Haas posts). */
+  /** Write toolpaths that repeat translated as subprograms (`M98` on Fanuc and Haas, `CALL LBL` labels on Heidenhain Klartext). */
   readonly subprograms?: boolean
   /** A post definition that writes the NC in place of the machine's built-in post (spec 54 C1). Inline, so a stored program re-runs with the post it was made with. */
   readonly postDefinition?: unknown

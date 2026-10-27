@@ -208,4 +208,4 @@ No answer to D1–D7 is recorded in the repository or in the project notes as of
 ## 6. Change log
 
 - 2026-10-25: created. Ledger of 16 specs, eight gaps outside them (specs 58–61), decisions D8–D12.
-- 2026-10-27: X6 row (IGES 124). Outside any spec: the history rebuild keeps one exact replay advanced on demand (`exactReplay`), so named faces and curved fillets no longer replay the exact prefix each time.
+- 2026-10-27: X6 row (IGES 124). Outside any spec: the history rebuild keeps one exact replay advanced on demand (`exactReplay`), so named faces and curved fillets no longer replay the exact prefix each time. Heidenhain Klartext writes repeated toolpaths as label subprograms (`CALL LBL n`, incremental bodies after `M30`); a post definition with `base: "heidenhain"` still writes ISO text through the shared writer, not Klartext (open).

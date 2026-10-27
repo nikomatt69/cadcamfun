@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { makeProgram, type Move, type Program, type Toolpath } from "../../src/cam/ir.ts"
-import { fanucPost, genericPost, grblPost, haasPost, type PostOptions } from "../../src/cam/post/index.ts"
+import { fanucPost, genericPost, grblPost, haasPost, heidenhainPost, type PostOptions } from "../../src/cam/post/index.ts"
 import { isTranslation, planSubprograms } from "../../src/cam/post/subprograms.ts"
 import { interpretGcode, type GSegment } from "../../src/cam/testing/gcode-interpreter.ts"
 
@@ -209,5 +209,92 @@ describe("subprograms from repeated toolpaths", () => {
     // Output steps of 0.0254 mm: 12.3456789 mm is not a whole number of them.
     expect(isTranslation(a, b, 0.0254)).toBe(false)
     expect(isTranslation(a, c(pocket("e", "t", 25.4, 2.54)), 0.0254)).toBe(true)
+  })
+})
+
+/** One step of a Klartext program as the control runs it: where the tool goes, at rapid or at which feed. */
+interface KlartextStep { readonly x: number; readonly y: number; readonly z: number; readonly rapid: boolean; readonly feed: number | undefined }
+
+/**
+ * Runs the `L` blocks of a Klartext program: absolute and incremental (`IX`) axes, `R0 FMAX` / `F`, `CALL LBL n` jumping to
+ * `LBL n` and back at `LBL 0`, the main program ending at `M30`. Enough of the control to compare two texts' motion.
+ */
+const runKlartext = (text: string): KlartextStep[] => {
+  const blocks = lines(text).map((l) => l.replace(/^\d+ /, ""))
+  const labels = new Map<number, number>()
+  blocks.forEach((b, i) => { const m = /^LBL (\d+)$/.exec(b); if (m && m[1] !== "0") labels.set(Number(m[1]), i) })
+  const steps: KlartextStep[] = []
+  const at = { x: 0, y: 0, z: 0 }
+  let feed: number | undefined
+  const run = (from: number, inLabel: boolean): void => {
+    for (let i = from; i < blocks.length; i++) {
+      const b = blocks[i]!
+      if (inLabel && b === "LBL 0") return
+      if (!inLabel && (b === "M30" || b.startsWith("END PGM"))) return
+      const call = /^CALL LBL (\d+)$/.exec(b)
+      if (call) { run(labels.get(Number(call[1]))! + 1, true); continue }
+      if (!b.startsWith("L ")) continue
+      for (const w of b.matchAll(/(I?)([XYZ])([+-][\d.]+)/g)) {
+        const axis = w[2]!.toLowerCase() as "x" | "y" | "z"
+        at[axis] = w[1] === "I" ? at[axis] + Number(w[3]) : Number(w[3])
+      }
+      const f = /\bF(\d+(?:\.\d*)?)/.exec(b)
+      if (f) feed = Number(f[1])
+      steps.push({ ...at, rapid: b.includes("FMAX"), feed: b.includes("FMAX") ? undefined : feed })
+    }
+  }
+  run(0, false)
+  return steps
+}
+
+const expectSameMotion = (a: ReadonlyArray<KlartextStep>, b: ReadonlyArray<KlartextStep>) => {
+  expect(a.length).toBe(b.length)
+  a.forEach((s, i) => {
+    const t = b[i]!
+    expect({ i, rapid: s.rapid, feed: s.feed }).toEqual({ i, rapid: t.rapid, feed: t.feed })
+    expect(Math.hypot(s.x - t.x, s.y - t.y, s.z - t.z)).toBeLessThan(2e-3)
+  })
+}
+
+describe("Klartext label subprograms", () => {
+  test("four copies become one label body after M30, called four times, and the control runs the same motion", () => {
+    const p = holes(gridMm)
+    const text = heidenhainPost.emit(p, sub)
+    const l = lines(text).map((x) => x.replace(/^\d+ /, ""))
+    expect(l.filter((x) => x === "CALL LBL 1")).toHaveLength(4)
+    expect(l.filter((x) => x === "LBL 1")).toHaveLength(1)
+    expect(l.indexOf("LBL 1")).toBeGreaterThan(l.indexOf("M30"))
+    expect(l.indexOf("LBL 0")).toBeLessThan(l.findIndex((x) => x.startsWith("END PGM")))
+    // The body is incremental, so one text serves every copy; nothing of the ISO subprogram syntax is left.
+    const body = l.slice(l.indexOf("LBL 1") + 1, l.indexOf("LBL 0"))
+    expect(body.some((x) => /^L .*\bI[XYZ][+-]/.test(x))).toBe(true)
+    expect(body.every((x) => !/(?:^|\s)[XYZ][+-]/.test(x))).toBe(true)
+    expect(text).not.toMatch(/M98|M99|G91|\bO\d/)
+    expect(text.length).toBeLessThan(heidenhainPost.emit(p).length)
+    expectSameMotion(runKlartext(text), runKlartext(heidenhainPost.emit(p)))
+  })
+
+  test("a move after a call keeps the body's feed mode: the writer omits the G1 the body left active", () => {
+    // Copies that end on a feed move, then a finishing pass whose first move is a feed move: after the last call the shared
+    // writer writes it without G1, and the post must not read it as the rapid of the positioning before the call.
+    const copy = (id: string, ox: number, oy: number): Toolpath => {
+      const t = pocket(id, "t1", ox, oy)
+      return { ...t, moves: t.moves.slice(0, -2) }
+    }
+    const finish: Toolpath = { id: "finish", name: "Finish", toolId: "t1", spindleRpm: 8000, coolant: "flood", moves: [
+      { _tag: "Linear", to: { x: 80, y: 80, z: -3 }, feed: 900 }, { _tag: "Linear", to: { x: 90, y: 80, z: -3 }, feed: 900 }, { _tag: "Rapid", to: { x: 90, y: 80, z: 5 } }
+    ] }
+    const p = makeProgram("ends-cutting", [...gridMm.map(([x, y], i) => copy(`c${i}`, x, y)), finish], { units: "mm", workOffset: "G54" })
+    const text = heidenhainPost.emit(p, sub)
+    expect(text).toContain("CALL LBL 1")
+    const l = lines(text).map((x) => x.replace(/^\d+ /, ""))
+    expect(l.slice(l.lastIndexOf("CALL LBL 1") + 1).find((x) => x.startsWith("L "))).toMatch(/^L X\+80(?:\.0+)? Y\+80(?:\.0+)?(?: Z-3(?:\.0+)?)? R0$/)
+    expectSameMotion(runKlartext(text), runKlartext(heidenhainPost.emit(p)))
+  })
+
+  test("without the option the Klartext text is unchanged", () => {
+    const p = holes(gridMm)
+    expect(heidenhainPost.emit(p, { subprograms: false })).toBe(heidenhainPost.emit(p))
+    expect(heidenhainPost.emit(p)).not.toContain("LBL")
   })
 })

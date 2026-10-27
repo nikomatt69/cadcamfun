@@ -439,7 +439,7 @@
   "cam.kernel.tolerance": "Geometry tolerance (mm)",
   "cam.kernel.finishAllowance": "Roughing finish allowance (mm)",
   "cam.kernel.scallop": "Finishing scallop height (mm)",
-  "cam.kernel.subprograms": "Subprograms (M98) for repeated toolpaths (Fanuc and Haas)",
+  "cam.kernel.subprograms": "Subprograms for repeated toolpaths (Fanuc and Haas M98, Heidenhain CALL LBL)",
   "cam.kernel.autoResolution": "Automatic stock replay resolution",
   "cam.kernel.resolution": "Stock replay cell size (mm)",
   "cam.kernel.resetQuality": "Use recommended quality",

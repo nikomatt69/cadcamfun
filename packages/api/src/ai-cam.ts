@@ -55,7 +55,7 @@ export const CamManufactureInput = Schema.Struct({
   tools: Schema.optionalKey(Schema.Array(cam.kernel.CutterSchema).check(Schema.isMinLength(1), Schema.isMaxLength(200))),
   /** Break the top edges with a chamfer of this width, mm (2D chamfer operations). */
   deburr: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(5))),
-  /** Write toolpaths that repeat translated (hole patterns, copies of a pocket) once as an `M98` subprogram (Fanuc and Haas posts). */
+  /** Write toolpaths that repeat translated (hole patterns, copies of a pocket) once as a subprogram (`M98` on the Fanuc and Haas posts, `CALL LBL` on the Heidenhain Klartext post). */
   subprograms: Schema.optionalKey(Schema.Boolean),
   /** A post definition (spec 54 C1) that writes the NC in place of the machine's post: inline, or the id of a library item (category "post"), or the `postDefinitionId` of the machine configuration. */
   postDefinition: Schema.optionalKey(Schema.Json),
