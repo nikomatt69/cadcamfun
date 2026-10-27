@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.34 (October 2026)
+
+## Desktop
+
+- Fix placement references and validate CAD/CAM keyboard flows
+
 ## v0.1.33 (October 2026)
 
 - No notable changes

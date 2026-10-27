@@ -2,7 +2,7 @@
   "expo": {
     "name": "CADCAMFUN",
     "slug": "cadcamfun-mobile",
-    "version": "0.1.33",
+    "version": "0.1.34",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
