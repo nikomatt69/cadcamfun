@@ -3,6 +3,7 @@
  * at the tool boundary (`toolRefusal`) they become the `{ ok: false, error }` answer instead of a thrown error.
  */
 import { Data } from "effect"
+import type { TurnCancelled } from "./acting-user.ts"
 
 /** The project does not exist or the acting account cannot see it. */
 export class ProjectNotAccessible extends Data.TaggedError("ProjectNotAccessible")<{ readonly projectId: string; readonly message: string }> {
@@ -18,17 +19,11 @@ export class WriteForbidden extends Data.TaggedError("WriteForbidden")<{ readonl
   }
 }
 
-/** The turn that called the tool was cancelled before the tool changed anything. */
-export class ToolCancelled extends Data.TaggedError("ToolCancelled")<{ readonly message: string }> {
-  constructor(message = "Tool execution cancelled before mutation.") {
-    super({ message })
-  }
-}
-
 /** The drawing the tool would act on cannot be resolved (gone, ambiguous, or none yet); the message says what to do. */
 export class DrawingUnavailable extends Data.TaggedError("DrawingUnavailable")<{ readonly message: string }> {}
 
-export type ToolAccessError = ProjectNotAccessible | WriteForbidden | ToolCancelled | DrawingUnavailable
+/** A cancelled turn (`TurnCancelled`, from `acting-user.ts`) is a refusal too. */
+export type ToolAccessError = ProjectNotAccessible | WriteForbidden | TurnCancelled | DrawingUnavailable
 
 /** The answer a tool gives the model for a refusal. */
 export const toolRefusal = (error: ToolAccessError): { readonly ok: false; readonly error: string } => ({ ok: false, error: error.message })

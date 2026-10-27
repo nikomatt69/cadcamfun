@@ -18,8 +18,8 @@ import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
 import { assemblyForModel, exactForModel, setupsForModel } from "./ai-exact.ts"
 import { changeParameters, historyRevision, inspectParametric, testParametric } from "./ai-parametric.ts"
-import { ActingUser } from "./acting-user.ts"
-import { DrawingUnavailable, ProjectNotAccessible, ToolCancelled, WriteForbidden, toolRefusal } from "./ai-tool-errors.ts"
+import { ActingUser, CurrentTurn, ensureTurnActive } from "./acting-user.ts"
+import { DrawingUnavailable, ProjectNotAccessible, WriteForbidden, toolRefusal } from "./ai-tool-errors.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
 import { ComponentRepo } from "../repos/component-repo.ts"
 import { DrawingConflict, DrawingRepo, drawingContentHash } from "../repos/drawing-repo.ts"
@@ -138,27 +138,28 @@ const toolHandlers = Effect.gen(function*() {
    * The one bridge from the tool handlers (Promises: the nikcli host contract) into Effect. It runs with the services this layer
    * was built with (the JSON logger on stderr, the tracer, every reference), where a bare `Effect.runPromise` runs on an empty
    * context: no spans, and logs printed unformatted on stdout, the channel the shell parses for the ready event.
+   *
+   * It is also where the turn enters Effect: the handler runs inside the host's invocation, so the turn is read from it here,
+   * once, and provided as `CurrentTurn`. Effect code reads its account, drawing and cancellation from that context value.
    */
-  const run = Effect.runPromiseWith(yield* Effect.context<never>())
+  const runInLayer = Effect.runPromiseWith(yield* Effect.context<never>())
+  const run = <A, E>(effect: Effect.Effect<A, E, CurrentTurn>): Promise<A> =>
+    runInLayer(effect.pipe(Effect.provideService(CurrentTurn, actingCell.turn(local))))
 
-  /** Fails with `ToolCancelled` when the turn that called the tool has been cancelled. */
-  const turnActive = Effect.try({
-    try: () => actingCell.assertActive(),
-    catch: (error) => new ToolCancelled(error instanceof Error ? error.message : undefined)
-  })
   /** The acting account's access to a project, or `ProjectNotAccessible`. */
   const requireProject = Effect.fn("AiTools.requireProject")(function*(projectId: string) {
-    const access = yield* projects.find(acting().id, projectId)
+    const { user } = yield* CurrentTurn
+    const access = yield* projects.find(user.id, projectId)
     if (access === undefined) return yield* new ProjectNotAccessible(projectId)
     return access
   })
   /** Reads never provision a workspace. Only an authorized write may create the default project or drawing. */
   const requireWrite = Effect.fn("AiTools.requireWrite")(function*(projectId: string) {
-    yield* turnActive
-    const actor = acting()
+    yield* ensureTurnActive
+    const { user: actor } = yield* CurrentTurn
     const access = yield* projects.find(actor.id, projectId)
     if (!access || (access.project.ownerId !== actor.id && access.orgRole !== "ADMIN" && access.orgRole !== "MANAGER")) return yield* new WriteForbidden(projectId)
-    yield* turnActive
+    yield* ensureTurnActive
   })
   const assertWrite = (projectId: string): Promise<void> => run(requireWrite(projectId))
   /** The answer a tool gives when the project is not accessible; undefined when it is. */
@@ -171,19 +172,20 @@ const toolHandlers = Effect.gen(function*() {
    * Without a binding (older clients, the compatibility path) the editor snapshot or an unambiguous project resolves it.
    */
   const loadDrawing = Effect.fn("AiTools.load")(function*(projectId: string, write: boolean) {
-    const actor = acting()
+    const turn = yield* CurrentTurn
+    const actor = turn.user
     let project: { id: string } | undefined = (yield* projects.find(actor.id, projectId))?.project
     let created = false
     if (!project) {
       if (projectId !== "default") return yield* new ProjectNotAccessible(projectId, "Project not found or not accessible; no other workspace was modified.")
-      const own = (yield* projects.list(acting().id)).find((candidate) => candidate.ownerId === acting().id)
+      const own = (yield* projects.list(actor.id)).find((candidate) => candidate.ownerId === actor.id)
       if (!own && !write) return yield* new DrawingUnavailable({ message: "Open a project before inspecting the workspace." })
       project = own ?? (yield* projects.create(actor.id, { name: "Untitled project" }))
       created = own === undefined
     }
     if (write) yield* requireWrite(project.id)
     const rows = yield* drawings.listByProject(project.id)
-    const turnDrawing = actingCell.drawing()
+    const turnDrawing = turn.drawingId
     if (turnDrawing !== undefined) {
       const row = rows.find((drawing) => drawing.id === turnDrawing)
       if (!row) return yield* new DrawingUnavailable({ message: "The drawing this conversation works on is not in this project any more; open a drawing and send the request again. Nothing was changed." })
@@ -213,7 +215,8 @@ const toolHandlers = Effect.gen(function*() {
    * the write are one transaction. A concurrent save is a `DrawingConflict` and is not overwritten. Answers the receipt.
    */
   const saveDrawing = Effect.fn("AiTools.save")(function*(loaded: { readonly id: string; readonly contentHash: string }, data: Record<string, unknown>, elements: ReadonlyArray<Element>) {
-    const drawing = yield* drawings.find(acting().id, loaded.id)
+    const { user } = yield* CurrentTurn
+    const drawing = yield* drawings.find(user.id, loaded.id)
     if (!drawing) return yield* new DrawingUnavailable({ message: "Drawing no longer exists." })
     yield* requireWrite(drawing.project.id)
     const receipt = yield* drawings.writeIfUnchanged(loaded.id, loaded.contentHash, { ...data, elements, version: "1.0" })
@@ -1169,7 +1172,7 @@ const toolHandlers = Effect.gen(function*() {
         note: "The stored program was replayed unchanged. A passing report covers only what is modelled at this program, drawing and stock revision; it is not a machine certification."
       }
     },
-    remember: async (key, value) => { actingCell.assertActive(); await run(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
+    remember: async (key, value) => { await run(ensureTurnActive); await run(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
     recall: async (prefix) => (await run(kv.list(`ai.memory.${prefix ?? ""}`))).map((e) => ({ key: e.key.slice("ai.memory.".length), value: e.value })),
     projectContext: async (projectId) => {
       const entry = await run(kv.get(projectContextKey(projectId)))
@@ -1213,7 +1216,7 @@ const toolHandlers = Effect.gen(function*() {
         const found = kind === "material" ? await run(materials.find(acting().id, id)) : await run(tools.find(acting().id, id))
         if (!found) return { ok: false, error: `Unknown ${kind} id: ${id}.` }
         if (!found.canWrite) return { ok: false, error: `The acting user may not delete this ${kind}.` }
-        actingCell.assertActive()
+        await run(ensureTurnActive)
         await run(kind === "material" ? materials.remove(id) : tools.remove(id))
         return { ok: true, kind, id, note: "Toolpaths that referenced it keep their stored parameters; re-check them with cam_verify_toolpath." }
       }
@@ -1221,7 +1224,7 @@ const toolHandlers = Effect.gen(function*() {
         const found = await run(libraryItems.find(acting().id, id))
         if (!found) return { ok: false, error: `Unknown library item id: ${id}.` }
         if (found.item.ownerId !== acting().id) return { ok: false, error: "Only the owner may delete this library item." }
-        actingCell.assertActive()
+        await run(ensureTurnActive)
         await run(libraryItems.remove(id))
         return { ok: true, kind, id }
       }
@@ -1229,7 +1232,7 @@ const toolHandlers = Effect.gen(function*() {
       if (!found) return { ok: false, error: `Unknown machine config id: ${id}.` }
       if (!found.permission.isOwner) return { ok: false, error: "Only the owner may delete this machine config." }
       if (found.usageCount > 0) return { ok: false, error: `This machine config is still used by ${found.usageCount} toolpath(s); reassign or delete them first.` }
-      actingCell.assertActive()
+      await run(ensureTurnActive)
       await run(machines.remove(id))
       return { ok: true, kind, id }
     },
@@ -1289,12 +1292,12 @@ const toolHandlers = Effect.gen(function*() {
       if (!found) return { ok: false, error: `Unknown component id: ${componentId}.` }
       const access = await run(projects.find(acting().id, found.projectId))
       if (!access || (access.project.ownerId !== acting().id && access.orgRole !== "ADMIN" && access.orgRole !== "MANAGER")) return { ok: false, error: "You do not have permission to delete this component." }
-      actingCell.assertActive()
+      await run(ensureTurnActive)
       await run(components.remove(componentId))
       return { ok: true, deleted: componentId }
     },
     upsertMaterial: async (input) => {
-      actingCell.assertActive()
+      await run(ensureTurnActive)
       const id = typeof input["id"] === "string" ? input["id"] : undefined
       const name = String(input["name"])
       const properties = (input["properties"] !== null && typeof input["properties"] === "object" ? input["properties"] : {}) as Record<string, unknown>
@@ -1303,7 +1306,7 @@ const toolHandlers = Effect.gen(function*() {
         if (!existing) return { ok: false, error: "Material not found or not accessible; no replacement was created." }
         if (existing) {
           if (!existing.canWrite) return { ok: false, error: "You do not have permission to update this material." }
-          actingCell.assertActive()
+          await run(ensureTurnActive)
           const row = await run(materials.update(id, { name, properties, ...(typeof input["description"] === "string" ? { description: input["description"] } : {}), ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }))
           return { ok: true, id: row.id, created: false }
         }
@@ -1312,7 +1315,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, id: row.id, created: true }
     },
     upsertTool: async (input) => {
-      actingCell.assertActive()
+      await run(ensureTurnActive)
       // Values that cannot describe one cutter are refused before any write, with what to change.
       const num = (key: string): number | undefined => (typeof input[key] === "number" ? input[key] as number : undefined)
       const cutting = num("cuttingLength"), total = num("totalLength")
@@ -1335,7 +1338,7 @@ const toolHandlers = Effect.gen(function*() {
         if (!existing) return { ok: false, error: "Tool not found or not accessible; no replacement was created." }
         if (existing) {
           if (!existing.canWrite) return { ok: false, error: "You do not have permission to update this tool." }
-          actingCell.assertActive()
+          await run(ensureTurnActive)
           const row = await run(tools.update(id, fields))
           return { ok: true, id: row.id, created: false }
         }
@@ -1344,7 +1347,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, id: row.id, created: true }
     },
     upsertMachineConfig: async (input) => {
-      actingCell.assertActive()
+      await run(ensureTurnActive)
       const id = typeof input["id"] === "string" ? input["id"] : undefined
       // The configuration is written as the machine profile: the fields the model sent, in the canonical shape, plus the
       // legacy spellings it may still use. The kernel reads it back through the same profile, so what is written is what
@@ -1356,7 +1359,7 @@ const toolHandlers = Effect.gen(function*() {
         if (!existing) return { ok: false, error: "Machine config not found or not accessible; no replacement was created." }
         if (existing) {
           if (!existing.permission.isOwner) return { ok: false, error: "Only the owner may update this machine config." }
-          actingCell.assertActive()
+          await run(ensureTurnActive)
           const res = await run(machines.update(id, { name: String(input["name"]), description: typeof input["description"] === "string" ? input["description"] : null, type, config, isPublic: input["isPublic"] === true }))
           return { ok: true, id: res.view.id, created: false }
         }
@@ -1365,7 +1368,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, id: view.id, created: true }
     },
     upsertLibraryItem: async (input) => {
-      actingCell.assertActive()
+      await run(ensureTurnActive)
       const id = typeof input["id"] === "string" ? input["id"] : undefined
       const fields = {
         name: String(input["name"]), category: String(input["category"]), type: String(input["type"]), data: input["data"],
@@ -1378,7 +1381,7 @@ const toolHandlers = Effect.gen(function*() {
         const existing = await run(libraryItems.find(acting().id, id))
         if (!existing) return { ok: false, error: "Library item not found or not accessible; no replacement was created." }
         if (existing.item.ownerId !== acting().id) return { ok: false, error: "Only the owner may update this library item." }
-        actingCell.assertActive()
+        await run(ensureTurnActive)
         const row = await run(libraryItems.update(existing.item, fields))
         return { ok: true, id: row.id, created: false }
       }
@@ -1386,7 +1389,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, id: row.id, created: true }
     },
     setCost: async (input) => {
-      actingCell.assertActive()
+      await run(ensureTurnActive)
       const userId = acting().id
       const kind = String(input["kind"])
       const id = typeof input["id"] === "string" ? input["id"] : undefined
@@ -1399,7 +1402,7 @@ const toolHandlers = Effect.gen(function*() {
         if (id !== undefined) {
           const existing = await run(costs.findMaterialCost(userId, id))
           if (!existing) return { ok: false, error: "Material cost not found or not accessible; no replacement was created." }
-          actingCell.assertActive()
+          await run(ensureTurnActive)
           return { ok: true, id: (await run(costs.updateMaterialCost(userId, id, patch))).id, created: false }
         }
         const materialId = typeof input["materialId"] === "string" ? input["materialId"] : undefined
@@ -1407,7 +1410,7 @@ const toolHandlers = Effect.gen(function*() {
         if (patch.costPerUnit === undefined) return missing("costPerUnit")
         const material = await run(materials.find(userId, materialId))
         if (!material) return { ok: false, error: `Unknown material id: ${materialId}.` }
-        actingCell.assertActive()
+        await run(ensureTurnActive)
         return { ok: true, id: (await run(costs.createMaterialCost(userId, { ...patch, materialId, costPerUnit: patch.costPerUnit }))).id, created: true }
       }
       if (kind === "tool_wear") {
@@ -1415,7 +1418,7 @@ const toolHandlers = Effect.gen(function*() {
         if (id !== undefined) {
           const existing = await run(costs.findToolWear(userId, id))
           if (!existing) return { ok: false, error: "Tool wear cost not found or not accessible; no replacement was created." }
-          actingCell.assertActive()
+          await run(ensureTurnActive)
           return { ok: true, id: (await run(costs.updateToolWear(userId, id, patch))).id, created: false }
         }
         const toolId = typeof input["toolId"] === "string" ? input["toolId"] : undefined
@@ -1423,18 +1426,18 @@ const toolHandlers = Effect.gen(function*() {
         if (patch.wearRatePerMeter === undefined || patch.replacementCost === undefined) return missing("wearRatePerMeter and replacementCost")
         const tool = await run(tools.find(userId, toolId))
         if (!tool) return { ok: false, error: `Unknown tool id: ${toolId}.` }
-        actingCell.assertActive()
+        await run(ensureTurnActive)
         return { ok: true, id: (await run(costs.createToolWear(userId, { ...patch, toolId, wearRatePerMeter: patch.wearRatePerMeter, replacementCost: patch.replacementCost }))).id, created: true }
       }
       const patch = pick({ name: typeof input["name"] === "string" ? input["name"] : undefined, machineHourlyRate: num("machineHourlyRate"), operatorHourlyRate: num("operatorHourlyRate"), setupTime: num("setupTime"), currencyCode })
       if (id !== undefined) {
         const existing = await run(costs.findOperationCost(userId, id))
         if (!existing) return { ok: false, error: "Operation cost not found or not accessible; no replacement was created." }
-        actingCell.assertActive()
+        await run(ensureTurnActive)
         return { ok: true, id: (await run(costs.updateOperationCost(userId, id, patch))).id, created: false }
       }
       if (patch.name === undefined || patch.machineHourlyRate === undefined || patch.operatorHourlyRate === undefined) return missing("name, machineHourlyRate and operatorHourlyRate")
-      actingCell.assertActive()
+      await run(ensureTurnActive)
       return { ok: true, id: (await run(costs.createOperationCost(userId, { ...patch, name: patch.name, machineHourlyRate: patch.machineHourlyRate, operatorHourlyRate: patch.operatorHourlyRate }))).id, created: true }
     },
     setProjectDefault: async (input) => {

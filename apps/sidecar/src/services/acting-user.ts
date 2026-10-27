@@ -3,9 +3,13 @@
  * `http/authorization.ts`), while handlers are cached. Admission binds an authenticated session owner; each tool invocation
  * captures that owner in async-local storage, including existing child-session ownership. The compatibility cell is never
  * consulted by admitted host calls. Private owner files survive native session reattachment; unknown controls fail closed.
+ *
+ * Async-local storage is the nikcli edge only: the host calls tools as Promises, so the invocation is found there once
+ * (`turn`) and from then on travels as the Effect context value `CurrentTurn`. Effect code reads the turn from its context,
+ * and a cancelled turn is the typed failure `TurnCancelled`, never a throw.
  */
 import type { SessionUser } from "@cadcamfun/api"
-import { Context, Layer } from "effect"
+import { Context, Data, Effect, Layer } from "effect"
 import { AsyncLocalStorage } from "node:async_hooks"
 import { childAgent } from "@cadcamfun/ai"
 import { createHash } from "node:crypto"
@@ -16,6 +20,43 @@ interface SessionOwner {
   readonly projectId: string
   readonly userId: string
 }
+
+/** The chat turn a tool call belongs to. */
+export interface Turn {
+  /** The account the call acts as: the admitted session owner, else the last chat turn's, else the fallback (local profile). */
+  readonly user: SessionUser
+  /** The message that opened the turn, for the citation an AI commit carries. */
+  readonly prompt?: string
+  /** The drawing the admitted turn works on; undefined outside an admitted invocation or when the turn named none. */
+  readonly drawingId?: string
+  /** Aborts when the turn is cancelled. */
+  readonly signal?: AbortSignal
+  /** True inside an admitted invocation (a host tool call or a bridge call), false for the compatibility path. */
+  readonly admitted: boolean
+}
+
+/** The turn of the running tool call, provided at the edge where a Promise call enters Effect. */
+export class CurrentTurn extends Context.Service<CurrentTurn, Turn>()("cadcamfun/CurrentTurn") {}
+
+/** The turn was cancelled; nothing after this point may change anything. */
+export class TurnCancelled extends Data.TaggedError("TurnCancelled")<{ readonly message: string }> {
+  constructor(message = "Tool execution cancelled before mutation.") {
+    super({ message })
+  }
+}
+
+/** A host call that no admitted session owns: refused, never run as someone else. */
+export class TurnUnowned extends Data.TaggedError("TurnUnowned")<{ readonly message: string }> {
+  constructor() {
+    super({ message: "AI invocation has no authenticated session owner" })
+  }
+}
+
+/** Fails with `TurnCancelled` once the current turn is cancelled: checked before every mutation. */
+export const ensureTurnActive: Effect.Effect<void, TurnCancelled, CurrentTurn> = Effect.gen(function*() {
+  const turn = yield* CurrentTurn
+  if (turn.signal?.aborted === true) return yield* new TurnCancelled()
+})
 
 interface InvocationActor {
   readonly user: SessionUser
@@ -44,12 +85,13 @@ export class ActingUser extends Context.Service<ActingUser, {
    * act on. Nothing outside the admission (another window's editor state) can change it.
    */
   readonly bind: (projectId: string, sessionId: string, user: SessionUser, prompt?: string, drawingId?: string) => Promise<boolean>
-  /** The drawing bound to the running invocation; undefined outside an admitted invocation or when the turn named none. */
-  readonly drawing: () => string | undefined
-  /** True inside an admitted invocation (a host tool call or a bridge call), false for the compatibility path. */
-  readonly admitted: () => boolean
+  /**
+   * The turn of the running call, read from the invocation it runs in. Call it where a Promise call enters Effect and provide it
+   * as `CurrentTurn`; Effect code never reads the async-local storage itself.
+   */
+  readonly turn: (fallback: SessionUser) => Turn
+  /** Runs `execute` as the session's admitted owner. Rejects with `TurnUnowned` or `TurnCancelled` without running it. */
   readonly invoke: <A>(projectId: string, sessionId: string, execute: () => Promise<A>, signal?: AbortSignal) => Promise<A>
-  readonly assertActive: () => void
 }>()("cadcamfun/ActingUser") {
   static readonly layer = Layer.sync(ActingUser, () => {
     let current: SessionUser | undefined
@@ -155,15 +197,21 @@ export class ActingUser extends Context.Service<ActingUser, {
         sessions.set(sessionId, { projectId, actor: Object.freeze({ user: Object.freeze({ ...user }), ...(message !== undefined ? { prompt: message } : {}), ...(drawingId !== undefined ? { drawingId } : {}) }) })
         return true
       },
-      drawing: () => invocations.getStore()?.drawingId,
-      admitted: () => invocations.getStore() !== undefined,
-      assertActive: () => {
-        if (invocations.getStore()?.signal?.aborted) throw new Error("Tool execution cancelled before mutation.")
+      turn: (fallback) => {
+        const invocation = invocations.getStore()
+        const turnPrompt = invocation ? invocation.prompt : prompt
+        return Object.freeze({
+          user: invocation?.user ?? current ?? fallback,
+          ...(turnPrompt !== undefined ? { prompt: turnPrompt } : {}),
+          ...(invocation?.drawingId !== undefined ? { drawingId: invocation.drawingId } : {}),
+          ...(invocation?.signal !== undefined ? { signal: invocation.signal } : {}),
+          admitted: invocation !== undefined
+        })
       },
       invoke: (projectId, sessionId, execute, signal) => {
         const owner = sessions.get(sessionId) ?? [...sessions.entries()].find(([parent, binding]) => binding.projectId === projectId && childAgent(parent, sessionId) !== undefined)?.[1]
-        if (!owner || owner.projectId !== projectId) return Promise.reject(new Error("AI invocation has no authenticated session owner"))
-        if (signal?.aborted) return Promise.reject(new Error("Tool execution cancelled."))
+        if (!owner || owner.projectId !== projectId) return Promise.reject(new TurnUnowned())
+        if (signal?.aborted) return Promise.reject(new TurnCancelled("Tool execution cancelled."))
         return invocations.run(Object.freeze({ ...owner.actor, ...(signal ? { signal } : {}) }), execute)
       }
     })

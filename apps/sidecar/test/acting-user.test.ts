@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { SessionUser } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { adoptChildSession } from "@cadcamfun/ai"
-import { ActingUser } from "../src/services/acting-user.ts"
+import { ActingUser, CurrentTurn, TurnCancelled, TurnUnowned, ensureTurnActive } from "../src/services/acting-user.ts"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -36,11 +36,16 @@ test("overlapping tool invocations retain their admitted actor and prompt", asyn
     } finally { detach() }
     const controller = new AbortController()
     yield* Effect.promise(() => acting.invoke("a", "sa", async () => {
+      const live = acting.turn(bob)
+      expect(Effect.runSync(Effect.exit(ensureTurnActive.pipe(Effect.provideService(CurrentTurn, live))))._tag).toBe("Success")
       controller.abort()
-      expect(() => acting.assertActive()).toThrow("cancelled before mutation")
+      const cancelled = Effect.runSync(Effect.flip(ensureTurnActive.pipe(Effect.provideService(CurrentTurn, acting.turn(bob)))))
+      expect(cancelled).toBeInstanceOf(TurnCancelled)
+      expect(cancelled.message).toContain("cancelled before mutation")
     }, controller.signal))
     yield* Effect.promise(async () => {
-      await expect(acting.invoke("a", "sa", async () => "must not execute", controller.signal)).rejects.toThrow("cancelled")
+      await expect(acting.invoke("a", "sa", async () => "must not execute", controller.signal)).rejects.toBeInstanceOf(TurnCancelled)
+      await expect(acting.invoke("b", "sa", async () => "wrong")).rejects.toBeInstanceOf(TurnUnowned)
     })
   }).pipe(Effect.provide(ActingUser.layer)))
 })
@@ -66,4 +71,21 @@ test("private session authority survives service restart and cannot be rebound t
     })
     await run(async (acting) => { expect(await acting.owner("ses_saved")).toBeUndefined() })
   } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test("the turn is read once at the edge: inside an invocation it is the admitted owner and drawing, outside the fallback", async () => {
+  await Effect.runPromise(Effect.gen(function*() {
+    const acting = yield* ActingUser
+    const alice = new SessionUser({ id: "alice", name: "Alice", email: "alice@test.local" })
+    const local = new SessionUser({ id: "local", name: "Local", email: "local@test.local" })
+    const outside = acting.turn(local)
+    expect(outside).toEqual({ user: local, admitted: false })
+    expect(yield* Effect.promise(() => acting.bind("p", "s", alice, "make a plate", "d1"))).toBe(true)
+    const inside = yield* Effect.promise(() => acting.invoke("p", "s", async () => acting.turn(local)))
+    expect(inside).toMatchObject({ user: { id: "alice" }, prompt: "make a plate", drawingId: "d1", admitted: true })
+    // Effect code reads the turn from its context, never from the storage: what was provided is what it sees.
+    const seen = yield* CurrentTurn.pipe(Effect.provideService(CurrentTurn, inside))
+    expect(seen.user.id).toBe("alice")
+    expect(Object.isFrozen(inside)).toBe(true)
+  }).pipe(Effect.provide(ActingUser.layer)))
 })
