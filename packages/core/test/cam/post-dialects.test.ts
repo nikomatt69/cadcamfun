@@ -79,7 +79,7 @@ describe("Klartext: circles, M functions and tool calls as the control reads the
     const circles = l.filter((b) => b.startsWith("C "))
     // Quarter arc + two halves of the full circle; the helix (Z changes) is not a C block.
     expect(circles).toHaveLength(3)
-    for (const c of circles) expect(c).toMatch(/^C X[+-][\d.]+ Y[+-][\d.]+ DR[+-] R0(?: F\d+)?$/)
+    for (const c of circles) expect(c).toMatch(/^C X[+-][\d.]+ Y[+-][\d.]+ DR[+-](?: F\d+)?$/)
     expect(l.filter((b) => b.startsWith("CC "))).toHaveLength(3)
     expect(l[l.indexOf(circles[0]!) - 1]).toBe("CC IX+0.000 IY+10.000")
     expect(circles[0]).toContain("DR+")
@@ -276,9 +276,9 @@ describe("Klartext inch programs and presets", () => {
   test("G54-G59 select preset rows 1-6 with cycle 247; its continuation line has no block number", () => {
     const text = heidenhainPost.emit({ ...contour(), workOffset: "G57" })
     const raw = text.split("\n")
-    const at = raw.findIndex((r) => r.endsWith("CYCL DEF 247 DATUM SETTING ~"))
+    const at = raw.findIndex((r) => r.endsWith("CYCL DEF 247 PRESETTING ~"))
     expect(at).toBeGreaterThan(0)
-    expect(raw[at + 1]).toBe("  Q339=+4 ;DATUM NUMBER")
+    expect(raw[at + 1]).toBe("  Q339=+4 ;PRESET NUMBER")
     expect(Number(raw[at + 2]!.split(" ")[0])).toBe(Number(raw[at]!.split(" ")[0]) + 1)
     expect(at).toBeLessThan(raw.findIndex((r) => r.includes("TOOL CALL")))
     const read = convertNc(text, { source: "heidenhain", target: "fanuc" })

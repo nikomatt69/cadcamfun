@@ -9,6 +9,10 @@ import type { Dialect, Post } from "./types.ts"
  * `M98` subprograms) with what is Mazak's own: synchronous (rigid) tapping is `G84.2`, entered without Fanuc's `M29` block,
  * and tool tip point control is `G43.4 H<n>` (cancelled with `G43 H<n>`). The control must read the tool length for EIA programs
  * (Mazak tool-data parameters). No contour smoothing: Mazak's high-speed modes are machine options with their own words.
+ *
+ * Source: Mazak EIA/ISO programming manual for MAZATROL MATRIX — G-code list (`G43.4`, `G84.2`/`G84.3` synchronous tapping),
+ * §14-3-5 `G84.2 X_ Z_ R_ P_ F_ L_ M_` (spindle reversed at the hole bottom, no M29 block). The machine needs the synchronous
+ * tapping option.
  */
 export const mazakDialect: Dialect = {
   ...fanucDialect,

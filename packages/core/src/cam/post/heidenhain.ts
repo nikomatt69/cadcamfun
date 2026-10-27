@@ -17,6 +17,10 @@ import type { Dialect, Post, PostOptions } from "./types.ts"
  * Units: `BEGIN PGM … MM` or `… INCH`; in an inch program positions are inches (4 decimals by default) and the feed is in
  * 1/10 inch/min, as the TNC reads F there. The work offset `G54`…`G59` selects row 1…6 of the preset table with cycle 247
  * (`Q339`), written at the start: the rows must hold the datums the program was made for.
+ *
+ * Sources: TNC 640 Klartext user's manual 01/2022 (feed "in 1/10 inch/min in inch-programs"; CC / C examples, C without radius
+ * compensation; up to four M functions at the end of a positioning block), TNC 640 cycle manual 10/2017 (`CYCL DEF 9.0 DWELL
+ * TIME` / `9.1 DWELL`, `CYCL DEF 32.0 TOLERANCE` / `32.1 T`, `CYCL DEF 247 PRESETTING` / `Q339=n ;PRESET NUMBER`).
  */
 export const heidenhainDialect: Dialect = {
   ...genericDialect, id: "heidenhain", canned: false, rigidTap: undefined, arcModes: ["ijk"], arcLimits: { helical: false, fullCircle: false },
@@ -131,7 +135,8 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
     if (/^G2[01](?:\s+(?:G90|G17|G94))*$/.test(line)) continue
     const datum = /^PRESET (\d)$/.exec(line)
     // Cycle 247 is one block over two lines: the continuation line carries no block number.
-    if (datum) { block("CYCL DEF 247 DATUM SETTING ~"); lines.push(`  Q339=+${datum[1]} ;DATUM NUMBER`); continue }
+    // TNC 640 cycle manual: `CYCL DEF 247 PRESETTING` / `Q339=n ;PRESET NUMBER` (iTNC 530 named it DATUM SETTING).
+    if (datum) { block("CYCL DEF 247 PRESETTING ~"); lines.push(`  Q339=+${datum[1]} ;PRESET NUMBER`); continue }
     if (line.startsWith("CYCL DEF ")) { block(line); continue }
     const dwell = /^G4 P([\d.]+)$/.exec(line)
     if (dwell) { block("CYCL DEF 9.0 DWELL TIME"); block(`CYCL DEF 9.1 DWELL ${dwell[1]}`); continue }
@@ -155,7 +160,8 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
       // The centre relative to the arc's start (the last programmed position), the end point absolute or incremental.
       block(`CC IX${signed(value("I") ?? "0")} IY${signed(value("J") ?? "0")}`)
       const ends = words.filter((w) => w[0] === "X" || w[0] === "Y").map(axis)
-      move(`C ${ends.join(" ")} DR${motion === "G3" ? "+" : "-"} R0${feed !== undefined ? ` F${feedWord(feed)}` : ""}`)
+      // As in the TNC 640 manual's examples: no radius compensation on C, it stays what the last L set (R0).
+      move(`C ${ends.join(" ")} DR${motion === "G3" ? "+" : "-"}${feed !== undefined ? ` F${feedWord(feed)}` : ""}`)
       continue
     }
     if (motion === "G2" || motion === "G3") throw new RangeError(`Klartext cannot express block: ${raw}`)

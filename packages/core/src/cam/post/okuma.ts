@@ -12,6 +12,10 @@ import type { Dialect, Post } from "./types.ts"
  * `G98` / `G99`: drilling is written as moves, with pecking), rigid tapping (the planner mills the thread), subprograms (OSP
  * subprograms are separate `.SSB` files), tool-centre-point control (the program is written in machine coordinates). None of
  * this is qualified on a real control.
+ *
+ * Sources: Okuma OSP-P200M programming manual (G15 modal work coordinate selection by number), Okuma code list (G56 tool length
+ * offset Z, G71 / M53 fixed-cycle return level, no G98 / G99), Okuma 5000/5020 control manual ("the duration depends on the F word
+ * programmed with the dwell command (G04)").
  */
 export const okumaDialect: Dialect = {
   id: "okuma",

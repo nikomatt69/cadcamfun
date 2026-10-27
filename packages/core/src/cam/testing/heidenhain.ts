@@ -22,7 +22,7 @@ export const decodeKlartext = (text: string): { readonly text: string; readonly 
     if (begin) { if (name !== undefined) return bad(); name = begin[1]; inch = begin[2] === "INCH"; return `${inch ? "G20" : "G21"} G90 G17 G94 G40` }
     const end = /^END PGM ([A-Z0-9_]+) (MM|INCH)$/.exec(line)
     if (end) return end[1] !== name || (end[2] === "INCH") !== inch ? bad() : ended ? "" : "M30"
-    if (line === "CYCL DEF 247 DATUM SETTING ~") { datum = true; return "" }
+    if (/^CYCL DEF 247 (?:PRESETTING|DATUM SETTING)(?: ~)?$/.test(line)) { datum = true; return "" }
     const row = /^Q339=\+?(\d+)$/.exec(line)
     if (row && datum) { datum = false; const n = Number(row[1]); return n >= 1 && n <= 6 ? `G${53 + n}` : bad() }
     const tool = new RegExp(`^TOOL CALL(?: (\\d+))? Z(?: S(\\d+(?:\\.\\d+)?))?$`).exec(line)
