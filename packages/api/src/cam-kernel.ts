@@ -27,6 +27,7 @@ export const CamKernelRequest = Schema.Struct({
   tools: CamManufactureInput.fields.tools,
   deburr: CamManufactureInput.fields.deburr,
   subprograms: CamManufactureInput.fields.subprograms,
+  smoothing: CamManufactureInput.fields.smoothing,
   /** A post definition (spec 54 C1; library category "post") that writes the NC in place of the machine's post; checked by the kernel. */
   postDefinition: CamManufactureInput.fields.postDefinition,
   print: CamManufactureInput.fields.print,
@@ -65,7 +66,7 @@ const cutter = Schema.Struct({
 export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.Struct({
   schemaVersion: Schema.Literal(1), jobId: id,
   material: Schema.Struct({ id, name: Schema.String, iso: Schema.String }),
-  machine: Schema.Struct({ id, name: Schema.String, post: Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain"]) }),
+  machine: Schema.Struct({ id, name: Schema.String, post: Schema.Literals(["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak"]) }),
   setupOrientation: Schema.optionalKey(cam.kernel.SetupOrientationSchema),
   origin: cad.Vec3Schema,
   stockBounds: Schema.Struct({ min: cad.Vec3Schema, max: cad.Vec3Schema }),

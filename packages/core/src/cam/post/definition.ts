@@ -23,6 +23,8 @@ import { grblDialect } from "./grbl.ts"
 import { haasDialect } from "./haas.ts"
 import { heidenhainDialect } from "./heidenhain.ts"
 import { linuxcncDialect } from "./linuxcnc.ts"
+import { mazakDialect } from "./mazak.ts"
+import { okumaDialect } from "./okuma.ts"
 import { siemensDialect } from "./siemens.ts"
 import { emitProgram } from "./emitter.ts"
 import type { Program } from "../ir.ts"
@@ -38,9 +40,9 @@ const template = Schema.String.check(
 const lines = (max: number) => Schema.Array(template).check(Schema.isMaxLength(max, { message: `at most ${max} lines` }))
 const gWord = Schema.String.check(Schema.isPattern(/^[GM]\d{1,3}(?:\.\d)?$/, { message: "a G or M code such as G43.4 or M128" }))
 
-export const BASE_POSTS = ["generic", "linuxcnc", "fanuc", "haas", "grbl", "siemens", "heidenhain"] as const
+export const BASE_POSTS = ["generic", "linuxcnc", "fanuc", "haas", "grbl", "siemens", "heidenhain", "okuma", "mazak"] as const
 const BASE_DIALECTS: Readonly<Record<(typeof BASE_POSTS)[number], Dialect>> = {
-  generic: genericDialect, linuxcnc: linuxcncDialect, fanuc: fanucDialect, haas: haasDialect, grbl: grblDialect, siemens: siemensDialect, heidenhain: heidenhainDialect
+  generic: genericDialect, linuxcnc: linuxcncDialect, fanuc: fanucDialect, haas: haasDialect, grbl: grblDialect, siemens: siemensDialect, heidenhain: heidenhainDialect, okuma: okumaDialect, mazak: mazakDialect
 }
 
 const Tcp = Schema.Union([

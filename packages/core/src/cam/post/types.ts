@@ -1,7 +1,7 @@
 /** Post-processor contract (spec 04-core-cam.md §4). */
-import type { Program } from "../ir.ts"
+import type { CycleMove, Program, WorkOffset } from "../ir.ts"
 
-export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain"
+export type PostId = "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" | "siemens" | "heidenhain" | "okuma" | "mazak"
 
 export type ArcMode = "ijk" | "radius" | "linearize"
 
@@ -114,6 +114,10 @@ export interface Dialect {
    * and those that switch it off (empty when the control keeps it until the program ends).
    */
   readonly smoothing?: { readonly on: (tolerance: string) => ReadonlyArray<string>; readonly off: ReadonlyArray<string> }
+  /** The block that selects the program's work offset (default the offset's own code, `G54`; Okuma `G15 H1`). */
+  readonly workOffset?: (offset: WorkOffset) => string
+  /** Canned-cycle codes that differ from the ISO ones (Mazak synchronous tapping `G84.2`). */
+  readonly cycleCodes?: Partial<Record<CycleMove["cycle"], string>>
   /** Upper-case comments (some controls reject lower case). */
   readonly uppercaseComments: boolean
   /** How a comment line is written: `(text)` (default) or `;text` (Siemens). */

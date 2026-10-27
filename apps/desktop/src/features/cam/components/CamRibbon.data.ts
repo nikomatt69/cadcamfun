@@ -49,6 +49,8 @@ export interface RibbonActionSpec {
     | "post-haas"
     | "post-siemens"
     | "post-heidenhain"
+    | "post-okuma"
+    | "post-mazak"
     | "post-linuxcnc"
     | "post-grbl"
     | "post-gcode"
@@ -188,6 +190,8 @@ export const RIBBON_GROUPS: Readonly<Record<RibbonTabId, ReadonlyArray<RibbonGro
         { id: "post-haas", label: "Haas NGC", accent: "blue", route: "post-haas" },
         { id: "post-siemens", label: "Siemens 840D sl", accent: "cyan", route: "post-siemens" },
         { id: "post-heidenhain", labelKey: "cam.ribbon.heidenhain", accent: "purple", route: "post-heidenhain" },
+        { id: "post-okuma", label: "Okuma OSP", accent: "cyan", route: "post-okuma" },
+        { id: "post-mazak", label: "Mazak EIA/ISO", accent: "blue", route: "post-mazak" },
         { id: "post-linuxcnc", label: "LinuxCNC", accent: "green", route: "post-linuxcnc" },
         { id: "post-grbl", label: "GRBL", accent: "amber", route: "post-grbl" },
         { id: "post-generic", labelKey: "cam.ribbon.generic", accent: "neutral", route: "post-gcode" },
@@ -224,6 +228,8 @@ export const RIBBON_ROUTES = new Set<RibbonActionSpec["route"]>([
   "post-haas",
   "post-siemens",
   "post-heidenhain",
+  "post-okuma",
+  "post-mazak",
   "post-linuxcnc",
   "post-grbl",
   "post-gcode",

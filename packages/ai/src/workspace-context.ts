@@ -126,6 +126,7 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
       num(kernelSettings["finishAllowance"]) !== undefined ? `finish allowance ${n(kernelSettings["finishAllowance"])} mm` : undefined,
       num(kernelSettings["scallop"]) !== undefined ? `scallop ${n(kernelSettings["scallop"])} mm` : undefined,
       kernelSettings["subprograms"] === true ? "subprograms on" : undefined,
+      typeof kernelSettings["smoothing"] === "number" ? `smoothing ${kernelSettings["smoothing"]} mm` : undefined,
       (count(kernelSettings["plannedOperations"]) ?? 0) > 0 ? `${count(kernelSettings["plannedOperations"])} planned operations` : undefined
     ].filter((x): x is string => x !== undefined)
     lines.push(`CAM kernel: ${preset.join(", ")}.`)

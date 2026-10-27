@@ -81,6 +81,11 @@ export interface InterpretOptions {
   readonly toolRadius?: (d: number | undefined, tool: number | undefined) => number | undefined
   /** Read G70-G76 as lathe cycles and U / W as incremental X / Z. Default: a program with no Y words that uses G18, G96 or T0101-style tools. */
   readonly lathe?: boolean
+  /**
+   * Okuma OSP words: `G15 H<n>` selects work coordinate system n (read as `G54`…`G59` for n = 1…6) and `G56`/`G57`/`G58` are tool
+   * length offsets, not work offsets. Default false (ISO meaning).
+   */
+  readonly okuma?: boolean
   /** Called with every segment (and, with `track`, its machine state) once the block that made it is complete, in program order. */
   readonly onSegment?: (segment: GSegment, state: MotionSample | undefined) => void
   /**
@@ -574,6 +579,15 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if ([0, 1, 2, 3, 73, 74, 76, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89].includes(g)) {
           motion = g
           if (g === 73 || g === 74 || g === 76 || (g >= 81 && g <= 89)) cycleStarted = true
+        }
+        // Mazak synchronous tapping: G84.2 right hand, G84.3 left hand (the ISO G84 / G74 strokes).
+        else if (g === 84.2 || g === 84.3) { motion = g === 84.2 ? 84 : 74; cycleStarted = true }
+        else if (options.okuma === true && g === 15) {
+          const h = get("H")
+          if (h === undefined || !Number.isInteger(h) || h < 1 || h > 6) { errors.push(`line ${physical}: G15 needs H1-H6 (work coordinate systems beyond 6 are not modelled)`); unsupported.push({ line: physical, word: "G15" }) }
+          else activeWork = 53 + h
+        } else if (options.okuma === true && (g === 56 || g === 57 || g === 58)) {
+          // OSP tool length offsets: no geometric effect on the programmed path.
         } else if (g === 32 || g === 33) motion = 32
         else if (options.probeMoves === true && ((g >= 38.2 && g <= 38.5) || g === 31)) motion = 38
         else if (g === 20 || g === 70) unit = 25.4

@@ -798,7 +798,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
 
   const initial = { x: 0, y: 0, z: CLEARANCE + 10 }
   // The replay reads dwells in the post's unit (Fanuc and Haas write milliseconds on `G4 P`).
-  const interpreted = nc === "" ? undefined : interpretGcode(nc, { start: initial, dwell: (written?.ok === true ? written.dialect : dialectOf(post.id))?.dwell ?? "seconds" })
+  const interpreted = nc === "" ? undefined : interpretGcode(nc, { start: initial, dwell: (written?.ok === true ? written.dialect : dialectOf(post.id))?.dwell ?? "seconds", okuma: post.id === "okuma" })
   const removedByOp = new Map<number, number>()
   const cutLengthByOp = new Map<number, number>()
   let rapidHits = 0, shankHits = 0, holderHits = 0, noTool = 0

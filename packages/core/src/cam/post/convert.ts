@@ -152,17 +152,24 @@ export const programOfNc = (text: string, options: { readonly source?: PostId; r
   // Words the replay models as plain moves, which the IR would then write as plain moves: refused, not silently degraded.
   codes.forEach((code, i) => {
     if (klartext) return
-    if (word(code, "G", [74, 84])) errors.push(`Line ${i + 1}: a tapping cycle reverses the spindle; written as plain moves it would break the tap`)
+    if (word(code, "G", [74, 84]) || /(?:^|[^A-Z])G0*84\.[23](?![\d])/.test(code)) errors.push(`Line ${i + 1}: a tapping cycle reverses the spindle; written as plain moves it would break the tap`)
     else if (word(code, "G", [76, 87, 88])) errors.push(`Line ${i + 1}: a boring cycle with oriented stop or manual retract cannot be written as plain moves`)
     if (word(code, "G", [33, 32])) errors.push(`Line ${i + 1}: spindle-synchronised threading cannot be written as plain moves`)
     if (/(?:^|[^A-Z])G0*(?:38\.[2-5]|31)(?![\d])/.test(code)) errors.push(`Line ${i + 1}: probing moves cannot be converted (where the stylus touches is known only on the machine)`)
   })
+  const okuma = options.source === "okuma"
   const offsets = new Set<WorkOffset>()
-  for (const code of codes) for (const m of code.matchAll(/(?:^|[^A-Z])G0*(5[4-9])(?![\d.])/g)) offsets.add(`G${m[1]}` as WorkOffset)
+  for (const code of codes) {
+    // Klartext selects a preset row with cycle 247 (Q339); on Okuma G56-G58 are tool length offsets and G15 H<n> selects the
+    // work coordinate system.
+    if (klartext) for (const m of code.matchAll(/^Q339=\+?0*([1-6])$/g)) offsets.add(`G${53 + Number(m[1])}` as WorkOffset)
+    else if (okuma) for (const m of code.matchAll(/(?:^|[^A-Z])G0*15\s*H0*([1-6])(?![\d.])/g)) offsets.add(`G${53 + Number(m[1])}` as WorkOffset)
+    else for (const m of code.matchAll(/(?:^|[^A-Z])G0*(5[4-9])(?![\d.])/g)) offsets.add(`G${m[1]}` as WorkOffset)
+  }
   if (offsets.size > 1) errors.push(`The program uses several work offsets (${[...offsets].join(", ")}): convert each setup on its own`)
   if (errors.length > 0) return { errors, notes }
 
-  const run = interpretGcode(text, { track: true, dwell: options.source === undefined ? "seconds" : dialectOf(options.source)?.dwell ?? "seconds" })
+  const run = interpretGcode(text, { track: true, okuma, dwell: options.source === undefined ? "seconds" : dialectOf(options.source)?.dwell ?? "seconds" })
   for (const e of run.errors) errors.push(e)
   const states = run.states ?? []
   if (states.length !== run.segments.length) errors.push("The replay could not report the machine state of every move")
@@ -311,7 +318,7 @@ export const convertNc = (text: string, options: ConvertOptions): ConvertResult 
   } catch (cause) {
     return { ok: false, code: "", program: read.program, ...(before !== undefined ? { before } : {}), errors: [`${post.id}: ${cause instanceof Error ? cause.message : String(cause)}`], notes: read.notes }
   }
-  const replay = interpretGcode(code, { dwell: dialectOf(options.target)?.dwell ?? "seconds" })
+  const replay = interpretGcode(code, { dwell: dialectOf(options.target)?.dwell ?? "seconds", okuma: options.target === "okuma" })
   const after = figuresOf(code, replay, rapidFeed)
   const errors = replay.errors.map((e) => `The output does not replay: ${e}`)
   const decimals = options.post?.decimals ?? 3

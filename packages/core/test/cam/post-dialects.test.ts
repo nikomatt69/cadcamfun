@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from "bun:test"
 import { makeProgram, type Program, type Toolpath } from "../../src/cam/ir.ts"
-import { fanucPost, genericPost, haasPost, heidenhainPost, linuxcncPost, siemensPost, grblPost, posts, getPost, samplePostProgram, type Post } from "../../src/cam/post/index.ts"
+import { convertNc, fanucPost, genericPost, haasPost, heidenhainPost, linuxcncPost, mazakPost, okumaPost, siemensPost, grblPost, posts, getPost, samplePostProgram, type Post } from "../../src/cam/post/index.ts"
 import { interpretGcode, type GSegment } from "../../src/cam/testing/gcode-interpreter.ts"
 import { postOfController } from "../../src/cam/kernel/machine-profile.ts"
 
@@ -123,7 +123,7 @@ describe("Klartext: circles, M functions and tool calls as the control reads the
 describe("LinuxCNC post", () => {
   test("is a real post: every PostId has one, and the controller name picks it", () => {
     expect(getPost("linuxcnc")).toBe(linuxcncPost)
-    for (const id of ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain"] as const) expect(posts[id].id).toBe(id)
+    for (const id of ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak"] as const) expect(posts[id].id).toBe(id)
     expect(postOfController("LinuxCNC 2.9")).toBe("linuxcnc")
   })
 
@@ -196,5 +196,93 @@ describe("dwell words as the replay reads them", () => {
     expect(dwell.seconds).toBeCloseTo(0.5, 9)
     const after = run.segments.slice(run.segments.indexOf(dwell as GSegment) + 1).find((s) => s.kind === "linear") as { feed: number }
     expect(after.feed).toBeGreaterThan(100)
+  })
+})
+
+const tapProgram = (): Program => makeProgram("tap", [{ id: "t", name: "Tap", toolId: "4", spindleRpm: 500, coolant: "flood", moves: [
+  { _tag: "Rapid", to: { x: 0, y: 0, z: 5 } }, { _tag: "Cycle", cycle: "tap", to: { x: 0, y: 0, z: -10 }, feed: 625, pitch: 1.25, peckDepth: 0, dwellSeconds: 0, retractHeight: 2 },
+  { _tag: "Rapid", to: { x: 0, y: 0, z: 20 } }
+] }])
+
+describe("Okuma OSP post", () => {
+  const p = { ...contour(), workOffset: "G56" as const }
+  const l = blocks(okumaPost.emit(p))
+
+  test("G15 H selects the work offset, G56 H is the tool length, G4 F the dwell, M2 ends; no ISO-only words", () => {
+    expect(l).toContain("G15 H3")
+    expect(l[l.indexOf("T1 M6") + 1]).toBe("G56 H1")
+    expect(l).toContain("G4 F0.500")
+    expect(l[l.length - 1]).toBe("M2")
+    expect(l.join("\n")).not.toMatch(/\bG43\b|\bG49\b|\bG98\b|\bG99\b|\bG8[1-9]\b|^%/m)
+  })
+
+  test("the controller name picks it, rigid tapping is refused, the Okuma-aware replay reads it", () => {
+    expect(postOfController("Okuma OSP-P300MA")).toBe("okuma")
+    expect(() => okumaPost.emit(tapProgram())).toThrow(/rigid tapping/)
+    const run = interpretGcode(l.join("\n"), { okuma: true })
+    expect(run.errors).toEqual([])
+    expect(run.cutLength).toBeCloseTo(interpretGcode(genericPost.emit(contour())).cutLength, 6)
+    expect(run.segments.filter((s) => s.kind === "dwell").map((s) => (s as { seconds: number }).seconds)).toEqual([0.5])
+  })
+
+  test("converts to and from the other controls with the motion proved", () => {
+    const toOkuma = convertNc(fanucPost.emit(p), { source: "fanuc", target: "okuma" })
+    expect(toOkuma.errors).toEqual([])
+    expect(toOkuma.code).toMatch(/^G15 H3$/m)
+    const back = convertNc(toOkuma.code, { source: "okuma", target: "fanuc" })
+    expect(back.errors).toEqual([])
+    expect(back.program!.workOffset).toBe("G56")
+    expect(back.code).toMatch(/^G56$/m)
+  })
+})
+
+describe("Mazak EIA/ISO post", () => {
+  test("synchronous tapping is G84.2 without M29, tool tip control G43.4, Fanuc family otherwise", () => {
+    const text = mazakPost.emit(tapProgram())
+    expect(text).toMatch(/^G84\.2 G99 /m)
+    expect(text).not.toMatch(/\bM29\b/)
+    expect(text).toMatch(/^O1000$/m)
+    expect(text).toMatch(/^G43 H4$/m)
+    expect(postOfController("Mazak SmoothX")).toBe("mazak")
+    const run = interpretGcode(text, { dwell: "milliseconds" })
+    expect(run.errors).toEqual([])
+    expect(run.minZ).toBeCloseTo(-10, 6)
+  })
+
+  test("a G84.2 program is refused by the converter (a tap written as moves breaks)", () => {
+    const r = convertNc(mazakPost.emit(tapProgram()), { source: "mazak", target: "generic" })
+    expect(r.ok).toBe(false)
+    expect(r.errors.join()).toMatch(/tapping/)
+  })
+})
+
+describe("Klartext inch programs and presets", () => {
+  test("INCH header, positions in inches, F in 1/10 inch/min, and the replay reads it back to the same path", () => {
+    const p = { ...contour(), units: "inch" as const }
+    const text = heidenhainPost.emit(p)
+    const l = blocks(text)
+    expect(l[0]).toBe("BEGIN PGM CONTOUR INCH")
+    expect(l[l.length - 1]).toBe("END PGM CONTOUR INCH")
+    // 400 mm/min = 15.748 inch/min, written as F157.48.
+    expect(l.some((b) => /^L .* F157\.48\b/.test(b))).toBe(true)
+    expect(l.some((b) => /X\+0\.7874\b/.test(b))).toBe(true)
+    const klartext = interpretGcode(text), iso = interpretGcode(genericPost.emit(contour()))
+    expect(klartext.errors).toEqual([])
+    expect(Math.abs(klartext.cutLength - iso.cutLength)).toBeLessThan(0.05)
+    const feed = (klartext.segments.find((s) => s.kind === "linear" && s.to.x > 19) as { feed: number }).feed
+    expect(feed).toBeCloseTo(400, 1)
+  })
+
+  test("G54-G59 select preset rows 1-6 with cycle 247; its continuation line has no block number", () => {
+    const text = heidenhainPost.emit({ ...contour(), workOffset: "G57" })
+    const raw = text.split("\n")
+    const at = raw.findIndex((r) => r.endsWith("CYCL DEF 247 DATUM SETTING ~"))
+    expect(at).toBeGreaterThan(0)
+    expect(raw[at + 1]).toBe("  Q339=+4 ;DATUM NUMBER")
+    expect(Number(raw[at + 2]!.split(" ")[0])).toBe(Number(raw[at]!.split(" ")[0]) + 1)
+    expect(at).toBeLessThan(raw.findIndex((r) => r.includes("TOOL CALL")))
+    const read = convertNc(text, { source: "heidenhain", target: "fanuc" })
+    expect(read.errors).toEqual([])
+    expect(read.program!.workOffset).toBe("G57")
   })
 })

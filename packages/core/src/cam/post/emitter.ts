@@ -397,7 +397,7 @@ class Writer {
       return
     }
     if (from.z < move.retractHeight) this.rapid({ ...from, z: move.retractHeight })
-    const code = CYCLE_CODE[move.cycle]
+    const code = this.dialect.cycleCodes?.[move.cycle] ?? CYCLE_CODE[move.cycle]
     if (this.cycle?.code !== code) {
       // Rigid tapping is entered from the cancelled state, with its prefix block (the spindle switches to position control).
       if (move.cycle === "tap") {
@@ -616,7 +616,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     for (const g of plan?.groups ?? []) w.comment(`SUBPROGRAM O${g.number}: ${program.toolpaths[g.leader]!.name} X${g.members.length}`)
   }
   w.block(program.units === "inch" ? (dialect.unitCodes?.inch ?? "G20") : (dialect.unitCodes?.mm ?? "G21"), ...dialect.setup)
-  w.block(program.workOffset)
+  w.block(dialect.workOffset?.(program.workOffset) ?? program.workOffset)
 
   let zMax = -Infinity
   let first = true

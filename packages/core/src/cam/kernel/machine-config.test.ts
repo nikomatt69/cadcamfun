@@ -25,7 +25,7 @@ describe("the machine library and the kernel are the same machines in two shapes
   })
 
   test("the controller of the configuration chooses the post, and an unknown one gets the plain ISO post", () => {
-    expect(postOfController("MAZATROL SmoothAi")).toBe("fanuc")
+    expect(postOfController("MAZATROL SmoothAi")).toBe("mazak")
     expect(postOfController("Sinumerik 840D sl")).toBe("siemens")
     expect(postOfController("Heidenhain TNC7")).toBe("heidenhain")
     expect(postOfController("Haas")).toBe("haas")

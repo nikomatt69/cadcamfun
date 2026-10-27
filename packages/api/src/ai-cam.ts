@@ -57,6 +57,8 @@ export const CamManufactureInput = Schema.Struct({
   deburr: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(5))),
   /** Write toolpaths that repeat translated (hole patterns, copies of a pocket) once as a subprogram (`M98` on the Fanuc and Haas posts, `CALL LBL` on the Heidenhain Klartext post). */
   subprograms: Schema.optionalKey(Schema.Boolean),
+  /** High-speed contour smoothing with this tolerance, mm (Fanuc AICC G5.1, Haas G187, Siemens CYCLE832, Heidenhain cycle 32, LinuxCNC G64 P); ignored by a control without it. */
+  smoothing: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(1))),
   /** A post definition (spec 54 C1) that writes the NC in place of the machine's post: inline, or the id of a library item (category "post"), or the `postDefinitionId` of the machine configuration. */
   postDefinition: Schema.optionalKey(Schema.Json),
   postDefinitionId: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80))),
@@ -104,7 +106,7 @@ export const CamManufactureOperationInput = Schema.Struct({
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance,
   scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision),
   operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr,
-  subprograms: CamManufactureInput.fields.subprograms, print: CamManufactureInput.fields.print
+  subprograms: CamManufactureInput.fields.subprograms, smoothing: CamManufactureInput.fields.smoothing, print: CamManufactureInput.fields.print
 })
 
 export const CamCreateInput = Schema.Struct({ type: id, params: Schema.optionalKey(params), expectedRevision: Schema.optionalKey(revision) })

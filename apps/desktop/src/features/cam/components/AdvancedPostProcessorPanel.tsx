@@ -31,6 +31,8 @@ export const POST_TARGETS: ReadonlyArray<{ readonly id: PostId; readonly label: 
   postTarget("haas", "cam.post.target.haas.label", "cam.post.target.haas.about"),
   postTarget("siemens", "cam.post.target.siemens.label", "cam.post.target.siemens.about"),
   postTarget("heidenhain", "cam.post.target.heidenhain.label", "cam.post.target.heidenhain.about"),
+  postTarget("okuma", "cam.post.target.okuma.label", "cam.post.target.okuma.about"),
+  postTarget("mazak", "cam.post.target.mazak.label", "cam.post.target.mazak.about"),
   postTarget("linuxcnc", "cam.post.target.linuxcnc.label", "cam.post.target.linuxcnc.about"),
   postTarget("grbl", "cam.post.target.grbl.label", "cam.post.target.grbl.about"),
   postTarget("generic", "cam.post.target.generic.label", "cam.post.target.generic.about")

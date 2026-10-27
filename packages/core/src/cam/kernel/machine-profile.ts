@@ -17,17 +17,17 @@ import type { PostId } from "../post/types.ts"
 import type { Rigidity } from "./cutting-data.ts"
 
 /** The post ids the kernel can write; the controller's name picks one when the profile does not name it. */
-export const POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain"] as const
+export const POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak"] as const
 
 /**
  * The controllers the kernel has a post for, and the control families that speak one of them. A controller's name picks
  * the post that writes its NC; an unknown control gets the plain ISO post, never a silent mismatch.
  */
 const POSTS: Readonly<Record<string, (typeof POST_IDS)[number]>> = {
-  fanuc: "fanuc", "fanuc 0i": "fanuc", "fanuc 0i-md": "fanuc", mazatrol: "fanuc", smoothai: "fanuc", mazak: "fanuc",
+  fanuc: "fanuc", "fanuc 0i": "fanuc", "fanuc 0i-md": "fanuc", mazatrol: "mazak", smoothai: "mazak", smoothx: "mazak", smoothg: "mazak", mazak: "mazak",
   haas: "haas", grbl: "grbl", linuxcnc: "linuxcnc", emc2: "linuxcnc", generic: "generic", iso: "generic",
   sinumerik: "siemens", "840d": "siemens", siemens: "siemens",
-  osp: "fanuc", okuma: "fanuc", doosan: "fanuc", dmgmori: "fanuc", dmu: "fanuc",
+  osp: "okuma", okuma: "okuma", doosan: "fanuc", dmgmori: "fanuc", dmu: "fanuc",
   heidenhain: "heidenhain", tnc: "heidenhain", tnc7: "heidenhain", klartext: "heidenhain"
 }
 
