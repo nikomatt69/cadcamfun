@@ -91,7 +91,7 @@ describe("features", () => {
   })
 
   test("a feature moves one place, but never above what it needs or below what needs it", () => {
-    expect(moveFeature(plate, "hole1", -1).features.map((f) => f.id)).toEqual(["sketch1", "hole1", "plate"]) // the hole is independent
+    expect(moveFeature(plate, "hole1", -1)).toEqual(plate) // the hole cuts the plate's body (lineage, spec 58 T3)
     expect(moveFeature(plate, "plate", -1)).toEqual(plate) // it needs its sketch above it
     expect(moveFeature(plate, "sketch1", 1)).toEqual(plate) // the extrusion needs it
     expect(moveFeature(plate, "sketch1", -1)).toEqual(plate) // already first

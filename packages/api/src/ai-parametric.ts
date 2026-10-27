@@ -115,20 +115,22 @@ const cornerTreatment = described(
   "Round (fillet) or bevel (chamfer) the sharp vertical corners of the sketch profile before extruding. Size is the radius or the setback in mm."
 )
 const point = Schema.Struct({ near: triple, normal: optional(triple) })
+/** Timeline fields every feature may carry (spec 58 §3.1): only `suppressed` changes the model; `name` and `group` are display. */
+const timeline = { suppressed: optional(Schema.Boolean), name: optional(text(100)), group: optional(id) }
 
 const feature = Schema.Union([
   Schema.Struct({
-    id, type: Schema.Literal("sketch"), plane: planeRef, offset: optional(dimension),
+    id, type: Schema.Literal("sketch"), ...timeline, plane: planeRef, offset: optional(dimension),
     sketch: Schema.Struct({
       entities: withDefault(Schema.Array(entity).check(Schema.isMaxLength(200)), []),
       constraints: withDefault(Schema.Array(constraint).check(Schema.isMaxLength(200)), []),
       shapes: optional(described(Schema.Array(shape).check(Schema.isMaxLength(40)), "Parametric profiles, fully constrained, measures take parameters. Prefer them to hand-built points and lines."))
     })
   }),
-  Schema.Struct({ id, type: Schema.Literal("extrude"), sketch: id, depth: dimension, direction: optional(direction), operation, targets, edge: optional(edgeTreatment), corner: optional(cornerTreatment), taper: optional(dimension) }),
-  Schema.Struct({ id, type: Schema.Literal("revolve"), sketch: id, axis: Schema.Union([Schema.Literals(["x", "y"]), Schema.Struct({ line: id })]), angle: optional(dimension), operation, targets }),
+  Schema.Struct({ id, type: Schema.Literal("extrude"), ...timeline, sketch: id, depth: dimension, direction: optional(direction), operation, targets, edge: optional(edgeTreatment), corner: optional(cornerTreatment), taper: optional(dimension) }),
+  Schema.Struct({ id, type: Schema.Literal("revolve"), ...timeline, sketch: id, axis: Schema.Union([Schema.Literals(["x", "y"]), Schema.Struct({ line: id })]), angle: optional(dimension), operation, targets }),
   Schema.Struct({
-    id, type: Schema.Literal("hole"), plane: planeRef, offset: optional(dimension), at: pair, diameter: dimension, depth: dimension, targets,
+    id, type: Schema.Literal("hole"), ...timeline, plane: planeRef, offset: optional(dimension), at: pair, diameter: dimension, depth: dimension, targets,
     kind: optional(described(
       Schema.Literals(["simple", "counterbore", "countersink"]),
       "simple (default), counterbore (flat recess for a screw head: needs headDiameter and headDepth) or countersink (cone for a flat head: needs headDiameter; angle is the included cone angle, default 90)."
@@ -136,7 +138,7 @@ const feature = Schema.Union([
     headDiameter: optional(dimension), headDepth: optional(dimension), angle: optional(dimension)
   }),
   Schema.Struct({
-    id, type: Schema.Literal("pattern"), feature: optional(id),
+    id, type: Schema.Literal("pattern"), ...timeline, feature: optional(id),
     bodies: optional(described(Schema.Array(id).check(Schema.isMinLength(1), Schema.isMaxLength(50)), "instead of feature: body ids copied whole, each copy a new body <id>#<k>.")),
     kind: Schema.Literals(["linear", "circular", "grid", "path"]), count: dimension, step: optional(triple), centre: optional(pair), span: optional(dimension),
     path: optional(described(id, "path only: the sketch whose open chain the copies ride, spaced by arc length and turned with its tangent.")),
@@ -144,20 +146,20 @@ const feature = Schema.Union([
     stepB: optional(described(triple, "grid only: the offset between two rows [dx,dy,dz]."))
   }),
   described(
-    Schema.Struct({ id, type: Schema.Literal("sweep"), profile: id, path: id, operation, targets, bendRadius: optional(dimension) }),
+    Schema.Struct({ id, type: Schema.Literal("sweep"), ...timeline, profile: id, path: id, operation, targets, bendRadius: optional(dimension) }),
     "Sweep the closed profile of an earlier sketch along the path of another sketch (ONE open chain of lines/arcs, or one closed loop). The centre of the profile rides the start of the path; loops inside loops are holes (a hollow tube is two circles)."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("loft"), sections: between(Schema.Array(id), 2, 12), smooth: optional(Schema.Boolean), operation, targets }),
+    Schema.Struct({ id, type: Schema.Literal("loft"), ...timeline, sections: between(Schema.Array(id), 2, 12), smooth: optional(Schema.Boolean), operation, targets }),
     "Loft a solid through the largest closed loop of two or more earlier sketches, in order. Sections are resampled to the same number of points; smooth passes a curve through them instead of straight spans."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("shell"), feature: id, thickness: dimension, open: optional(Schema.Literals(["none", "top", "bottom", "both"])), targets }),
+    Schema.Struct({ id, type: Schema.Literal("shell"), ...timeline, feature: id, thickness: dimension, open: optional(Schema.Literals(["none", "top", "bottom", "both"])), targets }),
     "Hollow out an earlier extrude, full revolve or sweep with uniform walls of thickness mm; open leaves the end faces open (a cup, a tube). Not for tapered extrudes or Boolean results."
   ),
   described(
     Schema.Struct({
-      id, type: Schema.Literal("primitive"), element: Schema.Literals(PRIMITIVE_ELEMENTS),
+      id, type: Schema.Literal("primitive"), ...timeline, element: Schema.Literals(PRIMITIVE_ELEMENTS),
       params: optional(namedRecord(dimension, /^[A-Za-z_][A-Za-z0-9_]{0,39}$/, "use a letter or _ then letters, digits or _ (at most 40)")),
       options: optional(namedRecord(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(40)), /^.{1,40}$/s, "1 to 40 characters")),
       profile: optional(between(Schema.Array(pair), 2, 200)),
@@ -168,30 +170,30 @@ const feature = Schema.Union([
   ),
   described(
     Schema.Struct({
-      id, type: Schema.Literal("coil"), radius: dimension, pitch: dimension, turns: dimension, wireDiameter: dimension, section: optional(Schema.Literals(["round", "square"])),
+      id, type: Schema.Literal("coil"), ...timeline, radius: dimension, pitch: dimension, turns: dimension, wireDiameter: dimension, section: optional(Schema.Literals(["round", "square"])),
       handedness: optional(Schema.Literals(["right", "left"])), centre: optional(pair), offset: optional(dimension), operation, targets
     }),
     "Helical wire about Z (spring): radius to the wire centre, pitch (above wireDiameter), turns; offset = start height."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("move"), targets, translate: optional(triple), rotate: optional(Schema.Struct({ axis: axis3, angle: dimension, about: optional(triple) })), copy: optional(Schema.Boolean) }),
+    Schema.Struct({ id, type: Schema.Literal("move"), ...timeline, targets, translate: optional(triple), rotate: optional(Schema.Struct({ axis: axis3, angle: dimension, about: optional(triple) })), copy: optional(Schema.Boolean) }),
     "Move/Copy bodies: rotate (degrees) then translate; copy:true keeps the originals."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("scale"), factor: Schema.Union([dimension, triple]), about: optional(triple), targets }),
+    Schema.Struct({ id, type: Schema.Literal("scale"), ...timeline, factor: Schema.Union([dimension, triple]), about: optional(triple), targets }),
     "Scale bodies about a point: one positive factor, or three for x, y, z."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("split"), plane, offset: optional(dimension), keep: Schema.Literals(["above", "below", "both"]), targets }),
+    Schema.Struct({ id, type: Schema.Literal("split"), ...timeline, plane, offset: optional(dimension), keep: Schema.Literals(["above", "below", "both"]), targets }),
     "Split Body by a plane at offset: keep the side the normal points to, the other, or both."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("combine"), target: id, tools: between(Schema.Array(id), 1, 40), operation: Schema.Literals(["join", "cut", "intersect"]), keepTools: optional(Schema.Boolean) }),
+    Schema.Struct({ id, type: Schema.Literal("combine"), ...timeline, target: id, tools: between(Schema.Array(id), 1, 40), operation: Schema.Literals(["join", "cut", "intersect"]), keepTools: optional(Schema.Boolean) }),
     "Combine bodies by id (the id of the feature that made each): join, cut or intersect; tools are consumed unless keepTools."
   ),
   described(
     Schema.Struct({
-      id, type: Schema.Literal("fillet"), radius: dimension, style: optional(Schema.Literals(["fillet", "chamfer"])), targets,
+      id, type: Schema.Literal("fillet"), ...timeline, radius: dimension, style: optional(Schema.Literals(["fillet", "chamfer"])), targets,
       secondDistance: optional(described(dimension, "Chamfer only: the setback on the second face, mm (the callout '2 x 1'). The first setback is radius, on the more horizontal of the two faces.")),
       angle: optional(described(dimension, "Chamfer only: the angle between the chamfer face and the first face, degrees (the callout '2 x 30°'). It fixes the setback on the second face.")),
       radiusEnd: optional(described(dimension, "Fillet only: the radius at the far end of each straight edge; the radius runs linearly from radius (at the edge's lexicographically smaller end) to radiusEnd. Corners where variable edges meet are not rounded.")),
@@ -206,12 +208,12 @@ const feature = Schema.Union([
     "Round (fillet radius) or bevel (chamfer setback) the edges between planar faces that meet at 25 degrees or more, on the bodies built so far. A chamfer takes one setback (radius) on both faces, or two distances (radius and secondDistance), or a distance and an angle (radius and angle), never both secondDistance and angle. A fillet may run its radius linearly along straight edges with radiusEnd. Distances are positive; angle is strictly between 0 and 90 degrees. Unequal setbacks need a uniquely more horizontal first face. Read the issues: a size wider than the faces is refused."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("rib"), sketch: id, thickness: dimension, depth: dimension, direction: optional(direction), operation: optional(operation), targets }),
+    Schema.Struct({ id, type: Schema.Literal("rib"), ...timeline, sketch: id, thickness: dimension, depth: dimension, direction: optional(direction), operation: optional(operation), targets }),
     "Rib / web (Fusion Rib): every OPEN line chain of an earlier sketch (the centre line, lines and arcs) is thickened to thickness and stands depth mm from the sketch plane along its normal, united (default union) with the bodies. Draw the sketch on the face the rib stands on (offset = that face)."
   ),
   described(
     Schema.Struct({
-      id, type: Schema.Literal("sheet"), sketch: id, thickness: dimension, width: dimension, bendRadius: optional(dimension), side: optional(Schema.Literals(["centre", "left", "right"])),
+      id, type: Schema.Literal("sheet"), ...timeline, sketch: id, thickness: dimension, width: dimension, bendRadius: optional(dimension), side: optional(Schema.Literals(["centre", "left", "right"])),
       flanges: optional(Schema.Array(Schema.Struct({ end: Schema.Literals(["start", "end"]), length: dimension, angle: dimension, relief: optional(Schema.Struct({ width: dimension, depth: dimension })) })).check(Schema.isMaxLength(2))).annotate({ description: "Full-width edge flanges on the exposed width edges of this sheet: end start/end, length from virtual bend corner, signed angle in degrees. Uses bendRadius and thickness of the existing sheet. Cannot share an edge with a hem. Flat development includes the new bend. Optional relief {width,depth} in mm cuts rectangular notches at both bend ends (turns up to 90 degrees), narrows the flange and updates the flat blank. Partial-width flanges and flanges on adjacent edges are not supported." }),
       hems: optional(Schema.Array(Schema.Struct({ end: Schema.Literals(["start", "end"]), length: dimension, gap: optional(dimension), fold: optional(Schema.Literals(["left", "right"])) })).check(Schema.isMaxLength(2))),
       direction: optional(direction), operation, targets
@@ -220,36 +222,36 @@ const feature = Schema.Union([
   ),
   described(
     Schema.Struct({
-      id, type: Schema.Literal("thread"), kind: Schema.Literals(["external", "internal"]), diameter: dimension, pitch: dimension, length: dimension, at: optional(pair), offset: optional(dimension),
+      id, type: Schema.Literal("thread"), ...timeline, kind: Schema.Literals(["external", "internal"]), diameter: dimension, pitch: dimension, length: dimension, at: optional(pair), offset: optional(dimension),
       handedness: optional(Schema.Literals(["right", "left"])), cut: optional(Schema.Boolean), axis: optional(axis3), operation: optional(operation), targets
     }),
     "Modelled ISO metric thread along Z at [x,y], starting at height offset. external = a threaded rod of the major diameter (default operation new; union it onto a stud); internal = the tool for a tapped hole (default operation subtract: the cavity is the tap drill plus the groove). cut:true (external only) cuts the thread into the shaft already there instead of making a rod. axis x or y runs it sideways: then at = [y,z] / [z,x] and offset = x / y. Pitch from the ISO table (M8 1.25, M10 1.5)."
   ),
   described(
     Schema.Struct({
-      id, type: Schema.Literal("text"), text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)), height: dimension, depth: dimension, strokeWidth: optional(dimension),
+      id, type: Schema.Literal("text"), ...timeline, text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)), height: dimension, depth: dimension, strokeWidth: optional(dimension),
       plane: planeRef, offset: optional(dimension), at: optional(pair), align: optional(Schema.Literals(["left", "centre"])), spacing: optional(dimension), direction: optional(direction), operation, targets
     }),
     "Solid text (capitals, digits, punctuation of a single-stroke font). Emboss: operation union, plane at the face (offset), direction up. Engrave: operation subtract, direction down. at = lower-left corner, or the centre with align centre. height = cap height."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("pushpull"), near: triple, name: optional(id), normal: optional(triple), distance: dimension, body: optional(id) }),
+    Schema.Struct({ id, type: Schema.Literal("pushpull"), ...timeline, near: triple, name: optional(id), normal: optional(triple), distance: dimension, body: optional(id) }),
     "Press Pull: move one planar face along its outward normal by distance (positive grows the body, negative cuts into it). name is the exact face name (e.g. plate.top): that face is moved, and near is only a hint that may be stale after an edit. A name that no longer exists is an error, never a nearby face. Without name, the planar face nearest near is taken. normal restricts to faces facing that way (use it to choose between the top and bottom face at the same point). A face with holes keeps them. A curved face (a boss side, a hole wall, a fillet with the faces tangent to it) is offset along its normals: a cylinder changes radius by distance; pulling a hole wall further than its radius is refused."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("draft"), near: triple, name: optional(id), normal: optional(triple), angle: dimension, pull: optional(triple), neutral: optional(dimension), body: optional(id) }),
+    Schema.Struct({ id, type: Schema.Literal("draft"), ...timeline, near: triple, name: optional(id), normal: optional(triple), angle: dimension, pull: optional(triple), neutral: optional(dimension), body: optional(id) }),
     "Draft of ONE planar face of any body (Fusion Draft): name is the exact face (e.g. plate.side0.0) and near is then only a hint; a name that no longer exists is an error, never a nearby face. Without name, the face nearest the point near is tilted by angle degrees (-45..45) about its hinge, where it meets the neutral plane (pull . p = neutral; pull defaults to [0,0,1], neutral to 0). Positive angle: above the neutral plane the wall leans inward (material removed), below it outward (added). One feature per face; faces square to the pull direction are refused. A curved face (a boss, a hole wall) is drafted too, one way only: put neutral at its base or top (a cylinder becomes a cone). Use extrude.taper when the whole extrusion is drafted."
   ),
   described(
     Schema.Struct({
-      id, type: Schema.Literal("mate"), body: id, face: point, to: Schema.Struct({ body: id, near: triple, normal: optional(triple) }), offset: optional(dimension), spin: optional(dimension), slide: optional(pair),
+      id, type: Schema.Literal("mate"), ...timeline, body: id, face: point, to: Schema.Struct({ body: id, near: triple, normal: optional(triple) }), offset: optional(dimension), spin: optional(dimension), slide: optional(pair),
       limits: optional(Schema.Struct({ spin: optional(pair), offset: optional(pair), slide: optional(Schema.Tuple([pair, pair])) })), interference: optional(Schema.Boolean)
     }),
     "Rigid joint (Fusion Joint): body (the id of the feature that made it) moves so that its face nearest face.near lies flush against the face nearest to.near of the other body (normals opposed, face centres together), offset mm apart, then spins degrees about the common normal (revolute joint); slide [u,v] shifts it along the target face (slider / planar joint); limits {spin, offset, slide:[[uMin,uMax],[vMin,vMax]]} turn a pose beyond them into an error; an overlap of the two bodies is reported as a warning (interference:false skips the check). Needs two bodies (an extrude etc. with operation new)."
   ),
   described(
     Schema.Struct({
-      id, type: Schema.Literal("plane"),
+      id, type: Schema.Literal("plane"), ...timeline,
       from: Schema.Union([
         Schema.Struct({ kind: Schema.Literal("offset"), base: planeRef, distance: dimension }),
         Schema.Struct({ kind: Schema.Literal("angle"), base: planeRef, angle: dimension, about: Schema.Literals(["u", "v"]), at: optional(dimension) }),
@@ -260,7 +262,7 @@ const feature = Schema.Union([
     "Work plane (Fusion Construct), named by this feature's id in the plane field of a sketch, hole or text. offset: base moved distance along its normal. angle: base turned angle degrees about its u or v axis (hinge at position `at` along the other axis). points: through three points (u from the first to the second). face: ON the planar face of a body nearest near, at the face centre (u = world X projected on the face, v = normal x u: a top face reads like XY), lifted by offset; follows the face on every rebuild. Sketch on a face = a face plane + a sketch on it."
   ),
   described(
-    Schema.Struct({ id, type: Schema.Literal("mirror"), feature: optional(id), bodies: optional(Schema.Array(id).check(Schema.isMinLength(1), Schema.isMaxLength(50))), join: optional(Schema.Boolean), plane, offset: optional(dimension) }),
+    Schema.Struct({ id, type: Schema.Literal("mirror"), ...timeline, feature: optional(id), bodies: optional(Schema.Array(id).check(Schema.isMinLength(1), Schema.isMaxLength(50))), join: optional(Schema.Boolean), plane, offset: optional(dimension) }),
     "Mirror the tool of an earlier extrude, revolve, hole or mirror (feature), or whole bodies (bodies: a new body; join: united with the original, half a symmetric part becomes the part) through a plane: XY reflects Z, YZ reflects X, ZX reflects Y, at offset along the plane normal."
   )
 ])
@@ -272,6 +274,21 @@ type Feature = typeof feature.Type
 export const ParametricParameters = namedRecord(dimension, /^[A-Za-z_][A-Za-z0-9_]{0,79}$/, "use a letter or _ then letters, digits or _ (at most 80)", 80)
 
 /** The order rules no field-level check can see: references point backwards, ids are unique, sketches resolve. */
+/** The timeline fields must name what exists: the rollback marker a feature, a feature's group a declared group, groups once. */
+const timelineIssues = (history: { readonly features: ReadonlyArray<Feature>; readonly rollback?: string; readonly groups?: ReadonlyArray<{ readonly id: string }> }): Array<Schema.FilterIssue> => {
+  const issues: Array<Schema.FilterIssue> = []
+  if (history.rollback !== undefined && !history.features.some((f) => f.id === history.rollback)) issues.push({ path: ["rollback"], issue: `The rollback marker '${history.rollback}' is not a feature id` })
+  const groups = new Set<string>()
+  for (const [index, g] of (history.groups ?? []).entries()) {
+    if (groups.has(g.id)) issues.push({ path: ["groups", index], issue: `Duplicate group id '${g.id}'` })
+    groups.add(g.id)
+  }
+  history.features.forEach((f, index) => {
+    if (f.group !== undefined && !groups.has(f.group)) issues.push({ path: ["features", index, "group"], issue: `Group '${f.group}' is not in groups` })
+  })
+  return issues
+}
+
 const historyIssues = (features: ReadonlyArray<Feature>): Array<Schema.FilterIssue> => {
   const issues: Array<Schema.FilterIssue> = []
   const seen = new Map<string, Feature>()
@@ -339,9 +356,13 @@ const historyIssues = (features: ReadonlyArray<Feature>): Array<Schema.FilterIss
 }
 
 export const ParametricHistory = described(
-  Schema.Struct({ parameters: ParametricParameters, features: between(Schema.Array(feature), 1, 80) }),
-  "JSON object, never a JSON-encoded string. Features and constraints use type; sketch entities use kind. Sketch features must precede extrude/revolve/sweep/loft references; shell needs an earlier extrude; fillet acts on the bodies built so far."
-).check(Schema.makeFilter((history) => historyIssues(history.features)))
+  Schema.Struct({
+    parameters: ParametricParameters, features: between(Schema.Array(feature), 1, 80),
+    rollback: optional(id), groups: optional(between(Schema.Array(Schema.Struct({ id, name: text(100), collapsed: optional(Schema.Boolean) })), 0, 40)),
+    version: optional(Schema.Literal(2))
+  }),
+  "JSON object, never a JSON-encoded string. Features and constraints use type; sketch entities use kind. Sketch features must precede extrude/revolve/sweep/loft references; shell needs an earlier extrude; fillet acts on the bodies built so far. Timeline: a feature with suppressed:true is left out with what needs it (nothing is deleted); rollback names the last built feature; name and group (an id of groups) are display only."
+).check(Schema.makeFilter((history) => [...historyIssues(history.features), ...timelineIssues(history)]))
 export type ParametricHistory = typeof ParametricHistory.Type
 
 // ---------------------------------------------------------------- the parametric actions

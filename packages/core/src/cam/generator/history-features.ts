@@ -13,6 +13,7 @@ import { Schema } from "effect"
 import { holeSites } from "../../cad/dfm.ts"
 import { dimensionValue, type Dimension } from "../../cad/expr.ts"
 import { rebuild, type History, type HoleFeature, type PlaneName } from "../../cad/history.ts"
+import { activeHistory } from "../../cad/history-timeline.ts"
 import { treatCorners } from "../../cad/profile-shape.ts"
 import { signedArea } from "../../cad/shapes.ts"
 import { sketchProfiles } from "../../cad/sketch.ts"
@@ -189,7 +190,9 @@ export const historyFeatures = (e: CadElement): HistoryFeatures | undefined => {
   }
 }
 
-const derive = (history: History): HistoryFeatures => {
+const derive = (source: History): HistoryFeatures => {
+  // A suppressed or rolled-back feature is not machined: the walk reads the model the person sees (spec 58).
+  const history = activeHistory(source)
   // Whole bodies mirrored or patterned carry their holes and pockets along; the walk below follows feature tools only, so such a
   // part is left to the exact recognition of the planner (`exactFeatures`), which reads the real geometry.
   if (history.features.some((f) => (f.type === "mirror" || f.type === "pattern") && f.bodies !== undefined)) throw new Error("body copies")

@@ -37,6 +37,7 @@ import { blendEdges, blendEdgesVariable, findEdges, selectEdges } from "./edge-b
 import { expandSketch, type SketchShape } from "./sketch-shapes.ts"
 import { elementMesh } from "../cam/model/element-mesh.ts"
 import { exactReplay, type ExactReplay } from "./history-brep.ts"
+import { bodyRefs, timelinePlan } from "./history-timeline.ts"
 import { blendBrep, blendCandidates, faceByName, faceCentre, isConePlaneRim, meshEdgeDefects, selectBlendEdges, tessellateBrep, withBudget } from "./brep/index.ts"
 import { isSpherePlaneRim } from "./brep/blend-sphere-plane.ts"
 
@@ -496,12 +497,43 @@ export interface PrimitiveFeature {
   readonly targets?: ReadonlyArray<string>
 }
 
-export type Feature = SketchFeature | ExtrudeFeature | RevolveFeature | HoleFeature | PatternFeature | MirrorFeature | SweepFeature | LoftFeature | ShellFeature | FilletFeature | PrimitiveFeature | CoilFeature | MoveFeature | ScaleFeature | SplitFeature | CombineFeature | RibFeature | SheetFeature | ThreadFeature | TextFeature | PushPullFeature | DraftFeature | MateFeature | PlaneFeature
+/** Timeline fields any feature may carry (spec 58 §3.1). Only `suppressed` changes the model; `name` and `group` are display. */
+export interface FeatureMeta {
+  /** Left out of the model together with everything that needs it; nothing is deleted. */
+  readonly suppressed?: boolean
+  /** Name shown in the timeline in place of the id. */
+  readonly name?: string
+  /** Id of the timeline group the feature is shown in. */
+  readonly group?: string
+}
 
+export type Feature = (SketchFeature | ExtrudeFeature | RevolveFeature | HoleFeature | PatternFeature | MirrorFeature | SweepFeature | LoftFeature | ShellFeature | FilletFeature | PrimitiveFeature | CoilFeature | MoveFeature | ScaleFeature | SplitFeature | CombineFeature | RibFeature | SheetFeature | ThreadFeature | TextFeature | PushPullFeature | DraftFeature | MateFeature | PlaneFeature) & FeatureMeta
+
+/** A named fold of the timeline (display only: a group never changes a replay). */
+export interface TimelineGroup { readonly id: string; readonly name: string; readonly collapsed?: boolean }
+
+/**
+ * The parametric history. The timeline fields are a read-compatible superset (spec 58, decision D8 default): a history without
+ * them replays exactly as before, and nothing migrates.
+ */
 export interface History {
   readonly parameters: ParameterTable
   readonly features: ReadonlyArray<Feature>
+  /** Id of the last active feature: the features after it are rolled back (kept, not built). */
+  readonly rollback?: string
+  readonly groups?: ReadonlyArray<TimelineGroup>
+  /** 2 when the history was written with the timeline fields. */
+  readonly version?: 2
 }
+
+/**
+ * What a feature was in a replay (spec 58 §3.2): built (`ok`), built with an error (`failed`), left out by its own flag
+ * (`suppressed`), left out because it needs a suppressed feature (`suppressed-by`, naming that feature), or after the
+ * rollback marker (`rolled-back`).
+ */
+export type FeatureState =
+  | { readonly state: "ok" | "failed" | "suppressed" | "rolled-back" }
+  | { readonly state: "suppressed-by"; readonly by: string }
 
 export interface Issue { readonly feature: string; readonly severity: "error" | "warning"; readonly message: string }
 
@@ -516,6 +548,13 @@ export interface RebuildResult {
   /** The flat pattern of each sheet-metal feature: straight length, bends and the strip's length before bending. */
   readonly flatPatterns: Readonly<Record<string, Developed>>
   readonly issues: ReadonlyArray<Issue>
+  /** The state of every feature of the history, by id. */
+  readonly states: Readonly<Record<string, FeatureState>>
+  /**
+   * For each built feature, the earlier features whose bodies it changed, removed or named (spec 58 §3.3): with the declared
+   * references, what a reorder must keep before it.
+   */
+  readonly lineage: Readonly<Record<string, ReadonlyArray<string>>>
 }
 
 const ptOf = (frame: { u: V3; v: V3; n: V3 }, origin: V3, p: V3): V3 => ({
@@ -821,12 +860,14 @@ export const rebuild = (history: History): RebuildResult => {
   }
   const bodies: Body[] = []
   const flatPatterns: Record<string, Developed> = {}
+  const states: Record<string, FeatureState> = {}
+  const lineage: Record<string, ReadonlyArray<string>> = {}
   // The exact model of the features before one that needs it (a named face, a curved fillet): one replay per rebuild,
   // advanced to that feature on demand and reading this rebuild's sketches and issues as they grow, so a history with many
   // such features replays each exact feature once instead of the whole prefix every time.
   let exactSoFar: ExactReplay | undefined
   const exactAt = (index: number) => {
-    exactSoFar ??= exactReplay(history, { bodies, parameters: values, sketches, flatPatterns, get planes() { return Object.fromEntries(planes) }, issues })
+    exactSoFar ??= exactReplay(history, { bodies, parameters: values, sketches, flatPatterns, get planes() { return Object.fromEntries(planes) }, issues, states, lineage })
     return exactSoFar.at(index, [...bodies], { budgetMs: 10_000 })
   }
   const tools = new Map<string, { readonly meshes: ReadonlyArray<Mesh>; readonly operation: Operation; readonly targets?: ReadonlyArray<string> }>()
@@ -912,7 +953,16 @@ export const rebuild = (history: History): RebuildResult => {
     return { error: `the face '${name}' does not exist any more` }
   }
 
+  // The timeline (spec 58): inactive features are recorded, not built. Lineage: the last feature that changed each body.
+  const plan = timelinePlan(history)
+  for (const message of plan.problems) issues.push({ feature: "timeline", severity: "warning", message })
+  const lastWriter = new Map<string, string>()
   for (const [featureIndex, f] of history.features.entries()) {
+    const planned = plan.states[f.id]!
+    if (planned.state !== "active") { states[f.id] = planned.state === "suppressed-by" ? planned : { state: planned.state }; continue }
+    const issuesBefore = issues.length
+    const before = new Map(bodies.map((b) => [b.id, b.mesh] as const))
+    const named = bodyRefs(f).flatMap((id) => lastWriter.get(id) ?? [])
     try {
       switch (f.type) {
         case "sketch": {
@@ -1792,9 +1842,24 @@ export const rebuild = (history: History): RebuildResult => {
       }
     } catch (error) {
       issues.push({ feature: f.id, severity: "error", message: error instanceof SketchError || error instanceof Error ? error.message : String(error) })
+    } finally {
+      // Whatever ended the feature, record what it did to the bodies: a changed or removed body ties it to that body's last writer.
+      const touched = new Set(named)
+      const after = new Map(bodies.map((b) => [b.id, b.mesh] as const))
+      for (const [id, mesh] of before) {
+        if (after.get(id) === mesh) continue
+        const writer = lastWriter.get(id)
+        if (writer !== undefined) touched.add(writer)
+        if (after.has(id)) lastWriter.set(id, f.id)
+        else lastWriter.delete(id)
+      }
+      for (const id of after.keys()) if (!before.has(id)) lastWriter.set(id, f.id)
+      touched.delete(f.id)
+      lineage[f.id] = [...touched]
+      states[f.id] = { state: issues.slice(issuesBefore).some((i) => i.feature === f.id && i.severity === "error") ? "failed" : "ok" }
     }
   }
-  return { bodies, parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues }
+  return { bodies, parameters: values, sketches, flatPatterns, planes: Object.fromEntries(planes), issues, states, lineage }
 }
 
 /** Volume of the bodies together, mm^3 (they may touch but are assumed not to overlap). */

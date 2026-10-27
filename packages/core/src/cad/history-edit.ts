@@ -7,7 +7,8 @@
  * same paths.
  */
 import { namesIn, type Dimension } from "./expr.ts"
-import type { DimConstraint, Feature, History } from "./history.ts"
+import { rebuild, type DimConstraint, type Feature, type History, type RebuildResult } from "./history.ts"
+import { bodyCreator, bodyRefs, declaredNeeds } from "./history-timeline.ts"
 
 export interface DimensionRef {
   /** Where it lives inside its feature: `depth`, `step.1`, `sketch.constraints.2.value`. */
@@ -219,17 +220,87 @@ export const removeFeature = (history: History, id: string): History => {
   return { ...history, features: history.features.filter((f) => !gone.has(f.id)) }
 }
 
-/** A feature moved one place up or down. A feature cannot move above what it needs, or below what needs it. */
+/** Why one feature must stay after another: it names it, it names a body it made, or the replay saw it change that feature's body. */
+export type DependencyReason = "declared" | "body" | "lineage"
+
+/**
+ * Every feature's needs (spec 58 §3.3): the declared references, the features that made the bodies it names, and the lineage of a
+ * replay, i.e. the features whose bodies it changed or removed (a hole cutting the plate needs the plate's extrusion although it
+ * names neither). The replay runs with every feature active (no suppression, no rollback), so a suppressed feature keeps its
+ * edges; `result` may be given when that replay is at hand.
+ */
+export const dependencyGraph = (history: History, result?: RebuildResult): ReadonlyMap<string, ReadonlyMap<string, DependencyReason>> => {
+  const ids = new Set(history.features.map((f) => f.id))
+  const replay = result ?? rebuild({ parameters: history.parameters, features: history.features.map((f) => (f.suppressed === true ? (({ suppressed: _s, ...rest }) => rest as Feature)(f) : f)) })
+  const graph = new Map<string, Map<string, DependencyReason>>()
+  for (const f of history.features) {
+    const needs = new Map<string, DependencyReason>()
+    for (const id of replay.lineage[f.id] ?? []) if (ids.has(id) && id !== f.id) needs.set(id, "lineage")
+    for (const id of bodyRefs(f).map(bodyCreator)) if (ids.has(id) && id !== f.id) needs.set(id, "body")
+    for (const id of declaredNeeds(f)) if (ids.has(id) && id !== f.id) needs.set(id, "declared")
+    graph.set(f.id, needs)
+  }
+  return graph
+}
+
+const because = (reason: DependencyReason): string =>
+  reason === "declared" ? "it is referenced" : reason === "body" ? "it makes a body that is named" : "it builds the body that is changed"
+
+/** The outcome of a timeline edit: the new history, or the same one with the reason it was refused. */
+export interface TimelineEdit { readonly history: History; readonly refusal?: string }
+
+/**
+ * `id` moved so it ends at `index` of the timeline. Valid only when every dependency still points backwards; otherwise the history is
+ * returned unchanged with the reason, naming the feature in the way (refusal over approximation: until persistent naming, a feature
+ * moved across a body's lineage could act on different geometry).
+ */
+export const moveFeatureTo = (history: History, id: string, index: number, graph: ReadonlyMap<string, ReadonlyMap<string, DependencyReason>> = dependencyGraph(history)): TimelineEdit => {
+  const from = history.features.findIndex((f) => f.id === id)
+  if (from < 0) return { history, refusal: `no feature '${id}' in the history` }
+  if (!Number.isInteger(index) || index < 0 || index >= history.features.length) return { history, refusal: `position ${index} is outside the timeline (0 to ${history.features.length - 1})` }
+  if (index === from) return { history }
+  const order = history.features.map((f) => f.id).filter((x) => x !== id)
+  order.splice(index, 0, id)
+  const at = new Map(order.map((x, i) => [x, i] as const))
+  if (index < from) {
+    // Moving up: nothing it needs may end below it.
+    for (const [need, reason] of graph.get(id) ?? []) {
+      if (at.get(need)! > index) return { history, refusal: `'${id}' cannot move above '${need}': ${id} needs it (${because(reason)})` }
+    }
+  } else {
+    // Moving down: nothing that needs it may end above it.
+    for (const other of order.slice(0, index)) {
+      const reason = graph.get(other)?.get(id)
+      if (reason !== undefined) return { history, refusal: `'${id}' cannot move below '${other}': ${other} needs it (${because(reason)})` }
+    }
+  }
+  const byId = new Map(history.features.map((f) => [f.id, f] as const))
+  return { history: { ...history, features: order.map((x) => byId.get(x)!) } }
+}
+
+/** A feature moved one place up or down; a move across a dependency (declared or lineage) leaves the history as it is. */
 export const moveFeature = (history: History, id: string, direction: -1 | 1): History => {
   const i = history.features.findIndex((f) => f.id === id)
   const j = i + direction
   if (i < 0 || j < 0 || j >= history.features.length) return history
-  const a = history.features[i]!, b = history.features[j]!
-  const needs = (x: Feature, y: Feature) => dependentsOf(history, y.id).includes(x.id)
-  if (direction === -1 ? needs(a, b) : needs(b, a)) return history
+  return moveFeatureTo(history, id, j).history
+}
+
+/**
+ * `feature` inserted right after `after` (at the top with `undefined`). Refused when its id is taken or when something it names
+ * (a feature, or the body of a feature) is not above the insertion point.
+ */
+export const insertFeature = (history: History, feature: Feature, after: string | undefined): TimelineEdit => {
+  if (history.features.some((f) => f.id === feature.id)) return { history, refusal: `the id '${feature.id}' is already used` }
+  const at = after === undefined ? 0 : history.features.findIndex((f) => f.id === after) + 1
+  if (at === 0 && after !== undefined) return { history, refusal: `no feature '${after}' in the history` }
+  const above = new Set(history.features.slice(0, at).map((f) => f.id))
+  const all = new Set(history.features.map((f) => f.id))
+  const missing = [...declaredNeeds(feature), ...bodyRefs(feature).map(bodyCreator)].find((id) => all.has(id) && !above.has(id))
+  if (missing !== undefined) return { history, refusal: `'${feature.id}' needs '${missing}', which comes after the insertion point` }
   const features = [...history.features]
-  features[i] = b; features[j] = a
-  return { ...history, features }
+  features.splice(at, 0, feature)
+  return { history: { ...history, features } }
 }
 
 /**

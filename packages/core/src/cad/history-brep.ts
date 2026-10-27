@@ -16,6 +16,7 @@
  * non-coaxial curved edge is refused by the rebuild with a message. `history-exactness.test.ts` records, for every feature
  * kind and option, whether the cell is exact or mesh-only (spec 40 U0) and fails when one of them changes.
  */
+import { timelinePlan } from "./history-timeline.ts"
 import { dimensionValue, type Dimension } from "./expr.ts"
 import { polygonArea, sketchProfiles, type Sketch } from "./sketch.ts"
 import { catmullRomCurves, ellipseCurves } from "./sketch-curves.ts"
@@ -631,6 +632,8 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
   let stopped: string | undefined
   const values = result.parameters
   const failed = (id: string): boolean => result.issues.some((i) => i.feature === id && i.severity === "error")
+  // A suppressed or rolled-back feature never reaches an exact body (spec 58 §3.2): the same plan as the mesh replay.
+  const active = timelinePlan(history).states
   const dim = (d: Dimension): number => dimensionValue(d, values)
   const bodies: Array<{ id: string; feature: string; exact: Exact }> = []
   const tools = new Map<string, { readonly exact: ReadonlyArray<Exact>; readonly operation: "new" | "union" | "subtract" | "intersect"; readonly targets?: ReadonlyArray<string> }>()
@@ -697,7 +700,7 @@ export const exactReplay = (history: History, result: RebuildResult): ExactRepla
   const advance = (end: number): void => {
     while (next < end && stopped === undefined) {
       const f = history.features[next++]!
-      if (failed(f.id)) continue
+      if (active[f.id]?.state !== "active" || failed(f.id)) continue
       featureId = f.id
       try {
         checkBudget()

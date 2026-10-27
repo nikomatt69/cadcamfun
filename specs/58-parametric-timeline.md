@@ -1,6 +1,6 @@
 # 58 — The parametric timeline: suppress, rollback, reorder, groups, edit-in-place, incremental rebuild
 
-Status: specified 2026-10-25 (not built). Part of [spec 39](39-professional-parity-master-plan.md); gap G1 of [spec 57](57-parity-ledger-2026-10-25.md).
+Status: specified 2026-10-25; T1–T3 built 2026-10-27 (core, API schema, readers; desktop panel and assistant actions are T7). Part of [spec 39](39-professional-parity-master-plan.md); gap G1 of [spec 57](57-parity-ledger-2026-10-25.md).
 Owner: WP1 (`packages/core/src/cad/{history.ts,history-brep.ts,history-edit.ts}`); adapters WP3 (`packages/api/src/ai-parametric.ts`),
 WP6 (`apps/desktop/src/features/cad`), WP8 (`packages/ai`, `cad_parametric`). Interacts with [spec 40](40-single-exact-brep-truth.md) (the two replays),
 [41](41-persistent-topological-naming.md) (refs follow the timeline) and [46](46-assembly-and-configurations.md) (configurations are built on suppression).
@@ -112,3 +112,14 @@ T1 → T2 → T3 → T5 → T6 → T7 → T4 → T8. T4 is last because it touch
 ## 8. Change log
 
 - 2026-10-25: created.
+- 2026-10-27: T1–T3 built. D8 taken at its default (read-compatible superset, no migration; `version: 2` optional). `cad/history-timeline.ts`
+  (`timelinePlan`, `activeHistory`, `withSuppressed`, `withRollback`, `declaredNeeds`, `bodyRefs`) is the one definition of an active feature;
+  `rebuild` returns `states` and `lineage`, the exact replay skips the same features, and the readers that interpret features themselves
+  (`drawing/dimensions.ts`, `cad/dfm.ts`, `cam/generator/history-features.ts`, `ai/acceptance.ts`) read `activeHistory`. `dependencyGraph` (declared,
+  named-body and lineage edges from a replay with every feature active), `moveFeatureTo`, `insertFeature`; `moveFeature` now refuses a hole above
+  the extrusion it cuts (the old test asserted the opposite). API `ParametricHistory` accepts the fields on all 24 kinds (a decode no longer drops
+  them) and checks the marker and groups. Gate: `history-timeline.test.ts` (24 kinds suppress = history without the feature, mesh and identical
+  exact B-rep; rollback = prefix on every recipe; T3 cases; T8 identity); a mutation that lets the exact replay ignore the flag fails 18 of its cases.
+  Not done: `failed` dependents are not yet `skipped` (T5); lineage is the bodies a feature changed or named, so a feature that only reads a body
+  without naming it (a fillet with no targets) gets edges to every body it changed, which refuses more moves than strictly needed; the
+  desktop timeline, the assistant actions and the sidecar route (T7).

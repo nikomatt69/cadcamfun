@@ -4,7 +4,7 @@
     { "id": "history.exact-rebuild", "area": "history", "title": "Exact B-rep replay of the parametric history", "source": "spec 40 U0", "state": "built", "evidence": ["src/cad/history-exactness.test.ts", "src/cad/history-brep.test.ts", "src/cad/history-exact-replay.test.ts"] },
     { "id": "history.pattern", "area": "history", "title": "Linear, circular, grid and body patterns, exact", "source": "spec 40 U0 coverage matrix", "state": "built", "evidence": ["src/cad/history-exactness.test.ts", "src/cad/history-pattern-path.test.ts"] },
     { "id": "history.thread-exact", "area": "history", "title": "Modelled threads as exact solids", "source": "spec 57 U1", "state": "built", "evidence": ["src/cad/thread-brep.test.ts"] },
-    { "id": "history.suppress-rollback", "area": "history", "title": "Suppress, rollback marker, groups, edit in place", "source": "spec 58 T1-T3", "state": "open", "evidence": [] },
+    { "id": "history.suppress-rollback", "area": "history", "title": "Suppress, rollback marker, lineage and reorder", "source": "spec 58 T1-T3 (T4-T8 open)", "state": "partial", "evidence": ["src/cad/history-timeline.test.ts"] },
     { "id": "naming.persistent", "area": "history", "title": "Persistent topological naming with resolve(ref)", "source": "spec 57 N1-N8", "state": "open", "evidence": [] },
     { "id": "revolve.exact", "area": "modelling", "title": "Exact revolve", "source": "spec 40 U0 coverage matrix", "state": "built", "evidence": ["src/cad/history-exactness.test.ts"] },
     { "id": "loft.exact", "area": "modelling", "title": "Exact loft (ruled sections)", "source": "spec 57 S3 (simple cases exact)", "state": "partial", "evidence": ["src/cad/brep/loft.test.ts", "src/cad/sweep-loft.test.ts"] },

@@ -11,7 +11,7 @@
  * - What cannot be measured (no exact model, a reference this module does not resolve) is `unmeasured`, and a part with an
  *   unmeasured check is not accepted.
  */
-import { brep, dimensionValue, meshVolume, rebuild, rebuildExact, type History, type RebuildResult } from "@cadcamfun/core"
+import { activeHistory, brep, dimensionValue, meshVolume, rebuild, rebuildExact, type History, type RebuildResult } from "@cadcamfun/core"
 
 /** Allowed deviation from the nominal: `plus` above, `minus` below, both non-negative mm (or mm³ for a volume). */
 export interface Tolerance {
@@ -99,7 +99,9 @@ const bounds = (result: RebuildResult, body?: string) => {
 }
 
 /** Measures every check on the rebuilt part. Pure and synchronous: run it in a kernel job for heavy parts. */
-export const acceptPart = (history: History, checks: ReadonlyArray<AcceptanceCheck>, options: { readonly budgetMs?: number } = {}): AcceptanceReport => {
+export const acceptPart = (source: History, checks: ReadonlyArray<AcceptanceCheck>, options: { readonly budgetMs?: number } = {}): AcceptanceReport => {
+  // Checks measure the model as built: suppressed and rolled-back features are not part of it.
+  const history = activeHistory(source)
   const result = rebuild(history)
   const rebuilt = result.bodies.length > 0 && !result.issues.some((issue) => issue.severity === "error")
   let exact: ReturnType<typeof rebuildExact> | undefined

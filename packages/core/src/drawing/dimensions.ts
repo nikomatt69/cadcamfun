@@ -14,6 +14,7 @@
 import { dimensionValue, type Dimension } from "../cad/expr.ts"
 import { toleranceGrade } from "../cad/fasteners.ts"
 import type { History, RebuildResult } from "../cad/history.ts"
+import { activeHistory } from "../cad/history-timeline.ts"
 import { meshBounds } from "../cad/solid.ts"
 import type { V3 } from "./project.ts"
 
@@ -97,7 +98,9 @@ const FRAME_AXES: Readonly<Record<string, { u: V3; v: V3; n: V3; axis: HoleAxis 
 const add = (a: V3, b: V3, s = 1): V3 => ({ x: a.x + b.x * s, y: a.y + b.y * s, z: a.z + b.z * s })
 
 /** The plan of a drawing from a history and its rebuild (the rebuild gives the resolved parameters and the bodies). */
-export const planDimensions = (history: History, result: RebuildResult): DimensionPlan => {
+export const planDimensions = (source: History, result: RebuildResult): DimensionPlan => {
+  // Suppressed and rolled-back features are not in the model, so they get no dimensions (spec 58).
+  const history = activeHistory(source)
   const values = result.parameters
   const notes: string[] = []
   const num = (d: Dimension | undefined): number | undefined => {

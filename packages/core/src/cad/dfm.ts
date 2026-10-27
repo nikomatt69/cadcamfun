@@ -15,6 +15,7 @@
 import { dimensionValue, type Dimension } from "./expr.ts"
 import { minEdgeDistance } from "./fasteners.ts"
 import { rebuild, type Feature, type History, type PlaneName, type PlaneRef, type PlaneFrame, type RebuildResult } from "./history.ts"
+import { activeHistory } from "./history-timeline.ts"
 import { sharpVertices, treatCorners } from "./profile-shape.ts"
 import { sketchProfiles } from "./sketch.ts"
 import { meshBounds, meshVolume, type Mesh } from "./solid.ts"
@@ -288,7 +289,9 @@ const value = (d: Dimension | undefined, parameters: Readonly<Record<string, num
 }
 
 /** Every hole of the history in plane coordinates, with the copies the patterns make. The work planes a `plane` feature made are needed for the holes on them. */
-export const holeSites = (history: History, parameters: Readonly<Record<string, number>>, planes: Readonly<Record<string, PlaneFrame>> = {}): HoleSite[] => {
+export const holeSites = (source: History, parameters: Readonly<Record<string, number>>, planes: Readonly<Record<string, PlaneFrame>> = {}): HoleSite[] => {
+  // Only the holes of the model: a suppressed or rolled-back hole is not drilled (spec 58).
+  const history = activeHistory(source)
   const base = new Map<string, HoleSite>()
   const sites: HoleSite[] = []
   /** The frame of a plane: a base plane, or a work plane the rebuild made. */
@@ -394,7 +397,8 @@ const sizeOf = (result: RebuildResult): { x: number; y: number; z: number } | nu
 const LITERAL_PATHS: ReadonlyArray<readonly [Feature["type"], string]> = [["extrude", "depth"], ["hole", "diameter"], ["hole", "depth"]]
 
 /** Reads a parametric history for what cannot be made, or made well, on the process; never changes anything. */
-export const analyzeManufacturability = (history: History, options: DfmOptions = {}): DfmReport => {
+export const analyzeManufacturability = (source: History, options: DfmOptions = {}): DfmReport => {
+  const history = activeHistory(source)
   const process = options.process ?? "mill"
   const material = options.material ?? "metal"
   const tool = options.toolDiameter ?? 6
