@@ -16,7 +16,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable)
 
 /** Circular header icon button (nikcli: IconCircleButton). 44pt hit target, theme-derived tones. */
 export function IconCircleButton({ children, size = 44, accessibilityLabel, tone = "surface", style, onPressIn, onPressOut, ...props }: IconCircleButtonProps) {
-  const { palette } = useTheme()
+  const { palette, isDark } = useTheme()
   const [pressed, setPressed] = useState(false)
   const press = usePressScale()
   const inverse = tone === "inverse"
@@ -49,7 +49,8 @@ export function IconCircleButton({ children, size = 44, accessibilityLabel, tone
             borderCurve: "continuous",
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: inverse ? "rgba(255,255,255,0.16)" : warm ? hexToRgba(palette.accent, 0.18) : palette.surface,
+            // Dark mode is neutral black and greys: the warm tint stays a light-mode accent.
+            backgroundColor: inverse ? "rgba(255,255,255,0.16)" : warm ? (isDark ? palette.surfaceRaised : hexToRgba(palette.accent, 0.18)) : palette.surface,
             borderWidth: 1,
             borderColor: inverse ? "rgba(255,255,255,0.22)" : hexToRgba(palette.ink, warm ? 0.06 : 0.12),
             opacity: props.disabled ? 0.45 : pressed ? 0.72 : 1,
