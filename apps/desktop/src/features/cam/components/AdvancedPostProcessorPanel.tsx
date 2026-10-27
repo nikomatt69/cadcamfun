@@ -72,7 +72,8 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
       setResult(null)
     }
   }, { defer: true }))
-  createEffect(on(() => props.controllerType, (next) => { setTarget(next); setSource(next) }, { defer: true }))
+  // The page's selection is the target; what the program is written for is the reader's choice and stays.
+  createEffect(on(() => props.controllerType, (next) => setTarget(next), { defer: true }))
 
   const toggleSection = (section: keyof ReturnType<typeof expanded>): void => {
     setExpanded((prev) => ({ ...prev, [section]: !prev[section] }))
