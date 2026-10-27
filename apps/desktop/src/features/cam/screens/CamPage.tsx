@@ -56,7 +56,7 @@ const RAPID_RATE_MM_PER_MIN = 5000
 
 
 /** Maps the seven legacy controller names onto the three the CAM store knows. */
-const storeController = (post: PostProcessorType): "gcode" | "grbl" | "fanuc" => (post === "fanuc" ? "fanuc" : "gcode")
+const storeController = (post: PostProcessorType): "gcode" | "grbl" | "fanuc" => (post === "fanuc" ? "fanuc" : post === "grbl" ? "grbl" : "gcode")
 
 export default function CamPage(): JSX.Element {
   const app = useApp()

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { categories, findManuals, manuals } from "../src/features/manuals/lib/catalogue.ts"
-import { CONTROLLER_TYPES } from "../../../packages/core/src/cam/post/advanced/options.ts"
+/** Control families the catalogue covers besides the ones with a post (Mazak and Okuma run Fanuc-compatible ISO here). */
+const CONTROLLER_TYPES = ["mazak", "okuma"] as const
 import { posts } from "../../../packages/core/src/cam/post/index.ts"
 import { installDom } from "./helpers/dom.ts"
 

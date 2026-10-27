@@ -1,54 +1,63 @@
 import { downloadFile } from "../../../shared/lib/save-file.ts"
 /**
- * Advanced panel for G-code post-processing (legacy `AdvancedPostProcessorPanel.tsx`).
+ * Post-processor panel: converts the editor's NC text into the program of another control (or rewrites it for the same one with
+ * other output options).
  *
- * Optimises and converts G-code text for a controller dialect, with general options, Fanuc / Heidenhain specific
- * options, presets, statistics, validation ("Safety Checks"), the list of applied optimisations and a preview.
- * The processing itself lives in the core (`cam.advanced.processGCode`); this component only edits the options
- * and shows the result.
+ * The work is the core's conversion kernel (`cam.convertNc`): the text is replayed by the reference interpreter in the source
+ * control's dialect, rebuilt as toolpaths, written by the target post and replayed again; the panel shows the figures measured on
+ * both replays, the largest distance between the two feed paths, what the output does differently, and refuses (with the reason)
+ * what cannot be converted without changing the cut. Nothing here edits text on its own.
  */
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
-import { AlertTriangle, Check, Cpu, Eye, Info, Loader, Save, Settings, Sliders } from "lucide-solid"
+import { AlertTriangle, Check, Cpu, Eye, Loader, Save, Settings, Sliders } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { t } from "../../../i18n/index.ts"
-import { CheckRow, Field, Note, PanelSection, Stat } from "../../../shared/components/panel/ui.tsx"
+import { CheckRow, Field, Note, NumberField, PanelSection, Segmented, Stat } from "../../../shared/components/panel/ui.tsx"
 import { gcodeSummary } from "../lib/gcode-summary.ts"
 import "../../../styles/cam-panels.css"
 
-const advanced = cam.advanced
+type PostId = cam.PostId
+type Result = cam.ConvertResult
 
-type ControllerType = cam.advanced.ControllerType
-type Options = cam.advanced.OptimizationOptions
-type Result = cam.advanced.OptimizationResult
+/** Every post the core writes, with the control it is for. */
+export const POST_TARGETS: ReadonlyArray<{ readonly id: PostId; readonly label: string; readonly about: string }> = [
+  { id: "fanuc", label: "Fanuc", about: "Fanuc 0i / 30i: % and O number, G43 H, canned cycles with M29 rigid tapping, G43.4 tool tip control, M98 subprograms, AICC smoothing (G5.1 Q1)." },
+  { id: "haas", label: "Haas NGC", about: "Haas Next Generation Control: Fanuc family, G234 TCPC, M98 subprograms, G187 accuracy control." },
+  { id: "siemens", label: "Siemens 840D sl", about: "Sinumerik native language: MPF header, ; comments, G71, T then D1, TRAORI, CYCLE832; drilling as moves, threads milled." },
+  { id: "heidenhain", label: "Heidenhain Klartext", about: "TNC 640 / TNC7 conversational: L, CC + C circles, TOOL CALL, cycle 9 dwell, cycle 32 tolerance, M128, LBL subprograms; millimetres, G54 preset." },
+  { id: "linuxcnc", label: "LinuxCNC", about: "LinuxCNC 2.8 / 2.9: % delimiters, G43 H, seconds on G4 / G82, canned drilling, G64 P blending, M2; threads milled." },
+  { id: "grbl", label: "GRBL", about: "GRBL 1.1: three axes, no tool changer (M0 pause), no canned cycles, M2." },
+  { id: "generic", label: "Generic ISO", about: "Plain ISO G-code: the reference output the other posts are compared with." }
+]
 
 export interface AdvancedPostProcessorPanelProps {
-  readonly onControllerChange?: ((controller: ControllerType) => void) | undefined
+  readonly onControllerChange?: ((controller: PostId) => void) | undefined
   readonly initialGcode: string
-  readonly controllerType: ControllerType
-  /** Receives the processed program and its statistics (legacy `onProcessedGcode(code, stats)`). */
-  readonly onProcessedGcode: (gcode: string, stats?: Result["stats"]) => void
+  /** The control the program is written for: the default target. */
+  readonly controllerType: PostId
+  /** Receives the converted program and its measured figures. */
+  readonly onProcessedGcode: (gcode: string, result?: Result) => void
 }
 
-interface OptionCheckboxProps {
-  readonly id: string
-  readonly label: string
-  readonly checked: boolean | undefined
-  readonly onChange: (checked: boolean) => void
-}
-
-function OptionCheckbox(props: OptionCheckboxProps): JSX.Element {
-  return <CheckRow id={props.id} checked={props.checked ?? false} onChange={props.onChange}>{props.label}</CheckRow>
-}
+const minutes = (seconds: number): string => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`
 
 export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorPanelProps): JSX.Element {
-  const [preset, setPreset] = createSignal("custom")
   const [inputGcode, setInputGcode] = createSignal(props.initialGcode)
   const [outputGcode, setOutputGcode] = createSignal("")
   const [isProcessing, setIsProcessing] = createSignal(false)
   const [result, setResult] = createSignal<Result | null>(null)
-  const [selectedController, setSelectedController] = createSignal<ControllerType>(props.controllerType)
-  const [options, setOptions] = createSignal<Options>(advanced.DEFAULT_OPTIONS)
-  const [expanded, setExpanded] = createSignal({ generalOptions: true, controllerOptions: true, results: true, preview: false })
+  const [source, setSource] = createSignal<PostId>(props.controllerType)
+  const [target, setTarget] = createSignal<PostId>(props.controllerType)
+  const [decimals, setDecimals] = createSignal(3)
+  const [numbered, setNumbered] = createSignal(false)
+  const [arcMode, setArcMode] = createSignal<cam.ArcMode>("ijk")
+  const [canned, setCanned] = createSignal(true)
+  const [subprograms, setSubprograms] = createSignal(false)
+  const [smoothing, setSmoothing] = createSignal(false)
+  const [tolerance, setTolerance] = createSignal(0.01)
+  const [header, setHeader] = createSignal(true)
+  const [comments, setComments] = createSignal(true)
+  const [expanded, setExpanded] = createSignal({ options: true, results: true, preview: false })
 
   createEffect(on(() => props.initialGcode, (next) => {
     if (next !== inputGcode()) {
@@ -57,25 +66,10 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
       setResult(null)
     }
   }, { defer: true }))
-  createEffect(on(() => props.controllerType, (next) => setSelectedController(next), { defer: true }))
+  createEffect(on(() => props.controllerType, (next) => { setTarget(next); setSource(next) }, { defer: true }))
 
   const toggleSection = (section: keyof ReturnType<typeof expanded>): void => {
     setExpanded((prev) => ({ ...prev, [section]: !prev[section] }))
-  }
-
-  const updateOption = <K extends keyof Options>(key: K, value: Options[K]): void => {
-    setPreset("custom")
-    setOptions((prev) => ({ ...prev, [key]: value }))
-  }
-
-  const updateFanuc = (key: keyof cam.advanced.FanucOptions, value: boolean): void => {
-    setPreset("custom")
-    setOptions((prev) => ({ ...prev, controllerSpecific: { ...prev.controllerSpecific, fanuc: { ...prev.controllerSpecific.fanuc, [key]: value } } }))
-  }
-
-  const updateHeidenhain = (key: keyof cam.advanced.HeidenhainOptions, value: boolean): void => {
-    setPreset("custom")
-    setOptions((prev) => ({ ...prev, controllerSpecific: { ...prev.controllerSpecific, heidenhain: { ...prev.controllerSpecific.heidenhain, [key]: value } } }))
   }
 
   const processGcode = async (): Promise<void> => {
@@ -84,10 +78,17 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
     setResult(null)
     try {
       await Promise.resolve()
-      const processed = advanced.processGCode(selectedController(), inputGcode(), { options: options() })
-      setOutputGcode(processed.code)
-      setResult(processed)
-      props.onProcessedGcode(processed.code, processed.stats)
+      const converted = cam.convertNc(inputGcode(), {
+        source: source(), target: target(), comments: comments(),
+        post: {
+          decimals: decimals(), arcMode: arcMode(), useCannedCycles: canned(), subprograms: subprograms(), header: header(),
+          ...(numbered() ? { lineNumbers: { start: 10, step: 10 } } : {}),
+          ...(smoothing() ? { smoothing: tolerance() } : {})
+        }
+      })
+      setOutputGcode(converted.code)
+      setResult(converted)
+      if (converted.ok) props.onProcessedGcode(converted.code, converted)
     } finally {
       setIsProcessing(false)
       setExpanded((prev) => ({ ...prev, results: true }))
@@ -97,21 +98,22 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
   const saveGcode = (): void => {
     if (!outputGcode()) return
     const date = new Date().toISOString().slice(0, 10)
-    const extension = selectedController() === "heidenhain" ? ".h" : ".nc"
-    downloadFile({ name: `optimized_${selectedController()}_${date}${extension}`, data: outputGcode(), mime: "text/plain" })
+    const extension = target() === "heidenhain" ? ".h" : target() === "siemens" ? ".mpf" : ".nc"
+    downloadFile({ name: `${target()}_${date}${extension}`, data: outputGcode(), mime: "text/plain" })
   }
 
   const summary = createMemo(() => gcodeSummary(inputGcode()))
-  const controllerName = (): string => advanced.capitalise(selectedController())
-  const fanuc = (): cam.advanced.FanucOptions => options().controllerSpecific.fanuc
-  const heidenhain = (): cam.advanced.HeidenhainOptions => options().controllerSpecific.heidenhain
+  const about = (id: PostId): string => POST_TARGETS.find((p) => p.id === id)?.about ?? ""
+  const label = (id: PostId): string => POST_TARGETS.find((p) => p.id === id)?.label ?? id
+  const smoothingCodes = (): boolean => cam.dialectOf(target())?.smoothing !== undefined || target() === "heidenhain"
+  const subprogramCodes = (): boolean => cam.dialectOf(target())?.subprograms !== undefined || target() === "heidenhain"
 
   return (
     <div class="panel cam-post__panel" data-testid="advanced-post-processor">
       <div class="cam-post__setup">
         <h2 class="panel-header__title cam-panel-heading">
           <Cpu size={15} />
-          Advanced Post-Processor
+          Post-Processor
         </h2>
 
         <div class="cam-program-summary" data-testid="post-input-summary">
@@ -121,308 +123,107 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
         </div>
         <Show when={summary().blocks === 0}><Note>{t("cam.panel.noInput")}</Note></Show>
         <div class="cam-post__controls">
-          <Field label={t("cam.panel.controller")} for="post-processor-type">
-            <select id="post-processor-type"
-              class="panel-input"
-              value={selectedController()}
-              onChange={(event) => { const value = event.currentTarget.value as ControllerType; setSelectedController(value); props.onControllerChange?.(value) }}
-              data-testid="advanced-controller"
-            >
-              <option value="fanuc">Fanuc</option>
-              <option value="heidenhain">Heidenhain</option>
-              <option value="siemens">Siemens</option>
-              <option value="haas">Haas</option>
-              <option value="mazak">Mazak</option>
-              <option value="okuma">Okuma</option>
-              <option value="generic">Generic</option>
+          <Field label="Written for" for="post-processor-source">
+            <select id="post-processor-source" class="panel-input" value={source()} data-testid="post-source"
+              onChange={(event) => setSource(event.currentTarget.value as PostId)}>
+              <For each={POST_TARGETS}>{(p) => <option value={p.id}>{p.label}</option>}</For>
             </select>
           </Field>
-            <button
-              class="panel-btn panel-btn--primary"
-              onClick={() => void processGcode()}
-              disabled={isProcessing() || summary().blocks === 0}
-              data-testid="process-gcode"
-            >
-              {isProcessing() ? <Loader size={18} class="mr-2 animate-spin" /> : <Settings size={18} class="mr-2" />}
-              {isProcessing() ? "Processing..." : "Process G-code"}
-            </button>
-        </div>
-
-        <div class="cam-post__presets"><span class="panel-label">{t("cam.panel.presets")}</span><div class="cam-post__result-actions" style={{ "justify-content": "flex-start" }}>
-          <button
-            type="button"
-            class="panel-btn"
-            aria-pressed={preset() === "basic"} onClick={() => { setPreset("basic"); setOptions(advanced.applyPreset("basic", options())) }}
-          >
-            Basic
-          </button>
-          <button
-            type="button"
-            class="panel-btn"
-            aria-pressed={preset() === "speed"} onClick={() => { setPreset("speed"); setOptions(advanced.applyPreset("speed", options())) }}
-          >
-            Speed
-          </button>
-          <button
-            type="button"
-            class="panel-btn"
-            aria-pressed={preset() === "quality"} onClick={() => { setPreset("quality"); setOptions(advanced.applyPreset("quality", options())) }}
-          >
-            Quality
-          </button>
-          <button
-            type="button"
-            class="panel-btn"
-            aria-pressed={preset() === "advanced"} onClick={() => { setPreset("advanced"); setOptions(advanced.applyPreset("advanced", options())) }}
-          >
-            Advanced
+          <Field label={t("cam.panel.controller")} for="post-processor-target">
+            <select id="post-processor-target" class="panel-input" value={target()} data-testid="advanced-controller"
+              onChange={(event) => { const value = event.currentTarget.value as PostId; setTarget(value); props.onControllerChange?.(value) }}>
+              <For each={POST_TARGETS}>{(p) => <option value={p.id}>{p.label}</option>}</For>
+            </select>
+          </Field>
+          <button class="panel-btn panel-btn--primary" onClick={() => void processGcode()} disabled={isProcessing() || summary().blocks === 0} data-testid="process-gcode">
+            {isProcessing() ? <Loader size={18} class="mr-2 animate-spin" /> : <Settings size={18} class="mr-2" />}
+            {isProcessing() ? "Converting..." : "Convert"}
           </button>
         </div>
-
-        </div>
-        <Note>{advanced.controllerDescription(selectedController())}</Note>
+        <Note>{about(target())}</Note>
       </div>
 
-      <PanelSection id="post-general" title={t("cam.panel.general")} icon={Sliders} open={expanded().generalOptions} onToggle={() => toggleSection("generalOptions")}>
-
-        <Show when={expanded().generalOptions}>
+      <PanelSection id="post-options" title={`${label(target())} output`} icon={Sliders} open={expanded().options} onToggle={() => toggleSection("options")}>
+        <Show when={expanded().options}>
           <div class="cam-post__grid">
-            <div>
-              <h4 class="font-medium text-gray-700 mb-2">Path Optimization</h4>
-              <div class="space-y-2">
-                <OptionCheckbox id="removeRedundantMoves" label="Remove redundant moves" checked={options().removeRedundantMoves} onChange={(v) => updateOption("removeRedundantMoves", v)} />
-                <OptionCheckbox id="optimizeRapidMoves" label="Optimize rapid moves" checked={options().optimizeRapidMoves} onChange={(v) => updateOption("optimizeRapidMoves", v)} />
-                <OptionCheckbox id="optimizeToolpaths" label="Optimize toolpaths" checked={options().optimizeToolpaths} onChange={(v) => updateOption("optimizeToolpaths", v)} />
-                <OptionCheckbox id="minimizeAxisMovement" label="Minimize axis movement" checked={options().minimizeAxisMovement} onChange={(v) => updateOption("minimizeAxisMovement", v)} />
-                <OptionCheckbox id="useArcOptimization" label="Optimize arcs and circles" checked={options().useArcOptimization} onChange={(v) => updateOption("useArcOptimization", v)} />
-              </div>
+            <div class="space-y-2">
+              <Field label="Decimals" for="post-decimals">
+                <NumberField id="post-decimals" value={decimals()} int accept={(v) => Number.isInteger(v) && v >= 0 && v <= 6} onValue={setDecimals} />
+              </Field>
+              <Segmented label="Arcs" testId="post-arcs" value={arcMode()} onChange={setArcMode}
+                options={[["ijk", "I J K"], ["radius", "R"], ["linearize", "Lines"]]} />
+              <CheckRow id="post-numbered" checked={numbered()} onChange={setNumbered}>Block numbers (N10, step 10)</CheckRow>
+              <CheckRow id="post-header" checked={header()} onChange={setHeader}>Header comments (program, units, operations)</CheckRow>
+              <CheckRow id="post-comments" checked={comments()} onChange={setComments}>Keep the program's comments</CheckRow>
             </div>
-
-            <div>
-              <h4 class="font-medium text-gray-700 mb-2">Code Optimization</h4>
-              <div class="space-y-2">
-                <OptionCheckbox id="removeRedundantCodes" label="Remove redundant codes" checked={options().removeRedundantCodes} onChange={(v) => updateOption("removeRedundantCodes", v)} />
-                <OptionCheckbox id="optimizeFeedrates" label="Optimize feed rates" checked={options().optimizeFeedrates} onChange={(v) => updateOption("optimizeFeedrates", v)} />
-                <OptionCheckbox id="consolidateGCodes" label="Consolidate modal G-codes" checked={options().consolidateGCodes} onChange={(v) => updateOption("consolidateGCodes", v)} />
-                <OptionCheckbox id="removeEmptyLines" label="Remove excess empty lines" checked={options().removeEmptyLines} onChange={(v) => updateOption("removeEmptyLines", v)} />
-                <OptionCheckbox id="removeComments" label="Remove comments" checked={options().removeComments} onChange={(v) => updateOption("removeComments", v)} />
-              </div>
+            <div class="space-y-2">
+              <CheckRow id="post-canned" checked={canned()} onChange={setCanned}>Canned cycles where the control has them</CheckRow>
+              <Show when={subprogramCodes()}>
+                <CheckRow id="post-subprograms" checked={subprograms()} onChange={setSubprograms}>Repeated toolpaths as subprograms</CheckRow>
+              </Show>
+              <Show when={smoothingCodes()}>
+                <CheckRow id="post-smoothing" checked={smoothing()} onChange={setSmoothing}>High-speed contour smoothing</CheckRow>
+                <Show when={smoothing()}>
+                  <Field label="Contour tolerance" unit="mm" for="post-tolerance">
+                    <NumberField id="post-tolerance" value={tolerance()} accept={(v) => v > 0 && v <= 1} onValue={setTolerance} />
+                  </Field>
+                </Show>
+              </Show>
             </div>
-
-            <div>
-              <h4 class="font-medium text-gray-700 mb-2">Advanced Features</h4>
-              <div class="space-y-2">
-                <OptionCheckbox id="useHighSpeedMode" label="Enable high-speed mode" checked={options().useHighSpeedMode} onChange={(v) => updateOption("useHighSpeedMode", v)} />
-                <OptionCheckbox id="useLookAhead" label="Enable look-ahead" checked={options().useLookAhead} onChange={(v) => updateOption("useLookAhead", v)} />
-                <OptionCheckbox id="useTCPMode" label="Enable TCP/TCPM (5-axis)" checked={options().useTCPMode} onChange={(v) => updateOption("useTCPMode", v)} />
-                <OptionCheckbox id="safetyChecks" label="Perform safety checks" checked={options().safetyChecks} onChange={(v) => updateOption("safetyChecks", v)} />
-              </div>
-            </div>
-          </div>
-        </Show>
-      </PanelSection>
-
-      <PanelSection id="post-controller" title={`${controllerName()} Specific Options`} icon={Settings} open={expanded().controllerOptions} onToggle={() => toggleSection("controllerOptions")}>
-
-        <Show when={expanded().controllerOptions}>
-          <div class="p-4 pt-0">
-            <Show when={selectedController() === "fanuc"}>
-              <div class="cam-post__grid">
-                <div>
-                  <h4 class="font-medium text-gray-700 mb-2">Format Optimization</h4>
-                  <div class="space-y-2">
-                    <OptionCheckbox id="fanucUseDecimalFormat" label="Use decimal format" checked={fanuc().useDecimalFormat} onChange={(v) => updateFanuc("useDecimalFormat", v)} />
-                    <OptionCheckbox id="fanucUseModalGCodes" label="Use modal G-codes" checked={fanuc().useModalGCodes} onChange={(v) => updateFanuc("useModalGCodes", v)} />
-                    <OptionCheckbox id="fanucUseCompactGCode" label="Generate compact G-code" checked={fanuc().useCompactGCode} onChange={(v) => updateFanuc("useCompactGCode", v)} />
-                  </div>
-                </div>
-
-                <div>
-                  <h4 class="font-medium text-gray-700 mb-2">Advanced Features</h4>
-                  <div class="space-y-2">
-                    <OptionCheckbox id="fanucUseAI" label="Enable AI Contour Control" checked={fanuc().useAI} onChange={(v) => updateFanuc("useAI", v)} />
-                    <OptionCheckbox id="fanucUseNanoSmoothing" label="Enable Nano Smoothing" checked={fanuc().useNanoSmoothing} onChange={(v) => updateFanuc("useNanoSmoothing", v)} />
-                    <OptionCheckbox id="fanucUseCornerRounding" label="Enable corner rounding" checked={fanuc().useCornerRounding} onChange={(v) => updateFanuc("useCornerRounding", v)} />
-                    <OptionCheckbox id="fanucUseHighPrecisionMode" label="Enable high-precision mode" checked={fanuc().useHighPrecisionMode} onChange={(v) => updateFanuc("useHighPrecisionMode", v)} />
-                  </div>
-                </div>
-
-                <div class="md:col-span-2">
-                  <div class="p-3 bg-yellow-50 rounded-md mt-2">
-                    <div class="flex items-start">
-                      <Info size={16} class="mt-0.5 mr-2 flex-shrink-0 text-yellow-600" />
-                      <p class="text-sm text-yellow-800">
-                        Advanced Fanuc options like AI Contour Control and Nano Smoothing require the CNC controller to
-                        support these features. Verify that your controller supports these functions before using them.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Show>
-
-            <Show when={selectedController() === "heidenhain"}>
-              <div class="cam-post__grid">
-                <div>
-                  <h4 class="font-medium text-gray-700 mb-2">Program Format</h4>
-                  <div class="space-y-2">
-                    <OptionCheckbox id="heidenhainUseConversationalFormat" label="Use conversational format" checked={heidenhain().useConversationalFormat} onChange={(v) => updateHeidenhain("useConversationalFormat", v)} />
-                    <OptionCheckbox id="heidenhainUseFunctionBlocks" label="Use function blocks (LBL)" checked={heidenhain().useFunctionBlocks} onChange={(v) => updateHeidenhain("useFunctionBlocks", v)} />
-                    <OptionCheckbox id="heidenhainUseCycleDefine" label="Use defined cycles (CYCL DEF)" checked={heidenhain().useCycleDefine} onChange={(v) => updateHeidenhain("useCycleDefine", v)} />
-                    <OptionCheckbox id="heidenhainUseParameterProgramming" label="Use parametric programming" checked={heidenhain().useParameterProgramming} onChange={(v) => updateHeidenhain("useParameterProgramming", v)} />
-                  </div>
-                </div>
-
-                <div>
-                  <h4 class="font-medium text-gray-700 mb-2">Advanced Features</h4>
-                  <div class="space-y-2">
-                    <OptionCheckbox id="heidenhainUseTCP" label="Enable TCPM (5-axis)" checked={heidenhain().useTCP} onChange={(v) => updateHeidenhain("useTCP", v)} />
-                    <OptionCheckbox id="heidenhainUseRadiusCompensation3D" label="3D radius compensation" checked={heidenhain().useRadiusCompensation3D} onChange={(v) => updateHeidenhain("useRadiusCompensation3D", v)} />
-                    <OptionCheckbox id="heidenhainUseSmartTurning" label="Enable Smart Turning" checked={heidenhain().useSmartTurning} onChange={(v) => updateHeidenhain("useSmartTurning", v)} />
-                  </div>
-                </div>
-
-                <div class="md:col-span-2">
-                  <div class="p-3 bg-yellow-50 rounded-md mt-2">
-                    <div class="flex items-start">
-                      <Info size={16} class="mt-0.5 mr-2 flex-shrink-0 text-yellow-600" />
-                      <p class="text-sm text-yellow-800">
-                        Converting standard G-code to Heidenhain conversational format may require additional manual
-                        adjustments for complex operations. Always verify the result before using it on the machine.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Show>
-
-            <Show when={["siemens", "haas", "mazak", "okuma", "generic"].includes(selectedController())}>
-              <div class="p-3 bg-blue-50 rounded-md">
-                <div class="flex items-start">
-                  <Info size={16} class="mt-0.5 mr-2 flex-shrink-0 text-blue-600" />
-                  <p class="text-sm text-blue-800">
-                    Optimizations for the {controllerName()}{" "}
-                    controller use the general optimization options configured in the previous section. Extended options
-                    are available only for Fanuc and Heidenhain controllers.
-                  </p>
-                </div>
-              </div>
-            </Show>
           </div>
         </Show>
       </PanelSection>
 
       <Show when={result()}>
         {(current) => (
-          <PanelSection id="post-results-section" testId="post-results" title="Optimization Results" icon={Check} open={expanded().results} onToggle={() => toggleSection("results")}>
-
+          <PanelSection id="post-results-section" testId="post-results" title={current().ok ? "Converted and verified" : "Not converted"} icon={current().ok ? Check : AlertTriangle} open={expanded().results} onToggle={() => toggleSection("results")}>
             <Show when={expanded().results}>
-              <div class="p-4 pt-0">
-                <div class="cam-post__grid mb-4">
-                  <div>
-                    <h4 class="font-medium text-gray-700 mb-2">Statistics</h4>
-                    <div class="bg-gray-50 p-3 rounded-md">
-                      <div class="grid grid-cols-2 gap-2 text-sm">
-                        <div class="flex justify-between">
-                          <span class="text-gray-600">Original lines:</span>
-                          <span class="font-medium">{current().stats.originalLines}</span>
-                        </div>
-                        <div class="flex justify-between">
-                          <span class="text-gray-600">Optimized lines:</span>
-                          <span class="font-medium">{current().stats.optimizedLines}</span>
-                        </div>
-                        <div class="flex justify-between">
-                          <span class="text-gray-600">Reduction:</span>
-                          <span class="font-medium">{current().stats.reductionPercent.toFixed(2)}%</span>
-                        </div>
-                        <div class="flex justify-between">
-                          <span class="text-gray-600">Estimated time:</span>
-                          <span class="font-medium">-{current().stats.estimatedTimeReduction.toFixed(2)} min</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 class="font-medium text-gray-700 mb-2">Safety Checks</h4>
-
-                    <Show
-                      when={current().validation.isValid}
-                      fallback={
-                        <div class="bg-red-50 p-3 rounded-md flex items-start">
-                          <AlertTriangle size={16} class="mt-0.5 mr-2 flex-shrink-0 text-red-600" />
-                          <div>
-                            <p class="text-sm font-medium text-red-800 mb-1">Warning: Issues detected in the G-code</p>
-                            <ul class="text-sm text-red-800 list-disc list-inside">
-                              <For each={current().validation.errors}>{(error) => <li>{error}</li>}</For>
-                            </ul>
-                          </div>
-                        </div>
-                      }
-                    >
-                      <div class="bg-green-50 p-3 rounded-md flex items-start">
-                        <Check size={16} class="mt-0.5 mr-2 flex-shrink-0 text-green-600" />
-                        <p class="text-sm text-green-800">The optimized G-code passed all safety checks.</p>
-                      </div>
-                    </Show>
-
-                    <Show when={current().validation.warnings.length > 0}>
-                      <div class="bg-yellow-50 p-3 rounded-md flex items-start mt-2">
-                        <AlertTriangle size={16} class="mt-0.5 mr-2 flex-shrink-0 text-yellow-600" />
-                        <div>
-                          <p class="text-sm font-medium text-yellow-800 mb-1">Warnings:</p>
-                          <ul class="text-sm text-yellow-800 list-disc list-inside">
-                            <For each={current().validation.warnings}>{(warning) => <li>{warning}</li>}</For>
-                          </ul>
-                        </div>
-                      </div>
-                    </Show>
-                  </div>
-                </div>
-
-                <div class="mb-4">
-                  <h4 class="font-medium text-gray-700 mb-2">Applied Optimizations</h4>
-                  <div class="bg-blue-50 p-3 rounded-md">
-                    <ul class="text-sm text-blue-800 grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <For each={current().improvements}>
-                        {(improvement) => (
-                          <li class="flex items-start">
-                            <Check size={14} class="mt-0.5 mr-2 flex-shrink-0 text-blue-600" />
-                            <span>{improvement}</span>
-                          </li>
-                        )}
-                      </For>
-                    </ul>
-                  </div>
-                </div>
-
+              <div class="p-4 pt-0 space-y-3">
+                <Show when={current().errors.length > 0}>
+                  <Note kind="bad" role="alert" testId="post-errors">
+                    <ul class="list-disc list-inside"><For each={current().errors}>{(error) => <li>{error}</li>}</For></ul>
+                  </Note>
+                </Show>
+                <Show when={current().ok}>
+                  <Note kind="ok" testId="post-verified">
+                    The output replays to the same feed path: largest distance {current().deviation!.toFixed(4)} mm (rounding allows {current().allowed!.toFixed(4)} mm).
+                  </Note>
+                </Show>
+                <Show when={current().before}>
+                  {(before) => (
+                    <table class="panel-table" data-testid="post-figures">
+                      <thead><tr><th /><th>Input</th><th>Output</th></tr></thead>
+                      <tbody>
+                        <For each={[
+                          ["Lines", (f: cam.NcFigures) => String(f.lines)],
+                          ["Bytes", (f: cam.NcFigures) => String(f.bytes)],
+                          ["Cut length (mm)", (f: cam.NcFigures) => f.cutLength.toFixed(1)],
+                          ["Rapid length (mm)", (f: cam.NcFigures) => f.rapidLength.toFixed(1)],
+                          ["Dwell (s)", (f: cam.NcFigures) => f.dwellSeconds.toFixed(2)],
+                          ["Estimated time", (f: cam.NcFigures) => minutes(f.seconds)],
+                          ["Tools", (f: cam.NcFigures) => f.tools.map((n) => `T${n}`).join(" ") || "-"]
+                        ] as const}>
+                          {([name, show]) => (
+                            <tr><td>{name}</td><td>{show(before())}</td><td>{current().after !== undefined ? show(current().after!) : "-"}</td></tr>
+                          )}
+                        </For>
+                      </tbody>
+                    </table>
+                  )}
+                </Show>
+                <Show when={current().notes.length > 0}>
+                  <Note testId="post-notes">
+                    <ul class="list-disc list-inside"><For each={current().notes}>{(note) => <li>{note}</li>}</For></ul>
+                  </Note>
+                </Show>
                 <div class="cam-post__result-actions">
-                  <button
-                    type="button"
-                    class="panel-btn"
-                    onClick={() => toggleSection("preview")}
-                  >
+                  <button type="button" class="panel-btn" onClick={() => toggleSection("preview")} disabled={!outputGcode()}>
                     <Eye size={16} class="mr-2" />
                     {expanded().preview ? "Hide Preview" : "Show Preview"}
                   </button>
-
-                  <button
-                    type="button"
-                    class="panel-btn"
-                    onClick={saveGcode}
-                  >
+                  <button type="button" class="panel-btn" onClick={saveGcode} disabled={!current().ok}>
                     <Save size={16} class="mr-2" />
-                    Save G-code
-                  </button>
-
-                  <button
-                    type="button"
-                    class="panel-btn panel-btn--primary"
-                    onClick={() => void processGcode()}
-                    disabled={isProcessing()}
-                  >
-                    <Settings size={16} class="mr-2" />
-                    Reprocess
+                    Save program
                   </button>
                 </div>
               </div>
@@ -431,9 +232,9 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
         )}
       </Show>
 
-      <Show when={result() && expanded().preview}>
+      <Show when={result() && expanded().preview && outputGcode()}>
         <div class="p-4">
-          <h3 class="text-lg font-medium text-gray-800 mb-2">Optimized G-code Preview</h3>
+          <h3 class="text-lg font-medium mb-2">{label(target())} program</h3>
           <div class="panel-code">
             <pre class="text-sm font-mono whitespace-pre-wrap" data-testid="post-preview">{outputGcode()}</pre>
           </div>

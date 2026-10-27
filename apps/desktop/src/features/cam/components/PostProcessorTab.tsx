@@ -1,26 +1,18 @@
 /**
- * The "Post-Processor" tab (legacy `pages/cam.tsx`): the controller select over the seven dialects, and the legacy
- * panel for that controller (Fanuc, Heidenhain, or the generic one for the others) underneath.
+ * The "Post-Processor" tab: the conversion panel over every post the core writes (`POST_TARGETS`).
  *
- * The panels work on G-code text, like the legacy ones. When the program has toolpaths but no text yet, the
- * text is emitted from the program through the matching core post, so the tab is never empty after a generate.
+ * The panel works on NC text. When the program has toolpaths but no text yet, the text is emitted from the program through
+ * the selected control's own post, so the tab is never empty after a generate.
  */
 import { createMemo, type JSX } from "solid-js"
 import "../../../styles/cam-panels.css"
 import { cam } from "@cadcamfun/core"
 import PostProcessorPanel from "./PostProcessorPanel.tsx"
+import { POST_TARGETS } from "./AdvancedPostProcessorPanel.tsx"
 
-export type PostProcessorType = "fanuc" | "heidenhain" | "siemens" | "haas" | "mazak" | "okuma" | "generic"
+export type PostProcessorType = cam.PostId
 
-export const POST_PROCESSORS: ReadonlyArray<{ readonly id: PostProcessorType; readonly label: string }> = [
-  { id: "fanuc", label: "Fanuc" },
-  { id: "heidenhain", label: "Heidenhain" },
-  { id: "siemens", label: "Siemens" },
-  { id: "haas", label: "Haas" },
-  { id: "mazak", label: "Mazak" },
-  { id: "okuma", label: "Okuma" },
-  { id: "generic", label: "Generic" }
-]
+export const POST_PROCESSORS: ReadonlyArray<{ readonly id: PostProcessorType; readonly label: string }> = POST_TARGETS.map(({ id, label }) => ({ id, label }))
 
 export interface PostProcessorTabProps {
   readonly gcode: string
@@ -35,7 +27,12 @@ export default function PostProcessorTab(props: PostProcessorTabProps): JSX.Elem
   const initialGcode = createMemo(() => {
     if (props.gcode) return props.gcode
     if (props.program.toolpaths.length === 0) return ""
-    return cam.posts[props.controller === "fanuc" ? "fanuc" : "generic"]?.emit(props.program) ?? ""
+    try {
+      return cam.posts[props.controller].emit(props.program)
+    } catch {
+      // A program the control cannot take (e.g. rotary moves on GRBL): the reference text, which the panel then refuses with the reason.
+      return cam.posts.generic.emit(props.program)
+    }
   })
 
   return (

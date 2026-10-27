@@ -9,7 +9,7 @@ import { linuxcncDialect, linuxcncPost } from "./linuxcnc.ts"
 import type { Dialect, Post, PostId } from "./types.ts"
 
 export * from "./types.ts"
-export * as advanced from "./advanced/index.ts"
+export { convertNc, programOfNc, type ConvertOptions, type ConvertResult, type NcFigures } from "./convert.ts"
 export { emitProgram, formatNumber, sanitizeComment, toolNumbers } from "./emitter.ts"
 export { genericDialect, genericPost } from "./generic.ts"
 export { fanucDialect, fanucPost } from "./fanuc.ts"

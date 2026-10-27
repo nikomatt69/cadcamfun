@@ -41,7 +41,7 @@ const toc = [
       <li><code>cam/operations/</code> and <code>cam/generator/</code>: operation implementations and generation pipeline.</li>
       <li><code>cam/setup.ts</code>, <code>indexing.ts</code>, <code>ir.ts</code>: setup frames, indexed machining, and intermediate motion representation.</li>
       <li><code>cam/post/index.ts</code>, <code>emitter.ts</code>, and the dialect files: registered posts and shared program emission.</li>
-      <li><code>cam/post/advanced/</code>: advanced G-code transformations and controller-oriented output handling.</li>
+      <li><code>cam/post/convert.ts</code>: the NC conversion kernel: replays G-code or Klartext, rewrites it with any post and proves the motion by replay.</li>
       <li><code>cam/verify/</code>, <code>kernel/</code>, <code>model/</code>, and <code>viewer/</code>: verification, machining kernels, models, and viewer helpers.</li>
     </ul>
     <p>Trace persisted machining through <code>apps/sidecar/src/http/toolpaths.ts</code> and <code>src/services/cam-program.ts</code>, then into the desktop CAM feature. The <a href="/docs/setups">setups reference</a> explains how portable program documents relate to saved toolpaths.</p>
