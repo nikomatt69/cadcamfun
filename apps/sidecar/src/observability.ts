@@ -119,7 +119,7 @@ const statusOf = (exit: Exit.Exit<HttpServerResponse.HttpServerResponse, unknown
  * of every span the request creates, it is where the router records the matched route template,
  * and a client that sends a W3C `traceparent` header continues its own trace in it.
  */
-export const httpMetrics: HttpMiddleware.HttpMiddleware = (app) =>
+export const httpMetrics = HttpMiddleware.make((app) =>
   Effect.gen(function*() {
     const request = yield* HttpServerRequest.HttpServerRequest
     const startedAt = Date.now()
@@ -138,7 +138,7 @@ export const httpMetrics: HttpMiddleware.HttpMiddleware = (app) =>
           Date.now() - startedAt
         )
       }))
-  })
+  }))
 
 const sensitiveKey = /(password|passwd|secret|token|authorization|cookie|api[-_]?key|prompt|payload)/i
 

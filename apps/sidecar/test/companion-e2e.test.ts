@@ -50,7 +50,7 @@ describe("companion end to end", () => {
         const response = await sidecar.local("/api/events", { signal: controller.signal })
         expect(response.status).toBe(200)
         const parse = sseParser<Record<string, unknown>>(), decoder = new TextDecoder()
-        for await (const chunk of response.body!) desktopEvents.push(...parse(decoder.decode(chunk, { stream: true })))
+        for await (const chunk of response.body! as unknown as AsyncIterable<Uint8Array>) desktopEvents.push(...parse(decoder.decode(chunk, { stream: true })))
       })().catch((error) => { if (!controller.signal.aborted) throw error }))
       tails.push((async () => {
         for await (const event of phone.hostEvents(controller.signal)) phoneEvents.push(event as Record<string, unknown>)

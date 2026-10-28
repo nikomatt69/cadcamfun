@@ -232,23 +232,22 @@ describe("the CAD surface audit trail", () => {
     const app = await makeApp({}, Layer.succeed(Tracer.Tracer, tracer))
     try {
       const projectId = (await app.call("/api/projects", { method: "POST", json: { name: "Audit" } })).body.id
-      const services = await app.services()
-      const database = Context.get(services, Database)
-      const repo = await Effect.runPromise(
+      const database = await app.database()
+      const repo = Context.get(await Effect.runPromise(
         Layer.build(CadSurfaceRepo.layer.pipe(Layer.provide(Layer.succeed(Database, database)))).pipe(Effect.scoped)
-      )
+      ), CadSurfaceRepo)
       await Effect.runPromise(repo.chamferBox(projectId, {
         box: { _tag: "Box", origin: { x: 0, y: 0, z: 0 }, size: { x: 10, y: 10, z: 10 } },
         distance: 1
-      }))
+      }).pipe(Effect.provideService(Tracer.Tracer, tracer)))
       const rows = await Effect.runPromise(database.query("test.audit", (db) => db.select().from(schema.cadOperationLogTable)))
       expect(rows).toHaveLength(1)
       // The ids come from Effect's tracer, so they exist whether or not a collector is configured.
       expect(rows[0]!.traceId).toMatch(/^[0-9a-f]{32}$/)
       expect(rows[0]!.spanId).toMatch(/^[0-9a-f]{16}$/)
       const operation = spans.find((span) => span.name.startsWith("cad."))
-      expect(operation?.traceId).toBe(rows[0]!.traceId)
-      expect(operation?.spanId).toBe(rows[0]!.spanId)
+      expect(operation?.traceId).toBe(rows[0]!.traceId ?? undefined)
+      expect(operation?.spanId).toBe(rows[0]!.spanId ?? undefined)
     } finally {
       await app.dispose()
     }

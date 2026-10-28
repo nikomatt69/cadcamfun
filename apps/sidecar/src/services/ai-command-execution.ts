@@ -94,8 +94,8 @@ export const makeCommandExecutor = (
       const status = outcome.kind === "uncertain" ? "uncertain" as const : "completed" as const
       yield* database.query("ai.command.finish", (db) => {
         const stored = db.update(T).set({ status, outcome: recorded, updatedAt: new Date() })
-          .where(and(eq(T.id, id), eq(T.status, "running"))).run()
-        if (stored.changes !== 1) throw new Error("Command ownership changed before its outcome was persisted")
+          .where(and(eq(T.id, id), eq(T.status, "running"))).returning({ id: T.id }).all()
+        if (stored.length !== 1) throw new Error("Command ownership changed before its outcome was persisted")
       })
       return recorded
     })
