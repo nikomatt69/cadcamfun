@@ -1,4 +1,4 @@
-Generate and verify the program of an existing operation; nothing else. It cannot create or change operations, stock or releases.
+Generate the G-code of an existing operation and verify its toolpath; nothing else.
 
 Actions
 - generate: store the NC of the operation from its current settings; return its programHash, size and a preview head.

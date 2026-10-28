@@ -51,10 +51,10 @@ describe("one host configuration per project", () => {
     // Alpha's configuration is read after beta's files were written: it must still be alpha's.
     const a = await effectiveAgents("instances-alpha")
     const b = await effectiveAgents("instances-beta")
-    expect(a["cadcam"]!.permission!["probe_alpha"]).toBe("allow")
-    expect(a["cadcam"]!.permission!["probe_beta"]).toBeUndefined()
-    expect(b["cadcam"]!.permission!["probe_beta"]).toEqual(HUMAN_APPROVAL)
-    expect(b["cadcam"]!.permission!["probe_alpha"]).toBeUndefined()
+    expect(a["cadcam-build"]!.permission!["probe_alpha"]).toBe("allow")
+    expect(a["cadcam-build"]!.permission!["probe_beta"]).toBeUndefined()
+    expect(b["cadcam-build"]!.permission!["probe_beta"]).toEqual(HUMAN_APPROVAL)
+    expect(b["cadcam-build"]!.permission!["probe_alpha"]).toBeUndefined()
     // The shared file carries no project's agents; each project's file sits in its own scratch folder.
     const shared = JSON.parse(readFileSync(join(runtime.paths.config, "nikcli.json"), "utf8")) as Record<string, unknown>
     expect(shared["agent"]).toBeUndefined()
@@ -72,7 +72,7 @@ describe("one host configuration per project", () => {
       // The previous round's tool left the set: its registration is closed, not only denied.
       if (round > 0) expect(ids).not.toContain(`probe_round_${round - 1}`)
       expect(ids.filter((id) => id === "probe_alpha")).toHaveLength(1)
-      expect((await effectiveAgents("instances-alpha"))["cadcam"]!.permission![`probe_round_${round}`]).toBe("allow")
+      expect((await effectiveAgents("instances-alpha"))["cadcam-build"]!.permission![`probe_round_${round}`]).toBe("allow")
     }
     extra.delete("instances-alpha")
     await Effect.runPromise(runtime.reloadTools())
@@ -91,9 +91,9 @@ describe("one host configuration per project", () => {
     ])
     const a = await effectiveAgents("instances-alpha")
     const b = await effectiveAgents("instances-beta")
-    expect(a["cadcam"]!.permission!["probe_beta_extra"]).toBeUndefined()
-    expect(b["cadcam"]!.permission!["probe_beta_extra"]).toBe("allow")
-    expect(b["cadcam"]!.permission!["probe_alpha"]).toBeUndefined()
+    expect(a["cadcam-build"]!.permission!["probe_beta_extra"]).toBeUndefined()
+    expect(b["cadcam-build"]!.permission!["probe_beta_extra"]).toBe("allow")
+    expect(b["cadcam-build"]!.permission!["probe_alpha"]).toBeUndefined()
     expect(await registered("instances-beta")).toContain("probe_beta_extra")
     expect(await registered("instances-alpha")).not.toContain("probe_beta_extra")
   })

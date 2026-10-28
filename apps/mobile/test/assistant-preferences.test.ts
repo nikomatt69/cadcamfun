@@ -38,9 +38,12 @@ test("thinking levels are ordered and labelled like nikcli, and the last level p
 })
 
 test("projects without their own settings follow the phone defaults; a project's choice wins", () => {
-  expect(resolveAssistantPreferences(undefined, { permissionMode: "ask", includeContext: false })).toEqual({ agent: "general", permissionMode: "ask", includeContext: false })
+  expect(resolveAssistantPreferences(undefined, { permissionMode: "ask", includeContext: false })).toEqual({ agent: "build", permissionMode: "ask", includeContext: false })
   expect(resolveAssistantPreferences({ agent: "machinist", permissionMode: "auto", includeContext: true }, { permissionMode: "ask", includeContext: false })).toEqual({ agent: "machinist", permissionMode: "auto", includeContext: true })
   // A corrupt stored default never becomes a permission mode the desktop does not know.
+  // A project that stored one of the removed agents lands on Build; Plan and unknown ids are kept.
+  for (const legacy of ["general", "cad", "cam", "cadcam", "cadcam-cad"]) expect(resolveAssistantPreferences({ agent: legacy }, undefined).agent, legacy).toBe("build")
+  expect(resolveAssistantPreferences({ agent: "plan" }, undefined).agent).toBe("plan")
   expect(resolveAssistantPreferences(undefined, { permissionMode: "everything" as never }).permissionMode).toBe("approve")
 })
 

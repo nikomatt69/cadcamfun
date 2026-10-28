@@ -11,6 +11,10 @@ const events: ReadonlyArray<typeof AiStreamEventSchema.Type> = [
   { type: "permission_blocked", sessionId: "s", permission: "cad_delete_entities", patterns: ["project:p"], reason: "Denied" },
   { type: "compaction", sessionId: "s", phase: "start" },
   { type: "context_snapshot", sessionId: "s", projectId: "p", source: "workspace", chars: 100 },
+  { type: "context_snapshot", sessionId: "s", projectId: "p", source: "workspace", chars: 130, observation: "sent", sections: [
+    { id: "project-rules", kind: "requirement", label: "project rules", chars: 100, tokens: 25, placement: "system" },
+    { id: "workspace-snapshot", kind: "ui-snapshot", label: "saved editor snapshot", chars: 30, tokens: 8, truncated: true, placement: "message" }
+  ] },
   { type: "tool_diagnostic", sessionId: "s", callId: "c", tool: "cad_parametric", kind: "argument", severity: "error", message: "Invalid history", mutationApplied: false },
   { type: "tool_call", sessionId: "s", callId: "c", tool: "cad_parametric", input: {} },
   { type: "tool_result", sessionId: "s", callId: "c", tool: "cad_parametric", ok: false, output: "Invalid history" },

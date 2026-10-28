@@ -8,6 +8,7 @@
  */
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
+import { __resetLocaleCache, resolveLocale } from "../src/nikcli/locale.ts"
 import { modeTable } from "../src/prompts/contributed-modes.ts"
 import { BASE_LAYERS, CADCAM_SYSTEM_PROMPT, MODE_PROMPTS, modeBlock, systemPrompt, turnSystemPrompt } from "../src/prompts/system.ts"
 import { CADCAM_SKILLS } from "../src/skills/index.ts"
@@ -198,17 +199,20 @@ describe("reply language wiring (nikcli locale resolver)", () => {
 
   test("a non-English replyLanguage appends a deterministic instruction", () => {
     const prompt = systemPrompt(undefined, "general", undefined, { tag: "it", name: "Italian" })
-    expect(prompt).toContain("Reply in Italian (it).")
+    expect(prompt).toContain("the user's language is Italian (it)")
+    expect(prompt).toContain("reply in Italian")
   })
 
   test("a replyLanguage without an English name still works (raw tag)", () => {
     const prompt = systemPrompt(undefined, "general", undefined, { tag: "it", name: "" })
-    expect(prompt).toContain("Reply in it.")
+    expect(prompt).toContain("the user's language is it.")
+    expect(prompt).toContain("reply in it.")
   })
 
   test("turnSystemPrompt honours the same language line", () => {
     const prompt = turnSystemPrompt(undefined, "general", undefined, { tag: "fr", name: "French" })
-    expect(prompt).toContain("Reply in French (fr).")
+    expect(prompt).toContain("the user's language is French (fr)")
+    expect(prompt).toContain("reply in French")
   })
 
   test("null tag means silent: no language line is added", () => {
@@ -216,9 +220,39 @@ describe("reply language wiring (nikcli locale resolver)", () => {
     expect(prompt.toLowerCase()).not.toContain("reply in ")
   })
 
+  test("one language rule: the base never states one, the turn block does, in it, de and en", () => {
+    expect(CADCAM_SYSTEM_PROMPT.toLowerCase()).not.toContain("user's language")
+    for (const layer of BASE_LAYERS) expect(layer.text, layer.id).not.toMatch(/answer in|reply in/i)
+    const rule = (tag: string, name: string) => turnSystemPrompt(undefined, "general", undefined, { tag, name }, new Date("2026-10-14T10:00:00Z"))
+    for (const [tag, name] of [["it", "Italian"], ["de", "German"]] as const) {
+      const prompt = rule(tag, name)
+      expect(prompt).toContain(`the user's language is ${name} (${tag})`)
+      expect(prompt).toContain(`reply in ${name}`)
+      expect(prompt).toContain("Unless the user writes in another language")
+      expect(prompt).toContain("Ids, tool names, G-code, units and standards stay as written")
+      expect(prompt).toContain("a decimal comma such as 12,5 means 12.5 mm")
+      expect(prompt.match(/user's language/g)).toHaveLength(1)
+    }
+    // English is the silent default: no language rule at all.
+    const english = turnSystemPrompt(undefined, "general", undefined, { tag: null, name: "" }, new Date("2026-10-14T10:00:00Z"))
+    expect(english).not.toMatch(/user's language|decimal comma/)
+  })
+
+  test("the resolved locale picks the language: it and de steer, en does not", () => {
+    __resetLocaleCache()
+    for (const [lang, expected] of [["it_IT.UTF-8", "Italian"], ["de_DE.UTF-8", "German"], ["en_US.UTF-8", null]] as const) {
+      const locale = resolveLocale(undefined, { LANG: lang })
+      const prompt = turnSystemPrompt(undefined, "cad", undefined, { tag: locale.replyLanguage, name: locale.replyLanguage ? locale.languageName : "" })
+      if (expected === null) expect(prompt).not.toContain("user's language")
+      else expect(prompt).toContain(`the user's language is ${expected}`)
+    }
+  })
+
   test("the language line does not bloat the prompt beyond the per-turn budget", () => {
-    // Even the longest plausible name must leave the prompt (base, mode, environment, language) well under 13.6k characters.
+    // Even the longest plausible name must leave the prompt (base, mode, environment, language) under 13.9k characters. The base
+    // itself stays under 12.9k (above) and the assembled agent prompt under PROMPT_BUDGETS.system; the 13.6k this test held before
+    // the single language rule (about 230 characters) and the background-first rule (about 430) were added.
     const prompt = systemPrompt(undefined, "general", undefined, { tag: "zh", name: "Chinese" })
-    expect(prompt.length).toBeLessThan(13_600)
+    expect(prompt.length).toBeLessThan(13_900)
   })
 })

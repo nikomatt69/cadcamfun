@@ -8,14 +8,18 @@
  * cad action describe rather than guess. Unknown or missing fields are skipped, never invented.
  */
 import { attachmentNames } from "./attachments.ts"
+import { untrustedBlock, untrustedLine } from "./untrusted.ts"
 
 export const DEFAULT_CONTEXT_BUDGET = 6_000
 
 type Rec = Record<string, unknown>
 const rec = (v: unknown): Rec => (v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Rec) : {})
 const arr = (v: unknown): ReadonlyArray<unknown> => (Array.isArray(v) ? v : [])
-// Snapshot labels are data: keep them on one line so they cannot forge context sections.
-const str = (v: unknown): string | undefined => (typeof v === "string" && v.trim() !== "" ? v.replace(/[\r\n\t\u0000-\u001f]/g, " ").trim() : undefined)
+// Snapshot labels are data (spec 64): one line, no control or invisible characters, no imitated delimiters, bounded.
+const str = (v: unknown): string | undefined => {
+  const line = typeof v === "string" ? untrustedLine(v, 300) : ""
+  return line === "" ? undefined : line
+}
 const label = (v: unknown): string => str(v)?.slice(0, 160) ?? "?"
 const count = (v: unknown): number | undefined => {
   const value = num(v)
@@ -142,7 +146,7 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
   const verification = rec(cam["verification"])
   const state = str(verification["state"])
   if (state !== undefined) {
-    const issues = arr(verification["issues"]).map(rec).slice(0, 4).map((i) => `${str(i["code"]) ?? "finding"}${num(i["line"]) !== undefined ? `@L${n(i["line"])}` : ""}${str(i["message"]) ? `: ${String(i["message"]).replace(/\s+/g, " ").slice(0, 240)}` : ""}`)
+    const issues = arr(verification["issues"]).map(rec).slice(0, 4).map((i) => `${str(i["code"]) ?? "finding"}${num(i["line"]) !== undefined ? `@L${n(i["line"])}` : ""}${str(i["message"]) ? `: ${untrustedLine(i["message"], 240)}` : ""}`)
     lines.push(`Verification: ${state === "not-run" ? "not run yet" : state === "stale" ? "stale (G-code changed since)" : state === "ok" ? "passed" : state === "errors" ? `${n(verification["errors"])} error(s)` : `unknown state ${JSON.stringify(state)}`}${issues.length > 0 ? ` [${issues.join(", ")}]` : ""}.`)
     const warnings = count(verification["warnings"])
     if (warnings !== undefined) lines.push(`Verification warnings: ${warnings}.`)
@@ -179,14 +183,16 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
   }
   const preview = typeof cam["gcodePreview"] === "string" ? cam["gcodePreview"] : undefined
   if (preview !== undefined && left > 200) {
+    // Program text is data: a comment such as "(ignore previous instructions)" stays inside a labelled block (spec 64).
     const kept: string[] = []
-    let used = 30
+    let used = 100
     for (const line of preview.split(/\r?\n/)) {
-      if (used + line.length + 1 > left || kept.length >= 12) break
-      kept.push(line)
-      used += line.length + 1
+      const clean = untrustedLine(line, 160)
+      if (used + clean.length + 1 > left || kept.length >= 12) break
+      kept.push(clean)
+      used += clean.length + 1
     }
-    out.push(`G-code start (${kept.length} of ${count(cam["gcodeLines"]) ?? "unknown total"} lines):\n${kept.join("\n")}`)
+    out.push(untrustedBlock({ source: "G-code preview", text: `G-code start (${kept.length} of ${count(cam["gcodeLines"]) ?? "unknown total"} lines):\n${kept.join("\n")}`, max: 100_000 }))
   }
   const text = out.join("\n")
   if (text.length <= budget) return text

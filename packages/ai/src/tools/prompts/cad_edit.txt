@@ -1,10 +1,10 @@
-Change the open drawing through governed writes.
+Change the open CAD drawing: add, modify, transform, group, delete, import and parametric parts.
 
 Actions and Parameters (mm; rotation/history angles degrees)
 - add: elements (1..40) [{type,...fields}]; editor solids, curves, booleans and components. Valid elements are stored; invalid ones appear under skipped. Standard parts and the full catalogue are in cad-3d-modeling.
 - add_entities: entities (1..500) of line/circle/arc/polyline/rectangle; flat 2D sketches only when requested. Each accepts layer, name, color.
 - modify: changes [{id,changes}]; edit fields in place.
-- transform: ids, dx?, dy?, dz?, rotateAxis?, rotateDegrees?, scale?, about? {x,y,z}, copies? (0=move).
+- transform: ids, dx?, dy?, dz?, rotateAxis?, rotateDegrees?, scale?, about? {x,y,z}, copies? (0=move, up to 100).
 - group: ids, name?, ungroup?, layer?; assemble or open a component.
 - delete: ids, confirm:true only when the user requested deletion. Destructive; host permission still applies.
 - editor: actions (1..40): layer_create/rename/color/show/hide/lock/unlock/delete/activate, view_3d/2d/fit, section_on/off, select/select_none, show/hide/isolate, undo/redo. Fields: layer, newName, color, moveTo, ids, axis, position, inverted.
@@ -18,7 +18,7 @@ Actions and Parameters (mm; rotation/history angles degrees)
 - title_block_set: titleBlock {title?,number?,revision?,status?,owner?,createdBy?,material?,standard?,scale?,...}; only given fields change.
 - hole: id, hole|boss|fillet|nurbs, diameter?|fill?|radius?|distance?|angle?, taper?, mode? (move|offset|draft), direction?, neutral?, pull?, tolerance?. Stores a checked copy. Preview cad.hole.
 - offset: id, distance (outward). Store a checked exact copy; source remains. Preview cad.offset.
-- surface: operation patch|stitch|thicken, patches [{data:{degreeU,degreeV,knotsU,knotsV,points,weights?},trim?:{u0,u1,v0,v1}}], thickness?, direction?, tolerance?, name?. Same checked input as cad.surface. Open surface bodies are excluded from solid analysis and CAM. Curved thicken is axial and requires direction; normal freeform offsets are unsupported.
+- surface: operation patch|stitch|thicken, patches [{data:{degreeU,degreeV,knotsU,knotsV,points,weights?},trim?:{u0,u1,v0,v1}}], thickness?, direction?, tolerance?, name?; as cad.surface, with the same thicken limits. Open surface bodies are excluded from solid analysis and CAM.
 
 History additions
 Fillet radiusEnd varies the radius along a straight edge from its lexicographically smaller end; chamfers refuse it. Sheet flanges [{end:start|end,length,angle}] extend exposed full-width edges, use the sheet bendRadius and appear in flatPatterns. Optional relief {width,depth} cuts bend-end notches (turns <=90 degrees) and updates the flat blank. Adjacent-edge corner treatment remains unsupported.

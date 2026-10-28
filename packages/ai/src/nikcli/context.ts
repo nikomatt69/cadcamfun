@@ -2,6 +2,7 @@
 import { Effect } from "effect"
 import { AiConfigError, AiProviderError } from "../errors.ts"
 import { describeHostFailure } from "./chat.ts"
+import { deliveredObservationDigest } from "../context-assembly.ts"
 import type { ProjectHost } from "./runtime.ts"
 
 export interface HostContextPolicy {
@@ -79,5 +80,19 @@ export const summariseBreakdown = (raw: {
 export const readContextBreakdown = (host: ProjectHost, sessionId: string): Effect.Effect<ContextBreakdown | undefined> =>
   Effect.tryPromise({
     try: async (signal) => summariseBreakdown(await host.client.session.contextBreakdown({ sessionID: sessionId }, { signal })),
+    catch: (cause) => cause
+  }).pipe(Effect.orElseSucceed(() => undefined))
+
+/** How many of the newest host messages are searched for the last delivered observation. Older than this is sent again, which costs one part. */
+export const OBSERVATION_LOOKBACK = 200
+
+/**
+ * The digest of the observation the session last received, read from the host (the attribute of the newest observation part).
+ * The host is the only record, so a restart of the sidecar or a turn from the phone cannot disagree with it. A host that cannot
+ * answer yields undefined: the observation is then sent, never assumed to be there.
+ */
+export const readDeliveredObservation = (host: ProjectHost, sessionId: string): Effect.Effect<string | undefined> =>
+  Effect.tryPromise({
+    try: async (signal) => deliveredObservationDigest(await host.client.session.messages({ sessionID: sessionId, limit: OBSERVATION_LOOKBACK }, { signal })),
     catch: (cause) => cause
   }).pipe(Effect.orElseSucceed(() => undefined))

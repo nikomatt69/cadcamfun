@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 import { AiProviderError } from "../errors.ts"
 import type { ModelSelector, ResolvedModel } from "../models.ts"
+import { CADCAM_AGENT } from "./config.ts"
 import type { NikCliRuntime } from "./runtime.ts"
 
 /** Stateless calls use the native subscription transport, with every host tool disabled. */
@@ -18,7 +19,7 @@ export const subscriptionText = Effect.fn("Subscription.text")(function*(runtime
       try: async (signal) => {
         const ids = await host.client.experimental.toolIDs()
         const result = await host.client["session-prompt"].prompt({
-          sessionID: session.id, agent: "cadcam",
+          sessionID: session.id, agent: CADCAM_AGENT,
           model: { providerID: resolved.provider, modelID: resolved.modelId },
           ...(input.model?.variant ? { variant: input.model.variant } : {}),
           ...(input.system ? { system: input.system } : {}),

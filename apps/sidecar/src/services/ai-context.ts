@@ -4,13 +4,15 @@
  * handed to `assembleContext` (`@cadcamfun/ai`), which orders, deduplicates and budgets them and reports a manifest.
  *
  * Disabled context (`includeContext: false`) acquires nothing: only the text the client sent for this turn is delivered.
+ * `assemble` keeps the one-block behaviour; `assembleParts` splits stable context from the observation and renders the stored
+ * editor snapshot inside the observation budget, so its low-value parts shrink first and the text says so.
  * The host's own automatic profile/habits injection is switched off by the `profile-reminder` host patch, so the habits
  * reach the model once, here, and not at all when context is disabled.
  */
 import {
-  assembleContext, notesByRecency, parseProjectContext, projectContextKey, projectMemoryPrefix, readProjectMemoryFiles,
+  assembleContext, assembleContextParts, notesByRecency, OBSERVATION_BUDGET, parseProjectContext, projectContextKey, projectMemoryPrefix, readProjectMemoryFiles,
   renderNotes, renderProjectContext, renderProjectMemory, renderUserHabits, renderWorkspaceContext,
-  type AiHost, type ContextAssembly, type ContextRequest, type ContextSource
+  type AiHost, type ContextAssembly, type ContextParts, type ContextRequest, type ContextSource
 } from "@cadcamfun/ai"
 import { Effect, Option } from "effect"
 import type { KvStore } from "./kv.ts"
@@ -34,7 +36,7 @@ export const makeAiContext = ({ kv, projects, host }: AiContextDeps) => {
     effect.pipe(Effect.catch((error) => Effect.logWarning(`Unable to load ${label}`, error).pipe(Effect.as(fallback))))
 
   /** Reads the sources the request may see; fails with `ContextAccessDenied` before reading anything it may not. */
-  const sources = (request: ContextRequest) => Effect.gen(function*() {
+  const sources = (request: ContextRequest, snapshotBudget?: number) => Effect.gen(function*() {
     const out: ContextSource[] = []
     if (request.explicit?.trim()) out.push({ id: "client-observation", kind: "observation", label: "editor state sent with this message", text: request.explicit.trim() })
     if (!request.includeContext) return out
@@ -45,7 +47,7 @@ export const makeAiContext = ({ kv, projects, host }: AiContextDeps) => {
       const snapshot = yield* read("saved AI context", kv.get(`ai.context.${projectId}`), undefined)
       if (snapshot) out.push({
         id: "workspace-snapshot", kind: "ui-snapshot", label: "saved editor snapshot", at: Date.parse(snapshot.updatedAt),
-        text: typeof snapshot.value === "string" ? snapshot.value : renderWorkspaceContext(snapshot.value, { projectId })
+        text: typeof snapshot.value === "string" ? snapshot.value : renderWorkspaceContext(snapshot.value, { projectId, ...(snapshotBudget !== undefined ? { budget: snapshotBudget } : {}) })
       })
       const document = yield* read("the project AI context", kv.get(projectContextKey(projectId)), undefined)
       out.push({ id: "project-rules", kind: "requirement", label: "project rules", text: renderProjectContext(document === undefined ? undefined : parseProjectContext(document.value).text) })
@@ -70,6 +72,15 @@ export const makeAiContext = ({ kv, projects, host }: AiContextDeps) => {
     sources,
     /** The context for one turn: the assembled text and what was included, truncated or left out. */
     assemble: (request: ContextRequest): Effect.Effect<ContextAssembly, ContextAccessDenied> =>
-      sources(request).pipe(Effect.map((all) => assembleContext(all, request.budget)))
+      sources(request).pipe(Effect.map((all) => assembleContext(all, request.budget))),
+    /**
+     * The same sources split for the cache (spec 64 Phase 1): the stable text goes into the turn's system block, the
+     * observation (editor state) into a message part that is only sent when it changed.
+     */
+    assembleParts: (request: ContextRequest): Effect.Effect<ContextParts, ContextAccessDenied> =>
+      sources(request, request.observationBudget ?? OBSERVATION_BUDGET).pipe(Effect.map((all) => assembleContextParts(all, {
+        ...(request.budget !== undefined ? { budget: request.budget } : {}),
+        ...(request.observationBudget !== undefined ? { observationBudget: request.observationBudget } : {})
+      })))
   }
 }

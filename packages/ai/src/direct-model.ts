@@ -18,7 +18,7 @@ import {
 } from "./models.ts"
 import { formatOverflowMessage, parseApiFailure, type ApiFailure } from "./provider-error.ts"
 import { RETRY_MAX_ATTEMPTS, providerRetry, retryable } from "./retry.ts"
-import { prepareCall, schema as transformSchema, transformModelFor, type PreparedCall } from "./transform.ts"
+import { prepareCall, schema as transformSchema, transformModelFor, type CacheRetention, type PreparedCall } from "./transform.ts"
 
 export interface DirectCallBase {
   readonly system?: string
@@ -68,7 +68,7 @@ export const defaultModelFactory: LanguageModelFactory = (resolved, credential) 
 }
 
 /** The provider transforms (nikcli's `ProviderTransform`) applied to a one-shot prompt. */
-export const prepareDirectCall = (resolved: ResolvedModel, input: DirectCallBase & { readonly prompt: string }): PreparedCall => {
+export const prepareDirectCall = (resolved: ResolvedModel, input: DirectCallBase & { readonly prompt: string }, retention?: CacheRetention): PreparedCall => {
   const messages: ModelMessage[] = [
     ...(input.system ? [{ role: "system", content: input.system } as const] : []),
     { role: "user", content: input.files?.length ? [
@@ -78,7 +78,7 @@ export const prepareDirectCall = (resolved: ResolvedModel, input: DirectCallBase
         : { type: "file" as const, data: file.url, mediaType: file.mime, filename: file.filename })
     ] : input.prompt }
   ]
-  return prepareCall({ model: transformModelFor(resolved), messages, sessionID: "cadcamfun-direct" })
+  return prepareCall({ model: transformModelFor(resolved), messages, sessionID: "cadcamfun-direct", ...(retention !== undefined ? { retention } : {}) })
 }
 
 const callSettings = (call: PreparedCall) => ({
@@ -187,7 +187,7 @@ export class DirectModel extends Context.Service<
         const generateTextImpl = Effect.fn("DirectModel.generateText")(function* (input: DirectCallBase & { readonly prompt: string }) {
           const { resolved, model, secrets } = yield* prepare(input.model)
           return yield* retried(async (abortSignal): Promise<TextResult> => {
-            const result = await generateText({ model, ...callSettings(prepareDirectCall(resolved, input)), abortSignal, timeout: requestTimeoutMs, maxRetries: 0 })
+            const result = await generateText({ model, ...callSettings(prepareDirectCall(resolved, input, config.cacheRetention)), abortSignal, timeout: requestTimeoutMs, maxRetries: 0 })
             return { text: result.text, model: resolved.modelId, provider: resolved.provider, usage: usageOf(result.usage) }
           }).pipe(Effect.mapError((error) => toError(error, undefined, resolved.provider, secrets, resolved.modelId)))
         })
@@ -201,7 +201,7 @@ export class DirectModel extends Context.Service<
                 yield* Effect.addFinalizer(() => Effect.sync(() => controller.abort()))
                 const result = streamText({
                   model,
-                  ...callSettings(prepareDirectCall(resolved, input)),
+                  ...callSettings(prepareDirectCall(resolved, input, config.cacheRetention)),
                   abortSignal: controller.signal,
                   timeout: { totalMs: requestTimeoutMs * 3, firstChunkMs: requestTimeoutMs, chunkMs: requestTimeoutMs },
                   maxRetries: 1,
@@ -266,7 +266,7 @@ export class DirectModel extends Context.Service<
               const raw = yield* retried(async (abortSignal) => {
                 const result = await generateText({
                   model,
-                  ...callSettings(prepareDirectCall(resolved, input)),
+                  ...callSettings(prepareDirectCall(resolved, input, config.cacheRetention)),
                   output: Output.object({ schema: aiSchema }),
                   abortSignal,
                   timeout: requestTimeoutMs,

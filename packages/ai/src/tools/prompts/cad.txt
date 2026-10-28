@@ -1,4 +1,4 @@
-Read and inspect the open drawing. Every action is read-only.
+Inspect the open CAD drawing: elements, layers, exact solids, assemblies, DFM and setups; read-only.
 
 Actions and Parameters (lengths mm; history and joint angles degrees)
 - describe: counts, bounds, layers; no parameters. Start here.
@@ -14,8 +14,8 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - drawing: elementId or history, options?; dimensioned PDF/SVG. Options include GDT, datums, balloons; see schema.
 - parametric_validate: history; build and validate before storing.
 - parametric_inspect: elementId; parameters and revision.
-- parametric_test: elementId, cases [{name,parameters,expectedBodies?,minVolumeMm3?,maxVolumeMm3?,checks?}]; dimensional checks and variants.
-- parametric_dfm: elementId or history, process (mill|turn|print), toolDiameter?, material?, minWall?, envelope? {x,y,z}.
+- parametric_test: elementId, cases (1-12) [{name,parameters,expectedBodies?,minVolumeMm3?,maxVolumeMm3?,checks?}]; dimensional checks and variants.
+- parametric_dfm: elementId or history, process (mill|turn|print), toolDiameter?, material? (metal|cast|plastic), minWall?, envelope? {x,y,z}.
 - parametric_exact: elementId or history, includeStep?, name?; exact body or reason it is mesh-only.
 - exact: ids?, machining?; exact validity, volume, bounds, faceNames, holes and CAM suitability.
 - assembly: washers?; exact clashes, gaps, BOM, joints, missing fasteners.
@@ -32,8 +32,10 @@ Actions and Parameters (lengths mm; history and joint angles degrees)
 - parametric_recipe: recipe, params?; standard-part history. Recipes: mounting_plate, flange, l_bracket, stepped_shaft, pipe_bend, duct_transition, enclosure.
 - parametric_from_element: elementId, depth?; named dimensions from existing geometry.
 
+Paging: limit goes up to 500 on inspect_elements, inspect_origins and inspect_search (their ids up to 500 too; defaults 10, 10, 20) and up to 200 on grep (default 20).
+
 Result (JSON)
 ok, geometry findings or problems; paged inspection gives total/nextOffset. Element ids are edit ids; parameter revisions guard later updates.
 
 Do not use it
-To write use cad_edit; to machine use cam/cam_edit. Store checked shell, offset or surface with cad_edit. Consult fusion-360-modelling for history features and supported domains.
+To write use cad_edit; to machine use cam/cam_edit. Consult fusion-360-modelling for history features and supported domains.

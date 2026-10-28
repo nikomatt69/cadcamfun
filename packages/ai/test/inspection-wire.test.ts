@@ -15,13 +15,13 @@ const leaves = {
 
 test("each inspection action's zod schema is the JSON Schema of the authoritative Effect contract", async () => {
   for (const input of [
-    { action: "layers" }, { action: "elements" }, { action: "elements", limit: 20 }, { action: "elements", limit: 100 },
-    { action: "search", query: "plate" }, { action: "search", query: "plate", limit: 51 }, { action: "search", query: "plate", limit: 101 },
+    { action: "layers" }, { action: "elements" }, { action: "elements", limit: 20 }, { action: "elements", limit: 500 },
+    { action: "search", query: "plate" }, { action: "search", query: "plate", limit: 51 }, { action: "search", query: "plate", limit: 501 },
     { action: "property", elementId: "part", path: ["history"] }, { action: "property", elementId: "part", path: ["history"], maxChars: 50_000 }, { action: "property", elementId: "part", path: ["history"], maxChars: 50_001 },
     { action: "property", elementId: "part", path: [] },
-    { action: "elements", ids: Array.from({ length: 100 }, (_, index) => String(index)) },
-    { action: "elements", ids: Array.from({ length: 101 }, (_, index) => String(index)) },
-    { action: "origins" }, { action: "origins", limit: 100 }, { action: "origins", limit: 101 },
+    { action: "elements", ids: Array.from({ length: 500 }, (_, index) => String(index)) },
+    { action: "elements", ids: Array.from({ length: 501 }, (_, index) => String(index)) },
+    { action: "origins" }, { action: "origins", limit: 500 }, { action: "origins", limit: 501 },
     { action: "elements", offset: -1 }, { action: "unknown" }
   ]) {
     const value = input.action as keyof typeof leaves
@@ -56,6 +56,6 @@ test("the union of the five leaves is still the contract the HTTP face decodes",
 test("every inspection leaf is derived through the same adapter the other wire schemas use", () => {
   const wire = nikcliWireSchema(CadInspectionElements)
   expect(wire.safeParse({ action: "elements", limit: 5 }).success).toBe(true)
-  expect(wire.safeParse({ action: "elements", limit: 99 }).success).toBe(true)
-  expect(wire.safeParse({ action: "elements", limit: 101 }).success).toBe(false)
+  expect(wire.safeParse({ action: "elements", limit: 499 }).success).toBe(true)
+  expect(wire.safeParse({ action: "elements", limit: 501 }).success).toBe(false)
 })

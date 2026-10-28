@@ -19,7 +19,7 @@ export * from "./service.ts"
 export * from "./tools/catalogue.ts"
 export { makeNikCliRuntime, type HostToolSpec, type NikCliRuntime, type NikCliRuntimeOptions } from "./nikcli/runtime.ts"
 export { ToolRegistry, ToolRegistryError, makeToolRegistry, compareToolIds, lastWins, RESERVED_TOOL_IDS, type ToolRegistryShape, type ToolRegistrySources, type ToolHandle, type ToolCatalogueEntry } from "./tools/tool-registry.ts"
-export { assembleContext, notesByRecency, CONTEXT_BUDGET, CONTEXT_KINDS, type ContextAssembly, type ContextKind, type ContextManifest, type ContextManifestEntry, type ContextRequest, type ContextSource, type OmissionReason } from "./context-assembly.ts"
+export { assembleContext, assembleContextParts, contextSections, deliveredObservationDigest, notesByRecency, observationDigest, planObservation, renderObservation, CONTEXT_BUDGET, CONTEXT_KINDS, OBSERVATION_BUDGET, OBSERVATION_KINDS, OBSERVATION_METADATA_KEY, type ContextAssembly, type ContextKind, type ContextManifest, type ContextManifestEntry, type ContextParts, type ContextPartsOptions, type ContextPlacement, type ContextRequest, type ContextSection, type ContextSource, type ObservationInput, type ObservationPart, type ObservationPlan, type OmissionReason } from "./context-assembly.ts"
 export { readProjectMemoryFiles, invalidateProjectMemoryFiles, projectMemoryFile, projectHabitsFile, type ProjectMemoryFiles } from "./nikcli/project-files.ts"
 export {
   abortHostSession,
@@ -33,6 +33,7 @@ export { automaticModel, flattenCatalog, hostCatalog, type HostModelInfo, type H
 export { defaultProviderSpecs } from "./nikcli/config.ts"
 export { childAgent, adoptChildSession } from "./nikcli/agents.ts"
 export { SUBAGENTS, SUBAGENT_IDS, type SubagentId, type SubagentSpec } from "./nikcli/agents.ts"
+export { PRIMARIES, PRIMARY_IDS, isPrimaryId, resolvePrimary, type PrimaryId, type PrimarySpec } from "./nikcli/primaries.ts"
 export { policyAllows, providerAllowed, toolAllowed, filterProviders, permittedTools, readPolicyFile, type PolicyStatement, type PolicyInput } from "./nikcli/policy.ts"
 export { LocaleEnvConfig, resolveLocale, type LocaleConfig, type LocaleEnv, type ResolvedLocale } from "./nikcli/locale.ts"
 export * from "./attachments.ts"

@@ -1,11 +1,9 @@
-See what the assistant has built into this installation and what the host has actually loaded.
+List and read the mods (hook extensions) the assistant built here and what the host has loaded.
 
-A mod is a small extension module (a nikcli mod) the application's assistant can author: it exports `register(on, options)`
-and hooks named events — `tool.call`, `tool.result`, `prompt.submit`, `session.start` and the other names the host
-documents. A hook can observe a call, rewrite it (`return next({ ...event, ... })`), refuse it (`return { deny: "why" }`)
-or wrap its result; it can also add text to the prompt. Mods are how a standing rule the user wants ("always ask before
-deleting", "note the units in every answer", "block G-code edits without verification") survives without repeating it
-in the conversation.
+A mod is a small extension module (a nikcli mod) the assistant can author: it exports `register(on, options)` and hooks
+events such as `tool.call`, `tool.result`, `prompt.submit` and `session.start` to observe, rewrite, refuse or wrap a call, or to add
+prompt text. Mods keep a standing rule the user wants ("always ask before deleting", "note the units in every answer",
+"block G-code edits without verification") alive without repeating it in the conversation.
 
 Actions
 - list: every mod the application stores, with the events the live host reports for it (empty when not loaded).

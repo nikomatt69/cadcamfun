@@ -13,7 +13,7 @@ import { ActingUser } from "../services/acting-user.ts"
 import { AssistantTurns } from "../services/assistant-turns.ts"
 import { LiveEvents } from "../services/live-events.ts"
 import { AiActions } from "../services/ai.ts"
-import { ToolRegistry } from "@cadcamfun/ai"
+import { ToolRegistry, contextSections } from "@cadcamfun/ai"
 import { AiPlugins } from "../services/ai-plugins.ts"
 import { BridgeTokens } from "../services/bridge-tokens.ts"
 import { HttpServerRequest } from "effect/unstable/http"
@@ -100,7 +100,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       const owner = yield* Effect.tryPromise({ try: () => actingUser.owner(payload.sessionId!), catch: () => new BadRequest({ message: "Unable to verify session owner" }) })
       if (owner && (owner.userId !== actor.id || owner.projectId !== (payload.projectId ?? "default"))) return yield* new BadRequest({ message: "Session not found or inaccessible" })
     }
-    const context = yield* contextFor(payload)
+    const { text: context, observation, sections } = yield* contextFor(payload)
     let announced = false
     return ai.chat({
       message: payload.message,
@@ -111,6 +111,8 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
       ...(payload.projectId ? { projectId: payload.projectId } : {}),
       ...(context ? { context } : {}),
+      ...(observation ? { observation } : {}),
+      ...(sections ? { contextSections: sections } : {}),
       ...(payload.model ? { model: payload.model } : {}),
       ...(payload.attachments && payload.attachments.length > 0 ? { attachments: payload.attachments } : {})
     }).pipe(Stream.catch((e) => Stream.succeed({
@@ -206,14 +208,24 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   /** The turn's context through the one assembly (`ai-context.ts`): authorised sources, one budget, a manifest. */
   const contextFor = (payload: { context?: string | undefined; projectId?: string | undefined; drawingId?: string | undefined; includeContext?: boolean | undefined }) => Effect.gen(function*() {
     const actor = yield* CurrentUser
-    const assembly = yield* aiContext.assemble({
+    const assembly = yield* aiContext.assembleParts({
       actorId: actor.id, includeContext: payload.includeContext !== false,
       ...(payload.projectId !== undefined ? { projectId: payload.projectId } : {}),
       ...(payload.drawingId !== undefined ? { drawingId: payload.drawingId } : {}),
       ...(payload.context !== undefined ? { explicit: payload.context } : {})
     }).pipe(Effect.mapError(() => new BadRequest({ message: "Project not found or inaccessible" })))
     if (assembly.manifest.omitted.some((entry) => entry.reason === "budget")) yield* Effect.logDebug("AI context left sources out", assembly.manifest)
-    return assembly.text
+    // Stable context goes into the turn's system block; the observation travels as a message part when it changed (spec 64 Phase 1).
+    const sections = contextSections(assembly)
+    return {
+      text: assembly.stable.text,
+      ...(assembly.observation.text !== "" ? { observation: {
+        text: assembly.observation.text,
+        ...(payload.drawingId !== undefined ? { drawingId: payload.drawingId } : {}),
+        ...(assembly.observationAt !== undefined ? { at: new Date(assembly.observationAt).toISOString() } : {})
+      } } : {}),
+      ...(sections.length > 0 ? { sections } : {})
+    }
   })
   /** Legacy single-shot call: the model selector is the vendor-neutral tier unless a model id is given. */
   const complete = (prompt: string, system?: string, model?: string) =>
@@ -369,11 +381,12 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       if (!revoked) return yield* new BadRequest({ message: "No such bridge token" })
       return { message: "Revoked" }
     }))
-    .handle("chatStream", ({ payload }) => Effect.map(turnOf(payload), (turn) => withHeartbeat(turn)))
+    // The desktop streams its own turn, and the journal records it too: a phone following the session sees it live.
+    .handle("chatStream", ({ payload }) => Effect.map(turnOf(payload), (turn) => withHeartbeat(turns.attach(turn, payload.sessionId, payload.message))))
     // nikcli mobile architecture (spec 13 §5): the prompt starts a detached turn, the phone follows the session stream.
     .handle("sessionPrompt", ({ payload }) => Effect.gen(function*() {
       const turn = yield* turnOf(payload)
-      return yield* turns.start(turn, payload.sessionId)
+      return yield* turns.start(turn, payload.sessionId, payload.message)
     }))
     .handle("sessionStream", ({ params, query }) => Effect.gen(function*() {
       yield* controlProject(params.sessionId)
@@ -488,6 +501,14 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       return yield* modsList
     }))
     .handle("modes", () => Effect.sync(() => ({
+      // Additive: `modes` keeps its contributed-only meaning for existing clients; `builtin` lists the built-in modes.
+      builtin: [
+        { id: "general", title: "General", description: "General CAD/CAM focus.", pluginId: "builtin", pluginName: "CADCAMFUN" },
+        { id: "cad", title: "CAD", description: "Drawing and 3D modelling focus.", pluginId: "builtin", pluginName: "CADCAMFUN" },
+        { id: "cam", title: "CAM", description: "Machining operations focus.", pluginId: "builtin", pluginName: "CADCAMFUN" },
+        { id: "gcode", title: "G-code", description: "G-code focus.", pluginId: "builtin", pluginName: "CADCAMFUN" },
+        { id: "toolpath", title: "Toolpath", description: "Toolpath focus.", pluginId: "builtin", pluginName: "CADCAMFUN" }
+      ],
       modes: plugins.modes().map((mode) => ({ id: mode.id, title: mode.title, description: mode.description, pluginId: mode.pluginId, pluginName: mode.pluginName }))
     })))
     .handle("skills", () => skillInfos.pipe(Effect.map((skills) => ({ skills, max: MAX_USER_SKILLS }))))

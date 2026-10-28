@@ -1,12 +1,12 @@
-Write machining operations, programs, stock and saved verification reports.
+Create CAM operations, generate G-code, set stock, verify toolpaths and store whole-part programs.
 
 Actions and Parameters (mm, mm/min, rpm)
-- create: type (contour, pocket, drill, engrave, profile, threading, 3d_surface, probing, multiaxis, facing, turning, parting), params, expectedRevision. params holds generator settings: toolType, toolDiameter, depth, stepdown, feedrate, rpm, material (aluminum|steel|wood|plastic|brass|titanium|composite|other), offset (inside|outside|center), workOffset, originType, machineType; printer extras infillDensity, supportType, shellCount.
+- create: type (mill: contour, pocket, drill, engrave, profile, threading, 3d_surface, probing, multiaxis; lathe: facing, turning, boring, grooving, parting, knurling), params, expectedRevision. params holds generator settings: toolType, toolDiameter, depth, stepdown, feedrate, rpm, material (aluminum|steel|wood|plastic|brass|titanium|composite|other), offset (inside|outside|center), workOffset, originType, machineType; printer extras infillDensity, supportType, shellCount.
 - update: operationId, params, expectedRevision; changed settings invalidate NC.
 - generate: operationId (required), maxLines (1-200, default 40); store full NC, return stats and preview.
 - verify: operationId, tool {cuttingLength,shankDiameter,stickout,holderDiameter,holderLength}, fixtures [{id,bounds:{minX,maxX,minY,maxY,minZ,maxZ}}], targetSolids, stock (same bounds), resolution, tolerance, start {x,y,z}. Replay stored NC, never regenerate; persist evidence bound to programHash. Omitted geometry is unmodelled. Default start is X0 Y0 at stock top +10 mm.
 - stock_set: stock {width,height,depth,radius,x,y,topZ,allowance,material?,elementId?}; change stock and invalidate programs.
-- manufacture: material, machine, machineConfig, origin, setupOrientation, finishAllowance, scallop, deburr, operations, tools, subprograms, smoothing (mm contour tolerance), expectedRevision. Store whole-part kernel NC and evidence; blocked releases refused. Preview via cam manufacture. machineConfig is the machine configuration of the library (from cam materials): it wins over the preset id.
+- manufacture: material, machine, machineConfig, origin, setupOrientation, workOffset, finishAllowance, scallop, deburr, operations, tools, subprograms, smoothing (mm contour tolerance), print (printers, as in cam manufacture), expectedRevision. Store whole-part kernel NC and evidence; blocked releases refused. Preview via cam manufacture. machineConfig (from cam materials) wins over the preset id and supplies the post (its postDefinitionId); there is no postDefinition input here.
 - turn: profile, stock, stepdown, allowance, feedMmRev, rpm, machine, machineConfig, expectedRevision (as cam turn). Store identical native external-turning NC with lathe stock settings. Always preview; ideal point tool, unqualified workholding/controller. Re-run turn after changes, never legacy generate.
 
 Result (JSON)

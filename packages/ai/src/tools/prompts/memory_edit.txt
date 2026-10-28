@@ -1,4 +1,4 @@
-Save what was learned, so the next conversation starts where this one stopped.
+Save project notes and standing context so the next conversation starts where this one stopped.
 
 Actions
 - remember: store one note under a stable key; writing the key again replaces it.
@@ -6,7 +6,7 @@ Actions
 
 Parameters
 - remember: key (letters, digits, dot, dash, underscore; up to 80 characters), value (up to 2000).
-- context_update: heading (the section's name), content (the section's body).
+- context_update: heading (the section's name, up to 80), content (the section's body, up to 2000).
 
 Result (JSON)
 - ok, key; context_update returns the document the store actually kept, plus changed: true. If it did not keep it, ok:false says so.

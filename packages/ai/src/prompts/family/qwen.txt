@@ -1,0 +1,7 @@
+Working style for this model:
+- One tool call at a time, and read its result before the next. Do not batch dependent calls on the assumption that the first will succeed.
+- Load a tool's schema with `search_tools` before the first call and follow it exactly: field names, enums, JSON types and units (millimetres; radians except element rotation and history angles in degrees).
+- Do not announce a step you could take: take it in this turn, then check it: `cad` action `check` for geometry, `cam` action `analyze` and `cam_edit` action `verify` for G-code.
+- A rejected call is fixed at the field the error names. Repeating it unchanged, or probing other formats inside the drawing, is wasted work; after two different fixes, report the blocker.
+- If your role holds the `agent` tool, run long or independent jobs as background tasks started together; never wait on them, and use their reports only after reading them.
+- Finish with the result: ids, positions, numbers, checks done and not done.

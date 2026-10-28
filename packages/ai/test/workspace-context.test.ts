@@ -133,6 +133,6 @@ describe("context evidence and recovery regressions", () => {
 
   test("main agent distinguishes completed events, stale checks and uncertain writes", () => {
     const prompt = systemPrompt()
-    for (const evidence of ["Tool output and recovery:", "Tool completion is not domain success", "inspect uncertain mutations before retrying", "revision conflicts", "invalidate prior CAM checks", "CAD origins, machine offsets"]) expect(prompt).toContain(evidence)
+    for (const evidence of ["Tool output and recovery:", "Tool completion is not domain success", "Before retrying a mutation whose outcome is uncertain, inspect the current state", "revision conflicts", "invalidate prior CAM checks", "CAD origins, machine offsets"]) expect(prompt).toContain(evidence)
   })
 })

@@ -1,5 +1,5 @@
 // @bun
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Pipeable.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Pipeable.js
 var pipeArguments = (self, args) => {
   switch (args.length) {
     case 0:
@@ -42,7 +42,7 @@ var Class = /* @__PURE__ */ function() {
   return PipeableBase;
 }();
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Function.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Function.js
 var dual = function(arity, body) {
   if (typeof arity === "function") {
     return function() {
@@ -111,7 +111,7 @@ function memoizeIdempotent(f) {
   };
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/equal.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/equal.js
 var getAllObjectKeys = (obj) => {
   const keys = new Set(Reflect.ownKeys(obj));
   if (obj.constructor === Object)
@@ -135,7 +135,7 @@ var getAllObjectKeys = (obj) => {
 };
 var byReferenceInstances = /* @__PURE__ */ new WeakSet;
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Predicate.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Predicate.js
 function isString(input) {
   return typeof input === "string";
 }
@@ -168,7 +168,7 @@ function isObjectKeyword(input) {
 }
 var hasProperty = /* @__PURE__ */ dual(2, (self, property) => isObjectKeyword(self) && (property in self));
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Hash.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Hash.js
 var symbol = "~effect/interfaces/Hash";
 var hash = (self) => {
   switch (typeof self) {
@@ -292,7 +292,7 @@ function withVisitedTracking(obj, fn) {
   return result;
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Equal.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Equal.js
 var symbol2 = "~effect/interfaces/Equal";
 function equals() {
   if (arguments.length === 1) {
@@ -489,7 +489,7 @@ function makeCompareSet(equivalence) {
 var compareSets = /* @__PURE__ */ makeCompareSet(compareBoth);
 var isEqual = (u) => hasProperty(u, symbol2);
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Redactable.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Redactable.js
 var symbolRedactable = /* @__PURE__ */ Symbol.for("~effect/Redactable");
 var isRedactable = (u) => hasProperty(u, symbolRedactable);
 function redact(u) {
@@ -512,7 +512,7 @@ var emptyContext = {
   }
 };
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Formatter.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Formatter.js
 function format(input, options) {
   const space = options?.space ?? 0;
   const ancestors = new WeakSet;
@@ -598,7 +598,7 @@ function safeToString(input) {
   }
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Inspectable.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Inspectable.js
 var NodeInspectSymbol = /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom");
 var toJson = (input) => {
   try {
@@ -625,7 +625,7 @@ var BaseProto = {
   }
 };
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Utils.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Utils.js
 class SingleShotGen {
   called = false;
   self;
@@ -664,7 +664,7 @@ var pickInternalCall = () => {
 };
 var internalCall = /* @__PURE__ */ pickInternalCall();
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/record.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/record.js
 function assignProperty(self, key, value) {
   if (key === "__proto__") {
     Object.defineProperty(self, key, {
@@ -685,7 +685,7 @@ function assignProperties(self, source) {
   }
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/core.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/core.js
 var EffectTypeId = `~effect/Effect`;
 var ExitTypeId = `~effect/Exit`;
 var effectVariance = {
@@ -1027,7 +1027,7 @@ var DoneVoid = {
   value: undefined
 };
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Data.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Data.js
 var Class2 = class extends Class {
   constructor(props) {
     super();
@@ -1037,13 +1037,13 @@ var Class2 = class extends Class {
   }
 };
 var TaggedError2 = TaggedError;
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Effectable.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Effectable.js
 var Prototype2 = (options) => makePrimitiveProto({
   op: options.label,
   [evaluate]: options.evaluate
 });
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/option.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/option.js
 var TypeId = "~effect/data/Option";
 var CommonProto = {
   [TypeId]: {
@@ -1109,7 +1109,7 @@ var some = (value) => {
   return a;
 };
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/result.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/result.js
 var TypeId2 = "~effect/data/Result";
 var CommonProto2 = {
   [TypeId2]: {
@@ -1175,7 +1175,7 @@ var succeed = (success) => {
   return a;
 };
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Order.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Order.js
 function make(compare) {
   return (self, that) => self === that ? 0 : compare(self, that);
 }
@@ -1193,7 +1193,7 @@ var isGreaterThan = (O) => dual(2, (self, that) => O(self, that) === 1);
 var isLessThanOrEqualTo = (O) => dual(2, (self, that) => O(self, that) !== 1);
 var isGreaterThanOrEqualTo = (O) => dual(2, (self, that) => O(self, that) !== -1);
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Option.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Option.js
 var none2 = () => none;
 var some2 = some;
 var isNone2 = isNone;
@@ -1201,7 +1201,7 @@ var isSome2 = isSome;
 var map = /* @__PURE__ */ dual(2, (self, f) => isNone2(self) ? none2() : some2(f(self.value)));
 var filter = /* @__PURE__ */ dual(2, (self, predicate) => isNone2(self) ? none2() : predicate(self.value) ? some2(self.value) : none2());
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Context.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Context.js
 var ServiceTypeId = "~effect/Context/Service";
 var Service = function() {
   function KeyClass() {}
@@ -1387,10 +1387,10 @@ var serviceNotFoundError = (service) => {
 };
 var Reference = Service;
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/array.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/array.js
 var isArrayNonEmpty = (self) => self.length > 0;
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Result.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Result.js
 var succeed2 = succeed;
 var fail2 = fail;
 var isFailure2 = isFailure;
@@ -1399,7 +1399,7 @@ var match = /* @__PURE__ */ dual(2, (self, {
   onSuccess
 }) => isFailure2(self) ? onFailure(self.failure) : onSuccess(self.success));
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Array.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Array.js
 var Array2 = globalThis.Array;
 var fromIterable = (collection) => Array2.isArray(collection) ? collection : Array2.from(collection);
 var append = /* @__PURE__ */ dual(2, (self, last) => [...self, last]);
@@ -1447,7 +1447,7 @@ var dedupe = (self) => {
   return out;
 };
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Scheduler.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Scheduler.js
 var Scheduler = /* @__PURE__ */ Reference("effect/Scheduler", {
   fiberCached: true,
   defaultValue: () => new MixedScheduler
@@ -1557,7 +1557,7 @@ var PreventSchedulerYield = /* @__PURE__ */ Reference("effect/Scheduler/PreventS
   defaultValue: () => false
 });
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Encoding.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Encoding.js
 var EncodingErrorTypeId = "~effect/encoding/EncodingError";
 
 class EncodingError extends (/* @__PURE__ */ TaggedError2("EncodingError")) {
@@ -1645,14 +1645,14 @@ for (let i = 0;i < 256; i++) {
   byteToHex.push(i.toString(16).padStart(2, "0"));
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Tracer.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Tracer.js
 var ParentSpanKey = "effect/Tracer/ParentSpan";
 var TracerKey = "effect/Tracer";
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/metric.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/metric.js
 var FiberRuntimeMetricsKey = "effect/observability/Metric/FiberRuntimeMetricsKey";
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/references.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/references.js
 var CurrentStackFrame = /* @__PURE__ */ Reference("effect/References/CurrentStackFrame", {
   fiberCached: true,
   defaultValue: constUndefined
@@ -1666,7 +1666,7 @@ var MinimumLogLevel = /* @__PURE__ */ Reference("effect/References/MinimumLogLev
   defaultValue: () => "Info"
 });
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/stackTraceLimit.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/stackTraceLimit.js
 var isStackTraceLimitWritable = () => {
   const desc = Object.getOwnPropertyDescriptor(Error, "stackTraceLimit");
   if (desc === undefined) {
@@ -1682,7 +1682,7 @@ var setStackTraceLimit = (value) => {
   }
 };
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/effect.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/effect.js
 class Interrupt extends ReasonBase {
   fiberId;
   constructor(fiberId, annotations = constEmptyAnnotations) {
@@ -2584,18 +2584,18 @@ var logLevelColors = {
   Fatal: [colors.bgBrightRed, colors.black]
 };
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Exit.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Exit.js
 var succeed4 = exitSucceed;
 var failCause2 = exitFailCause;
 var fail4 = exitFail;
 var void_2 = exitVoid;
 var isSuccess3 = exitIsSuccess;
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Cause.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Cause.js
 var isFailReason2 = isFailReason;
 var map5 = causeMap;
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Effect.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Effect.js
 var tryPromise2 = tryPromise;
 var succeed5 = succeed3;
 var succeedNone2 = succeedNone;
@@ -2612,7 +2612,7 @@ var mapEager2 = mapEager;
 var mapErrorEager2 = mapErrorEager;
 var flatMapEager2 = flatMapEager;
 var fnUntracedEager2 = fnUntracedEager;
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/schema/annotations.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/schema/annotations.js
 function resolve(ast) {
   return ast.checks ? ast.checks[ast.checks.length - 1].annotations : ast.annotations;
 }
@@ -2626,7 +2626,7 @@ var getExpected = /* @__PURE__ */ memoize((ast) => {
   return ast.getExpected(getExpected);
 });
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/schema/parser.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/schema/parser.js
 var missing = /* @__PURE__ */ Symbol();
 var succeed6 = succeed4;
 var missingExit = /* @__PURE__ */ succeed6(missing);
@@ -2634,7 +2634,7 @@ var sameExit = /* @__PURE__ */ succeed6(missing);
 var toOption = (value) => value === missing ? none2() : some2(value);
 var fromOptionExit = (option) => option._tag === "None" ? missingExit : succeed6(option.value);
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaIssue.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaIssue.js
 var TypeId4 = "~effect/SchemaIssue/Issue";
 function isIssue(u) {
   return hasProperty(u, TypeId4) && u[TypeId4] === TypeId4;
@@ -2886,7 +2886,7 @@ function findMessage(issue) {
     return message;
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/schema/cause.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/schema/cause.js
 function getSchemaIssue(cause) {
   let issue;
   for (const reason of cause.reasons) {
@@ -2907,7 +2907,7 @@ function getSchemaIssueOrThrow(cause, message) {
   return issue;
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaGetter.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaGetter.js
 class Getter extends Class {
   run;
   constructor(run) {
@@ -2970,7 +2970,7 @@ function decodeBase642() {
   }, input, options)));
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaTransformation.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaTransformation.js
 var TypeId5 = "~effect/SchemaTransformation/Transformation";
 
 class Transformation {
@@ -3017,7 +3017,7 @@ var urlFromString = /* @__PURE__ */ transformOrFail2({
 });
 var uint8ArrayFromBase64String = /* @__PURE__ */ new Transformation(/* @__PURE__ */ decodeBase642(), /* @__PURE__ */ encodeBase642());
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaAST.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaAST.js
 function makeGuard(tag) {
   return (ast) => ast._tag === tag;
 }
@@ -4607,7 +4607,7 @@ function getConstructorDescriptor(ast) {
   return isFunction(getDescriptor) ? getDescriptor(ast.typeParameters) : undefined;
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaParser.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/SchemaParser.js
 function makeEffect(schema) {
   const parser = runWithCompiler(constructorCompiler, toType(schema.ast));
   return (input, options) => {
@@ -4825,7 +4825,7 @@ function makeParser(ast, compile, compileConstructorDefault, constructorDefault)
   };
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/schema/schema.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/internal/schema/schema.js
 var TypeId7 = "~effect/Schema/Schema";
 var SchemaProto = {
   [TypeId7]: TypeId7,
@@ -4855,10 +4855,10 @@ function make5(ast, options) {
   return self;
 }
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Struct.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Struct.js
 var lambda = (f) => f;
 
-// ../../node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Schema.js
+// node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/Schema.js
 var TypeId8 = TypeId7;
 function declareConstructor() {
   return (typeParameters, run, annotations) => {
@@ -5718,7 +5718,7 @@ var Class3 = (identifier) => (schema, annotations) => {
     }
   }));
 };
-// ../../packages/plugin-sdk/src/capability.ts
+// packages/plugin-sdk/src/capability.ts
 var CAPABILITIES = [
   "drawing:read",
   "drawing:write",
@@ -5731,7 +5731,7 @@ var CAPABILITIES = [
 ];
 var CapabilitySchema = Literals(CAPABILITIES);
 var ALL_CAPABILITIES = [...CAPABILITIES];
-// ../../packages/plugin-sdk/src/manifest.ts
+// packages/plugin-sdk/src/manifest.ts
 var PluginIdSchema = String4.check(isMinLength(3), isMaxLength(128), isPattern2(/^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$/));
 var SemverSchema = String4.check(isPattern2(/^\d+\.\d+\.\d+(-[0-9A-Za-z-.]+)?$/));
 var SUPPORTED_API_VERSION = "1";
@@ -5797,7 +5797,7 @@ var PluginManifestSchema = Struct({
 var decodeManifest = decodeUnknownEffect2(PluginManifestSchema);
 var encodeManifest = encodeEffect(PluginManifestSchema);
 var isManifest = is2(PluginManifestSchema);
-// ../../packages/plugin-sdk/src/context.ts
+// packages/plugin-sdk/src/context.ts
 var requireCapability = (ctx, capability, surface) => {
   const value = ctx[surface];
   if (value === undefined) {
@@ -5817,9 +5817,9 @@ class CapabilityError extends Error {
     this.name = "CapabilityError";
   }
 }
-// ../../packages/plugin-sdk/src/plugin.ts
+// packages/plugin-sdk/src/plugin.ts
 var definePlugin = (plugin) => plugin;
-// ../../packages/core/src/cad/vec.ts
+// packages/core/src/cad/vec.ts
 var TAU = Math.PI * 2;
 var add2 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
 var fromPolar = (radius, angle) => ({
@@ -5827,14 +5827,14 @@ var fromPolar = (radius, angle) => ({
   y: radius * Math.sin(angle)
 });
 
-// ../../packages/core/src/cad/arc-math.ts
+// packages/core/src/cad/arc-math.ts
 var normalizeAngle = (a) => {
   const r = a % TAU;
   const n = r < 0 ? r + TAU : r;
   return n >= TAU ? 0 : n;
 };
 
-// ../../packages/core/src/cad/entities.ts
+// packages/core/src/cad/entities.ts
 var Num = Finite;
 var PositiveNum = Finite.check(isGreaterThan2(0));
 var NonNegativeNum = Finite.check(isGreaterThanOrEqualTo2(0));
@@ -5992,7 +5992,7 @@ var baseEntity = (id, layerId = "layer-0") => ({
   visible: true,
   locked: false
 });
-// ../../packages/core/src/cad/shapes.ts
+// packages/core/src/cad/shapes.ts
 var regularPolygon = (center, radius, sides, startAngle = Math.PI / 2) => {
   const n = Math.max(3, Math.floor(sides));
   const pts = [];
@@ -6000,9 +6000,9 @@ var regularPolygon = (center, radius, sides, startAngle = Math.PI / 2) => {
     pts.push(fromPolar(radius, normalizeAngle(startAngle + i * TAU / n)));
   return pts.map((p) => add2(p, center));
 };
-// ../../packages/core/src/cad/transform.ts
+// packages/core/src/cad/transform.ts
 var ARC_STEP = Math.PI / 180;
-// ../../packages/core/src/cad/snap.ts
+// packages/core/src/cad/snap.ts
 var SNAP_TYPES = [
   "endpoint",
   "midpoint",
@@ -6021,7 +6021,7 @@ var DEFAULT_SNAP_SETTINGS = {
   gridSpacing: 10
 };
 var quadrantAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
-// ../../packages/core/src/cad/solid.ts
+// packages/core/src/cad/solid.ts
 var Vec3Point = Struct({
   x: Finite,
   y: Finite,
@@ -6082,17 +6082,17 @@ var SolidSchema = Union2([
   RevolveSolidSchema
 ]);
 var decodeSolid = decodeUnknownEffect2(SolidSchema);
-// ../../packages/core/src/cad/migrate.ts
+// packages/core/src/cad/migrate.ts
 class DrawingMigrationError extends TaggedError2("DrawingMigrationError") {
 }
-// ../../packages/core/src/cad/design.ts
+// packages/core/src/cad/design.ts
 var SOLIDS = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "prism", "hemisphere", "ellipsoid", "capsule", "extrusion", "revolution", "parametric", "sweep", "loft", "gear", "spring", "bolt", "screw", "nut", "washer", "wall", "column", "stair"]);
 var BOOLEANS = new Set(["boolean-union", "boolean-subtract", "boolean-intersect"]);
 var RADIAN_LOOKALIKES = [Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, 3 * Math.PI / 2, 2 * Math.PI];
-// ../../packages/core/src/cad/expr.ts
+// packages/core/src/cad/expr.ts
 var UNITS = { mm: 1, cm: 10, m: 1000, in: 25.4, deg: Math.PI / 180, rad: 1 };
 var CONSTANTS = { pi: Math.PI, e: Math.E, tau: 2 * Math.PI };
-// ../../packages/core/src/cad/brep/math.ts
+// packages/core/src/cad/brep/math.ts
 var glCache = new Map;
 var TRIANGLE_RULE = (() => {
   const out = [];
@@ -6111,15 +6111,15 @@ var TRIANGLE_RULE = (() => {
   push6(0.008394777409958, 0.263112829634638, 0.027230314174435);
   return out;
 })();
-// ../../packages/core/src/cad/csg.ts
+// packages/core/src/cad/csg.ts
 var EMPTY = { positions: new Float32Array(0), indices: new Uint32Array(0) };
-// ../../packages/core/src/cad/profile-shape.ts
+// packages/core/src/cad/profile-shape.ts
 var CORNER_TURN = 10 * Math.PI / 180;
 
-// ../../packages/core/src/cad/thread.ts
+// packages/core/src/cad/thread.ts
 var TAN30 = Math.tan(Math.PI / 6);
 
-// ../../packages/core/src/cad/stroke-font.ts
+// packages/core/src/cad/stroke-font.ts
 var ring = [[1, 0], [0, 1], [0, 5], [1, 6], [3, 6], [4, 5], [4, 1], [3, 0], [1, 0]];
 var bowl = [[0, 0], [0, 6], [3, 6], [4, 5], [4, 4], [3, 3], [0, 3]];
 var dot2 = (x, y) => [[x - 0.2, y], [x + 0.2, y], [x + 0.2, y + 0.4], [x - 0.2, y + 0.4], [x - 0.2, y]];
@@ -6183,7 +6183,7 @@ var GLYPHS = {
   ">": [[[0, 5], [4, 3], [0, 1]]]
 };
 
-// ../../packages/core/src/cad/fasteners.ts
+// packages/core/src/cad/fasteners.ts
 var t = (d, pitch, tapDrill, fine, medium, coarse, headDiameter, headHeight, counterboreDiameter, counterboreDepth, countersinkDiameter) => ({
   name: `M${d}`,
   d,
@@ -6212,56 +6212,56 @@ var METRIC_THREADS = [
   t(24, 3, 21, 25, 26, 28, 36, 24, 40, 25.5, 43),
   t(30, 3.5, 26.5, 31, 33, 35, 45, 30, 50, 32, 54)
 ];
-// ../../packages/core/src/cad/brep/geom.ts
+// packages/core/src/cad/brep/geom.ts
 var TAU2 = Math.PI * 2;
 var gridCache = new WeakMap;
 
-// ../../packages/core/src/cad/brep/cdt.ts
+// packages/core/src/cad/brep/cdt.ts
 var EPS = 0.00000000000000011102230246251565;
 var CCW_BOUND = (3 + 16 * EPS) * EPS;
 var ICC_BOUND = (10 + 96 * EPS) * EPS;
 
-// ../../packages/core/src/cad/brep/tessellate.ts
+// packages/core/src/cad/brep/tessellate.ts
 var TAU3 = Math.PI * 2;
 var objectIds = new WeakMap;
 var faceMeshes = new WeakMap;
 var derived = new WeakMap;
 
-// ../../packages/core/src/cam/model/element-mesh.ts
+// packages/core/src/cam/model/element-mesh.ts
 var TAU4 = 2 * Math.PI;
 var meshOfTessellation = new WeakMap;
 var parametricCache = new Map;
 
-// ../../packages/core/src/cad/brep/boolean.ts
+// packages/core/src/cad/brep/boolean.ts
 var TAU5 = Math.PI * 2;
 var VOLUMES = new WeakMap;
 var SETS = new WeakMap;
 
-// ../../packages/core/src/cad/brep/primitives.ts
+// packages/core/src/cad/brep/primitives.ts
 var TAU6 = Math.PI * 2;
 
-// ../../packages/core/src/cad/thread-brep.ts
+// packages/core/src/cad/thread-brep.ts
 var TAN302 = Math.tan(Math.PI / 6);
-// ../../packages/core/src/cad/brep/sweep.ts
+// packages/core/src/cad/brep/sweep.ts
 var TAU7 = Math.PI * 2;
 var CORNER_TURN2 = 10 * Math.PI / 180;
-// ../../packages/core/src/cad/brep/step.ts
+// packages/core/src/cad/brep/step.ts
 var SOLID_KINDS = new Set(["MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS", "SHELL_BASED_SURFACE_MODEL", "FACETED_BREP"]);
-// ../../packages/core/src/cad/brep/features.ts
+// packages/core/src/cad/brep/features.ts
 var TAU8 = 2 * Math.PI;
 var MAX_GAP = Math.PI / 3;
-// ../../packages/core/src/cad/brep/boss-edit.ts
+// packages/core/src/cad/brep/boss-edit.ts
 var TAU9 = 2 * Math.PI;
 var MAX_GAP2 = Math.PI / 3;
-// ../../packages/core/src/cad/brep/chain-edit.ts
+// packages/core/src/cad/brep/chain-edit.ts
 var TAU10 = 2 * Math.PI;
 var TANGENT = Math.cos(0.5 * Math.PI / 180);
-// ../../packages/core/src/cad/brep/fillet-edit.ts
+// packages/core/src/cad/brep/fillet-edit.ts
 var TAU11 = 2 * Math.PI;
 var MAX_ARC = Math.PI - 0.001;
-// ../../packages/core/src/cad/brep/shell.ts
+// packages/core/src/cad/brep/shell.ts
 var CROSS = 1 + 0.000001;
-// ../../packages/core/src/cad/brep/export-mesh.ts
+// packages/core/src/cad/brep/export-mesh.ts
 var CRC_TABLE = (() => {
   const t = new Uint32Array(256);
   for (let n = 0;n < 256; n++) {
@@ -6272,15 +6272,15 @@ var CRC_TABLE = (() => {
   }
   return t;
 })();
-// ../../packages/core/src/cad/brep/iges.ts
+// packages/core/src/cad/brep/iges.ts
 var TAU12 = Math.PI * 2;
-// ../../packages/core/src/cad/history.ts
+// packages/core/src/cad/history.ts
 var PRIMITIVE_MAY_BE_ZERO = new Set(["holeDiameter", "phiStart"]);
-// ../../packages/core/src/cad/sketch-edit.ts
+// packages/core/src/cad/sketch-edit.ts
 var TAU13 = Math.PI * 2;
-// ../../packages/core/src/cad/kinematics.ts
+// packages/core/src/cad/kinematics.ts
 var RAD = Math.PI / 180;
-// ../../packages/core/src/cad/parametric-from-element.ts
+// packages/core/src/cad/parametric-from-element.ts
 var SOLIDS2 = {
   cube: { numbers: ["width", "height", "depth"] },
   sphere: { numbers: ["radius", "segments"] },
@@ -6313,13 +6313,13 @@ var SOLIDS2 = {
 var FLAT = ["rectangle", "circle", "polygon", "ellipse", "triangle"];
 var CONTAINERS = new Set(["component", "group"]);
 var CONVERTIBLE_TYPES = [...Object.keys(SOLIDS2), ...FLAT, ...CONTAINERS];
-// ../../packages/core/src/cad/element-transform.ts
+// packages/core/src/cad/element-transform.ts
 var DEG = Math.PI / 180;
-// ../../packages/core/src/cad/scene-evidence.ts
+// packages/core/src/cad/scene-evidence.ts
 var PRESENTATION = new Set(["layer", "layerId", "name", "description", "visible", "locked", "selected", "color", "opacity", "wireframe", "linewidth", "originalData"]);
-// ../../packages/core/src/cad/dfm.ts
+// packages/core/src/cad/dfm.ts
 var GRAZING = Math.cos(65 * Math.PI / 180);
-// ../../packages/core/src/cam/kernel/materials.ts
+// packages/core/src/cam/kernel/materials.ts
 var m = (x) => x;
 var MATERIALS = [
   m({
@@ -7297,19 +7297,19 @@ var INDEX = (() => {
   return map;
 })();
 
-// ../../packages/core/src/cad/scene-automation.ts
+// packages/core/src/cad/scene-automation.ts
 var SOLID_TYPES = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "hemisphere", "prism", "extrusion", "revolution", "parametric", "brep", "boolean-union", "boolean-subtract", "boolean-intersect"]);
 var CONTAINERS2 = new Set(["component", "group", "assembly"]);
-// ../../packages/core/src/cam/brep-part.ts
+// packages/core/src/cam/brep-part.ts
 var cache = new WeakMap;
 
-// ../../packages/core/src/cam/swarf-walls.ts
+// packages/core/src/cam/swarf-walls.ts
 var TAU14 = 2 * Math.PI;
 var MAX_GAP3 = Math.PI / 3;
 
-// ../../packages/core/src/cam/setup.ts
+// packages/core/src/cam/setup.ts
 var SETUP_ORIENTATIONS = ["+Z", "-Z", "+X", "-X", "+Y", "-Y"];
-// ../../packages/core/src/cam/ir.ts
+// packages/core/src/cam/ir.ts
 var Positive = Finite.check(isGreaterThan2(0));
 var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
 var RotarySchema = Struct({
@@ -7401,7 +7401,7 @@ var MachineProfileSchema = Struct({
 });
 var validateProgramInput = decodeUnknownSync(ProgramSchema, { errors: "all" });
 var validateMachineInput = decodeUnknownSync(MachineProfileSchema, { errors: "all" });
-// ../../packages/core/src/cam/tool.ts
+// packages/core/src/cam/tool.ts
 var ToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
 var NonNegative2 = Finite.check(isGreaterThanOrEqualTo2(0));
 var Positive2 = Finite.check(isGreaterThan2(0));
@@ -7427,10 +7427,10 @@ var StockSchema = Struct({
 });
 var decodeStock = decodeUnknownEffect2(StockSchema);
 var encodeStock = encodeEffect(StockSchema);
-// ../../packages/core/src/cam/indexing.ts
+// packages/core/src/cam/indexing.ts
 var DEG2 = 180 / Math.PI;
 var RAD2 = Math.PI / 180;
-// ../../packages/core/src/cam/params.ts
+// packages/core/src/cam/params.ts
 var NonNegative3 = Finite.check(isGreaterThanOrEqualTo2(0));
 var Positive3 = Finite.check(isGreaterThan2(0));
 var withDefault2 = (schema, value) => withConstructorDefault2(succeed5(value))(withDecodingDefaultTypeKey(succeed5(value))(schema));
@@ -7448,7 +7448,7 @@ var OperationFields = {
   coolant: withDefault2(CoolantSchema, "off")
 };
 var heightsOrdered = makeFilter2((p) => p.clearanceHeight >= p.safeHeight && p.safeHeight >= p.retractHeight ? undefined : "heights must satisfy clearanceHeight >= safeHeight >= retractHeight");
-// ../../packages/core/src/cam/operations/profile.ts
+// packages/core/src/cam/operations/profile.ts
 var ProfileSideSchema = Literals(["outside", "inside", "onLine"]);
 var LeadInSchema = Literals(["direct", "ramp", "helix", "arc"]);
 var TabSchema = Struct({
@@ -7472,7 +7472,7 @@ class ProfileParams extends Class3("cam/ProfileParams")(Struct({
   tolerance: withDefault2(Positive3, 0.01)
 }).check(heightsOrdered)) {
 }
-// ../../packages/core/src/cam/operations/pocket.ts
+// packages/core/src/cam/operations/pocket.ts
 var PocketEntrySchema = Literals(["plunge", "ramp", "helix"]);
 var PocketOrderSchema = Literals(["insideOut", "outsideIn"]);
 
@@ -7491,7 +7491,7 @@ class PocketParams extends Class3("cam/PocketParams")(Struct({
   toolCentre: withDefault2(Boolean3, false)
 }).check(heightsOrdered)) {
 }
-// ../../packages/core/src/cam/operations/drill.ts
+// packages/core/src/cam/operations/drill.ts
 var { stepdown: _stepdown, feed: _feed, ...commonFields } = OperationFields;
 
 class DrillParams extends Class3("cam/DrillParams")(Struct({
@@ -7503,7 +7503,7 @@ class DrillParams extends Class3("cam/DrillParams")(Struct({
   pitch: optionalKey2(Positive3)
 }).check(heightsOrdered).check(makeFilter2((p) => p.mode !== "tap" || p.pitch !== undefined ? undefined : "a tapping cycle needs the thread pitch"))) {
 }
-// ../../packages/core/src/cam/operations/face.ts
+// packages/core/src/cam/operations/face.ts
 class FaceParams extends Class3("cam/FaceParams")(Struct({
   ...OperationFields,
   stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 60),
@@ -7512,13 +7512,13 @@ class FaceParams extends Class3("cam/FaceParams")(Struct({
   tolerance: withDefault2(Positive3, 0.01)
 }).check(heightsOrdered)) {
 }
-// ../../packages/core/src/cam/operations/engrave.ts
+// packages/core/src/cam/operations/engrave.ts
 class EngraveParams extends Class3("cam/EngraveParams")(Struct({
   ...OperationFields,
   tolerance: withDefault2(Positive3, 0.01)
 }).check(heightsOrdered)) {
 }
-// ../../packages/core/src/cam/operations/adaptive.ts
+// packages/core/src/cam/operations/adaptive.ts
 class AdaptiveParams extends Class3("cam/AdaptiveParams")(Struct({
   ...OperationFields,
   engagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12),
@@ -7528,7 +7528,7 @@ class AdaptiveParams extends Class3("cam/AdaptiveParams")(Struct({
 }).check(heightsOrdered)) {
 }
 
-// ../../packages/core/src/cam/operations/surface.ts
+// packages/core/src/cam/operations/surface.ts
 var SurfaceStrategySchema = Literals(["roughing", "parallel", "waterline", "rest", "steep-shallow", "scallop", "spiral", "radial", "flat"]);
 var RestFromSchema = Struct({
   diameter: Positive3,
@@ -7559,7 +7559,7 @@ class SurfaceParams extends Class3("cam/SurfaceParams")(Struct({
   center: optionalKey2(Struct({ x: Finite, y: Finite }))
 }).check(heightsOrdered)) {
 }
-// ../../packages/core/src/cam/operations/thread.ts
+// packages/core/src/cam/operations/thread.ts
 class ThreadParams extends Class3("cam/ThreadParams")(Struct({
   ...OperationFields,
   stepdown: withDefault2(Positive3, 1e6),
@@ -7577,7 +7577,7 @@ class ThreadParams extends Class3("cam/ThreadParams")(Struct({
   tolerance: withDefault2(NonNegative3, 0.01)
 }).check(heightsOrdered)) {
 }
-// ../../packages/core/src/cam/operations/chamfer.ts
+// packages/core/src/cam/operations/chamfer.ts
 class ChamferParams extends Class3("cam/ChamferParams")(Struct({
   ...OperationFields,
   width: Positive3,
@@ -7585,7 +7585,7 @@ class ChamferParams extends Class3("cam/ChamferParams")(Struct({
   lead: withDefault2(Positive3, 1)
 }).check(heightsOrdered)) {
 }
-// ../../packages/core/src/cam/operations/multiaxis.ts
+// packages/core/src/cam/operations/multiaxis.ts
 var MultiaxisStrategySchema = Literals(["parallel", "contour", "swarf"]);
 var ToolAxisSchema = Literals(["normal", "lead"]);
 var Degrees = Finite.check(isBetween({ minimum: -85, maximum: 85 }));
@@ -7610,7 +7610,7 @@ class MultiaxisParams extends Class3("cam/MultiaxisParams")(Struct({
 }).check(heightsOrdered)) {
 }
 var RAD3 = Math.PI / 180;
-// ../../packages/core/src/cam/post/fanuc.ts
+// packages/core/src/cam/post/fanuc.ts
 var fanucProgramNumber = (program) => {
   const requested = Number(program.metadata?.["programNumber"]);
   return Number.isInteger(requested) && requested >= 1 && requested <= 9999 ? requested : 1000;
@@ -7640,7 +7640,7 @@ var fanucDialect = {
   finish: ["%"]
 };
 
-// ../../packages/core/src/cam/post/generic.ts
+// packages/core/src/cam/post/generic.ts
 var genericDialect = {
   id: "generic",
   canned: true,
@@ -7656,7 +7656,7 @@ var genericDialect = {
   finish: []
 };
 
-// ../../packages/core/src/cam/post/heidenhain.ts
+// packages/core/src/cam/post/heidenhain.ts
 var heidenhainDialect = {
   ...genericDialect,
   id: "heidenhain",
@@ -7670,7 +7670,7 @@ var heidenhainDialect = {
 var START_M = new Set(["M3", "M4", "M7", "M8", "M128"]);
 var END_M = new Set(["M0", "M1", "M2", "M5", "M9", "M30", "M129"]);
 
-// ../../packages/core/src/cam/post/mazak.ts
+// packages/core/src/cam/post/mazak.ts
 var mazakDialect = {
   ...fanucDialect,
   id: "mazak",
@@ -7679,13 +7679,13 @@ var mazakDialect = {
   tcp: "G43.4",
   smoothing: undefined
 };
-// ../../packages/core/src/cam/testing/heidenhain.ts
+// packages/core/src/cam/testing/heidenhain.ts
 var NUMBER = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)";
 var AXIS = new RegExp(`^(I?)([XYZABC])(${NUMBER})$`);
 
-// ../../packages/core/src/cam/testing/gcode-interpreter.ts
+// packages/core/src/cam/testing/gcode-interpreter.ts
 var SILENT_STATEMENTS = new Set(["MSG", "TRAORI", "TRAFOOF", "SOFT", "BRISK", "FFWON", "FFWOF", "CFC", "CFTCP", "CFIN", "STOPRE", "WORKPIECE", "DIAMON", "DIAMOF", "DIAM90", "CYCLE832", "COMPCAD", "COMPCURV", "COMPOF", "SUPA", "TOFFON", "TOFFOF", "SETMS", "SPOS", "WAIT", "DEF", "PRINT_START", "PRINT_END", "START_PRINT", "END_PRINT", "SET_PRESSURE_ADVANCE"]);
-// ../../packages/core/src/cam/post/definition.ts
+// packages/core/src/cam/post/definition.ts
 var LINE_MAX = 100;
 var printable = /^[\x20-\x7E]*$/;
 var template = String4.check(isMaxLength(LINE_MAX, { message: `a line is at most ${LINE_MAX} characters` }), isPattern2(printable, { message: "a line is printable ASCII (no control character, no line break)" }));
@@ -7718,7 +7718,7 @@ var PostDefinitionSchema = Struct({
   end: optionalKey2(template),
   finish: optionalKey2(lines(4))
 });
-// ../../packages/core/src/cam/post/builtin-definitions.ts
+// packages/core/src/cam/post/builtin-definitions.ts
 var of = (base) => ({ schemaVersion: 1, base });
 var GENERIC_DEFINITION = {
   ...of("generic"),
@@ -7796,7 +7796,7 @@ var LINUXCNC_DEFINITION = {
   end: "M2",
   finish: ["%"]
 };
-// ../../packages/core/src/cam/generator/cycles.ts
+// packages/core/src/cam/generator/cycles.ts
 var FixedCycleType = {
   DRILLING: "drilling",
   DRILLING_DWELL: "drilling_dwell",
@@ -7834,7 +7834,7 @@ var CODE_OF = {
   [FixedCycleType.CUSTOM]: "G81"
 };
 
-// ../../packages/core/src/cam/viewer/motion-track.ts
+// packages/core/src/cam/viewer/motion-track.ts
 var Index = Int.check(isGreaterThanOrEqualTo2(0));
 var MotionRunSchema = Struct({
   start: Index,
@@ -7862,7 +7862,7 @@ var MotionTrackSchema = Struct({
   unsupported: ArraySchema(Struct({ line: Index, word: String4 }))
 });
 
-// ../../packages/core/src/cam/kernel/identity.ts
+// packages/core/src/cam/kernel/identity.ts
 var K = new Uint32Array([
   1116352408,
   1899447441,
@@ -7930,7 +7930,7 @@ var K = new Uint32Array([
   3329325298
 ]);
 
-// ../../packages/core/src/cam/kernel/cutters.ts
+// packages/core/src/cam/kernel/cutters.ts
 var HOLDER = { diameter: 40, length: 50 };
 var flat = (d, flutes, material = "carbide", coating = "altin", suffix = "") => ({
   id: `flat-${d}${suffix}`,
@@ -8035,17 +8035,17 @@ var DEFAULT_CUTTERS = [
   ...DRILL_SIZES.map(drill2)
 ];
 
-// ../../packages/core/src/cam/kernel/cutting-data.ts
+// packages/core/src/cam/kernel/cutting-data.ts
 var FERROUS = new Set(["P", "M", "K", "S", "H"]);
 var FINISH = new Set(["finish-wall", "finish-floor", "finish-3d", "engrave"]);
 
-// ../../packages/core/src/cam/model/dexel.ts
+// packages/core/src/cam/model/dexel.ts
 var EMPTY2 = new Float64Array(0);
 
-// ../../packages/core/src/cam/model/model.ts
+// packages/core/src/cam/model/model.ts
 var BOOLEANS2 = new Set(["boolean-union", "boolean-subtract", "boolean-intersect"]);
 
-// ../../packages/core/src/cam/generator/schema.ts
+// packages/core/src/cam/generator/schema.ts
 var Num2 = Finite;
 var PositiveInt = Int.check(isGreaterThan2(0));
 var NonNegativeInt = Int.check(isGreaterThanOrEqualTo2(0));
@@ -8365,10 +8365,10 @@ var SuggestResponseSchema = Struct({
   warnings: ArraySchema(String4)
 });
 
-// ../../packages/core/src/cam/generator/history-features.ts
+// packages/core/src/cam/generator/history-features.ts
 var cache2 = new Map;
 
-// ../../packages/core/src/cam/generator/unified-geometry.ts
+// packages/core/src/cam/generator/unified-geometry.ts
 var SOLID_TYPES2 = new Set([
   "cube",
   "sphere",
@@ -8389,26 +8389,26 @@ var SOLID_TYPES2 = new Set([
   "imported"
 ]);
 
-// ../../packages/core/src/cam/viewer/rotary.ts
+// packages/core/src/cam/viewer/rotary.ts
 var RAD4 = Math.PI / 180;
 
-// ../../packages/core/src/cam/viewer/machine-setup.ts
+// packages/core/src/cam/viewer/machine-setup.ts
 var INTERNAL_TOOLS = new Set(["boring"]);
 
-// ../../packages/core/src/cam/generator/evidence.ts
+// packages/core/src/cam/generator/evidence.ts
 var PART_TYPES = new Set(["parametric", "brep", "mesh"]);
 
-// ../../packages/core/src/cam/print/gcode.ts
+// packages/core/src/cam/print/gcode.ts
 var PART_KINDS = new Set(["wall-outer", "wall-inner", "skin", "infill", "bridge", "vase"]);
 
-// ../../packages/core/src/cam/print/verify.ts
+// packages/core/src/cam/print/verify.ts
 var PRINT_G = new Set([0, 1, 2, 3, 4, 17, 20, 21, 28, 90, 91, 90.1, 91.1, 92, 92.1]);
 var PRINT_M = new Set([0, 1, 2, 17, 18, 30, 82, 83, 84, 104, 109, 140, 190, 106, 107, 204, 205, 400, 900]);
 var PART = new Set(["WALL-OUTER", "WALL-INNER", "SKIN", "FILL", "BRIDGE"]);
-// ../../packages/core/src/cam/viewer/collisions.ts
+// packages/core/src/cam/viewer/collisions.ts
 var HEAD_SIDE = new Set(["head", "spindle", "fork"]);
 var PART_SIDE = new Set(["table", "cradle", "platter"]);
-// ../../packages/core/src/cam/verify/schema.ts
+// packages/core/src/cam/verify/schema.ts
 var VerifyToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
 var VerifyToolSchema = Struct({
   kind: withDefault2(VerifyToolKindSchema, "endmill"),
@@ -8503,9 +8503,9 @@ var VerifyResponseSchema = Struct({
   stats: VerifyStatsSchema,
   preview: VerifyPreviewSchema
 });
-// ../../packages/core/src/cam/kernel/contracts.ts
+// packages/core/src/cam/kernel/contracts.ts
 var SURFACE_MODES = ["roughing", "rest", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"];
-// ../../packages/core/src/cam/kernel/machines.ts
+// packages/core/src/cam/kernel/machines.ts
 var kernMicroHd = (taper) => ({
   id: `kern-micro-hd-${taper}`,
   name: `KERN Micro HD ${taper === "hsk25" ? "HSK25 (50 000 rpm, 6 kW)" : "HSK40 (42 000 rpm, 15 kW)"} B/C`,
@@ -8685,7 +8685,7 @@ var PRINTERS = [
 ];
 var MACHINE_CATALOGUE = [...MACHINES, ...LATHES, ...PRINTERS];
 var DEFAULT_MACHINE = MACHINES[0];
-// ../../packages/core/src/cam/kernel/machine-profile.ts
+// packages/core/src/cam/kernel/machine-profile.ts
 var POST_IDS = ["generic", "fanuc", "grbl", "linuxcnc", "haas", "siemens", "heidenhain", "okuma", "mazak"];
 var MACHINE_KINDS = ["mill", "lathe", "printer", "laser"];
 var AXIS_IDS = ["X", "Y", "Z", "A", "B", "C", "U", "V", "W"];
@@ -8813,7 +8813,7 @@ var configOfProfile = (profile) => {
   return config;
 };
 
-// ../../packages/core/src/cam/kernel/machine-config.ts
+// packages/core/src/cam/kernel/machine-config.ts
 var machineConfigOf = (machine) => {
   if (machine.kind === "printer" && machine.printer !== undefined) {
     const p = machine.printer;
@@ -8911,12 +8911,12 @@ var machineConfigOf = (machine) => {
   };
 };
 var DEFAULT_MACHINE_CONFIGS = MACHINE_CATALOGUE.map(machineConfigOf);
-// ../../packages/core/src/cam/kernel/head.ts
+// packages/core/src/cam/kernel/head.ts
 var DEG3 = Math.PI / 180;
 
-// ../../packages/core/src/cam/kernel/collision.ts
+// packages/core/src/cam/kernel/collision.ts
 var DEG4 = Math.PI / 180;
-// ../../packages/core/src/drawing/title-block.ts
+// packages/core/src/drawing/title-block.ts
 var DOCUMENT_TYPES = ["part", "assembly", "cam-setup", "cam-program", "sketch"];
 var DOCUMENT_STATUSES = ["draft", "in-review", "released", "obsolete"];
 var TOLERANCE_STANDARDS = ["ISO 2768-1 f", "ISO 2768-1 m", "ISO 2768-1 c", "ISO 2768-1 v", "ISO 2768-mK", "ISO 2768-mH", "ISO 2768-fH", "ISO 286-1", "ASME Y14.5", "DIN 7168 m", "None"];
@@ -8946,7 +8946,7 @@ var TitleBlockSchema = Struct({
   program: optionalKey2(Short),
   setup: optionalKey2(Short)
 });
-// ../../packages/core/src/cam/kernel/schema.ts
+// packages/core/src/cam/kernel/schema.ts
 var SetupOrientationSchema = Literals(SETUP_ORIENTATIONS);
 var positive2 = Finite.check(isGreaterThan2(0));
 var nonNegative2 = Finite.check(isGreaterThanOrEqualTo2(0));
@@ -9053,7 +9053,7 @@ var PrintRequirementSchema = Struct({
   flow: optionalKey2(Finite.check(isBetween({ minimum: 50, maximum: 150 }))),
   relativeExtrusion: optionalKey2(Boolean3)
 });
-// ../../packages/core/src/drawing/sheet.ts
+// packages/core/src/drawing/sheet.ts
 var LAYERS = [
   { id: "frame", name: "FRAME", color: "#000000", width: 0.7 },
   { id: "visible", name: "VISIBLE", color: "#000000", width: 0.5 },
@@ -9066,9 +9066,9 @@ var LAYERS = [
 ];
 var WIDTH = Object.fromEntries(LAYERS.map((l) => [l.id, l.width]));
 var COLOR = Object.fromEntries(LAYERS.map((l) => [l.id, l.color]));
-// ../../packages/core/src/preview/companion.ts
+// packages/core/src/preview/companion.ts
 var FEATURE_STRUCTURE = new Set(["id", "type", "sketch", "plane", "from", "entities", "constraints", "shapes", "history", "profiles"]);
-// ../../packages/plugin-sdk/examples/hello-gear/index.ts
+// packages/plugin-sdk/examples/hello-gear/index.ts
 var gearEntity = (id) => ({
   ...baseEntity(id),
   _tag: "Polyline",

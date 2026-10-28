@@ -13,19 +13,26 @@ export interface AssistantPreferences {
   readonly permissionMode: AssistantPermissionMode
   readonly includeContext: boolean
 }
-export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = { agent: "general", permissionMode: "approve", includeContext: true }
+export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = { agent: "build", permissionMode: "approve", includeContext: true }
 
 /** Phone-wide defaults for projects that have no assistant settings of their own yet (Settings → Assistant). */
 export type AssistantDefaults = Pick<AssistantPreferences, "permissionMode" | "includeContext">
 export const DEFAULT_ASSISTANT_DEFAULTS: AssistantDefaults = { permissionMode: DEFAULT_ASSISTANT_PREFERENCES.permissionMode, includeContext: DEFAULT_ASSISTANT_PREFERENCES.includeContext }
 
+/** The agents stored preferences may still name from before Build and Plan were the only two: all of them edited, so they land on Build. */
+const LEGACY_AGENT_IDS = new Set<string>(["general", "cad", "cam", "cadcam", "cadcam-cad", "cadcam-cam"])
+export const currentAssistantAgent = (agent: string): string => LEGACY_AGENT_IDS.has(agent) ? "build" : agent
+
 /** A project's own settings win; anything it never set comes from the phone defaults. */
-export const resolveAssistantPreferences = (stored: Partial<AssistantPreferences> | undefined, defaults: Partial<AssistantDefaults> | undefined): AssistantPreferences => ({
-  ...DEFAULT_ASSISTANT_PREFERENCES,
-  ...(defaults?.permissionMode && PERMISSION_IDS.has(defaults.permissionMode) ? { permissionMode: defaults.permissionMode } : {}),
-  ...(typeof defaults?.includeContext === "boolean" ? { includeContext: defaults.includeContext } : {}),
-  ...stored,
-})
+export const resolveAssistantPreferences = (stored: Partial<AssistantPreferences> | undefined, defaults: Partial<AssistantDefaults> | undefined): AssistantPreferences => {
+  const merged: AssistantPreferences = {
+    ...DEFAULT_ASSISTANT_PREFERENCES,
+    ...(defaults?.permissionMode && PERMISSION_IDS.has(defaults.permissionMode) ? { permissionMode: defaults.permissionMode } : {}),
+    ...(typeof defaults?.includeContext === "boolean" ? { includeContext: defaults.includeContext } : {}),
+    ...stored,
+  }
+  return { ...merged, agent: currentAssistantAgent(merged.agent) }
+}
 const PERMISSION_IDS = new Set<string>(["approve", "ask", "auto"])
 export const PERMISSION_MODES: readonly { id: AssistantPermissionMode; title: string; description: string }[] = [
   { id: "approve", title: "Standard", description: "Run routine tools. Ask before destructive changes and external tools." },

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { HUMAN_APPROVAL } from "../src/nikcli/permission-modes.ts"
-import { PRIMARIES, PRIMARY_IDS, resolvePrimary } from "../src/nikcli/primaries.ts"
+import { currentHostAgent, PRIMARIES, PRIMARY_IDS, resolvePrimary } from "../src/nikcli/primaries.ts"
 import { adoptChildSession, SUBAGENT_IDS, SUBAGENTS, subagentCatalogue } from "../src/nikcli/agents.ts"
 import { BackgroundTaskManager, type BackgroundTaskRunnerInput } from "../src/nikcli/background-tasks.ts"
 import { backgroundToolContributions } from "../src/nikcli/background-tools.ts"
@@ -15,24 +15,25 @@ const REGISTERED = [...TOOL_IDS]
 describe("specialist roster", () => {
   test("Auto classifies creation and edits through existing tools, preserving role and policy denials", () => {
     const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, unknown> }> }
-    const permission = config.agent["cadcam-auto"]!.permission
+    const permission = config.agent["cadcam-build-auto"]!.permission
     expect(permission["cad_edit"]).toEqual({ "*": "ask", "action:delete": "deny", "action:editor:destructive": "deny" })
     expect(permission["cam_edit"]).toEqual({ "*": "ask" })
-    for (const id of ["vcs_edit", "mods_edit"]) expect(permission[id], id).toBe("deny")
+    expect(permission["mods_edit"]).toBe("deny")
+    // Version control is open to the classifier except the two actions that discard history or run unreviewed steps.
+    expect(permission["vcs_edit"]).toEqual({ "*": "ask", "action:restore": "deny", "action:run_workflows": "deny" })
     const edits = permission["cad_edit"] as Record<string, string>
     expect(edits["action:delete"]).toBe("deny")
     expect(edits["action:editor"]).toBeUndefined()
-    expect(config.agent["cadcam-cam-auto"]!.permission["cad_edit"]).toBeUndefined()
-    expect(config.agent["cadcam-cad-auto"]!.permission["library_edit"]).toBeUndefined()
+    expect(config.agent["cadcam-plan-auto"]!.permission["cad_edit"]).toBeUndefined()
     expect(config.agent["cadcam-reviewer-auto"]!.permission["cad_edit"]).toBeUndefined()
     const denied = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x", policies: [{ effect: "deny", action: "tool.use", resource: "cad_edit" }] }) as typeof config
-    expect(denied.agent["cadcam-auto"]!.permission["cad_edit"]).toBeUndefined()
+    expect(denied.agent["cadcam-build-auto"]!.permission["cad_edit"]).toBeUndefined()
   })
   test("a tool that contains a destructive action requires native approval, in every role", () => {
     expect(DESTRUCTIVE_TOOL_IDS.length).toBeGreaterThan(0)
     const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, unknown> }> }
     for (const id of DESTRUCTIVE_TOOL_IDS) {
-      for (const name of ["cadcam", "cadcam-ask"]) expect(config.agent[name]!.permission[id], name).toEqual(HUMAN_APPROVAL)
+      for (const name of ["cadcam-build", "cadcam-build-ask"]) expect(config.agent[name]!.permission[id], name).toEqual(HUMAN_APPROVAL)
     }
     // The editor deletes elements and the machinist removes library rows: both ask, and the researcher has neither tool.
     // The researcher's host name is the worker's (`cadcam-worker`), not a name spelled after the specialist.
@@ -120,48 +121,61 @@ describe("specialist roster", () => {
       expect(agent.permission["task"]).toBeUndefined()
     }
     expect(config.agent["cadcam-editor"]!.permission["cam_edit"]).toBeUndefined()
-    expect(config.agent["cadcam"]!.permission["task"]).toBe("deny")
+    expect(config.agent["cadcam-build"]!.permission["task"]).toBe("deny")
   })
 
-  test("three primary agents (plus the internal memory consolidator), every other agent a subagent", () => {
+  test("two primary agents (plus the internal memory consolidator), every other agent a subagent", () => {
     const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "base" }) as { agent: Record<string, { mode: string; prompt?: string; permission: Record<string, unknown> }> }
-    expect(PRIMARY_IDS).toEqual(["general", "cad", "cam"])
+    // There is no General, CAD or CAM agent: only Build and Plan, and both use CAD and CAM together.
+    expect(PRIMARY_IDS).toEqual(["build", "plan"])
     expect(Object.entries(config.agent).filter(([name, spec]) => spec.mode === "primary" && name !== "cadcam-memory" && !/-(ask|auto)$/.test(name)).map(([name]) => name).sort())
       .toEqual(PRIMARY_IDS.map((id) => PRIMARIES[id].host).sort())
     for (const id of SUBAGENT_IDS) expect(config.agent[SUBAGENTS[id].host]!.mode).toBe("subagent")
-    // The legacy host name is the general agent, and a subagent id is not a primary.
-    expect(resolvePrimary(undefined)).toBe("general")
-    expect(resolvePrimary("cadcam")).toBe("general")
+    for (const gone of ["cadcam", "cadcam-cad", "cadcam-cam"]) expect(config.agent[gone], gone).toBeUndefined()
+    // Legacy ids and host names of the removed agents land on Build (they were all editing agents); a subagent id is not a primary.
+    expect(resolvePrimary(undefined)).toBe("build")
+    for (const legacy of ["general", "cad", "cam", "cadcam", "cadcam-cad", "cadcam-cam"]) expect(resolvePrimary(legacy), legacy).toBe("build")
     expect(resolvePrimary("modeler")).toBeUndefined()
   })
 
-  test("the CAD primary changes the drawing and the CAM primary the machining; both read both and delegate", () => {
+  test("build holds both CAD and CAM writes; plan holds no write, delegation or code_mode in any permission mode", () => {
     const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "base" }) as { agent: Record<string, { prompt?: string; permission: Record<string, unknown> }> }
-    const general = config.agent[PRIMARIES.general.host]!
-    const cad = config.agent[PRIMARIES.cad.host]!
-    const cam = config.agent[PRIMARIES.cam.host]!
-    for (const tool of ["cad_edit", "parts", "cam_edit", "library_edit"]) expect(general.permission[tool], `general ${tool}`).toBeDefined()
-    expect(cad.permission["cad_edit"]).toBeDefined()
-    expect(cad.permission["parts"]).toBeDefined()
-    for (const tool of ["cam_edit", "library_edit"]) expect(cad.permission[tool], `cad ${tool}`).toBeUndefined()
-    expect(cam.permission["cam_edit"]).toBeDefined()
-    expect(cam.permission["library_edit"]).toBeDefined()
-    for (const tool of ["cad_edit", "parts"]) expect(cam.permission[tool], `cam ${tool}`).toBeUndefined()
-    for (const agent of [general, cad, cam]) for (const tool of ["cad", "cam", "library", "vcs", "memory", "agent"]) expect(agent.permission[tool]).toBeDefined()
-    // Variants keep the narrowing, and the focus reaches the prompt.
-    expect(config.agent["cadcam-cam-auto"]!.permission["cad_edit"]).toBeUndefined()
-    expect(general.prompt).toBe("base")
-    expect(cad.prompt).toContain("CAD agent")
-    expect(cam.prompt).toContain("CAM agent")
+    const build = config.agent[PRIMARIES.build.host]!
+    for (const tool of ["cad", "cam", "cad_edit", "parts", "cam_edit", "library_edit", "library", "vcs", "memory", "research", "agent", "code_mode"]) expect(build.permission[tool], `build ${tool}`).toBeDefined()
+    expect(build.prompt).toContain("Build agent")
+    expect(PRIMARIES.build.canEdit).toBe(true)
+    expect(PRIMARIES.plan.canEdit).toBe(false)
+    expect(PRIMARIES.plan.delegates).toBe(false)
+    expect(resolvePrimary("build")).toBe("build")
+    expect(resolvePrimary("plan")).toBe("plan")
+    expect(resolvePrimary("cadcam-build")).toBeUndefined()
+    for (const suffix of ["", "-auto", "-ask"]) {
+      const plan = config.agent[`${PRIMARIES.plan.host}${suffix}`]!
+      expect(plan, `plan${suffix}`).toBeDefined()
+      expect(plan.permission["**"]).toBe("deny")
+      for (const tool of WRITE_TOOL_IDS) expect(plan.permission[tool], `plan${suffix} ${tool}`).toBeUndefined()
+      for (const tool of ["agent", "code_mode"]) expect(plan.permission[tool], `plan${suffix} ${tool}`).toBeUndefined()
+      for (const tool of READ_TOOL_IDS) expect(plan.permission[tool], `plan${suffix} reads ${tool}`).toBeDefined()
+      for (const tool of ["todowrite", "todoread", "skill", "question", "search_tools"]) expect(plan.permission[tool], `plan${suffix} ${tool}`).toBeDefined()
+    }
+    expect(config.agent[PRIMARIES.plan.host]!.prompt).toContain("Plan agent")
+    // A stored host name of a removed agent keeps its permission-mode suffix on the Build host.
+    expect(currentHostAgent("cadcam-cad-ask")).toBe("cadcam-build-ask")
+    expect(currentHostAgent("cadcam")).toBe("cadcam-build")
+    expect(currentHostAgent("cadcam-auto")).toBe("cadcam-build-auto")
+    expect(currentHostAgent("cadcam-plan-ask")).toBe("cadcam-plan-ask")
+    expect(currentHostAgent(undefined)).toBeUndefined()
+    expect(PRIMARIES.build.host).toBe("cadcam-build")
+    expect(PRIMARIES.plan.host).toBe("cadcam-plan")
   })
 
   test("permission modes use native evaluation and preserve role denials", () => {
     const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission_mode?: string; permission: Record<string, unknown> }> }
-    expect(config.agent["cadcam-auto"]?.permission_mode).toBe("auto")
-    expect(config.agent["cadcam-ask"]?.permission_mode).toBe("default")
-    expect(config.agent["cadcam-ask"]?.permission["cad_edit"]).toEqual(HUMAN_APPROVAL)
-    expect(config.agent["cadcam"]?.permission["cad_edit"]).toEqual(HUMAN_APPROVAL)
-    expect(config.agent["cadcam"]?.permission["cam"]).toBe("allow")
+    expect(config.agent["cadcam-build-auto"]?.permission_mode).toBe("auto")
+    expect(config.agent["cadcam-build-ask"]?.permission_mode).toBe("default")
+    expect(config.agent["cadcam-build-ask"]?.permission["cad_edit"]).toEqual(HUMAN_APPROVAL)
+    expect(config.agent["cadcam-build"]?.permission["cad_edit"]).toEqual(HUMAN_APPROVAL)
+    expect(config.agent["cadcam-build"]?.permission["cam"]).toBe("allow")
     expect(config.agent["cadcam-modeler-auto"]?.permission["cam_edit"]).toBeUndefined()
     expect(config.agent["cadcam-modeler-auto"]?.permission["**"]).toBe("deny")
   })

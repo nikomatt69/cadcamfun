@@ -10,7 +10,6 @@
  */
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import Bot from "lucide-solid/icons/bot"
-import Compass from "lucide-solid/icons/compass"
 import ShieldCheck from "lucide-solid/icons/shield-check"
 import Brain from "lucide-solid/icons/brain"
 import Check from "lucide-solid/icons/check"
@@ -25,7 +24,11 @@ interface ControlOption {
   readonly value: string
   readonly label: string
   readonly description?: string
+  readonly dot?: string
 }
+
+/** The dot that marks the two work postures in the agent menu: blue builds, yellow plans. */
+const AGENT_DOTS: Readonly<Record<string, string>> = { build: "#2f7bff", plan: "#e9b949" }
 
 /**
  * An icon + quiet label stays visible in the composer rail; its complete,
@@ -36,6 +39,7 @@ function ControlMenu(props: {
   readonly icon: JSX.Element
   readonly label: string
   readonly value: string
+  readonly dot?: string
   readonly showValue?: boolean
   readonly title?: string
   readonly disabled?: boolean
@@ -61,6 +65,7 @@ function ControlMenu(props: {
         onClick={props.onToggle}
       >
         <span class="assistant-control-glyph" aria-hidden="true">{props.icon}</span>
+        <Show when={props.dot}>{(dot) => <span class="assistant-agent-dot" style={{ background: dot(), margin: 0 }} aria-hidden="true" />}</Show>
         <Show when={props.showValue}>
           <span class="assistant-control-label">{selected()?.label ?? props.value}</span>
           <ChevronDown size={11} class="assistant-control-chevron" aria-hidden="true" />
@@ -92,6 +97,7 @@ function ControlMenu(props: {
                 >
                   <span class="assistant-control-option-check">{active() ? <Check size={13} aria-hidden="true" /> : null}</span>
                   <span>
+                    <Show when={option.dot}>{(dot) => <span class="assistant-agent-dot" style={{ background: dot() }} aria-hidden="true" />}</Show>
                     <strong>{option.label}</strong>
                     <Show when={option.description}>{(description) => <small>{description()}</small>}</Show>
                   </span>
@@ -141,6 +147,7 @@ export function AssistantControls(): JSX.Element {
       <ControlMenu
         id="agent"
         icon={<Bot size={12} aria-hidden="true" />}
+        dot={AGENT_DOTS[ai.agent()]}
         label={t("ai.controls.agent")}
         title={agent()?.description}
         value={ai.agent()}
@@ -150,29 +157,10 @@ export function AssistantControls(): JSX.Element {
         onToggle={() => setOpen((current) => current === "agent" ? undefined : "agent")}
         onClose={() => setOpen(undefined)}
         onChange={(value) => ai.setAgent(value)}
-        options={[
-          { value: "general", label: t("ai.controls.coordinator") },
-          ...ai.agents().filter((candidate) => candidate.id !== "general").map((candidate) => ({ value: candidate.id, label: candidate.title, description: candidate.description }))
-        ]}
+        options={ai.agents().map((candidate) => ({ value: candidate.id, label: candidate.title, description: candidate.description, ...(AGENT_DOTS[candidate.id] ? { dot: AGENT_DOTS[candidate.id]! } : {}) }))}
       />
 
-      <ControlMenu
-        id="mode"
-        icon={<Compass size={12} aria-hidden="true" />}
-        label={t("ai.controls.mode")}
-        value={ai.mode()}
-        showValue={true}
-        disabled={running()}
-        open={open() === "mode"}
-        onToggle={() => setOpen((current) => current === "mode" ? undefined : "mode")}
-        onClose={() => setOpen(undefined)}
-        onChange={(value) => ai.setMode(value)}
-        options={[
-          ...(["general", "cad", "cam", "gcode", "toolpath"] as const).map((mode) => ({ value: mode, label: t(`ai.controls.mode.${mode}`) })),
-          // Modes enabled plugins contribute, labelled with their plugin: the id is namespaced, the title is the friendly name.
-          ...ai.pluginModes().map((mode) => ({ value: mode.id, label: mode.title, description: `${mode.description} — ${mode.pluginName}` }))
-        ]}
-      />
+      {/* No mode picker: the agent picks CAD, CAM, G-code or toolpath focus itself, per task (spec 08-ai.md). */}
 
       <Show when={variants().length > 0}>
         <ControlMenu

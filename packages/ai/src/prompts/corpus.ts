@@ -9,7 +9,7 @@ import { SUBAGENT_IDS } from "../nikcli/agents.ts"
 import { specialistPrompt } from "../nikcli/prompts/index.ts"
 import { CADCAM_SKILLS } from "../skills/index.ts"
 import { TOOL_PROMPT_IDS, toolPrompt } from "../tools/prompts/index.ts"
-import { agentSystemPrompt, MODE_PROMPTS, modelFamilyPrompt, type ModelFamily } from "./system.ts"
+import { agentSystemPrompt, FAMILY_SAMPLE_MODELS, MODE_PROMPTS, modelFamilyPrompt } from "./system.ts"
 import * as workflows from "./workflows.ts"
 
 /** Where a text goes: always in the system prompt, as a tool's description, loaded on demand, or in a one-shot call. */
@@ -21,16 +21,14 @@ export interface PromptEntry {
   readonly text: string
 }
 
-/** A model id per family, to read each family's style block through the same function a turn uses. */
-const FAMILY_SAMPLES: Readonly<Record<Exclude<ModelFamily, "claude">, string>> = { codex: "gpt-5", autonomous: "o3", gemini: "gemini-2.5-pro", other: "local-model" }
-
 const isTemplate = (value: unknown): value is workflows.PromptTemplate =>
   typeof value === "object" && value !== null && "system" in value && "user" in value && "variables" in value
 
 export const promptCorpus = (): ReadonlyArray<PromptEntry> => [
   { source: "system", kind: "static", text: agentSystemPrompt() },
   ...Object.entries(MODE_PROMPTS).map(([mode, text]) => ({ source: `mode/${mode}`, kind: "static" as const, text })),
-  ...Object.entries(FAMILY_SAMPLES).map(([family, model]) => ({ source: `family/${family}`, kind: "static" as const, text: modelFamilyPrompt(model) })),
+  // One sample model id per family (`FAMILY_SAMPLE_MODELS`), read through the same function a turn uses.
+  ...Object.entries(FAMILY_SAMPLE_MODELS).map(([family, model]) => ({ source: `family/${family}`, kind: "static" as const, text: modelFamilyPrompt(model) })),
   ...SUBAGENT_IDS.map((role) => ({ source: `specialist/${role}`, kind: "static" as const, text: specialistPrompt(role) })),
   ...TOOL_PROMPT_IDS.map((tool) => ({ source: `tool/${tool}`, kind: "description" as const, text: toolPrompt(tool) })),
   ...CADCAM_SKILLS.map((skill) => ({ source: `skill/${skill.name}`, kind: "skill" as const, text: skill.body })),
@@ -47,8 +45,8 @@ export const PROMPT_BUDGETS = {
   system: 13_000,
   /** One mode, one family style or one specialist prompt. */
   staticEntry: 10_000,
-  /** All tool descriptions together (they are sent as a set). Raised from 27 000 when the mods and mods_edit tools joined (RM-11): their two descriptions cost about 5 200 characters. */
-  descriptions: 34_000,
+  /** All tool descriptions together (they are sent as a set). Raised from 27 000 when the mods and mods_edit tools joined (RM-11): their two descriptions cost about 5 200 characters. Raised from 34 000 when the smoothing and timeline actions (spec 58 T7) joined: 34 279 on main. */
+  descriptions: 35_000,
   /** One tool description. */
   description: 4_000,
   /** One skill body. */

@@ -1633,6 +1633,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "items": {
                     "additionalProperties": false,
                     "properties": {
+                      "canEdit": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "delegates": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
                       "description": {
                         "type": "string",
                       },
@@ -1641,6 +1661,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       },
                       "id": {
                         "type": "string",
+                      },
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
                       },
                       "title": {
                         "type": "string",
@@ -6891,6 +6921,44 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "builtin": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "description": {
+                                "type": "string",
+                              },
+                              "id": {
+                                "type": "string",
+                              },
+                              "pluginId": {
+                                "type": "string",
+                              },
+                              "pluginName": {
+                                "type": "string",
+                              },
+                              "title": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "description",
+                              "pluginId",
+                              "pluginName",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
                     "modes": {
                       "items": {
                         "additionalProperties": false,

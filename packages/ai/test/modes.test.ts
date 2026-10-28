@@ -61,14 +61,50 @@ describe("systemPrompt with mode and context", () => {
     expect(prompt).toContain("general CAD/CAM")
   })
 })
+describe("agent-chosen focus and background delegation", () => {
+  test("general mode states there is no user-selected mode and focus is at will", () => {
+    const general = modePrefix("general")
+    expect(general).toMatch(/no user-selected mode/i)
+    expect(general).toMatch(/choose the focus|at will/i)
+    expect(general).toMatch(/never limits the tools|does not limit the tools/i)
+  })
+
+  test("every mode is an agent-chosen focus that does not limit tools", () => {
+    for (const mode of ASSISTANT_MODES.filter((candidate) => candidate !== "general")) {
+      const text = modePrefix(mode)
+      expect(text).toMatch(/chosen by you, not the user/i)
+      expect(text).toMatch(/never limits your tools/i)
+      expect(text).toMatch(/switch focus at will/i)
+    }
+  })
+
+  test("the Build prompt carries the background-delegation pattern, like nikcli's awareness blocks", async () => {
+    const { PRIMARIES } = await import("../src/nikcli/primaries.ts")
+    const prompt = PRIMARIES.build.focus
+    expect(prompt).toMatch(/background subagents/i)
+    expect(prompt).toMatch(/background by default/i)
+    expect(prompt).toMatch(/several background calls in one block/i)
+    expect(prompt).toMatch(/keep doing non-overlapping work/i)
+    expect(prompt).toMatch(/never delegate what blocks the next step/i)
+    expect(prompt).toMatch(/one at a time per project/i)
+    expect(prompt).toMatch(/only when it materially helps/i)
+    expect(prompt).toMatch(/one active researcher per parent/i)
+    // Plan cannot delegate or write: its prompt must not teach delegation or mods as its own actions.
+    expect(PRIMARIES.plan.focus).not.toMatch(/background subagents/i)
+    expect(PRIMARIES.plan.canEdit).toBe(false)
+  })
+})
+
 describe("model family working style (nikcli's per-family system prompts)", () => {
   test("families follow nikcli's mapping", async () => {
     const { modelFamilyOf } = await import("../src/prompts/system.ts")
-    expect(["gpt-5.2", "openai/gpt-6-astra", "gpt-reserve"].map(modelFamilyOf)).toEqual(["codex", "codex", "codex"])
+    expect(["gpt-5.2", "gpt-reserve"].map(modelFamilyOf)).toEqual(["codex", "codex"])
+    expect(["openai/gpt-6-astra", "gpt-6-luna"].map(modelFamilyOf)).toEqual(["gpt-6", "gpt-6"])
     expect(["gpt-4o", "o3-mini"].map(modelFamilyOf)).toEqual(["autonomous", "autonomous"])
     expect(modelFamilyOf("gemini-3-pro")).toBe("gemini")
     expect(modelFamilyOf("claude-sonnet-5-5")).toBe("claude")
-    expect(modelFamilyOf("MiniMax-M2")).toBe("other")
+    expect(modelFamilyOf("MiniMax-M2")).toBe("minimax")
+    expect(modelFamilyOf("local-model")).toBe("other")
   })
 
   test("Claude gets the base prompt untouched; the others get their block after the mode", async () => {

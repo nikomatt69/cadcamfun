@@ -54,10 +54,12 @@ describe("cadcam skills", () => {
   })
 
   test("the agent is allowed to load skills and still has no shell or file tools", () => {
-    const config = buildHostConfig({ providers: [], toolIds: [...TOOL_IDS], systemPrompt: "x" }) as { agent: { cadcam: { permission: Record<string, string> } } }
-    const permission = config.agent.cadcam.permission
-    expect(permission["skill"]).toBe("allow")
-    expect(permission["**"]).toBe("deny")
-    for (const blocked of ["bash", "edit", "write", "webfetch"]) expect(permission[blocked]).toBeUndefined()
+    const config = buildHostConfig({ providers: [], toolIds: [...TOOL_IDS], systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
+    for (const name of ["cadcam-build", "cadcam-plan"]) {
+      const permission = config.agent[name]!.permission
+      expect(permission["skill"], name).toBe("allow")
+      expect(permission["**"], name).toBe("deny")
+      for (const blocked of ["bash", "edit", "write", "webfetch"]) expect(permission[blocked], `${name} ${blocked}`).toBeUndefined()
+    }
   })
 })

@@ -1,4 +1,4 @@
-Read what the user owns: reusable components, materials, cutters and machine configurations. Nothing here changes it.
+Read the user's saved components, materials, cutters and machine configurations; changes nothing.
 
 Actions
 - component_list: the component instances present in the active CAD canvas, with their element ids, layer, child count and bounds (canvas element ids, not saved-library ids).

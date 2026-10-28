@@ -1,5 +1,5 @@
-Write, change, enable, disable or remove a mod: a small extension module the host loads and runs, so a standing rule
-survives without the user repeating it. A mod acts on the whole application, not on one project.
+Write, enable, disable or remove a mod: a standing rule that survives a restart.
+A mod is a small extension module the host loads and runs; it acts on the whole application, not on one project.
 
 Authoring (the only shape the store accepts)
 - Plain ESM, dependency-free: no `import`, no `require`; everything reachable arrives on the hook's `$` argument.
@@ -19,7 +19,7 @@ Actions
 - Every call is confirmed by the person first (remove is destructive).
 
 Parameters
-- save: id (lower-case file name, e.g. `confirm_deletes`), name?, description (what it hooks and why), source, enable?.
+- save: id (lower-case file name, up to 40 characters, e.g. `confirm_deletes`), name? (up to 60), description (what it hooks and why, up to 200), source (up to 20000 characters), enable?.
 - set_enabled: id, enabled. remove: id.
 
 Result (JSON)
@@ -30,7 +30,7 @@ Result (JSON)
 - If reload or inspection fails, the stored state is kept with a note; read it again before assuming its hooks are active.
 
 Rules
-- Enable, change or remove a mod only when the user asks or after they agree to your offer. `mods` shows what exists.
+- Enable, change or remove a mod only when the user asks or after they agree to your offer.
 - The user reads every mod's source in Extensions and can switch it off or delete it; write readable source. Changes apply from the next turn.
 - Keep it small and single-purpose; never store secrets in it.
 

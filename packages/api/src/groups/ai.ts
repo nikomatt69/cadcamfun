@@ -84,6 +84,7 @@ export const ChatAttachment = Schema.Struct({
 })
 export const StreamChatBody = Schema.Struct({
   permissionMode: opt(Schema.Literals(["auto", "ask", "approve"])),
+  /** A primary id (`build` or `plan`); kept a free string so older clients (`general`, `cad`, `cam` resolve to `build`) and specialist ids keep working. */
   agent: opt(Schema.String),
   /** A built-in mode id or one an enabled plugin contributes (`<pluginId>:<id>`); an unknown id resolves to `general`. */
   mode: opt(Schema.String),
@@ -185,7 +186,7 @@ export const AiExtensionMod = Schema.Struct({
 export const AiExtensionMods = Schema.Struct({ mods: Schema.Array(AiExtensionMod) })
 /** An assistant mode an enabled plugin contributes; conversations address it as `<pluginId>:<id>`. */
 export const AiModeInfo = Schema.Struct({ id: Schema.String, title: Schema.String, description: Schema.String, pluginId: Schema.String, pluginName: Schema.String })
-export const AiModesReply = Schema.Struct({ modes: Schema.Array(AiModeInfo) })
+export const AiModesReply = Schema.Struct({ modes: Schema.Array(AiModeInfo), builtin: opt(Schema.Array(AiModeInfo)) })
 /** Uploaded plugin bundle: the manifest, the worker module, and the mod modules the manifest declares (`entry` → source). */
 export const AiPluginBundle = Schema.Struct({ manifest: Schema.String, source: Schema.String, files: opt(Schema.Record(Schema.String, Schema.String)) })
 export const SkillList = Schema.Struct({ skills: Schema.Array(SkillInfo), max: Schema.Number })
@@ -215,7 +216,8 @@ export const AiRecoveryEvent = Schema.Union([
 export const SessionStateReply = Schema.Struct({ busy: Schema.Boolean, text: Schema.String, error: opt(Schema.String), tasks: opt(Schema.Array(SessionTask)),
   events: opt(Schema.Array(AiRecoveryEvent)), usage: opt(UsageSchema) })
 export const RemoveSessionReply = Schema.Struct({ removed: Schema.Boolean })
-export const AssistantAgent = Schema.Struct({ id: Schema.String, title: Schema.String, description: Schema.String, tools: Schema.Array(Schema.String), edits: Schema.Boolean })
+/** A primary agent a person can pick. `kind`/`canEdit`/`delegates` are additive: `edits` keeps its old meaning. */
+export const AssistantAgent = Schema.Struct({ id: Schema.String, title: Schema.String, description: Schema.String, tools: Schema.Array(Schema.String), edits: Schema.Boolean, kind: opt(Schema.String), canEdit: opt(Schema.Boolean), delegates: opt(Schema.Boolean) })
 export const QuestionInfo = Schema.Struct({ header: Schema.String, question: Schema.String, options: Schema.Array(Schema.Struct({ label: Schema.String, description: Schema.String })), multiple: opt(Schema.Boolean), custom: opt(Schema.Boolean) })
 export const PendingQuestion = Schema.Struct({ requestId: Schema.String, questions: Schema.Array(QuestionInfo) })
 export const SessionControlBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String),

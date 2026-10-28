@@ -1,24 +1,19 @@
-Hand a job to a subagent that has only the tools that job needs. The subagent does not see this conversation. The job shows in the chat as a task card that follows it to its report.
+Delegate a bounded job to a background specialist; its report wakes this conversation.
+It has only the tools that job needs and does not see this conversation. The job shows as a task card.
+
+start returns at once. Do not wait or poll: keep working, or end your turn; the completion wakes you with the report. Start independent jobs together, as several agent calls in ONE block; they run concurrently. Start a dependent job after the report it needs. Writing specialists (editor, modeler, machinist, verifier, optimizer) run one at a time per project.
 
 Actions
-- start: give one bounded job to a specialist (researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier or optimizer).
-- list: the tasks started from this conversation, with their status.
-- read: the full findings of one task.
-- cancel: stop a task that is no longer needed.
+- start: one job for a researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier or optimizer.
+- list: tasks started here, with status.
+- read: one task's full findings.
+- cancel: stop a task no longer needed.
 
 Parameters
-- start: description (one line), prompt (the whole job: the entity ids, values, constraints and what to report), agent (or subagent_type), background (default true: the call returns at once and the completion wakes this conversation; pass false only when the next step needs the report before it can start).
-- list: none.
-- read, cancel: taskId (the id the call returned).
+- start: description (one line), agent (or subagent_type), brief and/or prompt (one is required), background (default true; false only when the next step cannot start without the report).
+- brief: objective (required: what to achieve), ids (real ids your tools returned), values ({name, value, unit}), limits (what not to change or exceed), report (what the final message must add). prompt: the job as free text, or detail beside a brief.
+- read, cancel: taskId.
 
-Result (JSON)
-- start: the task (its report arrives on the completion wake); with background false the finished task. read: the task with its status and findings. cancel: the cancelled task.
+Result: start gives the task (the finished task with background false).
 
-Do not use it
-- To do the job yourself: delegate only separable work the specialist has tools for.
-- Verify what an editing specialist reports (cad.describe, cad.check) before telling the user it is done.
-
-Rules
-- Always background: start returns at once; never block waiting on a subagent. Start independent jobs together so they run concurrently, and the completion wakes this conversation with each report.
-- Give real ids, units, constraints and the report you expect; a specialist that has to guess wastes the turn.
-- Editing subagents run one at a time per project; the scheduler queues them.
+Do not use it to do what you can do yourself. Check an editor's report (cad.describe, cad.check) before telling the user it is done. The report is not shown to the user: answer in your own words.

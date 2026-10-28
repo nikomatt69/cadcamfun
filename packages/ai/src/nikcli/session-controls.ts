@@ -3,6 +3,7 @@ import type { ProjectHost } from "./runtime.ts"
 import type { HostCompactionSettings } from "./config.ts"
 import type { HostModelInfo } from "./catalog.ts"
 import { childAgent } from "./agents.ts"
+import { OUTPUT_TOKEN_MAX } from "../transform.ts"
 
 export interface SessionControlInput {
   readonly sessionId: string
@@ -15,15 +16,43 @@ export interface SessionControlInput {
   readonly model?: { readonly provider?: string; readonly model?: string }
 }
 
-/** Mirrors nikcli's overflow.ts; the host remains responsible for triggering compaction. */
-export const contextBudget = (model: Pick<HostModelInfo, "contextWindow" | "maxOutput" | "inputWindow">, policy: HostCompactionSettings = {}) => {
-  if (!(model.contextWindow > 0)) return {}
-  const output = Math.min(model.maxOutput, 32_000) || 32_000
-  const reserved = policy.reserved ?? Math.min(20_000, output)
-  return { contextWindow: model.contextWindow, maxOutput: model.maxOutput, requestOutput: output,
-    ...(model.inputWindow ? { inputWindow: model.inputWindow } : {}),
-    compactAt: Math.max(0, model.inputWindow ? model.inputWindow - reserved : model.contextWindow - output) }
+/** nikcli's `COMPACTION_BUFFER` (`session/overflow.ts`): the room kept below an input window before the host summarises. */
+export const COMPACTION_BUFFER = 20_000
+
+type BudgetModel = Pick<HostModelInfo, "contextWindow" | "maxOutput" | "inputWindow">
+
+/**
+ * Tokens the conversation may hold before the host summarises it: nikcli's `usable` (`session/overflow.ts`) and the only place
+ * the formula lives here. A model with an input window keeps `reserved` below it (default: the request's output, capped at the
+ * buffer); one without keeps the output of one request below its context window. Zero for a model the catalogue gives no window.
+ */
+export const usableContext = (model: BudgetModel, policy: HostCompactionSettings = {}): number => {
+  if (!(model.contextWindow > 0)) return 0
+  const output = Math.min(model.maxOutput, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
+  const reserved = policy.reserved ?? Math.min(COMPACTION_BUFFER, output)
+  return Math.max(0, model.inputWindow ? model.inputWindow - reserved : model.contextWindow - output)
 }
+
+/** The numbers behind the context gauge and the compaction warning; empty for a model without a window. */
+export const contextBudget = (model: BudgetModel, policy: HostCompactionSettings = {}) => {
+  if (!(model.contextWindow > 0)) return {}
+  return { contextWindow: model.contextWindow, maxOutput: model.maxOutput, requestOutput: Math.min(model.maxOutput, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX,
+    ...(model.inputWindow ? { inputWindow: model.inputWindow } : {}),
+    compactAt: usableContext(model, policy) }
+}
+
+/** Bounds of a compaction summary, in tokens (spec 64 Phase 5 step 5). */
+export const COMPACTION_TARGET_MIN = 2_000
+export const COMPACTION_TARGET_MAX = 12_000
+export const COMPACTION_TARGET_SHARE = 0.06
+
+/**
+ * How large the summary of a compaction may be for a model whose usable window is `usable` tokens (`usableContext`, the
+ * gauge's `compactAt`): 6 % of it, between 2 000 and 12 000 tokens. A 128 k model keeps a tight summary, a 1 M model keeps more
+ * state. A model with no known window gets the lower bound.
+ */
+export const compactionSizeTarget = (usable: number): number =>
+  Math.round(Math.min(COMPACTION_TARGET_MAX, Math.max(COMPACTION_TARGET_MIN, (Number.isFinite(usable) && usable > 0 ? usable : 0) * COMPACTION_TARGET_SHARE)))
 
 export const questionsForSession = async (host: ProjectHost, sessionId: string): Promise<ReadonlyArray<HostQuestionRequest>> =>
   (await host.client.question.list()).filter((request) => request.sessionID === sessionId || childAgent(sessionId, request.sessionID) !== undefined)

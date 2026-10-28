@@ -35,6 +35,7 @@ import { createEventApplier, nextMessageId } from "./events.ts"
 import { createTaskWatcher } from "./tasks.ts"
 import { createControls } from "./controls.ts"
 import { createSessions } from "./sessions.ts"
+import { createSessionFollower } from "./following.ts"
 import { captureEditorOwner } from "../lib/editor-sync.ts"
 import { sanitizeError } from "../lib/errors.ts"
 import type { ChatAttachment } from "../lib/attachments.ts"
@@ -186,7 +187,7 @@ export const createAiStore = (): AiStore => {
   const [agents, setAgents] = createSignal<ReadonlyArray<AiAgent>>([])
   const [pluginModes, setPluginModes] = createSignal<ReadonlyArray<AiMode>>([])
   const [permissionMode, setPermissionMode] = createSignal<"auto" | "ask" | "approve">("ask")
-  const [agent, setAgent] = createSignal("general")
+  const [agent, setAgent] = createSignal("build")
   const [mode, setMode] = createSignal<string>("general")
   const [questions, setQuestions] = createSignal<ReadonlyArray<AiPendingQuestion>>([])
   const [hostContext, setHostContext] = createSignal<AiContextState>()
@@ -349,6 +350,16 @@ export const createAiStore = (): AiStore => {
     }
   }
 
+  // A turn another device (the phone) runs on this conversation is shown here as it happens.
+  const follower = createSessionFollower({
+    app, sessionId, status, setStatus, error, setError, setActivity, activeAssistantId, setActiveAssistantId,
+    appendMessage, patchMessage, nextMessageId,
+    apply: applier.apply, resetTurn: applier.resetTurn,
+    refreshHistory: sessions.refreshServerHistory,
+    finish: finishStream,
+    isDisposed
+  })
+
   const enqueue = async (text: string, delivery: PendingDelivery): Promise<void> => {
     const sid = sessionId()
     if (sid === undefined) return
@@ -490,6 +501,7 @@ export const createAiStore = (): AiStore => {
     const sid = sessionId()
     if (sid === undefined) return
     turnGeneration += 1
+    follower.release()
     handle?.abort()
     handle = undefined
     setPending([])
@@ -508,6 +520,7 @@ export const createAiStore = (): AiStore => {
   const resetConversation = (): void => {
     conversationGeneration += 1
     turnGeneration += 1
+    follower.release()
     setActiveAssistantId(undefined)
     batch(() => {
       setMessages([])
@@ -531,6 +544,7 @@ export const createAiStore = (): AiStore => {
 
   const detachStream = (): void => {
      turnGeneration += 1
+     follower.release()
      handle?.abort()
      handle = undefined
      const assistant = activeAssistantId()
@@ -724,6 +738,13 @@ export const createAiStore = (): AiStore => {
       if (next !== observedProject) { observedProject = next; untrack(selectProject) }
     })
 
+  // The open conversation is followed on the sidecar's journal, so what the phone does in it shows up here.
+  createEffect(() => {
+    const sid = sessionId()
+    projectId()
+    untrack(() => follower.follow(sid))
+  })
+
     let controlsGeneration = 0
   createEffect(() => {
     const sid = sessionId()
@@ -774,6 +795,7 @@ export const createAiStore = (): AiStore => {
     disposed = true
     controlsGeneration++
     sessions.dispose()
+    follower.stop()
     taskWatcher.dispose()
     stopVisionBridge()
     stopProjectSubscription()

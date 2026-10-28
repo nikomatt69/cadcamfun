@@ -19,7 +19,7 @@ import { CompanionError } from "@/lib/client"
 import { isBusyRefusal } from "@/lib/assistant-outbox"
 import { followSession } from "@/lib/session-stream"
 import { rowsFromMessages } from "@/lib/session-history"
-import { Composer, type AssistantMode } from "@/components/chat/Composer"
+import { Composer } from "@/components/chat/Composer"
 import { TranscriptItemView, type ErrorRecovery, type TranscriptActions } from "@/components/chat/TranscriptItemView"
 import { JumpToLatestPill } from "@/components/chat/JumpToLatestPill"
 import { BrandMark } from "@/components/layout/BrandMark"
@@ -138,7 +138,8 @@ export default function AssistantScreen() {
     setActivity((previous) => reduceTurnActivity(previous, event))
   }
   const [busy, setBusy] = useState(false)
-  const [mode, setMode] = useState<AssistantMode>("general")
+  // The agent chooses its own focus; sends and queued messages always carry the general mode.
+  const mode = "general" as const
   const [promptSeed, setPromptSeed] = useState<{ projectId: string; text: string; token: number } | null>(null)
   const draftRef = useRef(draft)
   draftRef.current = draft
@@ -245,7 +246,7 @@ export default function AssistantScreen() {
 
   useEffect(() => {
     if (!draft || draft.projectId !== projectId) return
-    setMode(draft.mode)
+    // Stored drafts keep their `mode` field for compatibility; it is ignored here.
     setPromptSeed({ projectId: draft.projectId, text: draft.text, token: Date.now() })
     clearAssistantDraft()
   }, [draft, projectId, clearAssistantDraft])
@@ -822,8 +823,6 @@ export default function AssistantScreen() {
         permissionLabel={permissionLabel}
         onOpenModels={() => projectId ? setModelsOpen(true) : setPickerOpen(true)}
         onOpenControls={() => setInspectorOpen(true)}
-        mode={mode}
-        onModeChange={setMode}
         onSend={(text) => void send(text)}
         onQueue={(text) => void queue(text)}
         onStop={stop}
@@ -889,10 +888,11 @@ export default function AssistantScreen() {
                 style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, minHeight: 64, borderRadius: 18, borderCurve: "continuous", borderWidth: 0.5, borderColor: selected ? palette.accent : palette.border, backgroundColor: selected ? hexToRgba(palette.accent, 0.08) : palette.surface, padding: 16 }}
               >
                 <View style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 12, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: selected ? hexToRgba(palette.accent, 0.12) : palette.panel }}>
-                  {agent.id === "general" ? <Sparkles size={17} color={selected ? palette.accent : palette.soft} /> : <Bot size={17} color={selected ? palette.accent : palette.soft} />}
+                  {agent.id === "plan" ? <Route size={17} color={selected ? palette.accent : palette.soft} /> : <Bot size={17} color={selected ? palette.accent : palette.soft} />}
                 </View>
                 <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7 }}>
+                    {agent.id === "build" || agent.id === "plan" ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: agent.id === "build" ? "#2f7bff" : "#e9b949" }} /> : null}
                     <Text style={{ flexShrink: 1, color: palette.ink, ...type(16, { weight: "600" }) }}>{agent.title}</Text>
                     <Text style={{ color: agent.edits ? palette.warning : palette.muted, ...caps(11, { weight: "700" }) }}>{agent.edits ? "Can edit" : "Read only"}</Text>
                   </View>

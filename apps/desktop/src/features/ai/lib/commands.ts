@@ -88,7 +88,6 @@ const reject = (reason: string): CommandOutcome => ({ kind: "rejected", reason }
 /** Renders a command with no argument as a fixed prompt. */
 const prompt = (text: string) => (): CommandOutcome => ({ kind: "prompt", prompt: text })
 
-const MODES = ["general", "cad", "cam", "gcode", "toolpath"] as const
 const PERMISSIONS = ["auto", "ask", "approve"] as const
 
 /** `mm` tolerance on the argument so `/mode CAD` and `/mode cad` both work. */
@@ -262,28 +261,13 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
     title: "ai.cmd.agent",
     description: "ai.cmd.agent.desc",
     args: "[id]",
-    keywords: ["role", "general", "cad", "cam", "coordinator"],
+    keywords: ["role", "build", "plan", "read-only"],
     run: ({ args, host }) => {
       const wanted = normalise(args)
       if (wanted === "") { host.notify(host.ai.agents().find((agent) => agent.id === host.ai.agent())?.title ?? host.ai.agent()); return done }
       const match = host.ai.agents().find((agent) => agent.id === wanted || normalise(agent.title) === wanted)
       if (match === undefined) return reject("ai.cmd.agent.unknown")
       host.ai.setAgent(match.id)
-      return done
-    }
-  },
-  {
-    name: "mode",
-    group: "model",
-    title: "ai.cmd.mode",
-    description: "ai.cmd.mode.desc",
-    args: "[general|cad|cam|gcode|toolpath]",
-    keywords: ["cad", "cam", "gcode", "toolpath", "domain"],
-    run: ({ args, host }) => {
-      // Built-in modes by name; a contributed mode by its namespaced id (`<pluginId>:<id>`), lower-cased like the rest.
-      const wanted = oneOf(args, MODES) ?? host.ai.pluginModes().find((mode) => mode.id.toLowerCase() === normalise(args))?.id
-      if (wanted === undefined) return reject("ai.cmd.mode.unknown")
-      host.ai.setMode(wanted)
       return done
     }
   },

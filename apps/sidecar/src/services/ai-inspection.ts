@@ -4,7 +4,7 @@ import { usesOf, resolveParameters } from "@cadcamfun/core"
 type Element = Record<string, unknown> & { id: string; type: string }
 /**
  * Bound expensive property values, while providing an exact paging path for every omitted value. Raised with the
- * wire caps (limit 100, maxChars 50000): a page keeps up to 12 000 characters per element and 8 000 per property,
+ * wire caps (limit 500, maxChars 50000): a page keeps up to 12 000 characters per element and 8 000 per property,
  * so one reading carries the parameters of ordinary parts instead of omitting them early.
  */
 export const inspectProperties = (element: Element) => {

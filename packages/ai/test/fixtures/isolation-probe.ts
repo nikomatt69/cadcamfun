@@ -76,7 +76,7 @@ console.log(
       sentinelPaths,
       readsOwnConfig,
       readsInstanceConfig,
-      agentsHaveCadcam: agents.includes("cadcam"),
+      agentsHaveCadcam: agents.includes("cadcam-build"),
       sharedConfigHasAgents: sharedConfig["agent"] !== undefined,
       envScrubbed: process.env["NIKCLI_DB"] === undefined && process.env["NIKCLI_AUTH_CONTENT"] === undefined,
       sentinelDatabase: fs.existsSync(`${fakeHome}/sentinel.db`),

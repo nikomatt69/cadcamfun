@@ -97,6 +97,8 @@ declare module "@nikcli-ai/sdk-next" {
     readonly id: string
     readonly type: string
     readonly text?: string
+    /** Attributes a part was stored with (a text part keeps the `metadata` it was prompted with). */
+    readonly metadata?: Readonly<Record<string, unknown>>
     readonly tool?: string
     readonly callID?: string
     readonly state?: {
@@ -179,7 +181,7 @@ declare module "@nikcli-ai/sdk-next" {
           system?: string
           tools?: Record<string, boolean>
           parts: ReadonlyArray<
-            | { type: "text"; text: string; synthetic?: boolean }
+            | { type: "text"; text: string; synthetic?: boolean; metadata?: Record<string, unknown> }
             | { type: "file"; mime: string; filename?: string; url: string }
           >
         },

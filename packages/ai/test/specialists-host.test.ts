@@ -44,7 +44,8 @@ const script = (request: ChatRequestBody): Completion => {
   }
   editorRequests.push(request)
   if (failChildOnce) { failChildOnce = false; return { status: 503, body: "overloaded" } }
-  if (!toolNames(request).includes("cad")) return { toolCalls: [{ name: "search_tools", args: { query: "cad,cad_edit" } }] }
+  // `cad` is eager (the first request carries it); `cad_edit` stays deferred, so the editor has to find and load it.
+  if (!toolNames(request).includes("cad_edit")) return { toolCalls: [{ name: "search_tools", args: { query: "cad_edit" } }] }
   const described = request.messages.some((message) => message.role === "assistant" && JSON.stringify(message.tool_calls).includes('"name":"cad"'))
   return lastRole === "tool" && described ? { text: "Done: hole-1 radius 3 -> 4." } : { toolCalls: [{ name: "cad", args: { action: "describe" } }] }
 }
@@ -148,10 +149,12 @@ describe("an editing specialist inside a real host turn", () => {
     expect(events.at(-1)).toMatchObject({ type: "done", text: "The editor finished." })
 
     // The specialist had the editor's tools and nothing else, and used the parent's model.
-    expect(toolNames(editorRequests[0]!)).not.toContain("cad")
-    const names = toolNames(editorRequests.find((request) => toolNames(request).includes("cad"))!)
-    // Discovery may match one or both requested editor tools, within the permitted roster.
+    expect(toolNames(editorRequests[0]!)).toContain("cad")
+    expect(toolNames(editorRequests[0]!)).not.toContain("cad_edit")
+    const names = toolNames(editorRequests.find((request) => toolNames(request).includes("cad_edit"))!)
+    // Dynamic loading: `search_tools` brought the deferred tool in, within the permitted roster.
     expect(names).toContain("cad")
+    expect(names).toContain("cad_edit")
     // `cad_edit` is the editor's own tool (the model searched for it); what the editor must never see is CAM, delegation
     // or any shell surface.
     for (const forbidden of ["cam_edit", "cam", "agent", "task", "bash"]) expect(names).not.toContain(forbidden)

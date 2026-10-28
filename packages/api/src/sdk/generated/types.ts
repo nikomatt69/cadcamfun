@@ -2379,6 +2379,9 @@ export type AiAgentsOutput = Array<{
   description: string
   tools: Array<string>
   edits: boolean
+  kind?: string | undefined
+  canEdit?: boolean | undefined
+  delegates?: boolean | undefined
 }>
 
 export type AiSessionControlInput = {
@@ -2713,6 +2716,7 @@ export type AiRemoveExtensionModOutput = {
 
 export type AiModesOutput = {
   modes: Array<{ id: string; title: string; description: string; pluginId: string; pluginName: string }>
+  builtin?: Array<{ id: string; title: string; description: string; pluginId: string; pluginName: string }> | undefined
 }
 
 export type AiSkillsOutput = {
@@ -2924,7 +2928,23 @@ export type AiChatStreamOutput =
   | { type: "permission_resolved"; sessionId: string; requestId: string; reply: "once" | "always" | "reject" }
   | { type: "permission_blocked"; sessionId: string; permission: string; patterns: Array<string>; reason: string }
   | { type: "compaction"; sessionId: string; phase: "start" | "finish" }
-  | { type: "context_snapshot"; sessionId: string; projectId: string; source: "workspace"; chars: number }
+  | {
+      type: "context_snapshot"
+      sessionId: string
+      projectId: string
+      source: "workspace"
+      chars: number
+      sections?: Array<{
+        id: string
+        kind: "requirement" | "observation" | "ui-snapshot" | "memory" | "reference"
+        label: string
+        chars: number
+        tokens: number
+        truncated?: boolean
+        placement: "system" | "message"
+      }>
+      observation?: "sent" | "unchanged" | "skipped"
+    }
   | {
       type: "tool_diagnostic"
       sessionId: string
@@ -3040,7 +3060,23 @@ export type AiSessionStreamOutput =
         | { type: "permission_resolved"; sessionId: string; requestId: string; reply: "once" | "always" | "reject" }
         | { type: "permission_blocked"; sessionId: string; permission: string; patterns: Array<string>; reason: string }
         | { type: "compaction"; sessionId: string; phase: "start" | "finish" }
-        | { type: "context_snapshot"; sessionId: string; projectId: string; source: "workspace"; chars: number }
+        | {
+            type: "context_snapshot"
+            sessionId: string
+            projectId: string
+            source: "workspace"
+            chars: number
+            sections?: Array<{
+              id: string
+              kind: "requirement" | "observation" | "ui-snapshot" | "memory" | "reference"
+              label: string
+              chars: number
+              tokens: number
+              truncated?: boolean
+              placement: "system" | "message"
+            }>
+            observation?: "sent" | "unchanged" | "skipped"
+          }
         | {
             type: "tool_diagnostic"
             sessionId: string

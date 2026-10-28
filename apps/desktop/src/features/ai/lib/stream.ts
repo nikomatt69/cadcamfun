@@ -371,6 +371,79 @@ export const dispatch = (event: AiEvent, state: CallState): ReadonlyArray<AiEven
   return [event]
 }
 
+/** A connection that stays silent this long (two heartbeats and some margin) is dead and is reopened. */
+export const FOLLOW_STALE_MS = 40_000
+const FOLLOW_RECONNECT_MIN_MS = 1_000
+const FOLLOW_RECONNECT_MAX_MS = 15_000
+/** Connections in a row that never got a greeting before the session is given up on (it is not one the host knows). */
+const FOLLOW_MAX_FAILURES = 5
+
+export interface FollowInput {
+  readonly sessionId: string
+  readonly signal: AbortSignal
+  /** Every greeting; `reconnected` from the second one on. `reset` means the journal cannot replay what was missed. */
+  readonly onConnected: (frame: { readonly busy: boolean; readonly seq: number; readonly reset: boolean }, reconnected: boolean) => void
+  readonly onEvent: (event: AiEvent) => void
+}
+
+/**
+ * Follows one conversation the way the phone does (nikcli's session stream): the sidecar journals every turn, whoever
+ * started it, so this sees a turn the phone sent while it happens. The cursor resumes after a drop without replaying
+ * what was already shown; a conversation the host does not know ends the follow after a few refusals.
+ */
+export const followSessionEvents = async (client: Client, input: FollowInput): Promise<void> => {
+  let cursor: number | undefined
+  let greetings = 0
+  let failures = 0
+  const calls: CallState = { started: new Set<string>(), finished: new Set<string>() }
+  while (!input.signal.aborted && failures < FOLLOW_MAX_FAILURES) {
+    const connection = new AbortController()
+    const abort = () => connection.abort()
+    input.signal.addEventListener("abort", abort, { once: true })
+    let watchdog: ReturnType<typeof setTimeout> | undefined
+    const arm = () => { clearTimeout(watchdog); watchdog = setTimeout(() => connection.abort(), FOLLOW_STALE_MS) }
+    try {
+      arm()
+      const http = client.ai.sessionStream({ params: { sessionId: input.sessionId }, query: cursor !== undefined ? { after: cursor } : {} })
+      const stream = await Effect.runPromise(http, { signal: connection.signal })
+      await Effect.runPromise(stream.pipe(
+        Stream.runForEach((frame) => Effect.sync(() => {
+          if (connection.signal.aborted) return
+          arm()
+          if (frame.type === "server.connected") {
+            failures = 0
+            // A reset greeting carries the live edge; the old cursor would replay nothing.
+            if (frame.reset === true || cursor === undefined) cursor = frame.seq
+            input.onConnected({ busy: frame.busy, seq: frame.seq, reset: frame.reset === true }, greetings++ > 0)
+            return
+          }
+          if (frame.type !== "event") return
+          cursor = frame.seq
+          if (isIgnoredEvent(frame.event)) return
+          let decoded: AiEvent
+          try { decoded = decodeWireEvent(frame.event) } catch { return }
+          if (decoded.type === "turn" && decoded.phase === "start") { calls.started.clear(); calls.finished.clear() }
+          for (const event of dispatch(decoded, calls)) input.onEvent(event)
+        }))
+      ), { signal: connection.signal })
+    } catch {
+      /* A dropped connection reconnects below; an aborted one ends the loop. */
+    } finally {
+      clearTimeout(watchdog)
+      input.signal.removeEventListener("abort", abort)
+      connection.abort()
+    }
+    if (input.signal.aborted) return
+    // A connection that never greeted counts as a failure; one that did was healthy and just ended.
+    if (greetings === 0 || failures > 0) failures += 1
+    await new Promise<void>((resolve) => {
+      const wait = setTimeout(done, Math.min(FOLLOW_RECONNECT_MIN_MS * 2 ** Math.max(failures, 0), FOLLOW_RECONNECT_MAX_MS))
+      function done() { clearTimeout(wait); input.signal.removeEventListener("abort", done); resolve() }
+      input.signal.addEventListener("abort", done, { once: true })
+    })
+  }
+}
+
 /** Imperative wrapper: drives the Effect stream through callbacks the Solid store owns. */
 export const streamChat = (
   deps: { readonly client: Client; readonly runtime: AppRuntime; readonly onEvent: StreamCallbacks["onEvent"]; readonly onError: StreamCallbacks["onError"]; readonly onDone: StreamCallbacks["onDone"] },

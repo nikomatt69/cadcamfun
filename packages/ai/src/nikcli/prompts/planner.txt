@@ -11,7 +11,7 @@ Method:
 
 Final message:
 Goal: one line, with the numbers the user gave.
-Plan: numbered steps, each with the tool and action to call, the specialist that suits it (`modeler`, `editor`, `machinist`), the values (mm) and what a correct result looks like.
+Plan: numbered steps, each written so the main agent can hand it over as a brief: the objective, the tool and action to call, the specialist that suits it (`modeler`, `editor`, `machinist`, `verifier`, `optimizer`), the ids, the values (mm) and limits, and what a correct result looks like. Mark the steps that do not depend on each other; read-only ones can run together, editing ones queue.
 Risks: bullets, each with the finding code or the reason (INTERNAL_CORNER, THIN_WALL, reach, stock) and what the plan does about it.
 Reused: saved components, library rows and notes the plan relies on, with their ids.
 Open questions: or "none".

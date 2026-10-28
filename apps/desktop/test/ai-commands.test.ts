@@ -127,7 +127,8 @@ describe("command registry", () => {
 describe("command parsing", () => {
   test("splits name and arguments", () => {
     expect(parseCommand("/model anthropic/claude-sonnet-4")).toEqual({ name: "model", args: "anthropic/claude-sonnet-4" })
-    expect(parseCommand("  /mode   cad  ")).toEqual({ name: "mode", args: "cad" })
+    // Modes are no longer selectable, by picker or by command: /mode parses like any word but no command answers to it (see the run test).
+    expect(findCommand("mode")).toBeUndefined()
     expect(parseCommand("/stop")).toEqual({ name: "stop", args: "" })
   })
 
@@ -154,10 +155,9 @@ describe("command search", () => {
   test("a prefix ranks the tightest match first", () => {
     // One candidate: unambiguous.
     expect(searchCommands("ver")[0]?.name).toBe("verify")
-    // Two candidates share the prefix; the shorter name is the tighter match.
+    // Only one candidate keeps the prefix now that /mode is gone.
     const names = searchCommands("mo").map((command) => command.name)
-    expect(names.slice(0, 2).sort()).toEqual(["mode", "model"])
-    expect(names[0]).toBe("mode")
+    expect(names[0]).toBe("model")
   })
 
   test("matches a subsequence so short queries still find the command", () => {
@@ -215,20 +215,16 @@ describe("running commands", () => {
     expect(await run("/model openai/gpt-x", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.model.unconfigured" })
   })
 
-  test("/mode, /permissions and /agent validate their argument", async () => {
-    const setMode = (value: string) => { calls.push(`mode:${value}`) }
+  test("/permissions and /agent validate their argument; /mode no longer exists", async () => {
     const setPermissionMode = (value: string) => { calls.push(`perm:${value}`) }
     const setAgent = (value: string) => { calls.push(`agent:${value}`) }
     const calls: string[] = []
-    const rec = recorder(stubAi({ setMode, setPermissionMode, setAgent }))
-    expect(await run("/mode cad", rec)).toEqual({ kind: "done" })
+    const rec = recorder(stubAi({ setPermissionMode, setAgent }))
     expect(await run("/permissions auto", rec)).toEqual({ kind: "done" })
     expect(await run("/agent cad", rec)).toEqual({ kind: "done" })
-    // A plugin-contributed mode is set by its namespaced id, whatever the case the person types.
-    expect(await run("/mode com.example.shipping:feeds", rec)).toEqual({ kind: "done" })
-    expect(calls).toEqual(["mode:cad", "perm:auto", "agent:cad", "mode:com.example.shipping:feeds"])
-    expect(await run("/mode sculpting", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.mode.unknown" })
-    expect(await run("/mode com.example.shipping:gone", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.mode.unknown" })
+    expect(calls).toEqual(["perm:auto", "agent:cad"])
+    // Modes are chosen by the agent itself: the command is refused as unknown, like any other non-command.
+    expect(await run("/mode cad", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.unknown" })
     expect(await run("/permissions maybe", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.permissions.unknown" })
     expect(await run("/agent architect", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.agent.unknown" })
   })

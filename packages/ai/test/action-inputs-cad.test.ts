@@ -36,7 +36,7 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.describe": { accept: [{}], refuse: [[]] },
   "cad.check": { accept: [{}], refuse: [null] },
   "cad.relations": { accept: [{ firstId: "a", secondId: "b" }], refuse: [{ firstId: "a" }, { firstId: "", secondId: "b" }] },
-  "cad.grep": { accept: [{ query: "bolt" }, { query: "bolt", parametricOnly: true, limit: 50, offset: 3 }], refuse: [{ query: "" }, { query: "b", limit: 51 }, { query: "b", offset: -1 }] },
+  "cad.grep": { accept: [{ query: "bolt" }, { query: "bolt", parametricOnly: true, limit: 200, offset: 3 }], refuse: [{ query: "" }, { query: "b", limit: 201 }, { query: "b", offset: -1 }] },
   "cad.vision": { accept: [{}, { focus: "the pocket" }], refuse: [{ focus: "" }, { focus: "   " }] },
   "cad.exact": { accept: [{}, { ids: ["a"], machining: false }], refuse: [{ ids: [] }, { machining: "no" }] },
   "cad.setups": { accept: [{}, { ids: ["a"], fixture: "none", allowed: ["+Z", "-X"] }], refuse: [{ ids: [] }, { fixture: "top" }, { allowed: [] }, { allowed: ["+W"] }] },
@@ -81,6 +81,10 @@ const FIXTURES: Record<string, { readonly accept: ReadonlyArray<unknown>; readon
   "cad.parametric_from_element": { accept: [{ elementId: "a" }, { elementId: "a", depth: 4 }], refuse: [{ elementId: "a", depth: -1 }] },
   "cad_edit.parametric_create": { accept: [{ history, name: "Plate" }, { history, name: "Plate", x: 5, layer: "L" }, { history: tapered, name: "Tapered" }], refuse: [{ history }, { history, name: "" }, { history: dangling, name: "P" }] },
   "cad_edit.parametric_update": { accept: [{ elementId: "a", parameters: { w: 60 }, expectedRevision: "r1" }], refuse: [{ elementId: "a", parameters: { "1w": 3 }, expectedRevision: "r1" }, { elementId: "a", parameters: {} }] },
+  "cad_edit.parametric_timeline": {
+    accept: [{ elementId: "a", expectedRevision: "r1", suppress: ["f1"] }, { elementId: "a", expectedRevision: "r1", rollback: "f2" }, { elementId: "a", expectedRevision: "r1", rollForward: true }, { elementId: "a", expectedRevision: "r1", move: { feature: "f1", to: 2 } }],
+    refuse: [{ elementId: "a", expectedRevision: "r1" }, { elementId: "a", expectedRevision: "r1", suppress: [] }, { elementId: "a", expectedRevision: "r1", rollback: "f2", rollForward: true }, { elementId: "a", suppress: ["f1"] }, { elementId: "a", expectedRevision: "r1", move: { feature: "f1", to: 80 } }]
+  },
   "cad_edit.parametric_recipe_create": { accept: [{ recipe: "flange" }, { recipe: "flange", name: "F", z: 0 }], refuse: [{ recipe: "flange", name: "" }] },
   "cad_edit.parametric_convert": { accept: [{ elementId: "a" }], refuse: [{ elementId: "" }] }
 }
@@ -130,7 +134,7 @@ describe("Effect-owned CAD and parametric inputs", () => {
   })
 
   test("the catalogue's own pre-parse names the refused field", async () => {
-    const result = await runAction("cad.grep", { query: "b", limit: 99 }, { handlers: {} as ToolHandlersShape, projectId: "p" }) as { error: string }
+    const result = await runAction("cad.grep", { query: "b", limit: 299 }, { handlers: {} as ToolHandlersShape, projectId: "p" }) as { error: string }
     expect(result.error).toContain("limit")
   })
 })

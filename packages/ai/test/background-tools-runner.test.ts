@@ -183,7 +183,7 @@ describe("BackgroundToolsRunner", () => {
     expect(runner.manager.read({ projectId: "project-wake", parentSessionId: parentId }, task.id).status).toBe("completed")
     await runner.dispose()
     // nikcli's wake format: what finished, its status and id, the result, and how to read the rest.
-    const wake = seen.find((entry) => entry.sessionID === parentId && entry.agent === "cadcam")
+    const wake = seen.find((entry) => entry.sessionID === parentId && entry.agent === "cadcam-build")
     expect(wake?.text).toBe([
       `Background task "probe" finished.`,
       "Status: completed",

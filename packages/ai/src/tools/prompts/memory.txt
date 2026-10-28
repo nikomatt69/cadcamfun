@@ -1,4 +1,4 @@
-What the assistant keeps between conversations about this project. Reading it changes nothing.
+Read the notes and standing context the assistant keeps between conversations; changes nothing.
 
 Actions
 - recall: the saved notes of this project, optionally filtered by key prefix.

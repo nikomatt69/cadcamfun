@@ -6669,6 +6669,36 @@
                       },
                       "edits": {
                         "type": "boolean"
+                      },
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "canEdit": {
+                        "anyOf": [
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "delegates": {
+                        "anyOf": [
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "required": [
@@ -10054,6 +10084,44 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "builtin": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "pluginId": {
+                                "type": "string"
+                              },
+                              "pluginName": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "description",
+                              "pluginId",
+                              "pluginName"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -50476,7 +50544,9 @@
                                     "linuxcnc",
                                     "haas",
                                     "siemens",
-                                    "heidenhain"
+                                    "heidenhain",
+                                    "okuma",
+                                    "mazak"
                                   ]
                                 }
                               },
@@ -53781,6 +53851,11 @@
                   },
                   "subprograms": {
                     "type": "boolean"
+                  },
+                  "smoothing": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1
                   },
                   "postDefinition": {},
                   "print": {

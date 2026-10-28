@@ -49,15 +49,33 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
     transcript.scrollTop = transcript.scrollHeight
   }
 
-  // Following stops only when the user moves up. Content growing under the viewport, or the box being
-  // resized, also raises scroll events, and they must not let go of the newest turn.
-  let lastTop = 0
+  // Following stops only when the person scrolls up, never because a scroll event looked like it. Content that
+  // shrinks and grows again inside one frame (a card re-rendered, a thought closing) clamps `scrollTop` and then
+  // raises a scroll event that reads as "moved up, not at the end"; deciding from that let go of the newest turn.
+  // So the intent comes from the input that can only be a person: wheel, touch, keys and the scrollbar.
+  const letGo = (): void => props.onFollowLatest(false)
+  let touchY: number | undefined
+  let dragging = false
   const handleScroll = (el: HTMLDivElement): void => {
     const nearEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 64
-    const movedUp = el.scrollTop < lastTop - 1
-    lastTop = el.scrollTop
     if (nearEnd) props.onFollowLatest(true)
-    else if (movedUp) props.onFollowLatest(false)
+    else if (dragging) letGo()
+  }
+  const handleWheel = (event: WheelEvent): void => { if (event.deltaY < 0) letGo() }
+  const handleTouch = (event: TouchEvent): void => {
+    const y = event.touches[0]?.clientY
+    if (y === undefined) return
+    if (touchY !== undefined && y > touchY + 2) letGo()
+    touchY = y
+  }
+  const handleKey = (event: KeyboardEvent): void => {
+    if (["PageUp", "Home", "ArrowUp"].includes(event.key) && event.target === transcript) letGo()
+  }
+  // A press on the scroll container itself (not on its content) is the scrollbar: dragging it away lets go.
+  const handlePointerDown = (event: PointerEvent): void => {
+    if (event.target !== transcript) return
+    dragging = true
+    window.addEventListener("pointerup", () => { dragging = false }, { once: true })
   }
 
   let scrollFrame: number | undefined
@@ -87,6 +105,7 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
     if (content === undefined || typeof ResizeObserver === "undefined") return
     const observer = new ResizeObserver(followSoon)
     observer.observe(content)
+    if (transcript !== undefined) observer.observe(transcript)
     onCleanup(() => observer.disconnect())
   })
 
@@ -124,6 +143,11 @@ export function AssistantTranscript(props: AssistantTranscriptProps): JSX.Elemen
         ref={transcript}
         class="assistant-transcript flex-1 overflow-y-auto"
         onScroll={(event) => handleScroll(event.currentTarget)}
+        onWheel={handleWheel}
+        onTouchStart={() => { touchY = undefined }}
+        onTouchMove={handleTouch}
+        onKeyDown={handleKey}
+        onPointerDown={handlePointerDown}
         aria-live="polite"
         data-testid="ai-transcript"
       >

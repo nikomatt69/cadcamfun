@@ -10,7 +10,7 @@ describe("host context management", () => {
     const config = buildHostConfig({ providers: defaultProviderSpecs(), toolIds: [], systemPrompt: "CAD" }) as {
       agent: Record<string, { steps?: number }>; provider: Record<string, { options: Record<string, unknown> }>
     }
-    for (const id of ["cadcam", "cadcam-cad", "cadcam-cam", "cadcam-auto", "cadcam-cad-ask"]) expect(config.agent[id]?.steps).toBe(25)
+    for (const id of ["cadcam-build", "cadcam-plan", "cadcam-build-auto", "cadcam-plan-ask"]) expect(config.agent[id]?.steps).toBe(25)
     for (const provider of Object.values(config.provider)) {
       expect(provider.options).toEqual({ headerTimeout: 120_000, chunkTimeout: 120_000 })
     }

@@ -32,11 +32,11 @@ test("MCP configuration validates before persistence and stays project-local and
   expect(split.shared).not.toHaveProperty("mcp")
   expect(split.instance).toHaveProperty("mcp.ext_mcp_reference")
   const agents = config.agent as Record<string, { permission: Record<string, unknown> }>
-  for (const name of ["cadcam", "cadcam-auto", "cadcam-ask"]) expect(agents[name]?.permission["ext_mcp_reference_*"]).toEqual({ "**": "ask" })
+  for (const name of ["cadcam-build", "cadcam-build-auto", "cadcam-build-ask"]) expect(agents[name]?.permission["ext_mcp_reference_*"]).toEqual({ "**": "ask" })
   expect(agents["cadcam-worker"]?.permission["ext_mcp_reference_*"]).toBeUndefined()
   const restricted = buildHostConfig({ providers: [], toolIds: [], systemPrompt: "test", mcp: { reference: { ...remote, enabled: true } }, policies: [{ effect: "deny", action: "tool.use", resource: "ext_mcp_reference_delete" }] })
   const restrictedAgents = restricted.agent as Record<string, { permission: Record<string, unknown> }>
-  expect(restrictedAgents["cadcam"]?.permission["ext_mcp_reference_delete"]).toBe("deny")
+  expect(restrictedAgents["cadcam-build"]?.permission["ext_mcp_reference_delete"]).toBe("deny")
 })
 
 test("native MCP connects, discovers and executes only after approval, isolates projects and disconnects", async () => {
@@ -61,7 +61,7 @@ test("native MCP connects, discovers and executes only after approval, isolates 
     await Effect.runPromise(runtime.setProviderKey("fake", "fixture-key"))
     const sessionId = await Effect.runPromise(createHostSession(host, "MCP approval"))
     const events: AiEvent[] = []
-    await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, message: "Echo approved evidence", model: { providerID: "fake", modelID: "fake-model" }, agent: "cadcam-auto", autoContinues: 0 }), (event) => Effect.promise(async () => {
+    await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, message: "Echo approved evidence", model: { providerID: "fake", modelID: "fake-model" }, agent: "cadcam-build-auto", autoContinues: 0 }), (event) => Effect.promise(async () => {
       events.push(event)
       if (event.type === "permission_request") {
         expect(existsSync(evidence)).toBe(false)

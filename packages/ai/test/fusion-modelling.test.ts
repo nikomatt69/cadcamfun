@@ -147,14 +147,14 @@ describe("nikcli's policy and permission layers govern the new capabilities", ()
       if (agent.permission["cad"] === "allow") holders.push(name)
     }
     // The tool that validates a history (cad parametric_validate) is a different tool and is still there.
-    expect(holders).toContain("cadcam")
+    expect(holders).toContain("cadcam-build")
     expect(holders.length).toBeGreaterThan(1)
   })
 
   test("by default creating a part asks the person, only the agent, the editor and the modeller can, and every specialist can still validate", () => {
     const config = host([])
     const can = (name: string, tool: string) => config.agent[name]?.permission?.[tool]
-    for (const name of ["cadcam", "cadcam-editor", "cadcam-modeler"]) expect(can(name, "cad_edit"), name).toEqual(HUMAN_APPROVAL)
+    for (const name of ["cadcam-build", "cadcam-editor", "cadcam-modeler"]) expect(can(name, "cad_edit"), name).toEqual(HUMAN_APPROVAL)
     for (const name of ["cadcam-worker", "cadcam-reviewer", "cadcam-planner", "cadcam-diagnostician", "cadcam-machinist", "cadcam-verifier", "cadcam-optimizer"]) {
       expect(can(name, "cad_edit"), `${name} must not create parts`).toBeUndefined()
       expect(can(name, "cad"), `${name} reads the drawing and validates histories`).toBe("allow")

@@ -25,7 +25,8 @@ import { abortHostSession, createHostSession, hostChatStream, queueHostMessage, 
 import type { NikCliRuntime, ProjectHost } from "./nikcli/runtime.ts"
 import { isAssistantMode, SUGGESTED_PROMPTS, type AssistantMode } from "./prompts/modes.ts"
 import { AiModes, modeTable } from "./prompts/contributed-modes.ts"
-import { systemPrompt, turnSystemPrompt, type ReplyLanguage } from "./prompts/system.ts"
+import { systemPrompt, turnSections, type ReplyLanguage } from "./prompts/system.ts"
+import { changedSections, joinSections, sectionManifest, type SectionManifestEntry } from "./prompts/assembly.ts"
 import { resolveLocale } from "./nikcli/locale.ts"
 import { providerAllowed } from "./nikcli/policy.ts"
 import { goalArgumentsOf, goalSummary } from "./nikcli/goal.ts"
@@ -35,7 +36,8 @@ import type { HostQuestionRequest } from "@nikcli-ai/sdk-next"
 import type { HostContextPolicy } from "./nikcli/context.ts"
 import type { HostTaskInfo } from "./nikcli/chat.ts"
 import { PRIMARIES, PRIMARY_IDS, resolvePrimary } from "./nikcli/primaries.ts"
-import { compactHostSession, readContextBreakdown, type ContextBreakdown, readHostContextPolicy } from "./nikcli/context.ts"
+import { compactHostSession, readContextBreakdown, type ContextBreakdown, readDeliveredObservation, readHostContextPolicy } from "./nikcli/context.ts"
+import { planObservation, renderObservation, type ContextSection, type ObservationInput } from "./context-assembly.ts"
 import { contextBudget, questionsForSession, replySessionQuestion, type SessionControlInput } from "./nikcli/session-controls.ts"
 import {
   ANALYZE_DESIGN,
@@ -83,8 +85,15 @@ export interface ChatInput {
   readonly projectId?: string
   readonly message: string
   readonly attachments?: ReadonlyArray<Attachment>
-  /** Free-text project context appended to the system prompt. */
+  /** Stable project context (rules, memory, references), appended to the system prompt. */
   readonly context?: string
+  /**
+   * What the editor shows now. With the embedded host it joins the user message as one synthetic part, and only when the
+   * session does not already hold it; without a host (one stateless call) it is part of the system prompt.
+   */
+  readonly observation?: ObservationInput
+  /** The manifest of the sources behind `context` and `observation`, reported with the `context_snapshot` event. */
+  readonly contextSections?: ReadonlyArray<ContextSection>
   readonly model?: ModelSelector
   readonly permissionMode?: PermissionMode
   readonly agent?: string
@@ -125,7 +134,7 @@ export class AiService extends Context.Service<AiService, {
   readonly availableModels: Effect.Effect<ReadonlyArray<ModelEntry>, AiConfigError>
   readonly invalidateCatalogue: Effect.Effect<void>
   readonly chat: (input: ChatInput) => Stream.Stream<AiEvent, AiError>
-  readonly agents: ReadonlyArray<{ readonly id: string; readonly title: string; readonly description: string; readonly tools: ReadonlyArray<string>; readonly edits: boolean }>
+  readonly agents: ReadonlyArray<{ readonly id: string; readonly title: string; readonly description: string; readonly tools: ReadonlyArray<string>; readonly edits: boolean; readonly kind: string; readonly canEdit: boolean; readonly delegates: boolean }>
   readonly controlSession: (input: SessionControlInput) => Effect.Effect<SessionControlState, AiError>
   readonly complete: (input: { prompt: string; system?: string; model?: ModelSelector }) => Effect.Effect<{ text: string; model: string }, AiError>
   readonly generate: <A>(input: { prompt: string; schema: Schema.Decoder<A>; system?: string; model?: ModelSelector }) => Effect.Effect<A, AiError>
@@ -161,6 +170,8 @@ export class AiService extends Context.Service<AiService, {
       /** Client session id (owned by the UI) → the host session it actually talks to. */
       const sessionMap = yield* Ref.make(new Map<string, { host: ProjectHost; sessionId: string }>())
       const sessionAdmission = yield* Semaphore.make(1)
+      /** The turn prompt manifest last sent per conversation, for the `changed` field of the turn log (bounded, newest last). */
+      const turnManifests = new Map<string, ReadonlyArray<SectionManifestEntry>>()
 
       const configured = Effect.gen(function* () {
         const status = yield* credentials.status
@@ -365,7 +376,18 @@ export class AiService extends Context.Service<AiService, {
             })()
             // The modes enabled plugins contribute, read per chat so a plugin toggle applies from the next turn.
             const modes = Option.isSome(contributedModes) ? modeTable(contributedModes.value.modes()) : undefined
-            const system = Option.isSome(host) ? turnSystemPrompt(input.context, input.mode, resolved.modelId, reply, new Date(), modes) : systemPrompt(input.context, input.mode, resolved.modelId, reply, new Date(), modes)
+            const sections = turnSections(input.context, input.mode, resolved.modelId, reply, new Date(), modes)
+            // One stateless call has no session to hold the observation, so there it stays in the system prompt as it always did.
+            const directContext = [input.context, input.observation === undefined || input.observation.text.trim() === "" ? undefined : renderObservation(input.observation)].filter((part) => part !== undefined && part.trim() !== "").join("\n\n")
+            const system = Option.isSome(host) ? joinSections(sections) : systemPrompt(directContext, input.mode, resolved.modelId, reply, new Date(), modes)
+            // Which section moved since this conversation's previous turn: the answer to "why did the provider cache miss" (spec 64).
+            if (Option.isSome(host)) {
+              const manifest = sectionManifest(sections)
+              const key = input.sessionId ?? ""
+              const previous = key === "" ? undefined : turnManifests.get(key)
+              if (key !== "") { turnManifests.delete(key); turnManifests.set(key, manifest); if (turnManifests.size > 64) turnManifests.delete(turnManifests.keys().next().value!) }
+              yield* Effect.logDebug("AI turn prompt", { sessionId: input.sessionId, model: resolved.modelId, tokens: manifest.reduce((sum, entry) => sum + entry.tokens, 0), ...(previous !== undefined ? { changed: changedSections(previous, manifest) } : {}), sections: manifest.map((entry) => `${entry.id}:${entry.tokens}:${entry.sha}`) })
+            }
             const attached = prepareAttachments(input.projectId ?? "default", input.attachments)
             const message = input.message + attached.note
 
@@ -384,7 +406,7 @@ export class AiService extends Context.Service<AiService, {
                 return yield* new AiConfigError({ message: "This conversation belongs to a different authenticated actor." })
               }
               const primary = resolvePrimary(input.agent)
-              // A subagent is still addressable by id (an older client may send one), but only the three primaries are offered.
+              // A subagent is still addressable by id (an older client may send one), but only the primaries are offered.
               const agent = primary !== undefined ? PRIMARIES[primary].host : isSubagentId(input.agent) ? SUBAGENTS[input.agent].host : undefined
               if (agent === undefined) return yield* new AiConfigError({ message: `Unknown assistant agent: ${input.agent}` })
               const variant = input.model?.variant
@@ -395,14 +417,24 @@ export class AiService extends Context.Service<AiService, {
               }
               // `/goal ...` is the host's own command (nikcli's goal loop), not a prompt: see `nikcli/goal.ts`.
               const goalArguments = goalArgumentsOf(input.message)
+              // The observation joins the user message only when the session does not hold it yet (spec 64 Phase 1). A `/goal`
+              // line runs the host's own command, which takes no parts: nothing is delivered and nothing is recorded as delivered.
+              const hasObservation = input.observation !== undefined && input.observation.text.trim() !== ""
+              const plan = goalArguments === undefined && hasObservation ? planObservation(input.observation, yield* readDeliveredObservation(target.host, target.sessionId)) : undefined
+              const observationState = !hasObservation ? undefined : plan === undefined ? "skipped" as const : plan.status === "sent" ? "sent" as const : "unchanged" as const
+              const contextChars = (input.context?.length ?? 0) + (input.observation?.text.length ?? 0)
               return hostChatStream({
                 host: target.host, sessionId: target.sessionId, message, files: attached.parts, system,
+                ...(plan?.part !== undefined ? { observation: plan.part } : {}),
                 ...(goalArguments !== undefined ? { goalArguments } : {}),
                 agent: hostAgentWithPermissions(agent, input.permissionMode), ...(variant ? { variant } : {}),
                 model: { providerID: resolved.provider, modelID: resolved.modelId }
               }).pipe(
                 Stream.mapError((e): AiError => e),
-                (stream) => input.context ? Stream.concat(Stream.succeed<AiEvent>({ type: "context_snapshot", sessionId: target.sessionId, projectId, source: "workspace", chars: input.context.length }), stream) : stream
+                (stream) => contextChars > 0
+                  ? Stream.concat(Stream.succeed<AiEvent>({ type: "context_snapshot", sessionId: target.sessionId, projectId, source: "workspace", chars: contextChars,
+                    ...(input.contextSections !== undefined ? { sections: input.contextSections } : {}), ...(observationState !== undefined ? { observation: observationState } : {}) }), stream)
+                  : stream
               )
             }
 
@@ -498,7 +530,7 @@ export class AiService extends Context.Service<AiService, {
         providers,
         invalidateCatalogue: invalidateCatalog,
         chat,
-        agents: PRIMARY_IDS.map((id) => ({ id, title: PRIMARIES[id].title, description: PRIMARIES[id].description, tools: [], edits: true })),
+        agents: PRIMARY_IDS.map((id) => ({ id, title: PRIMARIES[id].title, description: PRIMARIES[id].description, tools: [], edits: PRIMARIES[id].canEdit, kind: PRIMARIES[id].kind, canEdit: PRIMARIES[id].canEdit, delegates: PRIMARIES[id].delegates })),
         controlSession,
         complete: completeText,
         generate: generateObject,

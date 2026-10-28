@@ -44,20 +44,23 @@ export const permissionAgents = (agents: Record<string, Record<string, unknown>>
           if (permissions[id] === "allow") permissions[id] = "ask"
           continue
         }
-        if (["vcs_edit", "mods_edit"].includes(id)) { permissions[id] = "deny"; continue }
+        // Extension writes change the assistant itself, which no classifier may approve.
+        if (id === "mods_edit") { permissions[id] = "deny"; continue }
         permissions[id] = {
           "*": "ask",
           ...Object.fromEntries(exposedActions(id)
             .filter((action) => action.kind === "destructive")
             .map((action) => [`action:${nameOf(action)}`, "deny" as const])),
-          ...(id === "cad_edit" ? { "action:editor:destructive": "deny" as const } : {})
+          ...(id === "cad_edit" ? { "action:editor:destructive": "deny" as const } : {}),
+          // A workflow runs steps the model does not write and can change project data: a person starts it.
+          ...(id === "vcs_edit" ? { "action:run_workflows": "deny" as const } : {})
         }
       }
-      for (const id of ["vcs_edit", "mods_edit"]) if (permissions[id] !== undefined) permissions[id] = "deny"
+      if (permissions["mods_edit"] !== undefined) permissions["mods_edit"] = "deny"
     }
     result[hostAgentWithPermissions(name, mode)] = {
       ...spec,
-      ...(mode === "auto" ? { prompt: `${typeof spec["prompt"] === "string" ? spec["prompt"] : ""}\nAuto uses nikcli's classifier to review creation and edits through the existing tools. Deletion, editor undo/redo, VCS and extension writes are denied. Work in the current drawing and report the saved edits without a branch, commit or pull request.` } : {}),
+      ...(mode === "auto" ? { prompt: `${typeof spec["prompt"] === "string" ? spec["prompt"] : ""}\nAuto uses nikcli's classifier to review creation and edits through the existing tools: operate fully on the active drawing and the machining setup the user asked for. Deletion of elements, saved parts or library rows, editor undo/redo and layer deletion, restoring history, running workflows and every extension write are denied. Version control is yours within its limits: start a reviewable change, commit on the checked-out branch and open a pull request when the work calls for it; nothing merges or pushes.` } : {}),
       permission_mode: mode === "auto" ? "auto" : "default", permission: permissions
     }
   }

@@ -1,0 +1,6 @@
+Working style for this model:
+- Reason briefly, then act. A long deliberation is not progress; a checked tool result is. Make the call in the same step that announces it, and never end a turn on an announcement.
+- Every id, tool name, material and operation type comes from a tool result or a lookup (`library` action `lookup_tool`, `lookup_material`); never from memory.
+- Use the exact schema: numbers are JSON numbers in millimetres, enum values are written as listed, angles follow the tool's unit. When a call is rejected, change the field the error names; do not resend it unchanged.
+- No result is final until checked: `cad` action `check` after a model change, `cam` action `analyze` and `cam_edit` action `verify` after G-code. Report the check and what it does not model.
+- If your role holds the `agent` tool, run long or separable work as background jobs started together, keep working on other steps, and read each report before depending on it.

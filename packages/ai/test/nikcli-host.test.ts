@@ -116,7 +116,7 @@ return blocked;`
     modified.length = 0
     const events: AiEvent[] = []
     try {
-      await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, agent: "cadcam-auto", message: "Create and edit the part", model, autoContinues: 0 }), (event) => Effect.promise(async () => {
+      await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, agent: "cadcam-build-auto", message: "Create and edit the part", model, autoContinues: 0 }), (event) => Effect.promise(async () => {
         events.push(event)
         // Never hang the test if a regression introduces an approval wait.
         if (event.type === "permission_request") await host.client.permission.reply({ requestID: event.requestId, reply: "reject" })
@@ -279,7 +279,7 @@ return blocked;`
     // answer; nothing executes until it arrives, which is what this test also proves by answering it.
     const sessionId = await Effect.runPromise(createHostSession(host, "3d"))
     const events: AiEvent[] = []
-    await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, agent: "cadcam-ask", message: "make a bottle and a block", model, autoContinues: 0 }), (event) => Effect.promise(async () => {
+    await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, agent: "cadcam-build-ask", message: "make a bottle and a block", model, autoContinues: 0 }), (event) => Effect.promise(async () => {
       events.push(event)
       if (event.type === "permission_request") await host.client.permission.reply({ requestID: event.requestId, reply: "once" })
     })))
@@ -338,7 +338,7 @@ return blocked;`
       script = (_index, _turn, lastRole) => lastRole === "tool" ? { text: "Settled." } : { toolCalls: [{ name: "cad_probe", args: { value: 42 } }] }
       const sessionId = await Effect.runPromise(createHostSession(host, decision))
       const events: AiEvent[] = []
-      await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, agent: "cadcam-ask", message: "Probe", model, autoContinues: 0 }), (event) => Effect.promise(async () => {
+      await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, agent: "cadcam-build-ask", message: "Probe", model, autoContinues: 0 }), (event) => Effect.promise(async () => {
         events.push(event)
         if (event.type === "permission_request") {
           expect(executed.length).toBe(before)

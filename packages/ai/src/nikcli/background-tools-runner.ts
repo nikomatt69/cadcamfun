@@ -9,6 +9,8 @@ import {
 } from "./background-tasks.ts"
 import { adoptChildSession, subagentById, SUBAGENTS } from "./agents.ts"
 import { isTransientFailure } from "./chat.ts"
+import { CADCAM_AGENT } from "./config.ts"
+import { currentHostAgent } from "./primaries.ts"
 import type { NikCliRuntime } from "./runtime.ts"
 
 export const CADCAM_WORKER_AGENT = SUBAGENTS.researcher.host
@@ -215,7 +217,7 @@ export class BackgroundToolsRunner {
     try {
       await host.client["session-prompt"].promptAsync({
         sessionID: task.parentSessionId,
-        agent: [...await host.client.session.messages({ sessionID: task.parentSessionId, limit: 20 })].reverse().find((message) => message.info.role === "user")?.info.agent ?? "cadcam",
+        agent: currentHostAgent([...await host.client.session.messages({ sessionID: task.parentSessionId, limit: 20 })].reverse().find((message) => message.info.role === "user")?.info.agent) ?? CADCAM_AGENT,
         delivery: "queue",
         parts: [{ type: "text", text: body, synthetic: true }]
       })

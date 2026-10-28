@@ -78,12 +78,14 @@ describe("who asks before a plugin tool runs", () => {
   test("the host config asks for the write tool in every permission mode and allows the read tool", () => {
     const registry = new HostToolRegistry(() => buildTools(stub, "p", [read, write]))
     const config = buildHostConfig({ providers: [], toolIds: registry.ids("p"), askToolIds: registry.approvalIds("p"), systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
-    for (const name of ["cadcam", "cadcam-ask", "cadcam-auto", "cadcam-cad", "cadcam-cam", "cadcam-cad-auto", "cadcam-cam-ask"]) {
+    for (const name of ["cadcam-build", "cadcam-build-ask", "cadcam-build-auto"]) {
       expect(config.agent[name]!.permission[write.id] as unknown, name).toEqual(HUMAN_APPROVAL)
       expect(config.agent[name]!.permission[read.id], name).toMatch(/^(allow|ask)$/)
     }
-    expect(config.agent["cadcam"]!.permission[read.id]).toBe("allow")
-    // A subagent's allow-list names catalogue tools only: a plugin's tool never reaches one. The primaries (general, cad, cam) hold it.
+    expect(config.agent["cadcam-build"]!.permission[read.id]).toBe("allow")
+    // Plan is read-only: a plugin's write tool never reaches it, in any permission mode.
+    for (const name of ["cadcam-plan", "cadcam-plan-ask", "cadcam-plan-auto"]) expect(config.agent[name]!.permission[write.id], name).toBeUndefined()
+    // A subagent's allow-list names catalogue tools only: a plugin's tool never reaches one. The editing primary (build) holds it.
     const primaries: ReadonlyArray<string> = PRIMARY_IDS.map((id) => PRIMARIES[id].host)
     for (const name of Object.keys(config.agent)) if (name.startsWith("cadcam-") && !name.endsWith("-ask") && !name.endsWith("-auto") && name !== "cadcam-memory" && !primaries.includes(name)) {
       expect(config.agent[name]!.permission?.[write.id], name).toBeUndefined()
@@ -94,6 +96,6 @@ describe("who asks before a plugin tool runs", () => {
   test("the AI policy takes a plugin's tool away like any other (tool.use)", () => {
     const registry = new HostToolRegistry(() => buildTools(stub, "p", [read]))
     const config = buildHostConfig({ providers: [], toolIds: registry.ids("p"), systemPrompt: "x", policies: [{ effect: "deny", action: "tool.use", resource: "plugin_*" }] }) as { agent: Record<string, { permission: Record<string, string> }> }
-    expect(config.agent["cadcam"]!.permission[read.id]).toBeUndefined()
+    expect(config.agent["cadcam-build"]!.permission[read.id]).toBeUndefined()
   })
 })

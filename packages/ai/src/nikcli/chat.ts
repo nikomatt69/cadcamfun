@@ -4,7 +4,10 @@ import type { HostClient, HostPromptResult, HostSession } from "@nikcli-ai/sdk-n
 import { AiConfigError, AiProviderError } from "../errors.ts"
 import type { AiEvent } from "../events.ts"
 import { isContextOverflowError } from "../provider-error.ts"
+import type { ObservationPart } from "../context-assembly.ts"
 import { CADCAM_AGENT, PRIMARY_STEP_LIMIT } from "./config.ts"
+import { currentHostAgent } from "./primaries.ts"
+import { primaryOfHost, reminderFor } from "../prompts/reminders.ts"
 import { mapHostEvent, newMapperState, type EventMapperState } from "./event-mapper.ts"
 import type { ProjectHost } from "./runtime.ts"
 import { formatGoalStatus, goalSubcommandTexts, parseGoalArguments, type GoalCommand, type GoalSubcommand } from "./goal.ts"
@@ -17,6 +20,11 @@ export interface HostChatInput {
   readonly files?: ReadonlyArray<{ readonly mime: string; readonly filename: string; readonly url: string }>
   /** Extra system text appended for this turn (project context). */
   readonly system?: string
+  /**
+   * The editor observation this turn adds to the user message (`planObservation`): one synthetic text part after the user's
+   * text and files. It is only given when the session does not hold it yet, so the history stays append-only.
+   */
+  readonly observation?: ObservationPart
   readonly model: { readonly providerID: string; readonly modelID: string }
   readonly agent?: string
   readonly variant?: string
@@ -446,9 +454,10 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         let stepResumes = 0
         let callsAtStepLimit: number | undefined
         const answers: string[] = []
-        let parts: Array<{ type: "text"; text: string; synthetic?: boolean } | { type: "file"; mime: string; filename: string; url: string }> = [
+        let parts: Array<{ type: "text"; text: string; synthetic?: boolean; metadata?: Record<string, unknown> } | { type: "file"; mime: string; filename: string; url: string }> = [
           { type: "text", text: input.message },
-          ...(input.files ?? []).map((f) => ({ type: "file" as const, mime: f.mime, filename: f.filename, url: f.url }))
+          ...(input.files ?? []).map((f) => ({ type: "file" as const, mime: f.mime, filename: f.filename, url: f.url })),
+          ...(input.observation !== undefined ? [{ type: "text" as const, text: input.observation.text, synthetic: true, metadata: { ...input.observation.metadata } }] : [])
         ]
         // Evidence only: a host without the read (or one that throws synchronously) must not turn a healthy prompt into an error.
         const readMessages = (limit: number) => Promise.resolve().then(() => host.client.session.messages({ sessionID: sessionId, limit })).catch(() => undefined)
@@ -513,6 +522,15 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           goalPending = command
           // The host records its own brief as a user message of the session: the stream's, not something the user wrote meanwhile.
           state.skipUserMessages += 1
+        }
+        // nikcli's plan-mode and build-switch reminders (`prompts/reminders.ts`): a short synthetic part, sent once when the primary
+        // changes. The previous primary is read from the session's latest assistant message; a compaction summary or a session
+        // without one counts as none, so a conversation that just entered Plan, or lost the reminder in a summary, gets it.
+        if (goalPending === undefined) {
+          const recent = await readMessages(20)
+          const lastAssistant = recent?.findLast((entry) => entry.info.role === "assistant" && entry.info.summary !== true)?.info
+          const reminder = reminderFor(primaryOfHost(input.agent ?? CADCAM_AGENT), primaryOfHost(lastAssistant?.agent))
+          if (reminder !== undefined) parts = [...parts, { type: "text", text: reminder, synthetic: true }]
         }
         for (;;) {
           let result: HostPromptResult
@@ -679,7 +697,7 @@ export const queueHostMessage = (host: ProjectHost, sessionId: string, message: 
       const previous = (await host.client.session.messages({ sessionID: sessionId, limit: 20 })).findLast((entry) => entry.info.role === "user")?.info
       const model = previous?.model
       await host.client["session-prompt"].promptAsync({
-        sessionID: sessionId, agent: previous?.agent ?? CADCAM_AGENT,
+        sessionID: sessionId, agent: currentHostAgent(previous?.agent) ?? CADCAM_AGENT,
         ...(typeof model?.providerID === "string" && typeof model.modelID === "string" ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
         ...(previous?.variant ? { variant: previous.variant } : {}),
         delivery, parts: [{ type: "text", text: message }]

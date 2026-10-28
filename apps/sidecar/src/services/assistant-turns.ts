@@ -227,7 +227,13 @@ export class AssistantTurns extends Context.Service<AssistantTurns, {
    * already has a turn running here is refused with `Conflict` (409): the phone steers it with `chat/queue` or stops it,
    * and a second turn never races the first on one host session.
    */
-  start(turn: Stream.Stream<AiEvent>, requestedSessionId?: string): Effect.Effect<{ readonly sessionId: string; readonly seq: number }, BadRequest | Conflict>
+  start(turn: Stream.Stream<AiEvent>, requestedSessionId?: string, prompt?: string): Effect.Effect<{ readonly sessionId: string; readonly seq: number }, BadRequest | Conflict>
+  /**
+   * Records a turn the caller streams itself (the desktop's own `chat/stream`) in the same journal, so a phone following
+   * the session sees it live, and the desktop sees the phone's. The stream passes through unchanged. A session that
+   * already has a turn running is left alone: nothing is claimed or recorded, and the host orders the two.
+   */
+  attach(turn: Stream.Stream<AiEvent>, requestedSessionId?: string, prompt?: string): Stream.Stream<AiEvent>
   /** Whether a turn started here is still running on `sessionId`. */
   busy(sessionId: string): Effect.Effect<boolean>
   /** The session's SSE frames: greeting, the missed events after `after`, then live events and heartbeats. */
@@ -244,7 +250,69 @@ export class AssistantTurns extends Context.Service<AssistantTurns, {
       const claimed = new Set<string>()
       const isBusy = (sessionId: string) => claimed.has(sessionId) || journal.isBusy(sessionId)
 
-      const start = (turn: Stream.Stream<AiEvent>, requestedSessionId?: string) => Effect.gen(function*() {
+      /**
+       * Follows one turn's events into the journal. The first event the host accepts opens the session's journal entry
+       * (`started`); an error before that is a refusal and never enters it, where it would end a turn that is not this one.
+       */
+      const track = (requestedSessionId?: string, prompt?: string) => {
+        let sessionId = requestedSessionId
+        let started = false
+        let finished = false
+        let refused = false
+        return {
+          record: (event: AiEvent): Effect.Effect<{ readonly kind: "refused"; readonly message: string } | { readonly kind: "started"; readonly sessionId: string; readonly seq: number } | undefined> => Effect.gen(function*() {
+            if (refused) return undefined
+            if (!started && event.type === "error") {
+              refused = true
+              // Nothing started: the session is free again as soon as the prompt has its answer.
+              if (requestedSessionId) claimed.delete(requestedSessionId)
+              return { kind: "refused" as const, message: event.message }
+            }
+            if (typeof event.sessionId === "string" && event.sessionId !== "") {
+              if (sessionId !== event.sessionId && sessionId !== undefined) claimed.delete(sessionId)
+              sessionId = event.sessionId
+            }
+            if (!sessionId) return undefined
+            if (!started) {
+              claimed.add(sessionId)
+              journal.begin(sessionId)
+            }
+            // The words that opened the turn lead its journal: the host reports a prompt as `user_message` only when
+            // it takes in a queued one, so a device that did not send this one would otherwise see an answer to nothing.
+            const opening = !started && prompt !== undefined && prompt.trim() !== ""
+              ? journal.record(sessionId, { type: "user_message", sessionId, text: prompt })
+              : undefined
+            if (opening !== undefined) yield* PubSub.publish(bus, opening)
+            const entry = journal.record(sessionId, event)
+            yield* PubSub.publish(bus, entry)
+            if (event.type === "done" || event.type === "error") finished = true
+            if (started) return undefined
+            started = true
+            return { kind: "started" as const, sessionId, seq: (opening ?? entry).seq - 1 }
+          }),
+          /** The turn's fiber ended: a follower is never left waiting on a turn that stopped without `done` or `error`. */
+          end: Effect.gen(function*() {
+            if (sessionId) {
+              if (started && !finished) yield* PubSub.publish(bus, journal.record(sessionId, { type: "error", sessionId, code: "internal", message: STOPPED_MESSAGE }))
+              if (started) journal.settle(sessionId)
+              claimed.delete(sessionId)
+            }
+            if (requestedSessionId) claimed.delete(requestedSessionId)
+          })
+        }
+      }
+
+      const attach = (turn: Stream.Stream<AiEvent>, requestedSessionId?: string, prompt?: string): Stream.Stream<AiEvent> => Stream.unwrap(Effect.sync(() => {
+        if (requestedSessionId && isBusy(requestedSessionId)) return turn
+        if (requestedSessionId) claimed.add(requestedSessionId)
+        const tracker = track(requestedSessionId, prompt)
+        return turn.pipe(
+          Stream.tap((event) => tracker.record(event)),
+          Stream.ensuring(tracker.end)
+        )
+      }))
+
+      const start = (turn: Stream.Stream<AiEvent>, requestedSessionId?: string, prompt?: string) => Effect.gen(function*() {
         // Checked and claimed in one synchronous step, so two prompts racing for one session cannot both pass.
         if (requestedSessionId) {
           if (isBusy(requestedSessionId)) {
@@ -253,50 +321,15 @@ export class AssistantTurns extends Context.Service<AssistantTurns, {
           claimed.add(requestedSessionId)
         }
         const ready = yield* Deferred.make<{ sessionId: string; seq: number }, string>()
-        let sessionId = requestedSessionId
-        let started = false
-        let finished = false
-        let refused = false
-        const publish = (id: string, event: AiEvent) => PubSub.publish(bus, journal.record(id, event))
+        const tracker = track(requestedSessionId, prompt)
         const run = turn.pipe(
-          Stream.runForEach((event) => Effect.gen(function*() {
-            // Refused before the host took it (unknown model, wrong owner, busy host): the POST answers with the reason.
-            // It never enters the session's journal, where it would end a turn that is not this one.
-            if (refused) return
-            if (!started && event.type === "error") {
-              refused = true
-              // Nothing started: the session is free again as soon as the prompt has its answer.
-              if (requestedSessionId) claimed.delete(requestedSessionId)
-              yield* Deferred.fail(ready, event.message)
-              return
-            }
-            if (typeof event.sessionId === "string" && event.sessionId !== "") {
-              if (sessionId !== event.sessionId && sessionId !== undefined) claimed.delete(sessionId)
-              sessionId = event.sessionId
-            }
-            if (!sessionId) return
-            if (!started) {
-              claimed.add(sessionId)
-              journal.begin(sessionId)
-            }
-            const entry = journal.record(sessionId, event)
-            yield* PubSub.publish(bus, entry)
-            if (event.type === "done" || event.type === "error") finished = true
-            if (!started) {
-              started = true
-              yield* Deferred.succeed(ready, { sessionId, seq: entry.seq - 1 })
-            }
-          })),
+          Stream.runForEach((event) => tracker.record(event).pipe(Effect.flatMap((outcome) =>
+            outcome?.kind === "refused" ? Deferred.fail(ready, outcome.message)
+              : outcome?.kind === "started" ? Deferred.succeed(ready, { sessionId: outcome.sessionId, seq: outcome.seq })
+              : Effect.void
+          ))),
           Effect.catchCause((cause) => Effect.logWarning("Assistant turn ended with a failure", cause)),
-          Effect.ensuring(Effect.gen(function*() {
-            if (sessionId) {
-              if (started && !finished) yield* publish(sessionId, { type: "error", sessionId, code: "internal", message: STOPPED_MESSAGE })
-              if (started) journal.settle(sessionId)
-              claimed.delete(sessionId)
-            }
-            if (requestedSessionId) claimed.delete(requestedSessionId)
-            yield* Deferred.fail(ready, "The assistant stopped before the turn started.")
-          }))
+          Effect.ensuring(tracker.end.pipe(Effect.andThen(Deferred.fail(ready, "The assistant stopped before the turn started."))))
         )
         yield* Effect.forkDetach(run)
         const answer = yield* Deferred.await(ready).pipe(
@@ -339,7 +372,7 @@ export class AssistantTurns extends Context.Service<AssistantTurns, {
         return Stream.merge(Stream.concat(Stream.fromIterable([hello, ...replay]), live), heartbeat, { haltStrategy: "left" })
       })
 
-      return AssistantTurns.of({ start, follow, busy: (sessionId) => Effect.sync(() => isBusy(sessionId)) })
+      return AssistantTurns.of({ start, attach, follow, busy: (sessionId) => Effect.sync(() => isBusy(sessionId)) })
     })
   )
 

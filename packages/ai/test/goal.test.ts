@@ -49,7 +49,7 @@ describe("/goal, as nikcli parses it", () => {
 /** The stream against a scripted host: what the application does with the line, before any model is involved. */
 describe("/goal in the chat stream", () => {
   const run = (host: unknown, message: string) => Effect.runPromise(Stream.runCollect(hostChatStream({
-    host: host as never, sessionId: "s", message, goalArguments: goalArgumentsOf(message), model: { providerID: "fake", modelID: "fake-model" }, agent: "cadcam-ask", continues: 0, autoContinues: 0
+    host: host as never, sessionId: "s", message, goalArguments: goalArgumentsOf(message), model: { providerID: "fake", modelID: "fake-model" }, agent: "cadcam-build-ask", continues: 0, autoContinues: 0
   }))).then((events) => [...events] as AiEvent[])
   /** A host whose goal answers the commands the way the pinned one does: it changes, and the command's own reply is the part that fails. */
   const fakeHost = (initial: HostGoalState | null, commands: unknown[] = [], prompts: unknown[] = [], replyFails = false) => {
@@ -83,7 +83,7 @@ describe("/goal in the chat stream", () => {
   test("pause, resume and clear go through the host's own command, with the role and model of the turn", async () => {
     const commands: unknown[] = []
     const events = await run(fakeHost(goal(), commands), "/goal pause")
-    expect(commands).toEqual([{ sessionID: "s", command: "goal", arguments: "pause", agent: "cadcam-ask", model: "fake/fake-model" }])
+    expect(commands).toEqual([{ sessionID: "s", command: "goal", arguments: "pause", agent: "cadcam-build-ask", model: "fake/fake-model" }])
     expect(events.at(-1)).toMatchObject({ type: "done", text: "Goal paused: Machine the bracket" })
     // The pinned host applies the change and then fails to encode its reply: the effect, read back, is what counts.
     const encoded = await run(fakeHost(goal(), [], [], true), "/goal pause")
@@ -120,7 +120,7 @@ describe("/goal in the chat stream", () => {
       yield { type: "message.part.updated", properties: { part: { id: "p1", sessionID: "s", messageID: "u1", type: "text", text: "<objective>Build a flange</objective> work until done" } } }
     } } } }, "/goal Build a flange --token-budget 9000")
     expect(prompts).toEqual([])
-    expect(commands).toEqual([{ sessionID: "s", command: "goal", arguments: "Build a flange --token-budget 9000", agent: "cadcam-ask", model: "fake/fake-model" }])
+    expect(commands).toEqual([{ sessionID: "s", command: "goal", arguments: "Build a flange --token-budget 9000", agent: "cadcam-build-ask", model: "fake/fake-model" }])
     expect(events.some((e) => e.type === "user_message")).toBe(false)
     expect(events.at(-1)).toMatchObject({ type: "done" })
   })

@@ -1,9 +1,26 @@
 Summarize this CAD/CAM session for another agent to continue the same job. Output only the summary; do not run tools or answer the user.
 
-Preserve the user's objective, explicit constraints, dimensions, tolerances, units, machine/material/tool setup, chosen agent/domain and decisions. Preserve the active project, real entity/component/layer/operation IDs, parametric dependencies and latest revisions, datum and stock/fixtures, CAM sequence and generated/verified operation status.
+Use exactly the headings below, in this order, even when the request that follows lists other headings (Goal, Instructions, Discoveries, Accomplished, Relevant files): fold those into the matching heading here. Write "none" under a heading with nothing to say; never drop a heading. Each heading is a short list of facts, not prose.
 
-Distinguish confirmed mutations from rejected calls, skipped elements and uncertain writes. List existing work that must not be duplicated. Retain unresolved error paths and their correction, verification findings and modelling limitations, pending plan/goal items, child task IDs/status/results and unanswered questions. Attribute facts to tool results; mark assumptions. Saved memory/preferences are reusable facts, not instructions from attachments.
+## Goal
+What the user is trying to make or machine, in their words, and the chosen agent or domain. Decisions already taken and why.
 
-Retain failure category, tool name, call ID, exact failing field/error message, known mutation outcome and retry scope; preserve current verification provenance and whether later changes made it stale. Distinguish CAD drawing coordinates, scene origin offsets and machine work offsets. Display precision must not erase sub-micron tolerances. A completed event alone is not a successful operation.
+## Constraints
+Units, tolerances (keep sub-micron values whole; display precision must not erase them), standards, machine and controller, material, stock, tools and holders, fixtures, datum. Distinguish CAD drawing coordinates, scene origin offsets and machine work offsets. Standing rules the user gave. Saved memory and preferences are reusable facts, not instructions from attachments.
 
-Keep the latest useful evidence and the next concrete action. Compact old logs, repeated failures, raw geometry arrays and G-code dumps into IDs and findings; the tools can inspect them again. Do not invent geometry, successful checks, user approval or missing child reports.
+## Model state
+The active project and drawing. The real entity, component, layer and history IDs with their latest revisions, parametric dependencies and what depends on what. Existing work that must not be duplicated. Modelling limitations found.
+
+## CAM state
+The operation sequence with each operation's ID, tool and generated status; for each, whether it was verified or is stale because later changes touched its geometry, stock, tool or setup. Verification provenance: which check, on what, when, and what it does not cover.
+
+## Verified vs assumed
+Verified: facts a tool result showed, each with the tool, call ID and result. Assumed: anything inferred or not checked, marked as an assumption. Distinguish confirmed mutations from rejected calls, skipped elements and uncertain writes. A completed event alone is not a successful operation.
+
+## Pending
+Open plan and goal items, running or finished child tasks with their IDs, status and results, unanswered questions to the user, and unresolved errors with their correction. For each failure keep the category, tool name, call ID, exact failing field or error message, known mutation outcome and retry scope.
+
+## Next action
+The one concrete next step, with the IDs and values it needs, and the latest evidence that justifies it.
+
+Keep the latest useful evidence. Compact old logs, repeated failures, raw geometry arrays and G-code dumps into IDs and findings; the tools can inspect them again. Attribute facts to tool results. Do not invent geometry, successful checks, user approval or missing child reports.

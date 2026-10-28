@@ -12,8 +12,17 @@ export const PermissionBlockedEvent = Schema.Struct({ type: Schema.Literal("perm
   permission: Schema.String, patterns: Schema.Array(Schema.String), reason: Schema.String })
 export const CompactionEvent = Schema.Struct({ type: Schema.Literal("compaction"), sessionId: Schema.String,
   phase: Schema.Literals(["start", "finish"]) })
+/** One source of the turn's context: what it is, its size, and where it travels (spec 64 Phase 1). */
+export const ContextSectionSchema = Schema.Struct({ id: Schema.String,
+  kind: Schema.Literals(["requirement", "observation", "ui-snapshot", "memory", "reference"]),
+  label: Schema.String, chars: Count, tokens: Count, truncated: Schema.optionalKey(Schema.Boolean),
+  placement: Schema.Literals(["system", "message"]) })
 export const ContextSnapshotEvent = Schema.Struct({ type: Schema.Literal("context_snapshot"), sessionId: Schema.String,
-  projectId: Schema.String, source: Schema.Literal("workspace"), chars: Count })
+  projectId: Schema.String, source: Schema.Literal("workspace"), chars: Count,
+  /** The manifest of the included sources; absent from older hosts. */
+  sections: Schema.optionalKey(Schema.Array(ContextSectionSchema)),
+  /** What happened to this turn's observation: `sent` as a new part, `unchanged` since the session already holds it, `skipped` for a turn that cannot carry a part. */
+  observation: Schema.optionalKey(Schema.Literals(["sent", "unchanged", "skipped"])) })
 export const ToolDiagnosticEvent = Schema.Struct({ type: Schema.Literal("tool_diagnostic"), sessionId: Schema.String,
   agent: Schema.optionalKey(Schema.String), callId: Schema.String, tool: Schema.String,
   kind: Schema.Literals(["argument", "execution", "partial", "verification"]),

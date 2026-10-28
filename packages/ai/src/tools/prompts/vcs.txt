@@ -1,7 +1,8 @@
-Read-only version control: where the project stands and what a person is being asked to review. Optional: a job never depends on it.
+Read-only version control: branch status, uncommitted changes, diffs and pull requests.
+Optional: a job never depends on it.
 
 Actions
-- status: the checked-out branch, uncommitted files, branches and open pull requests. Call it when the request involves history; the job never waits on it.
+- status: the checked-out branch, uncommitted files, branches and open pull requests. Call it when the request involves history.
 - diff: entity-level changes between two revisions (property path, before, after); `from` defaults to main.
 - list_pull_requests: the project's pull requests with their review verdicts.
 

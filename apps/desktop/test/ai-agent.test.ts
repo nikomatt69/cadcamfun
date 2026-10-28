@@ -3,7 +3,7 @@
  * stream in place of the sidecar's, through the real client, store and panel.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { Effect, Stream } from "effect"
+import { Effect, Queue, Stream } from "effect"
 import { bootLiveApp } from "./helpers/live-app.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
@@ -74,7 +74,7 @@ describe("the agent's work is shown", () => {
   }, 60000)
 })
 
-test("assistant controls select roles and modes, answer questions and compact through the typed client", async () => {
+test("assistant controls select Build or Plan, with no mode picker, answer questions and compact through the typed client", async () => {
   const client = app.state.client as unknown as { ai: { chatStream: unknown; sessionControl: unknown } }
   const originalStream = client.ai.chatStream, originalControl = client.ai.sessionControl
   const controls: Array<Record<string, unknown>> = []
@@ -104,14 +104,22 @@ test("assistant controls select roles and modes, answer questions and compact th
       const option = await w(`${control} option`, () => Array.from(panel.querySelectorAll<HTMLButtonElement>('.assistant-control-option')).find((candidate) => candidate.textContent?.includes(label)))
       option.click()
     }
-    await chooseControl("agent", "CAD")
-    await chooseControl("mode", "CAD / 3D modelling")
+    // Modes are no longer selected: there is no mode control in the composer, and the agent menu
+    // offers exactly Build and Plan.
+    expect(panel.querySelector('button[data-control="mode"]')).toBeNull()
+    panel.querySelector<HTMLButtonElement>('button[data-control="agent"]')!.click()
+    const agentOptions = await w("agent options", () => Array.from(panel.querySelectorAll<HTMLElement>('.assistant-control-option')).map((option) => option.textContent ?? ""))
+    expect(agentOptions.some((text) => text.includes("Build"))).toBe(true)
+    expect(agentOptions.some((text) => text.includes("Plan"))).toBe(true)
+    // Only the two primaries are offered (the descriptions mention CAD and CAM, so count the options).
+    expect(agentOptions.length).toBe(2)
+    ;(await w("build option", () => Array.from(panel.querySelectorAll<HTMLButtonElement>('.assistant-control-option')).find((candidate) => candidate.textContent?.includes("Build")))).click()
     await chooseControl("permissions", "Auto")
     const input = await w("composer", () => q<HTMLTextAreaElement>("textarea.assistant-prompt"))
     input.value = "Model this part"; input.dispatchEvent(new window.Event("input", { bubbles: true }))
     await flush(); q<HTMLButtonElement>("button.assistant-send")!.click()
     const question = await w("question UI", () => q('[data-testid="ai-question"]'))
-    expect(sent?.agent).toBe("cad"); expect(sent?.mode).toBe("cad")
+    expect(sent?.agent).toBe("build"); expect(sent?.mode).toBe("general")
     expect(sent?.permissionMode).toBe("auto")
     question.querySelector<HTMLInputElement>('input[type="radio"]')!.click()
     await flush(); question.querySelector<HTMLButtonElement>("button")!.click()
@@ -178,5 +186,97 @@ describe("the goal can be set and controlled like nikcli's /goal", () => {
     } finally {
       dispose(); client.ai.chatStream = original
     }
+  }, 60000)
+
+  test("the transcript keeps following the newest message: a scroll event alone never lets go, only the person scrolling up does", async () => {
+    const client = app.state.client as unknown as { ai: { chatStream: unknown } }
+    const original = client.ai.chatStream
+    client.ai.chatStream = () => Effect.succeed(Stream.fromIterable([
+      { type: "delta", sessionId: "s", text: "Done." }, { type: "done", sessionId: "s", text: "Done." }
+    ].map((e) => JSON.stringify(e))))
+    try {
+      const { dispose } = app.visit("/cad")
+      try {
+        if (!q('[data-testid="ai-panel"]')) (await w("open assistant", () => q<HTMLButtonElement>('button[title="Show CAD Assistant"]'))).click()
+        await flush(50)
+        const input = await w("prompt", () => q<HTMLTextAreaElement>("textarea.assistant-prompt"))
+        input.value = "Hello"
+        input.dispatchEvent(new window.Event("input", { bubbles: true }))
+        await flush()
+        q<HTMLElement>('button.assistant-send')!.click()
+        const transcript = await w("transcript", () => q('[data-testid="ai-transcript"]'))
+        await w("answer", () => transcript.textContent?.includes("Done."))
+        // Content that shrank and grew inside one frame leaves the box away from its end without anyone scrolling.
+        const geometry = (scrollTop: number): void => {
+          Object.defineProperty(transcript, "scrollHeight", { configurable: true, value: 5000 })
+          Object.defineProperty(transcript, "clientHeight", { configurable: true, value: 500 })
+          Object.defineProperty(transcript, "scrollTop", { configurable: true, writable: true, value: scrollTop })
+        }
+        geometry(3000)
+        transcript.dispatchEvent(new window.Event("scroll"))
+        await flush()
+        expect(q('[data-testid="ai-jump-latest"]')).toBeNull()
+        // The person scrolling up lets go and the jump button appears; it brings the end back.
+        transcript.dispatchEvent(new window.WheelEvent("wheel", { deltaY: -40 }))
+        await w("jump button", () => q('[data-testid="ai-jump-latest"]'))
+        q<HTMLButtonElement>('[data-testid="ai-jump-latest"]')!.click()
+        await w("following again", () => q('[data-testid="ai-jump-latest"]') === null)
+      } finally { dispose() }
+    } finally { client.ai.chatStream = original }
+  }, 60000)
+})
+
+describe("a conversation shared with the phone", () => {
+  test("a turn the phone runs on the open conversation appears here as it is written, and the window is free again after it", async () => {
+    const client = app.state.client as unknown as { ai: { chatStream: unknown; sessionStream: unknown } }
+    const originalChat = client.ai.chatStream, originalFollow = client.ai.sessionStream
+    const frames = Effect.runSync(Queue.unbounded<object>())
+    const opened: string[] = []
+    const frame = (event: object, seq: number): object => ({ type: "event", seq, event })
+    client.ai.chatStream = () => Effect.succeed(Stream.fromIterable([
+      { type: "turn", sessionId: "ses_shared", phase: "start" },
+      { type: "done", sessionId: "ses_shared", text: "Desktop answer." }
+    ].map((e) => JSON.stringify(e))))
+    client.ai.sessionStream = (input: { params: { sessionId: string } }) => {
+      opened.push(input.params.sessionId)
+      return Effect.succeed(Stream.concat(Stream.make({ type: "server.connected", sessionId: input.params.sessionId, busy: false, seq: 10 }), Stream.fromQueue(frames)))
+    }
+    try {
+      const { dispose } = app.visit("/cad")
+      try {
+        if (!q('[data-testid="ai-panel"]')) {
+          ;(await w("open-button", () => q<HTMLButtonElement>('button[title="Show CAD Assistant"]'))).click()
+          await flush(50)
+          await w("panel", () => q('[data-testid="ai-panel"]'))
+        }
+        const input = await w("prompt", () => q<HTMLTextAreaElement>("textarea.assistant-prompt"))
+        input.value = "Start a shared conversation"
+        input.dispatchEvent(new window.Event("input", { bubbles: true }))
+        await flush()
+        q<HTMLElement>("button.assistant-send")!.click()
+        await w("desktop-answer", () => (q('[data-testid="ai-panel"]')?.textContent ?? "").includes("Desktop answer.") || undefined)
+        // The conversation now has the host's name, and the window follows it.
+        await w("follows", () => opened.includes("ses_shared") || undefined)
+
+        // The phone sends a prompt: its turn arrives on the session stream, not on a stream of this window.
+        const push = (event: object, seq: number): void => { Effect.runSync(Queue.offer(frames, frame(event, seq))) }
+        push({ type: "user_message", sessionId: "ses_shared", text: "Question typed on the phone" }, 11)
+        push({ type: "turn", sessionId: "ses_shared", phase: "start" }, 12)
+        push({ type: "delta", sessionId: "ses_shared", text: "Written from the phone." }, 13)
+        await w("phone-delta", () => (q('[data-testid="ai-panel"]')?.textContent ?? "").includes("Written from the phone.") || undefined)
+        // The question the phone sent is in the transcript before its answer.
+        const text = q('[data-testid="ai-panel"]')?.textContent ?? ""
+        expect(text.indexOf("Question typed on the phone")).toBeGreaterThan(-1)
+        expect(text.indexOf("Question typed on the phone")).toBeLessThan(text.indexOf("Written from the phone."))
+        push({ type: "done", sessionId: "ses_shared", text: "Written from the phone." }, 14)
+        // The turn ended: the window is idle again and a message goes out as a new turn.
+        await w("idle-again", () => q<HTMLElement>("button.assistant-send") ? true : undefined)
+        expect((q('[data-testid="ai-panel"]')?.textContent ?? "").match(/Written from the phone\./g)?.length).toBe(1)
+        // The tail of a turn this window did not show (no start seen) is never applied on its own.
+        push({ type: "delta", sessionId: "ses_shared", text: "Stray tail." }, 15)
+        await flush(150)
+        expect(q('[data-testid="ai-panel"]')?.textContent ?? "").not.toContain("Stray tail.")
+      } finally { dispose() }
+    } finally { client.ai.chatStream = originalChat; client.ai.sessionStream = originalFollow }
   }, 60000)
 })

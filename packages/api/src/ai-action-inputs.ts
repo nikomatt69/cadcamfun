@@ -279,6 +279,26 @@ export const MEMORY_ACTION_INPUTS = {
 
 const taskId = Schema.Struct({ taskId: Schema.String.check(Schema.isUUID()) })
 
+/**
+ * The structured job description a parent may give a specialist instead of (or beside) free prose. The objective is the
+ * one required part: a job that does not say what it is for cannot be done or checked. Ids, values, limits and the
+ * expected report are optional because a read-only question may have none; nothing here is checked against project state.
+ */
+export const AgentBriefValue = Schema.Struct({
+  name: trimmed(80),
+  value: Schema.Union([trimmed(200), Schema.Finite]),
+  /** `mm`, `deg`, `rpm`, `mm/min`, ...; left out only for a count. */
+  unit: Schema.optionalKey(trimmed(20))
+})
+
+export const AgentBrief = Schema.Struct({
+  objective: trimmed(1_000),
+  ids: Schema.optionalKey(Schema.Array(trimmed(200)).check(Schema.isMaxLength(50))),
+  values: Schema.optionalKey(Schema.Array(AgentBriefValue).check(Schema.isMaxLength(50))),
+  limits: Schema.optionalKey(Schema.Array(trimmed(500)).check(Schema.isMaxLength(30))),
+  report: Schema.optionalKey(trimmed(1_000))
+})
+
 export const VCS_ACTION_INPUTS = {
   "vcs.status": empty,
   "vcs.diff": Schema.Struct({ from: Schema.optionalKey(Schema.String), to: withDefault(Schema.String, "HEAD") }),
@@ -290,11 +310,13 @@ export const VCS_ACTION_INPUTS = {
   "vcs_edit.run_workflows": Schema.Struct({ trigger: withDefault(Schema.Literals(["manual", "pull-request", "push"]), "manual") }),
   "agent.start": Schema.Struct({
     description: trimmed(200),
-    prompt: trimmed(20_000),
+    /** The job as free text. With a `brief` it is further detail; one of the two must be present (the input check below). */
+    prompt: Schema.optionalKey(trimmed(20_000)),
+    brief: Schema.optionalKey(AgentBrief),
     agent: Schema.optionalKey(Schema.String.pipe(Schema.decodeTo(Schema.String, SchemaTransformation.trim()))),
     subagent_type: Schema.optionalKey(Schema.String.pipe(Schema.decodeTo(Schema.String, SchemaTransformation.trim()))),
     background: Schema.optionalKey(flag)
-  }),
+  }).check(Schema.makeFilter((input) => input.prompt === undefined && input.brief === undefined ? "Send a brief (with an objective) or a prompt" : true)),
   "agent.list": empty,
   "agent.read": taskId,
   "agent.cancel": taskId

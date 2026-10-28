@@ -70,7 +70,7 @@ describe("the host configuration", () => {
     }
     // The tools the policy did not name are untouched.
     const other = REGISTERED.find((id) => id !== victim && !id.startsWith("cam"))!
-    expect(config.agent["cadcam"]!.permission[other]).toMatch(/^(allow|ask)$/)
+    expect(config.agent["cadcam-build"]!.permission[other]).toMatch(/^(allow|ask)$/)
   })
 
   test("without a policy the configuration carries no policies at all", () => {

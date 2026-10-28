@@ -6,6 +6,7 @@
  */
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { neutralizeDelimiters, stripInvisible } from "../untrusted.ts"
 import { CADCAM_SKILLS, skillMarkdown, type CadCamSkill } from "./index.ts"
 
 export const SKILL_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -22,6 +23,18 @@ export interface UserSkill {
 
 export type SkillResult<A> = { readonly ok: true; readonly value: A } | { readonly ok: false; readonly problems: ReadonlyArray<string> }
 
+/**
+ * A skill is a playbook the model follows, and one pasted from the internet is somebody else's text (spec 64). It may give any
+ * advice, but it may not hide characters, nor imitate the delimiters the app uses to tell its own framing from data (a closing
+ * `</project_memory>`, a `<system-reminder>`, a chat-template token, a `Current context:` header).
+ */
+const hostileText = (text: string): "invisible" | "delimiter" | undefined => {
+  const plain = text.replace(/\r/g, "")
+  if (stripInvisible(plain) !== plain) return "invisible"
+  if (neutralizeDelimiters(plain) !== plain) return "delimiter"
+  return undefined
+}
+
 /** Everything wrong with a skill, in one list (empty when it can be loaded). */
 export const skillProblems = (skill: { readonly name: string; readonly description: string; readonly body: string }): string[] => {
   const problems: string[] = []
@@ -34,6 +47,11 @@ export const skillProblems = (skill: { readonly name: string; readonly descripti
   if (/[\r\n]/.test(skill.description)) problems.push("description must be one line")
   if (skill.body.trim().length < 20) problems.push("the playbook is empty or too short to be useful")
   if (skill.body.length > MAX_SKILL_BODY) problems.push(`the playbook is longer than ${MAX_SKILL_BODY} characters`)
+  for (const [field, text] of [["description", skill.description], ["playbook", skill.body]] as const) {
+    const found = hostileText(text)
+    if (found === "invisible") problems.push(`the ${field} contains control, zero-width or direction-override characters`)
+    if (found === "delimiter") problems.push(`the ${field} imitates a prompt delimiter (a tag such as <system-reminder> or </project_memory>, a chat-template token or a "Current context:" header); rewrite it without`)
+  }
   return problems
 }
 

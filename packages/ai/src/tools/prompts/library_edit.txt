@@ -1,4 +1,4 @@
-Create, replace or remove rows of the user's libraries, and set a project's defaults.
+Create, replace or delete the user's materials, cutters, machines, costs and project defaults.
 
 Actions
 - upsert_material: create a material row, or replace an existing one when id names a row you may write.
@@ -12,19 +12,19 @@ Actions
 Parameters
 - upsert_material: id (omit to create), name, description, properties ({name: number|string|boolean}), isPublic.
 - upsert_tool: id, name, type, diameter (mm), material, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, cornerRadius (mm, 0 is sharp), tipAngle (degrees), threadPitch (mm), holderDiameter, holderLength, stickout (mm), notes, isPublic.
-- upsert_machine_config: id, name, kind (mill|lathe|3Dprinter), description, controller (the control in the shop's words, "Fanuc 0i-MD", "Heidenhain TNC7"), post (generic|fanuc|grbl|linuxcnc|haas|siemens|heidenhain, when the controller's name does not decide it), axes, axisTable ([{id, kind, min, max, sense, continuous}]), spindle ({maxRpm, minRpm, powerKw, torqueNm, ...}), feed ({max, rapid}), rigidity, workVolume ({x,y,z}), travel ({minX,maxX,minY,maxY,minZ,maxZ}), table ({length,width,gap}), rotary ({layout,tilt,rotation,pivot}), turning ({maxBarDiameter,maxBarLength,chuckDiameter,b,c,continuousC,yTravel}), workOffsets, probing, toolChanger, coolant, accuracy ({positioningMm,repeatabilityMm,runoutMm}), reference ({source,notes}), kinematics ({axis: {min, max}}), postProcessor, maxRPM, maxFeed, isPublic.
+- upsert_machine_config: id, name, kind (mill|lathe|3Dprinter), description, controller (the control in the shop's words, "Fanuc 0i-MD", "Heidenhain TNC7"), post (generic|fanuc|grbl|linuxcnc|haas|siemens|heidenhain|okuma|mazak, when the controller's name does not decide it), axes, axisTable ([{id, kind, min, max, sense, continuous}]), spindle ({maxRpm, minRpm, powerKw, torqueNm, ...}), feed ({max, rapid}), rigidity, workVolume ({x,y,z}), travel ({minX,maxX,minY,maxY,minZ,maxZ}), table ({length,width,gap}), rotary ({layout,tilt,rotation,pivot}), turning ({maxBarDiameter,maxBarLength,chuckDiameter,b,c,continuousC,yTravel}), workOffsets, probing, toolChanger, coolant, accuracy ({positioningMm,repeatabilityMm,runoutMm}), reference ({source,notes}), kinematics ({axis: {min, max}}), postProcessor, maxRPM, maxFeed, isPublic.
 - upsert_library_item: id, name, category, type, data ({...}), description, properties, tags, isPublic.
 - set_cost: kind (material|tool_wear|operation), id (omit to create). material: materialId, costPerUnit, wasteFactor, minimumCharge. tool_wear: toolId, wearRatePerMeter, replacementCost, replacementThreshold. operation: name, machineHourlyRate, operatorHourlyRate, setupTime (min). currencyCode.
 - set_default: materialId, toolId, machineConfigId (any subset; the open project is the one that changes).
 - delete: kind (material|tool|machine_config|library_item), id, confirm (true, only when the user asked).
 
-Fill every parameter the row stores: a library row with empty fields is incomplete, not a draft. Give values with the units the parameters name (mm, rpm, mm/min) and keep them consistent (a cutting length that fits the total length, a shank no smaller than the cutter, an RPM the holder allows). The shape parameters (cornerRadius, tipAngle, threadPitch, holder*) are what draws the tool's 3D model; set the ones the cutter type has and leave the others out.
+Fill every parameter the row stores: empty fields are incomplete, not a draft. Use the units named (mm, rpm, mm/min) and keep values consistent (cutting length within total length, shank no smaller than the cutter, an RPM the holder allows). The shape parameters (cornerRadius, tipAngle, threadPitch, holder*) draw the tool's 3D model: set those the cutter type has, omit the rest.
 
 Result (JSON)
 - ok, id, created (true when a row was created, false when an existing one was replaced); the store's answer, not the intention. delete also returns what still refers to the row.
 
 Do not use it
-- To read what exists: library is read-only and free of side effects.
+- To read what exists: library is read-only.
 - Never invent a material, a cutter or a machine: only write rows from real user- or manufacturer-supplied values, and only when the user asked.
 
 On refusal

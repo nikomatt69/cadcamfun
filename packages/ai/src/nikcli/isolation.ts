@@ -93,7 +93,16 @@ export const SCRUBBED_ENV = [
   "NIKCLI_DISABLE_CODE_MODE"
 ] as const
 
+/** nikcli's `NIKCLI_CACHE_RETENTION`: `short` is the provider's 5-minute cache entry, `long` the 1-hour entry (2x the write price). */
+export type CacheRetentionSetting = "short" | "long"
+
 export interface IsolationOptions {
+  /**
+   * `ai.cacheRetention`: how long the host asks the provider to keep the prompt cache entry (default `short`). It becomes
+   * `NIKCLI_CACHE_RETENTION`, which the host reads for every request; only routes with cache breakpoints (Anthropic, OpenRouter,
+   * Bedrock, Alibaba) honour it. The setting overrides whatever the process inherited.
+   */
+  readonly cacheRetention?: CacheRetentionSetting
   /**
    * Also point `HOME`/`USERPROFILE` at the isolated home. Defence in depth on
    * top of the documented variables; on by default. Process-wide side effect.
@@ -130,6 +139,7 @@ export const isolationEnv = (paths: IsolatedPaths, options?: IsolationOptions): 
   ...(options?.mods === true ? {} : { NIKCLI_DISABLE_MODS: "1" }),
   NIKCLI_DISABLE_HOT_RELOAD: "1",
   NIKCLI_DISABLE_PLUGIN_RELOAD: "1",
+  NIKCLI_CACHE_RETENTION: options?.cacheRetention === "long" ? "long" : "short",
   NIKCLI_EXPERIMENTAL_DISABLE_FILEWATCHER: "1",
   // Never import skills/prompts from other coding agents' folders.
   NIKCLI_DISABLE_CLAUDE_CODE: "1",

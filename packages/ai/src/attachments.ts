@@ -11,6 +11,7 @@
  * The store is per project and in memory: attachments belong to the conversation, not to the data.
  */
 import { Schema } from "effect"
+import { untrustedBlock, untrustedLine } from "./untrusted.ts"
 
 export const MAX_ATTACHMENTS = 5
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -105,7 +106,8 @@ export const prepareAttachments = (projectId: string, attachments: ReadonlyArray
   const rejected: Array<{ name: string; reason: string }> = []
   const lines: string[] = []
   for (const [index, attachment] of (attachments ?? []).entries()) {
-    const name = attachment.name.replace(/[\r\n]/g, " ")
+    // The name is the file's, not ours: one line, no control or imitated delimiters (spec 64). The tools receive this same name.
+    const name = untrustedLine(attachment.name, 200) || "unnamed"
     if (index >= MAX_ATTACHMENTS) {
       rejected.push({ name, reason: `at most ${MAX_ATTACHMENTS} files per message` })
       continue
@@ -138,12 +140,13 @@ export const prepareAttachments = (projectId: string, attachments: ReadonlyArray
       stored.push(name)
       const ext = extensionOf(name)
       const hint = name.endsWith(".mesh.json")
-        ? `parsed mesh; use cad_edit action import with format mesh and attachment "${name}"; specify source-unit scale to mm`
+        ? `parsed mesh; use cad_edit action import with format mesh and attachment ${JSON.stringify(name)}; specify source-unit scale to mm`
         : ext === "dxf" || ext === "svg" || ext === "step" || ext === "stp"
-        ? `use cad_edit action import with attachment "${name}" (and a depth for DXF/SVG) to build it in 3D`
+        ? `use cad_edit action import with attachment ${JSON.stringify(name)} (and a depth for DXF/SVG) to build it in 3D`
         : "kept for the tools"
       if (attachment.data.length <= INLINE_TEXT_CHARS && ext !== "dxf" && ext !== "svg" && ext !== "step" && ext !== "stp") {
-        lines.push(`- ${name}: text, ${attachment.data.length} characters (${hint}). Content:\n\`\`\`\n${attachment.data}\n\`\`\``)
+        // The file's text is data inside a labelled block it cannot close; a code fence would end at the file's own fence.
+        lines.push(`- ${name}: text, ${attachment.data.length} characters (${hint}). Content:\n${untrustedBlock({ source: `attachment ${name}`, text: attachment.data, max: INLINE_TEXT_CHARS })}`)
       } else {
         lines.push(`- ${name}: text, ${attachment.data.length} characters (${hint}).`)
       }

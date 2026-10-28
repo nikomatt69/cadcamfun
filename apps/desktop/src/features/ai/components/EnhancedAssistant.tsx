@@ -36,6 +36,7 @@ import { AssistantComposer, MAX_PROMPT } from "./AssistantComposer.tsx"
 import { AssistantPanels } from "./AssistantPanels.tsx"
 import { AssistantTranscript } from "./AssistantTranscript.tsx"
 import { AgentActivity } from "./AgentActivity.tsx"
+import { BackgroundTasksSheet } from "./BackgroundTasksSheet.tsx"
 import { ContextDialog } from "./ContextDialog.tsx"
 import { t } from "../../../i18n/index.ts"
 import { toast } from "../../../shared/ui/toast.tsx"
@@ -451,6 +452,8 @@ export function EnhancedAssistant(props: Props): JSX.Element {
           </ul>
         </section>
       </Show>
+
+      <BackgroundTasksSheet />
 
       {/* The dock is its own box, outside the scrolling transcript: it keeps its size while the conversation moves. */}
       <div class="assistant-composer-dock" data-testid="ai-dock">

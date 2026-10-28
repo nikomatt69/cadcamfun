@@ -28,7 +28,8 @@ export const CadGrepInput = Schema.Struct({
   /** Inline each parametric hit's full parameter set, so finding a part and reading its parameters is one call. */
   includeParameters: withDefault(Schema.Boolean, true),
   offset: withDefault(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), 0),
-  limit: withDefault(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 50 })), 20)
+  /** Each hit can carry its whole parameter set, so a page stays smaller than an inspection page. */
+  limit: withDefault(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 200 })), 20)
 })
 export type CadGrepInput = typeof CadGrepInput.Type
 

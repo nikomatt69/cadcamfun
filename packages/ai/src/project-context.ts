@@ -18,6 +18,8 @@
  * omitted remainder is counted, and nothing is ever invented to fill a hole.
  */
 
+import { sealText } from "./untrusted.ts"
+
 /** The key-value row the document lives in, beside `ai.context.<projectId>` and `ai.memory.*`. */
 export const projectContextKey = (projectId: string): string => `ai.projectcontext.${projectId}`
 
@@ -151,7 +153,9 @@ const block = (tag: string, header: ReadonlyArray<string>, body: string, budget:
   const overhead = open.length + close.length + prose.length + 3
   const room = budget - overhead
   if (room <= 0) return ""
-  return [open, prose, clipLines(body.trim(), room, marker), close].join("\n")
+  // The body is somebody's text (the user's rules, Brain's file, a habits file an earlier session wrote): it cannot close this
+  // block or open another one, and no invisible or control character reaches the model (spec 64).
+  return [open, prose, clipLines(sealText(body).trim(), room, marker), close].join("\n")
 }
 
 /**

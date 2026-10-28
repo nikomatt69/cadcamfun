@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { AiEvent } from "@cadcamfun/ai"
 import type { SessionStreamFrame } from "@cadcamfun/api"
-import { Effect, Queue, Scope, Stream } from "effect"
+import { Effect, Fiber, Queue, Scope, Stream } from "effect"
 import { AssistantTurns, SessionJournal, STOPPED_MESSAGE } from "../src/services/assistant-turns.ts"
 
 const turn = (sessionId: string): AiEvent => ({ type: "turn", sessionId, phase: "start" })
@@ -234,5 +234,85 @@ describe("detached assistant turns", () => {
       return yield* Stream.runCollect(stream.pipe(Stream.take(1)))
     }))
     expect(hello[0]).toMatchObject({ type: "server.connected", busy: false })
+  })
+  test("a turn the desktop streams itself is journaled: the phone follows it live and the stream passes through unchanged", async () => {
+    const { passed, frames, busyDuring, busyAfter } = await run(Effect.gen(function*() {
+      const turns = yield* AssistantTurns
+      const gate = yield* Queue.unbounded<AiEvent>()
+      const mine = turns.attach(Stream.concat(Stream.make(turn("ses_desk")), Stream.fromQueue(gate).pipe(Stream.takeUntil((event) => event.type === "done"))), "s-desk")
+      const collected = yield* Effect.forkChild(Stream.runCollect(mine))
+      yield* Effect.sleep("20 millis")
+      const busyDuring = yield* turns.busy("ses_desk")
+      const stream = yield* turns.follow("ses_desk", undefined, 60_000)
+      const followed = yield* Effect.forkChild(Stream.runCollect(stream.pipe(Stream.takeUntil((frame) => frame.type === "event" && frame.event.type === "done"))))
+      yield* Effect.sleep("20 millis")
+      yield* Queue.offer(gate, delta("ses_desk", "Hi"))
+      yield* Queue.offer(gate, done("ses_desk", "Hi"))
+      const passed = yield* Fiber.join(collected)
+      const frames = yield* Fiber.join(followed)
+      return { passed, frames, busyDuring, busyAfter: yield* turns.busy("ses_desk") }
+    }))
+    expect([...passed].map((event) => event.type)).toEqual(["turn", "delta", "done"])
+    expect(busyDuring).toBe(true)
+    expect(busyAfter).toBe(false)
+    expect(frames.map((frame: SessionStreamFrame) => frame.type === "event" ? frame.event.type : frame.type)).toEqual(["server.connected", "delta", "done"])
+  })
+
+  test("an attached turn that is refused before it starts leaves the session free and unjournaled", async () => {
+    const result = await run(Effect.gen(function*() {
+      const turns = yield* AssistantTurns
+      const passed = yield* Stream.runCollect(turns.attach(Stream.make<AiEvent[]>({ type: "error", sessionId: "ses_no", code: "config", message: "No model" }), "ses_no"))
+      const stream = yield* turns.follow("ses_no", undefined, 60_000)
+      return { passed, hello: yield* Stream.runCollect(stream.pipe(Stream.take(1))), busy: yield* turns.busy("ses_no") }
+    }))
+    expect([...result.passed].map((event) => event.type)).toEqual(["error"])
+    expect(result.hello[0]).toMatchObject({ type: "server.connected", busy: false })
+    expect(result.busy).toBe(false)
+  })
+
+  test("an attached turn on a session that is already busy is left alone", async () => {
+    const result = await run(Effect.gen(function*() {
+      const turns = yield* AssistantTurns
+      const gate = yield* Queue.unbounded<AiEvent>()
+      yield* turns.start(Stream.concat(Stream.make(turn("ses_two")), Stream.fromQueue(gate).pipe(Stream.takeUntil((event) => event.type === "done"))), "ses_two")
+      const passed = yield* Stream.runCollect(turns.attach(Stream.make(delta("ses_two", "late"), done("ses_two", "late")), "ses_two"))
+      const busy = yield* turns.busy("ses_two")
+      return { passed, busy }
+    }))
+    expect([...result.passed].map((event) => event.type)).toEqual(["delta", "done"])
+    // The first turn still owns the session: the second one's `done` did not settle it.
+    expect(result.busy).toBe(true)
+  })
+
+  test("an attached turn whose stream is cut tells a follower it stopped", async () => {
+    const frames = await run(Effect.gen(function*() {
+      const turns = yield* AssistantTurns
+      yield* Stream.runCollect(turns.attach(Stream.make(turn("ses_cut"), delta("ses_cut", "half")), "ses_cut"))
+      const stream = yield* turns.follow("ses_cut", 0, 60_000)
+      return yield* Stream.runCollect(stream.pipe(Stream.take(4)))
+    }))
+    const last = [...frames].at(-1)
+    expect(last).toMatchObject({ type: "event", event: { type: "error", message: STOPPED_MESSAGE } })
+  })
+
+  test("the words that started a turn lead its journal, whichever device sent them", async () => {
+    const seen = await run(Effect.gen(function*() {
+      const turns = yield* AssistantTurns
+      const started = yield* turns.start(Stream.make(turn("ses_p"), done("ses_p", "ok")), "s-p", "Make a bracket")
+      const stream = yield* turns.follow("ses_p", started.seq, 60_000)
+      const attached = yield* Stream.runCollect(turns.attach(Stream.make(turn("ses_q"), done("ses_q", "ok")), "s-q", "Add a hole"))
+      const other = yield* turns.follow("ses_q", 0, 60_000)
+      return {
+        phone: yield* Stream.runCollect(stream.pipe(Stream.take(4))),
+        desktop: yield* Stream.runCollect(other.pipe(Stream.take(4))),
+        attached
+      }
+    }))
+    const names = (frames: ReadonlyArray<SessionStreamFrame>) => frames.map((frame) => frame.type === "event" ? frame.event.type : frame.type)
+    expect(names([...seen.phone])).toEqual(["server.connected", "user_message", "turn", "done"])
+    expect(seen.phone[1]).toMatchObject({ event: { type: "user_message", text: "Make a bracket" } })
+    expect(names([...seen.desktop])).toEqual(["server.connected", "user_message", "turn", "done"])
+    // The desktop's own stream is untouched: it already shows its question.
+    expect([...seen.attached].map((event) => event.type)).toEqual(["turn", "done"])
   })
 })

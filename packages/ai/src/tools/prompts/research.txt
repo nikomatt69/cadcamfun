@@ -1,11 +1,11 @@
-Read the world outside the drawing: a live web search and the files the user attached.
+Search the web for technical sources and read files the user attached (text, code, G-code).
 
 Actions
 - search: web search over technical sources; returns URLs and bounded excerpts.
 - read_attachment: read an attached text, code or G-code file in bounded pages.
 
 Parameters
-- search: query, numResults, type (auto...), livecrawl, contextMaxCharacters (see the schema's bounds).
+- search: query (up to 500 characters), numResults (1-8, default 5).
 - read_attachment: attachment (the file name), offset (default 0), maxChars (1-20000, default 10000).
 
 Result (JSON)

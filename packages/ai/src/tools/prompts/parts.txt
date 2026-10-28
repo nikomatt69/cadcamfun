@@ -1,4 +1,4 @@
-Reusable parts: gather what is in the drawing into a saved component, place one, or remove it.
+Save drawing elements as a reusable component, insert a saved component, or delete it.
 
 Actions
 - save: gather existing elements by id into a named component of this project; children are stored relative to the group's origin. Description, type and visibility are the component's library metadata and travel with the save.

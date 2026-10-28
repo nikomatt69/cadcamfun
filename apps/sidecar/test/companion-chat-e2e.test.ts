@@ -220,7 +220,8 @@ describe("the assistant from the phone", () => {
       seen.push(frame.event.type)
       if (frame.event.type === "question_request") { requestId = String((frame.event as { requestId: string }).requestId); first.abort(); break }
     }
-    expect(seen[0]).toBe("turn")
+    // The words that started the turn lead its journal, so a device that did not send them still shows the question.
+    expect(seen.slice(0, 2)).toEqual(["user_message", "turn"])
     expect(requestId).not.toBe("")
 
     // With no stream open, the phone answers; the desktop finishes the turn on its own.

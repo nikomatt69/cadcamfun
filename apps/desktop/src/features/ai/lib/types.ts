@@ -75,7 +75,7 @@ export interface AiQuestion {
   readonly custom?: boolean
 }
 export interface AiPendingQuestion { readonly requestId: string; readonly questions: ReadonlyArray<AiQuestion> }
-export interface AiAgent { readonly id: string; readonly title: string; readonly description: string; readonly tools: ReadonlyArray<string>; readonly edits: boolean }
+export interface AiAgent { readonly id: string; readonly title: string; readonly description: string; readonly tools: ReadonlyArray<string>; readonly edits: boolean; readonly kind?: string; readonly canEdit?: boolean; readonly delegates?: boolean }
 /** An assistant mode a plugin contributes (spec 09-plugins.md): conversations address it as `<pluginId>:<id>`. */
 export interface AiMode { readonly id: string; readonly title: string; readonly description: string; readonly pluginId: string; readonly pluginName: string }
 export interface AiContextState {

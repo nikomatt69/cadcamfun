@@ -68,9 +68,20 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // Raised to 32 000 when the swarf operation (a flank cut of a cone or cylinder wall) joined the cam tool, to 32 300 with the post definition input.
     // Raised to 32 500 when cad title_block / title_block_set (the drawing's title block, read and set) joined cad and cad_edit.
     // +300: cad_edit parametric_timeline (spec 58 T7: suppress, release, rollback, move).
+    // Spec 64: the searchable first lines and the new limits stayed inside this ceiling by cutting the duplicated first sentences
+    // of library, vcs, vcs_edit, mods and mods_edit, the repeated surface limits and the mods preamble; no action or rule was removed.
     expect(total).toBeLessThan(32_800)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
+  })
+
+  test("paging limits and retired parameters: the prompts state the schema caps and name no dropped parameter", () => {
+    const cadText = rawToolPrompt("cad")
+    expect(cadText).toMatch(/limit goes up to 500 on inspect_elements, inspect_origins and inspect_search/)
+    expect(cadText).toMatch(/up to 200 on grep/)
+    for (const key of ["livecrawl", "contextMaxCharacters"]) expect(rawToolPrompt("research"), key).not.toContain(key)
+    expect(rawToolPrompt("research")).toContain("numResults (1-8")
+    for (const post of ["okuma", "mazak"]) expect(rawToolPrompt("library_edit"), post).toContain(post)
   })
 
   test("what the prompts promise is true: operation types, tool types, materials, offsets decode in the generator", () => {
