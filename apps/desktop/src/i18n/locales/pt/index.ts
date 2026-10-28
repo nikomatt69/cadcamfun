@@ -1,5 +1,5 @@
 /**
- * The Portuguese pack: the tables of every vertical, merged.
+ * The Portuguese (Brazil) pack: the tables of every vertical, merged.
  *
  * The order of the merge is the order of the verticals; the last file wins a key
  * that two of them share.
@@ -23,5 +23,5 @@ import vcs from "./vcs.json" with { type: "json" }
 import manuals from "./manuals.json" with { type: "json" }
 import keys from "./keys.json" with { type: "json" }
 
-/** The tables of the Portuguese language, merged. */
+/** The tables of the Portuguese (Brazil) language, merged. */
 export default { ...base, ...shell, ...library, ...org, ...cad, ...cam, ...ai, ...plugins, ...legacy, ...settings, ...viewport, ...system, ...pricing, ...detail, ...companion, ...vcs, ...manuals, ...keys }

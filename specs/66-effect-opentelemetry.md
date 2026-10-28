@@ -108,3 +108,7 @@ instrumentation does not.
   `apps/sidecar/test/observability.test.ts` (in-process server span parented by `traceparent`,
   route/status attributes, Prometheus exposition, unmatched-route counting, in-flight release,
   scrubbing, a 0 sample ratio exporting nothing, log records carrying their span's trace id).
+- 2026-10-28: the CAD surface audit log reads the trace and span id from Effect's tracer
+  instead of the OpenTelemetry global API: the ids exist whether or not a collector is
+  configured, and they are the ids of the span the operation actually ran in. Covered by the
+  audit-trail test in `apps/sidecar/test/observability.test.ts`.
