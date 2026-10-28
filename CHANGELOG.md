@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.41 (October 2026)
+
+## Desktop
+
+- Build and Plan primaries, shared sessions between desktop and phone, prompt system alignment
+
 ## v0.1.40 (October 2026)
 
 - No notable changes
