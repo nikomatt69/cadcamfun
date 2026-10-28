@@ -9,6 +9,7 @@ import { compactStorage, readStorage, type DatabaseStorage } from "./storage.ts"
 
 export * as schema from "./schema.ts"
 export type { DatabaseStorage } from "./storage.ts"
+export { commitMutation, hasMutationCommand, withMutationCommand, type MutationCommand, type MutationEvidence, type MutationTransaction } from "./commands.ts"
 
 export class DatabaseError extends Data.TaggedError("DatabaseError")<{
   readonly operation: string

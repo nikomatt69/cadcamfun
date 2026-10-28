@@ -1,4 +1,4 @@
-import { Database, DatabaseError, schema } from "@cadcamfun/db"
+import { commitMutation, Database, DatabaseError, schema } from "@cadcamfun/db"
 import type { Db } from "@cadcamfun/db"
 import { and, count, desc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
@@ -88,22 +88,41 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
           }),
         create: (userId, d) =>
           query("machineConfigs.create", async (db) => {
-            const [row] = await db.insert(T).values({ name: d.name, description: d.description ?? null, type: d.type, config: d.config, ownerId: userId, isPublic: d.isPublic }).returning()
-            return { ...serialize(row!), owner: await ownerOf(db, userId) }
+            const row = commitMutation(db, "machineConfigs.create", (tx) => {
+              const saved = tx.insert(T).values({ name: d.name, description: d.description ?? null, type: d.type, config: d.config, ownerId: userId, isPublic: d.isPublic }).returning().get()
+              if (!saved) throw new Error("Machine configuration was not created")
+              return { result: saved, resourceId: saved.id, revision: saved.updatedAt.toISOString() }
+            })
+            return { ...serialize(row), owner: await ownerOf(db, userId) }
           }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId) : Effect.void)),
         update: (id, d) =>
           query("machineConfigs.update", async (db) => {
-            const [row] = await db.update(T).set({ ...d, updatedAt: new Date() }).where(eq(T.id, id)).returning()
-            return { view: { ...serialize(row!), owner: await ownerOf(db, row!.ownerId) }, usageCount: await usageOf(db, id), orgs: await orgsUsing(db, id) }
+            const row = commitMutation(db, "machineConfigs.update", (tx) => {
+              const previous = tx.select().from(T).where(eq(T.id, id)).get()
+              if (!previous) throw new Error("Machine configuration no longer exists")
+              const saved = tx.update(T).set({ ...d, updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)) }).where(eq(T.id, id)).returning().get()
+              if (!saved) throw new Error("Machine configuration disappeared during update")
+              return { result: saved, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: saved.updatedAt.toISOString() }
+            })
+            return { view: { ...serialize(row), owner: await ownerOf(db, row.ownerId) }, usageCount: await usageOf(db, id), orgs: await orgsUsing(db, id) }
           }).pipe(Effect.tap((row) => row.view.ownerId ? announce(row.view.ownerId, row.orgs) : Effect.void), Effect.map(({ view, usageCount }) => ({ view, usageCount }))),
         remove: (id) => query("machineConfigs.remove", async (db) => {
           const orgs = await orgsUsing(db, id)
-          const row = (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId }))[0]
+          const row = commitMutation(db, "machineConfigs.remove", (tx) => {
+            const removed = tx.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, updatedAt: T.updatedAt }).get()
+            return { result: removed, resourceId: id, ...(removed ? { previousRevision: removed.updatedAt.toISOString() } : {}), changed: removed !== undefined }
+          })
           return row ? { ownerId: row.ownerId, orgs } : undefined
         }).pipe(Effect.tap((row) => row?.ownerId ? announce(row.ownerId, row.orgs) : Effect.void), Effect.asVoid),
         usage: (id) => query("machineConfigs.usage", (db) => usageOf(db, id)),
         byId: (id) => query("machineConfigs.byId", async (db) => (await db.select().from(T).where(eq(T.id, id)).limit(1))[0]),
-        setConfig: (id, config) => query("machineConfigs.setConfig", async (db) => void (await db.update(T).set({ config, updatedAt: new Date() }).where(eq(T.id, id)))),
+        setConfig: (id, config) => query("machineConfigs.setConfig", (db) => commitMutation(db, "machineConfigs.setConfig", (tx) => {
+          const previous = tx.select().from(T).where(eq(T.id, id)).get()
+          if (!previous) return { result: undefined, changed: false }
+          const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+          tx.update(T).set({ config, updatedAt }).where(eq(T.id, id)).run()
+          return { result: undefined, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
+        })),
         visibleByIds: (userId, ids) =>
           query("machineConfigs.visibleByIds", async (db) => {
             if (ids.length === 0) return []
@@ -117,16 +136,23 @@ export class MachineConfigRepo extends Context.Service<MachineConfigRepo, {
               const [row] = await db.select().from(T).where(eq(T.id, id)).limit(1)
               return !!row && (m === "skip" || row.ownerId === userId)
             },
-            create: async (c) => (await db.insert(T).values({
+            create: async (c) => commitMutation(db, "machineConfigs.import.create", (tx) => {
+              const row = tx.insert(T).values({
               name: String(c.name), description: (c.description as string | undefined) || null, type: String(c.type), config: c.config,
               ownerId: userId, isPublic: false
-            }).returning())[0]!.id,
-            update: async (id, c) => {
-              await db.update(T).set({
-                name: String(c.name), description: (c.description as string | undefined) || null, type: String(c.type), config: c.config, updatedAt: new Date()
-              }).where(eq(T.id, id))
-              return id
-            }
+              }).returning().get()
+              if (!row) throw new Error("Imported machine configuration was not created")
+              return { result: row.id, resourceId: row.id, revision: row.updatedAt.toISOString() }
+            }),
+            update: async (id, c) => commitMutation(db, "machineConfigs.import.update", (tx) => {
+              const previous = tx.select().from(T).where(eq(T.id, id)).get()
+              if (!previous) throw new Error("Imported machine configuration no longer exists")
+              const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+              tx.update(T).set({
+                name: String(c.name), description: (c.description as string | undefined) || null, type: String(c.type), config: c.config, updatedAt
+              }).where(eq(T.id, id)).run()
+              return { result: id, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
+            })
           }))
       })
     })

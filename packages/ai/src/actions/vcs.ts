@@ -10,12 +10,15 @@ import { VCS_ACTION_INPUTS as INPUTS } from "@cadcamfun/api"
 import { contributedAction, type ActionSpec } from "./action.ts"
 
 export const VCS_ACTIONS: ReadonlyArray<ActionSpec> = [
+  contributedAction({ id: "vcs.checkpoints", kind: "read", contribution: "vcs.checkpoints", parameters: INPUTS["vcs.checkpoints"] }),
   contributedAction({ id: "vcs.status", kind: "read", replaces: "vcs_status", contribution: "vcs.status", parameters: INPUTS["vcs.status"] }),
   contributedAction({ id: "vcs.diff", kind: "read", replaces: "vcs_diff", contribution: "vcs.diff", parameters: INPUTS["vcs.diff"] }),
   contributedAction({ id: "vcs.list_pull_requests", kind: "read", replaces: "vcs_list_pull_requests", contribution: "vcs.list_pull_requests", parameters: INPUTS["vcs.list_pull_requests"] })
 ]
 
 export const VCS_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
+  contributedAction({ id: "vcs_edit.checkpoint", kind: "write", contribution: "vcs_edit.checkpoint", parameters: INPUTS["vcs_edit.checkpoint"] }),
+  contributedAction({ id: "vcs_edit.restore_checkpoint", kind: "destructive", contribution: "vcs_edit.restore_checkpoint", parameters: INPUTS["vcs_edit.restore_checkpoint"] }),
   contributedAction({ id: "vcs_edit.start_change", kind: "write", replaces: "vcs_start_change", contribution: "vcs_edit.start_change", parameters: INPUTS["vcs_edit.start_change"] }),
   contributedAction({ id: "vcs_edit.commit", kind: "write", replaces: "vcs_commit", contribution: "vcs_edit.commit", parameters: INPUTS["vcs_edit.commit"] }),
   contributedAction({

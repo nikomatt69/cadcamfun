@@ -49,11 +49,11 @@ export const createCadcamTools = async (options: CadcamPluginOptions & { readonl
     return [entry.id, options.tool({
       description,
       args: { ...shape, projectId: z.string().optional().describe("The CADCAMFUN project id; defaults to the plugin's project") },
-      execute: async (args: Record<string, unknown>, context: { abort?: AbortSignal }) => {
+      execute: async (args: Record<string, unknown>, context: { abort?: AbortSignal; callID?: string; sessionID?: string }) => {
         const { projectId: named, ...input } = args
         const projectId = typeof named === "string" && named !== "" ? named : options.projectId
         if (!projectId) return JSON.stringify({ ok: false, error: "No CADCAMFUN project: set the plugin's projectId option (or CADCAMFUN_PROJECT) or pass projectId." })
-        try { return textOf(await client.invoke(projectId, entry.id, input, context?.abort)) }
+        try { return textOf(await client.invoke(projectId, entry.id, input, context?.abort, context.callID ? `${context.sessionID ?? "session"}:${context.callID}` : undefined)) }
         catch (cause) { return JSON.stringify({ ok: false, error: cause instanceof Error ? cause.message : String(cause) }) }
       }
     })]

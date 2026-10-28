@@ -64,6 +64,10 @@ export class AiHost extends Context.Service<AiHost, {
    * to build its worker runner without allocating a second one.
    */
   readonly scheduler: import("./nikcli/background-tasks.ts").BackgroundTaskManager
+  readonly engineering?: {
+    readonly accept: (projectId: string, sessionId: string, objective?: string) => Promise<import("./engineering-state.ts").EngineeringAcceptance | undefined>
+    readonly setCriteria: (projectId: string, sessionId: string, criteria: unknown, objective?: string) => Promise<void>
+  }
 }>()("cadcamfun/AiHost") {}
 
 /**
@@ -114,6 +118,7 @@ export interface ProviderEntry extends HostProviderInfo {
 }
 
 export interface SessionControlState {
+  readonly engineeringAcceptance?: import("./engineering-state.ts").EngineeringAcceptance
   readonly busy: boolean
   readonly text: string
   readonly tasks: ReadonlyArray<HostTaskInfo>
@@ -125,6 +130,7 @@ export interface SessionControlState {
 }
 
 const describeControlError = (cause: unknown): string => cause instanceof Error ? cause.message : "Unable to control the conversation."
+const toEngineeringError = (cause: unknown): AiConfigError => new AiConfigError({ message: describeControlError(cause) })
 
 export class AiService extends Context.Service<AiService, {
   /** Every model the host knows; `configured` is true when its provider (or the gateway) has a key. */
@@ -517,7 +523,14 @@ export class AiService extends Context.Service<AiService, {
         const tokens = latest?.info.tokens
         // The goal lives in the host's session: a reloaded window reads it back instead of showing none.
         const goal = yield* Effect.tryPromise({ try: () => projectHost.client.session.goal({ sessionID: sessionId }), catch: (cause) => cause }).pipe(Effect.orElseSucceed(() => null))
-        return { goal: goal ? goalSummary(goal) : null, busy: state.busy, text: state.text, permissions, tasks: taskInfos(host.value.scheduler, owner), questions: questions.map((question) => ({ requestId: question.id, questions: question.questions })),
+        let engineeringAcceptance: import("./engineering-state.ts").EngineeringAcceptance | undefined
+        if (input.action === "acceptance" || input.action === "set_acceptance") {
+          const engineering = host.value.engineering
+          if (!engineering) return yield* new AiConfigError({ message: "Engineering acceptance is unavailable in this host." })
+          if (input.action === "set_acceptance") yield* Effect.tryPromise({ try: () => engineering.setCriteria(projectHost.projectId, sessionId, input.criteria, goal?.objective), catch: toEngineeringError })
+          engineeringAcceptance = yield* Effect.tryPromise({ try: () => engineering.accept(projectHost.projectId, sessionId, goal?.objective), catch: toEngineeringError })
+        }
+        return { ...(engineeringAcceptance ? { engineeringAcceptance } : {}), goal: goal ? goalSummary(goal) : null, busy: state.busy, text: state.text, permissions, tasks: taskInfos(host.value.scheduler, owner), questions: questions.map((question) => ({ requestId: question.id, questions: question.questions })),
           context: { ...policy, memory, ...(breakdown ? { breakdown } : {}), ...(providerID && modelID ? { provider: providerID, model: modelID } : {}), ...(selected ? contextBudget(selected, policy) : {}),
             ...(input.action !== "compact" && tokens ? { tokens: tokens.total || tokens.input + tokens.output + (tokens.cache?.read ?? 0) + (tokens.cache?.write ?? 0) } : summaryIndex >= 0 ? { tokens: 0 } : {}), compacted: input.action === "compact" } }
       })

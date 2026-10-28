@@ -1,5 +1,5 @@
 import type { ComponentDetail, ComponentRow } from "@cadcamfun/api"
-import { Database, DatabaseError, schema } from "@cadcamfun/db"
+import { commitMutation, Database, DatabaseError, schema } from "@cadcamfun/db"
 import { and, desc, eq, inArray, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
@@ -51,16 +51,23 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
         listByProject: (projectId) =>
           query("components.listByProject", async (db) => (await db.select().from(T).where(eq(T.projectId, projectId)).orderBy(desc(T.updatedAt))).map(toComponentRow)),
         create: (projectId, d) =>
-          query("components.create", async (db) => {
-            const [row] = await db.insert(T).values({ name: d.name, description: d.description ?? null, data: d.data || {}, type: d.type ?? null, isPublic: d.isPublic ?? false, projectId }).returning()
-            return toComponentRow(row!)
-          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
+          query("components.create", (db) => commitMutation(db, "components.create", (tx) => {
+            const row = tx.insert(T).values({ name: d.name, description: d.description ?? null, data: d.data || {}, type: d.type ?? null, isPublic: d.isPublic ?? false, projectId }).returning().get()
+            if (!row) throw new Error("Component was not created")
+            return { result: toComponentRow(row), resourceId: row.id, revision: row.updatedAt.toISOString() }
+          })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         update: (id, patch) =>
-          query("components.update", async (db) => {
-            const [row] = await db.update(T).set({ ...patch, updatedAt: new Date() }).where(eq(T.id, id)).returning()
-            return toComponentRow(row!)
-          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
-        remove: (id) => query("components.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId }))[0]).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid),
+          query("components.update", (db) => commitMutation(db, "components.update", (tx) => {
+            const previous = tx.select().from(T).where(eq(T.id, id)).get()
+            if (!previous) throw new Error("Component no longer exists")
+            const row = tx.update(T).set({ ...patch, updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1)) }).where(eq(T.id, id)).returning().get()
+            if (!row) throw new Error("Component disappeared during update")
+            return { result: toComponentRow(row), resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: row.updatedAt.toISOString() }
+          })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
+        remove: (id) => query("components.remove", (db) => commitMutation(db, "components.remove", (tx) => {
+          const row = tx.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId, updatedAt: T.updatedAt }).get()
+          return { result: row, resourceId: id, ...(row ? { previousRevision: row.updatedAt.toISOString() } : {}), changed: row !== undefined }
+        })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid),
         projectOrganization: (projectId) =>
           query("components.projectOrganization", async (db) => (await db.select({ o: P.organizationId }).from(P).where(eq(P.id, projectId)).limit(1))[0]?.o ?? null),
         userName: (userId) =>

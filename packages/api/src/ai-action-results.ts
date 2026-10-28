@@ -240,6 +240,9 @@ const vcsDiff = Schema.Array(Schema.StructWithRest(Schema.Struct({ path: str, st
 const pullRequests = Schema.Array(Schema.StructWithRest(Schema.Struct(pullRequestRef), [record]))
 const changeStarted = Schema.Struct({ branch: str })
 const committed = Schema.Struct({ commit: str })
+const checkpoint = Schema.Struct({ commit: str, revision: str, label: str, createdAt: str, projectId: str, actorId: str, sessionId: Schema.optionalKey(str), taskId: Schema.optionalKey(str) })
+const checkpointList = Schema.Struct({ revision: str, checkpoints: Schema.Array(checkpoint) })
+const checkpointRestored = Schema.Struct({ ok: Schema.Literal(true), commit: str, revision: str, verification: Schema.Literal("invalidated") })
 const restored = Schema.Struct({ commit: str, branch: str, paths: strings })
 const pullRequestOpened = Schema.Struct({ number: int, head: str, base: str })
 const workflowsRun = Schema.Array(Schema.Struct({ workflow: str, status: str }))
@@ -399,10 +402,13 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "research.read_attachment": read(attachmentRead),
 
   "vcs.status": read(vcsStatus),
+  "vcs.checkpoints": read(checkpointList),
   "vcs.diff": read(vcsDiff),
   "vcs.list_pull_requests": read(pullRequests),
   "vcs_edit.start_change": write(["history"], changeStarted),
   "vcs_edit.commit": write(["history"], committed),
+  "vcs_edit.checkpoint": write(["history"], checkpoint),
+  "vcs_edit.restore_checkpoint": write(["history", "drawing", "operation", "program", "report", "stock"], checkpointRestored),
   "vcs_edit.restore": write(["history", "drawing"], restored),
   "vcs_edit.open_pull_request": write(["history"], pullRequestOpened),
   "vcs_edit.run_workflows": write(["workflow"], workflowsRun),

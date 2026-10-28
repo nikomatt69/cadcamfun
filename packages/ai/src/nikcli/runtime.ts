@@ -2,6 +2,8 @@
 import type { FilePart } from "../attachments.ts"
 import { mcpStore, mcpHostName, validateMcpName, validateMcpConfig, type McpConfig } from "./mcp.ts"
 import { z } from "zod"
+import { assertHostCapabilities } from "./host-capabilities.ts"
+import { installEngineeringLedgerMod, type EngineeringLedgerRead } from "./engineering-ledger-mod.ts"
 import { Effect, Scope, Semaphore } from "effect"
 import { mkdirSync, realpathSync } from "node:fs"
 import { rename, rm, writeFile } from "node:fs/promises"
@@ -26,6 +28,17 @@ import { toolPermissionPattern } from "./permission-modes.ts"
 import { exposedActions, EXPOSED_TOOL_IDS, nameOf } from "../actions/catalogue.ts"
 
 /** A tool exposed to the model. `execute` receives already zod-validated input. */
+export interface HostToolContext {
+  readonly sessionId: string
+  readonly projectId: string
+  readonly signal: AbortSignal
+  readonly callId?: string
+  readonly messageId?: string
+  readonly executeMutation?: import("../tools/define.ts").ToolContext["executeMutation"]
+  readonly taskTarget?: import("./background-tasks.ts").BackgroundTaskTarget
+  readonly validateDelegation?: import("../tools/define.ts").ToolContext["validateDelegation"]
+}
+
 export interface HostToolSpec {
   readonly id: string
   readonly description: string
@@ -35,7 +48,7 @@ export interface HostToolSpec {
   readonly formatValidationError?: (error: z.ZodError) => string
   readonly execute: (
     input: unknown,
-    ctx: { readonly sessionId: string; readonly projectId: string; readonly signal: AbortSignal }
+    ctx: HostToolContext
   ) => Promise<string>
   /** The host asks the person before each call, whatever the role (an extension tool that changes something). */
   readonly approval?: boolean
@@ -43,7 +56,7 @@ export interface HostToolSpec {
    * The full answer: `output` is the bounded text the model reads, `value` the whole validated result that Code Mode and
    * the stored part receive (absent for a tool that only has text), `bounded` whether the text leaves anything out.
    */
-  readonly executeWithFiles?: (input: unknown, ctx: { readonly sessionId: string; readonly projectId: string; readonly signal: AbortSignal }) => Promise<HostToolAnswer>
+  readonly executeWithFiles?: (input: unknown, ctx: HostToolContext) => Promise<HostToolAnswer>
 }
 
 export interface HostToolAnswer {
@@ -76,6 +89,10 @@ export interface NikCliRuntimeOptions {
    * `reloadMods` (spec 27 §4.3).
    */
   readonly mods?: () => ReadonlyArray<string>
+  readonly engineeringLedger?: (projectId: string, sessionId: string) => Promise<EngineeringLedgerRead | undefined>
+  readonly taskBindings?: {
+    readonly bindChild: (owner: { readonly projectId: string; readonly parentSessionId: string }, target: import("./background-tasks.ts").BackgroundTaskTarget, childSessionId: string, checkLease?: () => Promise<void>) => Promise<void>
+  }
   /** Whether the one-shot models.dev seed may touch the network. Default: never (tests stay offline). */
   readonly catalogue?: { readonly network?: boolean }
   /** Receives the host's own log lines. Default: warnings and errors only, dropped otherwise. */
@@ -97,6 +114,7 @@ export interface ProjectHost {
 }
 
 export interface NikCliRuntime {
+  readonly bindBackgroundTask?: NonNullable<NikCliRuntimeOptions["taskBindings"]>["bindChild"]
   /** Actual host registrations plus permitted native discovery/control tools; no executor is invoked. */
   readonly toolCatalogue: () => ReadonlyArray<{ id: string; description: string }>
   mcpServers(projectId: string): Effect.Effect<ReadonlyArray<{ name: string; config: McpConfig; status: string }>, AiConfigError>
@@ -201,6 +219,15 @@ export const makeNikCliRuntime = (
 ): Effect.Effect<NikCliRuntime, AiConfigError, Scope.Scope> =>
   Effect.gen(function* () {
     const paths = isolatedPaths(options.dataDir)
+    const projectDirectories = new Map<string, string>()
+    const ledgerMod = options.engineeringLedger ? yield* Effect.try({
+      try: () => installEngineeringLedgerMod(paths.root, async (directory, sessionId) => {
+        const projectId = projectDirectories.get(directory)
+        return projectId === undefined ? undefined : options.engineeringLedger?.(projectId, sessionId)
+      }),
+      catch: toConfigError("Could not install engineering context hooks")
+    }) : undefined
+    if (ledgerMod) yield* Effect.addFinalizer(() => Effect.sync(ledgerMod.close))
     let closed = false
     const assertOpen = () => { if (closed) throw new Error("The embedded nikcli runtime is closed") }
 
@@ -290,7 +317,7 @@ export const makeNikCliRuntime = (
             toolIds: toolIdsOf(projectId),
             askToolIds: toolRegistry.approvalIds(projectId),
             systemPrompt: options.systemPrompt,
-            ...(options.mods ? { mods: [...new Set(options.mods())] } : {}),
+            ...(options.mods || ledgerMod ? { mods: [...new Set([...(options.mods?.() ?? []), ...(ledgerMod ? [ledgerMod.spec] : [])])] } : {}),
             ...(options.compaction ? { compaction: options.compaction } : {}),
             ...(options.timeouts ? { timeouts: options.timeouts } : {}),
             ...(options.policies ? { policies: options.policies } : {})
@@ -310,6 +337,8 @@ export const makeNikCliRuntime = (
 
     /** The live registration batch of each project's host; closed when the next batch is registered. */
     const registrations = new Map<string, HostRegistration>()
+    // Code Mode reuses one context for every inner call. Order is allocated before awaits and restarts with a replayed program.
+    const invocationOrdinals = new WeakMap<object, number>()
 
     /**
      * Registers the project's tools on its host. The host keeps the last registration of an id (nikcli `lastWins`), so
@@ -329,6 +358,8 @@ export const makeNikCliRuntime = (
           ...(spec.formatValidationError ? { formatValidationError: spec.formatValidationError } : {}),
           execute: async (args: never, ctx: ToolExecuteContext) => {
             assertOpen()
+            const ordinal = (invocationOrdinals.get(ctx) ?? 0) + 1
+            invocationOrdinals.set(ctx, ordinal)
             const pattern = toolPermissionPattern(spec.id, args, projectId, ctx.agent)
             const action = EXPOSED_TOOL_IDS.includes(spec.id)
               ? exposedActions(spec.id).find((entry) => nameOf(entry) === (args as { action?: unknown }).action)
@@ -338,7 +369,7 @@ export const makeNikCliRuntime = (
               context: { application: "CADCAMFUN", projectId, ...(action ? { action: { id: action.id, kind: action.kind, effects: action.effects } } : {}) }
             } })
             assertOpen()
-            const call = { sessionId: ctx.sessionID, projectId, signal: ctx.abort }
+            const call: HostToolContext = { sessionId: ctx.sessionID, projectId, signal: ctx.abort, ...(ctx.callID ? { callId: `${ctx.callID}#${ordinal}` } : {}), messageId: ctx.messageID }
             // Under `code_mode` the call id is the program's, not this tool's: record what happened so the program's inner calls
             // reach the editor as they finish (see `program-calls.ts`).
             const result: HostToolAnswer = await (spec.executeWithFiles
@@ -372,6 +403,7 @@ export const makeNikCliRuntime = (
       const scratch = projectScratchDir(paths, projectId)
       mkdirSync(scratch, { recursive: true })
       const directory = realpathSync(scratch)
+      projectDirectories.set(directory, projectId)
       // The host builds its provider database once, at Instance creation, from
       // `<cache>/models.json`: a host created before the seed lands would keep
       // only the declared providers for its whole lifetime. Every host
@@ -383,6 +415,7 @@ export const makeNikCliRuntime = (
       const client = await bootstrapStep("client creation", () => Effect.runPromise(sdk.NikCli.create({ directory })))
       try {
         assertOpen()
+        await bootstrapStep("host compatibility", async () => assertHostCapabilities(client))
         await bootstrapStep("tool registration", () => registerTools(sdk, client, projectId))
         assertOpen()
         // Keys set before this host existed.
@@ -460,6 +493,7 @@ export const makeNikCliRuntime = (
       }),
       oauth: providerOAuth(() => Effect.tryPromise({ try: () => getHost("default"), catch: toConfigError("Could not open provider sign-in") }), join(paths.data, "auth.json")),
       toolCatalogue: () => toolRegistry.catalogue("default"),
+      ...(options.taskBindings ? { bindBackgroundTask: options.taskBindings.bindChild } : {}),
       paths,
       get catalogueReady() {
         assertOpen()

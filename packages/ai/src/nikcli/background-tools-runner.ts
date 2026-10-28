@@ -1,6 +1,7 @@
 /// <reference path="./sdk-next.d.ts" />
 import { hostAgentWithPermissions, inheritedPermissionMode } from "./permission-modes.ts"
 import { Effect } from "effect"
+import { createHash } from "node:crypto"
 import {
   BackgroundTaskManager,
   type BackgroundTask,
@@ -79,6 +80,9 @@ class WorkerRunner {
       const release = adoptChildSession(this.parentSessionId, session.id, spec.id)
       let report: string | undefined
       try {
+        await input.childSession?.(session.id)
+        await input.checkLease?.()
+        if (input.target !== undefined) await this.runtime.bindBackgroundTask?.({ projectId: this.projectId, parentSessionId: this.parentSessionId }, input.target, session.id, input.checkLease)
         const controller = new AbortController()
         let aborting: Promise<unknown> | undefined
         const abortChild = () => { aborting ??= host.client.session.abort({ sessionID: session.id }).catch(() => undefined) }
@@ -127,9 +131,13 @@ class WorkerRunner {
         }
       } finally {
         release()
-        // The report is in the journal before the session that holds it goes away.
-        if (report !== undefined) await input.report?.(report).catch(() => undefined)
-        await host.client.session.remove({ sessionID: session.id }).catch(() => undefined)
+        // Failed storage retains the native evidence. Removing it here would make an acknowledged result unrecoverable.
+        if (report !== undefined) {
+          await input.report?.(report)
+          await host.client.session.remove({ sessionID: session.id }).catch(() => undefined)
+        } else if (input.childSession === undefined) {
+          await host.client.session.remove({ sessionID: session.id }).catch(() => undefined)
+        }
       }
     })() as Promise<string>
     return await work
@@ -163,6 +171,7 @@ export class BackgroundToolsRunner {
     // the caller supplied it or we just built it — so completion deliveries
     // happen regardless of who owns the manager.
     this.manager.setOnCompletion((task) => this.deliver(task))
+    this.manager.setRecoveryReader((task) => this.recoverReport(task))
     // If the manager we were given has no runner yet (lazy wiring), install ours.
     this.manager.setRunner(runner)
   }
@@ -186,6 +195,24 @@ export class BackgroundToolsRunner {
   private async invoke(input: BackgroundTaskRunnerInput): Promise<string> {
     if (this.disposed || this.retired.has(this.ownerKey(input))) throw new Error("Worker owner is closed")
     return await new WorkerRunner(this.runtime, input.projectId, input.parentSessionId).run(input)
+  }
+
+  private async recoverReport(task: BackgroundTask): Promise<string | undefined> {
+    if (task.childSessionId === undefined || this.disposed || this.retired.has(this.ownerKey(task))) return undefined
+    const host = await runPromise(this.runtime.host(task.projectId))
+    let messages
+    try { messages = await host.client.session.messages({ sessionID: task.childSessionId, limit: 40 }) }
+    catch (cause) {
+      // A deleted child has no recoverable report. A transport/storage failure is not evidence that it never finished.
+      const status = typeof cause === "object" && cause !== null && "status" in cause ? cause.status : undefined
+      if (status === 404) return undefined
+      throw cause
+    }
+    const last = messages.findLast((message) => message.info.role === "assistant" && message.info.summary !== true)
+    if (!last || last.info.error || !["stop", "end_turn", "stop_sequence"].includes(last.info.finish ?? "")) return undefined
+    if (last.parts.some((part) => part.type === "tool" && (part.state?.status === "pending" || part.state?.status === "running"))) return undefined
+    const report = extractWorkerText(last.parts)
+    return report === "" ? undefined : report
   }
 
   /**
@@ -214,15 +241,27 @@ export class BackgroundToolsRunner {
       "",
       `Use agent action read (taskId="${task.id}") for the full result.`
     ].join("\n")
-    try {
-      await host.client["session-prompt"].promptAsync({
+    const agent = task.deliveryAgent ?? await this.manager.prepareDelivery(task, task.id,
+      currentHostAgent([...await host.client.session.messages({ sessionID: task.parentSessionId, limit: 20 })].reverse().find((message) => message.info.role === "user")?.info.agent) ?? CADCAM_AGENT)
+    // The message identity and role survive a crash between native admission and recording delivered=true. A retry
+    // admits the same outcome, never a second wake, even if the parent changed roles in the meantime.
+    const notification = {
         sessionID: task.parentSessionId,
-        agent: currentHostAgent([...await host.client.session.messages({ sessionID: task.parentSessionId, limit: 20 })].reverse().find((message) => message.info.role === "user")?.info.agent) ?? CADCAM_AGENT,
-        delivery: "queue",
-        parts: [{ type: "text", text: body, synthetic: true }]
-      })
-    } catch {
-      // Parent session removed (404) or busy after dispose; the worker already settled.
+        messageID: `msg_${createHash("sha256").update(`cadcam-task:${task.id}`).digest("hex").slice(0, 24)}`,
+        agent,
+        delivery: "queue" as const,
+        parts: [{ type: "text" as const, text: body, synthetic: true }]
+    }
+    const admitted = await host.client["session-prompt"].promptAsync(notification)
+    // Generated clients may resolve an error wrapper instead of rejecting. Only actual admission acknowledges delivery.
+    if (admitted !== null && typeof admitted === "object") {
+      const response = "response" in admitted ? admitted.response : undefined
+      const status = typeof response === "object" && response !== null && "status" in response ? response.status
+        : "status" in admitted ? admitted.status : undefined
+      const failed = "error" in admitted && admitted.error !== undefined && admitted.error !== null
+      if (failed || typeof status === "number" && status >= 400 || "name" in admitted && typeof admitted.name === "string") {
+        throw new Error(`The parent did not admit the background task outcome${typeof status === "number" ? ` (${status})` : ""}`)
+      }
     }
   }
 }

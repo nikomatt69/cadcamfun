@@ -1,5 +1,5 @@
 import type { ToolpathRow } from "@cadcamfun/api"
-import { Database, DatabaseError, schema } from "@cadcamfun/db"
+import { commitMutation, hasMutationCommand, Database, DatabaseError, schema } from "@cadcamfun/db"
 import type { Db } from "@cadcamfun/db"
 import { and, desc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
@@ -107,8 +107,8 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
             return { row: toToolpathRow(hit.t), project: hit.p, canWrite }
           }),
         create: (userId, d) =>
-          query("toolpaths.create", async (db) => {
-            const [row] = await db.insert(T).values({
+          query("toolpaths.create", (db) => commitMutation(db, "toolpaths.create", (tx) => {
+            const row = tx.insert(T).values({
               name: d.name, description: d.description ?? null, data: d.data || {},
               // `/api/toolpaths` and the project route default these; the drawing route stores them as given.
               gcode: d.applyDefaults === false ? (d.gcode ?? null) : (d.gcode || ""),
@@ -117,25 +117,40 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
               operationType: d.applyDefaults === false ? (d.operationType ?? null) : (d.operationType || "contour"),
               isPublic: d.isPublic || false, thumbnail: d.thumbnail ?? null, createdBy: userId,
               drawingId: d.drawingId ?? null, materialId: d.materialId ?? null, machineConfigId: d.machineConfigId ?? null, toolId: d.toolId ?? null
-            }).returning()
-            return toToolpathRow(row!)
-          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
+            }).returning().get()
+            if (!row) throw new Error("Toolpath was not created")
+            return { result: toToolpathRow(row), resourceId: row.id, revision: row.updatedAt.toISOString() }
+          })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         update: (id, patch) =>
-          query("toolpaths.update", async (db) => {
-            const [row] = await db.update(T).set({ ...patch, updatedAt: new Date() }).where(eq(T.id, id)).returning()
-            return toToolpathRow(row!)
+          query("toolpaths.update", (db) => {
+            if (!hasMutationCommand()) {
+              const row = db.update(T).set({ ...patch, updatedAt: new Date() }).where(eq(T.id, id)).returning().get()
+              if (!row) throw new Error("Toolpath no longer exists")
+              return toToolpathRow(row)
+            }
+            return commitMutation(db, "toolpaths.update", (tx) => {
+              const current = tx.select().from(T).where(eq(T.id, id)).get()
+              if (!current) throw new Error("Toolpath no longer exists")
+              const row = tx.update(T).set({ ...patch, updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) }).where(eq(T.id, id)).returning().get()
+              if (!row) throw new Error("Toolpath disappeared during update")
+              return { result: toToolpathRow(row), resourceId: id, previousRevision: current.updatedAt.toISOString(), revision: row.updatedAt.toISOString() }
+            })
           }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         updateWhere: (id, guard, patch) =>
-          query("toolpaths.updateWhere", (db) => db.transaction((tx) => {
+          query("toolpaths.updateWhere", (db) => commitMutation<ToolpathRow | undefined>(db, "toolpaths.updateWhere", (tx) => {
             const current = tx.select().from(T).where(eq(T.id, id)).get()
-            if (!current) return undefined
+            if (!current) return { result: undefined, changed: false }
             const row = toToolpathRow(current)
             const drawing = current.drawingId === null ? undefined : tx.select({ data: schema.drawingTable.data }).from(schema.drawingTable).where(eq(schema.drawingTable.id, current.drawingId)).get()
-            if (!guard(row, drawing?.data)) return undefined
+            if (!guard(row, drawing?.data)) return { result: undefined, changed: false }
             const [updated] = tx.update(T).set({ ...patch(row), updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) }).where(eq(T.id, id)).returning().all()
-            return updated === undefined ? undefined : toToolpathRow(updated)
+            return { result: updated === undefined ? undefined : toToolpathRow(updated), resourceId: id, previousRevision: current.updatedAt.toISOString(), ...(updated ? { revision: updated.updatedAt.toISOString() } : {}), changed: updated !== undefined }
           })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
-        remove: (id) => query("toolpaths.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId }))[0]).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid),
+        remove: (id) => query("toolpaths.remove", (db) => commitMutation(db, "toolpaths.remove", (tx) => {
+          const current = tx.select().from(T).where(eq(T.id, id)).get()
+          const row = tx.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId }).get()
+          return { result: row, resourceId: id, ...(current ? { previousRevision: current.updatedAt.toISOString() } : {}), changed: row !== undefined }
+        })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid),
         listForDrawing: (drawingId) =>
           query("toolpaths.listForDrawing", async (db) => {
             const rows = await db.select().from(T).where(eq(T.drawingId, drawingId)).orderBy(desc(T.updatedAt))
@@ -181,12 +196,13 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
             return row ? toVersion(row) : undefined
           }),
         createVersion: (toolpathId, userId, v) =>
-          query("toolpaths.createVersion", async (db) => {
-            const [row] = await db.insert(V).values({
+          query("toolpaths.createVersion", (db) => commitMutation(db, "toolpaths.createVersion", (tx) => {
+            const row = tx.insert(V).values({
               toolpathId, userId, data: v.data ?? null, gcode: v.gcode ?? null, changeMessage: v.changeMessage ?? ""
-            }).returning()
-            return toVersion(row!)
-          }),
+            }).returning().get()
+            if (!row) throw new Error("Toolpath version was not created")
+            return { result: toVersion(row), resourceId: row.id, revision: row.createdAt.toISOString() }
+          })),
         listComments: (toolpathId) =>
           query("toolpaths.listComments", async (db) => {
             const rows = await db.select().from(C).where(eq(C.toolpathId, toolpathId)).orderBy(desc(C.createdAt))
@@ -198,16 +214,30 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
             return row
           }),
         createComment: (toolpathId, userId, content) =>
-          query("toolpaths.createComment", async (db) => {
-            const [row] = await db.insert(C).values({ toolpathId, userId, content }).returning()
-            return (await withAuthors(db, [row!]))[0]!
+          query("toolpaths.createComment", (db) => {
+            const row = commitMutation(db, "toolpaths.createComment", (tx) => {
+              const saved = tx.insert(C).values({ toolpathId, userId, content }).returning().get()
+              if (!saved) throw new Error("Toolpath comment was not created")
+              return { result: saved, resourceId: saved.id, revision: saved.updatedAt.toISOString() }
+            })
+            return withAuthors(db, [row]).then((rows) => rows[0]!)
           }),
         updateComment: (commentId, content) =>
-          query("toolpaths.updateComment", async (db) => {
-            const [row] = await db.update(C).set({ content, updatedAt: new Date() }).where(eq(C.id, commentId)).returning()
-            return (await withAuthors(db, [row!]))[0]!
+          query("toolpaths.updateComment", (db) => {
+            const row = commitMutation(db, "toolpaths.updateComment", (tx) => {
+              const current = tx.select().from(C).where(eq(C.id, commentId)).get()
+              if (!current) throw new Error("Toolpath comment no longer exists")
+              const saved = tx.update(C).set({ content, updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) }).where(eq(C.id, commentId)).returning().get()
+              if (!saved) throw new Error("Toolpath comment disappeared during update")
+              return { result: saved, resourceId: commentId, previousRevision: current.updatedAt.toISOString(), revision: saved.updatedAt.toISOString() }
+            })
+            return withAuthors(db, [row]).then((rows) => rows[0]!)
           }),
-        removeComment: (commentId) => query("toolpaths.removeComment", async (db) => void (await db.delete(C).where(eq(C.id, commentId))))
+        removeComment: (commentId) => query("toolpaths.removeComment", (db) => commitMutation(db, "toolpaths.removeComment", (tx) => {
+          const current = tx.select().from(C).where(eq(C.id, commentId)).get()
+          tx.delete(C).where(eq(C.id, commentId)).run()
+          return { result: undefined, resourceId: commentId, ...(current ? { previousRevision: current.updatedAt.toISOString() } : {}), changed: current !== undefined }
+        }))
       })
     })
   ).pipe(Layer.provide(LiveEvents.layer))

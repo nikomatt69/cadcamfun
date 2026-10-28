@@ -13,6 +13,20 @@ import { lenient, sanitizeArguments } from "./lenient-arguments.ts"
 import { formatToolValidationError, toolValidationFailure } from "../tool-validation.ts"
 import { TOOL_PROMPT_IDS, toolPrompt, type ToolPromptId } from "./prompts/index.ts"
 import { toolOutput } from "./tool-output.ts"
+import type { ActionOutcome } from "../actions/outcome.ts"
+
+/** Trusted transport identity; these fields are supplied by the host/bridge, never by model arguments. */
+export interface MutationExecution {
+  readonly actionId: string
+  readonly input: unknown
+  readonly projectId: string
+  readonly sessionId?: string
+  readonly callId?: string
+  readonly messageId?: string
+  readonly signal?: AbortSignal
+}
+
+export type MutationExecutor = (request: MutationExecution, run: () => Promise<ActionOutcome>) => Promise<ActionOutcome>
 
 /** An implementation the application contributes for a catalogue action it owns (libraries, version control, delegation). */
 export type ActionContribution = (input: never, context: ToolContext) => Promise<unknown>
@@ -22,6 +36,11 @@ export interface ToolContext {
   readonly projectId: string
   readonly signal?: AbortSignal
   readonly sessionId?: string
+  readonly callId?: string
+  readonly messageId?: string
+  readonly executeMutation?: MutationExecutor
+  readonly taskTarget?: { readonly actorId?: string; readonly drawingId?: string; readonly revision?: string; readonly turnId?: string }
+  readonly validateDelegation?: (ids: readonly string[]) => Promise<{ readonly ok: boolean; readonly error?: string }>
   /** Present only where the host contributes implementations (the sidecar); a missing one answers "not available". */
   readonly contributions?: Readonly<Record<string, ActionContribution>>
 }
@@ -65,12 +84,19 @@ export const toSpec = (definition: ToolDefinition, context: ToolContext): HostTo
     const out = toolOutput(value)
     return { output: out.text, value, outcome: out.outcome, bounded: out.bounded, ...(files !== undefined ? { files } : {}) }
   }
-  const run = async (input: unknown, call: { signal: AbortSignal; sessionId: string }) => {
+  const run = async (input: unknown, call: { signal: AbortSignal; sessionId: string; callId?: string; messageId?: string; executeMutation?: MutationExecutor; taskTarget?: ToolContext["taskTarget"]; validateDelegation?: ToolContext["validateDelegation"] }) => {
     try {
       if (call.signal.aborted) return answer({ ok: false, error: "Tool execution cancelled." })
       const parsed = definition.parameters.safeParse(sanitizeArguments(input))
       if (!parsed.success) return answer(toolValidationFailure(definition.id, parsed.error))
-      const result = await definition.execute(parsed.data, { ...context, signal: call.signal, sessionId: call.sessionId })
+      const result = await definition.execute(parsed.data, {
+        ...context, signal: call.signal, sessionId: call.sessionId,
+        ...(call.callId !== undefined ? { callId: call.callId } : {}),
+        ...(call.messageId !== undefined ? { messageId: call.messageId } : {}),
+        ...(call.executeMutation !== undefined ? { executeMutation: call.executeMutation } : {}),
+        ...(call.taskTarget !== undefined ? { taskTarget: call.taskTarget } : {}),
+        ...(call.validateDelegation !== undefined ? { validateDelegation: call.validateDelegation } : {})
+      })
       return result instanceof ToolMediaResult ? answer(result.value, result.files) : answer(result)
     } catch (error) { return answer({ ok: false, error: safeToolError(error) }) }
   }

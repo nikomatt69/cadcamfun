@@ -1,5 +1,5 @@
 import type { DrawingDetail, DrawingRow } from "@cadcamfun/api"
-import { Database, DatabaseError, schema, type Db } from "@cadcamfun/db"
+import { commitMutation, Database, DatabaseError, schema, type Db } from "@cadcamfun/db"
 import { and, desc, eq } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
@@ -111,10 +111,10 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
         for (const row of stale) tx.delete(V).where(eq(V.id, row.id)).run()
       }
       const saveRow = (id: string, d: { name?: string | undefined; description?: string | null | undefined; data?: unknown; thumbnail?: string | null | undefined }, baseUpdatedAt: string | undefined, mergeData = false) =>
-        query("drawings.update", (db) => db.transaction((tx): DrawingSaved => {
+        query("drawings.update", (db) => commitMutation<DrawingSaved>(db, "drawings.update", (tx, recording) => {
           const current = tx.select().from(T).where(eq(T.id, id)).get()
           if (!current) throw new Error("Drawing disappeared before it was saved.")
-          if (baseUpdatedAt !== undefined && current.updatedAt.toISOString() !== baseUpdatedAt) return { ok: false, reason: "conflict", currentUpdatedAt: current.updatedAt.toISOString() }
+          if (baseUpdatedAt !== undefined && current.updatedAt.toISOString() !== baseUpdatedAt) return { result: { ok: false, reason: "conflict", currentUpdatedAt: current.updatedAt.toISOString() }, changed: false }
           if (d.data) keepVersion(tx, id, current.data, false)
           const row = tx.update(T).set({
             ...(d.name && { name: d.name }),
@@ -124,7 +124,7 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
             // Strictly newer than the copy it replaces, so a compare-and-swap on `updatedAt` can never mistake two saves in one millisecond for one.
             updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1))
           }).where(eq(T.id, id)).returning().get()!
-          return { ok: true, row: toDrawingRow(row) }
+          return { result: { ok: true, row: toDrawingRow(row) }, ...(recording ? { resourceId: id, previousRevision: drawingContentHash(current.data), revision: drawingContentHash(row.data) } : {}) }
         })).pipe(Effect.tap((saved) => saved.ok ? events.workspaceChanged(saved.row.projectId) : Effect.void))
       return DrawingRepo.of({
         find: (userId, id) =>
@@ -144,10 +144,11 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
         listByProject: (projectId) =>
           query("drawings.listByProject", async (db) => (await db.select().from(T).where(eq(T.projectId, projectId)).orderBy(desc(T.updatedAt))).map(toDrawingRow)),
         create: (projectId, d) =>
-          query("drawings.create", async (db) => {
-            const [row] = await db.insert(T).values({ name: d.name, description: d.description ?? null, data: d.data || {}, projectId }).returning()
-            return toDrawingRow(row!)
-          }).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
+          query("drawings.create", (db) => commitMutation(db, "drawings.create", (tx) => {
+            const row = tx.insert(T).values({ name: d.name, description: d.description ?? null, data: d.data || {}, projectId }).returning().get()
+            if (!row) throw new Error("Drawing was not created")
+            return { result: toDrawingRow(row), resourceId: row.id, revision: drawingContentHash(row.data) }
+          })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
         update: (id, d) => saveRow(id, d, undefined).pipe(Effect.map((saved) => {
           if (!saved.ok) throw new Error("A write without a base copy cannot conflict.")
           return saved.row
@@ -156,24 +157,27 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
         versions: (id) => query("drawings.versions", async (db) =>
           (await db.select().from(V).where(eq(V.drawingId, id)).orderBy(desc(V.version)))
             .map((row) => ({ id: row.id, version: row.version, createdAt: row.createdAt.toISOString(), elements: elementCount(row.data) }))),
-        restoreVersion: (id, versionId) => query("drawings.restoreVersion", (db) => db.transaction((tx) => {
+        restoreVersion: (id, versionId) => query("drawings.restoreVersion", (db) => commitMutation<DrawingRow | undefined>(db, "drawings.restoreVersion", (tx) => {
           const version = tx.select().from(V).where(and(eq(V.id, versionId), eq(V.drawingId, id))).get()
           const current = tx.select().from(T).where(eq(T.id, id)).get()
-          if (!version || !current) return undefined
+          if (!version || !current) return { result: undefined, changed: false }
           keepVersion(tx, id, current.data, true)
-          return toDrawingRow(tx.update(T).set({ data: version.data, updatedAt: new Date() }).where(eq(T.id, id)).returning().get()!)
+          const row = tx.update(T).set({ data: version.data, updatedAt: new Date() }).where(eq(T.id, id)).returning().get()
+          if (!row) throw new Error("Drawing disappeared during restore")
+          return { result: toDrawingRow(row), resourceId: id, previousRevision: drawingContentHash(current.data), revision: drawingContentHash(row.data) }
         })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void)),
-        writeIfUnchanged: (id, expectedHash, data) => query("drawings.writeIfUnchanged", (db) => db.transaction((tx): DrawingWrite => {
+        writeIfUnchanged: (id, expectedHash, data) => query("drawings.writeIfUnchanged", (db) => commitMutation<DrawingWrite>(db, "drawings.writeIfUnchanged", (tx) => {
           const row = tx.select({ data: T.data }).from(T).where(eq(T.id, id)).get()
-          if (!row) return { ok: false, reason: "missing", drawingId: id }
+          if (!row) return { result: { ok: false, reason: "missing", drawingId: id }, changed: false }
           const currentHash = drawingContentHash(row.data)
-          if (currentHash !== expectedHash) return { ok: false, reason: "conflict", drawingId: id, expectedHash, currentHash }
+          if (currentHash !== expectedHash) return { result: { ok: false, reason: "conflict", drawingId: id, expectedHash, currentHash }, changed: false }
           const updatedAt = new Date()
           keepVersion(tx, id, row.data, false)
           tx.update(T).set({ data, updatedAt }).where(eq(T.id, id)).run()
-          return { ok: true, drawingId: id, previousHash: currentHash, contentHash: drawingContentHash(data), updatedAt: updatedAt.toISOString() }
+          const contentHash = drawingContentHash(data)
+          return { result: { ok: true, drawingId: id, previousHash: currentHash, contentHash, updatedAt: updatedAt.toISOString() }, resourceId: id, previousRevision: currentHash, revision: contentHash }
         })).pipe(Effect.tap((result) => result.ok ? announceDrawing(id) : Effect.void)),
-        configureStock: (id, stock, expectedHash) => query("drawings.configureStock", (db) => db.transaction((tx) => {
+        configureStock: (id, stock, expectedHash) => query("drawings.configureStock", (db) => commitMutation(db, "drawings.configureStock", (tx) => {
           const drawing = tx.select().from(T).where(eq(T.id, id)).get()
           if (!drawing) throw new Error("Drawing disappeared before stock update.")
           if (expectedHash !== undefined && drawingContentHash(drawing.data) !== expectedHash) throw new DrawingConflict(id)
@@ -198,9 +202,13 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
             invalidated.push(path.id)
           }
           tx.update(T).set({ data: { ...data, stock }, updatedAt: new Date() }).where(eq(T.id, id)).run()
-          return invalidated
+          return { result: invalidated, resourceId: id, previousRevision: drawingContentHash(drawing.data), revision: drawingContentHash({ ...data, stock }) }
         })).pipe(Effect.tap(() => announceDrawing(id))),
-        remove: (id) => query("drawings.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId }))[0]).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid)
+        remove: (id) => query("drawings.remove", (db) => commitMutation(db, "drawings.remove", (tx) => {
+          const current = tx.select().from(T).where(eq(T.id, id)).get()
+          const row = tx.delete(T).where(eq(T.id, id)).returning({ projectId: T.projectId }).get()
+          return { result: row, resourceId: id, ...(current ? { previousRevision: drawingContentHash(current.data) } : {}), changed: row !== undefined }
+        })).pipe(Effect.tap((row) => row ? events.workspaceChanged(row.projectId) : Effect.void), Effect.asVoid)
       })
     })
   ).pipe(Layer.provide(LiveEvents.layer))

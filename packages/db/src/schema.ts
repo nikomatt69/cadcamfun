@@ -1000,3 +1000,33 @@ export const localKeyValueTable = sqliteTable("LocalKeyValue", {
 export type LocalKeyValue = typeof localKeyValueTable.$inferSelect
 export type NewLocalKeyValue = typeof localKeyValueTable.$inferInsert
 
+/** One admitted AI mutation. A running command is never replayed after losing its process. */
+export const aiCommandTable = sqliteTable("AiCommand", {
+  id: text("id").primaryKey(),
+  actorId: text("actorId").notNull().references((): AnySQLiteColumn => userTable.id, { onDelete: "cascade" }),
+  projectId: text("projectId").notNull().references((): AnySQLiteColumn => projectTable.id, { onDelete: "cascade" }),
+  drawingId: text("drawingId"),
+  sessionId: text("sessionId").notNull(),
+  callId: text("callId").notNull(),
+  messageId: text("messageId"),
+  actionId: text("actionId").notNull(),
+  inputDigest: text("inputDigest").notNull(),
+  status: text("status", { enum: ["running", "completed", "uncertain"] }).notNull(),
+  outcome: text("outcome", { mode: "json" }),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date())
+}, (t) => [index("AiCommand_owner_idx").on(t.actorId, t.projectId, t.sessionId)])
+
+/** A domain mutation and this receipt commit in the same synchronous SQLite transaction. */
+export const aiMutationReceiptTable = sqliteTable("AiMutationReceipt", {
+  id: text("id").primaryKey(),
+  commandId: text("commandId").notNull().references((): AnySQLiteColumn => aiCommandTable.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(),
+  operation: text("operation").notNull(),
+  resourceId: text("resourceId"),
+  previousRevision: text("previousRevision"),
+  revision: text("revision"),
+  result: text("result", { mode: "json" }).notNull(),
+  committedAt: integer("committedAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date())
+}, (t) => [uniqueIndex("AiMutationReceipt_command_sequence_key").on(t.commandId, t.sequence)])
+

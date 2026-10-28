@@ -104,7 +104,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     let announced = false
     return ai.chat({
       message: payload.message,
-      admitSession: (projectId, sessionId) => actingUser.bind(projectId, sessionId, actor, payload.message, payload.drawingId),
+      admitSession: (projectId, sessionId) => actingUser.bind(projectId, sessionId, actor, payload.message, payload.drawingId, payload.includeContext),
       ...(payload.permissionMode ? { permissionMode: payload.permissionMode } : {}),
       ...(payload.agent ? { agent: payload.agent } : {}),
       ...(payload.mode ? { mode: payload.mode } : {}),
@@ -367,7 +367,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       if (grant !== undefined && grant.scope.projectId !== payload.projectId) return yield* new BadRequest({ message: "This token is for another project." })
       yield* checkProject(payload.projectId)
       yield* checkDrawing(payload.projectId, payload.drawingId)
-      return yield* actions.invoke({ projectId: payload.projectId, tool: payload.tool, input: payload.input, user: actor, ...(payload.drawingId !== undefined ? { drawingId: payload.drawingId } : {}), ...(grant ? { mode: grant.scope.mode } : {}) }).pipe(Effect.mapError((e) => new BadRequest({ message: e.message })))
+      return yield* actions.invoke({ projectId: payload.projectId, tool: payload.tool, input: payload.input, user: actor, ...(payload.callId ? { callId: payload.callId } : {}), ...(payload.drawingId !== undefined ? { drawingId: payload.drawingId } : {}), ...(grant ? { mode: grant.scope.mode } : {}) }).pipe(Effect.mapError((e) => new BadRequest({ message: e.message })))
     }))
     .handle("issueBridgeToken", ({ payload }) => Effect.gen(function*() {
       const actor = yield* CurrentUser

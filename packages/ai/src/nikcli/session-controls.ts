@@ -8,12 +8,14 @@ import { OUTPUT_TOKEN_MAX } from "../transform.ts"
 export interface SessionControlInput {
   readonly sessionId: string
   readonly projectId?: string
-  readonly action: "status" | "compact" | "cancel_task" | "answer_question" | "reject_question" | "reply_permission" | "consolidate_memory" | "context"
+  readonly action: "status" | "compact" | "cancel_task" | "answer_question" | "reject_question" | "reply_permission" | "consolidate_memory" | "context" | "acceptance" | "set_acceptance"
   readonly taskId?: string
   readonly requestId?: string
   readonly answers?: ReadonlyArray<ReadonlyArray<string>>
   readonly decision?: "once" | "always" | "reject"
   readonly model?: { readonly provider?: string; readonly model?: string }
+  /** Explicit owner-authored engineering criteria; the sidecar validates and stores them separately from model text. */
+  readonly criteria?: unknown
 }
 
 /** nikcli's `COMPACTION_BUFFER` (`session/overflow.ts`): the room kept below an input window before the host summarises. */

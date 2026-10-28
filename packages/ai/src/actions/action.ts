@@ -158,6 +158,16 @@ const failureOutcome = (action: ActionSpec, error: ActionFailure): ActionOutcome
  * (`outcome.ts`). Interruption has the same wire result on both; an abort that lands while a write runs is `uncertain`.
  */
 export const executeActionOutcome = async (action: ActionSpec, input: unknown, context: ActionContext): Promise<ActionOutcome> => {
+  if (action.kind !== "read" && context.executeMutation) {
+    const { executeMutation, ...directContext } = context
+    return executeMutation({
+      actionId: action.id, input, projectId: context.projectId,
+      ...(context.sessionId !== undefined ? { sessionId: context.sessionId } : {}),
+      ...(context.callId !== undefined ? { callId: context.callId } : {}),
+      ...(context.messageId !== undefined ? { messageId: context.messageId } : {}),
+      ...(context.signal !== undefined ? { signal: context.signal } : {})
+    }, () => executeActionOutcome(action, input, directContext))
+  }
   let started = false
   try {
     const outcome = await Effect.runPromise(

@@ -4,6 +4,8 @@ Edit and commit on the checked-out branch, main included; no branch is required.
 Actions
 - start_change: optional. Create an ai/<topic> branch from main and check it out, only when the user wants a reviewable change or a pull request.
 - commit: record the current edits with a short imperative message that says what changed and why.
+- checkpoint: save drawing, components, operations, stock and used libraries without moving the checked-out branch. Carries this conversation and optional task lineage.
+- restore_checkpoint: restore a whole engineering checkpoint only on explicit request and native approval. Read vcs.checkpoints first; stale expectedRevision refuses the restore. Saved NC verification becomes stale and must be checked again.
 - restore: roll the named ids back to an earlier commit. Destructive: send confirm true only after the user asked for it; the host still asks before the tool runs.
 - open_pull_request: open the pull request from the checked-out branch into main, with a title and a body.
 - run_workflows: run the project's .cadcamfun/workflows on the checked-out branch and report the runs.
@@ -11,6 +13,8 @@ Actions
 Parameters
 - start_change: topic (up to 80 characters; it names the branch).
 - commit: message (up to 200 characters).
+- checkpoint: label (up to 200), optional taskId.
+- restore_checkpoint: commit (from vcs.checkpoints), expectedRevision (its current project revision), confirm true.
 - restore: paths (1-200 entity ids), from (commit id or branch), confirm (true, only when the user asked).
 - open_pull_request: title (up to 120), body (up to 4000; say what to double-check).
 - run_workflows: trigger (manual|pull-request|push, default manual).

@@ -1,5 +1,5 @@
 import type { MaterialDetail, MaterialRow } from "@cadcamfun/api"
-import { Database, DatabaseError, schema } from "@cadcamfun/db"
+import { commitMutation, Database, DatabaseError, schema } from "@cadcamfun/db"
 import { and, asc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
@@ -76,7 +76,13 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
             return { row, allowed }
           }),
         setProperties: (id, properties) =>
-          query("materials.setProperties", async (db) => void (await db.update(T).set({ properties, updatedAt: new Date() }).where(eq(T.id, id)))),
+          query("materials.setProperties", (db) => commitMutation(db, "materials.setProperties", (tx) => {
+            const previous = tx.select().from(T).where(eq(T.id, id)).get()
+            if (!previous) return { result: undefined, changed: false }
+            const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+            tx.update(T).set({ properties, updatedAt }).where(eq(T.id, id)).run()
+            return { result: undefined, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
+          })),
         visibleByIds: (userId, ids) =>
           query("materials.visibleByIds", async (db) => {
             if (ids.length === 0) return []
@@ -90,45 +96,56 @@ export class MaterialRepo extends Context.Service<MaterialRepo, {
           query("materials.importMany", (db) => importLoop(items, mode, {
             validate: (m) => (m.name ? undefined : "Missing required field (name)"),
             exists: async (id) => (await db.select({ id: T.id }).from(T).where(eq(T.id, id)).limit(1)).length > 0,
-            create: async (m) => {
-              const [row] = await db.insert(T).values({
+            create: async (m) => commitMutation(db, "materials.import.create", (tx) => {
+              const row = tx.insert(T).values({
                 name: String(m.name), description: (m.description as string | undefined) || null,
                 properties: m.properties || {}, ownerId: userId
-              }).returning()
-              return row!.id
-            },
-            update: async (id, m) => {
-              await db.update(T).set({
+              }).returning().get()
+              if (!row) throw new Error("Imported material was not created")
+              return { result: row.id, resourceId: row.id, revision: row.updatedAt.toISOString() }
+            }),
+            update: async (id, m) => commitMutation(db, "materials.import.update", (tx) => {
+              const previous = tx.select().from(T).where(eq(T.id, id)).get()
+              if (!previous) throw new Error("Imported material no longer exists")
+              const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+              tx.update(T).set({
                 name: String(m.name), description: (m.description as string | undefined) || null,
-                properties: m.properties || {}, updatedAt: new Date()
-              }).where(eq(T.id, id))
-              return id
-            }
+                properties: m.properties || {}, updatedAt
+              }).where(eq(T.id, id)).run()
+              return { result: id, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
+            })
           })),
         create: (userId, input) =>
-          query("materials.create", async (db) => {
-            const [row] = await db.insert(T).values({
+          query("materials.create", (db) => commitMutation(db, "materials.create", (tx) => {
+            const row = tx.insert(T).values({
               name: input.name,
               description: input.description ?? null,
               properties: input.properties,
               ownerId: userId,
               organizationId: input.organizationId || null,
               isPublic: input.isPublic || false
-            }).returning()
-            return toRow(row!)
-          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
+            }).returning().get()
+            if (!row) throw new Error("Material was not created")
+            return { result: toRow(row), resourceId: row.id, revision: row.updatedAt.toISOString() }
+          })).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
         update: (id, input) =>
-          query("materials.update", async (db) => {
-            const [row] = await db.update(T).set({
+          query("materials.update", (db) => commitMutation(db, "materials.update", (tx) => {
+            const previous = tx.select().from(T).where(eq(T.id, id)).get()
+            if (!previous) throw new Error("Material no longer exists")
+            const row = tx.update(T).set({
               ...(input.name && { name: input.name }),
               ...(input.description !== undefined && { description: input.description }),
               ...(input.properties ? { properties: input.properties } : {}),
               ...(input.isPublic !== undefined && { isPublic: input.isPublic }),
-              updatedAt: new Date()
-            }).where(eq(T.id, id)).returning()
-            return toRow(row!)
-          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
-        remove: (id) => query("materials.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId }))[0]).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void), Effect.asVoid)
+              updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+            }).where(eq(T.id, id)).returning().get()
+            if (!row) throw new Error("Material disappeared during update")
+            return { result: toRow(row), resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: row.updatedAt.toISOString() }
+          })).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
+        remove: (id) => query("materials.remove", (db) => commitMutation(db, "materials.remove", (tx) => {
+          const row = tx.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId, updatedAt: T.updatedAt }).get()
+          return { result: row, resourceId: id, ...(row ? { previousRevision: row.updatedAt.toISOString() } : {}), changed: row !== undefined }
+        })).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void), Effect.asVoid)
       })
     })
   ).pipe(Layer.provide(LiveEvents.layer))

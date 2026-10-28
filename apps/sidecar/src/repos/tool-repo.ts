@@ -1,5 +1,5 @@
 import type { ToolDetail, ToolRow } from "@cadcamfun/api"
-import { Database, DatabaseError, schema } from "@cadcamfun/db"
+import { commitMutation, Database, DatabaseError, schema } from "@cadcamfun/db"
 import { and, asc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { LiveEvents } from "../services/live-events.ts"
@@ -66,7 +66,13 @@ export class ToolRepo extends Context.Service<ToolRepo, {
             const allowed = row.ownerId === userId || (!!row.organizationId && await isOrgMember(db, userId, row.organizationId))
             return { row, allowed }
           }),
-        touch: (id) => query("tools.touch", async (db) => void (await db.update(T).set({ updatedAt: new Date() }).where(eq(T.id, id)))),
+        touch: (id) => query("tools.touch", (db) => commitMutation(db, "tools.touch", (tx) => {
+          const previous = tx.select().from(T).where(eq(T.id, id)).get()
+          if (!previous) return { result: undefined, changed: false }
+          const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+          tx.update(T).set({ updatedAt }).where(eq(T.id, id)).run()
+          return { result: undefined, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
+        })),
         visibleByIds: (userId, ids) =>
           query("tools.visibleByIds", async (db) => {
             if (ids.length === 0) return []
@@ -96,29 +102,39 @@ export class ToolRepo extends Context.Service<ToolRepo, {
                 return errors.length ? errors.join(", ") : undefined
               },
               exists: async (id) => (await db.select({ id: T.id }).from(T).where(eq(T.id, id)).limit(1)).length > 0,
-              create: async (t) => (await db.insert(T).values({ ...fields(t), ownerId: userId }).returning())[0]!.id,
-              update: async (id, t) => {
-                await db.update(T).set({ ...fields(t), updatedAt: new Date() }).where(eq(T.id, id))
-                return id
-              }
+              create: async (t) => commitMutation(db, "tools.import.create", (tx) => {
+                const row = tx.insert(T).values({ ...fields(t), ownerId: userId }).returning().get()
+                if (!row) throw new Error("Imported tool was not created")
+                return { result: row.id, resourceId: row.id, revision: row.updatedAt.toISOString() }
+              }),
+              update: async (id, t) => commitMutation(db, "tools.import.update", (tx) => {
+                const previous = tx.select().from(T).where(eq(T.id, id)).get()
+                if (!previous) throw new Error("Imported tool no longer exists")
+                const updatedAt = new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+                tx.update(T).set({ ...fields(t), updatedAt }).where(eq(T.id, id)).run()
+                return { result: id, resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: updatedAt.toISOString() }
+              })
             })
           }),
         create: (userId, input) =>
-          query("tools.create", async (db) => {
-            const [row] = await db.insert(T).values({
+          query("tools.create", (db) => commitMutation(db, "tools.create", (tx) => {
+            const row = tx.insert(T).values({
               name: input.name, type: input.type, diameter: input.diameter, material: input.material,
               numberOfFlutes: input.numberOfFlutes ?? null, maxRPM: input.maxRPM ?? null, coolantType: input.coolantType ?? null,
               cuttingLength: input.cuttingLength ?? null, totalLength: input.totalLength ?? null, shankDiameter: input.shankDiameter ?? null,
               cornerRadius: input.cornerRadius ?? null, tipAngle: input.tipAngle ?? null, threadPitch: input.threadPitch ?? null,
               holderDiameter: input.holderDiameter ?? null, holderLength: input.holderLength ?? null, stickout: input.stickout ?? null,
               notes: input.notes ?? null, ownerId: userId, organizationId: input.organizationId || null, isPublic: input.isPublic || false
-            }).returning()
-            return toRow(row!)
-          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
+            }).returning().get()
+            if (!row) throw new Error("Tool was not created")
+            return { result: toRow(row), resourceId: row.id, revision: row.updatedAt.toISOString() }
+          })).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
         update: (id, i) =>
-          query("tools.update", async (db) => {
+          query("tools.update", (db) => commitMutation(db, "tools.update", (tx) => {
+            const previous = tx.select().from(T).where(eq(T.id, id)).get()
+            if (!previous) throw new Error("Tool no longer exists")
             // Same truthiness rules as the legacy spread: required text/number fields only when truthy, the rest when defined.
-            const [row] = await db.update(T).set({
+            const row = tx.update(T).set({
               ...(i.name && { name: i.name }), ...(i.type && { type: i.type }),
               ...(i.diameter && { diameter: i.diameter }), ...(i.material && { material: i.material }),
               ...(i.numberOfFlutes !== undefined && { numberOfFlutes: i.numberOfFlutes }),
@@ -135,11 +151,15 @@ export class ToolRepo extends Context.Service<ToolRepo, {
               ...(i.stickout !== undefined && { stickout: i.stickout }),
               ...(i.notes !== undefined && { notes: i.notes }),
               ...(i.isPublic !== undefined && { isPublic: i.isPublic }),
-              updatedAt: new Date()
-            }).where(eq(T.id, id)).returning()
-            return toRow(row!)
-          }).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
-        remove: (id) => query("tools.remove", async (db) => (await db.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId }))[0]).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void), Effect.asVoid)
+              updatedAt: new Date(Math.max(Date.now(), previous.updatedAt.getTime() + 1))
+            }).where(eq(T.id, id)).returning().get()
+            if (!row) throw new Error("Tool disappeared during update")
+            return { result: toRow(row), resourceId: id, previousRevision: previous.updatedAt.toISOString(), revision: row.updatedAt.toISOString() }
+          })).pipe(Effect.tap((row) => row.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void)),
+        remove: (id) => query("tools.remove", (db) => commitMutation(db, "tools.remove", (tx) => {
+          const row = tx.delete(T).where(eq(T.id, id)).returning({ ownerId: T.ownerId, organizationId: T.organizationId, updatedAt: T.updatedAt }).get()
+          return { result: row, resourceId: id, ...(row ? { previousRevision: row.updatedAt.toISOString() } : {}), changed: row !== undefined }
+        })).pipe(Effect.tap((row) => row?.ownerId ? events.resourcesChanged(row.ownerId, row.organizationId) : Effect.void), Effect.asVoid)
       })
     })
   ).pipe(Layer.provide(LiveEvents.layer))

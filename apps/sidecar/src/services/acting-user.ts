@@ -13,12 +13,14 @@ import { Context, Data, Effect, Layer } from "effect"
 import { AsyncLocalStorage } from "node:async_hooks"
 import { childAgent } from "@cadcamfun/ai"
 import { createHash } from "node:crypto"
-import { mkdir, open, readdir, unlink } from "node:fs/promises"
+import { mkdir, open, readdir, unlink, writeFile, rename } from "node:fs/promises"
 import { join } from "node:path"
 
 interface SessionOwner {
   readonly projectId: string
   readonly userId: string
+  readonly drawingId?: string
+  readonly includeContext?: boolean
 }
 
 /** The chat turn a tool call belongs to. */
@@ -75,6 +77,8 @@ interface InvocationActor {
   readonly signal?: AbortSignal
   /** The drawing the admitted turn works on (checked against the project before admission). */
   readonly drawingId?: string
+  readonly includeContext?: boolean
+  readonly checkLease?: () => Promise<void>
 }
 
 export class ActingUser extends Context.Service<ActingUser, {
@@ -95,7 +99,8 @@ export class ActingUser extends Context.Service<ActingUser, {
    * (each admitted turn names it again), and it is what every tool call of the turn, its Code Mode programs and its children
    * act on. Nothing outside the admission (another window's editor state) can change it.
    */
-  readonly bind: (projectId: string, sessionId: string, user: SessionUser, prompt?: string, drawingId?: string) => Promise<boolean>
+  readonly bind: (projectId: string, sessionId: string, user: SessionUser, prompt?: string, drawingId?: string, includeContext?: boolean) => Promise<boolean>
+  readonly bindChild: (projectId: string, parentSessionId: string, childSessionId: string, user: SessionUser, drawingId?: string, checkLease?: () => Promise<void>) => Promise<void>
   /**
    * The turn of the running call, read from the invocation it runs in. Call it where a Promise call enters Effect and provide it
    * as `CurrentTurn`; Effect code never reads the async-local storage itself.
@@ -113,7 +118,7 @@ export class ActingUser extends Context.Service<ActingUser, {
     const fileFor = (sessionId: string) => directory === undefined ? undefined : join(directory, `${createHash("sha256").update(sessionId).digest("hex")}.json`)
     const owner = async (sessionId: string): Promise<SessionOwner | undefined> => {
       const binding = sessions.get(sessionId) ?? [...sessions.entries()].find(([parent]) => childAgent(parent, sessionId) !== undefined)?.[1]
-      if (binding) return { projectId: binding.projectId, userId: binding.actor.user.id }
+      if (binding) return { projectId: binding.projectId, userId: binding.actor.user.id, ...(binding.actor.drawingId ? { drawingId: binding.actor.drawingId } : {}), ...(binding.actor.includeContext !== undefined ? { includeContext: binding.actor.includeContext } : {}) }
       const file = fileFor(sessionId)
       if (file === undefined) return undefined
       const handle = await open(file, "r").catch((error: unknown) => {
@@ -125,7 +130,7 @@ export class ActingUser extends Context.Service<ActingUser, {
         if ((await handle.stat()).size > 4096) throw new Error("Invalid AI session owner file")
         const value: unknown = JSON.parse(await handle.readFile("utf8"))
         if (typeof value !== "object" || value === null || !("sessionId" in value) || value.sessionId !== sessionId || !("projectId" in value) || typeof value.projectId !== "string" || !("userId" in value) || typeof value.userId !== "string") throw new Error("Invalid AI session owner file")
-        return { projectId: value.projectId, userId: value.userId }
+        return { projectId: value.projectId, userId: value.userId, ...("drawingId" in value && typeof value.drawingId === "string" ? { drawingId: value.drawingId } : {}), ...("includeContext" in value && typeof value.includeContext === "boolean" ? { includeContext: value.includeContext } : {}) }
       } finally { await handle.close() }
     }
     /** Owner files read per listing; a desktop with more conversations than this lists the most recent ones. */
@@ -185,7 +190,13 @@ export class ActingUser extends Context.Service<ActingUser, {
         const invocation = invocations.getStore()
         return invocation ? invocation.prompt : prompt
       },
-      bind: async (projectId, sessionId, user, message, drawingId) => {
+      bindChild: async (projectId, parentSessionId, childSessionId, user, drawingId, checkLease) => {
+        const parent = await owner(parentSessionId)
+        if (!parent || parent.projectId !== projectId || parent.userId !== user.id) throw new TurnUnowned()
+        await checkLease?.()
+        sessions.set(childSessionId, { projectId, actor: Object.freeze({ user: Object.freeze({ ...user }), ...(drawingId ? { drawingId } : {}), ...(parent.includeContext !== undefined ? { includeContext: parent.includeContext } : {}), ...(checkLease ? { checkLease } : {}) }) })
+      },
+      bind: async (projectId, sessionId, user, message, drawingId, includeContext) => {
         const previous = await owner(sessionId)
         if (previous && (previous.projectId !== projectId || previous.userId !== user.id)) return false
         const file = fileFor(sessionId)
@@ -205,7 +216,14 @@ export class ActingUser extends Context.Service<ActingUser, {
         }
         const active = sessions.get(sessionId)
         if (active && (active.projectId !== projectId || active.actor.user.id !== user.id)) return false
-        sessions.set(sessionId, { projectId, actor: Object.freeze({ user: Object.freeze({ ...user }), ...(message !== undefined ? { prompt: message } : {}), ...(drawingId !== undefined ? { drawingId } : {}) }) })
+        if (file) {
+          const temporary = `${file}.${crypto.randomUUID()}.tmp`
+          try {
+            await writeFile(temporary, JSON.stringify({ sessionId, projectId, userId: user.id, ...(drawingId ? { drawingId } : {}), ...(includeContext !== undefined ? { includeContext } : {}) }), { mode: 0o600 })
+            await rename(temporary, file)
+          } finally { await unlink(temporary).catch(() => undefined) }
+        }
+        sessions.set(sessionId, { projectId, actor: Object.freeze({ user: Object.freeze({ ...user }), ...(message !== undefined ? { prompt: message } : {}), ...(drawingId !== undefined ? { drawingId } : {}), ...(includeContext !== undefined ? { includeContext } : {}) }) })
         return true
       },
       turn: (fallback) => {
@@ -219,10 +237,11 @@ export class ActingUser extends Context.Service<ActingUser, {
           admitted: invocation !== undefined
         })
       },
-      invoke: (projectId, sessionId, execute, signal) => {
+      invoke: async (projectId, sessionId, execute, signal) => {
         const owner = sessions.get(sessionId) ?? [...sessions.entries()].find(([parent, binding]) => binding.projectId === projectId && childAgent(parent, sessionId) !== undefined)?.[1]
         if (!owner || owner.projectId !== projectId) return Promise.reject(new TurnUnowned())
         if (signal?.aborted) return Promise.reject(new TurnCancelled("Tool execution cancelled."))
+        await owner.actor.checkLease?.()
         return invocations.run(Object.freeze({ ...owner.actor, ...(signal ? { signal } : {}) }), execute)
       }
     })

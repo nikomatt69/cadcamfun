@@ -56,8 +56,8 @@ export class BridgeClient {
   }
 
   /** Runs one action. A refusal by the application (400) is returned as `{ ok: false, error }`, so the agent can read it and recover. */
-  async invoke(projectId: string, tool: string, input: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {
-    const response = await this.#request("/api/ai/actions/invoke", { method: "POST", body: JSON.stringify({ projectId, tool, input }), ...(signal ? { signal } : {}) })
+  async invoke(projectId: string, tool: string, input: Record<string, unknown>, signal?: AbortSignal, callId?: string): Promise<unknown> {
+    const response = await this.#request("/api/ai/actions/invoke", { method: "POST", body: JSON.stringify({ projectId, tool, input, ...(callId ? { callId } : {}) }), ...(signal ? { signal } : {}) })
     if (response.status === 400) return { ok: false, error: await messageOf(response) }
     if (!response.ok) throw new BridgeError(`CADCAMFUN could not run ${tool}: ${await messageOf(response)}`, response.status)
     return ((await response.json()) as { result: unknown }).result

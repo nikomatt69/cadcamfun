@@ -6287,6 +6287,18 @@
                       }
                     ]
                   },
+                  "callId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "tool": {
                     "type": "string"
                   },
@@ -7091,6 +7103,102 @@
                         "additionalProperties": false
                       }
                     },
+                    "engineeringAcceptance": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "accepted",
+                                "failed",
+                                "unmeasured",
+                                "stale",
+                                "not_configured"
+                              ]
+                            },
+                            "projectId": {
+                              "type": "string"
+                            },
+                            "drawingId": {
+                              "type": "string"
+                            },
+                            "revision": {
+                              "type": "string"
+                            },
+                            "criteriaDigest": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "checks": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pass",
+                                      "fail",
+                                      "unmeasured",
+                                      "stale"
+                                    ]
+                                  },
+                                  "reason": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "report": {
+                                    "anyOf": [
+                                      {},
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "note": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "projectId",
+                            "drawingId",
+                            "revision",
+                            "checks",
+                            "note"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "context": {
                       "type": "object",
                       "properties": {
@@ -7535,7 +7643,17 @@
                       "reject_question",
                       "reply_permission",
                       "consolidate_memory",
-                      "context"
+                      "context",
+                      "acceptance",
+                      "set_acceptance"
+                    ]
+                  },
+                  "criteria": {
+                    "anyOf": [
+                      {},
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "taskId": {

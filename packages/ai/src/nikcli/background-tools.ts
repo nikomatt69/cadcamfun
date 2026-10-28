@@ -97,15 +97,24 @@ export const backgroundToolContributions = (manager: BackgroundTaskManagerInterf
       const spec = SUBAGENTS[normalized]
       const job = agentJobPrompt(value)
       if (!job.ok) return refuse(job.error)
+      const brief = value["brief"]
+      const ids = brief !== null && typeof brief === "object" && "ids" in brief && Array.isArray(brief.ids)
+        ? brief.ids.filter((id): id is string => typeof id === "string") : []
+      if (ids.length > 0 && context.validateDelegation !== undefined) {
+        const checked = await context.validateDelegation(ids)
+        if (!checked.ok) return refuse(checked.error ?? "The delegation names unavailable or stale references. Inspect them before delegating.")
+      }
       // nikcli's `background` is optional and defaults to true: start returns at once and the completion wakes this
       // conversation. Only an explicit false makes the call wait for the report.
       const background = backgroundFlag(value["background"]) ?? true
       const task = manager.enqueue({
         description: String(value["description"]), prompt: job.prompt,
-        ...owner, agent: spec.id, edits: spec.edits, background
+        ...owner, agent: spec.id, edits: spec.edits, background,
+        ...(context.taskTarget !== undefined ? { target: context.taskTarget } : {})
       })
+      const admitted = manager.accepted !== undefined ? await manager.accepted(owner, task.id) : task
       // The caller asked to wait: the specialist works inside this tool call and its report is the call's result.
-      if (background) return task
+      if (background) return admitted
       return { ...(await manager.wait(owner, task.id, context.signal)), specialists: subagentCatalogue() }
     }
     if (action === "agent.list") return manager.list(owner)

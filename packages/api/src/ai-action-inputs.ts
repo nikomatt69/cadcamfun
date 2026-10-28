@@ -301,10 +301,13 @@ export const AgentBrief = Schema.Struct({
 
 export const VCS_ACTION_INPUTS = {
   "vcs.status": empty,
+  "vcs.checkpoints": empty,
   "vcs.diff": Schema.Struct({ from: Schema.optionalKey(Schema.String), to: withDefault(Schema.String, "HEAD") }),
   "vcs.list_pull_requests": Schema.Struct({ state: withDefault(Schema.Literals(["open", "merged", "closed"]), "open") }),
   "vcs_edit.start_change": Schema.Struct({ topic: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80)) }),
   "vcs_edit.commit": Schema.Struct({ message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)) }),
+  "vcs_edit.checkpoint": Schema.Struct({ label: trimmed(200), taskId: Schema.optionalKey(id) }),
+  "vcs_edit.restore_checkpoint": Schema.Struct({ commit: id, expectedRevision: id, confirm }),
   "vcs_edit.restore": Schema.Struct({ paths: Schema.Array(id).check(Schema.isMinLength(1), Schema.isMaxLength(200)), from: id, confirm }),
   "vcs_edit.open_pull_request": Schema.Struct({ title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)), body: withDefault(Schema.String.check(Schema.isMaxLength(4000)), "") }),
   "vcs_edit.run_workflows": Schema.Struct({ trigger: withDefault(Schema.Literals(["manual", "pull-request", "push"]), "manual") }),

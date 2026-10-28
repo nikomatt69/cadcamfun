@@ -1,13 +1,18 @@
-import { Database, DatabaseError, schema, type Db } from "@cadcamfun/db"
+import { Database, DatabaseError, commitMutation, schema, type Db } from "@cadcamfun/db"
 import type { Backend, Entity, ProjectSnapshot } from "@cadcamfun/vcs"
 import { and, eq, inArray, like, notExists } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
+import { createHash } from "node:crypto"
+import { canonicalJson, snapshotToFiles } from "@cadcamfun/vcs"
+
+export const projectSnapshotRevision = (snapshot: ProjectSnapshot): string =>
+  createHash("sha256").update(canonicalJson(snapshotToFiles(snapshot))).digest("hex")
 
 /**
  * `@cadcamfun/vcs` storage over the `GitObject` / `GitRef` / `GitRepo` tables, scoped to one project.
  * The vcs library is synchronous, so this uses Drizzle's synchronous bun:sqlite calls.
  */
-export const sqliteBackend = (db: Db, projectId: string): Backend => {
+export const sqliteBackend = (db: Pick<Db, "select" | "insert" | "update" | "delete">, projectId: string): Backend => {
   const O = schema.gitObjectTable
   const R = schema.gitRefTable
   const head = (): typeof schema.gitRepoTable.$inferSelect => {
@@ -32,6 +37,36 @@ export const sqliteBackend = (db: Db, projectId: string): Backend => {
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null)
 
+
+/** One synchronous snapshot reader shared by checkpoint commit and compare-and-swap restore. */
+export const readProjectSnapshot = (db: Pick<Db, "select">, projectId: string): ProjectSnapshot | undefined => {
+  const P = schema.projectTable
+  const project = db.select().from(P).where(eq(P.id, projectId)).get()
+  if (!project) return undefined
+  const dated = (row: { createdAt: Date; updatedAt: Date }) => ({ createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })
+  // Thumbnails are derived; owners and organisations are properties of an installation, not of the model.
+  const entity = (row: Record<string, unknown> & { createdAt: Date; updatedAt: Date }, drop: ReadonlyArray<string>): Entity => {
+    const copy: Record<string, unknown> = { ...row, ...dated(row) }
+    for (const key of drop) delete copy[key]
+    return copy as unknown as Entity
+  }
+  const toolpaths = db.select().from(schema.toolpathTable).where(eq(schema.toolpathTable.projectId, projectId)).all()
+  const used = (pick: (t: (typeof toolpaths)[number]) => string | null) => [...new Set(toolpaths.flatMap((t) => { const v = pick(t); return v ? [v] : [] }))]
+  const library = <T extends { createdAt: Date; updatedAt: Date }>(table: typeof schema.materialTable | typeof schema.toolTable | typeof schema.machineConfigTable, ids: string[], drop: string[]) =>
+    (ids.length === 0 ? [] : db.select().from(table).where(inArray(table.id, ids)).all() as unknown as Array<Record<string, unknown> & T>).map((r) => entity(r, drop))
+  const toolpathIds = toolpaths.map((t) => t.id)
+  return {
+    project: { id: project.id, name: project.name, description: project.description, isPublic: project.isPublic },
+    drawings: db.select().from(schema.drawingTable).where(eq(schema.drawingTable.projectId, projectId)).all().map((r) => entity(r, ["thumbnail", "projectId"])),
+    components: db.select().from(schema.componentTable).where(eq(schema.componentTable.projectId, projectId)).all().map((r) => entity(r, ["thumbnail", "projectId"])),
+    toolpaths: toolpaths.map((r) => entity(r, ["thumbnail", "projectId"])),
+    materials: library(schema.materialTable, used((t) => t.materialId), ["ownerId", "organizationId"]),
+    tools: library(schema.toolTable, used((t) => t.toolId), ["ownerId", "organizationId"]),
+    machineConfigs: library(schema.machineConfigTable, used((t) => t.machineConfigId), ["ownerId"]),
+    costs: toolpathIds.length === 0 ? [] : db.select().from(schema.productionCostEstimateTable).where(inArray(schema.productionCostEstimateTable.toolpathId, toolpathIds)).all().map((r) => entity(r, ["ownerId", "organizationId", "operationCostId"])),
+  } satisfies ProjectSnapshot
+}
+
 /** `user.name` / `user.email` of a commit signature. */
 export interface GitIdentity {
   readonly name: string
@@ -49,7 +84,7 @@ export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
   /** Current database state of a project as a repository snapshot (thumbnails are derived data and excluded). */
   snapshot(projectId: string): Effect.Effect<ProjectSnapshot | undefined, DatabaseError>
   /** Makes the database match `snapshot`: upserts present entities, deletes absent ones. */
-  apply(projectId: string, snapshot: ProjectSnapshot, userId: string): Effect.Effect<void, DatabaseError>
+  apply(projectId: string, snapshot: ProjectSnapshot, userId: string, options?: { readonly expectedRevision: string; readonly checkpointId: string }): Effect.Effect<void, DatabaseError>
   /** Appends to the legacy `ActivityLog`, so version-control actions show up in the same audit trail as every other change. */
   audit(userId: string, projectId: string, action: string, details: Record<string, unknown>): Effect.Effect<void, DatabaseError>
   remote(projectId: string): Effect.Effect<string | null, DatabaseError>
@@ -69,35 +104,14 @@ export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
       return ProjectVcsRepo.of({
         backend: (projectId) => sqliteBackend(db, projectId),
         snapshot: (projectId) =>
-          query("vcs.snapshot", (db) => {
-            const project = db.select().from(P).where(eq(P.id, projectId)).get()
-            if (!project) return undefined
-            const dated = (row: { createdAt: Date; updatedAt: Date }) => ({ createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })
-            // Thumbnails are derived; owners and organisations are properties of an installation, not of the model.
-            const entity = (row: Record<string, unknown> & { createdAt: Date; updatedAt: Date }, drop: ReadonlyArray<string>): Entity => {
-              const copy: Record<string, unknown> = { ...row, ...dated(row) }
-              for (const key of drop) delete copy[key]
-              return copy as unknown as Entity
-            }
-            const toolpaths = db.select().from(schema.toolpathTable).where(eq(schema.toolpathTable.projectId, projectId)).all()
-            const used = (pick: (t: (typeof toolpaths)[number]) => string | null) => [...new Set(toolpaths.flatMap((t) => { const v = pick(t); return v ? [v] : [] }))]
-            const library = <T extends { createdAt: Date; updatedAt: Date }>(table: typeof schema.materialTable | typeof schema.toolTable | typeof schema.machineConfigTable, ids: string[], drop: string[]) =>
-              (ids.length === 0 ? [] : db.select().from(table).where(inArray(table.id, ids)).all() as unknown as Array<Record<string, unknown> & T>).map((r) => entity(r, drop))
-            const toolpathIds = toolpaths.map((t) => t.id)
-            return {
-              project: { id: project.id, name: project.name, description: project.description, isPublic: project.isPublic },
-              drawings: db.select().from(schema.drawingTable).where(eq(schema.drawingTable.projectId, projectId)).all().map((r) => entity(r, ["thumbnail", "projectId"])),
-              components: db.select().from(schema.componentTable).where(eq(schema.componentTable.projectId, projectId)).all().map((r) => entity(r, ["thumbnail", "projectId"])),
-              toolpaths: toolpaths.map((r) => entity(r, ["thumbnail", "projectId"])),
-              materials: library(schema.materialTable, used((t) => t.materialId), ["ownerId", "organizationId"]),
-              tools: library(schema.toolTable, used((t) => t.toolId), ["ownerId", "organizationId"]),
-              machineConfigs: library(schema.machineConfigTable, used((t) => t.machineConfigId), ["ownerId"]),
-              costs: toolpathIds.length === 0 ? [] : db.select().from(schema.productionCostEstimateTable).where(inArray(schema.productionCostEstimateTable.toolpathId, toolpathIds)).all().map((r) => entity(r, ["ownerId", "organizationId", "operationCostId"])),
-            } satisfies ProjectSnapshot
-          }),
-        apply: (projectId, s, userId) =>
+          query("vcs.snapshot", (db) => readProjectSnapshot(db, projectId)),
+        apply: (projectId, s, userId, options) =>
           query("vcs.apply", (db) =>
-            db.transaction((tx) => {
+            commitMutation(db, "vcs.apply", (tx) => {
+              if (options) {
+                const current = readProjectSnapshot(tx, projectId)
+                if (!current || projectSnapshotRevision(current) !== options.expectedRevision) throw new Error("CheckpointConflict: the project changed; inspect it before restoring.")
+              }
               const p = s.project as { name?: string; description?: string | null; isPublic?: boolean }
               tx.update(P).set({ ...(p.name && { name: p.name }), description: p.description ?? null, isPublic: p.isPublic ?? false }).where(eq(P.id, projectId)).run()
               const date = (v: unknown): Date => (typeof v === "string" ? new Date(v) : new Date())
@@ -149,7 +163,7 @@ export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
               sync(schema.componentTable, s.components, (e) => ({ ...common(e), data: e.data ?? {}, type: str(e.type), isPublic: Boolean(e.isPublic) }))
               sync(schema.toolpathTable, s.toolpaths, (e) => ({
                 ...common(e),
-                data: e.data ?? null,
+                data: options ? { ...(typeof e.data === "object" && e.data !== null ? e.data : {}), verification: null, sourceRevision: `checkpoint-restored:${options.checkpointId}`, checkpointRestore: { checkpointId: options.checkpointId, restoredAt: new Date().toISOString() } } : e.data ?? null,
                 type: str(e.type),
                 operationType: str(e.operationType),
                 gcode: str(e.gcode),
@@ -180,6 +194,8 @@ export class ProjectVcsRepo extends Context.Service<ProjectVcsRepo, {
                 }
                 tx.insert(C).values(v).onConflictDoUpdate({ target: C.id, set: v }).run()
               }
+              const restored = readProjectSnapshot(tx, projectId)
+              return { result: undefined, resourceId: projectId, ...(restored ? { revision: projectSnapshotRevision(restored) } : {}) }
             })),
         audit: (userId, projectId, action, details) =>
           query("vcs.audit", (db) => void db.insert(schema.activityLogTable).values({ userId, itemId: projectId, itemType: "project", action, details }).run()),

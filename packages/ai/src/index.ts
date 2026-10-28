@@ -17,7 +17,13 @@ export * from "./prompts/system.ts"
 export * from "./prompts/workflows.ts"
 export * from "./service.ts"
 export * from "./tools/catalogue.ts"
-export { makeNikCliRuntime, type HostToolSpec, type NikCliRuntime, type NikCliRuntimeOptions } from "./nikcli/runtime.ts"
+export { makeNikCliRuntime, type HostToolContext, type HostToolSpec, type NikCliRuntime, type NikCliRuntimeOptions } from "./nikcli/runtime.ts"
+export { HOST_CAPABILITIES, HostCompatibilityError, inspectHostCapabilities } from "./nikcli/host-capabilities.ts"
+export type { ActionOutcome } from "./actions/outcome.ts"
+export type { MutationExecutor, MutationExecution } from "./tools/define.ts"
+export * from "./engineering-state.ts"
+export * from "./engineering-evaluation.ts"
+export { installEngineeringLedgerMod, type EngineeringLedgerRead, type EngineeringLedgerReader } from "./nikcli/engineering-ledger-mod.ts"
 export { ToolRegistry, ToolRegistryError, makeToolRegistry, compareToolIds, lastWins, RESERVED_TOOL_IDS, type ToolRegistryShape, type ToolRegistrySources, type ToolHandle, type ToolCatalogueEntry } from "./tools/tool-registry.ts"
 export { assembleContext, assembleContextParts, contextSections, deliveredObservationDigest, notesByRecency, observationDigest, planObservation, renderObservation, CONTEXT_BUDGET, CONTEXT_KINDS, OBSERVATION_BUDGET, OBSERVATION_KINDS, OBSERVATION_METADATA_KEY, type ContextAssembly, type ContextKind, type ContextManifest, type ContextManifestEntry, type ContextParts, type ContextPartsOptions, type ContextPlacement, type ContextRequest, type ContextSection, type ContextSource, type ObservationInput, type ObservationPart, type ObservationPlan, type OmissionReason } from "./context-assembly.ts"
 export { readProjectMemoryFiles, invalidateProjectMemoryFiles, projectMemoryFile, projectHabitsFile, type ProjectMemoryFiles } from "./nikcli/project-files.ts"
@@ -56,6 +62,7 @@ export {
   MAX_TASK_ATTEMPTS,
   TASK_RETENTION_MS,
   type BackgroundTask,
+  type BackgroundTaskTarget,
   type BackgroundTaskJournal,
   type BackgroundTaskRecovery,
   type BackgroundTaskInput,

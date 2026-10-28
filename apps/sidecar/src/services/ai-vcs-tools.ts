@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import type { ProjectRepo } from "../repos/project-repo.ts"
 import type { Actor, ProjectVcs } from "./project-vcs.ts"
 import type { WorkflowRunner } from "./workflow-runner.ts"
+import type { makeEngineeringCheckpoints } from "./ai-checkpoints.ts"
 
 export interface VcsToolDeps {
   readonly vcs: ProjectVcs["Service"]
@@ -10,6 +11,7 @@ export interface VcsToolDeps {
   readonly projects: ProjectRepo["Service"]
   /** The human the assistant acts for; every write is attributed to them as an AI actor. */
   readonly actor: Actor
+  readonly checkpoints?: ReturnType<typeof makeEngineeringCheckpoints>
 }
 
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "change"
@@ -38,12 +40,12 @@ export const vcsContributions = (deps: VcsToolDeps): Readonly<Record<string, Act
   /**
    * One Promise crossing: the Effect runs here, with the call's signal, and a failure carries its message to the model.
    */
-  const contribute = <I, A>(write: boolean, body: (projectId: string, input: I, actor: Actor) => Effect.Effect<A, unknown>): ActionContribution =>
+  const contribute = <I, A>(write: boolean, body: (projectId: string, input: I, actor: Actor, context: ToolContext) => Effect.Effect<A, unknown>): ActionContribution =>
     (async (input: I, context: ToolContext) => {
       const actor: Actor = Object.freeze({ ...deps.actor, kind: "ai" })
       return Effect.runPromise(
         project(context.projectId, actor, write).pipe(
-          Effect.flatMap((projectId) => body(projectId, input, actor)),
+          Effect.flatMap((projectId) => body(projectId, input, actor, context)),
           Effect.catch((error) => Effect.fail(new Error(failureMessage(error))))
         ),
         context.signal ? { signal: context.signal } : undefined
@@ -51,6 +53,13 @@ export const vcsContributions = (deps: VcsToolDeps): Readonly<Record<string, Act
     }) as ActionContribution
 
   return {
+    "vcs.checkpoints": contribute(false, (id) => deps.checkpoints ? deps.checkpoints.list(id) : Effect.fail(new Error("Engineering checkpoints are unavailable"))),
+    "vcs_edit.checkpoint": contribute(true, (id, input: { label: string; taskId?: string }, actor, context) => deps.checkpoints
+      ? deps.checkpoints.create(id, { ...input, ...(context.sessionId ? { sessionId: context.sessionId } : {}) }, actor)
+      : Effect.fail(new Error("Engineering checkpoints are unavailable"))),
+    "vcs_edit.restore_checkpoint": contribute(true, (id, input: { commit: string; expectedRevision: string; confirm: boolean }, actor) => input.confirm !== true
+      ? Effect.fail(new Error("An explicit restore request and native approval are required"))
+      : deps.checkpoints ? deps.checkpoints.restore(id, input, actor) : Effect.fail(new Error("Engineering checkpoints are unavailable"))),
     "vcs.status": contribute(false, (id) =>
       Effect.gen(function*() {
         const { current, branches } = yield* vcs.branches(id)

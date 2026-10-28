@@ -14,7 +14,7 @@ export const MODEL_TEXT_BUDGET = 24_000
 
 /** Keys whose values are carried in full whatever their size: what a consumer needs to name, trust or reconcile a result. */
 const PROTECTED = new Set([
-  "ok", "_tag", "status", "error", "message", "actionId", "receipt", "identity", "revision", "expectedRevision", "actualRevision",
+  "ok", "_tag", "status", "error", "message", "actionId", "receipt", "execution", "identity", "revision", "expectedRevision", "actualRevision",
   "programHash", "drawingId", "projectId", "operationId", "elementId", "componentId", "ids", "missingIds", "removed", "total",
   "returned", "omitted", "complete", "nextOffset", "offset", "release", "mutation", "mode", "skipped", "problems"
 ])

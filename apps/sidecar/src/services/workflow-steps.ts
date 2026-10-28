@@ -155,8 +155,10 @@ export const camGcode: StepRegistry<StepContext>["cam/gcode"] = ({ ctx, with: w 
       const request = requestOf(toolpath)
       if (gcode === undefined) { skipped.push(`${name}: no G-code in the commit`); continue }
       if (request === undefined) { skipped.push(`${name}: no generation request stored`); continue }
-      // `stamp` is deliberately dropped: it is a header comment, not part of what is being checked.
-      const outcome = yield* runKernelJobEffect("cam-generate", { ...request, stamp: undefined } as never).pipe(Effect.mapError((error) => new StepError({ message: `${name}: ${error.message}` })))
+      // `stamp` is deliberately dropped: it is a header comment, not part of what is being checked. The key is left out, not set
+      // to `undefined`: the kernel job's input schema takes an absent `stamp` but refuses one that is present and not a string.
+      const { stamp: _stamp, ...withoutStamp } = request as Record<string, unknown>
+      const outcome = yield* runKernelJobEffect("cam-generate", withoutStamp as never).pipe(Effect.mapError((error) => new StepError({ message: `${name}: ${error.message}` })))
       if (outcome.error !== undefined) { skipped.push(`${name}: ${outcome.error}`); continue }
       if (outcome.response.gcode.trim() === gcode.trim()) matched++
       else stale.push(`${name}: the committed G-code does not match its generation request`)

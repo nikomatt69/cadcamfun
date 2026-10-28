@@ -4,12 +4,14 @@ import { createHash } from "node:crypto"
 import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiModes, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, ToolRegistry, makeToolRegistry, backgroundToolContributionsFor, defaultProviderSpecs, makeAiBackgroundLayer,
-  searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, decodeHistory, parseHistory, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
+  searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, decodeHistory, parseHistory, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type HostToolContext, type ProviderId, type ToolHandlersShape,
   modToolContributions, modSpecs, isolatedPaths, CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel, drawing as sheets, type History } from "@cadcamfun/core"
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
-import { CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
+import { ACTION_CONTRACTS, PERSISTENT_EFFECTS, CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
+import { Database, schema } from "@cadcamfun/db"
+import { eq } from "drizzle-orm"
 import { drawingRevision } from "./cam-program.ts"
 import { camProgressReporter } from "./cam-progress.ts"
 import { LiveEvents } from "./live-events.ts"
@@ -33,6 +35,10 @@ import { ToolRepo } from "../repos/tool-repo.ts"
 import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { KvStore } from "./kv.ts"
 import { kvTaskJournal } from "./ai-task-journal.ts"
+import { makeCommandExecutor } from "./ai-command-execution.ts"
+import { makeAiEngineeringState } from "./ai-engineering-state.ts"
+import { makeEngineeringCheckpoints } from "./ai-checkpoints.ts"
+import { ProjectVcsRepo } from "../repos/project-vcs-repo.ts"
 import { KernelJobError, featureEditOf, normalizeElement, runKernelJob, withDefaultTolerance } from "@cadcamfun/ai"
 import { groupElements, transformElements } from "./ai-transform.ts"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
@@ -1562,6 +1568,7 @@ const AiToolRegistryLive = Layer.effect(ToolRegistry, Effect.gen(function*() {
   const vcs = yield* ProjectVcs
   const runner = yield* WorkflowRunner
   const projectsRepo = yield* ProjectsForVcs
+  const checkpoints = makeEngineeringCheckpoints(yield* Database, yield* ProjectVcsRepo)
   const { user: local } = yield* LocalProfile
   const acting = yield* ActingUser
   const plugins = yield* AiPlugins
@@ -1575,7 +1582,7 @@ const AiToolRegistryLive = Layer.effect(ToolRegistry, Effect.gen(function*() {
   }
   return makeToolRegistry({
     handlers,
-    contributions: { ...libraryContributions(handlers), ...vcsContributions({ vcs, runner, projects: projectsRepo, actor }) },
+    contributions: { ...libraryContributions(handlers), ...vcsContributions({ vcs, runner, projects: projectsRepo, actor, checkpoints }) },
     contributed: () => plugins.tools()
   })
 }))
@@ -1590,11 +1597,12 @@ const AiToolRegistryLive = Layer.effect(ToolRegistry, Effect.gen(function*() {
 export class AiActions extends Context.Service<AiActions, {
   /** The catalogue as the operator's policy leaves it (`bridge.use`, `tool.use`). */
   readonly list: (mode?: BridgeMode) => ReadonlyArray<BridgeTool>
-  readonly invoke: (call: { readonly projectId: string; readonly drawingId?: string; readonly tool: string; readonly input: unknown; readonly user: SessionUser; readonly mode?: BridgeMode; readonly signal?: AbortSignal }) => Effect.Effect<{ readonly tool: string; readonly action: string; readonly result: unknown }, { readonly message: string }>
+  readonly invoke: (call: { readonly projectId: string; readonly drawingId?: string; readonly callId?: string; readonly tool: string; readonly input: unknown; readonly user: SessionUser; readonly mode?: BridgeMode; readonly signal?: AbortSignal }) => Effect.Effect<{ readonly tool: string; readonly action: string; readonly result: unknown }, { readonly message: string }>
 }>()("cadcamfun/AiActions") {}
 
 export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
   const acting = yield* ActingUser
+  const database = yield* Database
   const { policies = [] } = yield* AiConfig
   const plugins = yield* AiPlugins
   // The same registry the embedded host registers from; delegation (`agent`) is refused by `bridgeAdmission`, so the
@@ -1607,7 +1615,7 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
   })
   return AiActions.of({
     list: (mode) => [...scopeBridge(describeBridge(), policies, mode), ...scopeBridge(pluginBridge(), policies, mode)],
-    invoke: ({ projectId, drawingId, tool, input, user, mode, signal }) => Effect.gen(function*() {
+    invoke: ({ projectId, drawingId, callId, tool, input, user, mode, signal }) => Effect.gen(function*() {
       const admission = tool.startsWith("plugin_")
         ? (() => {
             const entry = plugins.listing().find((candidate) => pluginToolId(candidate.pluginId, candidate.id) === tool)
@@ -1634,7 +1642,7 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
       const result = yield* Effect.tryPromise({ try: (abort) => {
         const cancel = signal ?? abort
         return acting.invoke(projectId, sessionId, async () => {
-          const call = { sessionId, projectId, signal: cancel }
+          const call: HostToolContext = { sessionId, projectId, signal: cancel, callId: callId ?? crypto.randomUUID(), executeMutation: makeCommandExecutor(database, { actorId: user.id, projectId, ...(drawingId ? { drawingId } : {}) }) }
           // The HTTP caller consumes data, not the model's bounded preview. Text-only extensions retain their codec.
           const answer = spec.executeWithFiles ? await spec.executeWithFiles(input, call) : { output: await spec.execute(input, call) }
           // Match the JSON wire encoding (omit optional undefined fields) without going through the bounded model text.
@@ -1655,6 +1663,13 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const credentials = yield* AiCredentials
   const actingCell = yield* ActingUser
   const registry = yield* ToolRegistry
+  const database = yield* Database
+  const projects = yield* ProjectRepo
+  const drawings = yield* DrawingRepo
+  const toolpaths = yield* ToolpathRepo
+  const kv = yield* KvStore
+  const handlers = yield* ToolHandlers
+  const { user: local } = yield* LocalProfile
   // The mods the host imports: the app-owned store's plus the ones enabled plugins ship, both only ever `file://` specs
   // inside app-owned folders. Read again on every configuration publication, so a toggle reaches live hosts.
   const plugins = yield* AiPlugins
@@ -1663,7 +1678,62 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   // instance is passed to `AiBackgroundLive` below so the worker runner owns
   // it (no second scheduler, no second scheduler across projects).
   // Tasks are journalled in the key-value store, so a restart neither loses an outcome nor replays a document change.
-  const scheduler = new BackgroundTaskManager({ journal: kvTaskJournal(yield* KvStore) })
+  const scheduler = new BackgroundTaskManager({ journal: kvTaskJournal(kv, database) })
+  const engineering = makeAiEngineeringState({ projects, drawings, toolpaths, kv,
+    authorizeSession: async (actorId, projectId, sessionId) => {
+      const owner = await actingCell.owner(sessionId)
+      return owner?.userId === actorId && owner.projectId === projectId
+    },
+    pendingTasks: (projectId, sessionId) => scheduler.list({ projectId, parentSessionId: sessionId }),
+    ...(handlers.reviewOperation ? { reviewOperation: (request: { projectId: string; sessionId: string; signal?: AbortSignal }, operationId: string) => actingCell.invoke(request.projectId, request.sessionId, () => handlers.reviewOperation!(request.projectId, operationId), request.signal) } : {})
+  })
+  const engineeringRequest = async (projectId: string, sessionId: string) => {
+    const owner = await actingCell.owner(sessionId)
+    if (!owner || owner.projectId !== projectId) throw new Error("The engineering session has no authenticated owner")
+    return { actorId: owner.userId, projectId, sessionId, ...(owner.drawingId ? { drawingId: owner.drawingId } : {}), ...(owner.includeContext !== undefined ? { includeContext: owner.includeContext } : {}) }
+  }
+  const observed = new Map<string, { revision?: string; ids: Set<string> }>()
+  const observe = (sessionId: string, revision: string | undefined, value: unknown) => {
+    let entry = observed.get(sessionId)
+    if (!entry || entry.revision !== revision) { entry = { revision, ids: new Set() }; observed.set(sessionId, entry) }
+    const pending: unknown[] = [value]
+    for (let count = 0; pending.length && count < 8_000; count++) {
+      const next = pending.pop()
+      if (Array.isArray(next)) { if (next.length && typeof next[0] !== "number") pending.push(...next.slice(0, 500)); continue }
+      if (!next || typeof next !== "object") continue
+      for (const [key, child] of Object.entries(next)) {
+        if (["id", "elementId", "operationId", "featureId", "drawingId", "layerId"].includes(key) && typeof child === "string") entry.ids.add(child)
+        else if (key === "ids" && Array.isArray(child)) for (const id of child) { if (typeof id === "string") entry.ids.add(id) }
+        else if (typeof child === "object" && child !== null) pending.push(child)
+      }
+    }
+    while (observed.size > 128) observed.delete(observed.keys().next().value!)
+  }
+  const invokeTool = async <A>(projectId: string, spec: HostToolSpec, input: unknown, ctx: HostToolContext, execute: (call: HostToolContext) => Promise<A>): Promise<A> => actingCell.invoke(projectId, ctx.sessionId, async () => {
+    const turn = actingCell.turn(local)
+    const request = await engineeringRequest(projectId, ctx.sessionId)
+    const rows = await Effect.runPromise(drawings.listByProject(projectId))
+    const current = turn.drawingId ? rows.find((row) => row.id === turn.drawingId) : rows.length === 1 ? rows[0] : undefined
+    const data = record(current?.data)
+    const revision = current ? drawingRevision({ id: current.id, data, elements: elementsOf(data) }) : undefined
+    const owner = { actorId: turn.user.id, projectId, ...(turn.drawingId ? { drawingId: turn.drawingId } : {}) }
+    const call: HostToolContext = { ...ctx,
+      executeMutation: makeCommandExecutor(database, owner, async () => {
+        const access = await Effect.runPromise(projects.find(turn.user.id, projectId))
+        if (!access || access.project.ownerId !== turn.user.id && access.orgRole !== "ADMIN" && access.orgRole !== "MANAGER") throw new Error("Write access was revoked")
+      }),
+      taskTarget: { ...owner, ...(current ? { drawingId: current.id } : {}), ...(revision ? { revision } : {}), ...(ctx.messageId ? { turnId: ctx.messageId } : {}) },
+      validateDelegation: (ids) => Effect.runPromise(engineering.validateDelegation(request, ids, observed.get(ctx.sessionId)?.ids ?? new Set(), observed.get(ctx.sessionId)?.revision))
+    }
+    const answer = await execute(call)
+    const action = typeof input === "object" && input !== null && "action" in input ? input.action : undefined
+    const contract = typeof action === "string" ? ACTION_CONTRACTS[`${spec.id}.${action}`] : undefined
+    if (contract && contract.effects.every((effect) => !PERSISTENT_EFFECTS.includes(effect))) {
+      if (typeof answer === "object" && answer !== null && "value" in answer) observe(ctx.sessionId, revision, answer.value)
+      else if (typeof answer === "string") { try { observe(ctx.sessionId, revision, JSON.parse(answer)) } catch { /* Non-JSON text carries no trusted references. */ } }
+    }
+    return answer
+  }, ctx.signal)
   const logInLayer = Effect.runForkWith(yield* Effect.context<never>())
   /** The model's answer for a tool call that did not answer; a failure that is not a refusal is logged with the tool's id. */
   const reportToolFailure = (toolId: string, error: unknown): string => {
@@ -1677,6 +1747,25 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const runtime = yield* makeNikCliRuntime({
     dataDir: config.dataDir,
     isolation: { mods: true },
+    engineeringLedger: async (projectId, sessionId) => {
+      const owner = await actingCell.owner(sessionId)
+      if (!owner || owner.projectId !== projectId || owner.includeContext === false) return undefined
+      const ledger = await Effect.runPromise(engineering.read(await engineeringRequest(projectId, sessionId)))
+      return ledger ? { ledger } : undefined
+    },
+    taskBindings: { bindChild: async (owner, target, childSessionId, checkLease) => {
+      const parent = await actingCell.owner(owner.parentSessionId)
+      if (!target.actorId || parent?.userId !== target.actorId || parent.projectId !== owner.projectId) throw new Error("Background task owner changed")
+      const user = await Effect.runPromise(database.query("ai.task.actor", (db) => db.select({ id: schema.userTable.id, email: schema.userTable.email, name: schema.userTable.name }).from(schema.userTable).where(eq(schema.userTable.id, target.actorId!)).get()))
+      if (!user || !(await Effect.runPromise(projects.find(user.id, owner.projectId)))) throw new Error("Background task access was revoked")
+      if (target.drawingId) {
+        const row = (await Effect.runPromise(drawings.listByProject(owner.projectId))).find((drawing) => drawing.id === target.drawingId)
+        if (!row) throw new Error("The background task drawing no longer exists")
+        const data = record(row.data)
+        if (target.revision && drawingRevision({ id: row.id, data, elements: elementsOf(data) }) !== target.revision) throw new Error("The background task drawing changed after enqueue; inspect before retrying")
+      }
+      await actingCell.bindChild(owner.projectId, owner.parentSessionId, childSessionId, user, target.drawingId, checkLease)
+    } },
     mods: () => [...new Set([...modSpecs(isolatedPaths(config.dataDir)), ...plugins.modSpecs()])],
     ...(policies.length > 0 ? { policies } : {}),
     providers: [...defaultProviderSpecs(config.aiMinimaxBaseUrl ? { minimax: config.aiMinimaxBaseUrl } : {}), ...openCodeProviderSpecs()],
@@ -1690,9 +1779,9 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
     toolChanges: registry.subscribe,
     toolsFor: (projectId) => registry.snapshot(projectId).map((spec): HostToolSpec => ({
       ...spec,
-      execute: (input, ctx) => actingCell.invoke(projectId, ctx.sessionId, () => spec.execute(input, ctx), ctx.signal)
+      execute: (input, ctx) => invokeTool(projectId, spec, input, ctx, (call) => spec.execute(input, call))
         .catch((error: unknown) => JSON.stringify({ ok: false, error: reportToolFailure(spec.id, error) })),
-      ...(spec.executeWithFiles ? { executeWithFiles: (input: unknown, ctx: { sessionId: string; projectId: string; signal: AbortSignal }) => actingCell.invoke(projectId, ctx.sessionId, () => spec.executeWithFiles!(input, ctx), ctx.signal).catch((error: unknown) => ({ output: JSON.stringify({ ok: false, error: reportToolFailure(spec.id, error) }) })) } : {})
+      ...(spec.executeWithFiles ? { executeWithFiles: (input: unknown, ctx: HostToolContext) => invokeTool(projectId, spec, input, ctx, (call) => spec.executeWithFiles!(input, call)).catch((error: unknown) => ({ output: JSON.stringify({ ok: false, error: reportToolFailure(spec.id, error) }) })) } : {})
     }))
   })
   yield* registry.contributeScoped(modToolContributions(runtime))
@@ -1702,7 +1791,10 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
       ? runtime.setProviderKey(change.provider, Redacted.value(change.credential.key))
       : change._tag === "oauth" ? runtime.useProviderOAuth(change.provider) : runtime.clearProviderKey(change.provider)
   })
-  return AiHost.of({ runtime, scheduler })
+  return AiHost.of({ runtime, scheduler, engineering: {
+    accept: async (projectId, sessionId, objective) => Effect.runPromise(engineering.accept({ ...await engineeringRequest(projectId, sessionId), ...(objective ? { objective } : {}) })),
+    setCriteria: async (projectId, sessionId, criteria, objective) => { await Effect.runPromise(engineering.setCriteria({ ...await engineeringRequest(projectId, sessionId), ...(objective ? { objective } : {}) }, criteria)) }
+  } })
 }))
 
 const AiBackgroundLive = Layer.unwrap(Effect.gen(function*() {

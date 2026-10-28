@@ -191,6 +191,7 @@ declare module "@nikcli-ai/sdk-next" {
       promptAsync(
         input: {
           sessionID: string
+          messageID?: string
           delivery?: "steer" | "queue"
           agent?: string
           model?: { providerID: string; modelID: string }

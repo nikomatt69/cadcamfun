@@ -3,6 +3,7 @@ Optional: a job never depends on it.
 
 Actions
 - status: the checked-out branch, uncommitted files, branches and open pull requests. Call it when the request involves history.
+- checkpoints: saved engineering states and the current project revision for an explicit restore.
 - diff: entity-level changes between two revisions (property path, before, after); `from` defaults to main.
 - list_pull_requests: the project's pull requests with their review verdicts.
 

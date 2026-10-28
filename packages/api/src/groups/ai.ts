@@ -221,7 +221,8 @@ export const AssistantAgent = Schema.Struct({ id: Schema.String, title: Schema.S
 export const QuestionInfo = Schema.Struct({ header: Schema.String, question: Schema.String, options: Schema.Array(Schema.Struct({ label: Schema.String, description: Schema.String })), multiple: opt(Schema.Boolean), custom: opt(Schema.Boolean) })
 export const PendingQuestion = Schema.Struct({ requestId: Schema.String, questions: Schema.Array(QuestionInfo) })
 export const SessionControlBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String),
-  action: Schema.Literals(["status", "compact", "cancel_task", "answer_question", "reject_question", "reply_permission", "consolidate_memory", "context"]),
+  action: Schema.Literals(["status", "compact", "cancel_task", "answer_question", "reject_question", "reply_permission", "consolidate_memory", "context", "acceptance", "set_acceptance"]),
+  criteria: opt(Schema.Unknown),
   taskId: opt(Schema.String), requestId: opt(Schema.String), answers: opt(Schema.Array(Schema.Array(Schema.String))), decision: opt(Schema.Literals(["once", "always", "reject"])), model: opt(AiModelSelector) })
 /** nikcli's session goal (`/goal`): what the agent works toward on its own, and how far it is. */
 export const SessionGoal = Schema.Struct({
@@ -230,6 +231,7 @@ export const SessionGoal = Schema.Struct({
   iteration: Schema.Number, tokensUsed: Schema.Number, tokenBudget: opt(Schema.Number)
 })
 export const SessionControlReply = Schema.Struct({ goal: opt(Schema.NullOr(SessionGoal)), permissions: opt(Schema.Array(Schema.Struct({ requestId: Schema.String, sessionId: Schema.String, permission: Schema.String, patterns: Schema.Array(Schema.String) }))), busy: Schema.Boolean, text: Schema.String, tasks: Schema.Array(SessionTask), questions: Schema.Array(PendingQuestion),
+  engineeringAcceptance: opt(Schema.Struct({ status: Schema.Literals(["accepted", "failed", "unmeasured", "stale", "not_configured"]), projectId: Schema.String, drawingId: Schema.String, revision: Schema.String, criteriaDigest: opt(Schema.String), checks: Schema.Array(Schema.Struct({ id: Schema.String, status: Schema.Literals(["pass", "fail", "unmeasured", "stale"]), reason: opt(Schema.String), report: opt(Schema.Unknown) })), note: Schema.String })),
   context: Schema.Struct({ memory: Schema.optional(Schema.Struct({ enabled: Schema.Boolean, memoryEnabled: Schema.Boolean, minHours: Schema.Number, minSessions: Schema.Number, lastBrainAt: Schema.Number, hoursSinceLastBrain: Schema.Number, sessionsSinceLastBrain: Schema.Number, shouldTrigger: Schema.Boolean })), source: Schema.Literal("host-config"), auto: Schema.Boolean, prune: Schema.Boolean, reserved: opt(Schema.Number),
     provider: opt(Schema.String), model: opt(Schema.String), contextWindow: opt(Schema.Number), maxOutput: opt(Schema.Number), inputWindow: opt(Schema.Number), requestOutput: opt(Schema.Number), compactAt: opt(Schema.Number), tokens: opt(Schema.Number), compacted: Schema.Boolean,
     /** nikcli `SessionContext.breakdown` summed per category; only on the `context` action. */
@@ -243,7 +245,7 @@ export const BridgeTool = Schema.Struct({
   parameters: Schema.Record(Schema.String, Schema.Unknown)
 })
 export const BridgeTools = Schema.Struct({ tools: Schema.Array(BridgeTool) })
-export const BridgeInvokeBody = Schema.Struct({ projectId: Schema.String, drawingId: opt(Schema.String), tool: Schema.String, input: Schema.Record(Schema.String, Schema.Unknown) })
+export const BridgeInvokeBody = Schema.Struct({ projectId: Schema.String, drawingId: opt(Schema.String), callId: opt(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))), tool: Schema.String, input: Schema.Record(Schema.String, Schema.Unknown) })
 export const BridgeInvokeReply = Schema.Struct({ tool: Schema.String, action: Schema.String, result: Schema.Unknown })
 /** RM-11: scoped, revocable tokens for a standalone nikcli (one project, read-only or read-write). Issued with the application's own token. */
 export const BridgeMode = Schema.Literals(["read", "write"])

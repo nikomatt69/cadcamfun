@@ -76,6 +76,22 @@ export const ActionReceipt = Schema.Struct({
 })
 export type ActionReceipt = typeof ActionReceipt.Type
 
+/** Atomic repository-step evidence. Several steps may belong to one action; this is not an aggregate rollback claim. */
+export const ActionCommandEvidence = Schema.Struct({
+  commandId: identifier,
+  callId: identifier,
+  committedSteps: Schema.Array(Schema.Struct({
+    receiptId: identifier,
+    operation: identifier,
+    resourceId: Schema.NullOr(identifier),
+    previousRevision: Schema.NullOr(Schema.String),
+    revision: Schema.NullOr(Schema.String),
+    committedAt: Schema.String,
+    result: Schema.optionalKey(Schema.Json)
+  }))
+})
+export type ActionCommandEvidence = typeof ActionCommandEvidence.Type
+
 export const ActionCommitted = Schema.Struct({
   ok: Schema.Literal(true),
   _tag: Schema.Literal("ActionCommitted"),
