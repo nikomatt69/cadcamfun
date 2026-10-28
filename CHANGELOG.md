@@ -1,10 +1,26 @@
 # Changelog
 
 <!-- UNRELEASED:START -->
-## Observability
-
-- Sidecar/ai: Effect OpenTelemetry integration — request, AI turn and CAD surface metrics, a Prometheus `/metrics` endpoint, head sampling and attribute scrubbing (spec 66)
 <!-- UNRELEASED:END -->
+
+## v0.1.42 (October 2026)
+
+## Core
+
+- Enhance localization support and add new language options
+
+## Desktop
+
+- Clarify Portuguese language pack description
+- Update httpMetrics middleware implementation
+
+## Sidecar
+
+- Refine G-code generation request handling by omitting `stamp` key
+
+## API
+
+- Add callId and criteria fields to endpoint inputs and payloads
 
 ## v0.1.41 (October 2026)
 
