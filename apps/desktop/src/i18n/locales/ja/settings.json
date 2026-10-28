@@ -1,0 +1,18 @@
+{
+  "appearance": "外観",
+  "general": "一般",
+  "manufacturing": "製造",
+  "subtitle": "ワークスペースと環境設定を管理します",
+  "appearanceHint": "CAD/CAM FUN のデバイス上での外観を選択します。",
+  "generalHint": "表示単位、言語、精度、描画の環境設定。",
+  "manufacturingHint": "生成する加工プログラムのデフォルトコントローラーを設定します。",
+  "saved": "環境設定はこのデバイスに自動保存されます。",
+  "reset": "環境設定をリセット",
+  "resetHint": "ワークスペースの既定の環境設定に戻します。プロジェクトとライブラリの項目には影響しません。",
+  "confirmReset": "すべてのワークスペース設定をリセットしますか？",
+  "preview": "プレビュー",
+  "precisionHint": "表示精度と G-code の小数点以下の桁数を設定します。",
+  "unitsHint": "ジオメトリはミリメートルで保存されます。表示と G-code の単位はこの設定に従います。",
+  "unsupportedPost": "LinuxCNC と SmoothWB は現在の加工コアでは利用できません。GRBL、Fanuc または汎用 G-code を選択してください。",
+  "shortcutsHint": "デスクトップワークスペースで使用できるキーボードコマンド。"
+}

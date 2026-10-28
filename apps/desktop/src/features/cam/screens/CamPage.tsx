@@ -414,7 +414,7 @@ export default function CamPage(): JSX.Element {
           ref={ribbonFilePicker}
           type="file"
           class="hidden"
-          accept=".nc,.gcode,.cnc,.txt,.h,.mpf,.json"
+          accept=".nc,.gcode,.ngc,.tap,.cnc,.txt,.h,.mpf,.json"
           aria-label="Import G-Code"
           onChange={(event) => {
             const file = event.currentTarget.files?.[0]

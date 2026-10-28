@@ -113,6 +113,7 @@ apps/mobile/dist/
 /out/
 /.nikcli/
 apps/desktop/tmpprobe/
+apps/desktop/.i18n-work/
 .opencode/
 .tmp-probe/
 release-local/

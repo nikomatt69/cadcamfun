@@ -1,0 +1,22 @@
+{
+  "library.detail.tool.title": "工具の詳細",
+  "library.detail.tool.subtitle": "ライブラリ内の工具を確認、編集、または削除します。",
+  "library.detail.material.title": "材料の詳細",
+  "library.detail.material.subtitle": "ライブラリ内の材料を確認、編集、または削除します。",
+  "library.detail.machine.title": "機械の設定",
+  "library.detail.machine.subtitle": "ライブラリ内の機械プリセットを確認、編集、または削除します。",
+  "library.detail.removed": "項目を削除しました",
+  "library.detail.confirmDelete": "この項目をライブラリから削除しますか？",
+  "library.detail.raw": "生の JSON",
+  "library.field.name": "名前",
+  "library.field.type": "種類",
+  "library.field.material": "材料",
+  "library.field.diameter": "直径 (mm)",
+  "library.field.flutes": "刃数",
+  "library.field.maxRpm": "最大 RPM",
+  "library.field.density": "密度 (kg/m³)",
+  "library.field.cost": "単価",
+  "library.field.workVolume": "作業範囲 (mm)",
+  "library.field.controller": "コントローラ",
+  "library.unnamed": "名前未設定の項目"
+}

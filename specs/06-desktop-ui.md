@@ -219,7 +219,7 @@ Status: in progress. Owner-requested WP6 redesign owns the library dialog frame,
 - Forms are generated from the Effect Schemas where possible (one small `SchemaForm` component) so parameters never drift from the core definitions.
 - State: server data lives in the API (no duplicated caches beyond a lightweight query cache keyed by endpoint + params); undo/redo history for the editor is client state (command pattern over `Drawing` patches, max 200 steps).
 - Theming: light/dark/system via CSS variables; every colour as a token; keyboard-first (command palette `Cmd/Ctrl+K`, shortcuts table in settings).
-- i18n: `src/i18n/en.json` only for v6.0, keyed strings, no inline literals in components (lint rule).
+- i18n: `src/i18n/locales/<code>/<vertical>.json` holds one table per vertical and per language; English (`locales/en/`) is the source of the keys, and the ten principal languages plus Italian ship as packs beside it. Keyed strings, no inline literals in components (lint rule). The language is a preference (`settings.locale`), picked in **Settings → Language**; the pack is loaded on demand and the whole app follows.
 - Accessibility: all interactive controls keyboard reachable and labelled; focus ring visible.
 
 ## 2. Viewport (WP7)
@@ -377,3 +377,28 @@ Owner-requested cross-WP scope and verification are defined in `30-identity.md`.
 Status: implemented; 21 targeted tests pass, including DOM selection flows for all three machine families; desktop typecheck passes (1,122 files). API reference regenerated and its freshness check passes.
 
 WP6 owns a CAD element picker directly in the Toolpath Generator's selected-geometry panel, shared by milling, turning and printing. List every CAD part in the live drawing, including hidden, locked and grouped elements; exclude stock and scene helpers. Choosing a part replaces both CAD selection stores so an earlier multi-selection cannot override the choice. Generation keeps the complete current element through the existing JSON-safe request boundary. External CAD selections and edits remain reactive; no new geometry or API contract is introduced. Verify with automated DOM selection-to-request flows.
+
+## Interface languages (2026-10-28)
+
+Status: implemented; the desktop typecheck passes, the locale and table checks pass
+and the desktop bundle builds with one chunk per language.
+
+The app ships the ten principal languages plus Italian. `src/i18n/locales/<code>/`
+holds one table per vertical and per language; English (`locales/en/`) is the source
+of the keys and the fallback, every other language is a pack beside it with the
+same keys. `src/i18n/registry.ts` lists the languages (code, English name, name in
+the language, writing direction), `src/i18n/packs.ts` holds the English table and
+the loaders of the packs, and `src/i18n/index.ts` is the runtime.
+
+- The language is a preference (`settings.locale`), stored with the other settings
+  and picked in **Settings → Language**. The list shows every language by its own
+  name; the pack is loaded on demand, the whole app follows and the document
+  carries the language and its direction (Arabic is right-to-left).
+- `t()` reads the table of the current language from a signal, so every screen
+  re-renders on a language change; the translator therefore lives in the module
+  and not in a context, which nothing mounted.
+- A pack that fails to load leaves the current language alone and reports it.
+- A key that a pack does not have falls back to English and the tables are checked
+  against English (same keys, same placeholders, no empty string) in
+  `apps/desktop/test/i18n-tables.test.ts`; the switch itself is checked in
+  `apps/desktop/test/i18n-locale.test.ts`.

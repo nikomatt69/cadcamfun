@@ -90,7 +90,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
             <input
               type="file"
               class="hidden"
-              accept=".nc,.gcode,.cnc,.txt,.h,.json"
+              accept=".nc,.gcode,.ngc,.tap,.cnc,.txt,.h,.mpf,.json"
               aria-label={t("cam.import")}
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0]

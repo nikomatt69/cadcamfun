@@ -1,49 +1,26 @@
 /**
- * The translation table and the `t()` function (spec 06-desktop-ui.md §1).
+ * The translation tables and the `t()` function (spec 06-desktop-ui.md §1).
  *
- * `en` is the only locale in v6.0 and it is a *typed* table: `Key` comes from
- * `en.json`, so asking for a string nobody wrote is a type error rather than a
- * runtime `[missing]`. Values may carry `{placeholder}` slots that `t` fills.
+ * English is the source table and every other language is a pack beside it. The
+ * pack of a language is loaded the first time a reader picks it and then kept in
+ * memory, so switching back and forth is free.
+ *
+ * `t()` reads the table of the current language from a signal, so a screen that
+ * renders a string re-renders when the language changes. That is why the
+ * translator lives in the module and not in a context: the language has to reach
+ * every screen, and a context would only reach the ones below its provider.
  */
-import { createContext, createMemo, createSignal, useContext, type Accessor, type JSX } from "solid-js"
-import base from "./en.json" with { type: "json" }
-// One table per vertical so ports of different areas never edit the same file concurrently.
-import shell from "./en.shell.json" with { type: "json" }
-import library from "./en.library.json" with { type: "json" }
-import org from "./en.org.json" with { type: "json" }
-import cad from "./en.cad.json" with { type: "json" }
-import cam from "./en.cam.json" with { type: "json" }
-import ai from "./en.ai.json" with { type: "json" }
-import plugins from "./en.plugins.json" with { type: "json" }
-import legacy from "./en.legacy.json" with { type: "json" }
-import settings from "./en.settings.json" with { type: "json" }
-import viewport from "./en.viewport.json" with { type: "json" }
-import system from "./en.system.json" with { type: "json" }
-import pricing from "./en.pricing.json" with { type: "json" }
-import detail from "./en.detail.json" with { type: "json" }
-import companion from "./en.companion.json" with { type: "json" }
-import vcsStrings from "./en.vcs.json" with { type: "json" }
-import manuals from "./en.manuals.json" with { type: "json" }
-import keys from "./en.keys.json" with { type: "json" }
+import { createSignal, type Accessor } from "solid-js"
+import { DEFAULT_LOCALE, isLocale, localeInfo, type Locale } from "./registry.ts"
+import { PACKS, en, type Key, type Messages } from "./packs.ts"
 
-const table = { ...base, ...shell, ...library, ...org, ...cad, ...cam, ...ai, ...plugins, ...legacy, ...settings, ...viewport, ...system, ...pricing, ...detail, ...companion, ...vcsStrings, ...manuals, ...keys }
-
-/** The shipped locale, and the only one in v6.0. */
-export type Locale = "en"
-
-export const DEFAULT_LOCALE: Locale = "en"
-
-/** Flat key -> string map; values are `"text"` or `"text with {placeholders}"`. */
-export type Messages = Record<string, string>
-
-/** Every key that exists in the shipped locale. */
-export type Key = keyof typeof table
+export { DEFAULT_LOCALE, LOCALES, LOCALE_CODES, isLocale, localeInfo } from "./registry.ts"
+export type { Direction, Locale, LocaleInfo } from "./registry.ts"
+export { en } from "./packs.ts"
+export type { Key, Messages } from "./packs.ts"
 
 /** Values a caller may substitute into a message. */
 export type Placeholders = Readonly<Record<string, string | number>>
-
-/** The shipped table, frozen so one screen cannot mutate another screen's strings. */
-export const en: Messages = Object.freeze({ ...table }) as Messages
 
 const PLACEHOLDER = /\{(\w+)\}/g
 
@@ -56,58 +33,102 @@ export const format = (message: string, values?: Placeholders): string => {
   })
 }
 
-/** Looks a key up outside of a component (tests, log lines); unknown keys echo back. */
-export const translate = (key: Key, values?: Placeholders): string =>
-  format(en[key] === undefined ? key : (en[key] as string), values)
+const [locale, setLocaleSignal] = createSignal<Locale>(DEFAULT_LOCALE)
+const [messages, setMessages] = createSignal<Messages>(en)
+const [loading, setLoading] = createSignal(false)
 
-export interface I18n {
-  readonly locale: Accessor<Locale>
-  readonly t: (key: Key, values?: Placeholders) => string
+/** The packs already loaded, so a language is fetched once. */
+const packs = new Map<Locale, Messages>()
+
+/** The language the app renders in. */
+export const currentLocale: Accessor<Locale> = locale
+
+/** `true` while a language pack is being loaded. */
+export const isLoading: Accessor<boolean> = loading
+
+/** Tells the document which language and direction the app renders in. */
+const applyDocument = (code: Locale): void => {
+  if (typeof document === "undefined") return
+  const info = localeInfo(code)
+  document.documentElement.lang = code
+  document.documentElement.dir = info.dir
 }
 
-const createI18n = (): I18n => {
-  const [locale, setLocale] = createSignal<Locale>(DEFAULT_LOCALE)
-  // A memo, not a plain read: switching locale must re-render every string.
-  const messages = createMemo((): Messages => en)
-  return {
-    locale,
-    t: (key, values) => format(messages()[key] === undefined ? key : (messages()[key] as string), values),
-    setLocale
-  } as I18n & { setLocale: (next: Locale) => void }
-}
+/** The pack of a language that is being loaded; two readers share one load. */
+const pending = new Map<Locale, Promise<Messages>>()
 
-const I18nContext = createContext<I18n>()
+/** Loads the pack of a language; English is already in memory. */
+const loadPack = (code: Locale): Promise<Messages> => {
+  if (code === "en") return Promise.resolve(en)
+  const cached = packs.get(code)
+  if (cached !== undefined) return Promise.resolve(cached)
+  const loading = pending.get(code)
+  if (loading !== undefined) return loading
+  const promise = PACKS[code]()
+    .then((table) => {
+      packs.set(code, table)
+      return table
+    })
+    .finally(() => { pending.delete(code) })
+  pending.set(code, promise)
+  return promise
+}
 
 /**
- * The app-wide translator.
+ * Switches the language.
  *
- * Components render text through the *module-level* `t` so that no string is ever
- * written as a literal in JSX; the context only carries the locale, which is what
- * actually has to be reactive.
+ * The table and the locale change together, so no screen ever shows the strings
+ * of one language under the name of another. A pack that fails to load leaves the
+ * current language alone and rejects, so the caller can tell the reader.
  */
-export const useI18n = (): I18n => {
-  const context = useContext(I18nContext)
-  if (context === undefined) throw new Error("useI18n must be called inside <I18nProvider>")
-  return context
+let requested = 0
+export const setLocale = async (next: Locale): Promise<void> => {
+  if (!isLocale(next)) throw new Error(`Unknown language: ${String(next)}`)
+  // The language is already the one on screen: nothing to load, nothing to swap.
+  if (next === locale()) return
+  const token = ++requested
+  setLoading(true)
+  try {
+    const table = await loadPack(next)
+    if (token !== requested) return
+    setMessages(table)
+    setLocaleSignal(next)
+    applyDocument(next)
+  } finally {
+    if (token === requested) setLoading(false)
+  }
 }
 
-/** Reactive `t()` for code that has to follow a locale change. */
-export const useT = (): ((key: Key, values?: Placeholders) => string) => useI18n().t
-
-/** Imperative `t()`: the default-locale translator, safe outside a component tree. */
-export const t: (key: Key, values?: Placeholders) => string = (key, values) => translate(key, values)
-
-export interface I18nProviderProps {
-  readonly children: JSX.Element
+/**
+ * The translator.
+ *
+ * It reads the table of the current language, so a component that renders a
+ * string re-renders when the language changes.
+ */
+export const t = (key: Key, values?: Placeholders): string => {
+  const table = messages()
+  const value = table[key]
+  return format(value === undefined ? key : value, values)
 }
 
-/** Installs the locale signal; children read text through `t`/`useT`. */
-export function I18nProvider(props: I18nProviderProps): JSX.Element {
-  const i18n = createI18n()
-  return I18nContext.Provider({
-    value: i18n,
-    get children() {
-      return props.children
-    }
-  })
+/** Looks a key up outside of a component (tests, log lines); unknown keys echo back. */
+export const translate = (key: Key, values?: Placeholders): string => t(key, values)
+
+export interface I18n {
+  /** The language the app renders in. */
+  readonly locale: Accessor<Locale>
+  /** `true` while a language pack is being loaded. */
+  readonly loading: Accessor<boolean>
+  readonly t: (key: Key, values?: Placeholders) => string
+  /** Switches the language; the pack is loaded on the way. */
+  readonly setLocale: (next: Locale) => Promise<void>
 }
+
+/** The app-wide translator. */
+export const i18n: I18n = { locale, loading: isLoading, t, setLocale }
+
+/** The translator of the app; the locale is global, so no provider is needed. */
+export const useI18n = (): I18n => i18n
+
+/** Reactive `t()` for code that has to follow a language change. */
+export const useT = (): ((key: Key, values?: Placeholders) => string) => t

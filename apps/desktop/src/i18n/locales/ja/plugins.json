@@ -1,0 +1,11 @@
+{
+  "plugins.title": "インストール済みプラグイン",
+  "plugins.install": "プラグインをインストール",
+  "plugins.empty": "まだプラグインがインストールされていません。",
+  "plugins.info": "プラグイン情報",
+  "plugins.uploadFile": "ファイルをアップロード",
+  "plugins.dropPackage": "プラグインパッケージをここにドロップ",
+  "plugins.browsePackage": "またはクリックしてファイルを選択（.zip または .vsix）",
+  "plugins.invalidPackage": "無効なファイル形式です。プラグインパッケージ（.zip または .vsix）をアップロードしてください",
+  "plugins.packageTooLarge": "ファイルが大きすぎます。最大サイズは 10MB です"
+}

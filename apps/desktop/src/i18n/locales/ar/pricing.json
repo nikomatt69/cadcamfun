@@ -1,0 +1,11 @@
+{
+  "pricing.title": "تسعير بسيط وشفاف",
+  "pricing.subtitle": "اختر الخطة المناسبة لك وابدأ باستخدام CAD/CAM FUN اليوم.",
+  "pricing.trial": "أنت في الفترة التجريبية Pro — يتبقى {days} يوم",
+  "pricing.faq.title": "أسئلة شائعة",
+  "pricing.faq.detail": "يمكن تحديث الخطط في أي وقت. تطبيق سطح المكتب نفسه مجاني للاستخدام محليًا دائمًا.",
+  "pricing.cta.trial": "الفترة التجريبية مفعّلة",
+  "pricing.cta.included": "مضمَّم دائمًا",
+  "pricing.cta.startTrial": "بدء فترة تجريبية مدتها 14 يومًا",
+  "pricing.checkoutUnavailable": "تعذّر بدء الدفع. تتطلب المدفوعات عبر الإنترنت مفتاح Stripe في هذا التثبيت؛ أما الفترة التجريبية Pro فتعمل بدونه."
+}

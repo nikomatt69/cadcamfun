@@ -1,0 +1,22 @@
+{
+  "library.detail.tool.title": "Сведения об инструменте",
+  "library.detail.tool.subtitle": "Просмотрите, измените или удалите инструмент из библиотеки.",
+  "library.detail.material.title": "Сведения о материале",
+  "library.detail.material.subtitle": "Просмотрите, измените или удалите материал из библиотеки.",
+  "library.detail.machine.title": "Конфигурация станка",
+  "library.detail.machine.subtitle": "Просмотрите, измените или удалите пресет станка из библиотеки.",
+  "library.detail.removed": "Элемент удалён",
+  "library.detail.confirmDelete": "Удалить этот элемент из библиотеки?",
+  "library.detail.raw": "Исходный JSON",
+  "library.field.name": "Название",
+  "library.field.type": "Тип",
+  "library.field.material": "Материал",
+  "library.field.diameter": "Диаметр (mm)",
+  "library.field.flutes": "Пёра",
+  "library.field.maxRpm": "Макс. об/мин",
+  "library.field.density": "Плотность (kg/m³)",
+  "library.field.cost": "Цена за единицу",
+  "library.field.workVolume": "Рабочий объём (mm)",
+  "library.field.controller": "Контроллер",
+  "library.unnamed": "Безымянный элемент"
+}

@@ -1,7 +1,7 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { elementBrep, sceneToStep, stepToElements } from "./scene-step.ts"
+import { elementBrep, igesToElements, sceneToIges, sceneToStep, stepToElements } from "./scene-step.ts"
 import { brepBox } from "./history-brep.ts"
-import { massProperties, readStepBreps, validateBrep, writeStepBreps } from "./brep/index.ts"
+import { massProperties, readIgesBreps, readStepBreps, validateBrep, writeStepBreps } from "./brep/index.ts"
 import { model } from "./script.ts"
 import { elementMesh, volumeOf } from "../cam/model/element-mesh.ts"
 
@@ -114,6 +114,37 @@ describe("the drawing as a STEP file", () => {
     const mp = massProperties(again.parts[0]!.brep)
     expect(rel(mp.volume, 12000 - PI * 250)).toBeLessThan(1e-9)
     expect(mp.centroid.x).toBeCloseTo(100, 9)
+  })
+})
+
+describe("the drawing as an IGES file", () => {
+  test("the same solids, parts and skips as STEP, and the import reads them back exact", () => {
+    const elements = [
+      { id: "plate", type: "cube", width: 40, height: 30, depth: 10, x: 0, y: 0, z: 0 },
+      { id: "bore", type: "cylinder", radius: 5, height: 20, x: 0, y: 0, z: 0 },
+      { id: "cut", type: "boolean-subtract", operands: ["plate", "bore"], name: "drilled plate" },
+      { id: "stock", type: "workpiece", width: 100, height: 100, depth: 20, name: "Stock" },
+      { id: "l", type: "line", x1: 0, y1: 0, x2: 10, y2: 0, name: "sketch line" }
+    ]
+    const iges = sceneToIges(elements)
+    const step = sceneToStep(elements, { timestamp: "2026-10-13T00:00:00" })
+    // One traversal for both formats: no part or skip may differ.
+    expect(iges.parts).toEqual(step.parts)
+    expect(iges.skipped).toEqual(step.skipped)
+    expect(iges.parts.map((p) => [p.name, p.exact, p.valid])).toEqual([["drilled plate", true, true]])
+    const back = igesToElements(iges.iges!)
+    // IGES directory names hold 8 characters ("drilled plate" comes back "drilled_"); geometry is what round-trips.
+    expect(back.elements.map((e) => e.name)).toEqual(readIgesBreps(iges.iges!).parts.map((p) => p.name))
+    expect(back.elements[0]!.name).toStartWith("drilled")
+    expect(back.report.map((r) => [r.name, r.valid])).toEqual([[back.elements[0]!.name, true]])
+    expect(rel(back.report[0]!.volume, 12000 - PI * 250)).toBeLessThan(1e-9)
+    expect(readIgesBreps(iges.iges!).parts).toHaveLength(1)
+  })
+
+  test("no solid in the drawing, no IGES file", () => {
+    const r = sceneToIges([{ id: "l", type: "line", x1: 0, y1: 0, x2: 10, y2: 0, name: "sketch line" }])
+    expect(r.iges).toBeUndefined()
+    expect(r.skipped.map((s) => s.name)).toEqual(["sketch line"])
   })
 })
 

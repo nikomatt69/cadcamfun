@@ -13,7 +13,7 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { Bell, Cpu, Globe, Keyboard, Lock, Shield, Smartphone, User } from "lucide-solid"
-import { t } from "../../../i18n/index.ts"
+import { LOCALE_CODES, localeInfo, t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { endSession } from "../../../shared/state/session.ts"
 import { toast } from "../../../shared/ui/feedback.tsx"
@@ -23,7 +23,7 @@ import { SessionManagement } from "../components/session-management.tsx"
 import { PasskeySettings } from "../components/passkey-settings.tsx"
 import { AISettingsPanel } from "../components/ai-settings-panel.tsx"
 import { CompanionPanel } from "../../companion/screens/companion.tsx"
-import { LanguageSelector, SUPPORTED_LANGUAGES } from "../components/language-selector.tsx"
+import { LanguageSelector } from "../components/language-selector.tsx"
 import { AutosaveSettings } from "../components/autosave-settings.tsx"
 import { KeybindingsSettings } from "../components/keybindings-settings.tsx"
 import { checkForUpdates, inDesktopShell, openReleaseNotes } from "../../../app/updates.ts"
@@ -152,7 +152,10 @@ export function SettingsScreen(): JSX.Element {
                   <LanguageSelector />
                 </div>
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  {t("settings.lang.current", { name: SUPPORTED_LANGUAGES.en })}
+                  {t("settings.lang.hint")}
+                </p>
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  {t("settings.lang.current", { name: localeInfo(app.settings.settings().locale).endonym })}
                 </p>
               </div>
             </div>
@@ -170,18 +173,18 @@ export function SettingsScreen(): JSX.Element {
             <div class="mt-8">
               <h4 class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.lang.available")}</h4>
               <div class="mt-4 space-y-4">
-                <For each={Object.entries(SUPPORTED_LANGUAGES)}>
-                  {([code, name]) => (
+                <For each={LOCALE_CODES}>
+                  {(code) => (
                     <div class="flex items-center">
                       <div class="flex-shrink-0">
-                        <Show when={code === "en"}>
+                        <Show when={code === app.settings.settings().locale}>
                           <span class="inline-block h-2 w-2 rounded-full bg-blue-600" />
                         </Show>
                       </div>
                       <div class="ml-3">
-                        <p class="text-sm text-slate-700 dark:text-slate-300">{name}</p>
+                        <p class="text-sm text-slate-700 dark:text-slate-300">{localeInfo(code).endonym}</p>
                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                          {code === "en" ? t("settings.lang.currentLanguage") : ""}
+                          {code === app.settings.settings().locale ? t("settings.lang.currentLanguage") : localeInfo(code).name}
                         </p>
                       </div>
                     </div>
@@ -198,8 +201,7 @@ export function SettingsScreen(): JSX.Element {
                 <div class="ml-3">
                   <h4 class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.lang.infoTitle")}</h4>
                   <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Translations are loaded automatically when you change language. If you encounter any issues with
-                    translations, please contact support.
+                    {t("settings.lang.infoBody")}
                   </p>
                 </div>
               </div>

@@ -9,6 +9,8 @@ import { BootScreen } from "../shared/components/boot-screen.tsx"
 import { messageOf, type BootState } from "../shared/state/client.ts"
 import { Shell } from "./Shell.tsx"
 import { watchSystemTheme } from "../shared/state/settings.ts"
+import { setLocale, t } from "../i18n/index.ts"
+import { toast } from "../shared/ui/feedback.tsx"
 import { routes } from "./routes.tsx"
 import { AiProvider } from "../features/ai/index.ts"
 import { applyGlass, removeGlass, tauriGlassHost, type GlassHost } from "./glass.ts"
@@ -97,6 +99,15 @@ export default function App() {
   })
   const theme = watchSystemTheme()
   createEffect(() => { const app = state(); if (app) theme.apply(app.settings.settings().theme) })
+  // The language is a preference: the pack is loaded when it changes and the whole app follows.
+  createEffect(() => {
+    const app = state()
+    if (!app) return
+    void setLocale(app.settings.settings().locale).catch((cause: unknown) => {
+      console.error("The language pack could not be loaded", cause)
+      toast.error(t("settings.lang.failed"))
+    })
+  })
   onMount(() => {
     let off: (() => void) | undefined
     void trackSidecarStatus().then((stop) => {

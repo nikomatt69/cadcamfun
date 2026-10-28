@@ -1,0 +1,11 @@
+{
+  "plugins.title": "इंस्टॉल किए गए प्लगइन",
+  "plugins.install": "प्लगइन इंस्टॉल करें",
+  "plugins.empty": "अभी तक कोई प्लगइन इंस्टॉल नहीं है।",
+  "plugins.info": "प्लगइन की जानकारी",
+  "plugins.uploadFile": "फ़ाइल अपलोड करें",
+  "plugins.dropPackage": "अपना प्लगइन पैकेज यहाँ छोड़ें",
+  "plugins.browsePackage": "या फ़ाइलें ब्राउज़ करने के लिए क्लिक करें (.zip या .vsix)",
+  "plugins.invalidPackage": "अमान्य फ़ाइल प्रकार। कृपया प्लगइन पैकेज अपलोड करें (.zip या .vsix)",
+  "plugins.packageTooLarge": "फ़ाइल बहुत बड़ी है। अधिकतम आकार 10MB है"
+}

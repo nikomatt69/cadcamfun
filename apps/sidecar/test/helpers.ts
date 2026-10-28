@@ -34,16 +34,24 @@ const testConfig = (dataDir: string, extra: Partial<AppConfig> = {}) => Layer.su
   ...extra
 }))
 
-/** Boots the whole API in-process on a fresh in-memory database; returns a fetch-like function and the DB handle. */
-export async function makeApp(extra: Partial<AppConfig> = {}) {
+/**
+ * Boots the whole API in-process on a fresh in-memory database; returns a fetch-like function and the DB handle.
+ *
+ * `extraLayers` adds services to the runtime (a test tracer, for instance) without touching the
+ * services every other test relies on.
+ */
+export async function makeApp(extra: Partial<AppConfig> = {}, extraLayers: Layer.Layer<never, never, never> = Layer.empty) {
   // Files (StorageService) go to a throw-away folder; the database itself is in memory.
   const dataDir = mkdtempSync(join(tmpdir(), "cadcamfun-test-"))
   const db = Database.layer({ path: ":memory:", migrationsFolder })
-  const deps = Layer.mergeAll(db, testConfig(dataDir, extra))
+  const deps = Layer.mergeAll(db, testConfig(dataDir, extra), extraLayers)
   // One memo map for the routes and for `toolHandlers()`, so both see the same in-memory database.
   const memoMap = Layer.makeMemoMapUnsafe()
   const { handler, dispose } = HttpRouter.toWebHandler(
-    ApiRoutes.pipe(Layer.provide(deps), Layer.provideMerge(testServices)),
+    // `extraLayers` is merged into the built context, not provided to the routes: a middleware
+    // runs in the request's context, so a service it needs has to be in the context the handler
+    // is built with.
+    ApiRoutes.pipe(Layer.provide(deps), Layer.provideMerge(testServices), Layer.provideMerge(extraLayers)),
     { memoMap }
   )
   const scope = Effect.runSync(Scope.make())

@@ -262,10 +262,17 @@ Normal desktop startup manages the connection settings. For standalone sidecar o
 - `CADCAMFUN_AI_OFFLINE` controls AI offline mode; other integrations have their own network behaviour.
 - `CADCAMFUN_IDENTITY_ISSUER` selects the identity endpoint.
 - `OTEL_EXPORTER_OTLP_ENDPOINT` enables the telemetry exporter; it is disabled without an endpoint.
+- `OTEL_TRACES_SAMPLER_ARG` sets the trace sampling ratio (0..1); unset keeps every trace.
 
 Local project records live in `<data directory>/cadcamfun.db`. SQLite uses WAL and foreign keys, checkpoints on shutdown, and backs up an existing database before applying pending migrations. The upgrade implementation retains the **last five managed database backups**. See [database lifecycle](packages/db/src/index.ts) and [upgrade handling](packages/db/src/upgrade.ts).
 
 Exports, logs, credentials and AI session history can live separately. A project export or database upgrade snapshot is only part of an installation backup. Migrations are forward-only.
+
+### Observability
+
+The sidecar is the one telemetry edge. With `OTEL_EXPORTER_OTLP_ENDPOINT` set, Effect spans, metrics and logs are exported over OTLP/HTTP: the request span of every HTTP call (with the route template and the status), the `ai.turn` span of every assistant turn, and the metric catalogue of requests, AI turns and CAD surface operations. A client that sends a W3C `traceparent` header continues its own trace into the sidecar.
+
+Without a collector, the same numbers are readable on the loopback listener at `GET /metrics`, in the Prometheus exposition format. Telemetry carries shapes, never content: attributes whose key names a prompt, a payload or a credential are dropped before export. See [spec 66](specs/66-effect-opentelemetry.md) and [PRIVACY.md](PRIVACY.md).
 
 ### Security and privacy
 

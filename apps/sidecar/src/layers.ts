@@ -76,6 +76,7 @@ import { EventsHandlers } from "./http/events.ts"
 import { WorkspaceHandlers } from "./http/workspace.ts"
 import { LiveEvents } from "./services/live-events.ts"
 import { AssistantTurns } from "./services/assistant-turns.ts"
+import { MetricsRouteLive, httpMetrics } from "./observability.ts"
 
 /** Every group handler; add new route families here as they are implemented. */
 export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CadExactHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers, WorkspaceHandlers)
@@ -144,13 +145,21 @@ export const isAllowedOrigin = (origin: string): boolean =>
   ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"].includes(origin) ||
   /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
 
-export const ApiRoutes = HttpApiBuilder.layer(ServedApi, { openapiPath: "/api/openapi.json" }).pipe(
+export const ApiRoutes = Layer.mergeAll(
+  HttpApiBuilder.layer(ServedApi, { openapiPath: "/api/openapi.json" }),
+  // The operator's metrics endpoint. It is a raw route, not an API group: it is not part of the
+  // product contract and must not appear in the generated API reference.
+  MetricsRouteLive
+).pipe(
   Layer.provide(HttpRouter.middleware(
     // No fixed header list: the preflight echoes what the client asks for. The Effect client adds
     // `traceparent`, and an allowlist would silently break every call from a webview.
     HttpMiddleware.cors({ allowedOrigins: isAllowedOrigin, maxAge: 600 }),
     { global: true }
   )),
+  // The request metrics. Effect's HTTP server already creates the request span above this
+  // middleware and records the matched route on it, so the metrics read the route from there.
+  Layer.provide(HttpRouter.middleware(httpMetrics, { global: true })),
   Layer.provide(Handlers),
   Layer.provide(AuthorizationLive),
   Layer.provide(Services)

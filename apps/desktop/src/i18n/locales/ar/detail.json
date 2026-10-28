@@ -1,0 +1,22 @@
+{
+  "library.detail.tool.title": "تفاصيل الأداة",
+  "library.detail.tool.subtitle": "افحص أداة من المكتبة أو عدّلها أو أزلها.",
+  "library.detail.material.title": "تفاصيل المادة",
+  "library.detail.material.subtitle": "افحص مادة من المكتبة أو عدّلها أو أزلها.",
+  "library.detail.machine.title": "إعداد الآلة",
+  "library.detail.machine.subtitle": "افحص إعدادًا محفوظًا للآلة من المكتبة أو عدّله أو أزله.",
+  "library.detail.removed": "تمت إزالة العنصر",
+  "library.detail.confirmDelete": "هل تريد حذف هذا العنصر من المكتبة؟",
+  "library.detail.raw": "JSON خام",
+  "library.field.name": "الاسم",
+  "library.field.type": "النوع",
+  "library.field.material": "المادة",
+  "library.field.diameter": "القطر (mm)",
+  "library.field.flutes": "الأسنان",
+  "library.field.maxRpm": "الحد الأقصى لـ RPM",
+  "library.field.density": "الكثافة (kg/m³)",
+  "library.field.cost": "التكلفة للوحدة",
+  "library.field.workVolume": "حجم العمل (mm)",
+  "library.field.controller": "وحدة التحكم",
+  "library.unnamed": "عنصر بلا اسم"
+}

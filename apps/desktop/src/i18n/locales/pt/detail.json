@@ -1,0 +1,22 @@
+{
+  "library.detail.tool.title": "Detalhes da ferramenta",
+  "library.detail.tool.subtitle": "Inspecione, edite ou remova uma ferramenta da biblioteca.",
+  "library.detail.material.title": "Detalhes do material",
+  "library.detail.material.subtitle": "Inspecione, edite ou remova um material da biblioteca.",
+  "library.detail.machine.title": "Configuração da máquina",
+  "library.detail.machine.subtitle": "Inspecione, edite ou remova um preset de máquina da biblioteca.",
+  "library.detail.removed": "Item removido",
+  "library.detail.confirmDelete": "Excluir este item da biblioteca?",
+  "library.detail.raw": "JSON bruto",
+  "library.field.name": "Nome",
+  "library.field.type": "Tipo",
+  "library.field.material": "Material",
+  "library.field.diameter": "Diâmetro (mm)",
+  "library.field.flutes": "Facas",
+  "library.field.maxRpm": "RPM máx.",
+  "library.field.density": "Densidade (kg/m³)",
+  "library.field.cost": "Custo por unidade",
+  "library.field.workVolume": "Volume de trabalho (mm)",
+  "library.field.controller": "Controlador",
+  "library.unnamed": "Item sem nome"
+}

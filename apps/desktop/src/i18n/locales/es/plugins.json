@@ -1,0 +1,11 @@
+{
+  "plugins.title": "Complementos instalados",
+  "plugins.install": "Instalar complemento",
+  "plugins.empty": "Aún no hay complementos instalados.",
+  "plugins.info": "Información del complemento",
+  "plugins.uploadFile": "Subir archivo",
+  "plugins.dropPackage": "Arrastra aquí el paquete de tu complemento",
+  "plugins.browsePackage": "o haz clic para buscar archivos (.zip o .vsix)",
+  "plugins.invalidPackage": "Tipo de archivo no válido. Sube un paquete de complemento (.zip o .vsix)",
+  "plugins.packageTooLarge": "Archivo demasiado grande. El tamaño máximo es 10MB"
+}

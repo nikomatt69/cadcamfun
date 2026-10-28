@@ -1,6 +1,9 @@
 # Changelog
 
 <!-- UNRELEASED:START -->
+## Observability
+
+- Sidecar/ai: Effect OpenTelemetry integration — request, AI turn and CAD surface metrics, a Prometheus `/metrics` endpoint, head sampling and attribute scrubbing (spec 66)
 <!-- UNRELEASED:END -->
 
 ## v0.1.41 (October 2026)

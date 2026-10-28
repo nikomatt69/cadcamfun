@@ -1,0 +1,11 @@
+{
+  "plugins.title": "Plugins installés",
+  "plugins.install": "Installer un plugin",
+  "plugins.empty": "Aucun plugin installé pour le moment.",
+  "plugins.info": "Infos sur le plugin",
+  "plugins.uploadFile": "Téléverser un fichier",
+  "plugins.dropPackage": "Déposez votre package de plugin ici",
+  "plugins.browsePackage": "ou cliquez pour parcourir les fichiers (.zip ou .vsix)",
+  "plugins.invalidPackage": "Type de fichier non valide. Veuillez téléverser un package de plugin (.zip ou .vsix)",
+  "plugins.packageTooLarge": "Fichier trop volumineux. La taille maximale est de 10MB"
+}

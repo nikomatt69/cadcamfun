@@ -1,0 +1,11 @@
+{
+  "plugins.title": "已安装插件",
+  "plugins.install": "安装插件",
+  "plugins.empty": "尚未安装任何插件。",
+  "plugins.info": "插件信息",
+  "plugins.uploadFile": "上传文件",
+  "plugins.dropPackage": "将插件包拖放到此处",
+  "plugins.browsePackage": "或点击浏览文件（.zip 或 .vsix）",
+  "plugins.invalidPackage": "文件类型无效。请上传插件包（.zip 或 .vsix）",
+  "plugins.packageTooLarge": "文件过大。最大大小为 10MB"
+}

@@ -1,0 +1,11 @@
+{
+  "pricing.title": "简单透明的价格",
+  "pricing.subtitle": "选择适合您的方案，立即开始使用 CAD/CAM FUN。",
+  "pricing.trial": "您正在使用 Pro 试用版 — 剩余 {days} 天",
+  "pricing.faq.title": "常见问题",
+  "pricing.faq.detail": "方案随时可以更新。桌面应用本身在本地始终免费使用。",
+  "pricing.cta.trial": "试用中",
+  "pricing.cta.included": "始终包含",
+  "pricing.cta.startTrial": "开始 14 天试用",
+  "pricing.checkoutUnavailable": "无法启动结算。在线支付需要在此安装上配置 Stripe 密钥；Pro 试用无需该密钥即可使用。"
+}

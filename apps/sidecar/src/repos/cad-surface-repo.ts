@@ -23,8 +23,8 @@ import type { cad } from "@cadcamfun/core"
 import { chamferBox, chamferCylinderTop, loftMesh, meshBounds, meshVolume, shellMesh, sweepMesh, type BoxSolid, type CylinderSolid, type Mesh } from "@cadcamfun/core"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import { and, count, desc, eq } from "drizzle-orm"
-import { Context, Effect, Layer } from "effect"
-import { trace } from "@opentelemetry/api"
+import { Context, Effect, Layer, Option, Tracer } from "effect"
+import { countCadOperation } from "../observability.ts"
 
 type Db = Database["Service"]["db"]
 
@@ -83,12 +83,20 @@ const meshStats = (kind: string, mesh: Mesh): { kind: string; vertexCount: numbe
 const OK = "ok" as const
 const ERR = "error" as const
 
-const currentSpanIds = (): { readonly traceId: string | null; readonly spanId: string | null } => {
-  const span = trace.getActiveSpan()
-  if (span === undefined) return { traceId: null, spanId: null }
-  const ctx = span.spanContext()
-  return { traceId: ctx.traceId, spanId: ctx.spanId }
-}
+/**
+ * The ids of the span the operation runs in.
+ *
+ * They are read from Effect's tracer rather than from the OpenTelemetry global: Effect creates
+ * the span whether or not a collector is configured, so the audit log always points at the trace
+ * that produced it, and the ids are the ones the exported spans carry.
+ */
+const currentSpanIds = Effect.gen(function*() {
+  const span = yield* Effect.serviceOption(Tracer.ParentSpan)
+  return Option.match(span, {
+    onSome: (span) => ({ traceId: span.traceId, spanId: span.spanId }),
+    onNone: () => ({ traceId: null, spanId: null })
+  })
+})
 
 const toDatabaseError = (operation: string, error: unknown): DatabaseError =>
   new DatabaseError({ operation, cause: error instanceof Error ? error : new Error(String(error)) })
@@ -112,7 +120,7 @@ const runWithSpan = (query: QueryFn, { spanName, projectId, kind, inputs, run }:
       catch: (error) => toDatabaseError(`${kind}.run`, error)
     }).pipe(
       Effect.catch((error) => Effect.gen(function*() {
-        const errIds = currentSpanIds()
+        const errIds = yield* currentSpanIds
         yield* query("cadSurfaceRepo.logError", async (db) => {
           await db.insert(schema.cadOperationLogTable).values({
             projectId,
@@ -126,11 +134,12 @@ const runWithSpan = (query: QueryFn, { spanName, projectId, kind, inputs, run }:
             spanId: errIds.spanId
           })
         })
+        yield* countCadOperation(kind, "error", Date.now() - startedAt)
         return yield* Effect.fail(error)
       }))
     )
     const durationMs = Date.now() - startedAt
-    const finalIds = currentSpanIds()
+    const finalIds = yield* currentSpanIds
     const view = yield* query("cadSurfaceRepo.persist", async (db): Promise<MeshAssetView> => {
       const [inserted] = await db.insert(schema.meshAssetTable).values({
         projectId,
@@ -166,6 +175,7 @@ const runWithSpan = (query: QueryFn, { spanName, projectId, kind, inputs, run }:
         createdAt: inserted.createdAt
       }
     })
+    yield* countCadOperation(kind, "ok", durationMs)
     return view
   }).pipe(
     Effect.withSpan(spanName, {

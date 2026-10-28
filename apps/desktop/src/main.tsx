@@ -1,5 +1,7 @@
 import { render } from "solid-js/web"
 import App from "./app/App.tsx"
+import { DEFAULT_LOCALE, setLocale } from "./i18n/index.ts"
+import { createSettings } from "./shared/state/settings.ts"
 import "./styles/globals.css"
 import "./styles/ui.css"
 import "./features/dashboard/styles/dashboard.css"
@@ -25,6 +27,11 @@ if ("__TAURI_INTERNALS__" in window) {
     window.addEventListener("unhandledrejection", (event) => { void error(`webview unhandled rejection: ${String(event.reason)}`) })
   }).catch(() => undefined)
 }
+
+// The language the reader picked last time is applied before the app paints, so the
+// first screen is already in their language and not in English.
+const savedLocale = createSettings().settings().locale
+if (savedLocale !== DEFAULT_LOCALE) void setLocale(savedLocale).catch(() => undefined)
 
 render(() => (
   <>

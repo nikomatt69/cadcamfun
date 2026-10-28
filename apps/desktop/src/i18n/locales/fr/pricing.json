@@ -1,0 +1,11 @@
+{
+  "pricing.title": "Une tarification simple et transparente",
+  "pricing.subtitle": "Choisissez l'offre qui vous convient et commencez dès aujourd'hui avec CAD/CAM FUN.",
+  "pricing.trial": "Vous êtes en essai Pro — {days} jours restants",
+  "pricing.faq.title": "Questions fréquentes",
+  "pricing.faq.detail": "Les offres peuvent être modifiées à tout moment. L'application de bureau reste toujours gratuite en local.",
+  "pricing.cta.trial": "Essai actif",
+  "pricing.cta.included": "Toujours inclus",
+  "pricing.cta.startTrial": "Démarrer l'essai de 14 jours",
+  "pricing.checkoutUnavailable": "Le paiement n'a pas pu être lancé. Les paiements en ligne nécessitent une clé Stripe sur cette installation ; l'essai Pro fonctionne sans."
+}

@@ -1,0 +1,18 @@
+{
+  "appearance": "Darstellung",
+  "general": "Allgemein",
+  "manufacturing": "Fertigung",
+  "subtitle": "Verwalten Sie Ihren Arbeitsbereich und Ihre Einstellungen",
+  "appearanceHint": "Wählen Sie, wie CAD/CAM FUN auf Ihrem Gerät aussieht.",
+  "generalHint": "Anzeigeeinheiten, Sprache, Präzision und Zeichnungseinstellungen.",
+  "manufacturingHint": "Legen Sie die Standardsteuerung für erzeugte Bearbeitungsprogramme fest.",
+  "saved": "Einstellungen werden auf diesem Gerät automatisch gespeichert.",
+  "reset": "Einstellungen zurücksetzen",
+  "resetHint": "Stellen Sie die Standardeinstellungen des Arbeitsbereichs wieder her. Projekte und Bibliothekselemente sind nicht betroffen.",
+  "confirmReset": "Alle Arbeitsbereichseinstellungen zurücksetzen?",
+  "preview": "Vorschau",
+  "precisionHint": "Steuert die Anzeigegenauigkeit und die Nachkommastellen im G-code.",
+  "unitsHint": "Geometrie wird in Millimetern gespeichert; Anzeige- und G-code-Einheiten folgen dieser Einstellung.",
+  "unsupportedPost": "LinuxCNC und SmoothWB sind in der aktuellen Bearbeitungsversion nicht verfügbar. Wählen Sie GRBL, Fanuc oder generischen G-code.",
+  "shortcutsHint": "Tastenkürzel, die im Desktop-Arbeitsbereich verfügbar sind."
+}

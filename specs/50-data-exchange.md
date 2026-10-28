@@ -17,6 +17,11 @@ Verified state of every item (2026-10-25): see [spec 57](57-parity-ledger-2026-1
 - `iges.ts` reads / writes IGES 5.3 B-rep, diagnosing unsupported entities and transformations.
 - `export-mesh.ts`: STL (binary / ASCII), OBJ, glTF 2.0, 3MF from an exact body.
 - DXF read / write (`dxf.ts`, `import-drawing.ts`).
+- Desktop import/export dialog wired to the core above: STEP exact both ways; IGES exact both ways
+  (`igesToElements` / `sceneToIges` in `scene-step.ts`, the same scene traversal and skip report as STEP);
+  STL / OBJ / PLY mesh import through the shared Three.js loaders (`mesh-file-import.ts`); STL / OBJ / GLB
+  scene export through the canvas. IGES directory names hold 8 characters, so part names truncate on
+  round trip while geometry is exact.
 - Spec 12 gate 1 is open for lack of recorded evidence on a real-part corpus.
 
 ## 2. Work items

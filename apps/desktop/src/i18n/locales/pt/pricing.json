@@ -1,0 +1,11 @@
+{
+  "pricing.title": "Preços simples e transparentes",
+  "pricing.subtitle": "Escolha o plano ideal para você e comece a usar o CAD/CAM FUN hoje.",
+  "pricing.trial": "Você está no teste do Pro — restam {days} dias",
+  "pricing.faq.title": "Perguntas frequentes",
+  "pricing.faq.detail": "Os planos podem ser alterados a qualquer momento. O aplicativo de desktop em si é sempre gratuito para uso local.",
+  "pricing.cta.trial": "Teste ativo",
+  "pricing.cta.included": "Sempre incluído",
+  "pricing.cta.startTrial": "Iniciar teste de 14 dias",
+  "pricing.checkoutUnavailable": "Não foi possível iniciar o checkout. Pagamentos online exigem uma chave Stripe nesta instalação; o teste do Pro funciona sem ela."
+}

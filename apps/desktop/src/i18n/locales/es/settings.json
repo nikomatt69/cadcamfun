@@ -1,0 +1,18 @@
+{
+  "appearance": "Apariencia",
+  "general": "General",
+  "manufacturing": "Fabricación",
+  "subtitle": "Gestiona tu espacio de trabajo y tus preferencias",
+  "appearanceHint": "Elige cómo se ve CAD/CAM FUN en tu dispositivo.",
+  "generalHint": "Unidades de visualización, idioma, precisión y preferencias de dibujo.",
+  "manufacturingHint": "Define el controlador predeterminado para los programas de mecanizado generados.",
+  "saved": "Preferencias guardadas automáticamente en este dispositivo.",
+  "reset": "Restablecer preferencias",
+  "resetHint": "Restaura las preferencias predeterminadas del espacio de trabajo. Los proyectos y los elementos de la biblioteca no se ven afectados.",
+  "confirmReset": "¿Restablecer todas las preferencias del espacio de trabajo?",
+  "preview": "Vista previa",
+  "precisionHint": "Controla la precisión de visualización y los decimales del G-code.",
+  "unitsHint": "La geometría se almacena en milímetros; las unidades de visualización y del G-code siguen esta preferencia.",
+  "unsupportedPost": "LinuxCNC y SmoothWB no están disponibles en el actual núcleo de mecanizado. Selecciona GRBL, Fanuc o G-code genérico.",
+  "shortcutsHint": "Comandos de teclado disponibles en el espacio de trabajo del escritorio."
+}

@@ -1,0 +1,22 @@
+{
+  "library.detail.tool.title": "刀具详情",
+  "library.detail.tool.subtitle": "查看、编辑或从库中移除刀具。",
+  "library.detail.material.title": "材料详情",
+  "library.detail.material.subtitle": "查看、编辑或从库中移除材料。",
+  "library.detail.machine.title": "机床配置",
+  "library.detail.machine.subtitle": "查看、编辑或从库中移除机床预设。",
+  "library.detail.removed": "项目已移除",
+  "library.detail.confirmDelete": "从库中删除该项目？",
+  "library.detail.raw": "原始 JSON",
+  "library.field.name": "名称",
+  "library.field.type": "类型",
+  "library.field.material": "材料",
+  "library.field.diameter": "直径 (mm)",
+  "library.field.flutes": "刃数",
+  "library.field.maxRpm": "最大 RPM",
+  "library.field.density": "密度 (kg/m³)",
+  "library.field.cost": "单件成本",
+  "library.field.workVolume": "工作空间 (mm)",
+  "library.field.controller": "控制器",
+  "library.unnamed": "未命名项目"
+}

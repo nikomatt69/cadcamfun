@@ -75,7 +75,11 @@ assurance that data never leaves the device.
 
 The sidecar's OpenTelemetry exporter is disabled unless an operator configures
 an OTLP endpoint. If configured, traces, metrics and logs can be exported to that
-endpoint. This policy does not claim the data is anonymous, that every collector
+endpoint. Traces carry the shape of an operation (route template, status, provider,
+model, tool name), never its content: an attribute whose key names a prompt, a
+payload or a credential is dropped before export. The same numbers are readable
+locally at the loopback `GET /metrics` endpoint, in the Prometheus exposition
+format. This policy does not claim the data is anonymous, that every collector
 has the same retention, or that a particular UI switch controls all telemetry.
 
 ## Retention, deletion and rights

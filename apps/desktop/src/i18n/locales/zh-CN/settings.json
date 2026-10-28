@@ -1,0 +1,18 @@
+{
+  "appearance": "外观",
+  "general": "常规",
+  "manufacturing": "加工",
+  "subtitle": "管理工作区和首选项",
+  "appearanceHint": "选择 CAD/CAM FUN 在你的设备上的显示方式。",
+  "generalHint": "显示单位、语言、精度和绘图首选项。",
+  "manufacturingHint": "设置生成加工程序的默认控制器。",
+  "saved": "首选项会自动保存在此设备上。",
+  "reset": "重置首选项",
+  "resetHint": "恢复默认的工作区首选项。项目和库项目不受影响。",
+  "confirmReset": "重置所有工作区首选项？",
+  "preview": "预览",
+  "precisionHint": "控制显示精度和 G-code 小数位数。",
+  "unitsHint": "几何数据以毫米存储；显示单位和 G-code 单位遵循此首选项。",
+  "unsupportedPost": "当前的加工内核不支持 LinuxCNC 和 SmoothWB。请选择 GRBL、Fanuc 或通用 G-code。",
+  "shortcutsHint": "桌面工作区中可用的键盘命令。"
+}

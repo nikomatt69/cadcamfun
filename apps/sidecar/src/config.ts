@@ -30,6 +30,8 @@ export interface AppConfig {
   readonly aiMinimaxBaseUrl?: string
   /** OTLP/HTTP collector base URL (standard `OTEL_EXPORTER_OTLP_ENDPOINT`); telemetry is off without it. */
   readonly otlpEndpoint?: string
+  /** Head sampling ratio for traces, 0..1 (standard `OTEL_TRACES_SAMPLER_ARG`); unset keeps every trace. */
+  readonly otelSampleRatio?: number
   /** The locale variables of the environment (`LANG`, `TZ`, nikcli's `NIKCLI_LOCALE`…): the assistant's reply language. */
   readonly localeEnv: LocaleEnv
   /** A save keeps a restore point of the replaced drawing when the newest is older than this, ms (`CADCAMFUN_VERSION_INTERVAL_MS`). */
@@ -64,6 +66,7 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
       const cronSecret = yield* Config.option(Config.string("CRON_SECRET"))
       const adminEmail = yield* Config.option(Config.string("ADMIN_EMAIL"))
       const otlpEndpoint = yield* Config.option(Config.string("OTEL_EXPORTER_OTLP_ENDPOINT"))
+      const otelSampleRatio = yield* Config.option(Config.number("OTEL_TRACES_SAMPLER_ARG"))
       const localeEnv = yield* LocaleEnvConfig
       const versionIntervalMs = yield* Config.option(Config.number("CADCAMFUN_VERSION_INTERVAL_MS"))
       const versionLimit = yield* Config.option(Config.int("CADCAMFUN_VERSION_LIMIT"))
@@ -78,6 +81,7 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
         aiOffline,
         ...(aiMinimaxBaseUrl._tag === "Some" && aiMinimaxBaseUrl.value.trim() ? { aiMinimaxBaseUrl: aiMinimaxBaseUrl.value.trim() } : {}),
         ...(otlpEndpoint._tag === "Some" && otlpEndpoint.value.trim() ? { otlpEndpoint: otlpEndpoint.value.trim() } : {}),
+        ...(otelSampleRatio._tag === "Some" && otelSampleRatio.value >= 0 && otelSampleRatio.value <= 1 ? { otelSampleRatio: otelSampleRatio.value } : {}),
         ...(appUrl._tag === "Some" ? { appUrl: appUrl.value } : {}),
         debugLinks,
         token,

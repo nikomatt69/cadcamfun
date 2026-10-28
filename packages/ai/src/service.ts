@@ -8,6 +8,7 @@ import { DirectModel } from "./direct-model.ts"
 import { AiCache } from "./cache.ts"
 import { AiAborted, AiConfigError, AiProviderError, type AiError } from "./errors.ts"
 import type { AiEvent } from "./events.ts"
+import { countTurn, observedTurn } from "./observability.ts"
 import { analyzeGcode, type GcodeReport, type MachineProfile } from "./gcode-analysis.ts"
 import {
   BUILTIN_PROVIDER_IDS,
@@ -373,6 +374,10 @@ export class AiService extends Context.Service<AiService, {
         Stream.unwrap(
           Effect.gen(function* () {
             const resolved = yield* resolveSelection(input.model)
+            // The turn is counted here, before the stream runs: a turn that never reaches the
+            // model still cost a session, a prompt and a round trip.
+            yield* countTurn(resolved.provider)
+            const startedAt = Date.now()
             // Resolve the reply language once per chat (nikcli `locale/resolve.ts` shape, mirrored
             // locally because the SDK does not expose it). English is the silent default; every
             // other language becomes a deterministic instruction in the system prompt.
@@ -440,7 +445,8 @@ export class AiService extends Context.Service<AiService, {
                 (stream) => contextChars > 0
                   ? Stream.concat(Stream.succeed<AiEvent>({ type: "context_snapshot", sessionId: target.sessionId, projectId, source: "workspace", chars: contextChars,
                     ...(input.contextSections !== undefined ? { sections: input.contextSections } : {}), ...(observationState !== undefined ? { observation: observationState } : {}) }), stream)
-                  : stream
+                  : stream,
+                (stream) => observedTurn(stream, startedAt, { provider: resolved.provider, model: resolved.modelId, session: target.sessionId })
               )
             }
 
@@ -461,7 +467,8 @@ export class AiService extends Context.Service<AiService, {
                   type: "error", sessionId,
                   code: error._tag === "AiAborted" ? "aborted" : error._tag === "AiConfigError" ? "config" : "provider",
                   message: error._tag === "AiAborted" ? "The request was cancelled." : error.message
-                }))
+                })),
+              (stream) => observedTurn(stream, startedAt, { provider: resolved.provider, model: resolved.modelId, session: sessionId })
             )
           })
         )

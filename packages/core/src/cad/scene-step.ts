@@ -13,10 +13,12 @@ import {
   booleanBrep,
   healBrep,
   polyhedron,
+  readIgesBreps,
   readStepBreps,
   transformBrep,
   translation,
   validateBrep,
+  writeIgesBreps,
   writeStepBreps,
   type Brep,
   type StepWriteOptions,
@@ -153,6 +155,30 @@ export const stepToElements = (text: string): StepImport => {
   }
 }
 
+export interface IgesImport {
+  /** One `brep` element per solid, in millimetres, at the origin of the file. */
+  readonly elements: ReadonlyArray<{ readonly type: "brep"; readonly name: string; readonly brep: Brep; readonly x: 0; readonly y: 0; readonly z: 0 }>
+  readonly report: ReadonlyArray<{ readonly name: string; readonly faces: number; readonly valid: boolean; readonly volume: number; readonly issues: ReadonlyArray<string> }>
+  readonly warnings: ReadonlyArray<string>
+  readonly lengthScale: number
+}
+
+/**
+ * An IGES file as drawing elements: each solid read exactly and checked, so what is imported can be measured,
+ * machined and written back. Unlike STEP there is no healing pass: the IGES reader already diagnoses the
+ * entities it cannot place, and those diagnostics stay in `warnings`.
+ */
+export const igesToElements = (text: string): IgesImport => {
+  const read = readIgesBreps(text)
+  const parts = read.parts.map((p) => ({ name: p.name, brep: p.brep, rep: validateBrep(p.brep) }))
+  return {
+    elements: parts.map((p) => ({ type: "brep" as const, name: p.name, brep: p.brep, x: 0 as const, y: 0 as const, z: 0 as const })),
+    report: parts.map((p) => ({ name: p.name, faces: p.brep.faces.length, valid: p.rep.valid, volume: p.rep.volume ?? 0, issues: p.rep.issues.slice(0, 5).map((i) => i.message) })),
+    warnings: read.warnings,
+    lengthScale: read.lengthScale
+  }
+}
+
 /** A closed triangle mesh as a faceted solid (one planar face per triangle), with coincident vertices welded. */
 const facetedBrep = (positions: ArrayLike<number>, indices: ArrayLike<number>): Brep => {
   const key = (i: number) => `${Math.round(positions[i * 3]! * 1e6)},${Math.round(positions[i * 3 + 1]! * 1e6)},${Math.round(positions[i * 3 + 2]! * 1e6)}`
@@ -196,11 +222,14 @@ export interface SceneStepOptions extends StepWriteOptions {
   readonly maxFacets?: number
 }
 
-/**
- * The drawing as a STEP file: visible solids that are not consumed as operands of a Boolean element, exact where the
- * kernel has a model, faceted otherwise.
- */
-export const sceneToStep = (elements: ReadonlyArray<Element>, options: SceneStepOptions = {}): SceneStep => {
+interface CollectedScene {
+  readonly breps: ReadonlyArray<{ readonly name: string; readonly brep: Brep }>
+  readonly parts: ReadonlyArray<SceneStepPart>
+  readonly skipped: ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>
+}
+
+/** The solids a scene export writes, shared by every exact format so they all see the same parts and skips. */
+const collectSceneBreps = (elements: ReadonlyArray<Element>, options: SceneStepOptions): CollectedScene => {
   const byId = new Map<string, Element>()
   for (const e of elements) if (typeof e["id"] === "string") byId.set(e["id"] as string, e)
   const consumed = new Set<string>()
@@ -229,5 +258,26 @@ export const sceneToStep = (elements: ReadonlyArray<Element>, options: SceneStep
     breps.push({ name, brep: b })
     parts.push({ id, name, exact: false, faces: b.faces.length, valid: rep.valid, note: `faceted: ${exact.reason}` })
   }
+  return { breps, parts, skipped }
+}
+
+/**
+ * The drawing as a STEP file: visible solids that are not consumed as operands of a Boolean element, exact where the
+ * kernel has a model, faceted otherwise.
+ */
+export const sceneToStep = (elements: ReadonlyArray<Element>, options: SceneStepOptions = {}): SceneStep => {
+  const { breps, parts, skipped } = collectSceneBreps(elements, options)
   return breps.length === 0 ? { parts, skipped } : { step: writeStepBreps(breps, options), parts, skipped }
+}
+
+export interface SceneIges {
+  readonly iges?: string
+  readonly parts: ReadonlyArray<SceneStepPart>
+  readonly skipped: ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>
+}
+
+/** The drawing as an IGES 5.3 file: the same solids, parts and skips `sceneToStep` reports. */
+export const sceneToIges = (elements: ReadonlyArray<Element>, options: SceneStepOptions = {}): SceneIges => {
+  const { breps, parts, skipped } = collectSceneBreps(elements, options)
+  return breps.length === 0 ? { parts, skipped } : { iges: writeIgesBreps(breps), parts, skipped }
 }

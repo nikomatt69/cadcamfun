@@ -7,7 +7,7 @@
  * breaking the shell.
  */
 import { createEffect, createSignal, type Accessor } from "solid-js"
-import { DEFAULT_LOCALE, type Locale } from "../../i18n/index.ts"
+import { DEFAULT_LOCALE, isLocale, type Locale } from "../../i18n/registry.ts"
 import { DEFAULT_TOLERANCE, isTolerance } from "@cadcamfun/core"
 import { isDisplayUnits, type DisplayUnits } from "../../viewport/units.ts"
 
@@ -68,7 +68,7 @@ export const decodeSettings = (raw: unknown): Settings => {
   return {
     units: isDisplayUnits(record["units"]) ? record["units"] : DEFAULT_SETTINGS.units,
     theme: isOneOf(THEMES, record["theme"]) ? record["theme"] : DEFAULT_SETTINGS.theme,
-    locale: isOneOf([DEFAULT_LOCALE], record["locale"]) ? record["locale"] : DEFAULT_SETTINGS.locale,
+    locale: isLocale(record["locale"]) ? record["locale"] : DEFAULT_SETTINGS.locale,
     decimals:
       typeof record["decimals"] === "number" && Number.isInteger(record["decimals"]) &&
         (record["decimals"] as number) >= 0 && (record["decimals"] as number) <= 6

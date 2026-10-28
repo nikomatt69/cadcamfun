@@ -1,0 +1,11 @@
+{
+  "pricing.title": "シンプルで透明な料金体系",
+  "pricing.subtitle": "あなたに合うプランを選び、今日から CAD/CAM FUN を始めましょう。",
+  "pricing.trial": "Pro トライアル中です — 残り {days} 日",
+  "pricing.faq.title": "よくある質問",
+  "pricing.faq.detail": "プランはいつでも変更できます。デスクトップアプリケーション自体はローカルで常に無料で利用できます。",
+  "pricing.cta.trial": "トライアル中",
+  "pricing.cta.included": "常に含まれる",
+  "pricing.cta.startTrial": "14 日トライアルを開始",
+  "pricing.checkoutUnavailable": "決済を開始できませんでした。オンライン決済にはこのインストールに Stripe キーが必要ですが、Pro トライアルはキーなしで利用できます。"
+}

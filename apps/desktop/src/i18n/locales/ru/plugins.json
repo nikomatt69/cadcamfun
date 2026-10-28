@@ -1,0 +1,11 @@
+{
+  "plugins.title": "Установленные плагины",
+  "plugins.install": "Установить плагин",
+  "plugins.empty": "Плагины ещё не установлены.",
+  "plugins.info": "Сведения о плагине",
+  "plugins.uploadFile": "Загрузить файл",
+  "plugins.dropPackage": "Перетащите пакет плагина сюда",
+  "plugins.browsePackage": "или нажмите, чтобы выбрать файл (.zip или .vsix)",
+  "plugins.invalidPackage": "Недопустимый тип файла. Загрузите пакет плагина (.zip или .vsix)",
+  "plugins.packageTooLarge": "Файл слишком большой. Максимальный размер — 10MB"
+}

@@ -1,0 +1,22 @@
+{
+  "library.detail.tool.title": "Werkzeugdetails",
+  "library.detail.tool.subtitle": "Ein Werkzeug aus der Bibliothek prüfen, bearbeiten oder entfernen.",
+  "library.detail.material.title": "Materialdetails",
+  "library.detail.material.subtitle": "Ein Material aus der Bibliothek prüfen, bearbeiten oder entfernen.",
+  "library.detail.machine.title": "Maschinenkonfiguration",
+  "library.detail.machine.subtitle": "Eine Maschinenvorlage aus der Bibliothek prüfen, bearbeiten oder entfernen.",
+  "library.detail.removed": "Element entfernt",
+  "library.detail.confirmDelete": "Dieses Element aus der Bibliothek löschen?",
+  "library.detail.raw": "Rohes JSON",
+  "library.field.name": "Name",
+  "library.field.type": "Typ",
+  "library.field.material": "Material",
+  "library.field.diameter": "Durchmesser (mm)",
+  "library.field.flutes": "Schneiden",
+  "library.field.maxRpm": "Max. U/min",
+  "library.field.density": "Dichte (kg/m³)",
+  "library.field.cost": "Kosten pro Stück",
+  "library.field.workVolume": "Arbeitsraum (mm)",
+  "library.field.controller": "Controller",
+  "library.unnamed": "Unbenanntes Element"
+}

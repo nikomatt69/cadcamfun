@@ -1,0 +1,22 @@
+{
+  "library.detail.tool.title": "टूल विवरण",
+  "library.detail.tool.subtitle": "लाइब्रेरी में मौजूद टूल का निरीक्षण करें, संपादित करें या हटाएँ।",
+  "library.detail.material.title": "सामग्री विवरण",
+  "library.detail.material.subtitle": "लाइब्रेरी में मौजूद सामग्री का निरीक्षण करें, संपादित करें या हटाएँ।",
+  "library.detail.machine.title": "मशीन कॉन्फ़िगरेशन",
+  "library.detail.machine.subtitle": "लाइब्रेरी में मौजूद मशीन प्रीसेट का निरीक्षण करें, संपादित करें या हटाएँ।",
+  "library.detail.removed": "आइटम हटा दिया गया",
+  "library.detail.confirmDelete": "क्या यह आइटम लाइब्रेरी से हटाएँ?",
+  "library.detail.raw": "रॉ JSON",
+  "library.field.name": "नाम",
+  "library.field.type": "प्रकार",
+  "library.field.material": "सामग्री",
+  "library.field.diameter": "व्यास (mm)",
+  "library.field.flutes": "फ्लूट",
+  "library.field.maxRpm": "अधिकतम RPM",
+  "library.field.density": "घनत्व (kg/m³)",
+  "library.field.cost": "प्रति इकाई लागत",
+  "library.field.workVolume": "वर्किंग वॉल्यूम (mm)",
+  "library.field.controller": "कंट्रोलर",
+  "library.unnamed": "बेनाम आइटम"
+}
