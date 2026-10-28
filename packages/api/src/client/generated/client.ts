@@ -383,6 +383,7 @@ type Endpoint6_1Request = Parameters<RawClient["ai"]["invokeAction"]>[0]
 type Endpoint6_1Input = {
   readonly projectId: Endpoint6_1Request["payload"]["projectId"]
   readonly drawingId?: Endpoint6_1Request["payload"]["drawingId"]
+  readonly callId?: Endpoint6_1Request["payload"]["callId"]
   readonly tool: Endpoint6_1Request["payload"]["tool"]
   readonly input: Endpoint6_1Request["payload"]["input"]
 }
@@ -391,6 +392,7 @@ const Endpoint6_1 = (raw: RawClient["ai"]) => (input: Endpoint6_1Input) =>
     payload: {
       projectId: input["projectId"],
       drawingId: input["drawingId"],
+      callId: input["callId"],
       tool: input["tool"],
       input: input["input"],
     },
@@ -422,6 +424,7 @@ type Endpoint6_6Input = {
   readonly sessionId: Endpoint6_6Request["payload"]["sessionId"]
   readonly projectId?: Endpoint6_6Request["payload"]["projectId"]
   readonly action: Endpoint6_6Request["payload"]["action"]
+  readonly criteria?: Endpoint6_6Request["payload"]["criteria"]
   readonly taskId?: Endpoint6_6Request["payload"]["taskId"]
   readonly requestId?: Endpoint6_6Request["payload"]["requestId"]
   readonly answers?: Endpoint6_6Request["payload"]["answers"]
@@ -434,6 +437,7 @@ const Endpoint6_6 = (raw: RawClient["ai"]) => (input: Endpoint6_6Input) =>
       sessionId: input["sessionId"],
       projectId: input["projectId"],
       action: input["action"],
+      criteria: input["criteria"],
       taskId: input["taskId"],
       requestId: input["requestId"],
       answers: input["answers"],

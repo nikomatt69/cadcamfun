@@ -1252,6 +1252,7 @@ export function make(options: ClientOptions) {
             body: {
               projectId: input["projectId"],
               drawingId: input["drawingId"],
+              callId: input["callId"],
               tool: input["tool"],
               input: input["input"],
             },
@@ -1309,6 +1310,7 @@ export function make(options: ClientOptions) {
               sessionId: input["sessionId"],
               projectId: input["projectId"],
               action: input["action"],
+              criteria: input["criteria"],
               taskId: input["taskId"],
               requestId: input["requestId"],
               answers: input["answers"],

@@ -367,6 +367,7 @@ export type UserUpdateGitProfilePayload = { readonly name: string; readonly emai
 export type AiInvokeActionPayload = {
   readonly projectId: string
   readonly drawingId?: string | undefined
+  readonly callId?: string | undefined
   readonly tool: string
   readonly input: { readonly [x: string]: any }
 }
@@ -390,6 +391,9 @@ export type AiSessionControlPayload = {
     | "reply_permission"
     | "consolidate_memory"
     | "context"
+    | "acceptance"
+    | "set_acceptance"
+  readonly criteria?: unknown | undefined
   readonly taskId?: string | undefined
   readonly requestId?: string | undefined
   readonly answers?: ReadonlyArray<ReadonlyArray<string>> | undefined
@@ -2333,6 +2337,7 @@ export type AiActionsOutput = {
 export type AiInvokeActionInput = {
   readonly projectId: AiInvokeActionPayload["projectId"]
   readonly drawingId?: AiInvokeActionPayload["drawingId"]
+  readonly callId?: AiInvokeActionPayload["callId"]
   readonly tool: AiInvokeActionPayload["tool"]
   readonly input: AiInvokeActionPayload["input"]
 }
@@ -2388,6 +2393,7 @@ export type AiSessionControlInput = {
   readonly sessionId: AiSessionControlPayload["sessionId"]
   readonly projectId?: AiSessionControlPayload["projectId"]
   readonly action: AiSessionControlPayload["action"]
+  readonly criteria?: AiSessionControlPayload["criteria"]
   readonly taskId?: AiSessionControlPayload["taskId"]
   readonly requestId?: AiSessionControlPayload["requestId"]
   readonly answers?: AiSessionControlPayload["answers"]
@@ -2431,6 +2437,22 @@ export type AiSessionControlOutput = {
       custom?: boolean | undefined
     }>
   }>
+  engineeringAcceptance?:
+    | {
+        status: "accepted" | "failed" | "unmeasured" | "stale" | "not_configured"
+        projectId: string
+        drawingId: string
+        revision: string
+        criteriaDigest?: string | undefined
+        checks: Array<{
+          id: string
+          status: "pass" | "fail" | "unmeasured" | "stale"
+          reason?: string | undefined
+          report?: unknown | undefined
+        }>
+        note: string
+      }
+    | undefined
   context: {
     memory?:
       | {
