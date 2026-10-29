@@ -517,6 +517,7 @@
   "cam.resource.moves": "Moves: {count}",
   "cam.resource.multi": "Multiple operations",
   "cam.kernel.deburr": "Deburr edges, chamfer width mm (0 = off)",
+  "cam.kernel.tabs": "Tabs on through-cut outlines, count (0 = none, 4 mm x 2 mm each)",
   "cam.kernel.plan": "Plan operations",
   "cam.kernel.planHint": "The kernel's plan from the part. Change a tool, override rpm / feed / stepdown / stepover, reorder or remove an operation; Generate runs this list.",
   "cam.kernel.planReset": "Automatic plan",

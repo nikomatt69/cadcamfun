@@ -517,6 +517,7 @@
   "cam.resource.moves": "移動: {count}",
   "cam.resource.multi": "複数工程",
   "cam.kernel.deburr": "エッジのバリ取り、チャンファ幅 mm（0 = 無効）",
+  "cam.kernel.tabs": "貫通加工の輪郭に残すタブの数（0 = なし、各 4 mm x 2 mm）",
   "cam.kernel.plan": "工程を計画",
   "cam.kernel.planHint": "部品からカーネルが作成した計画です。工具の変更、rpm / 送り / 段差 / 横方向送りの上書き、工程の並べ替えや削除ができます。生成はこのリストに従います。",
   "cam.kernel.planReset": "自動計画",

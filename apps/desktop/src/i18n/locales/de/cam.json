@@ -517,6 +517,7 @@
   "cam.resource.moves": "Bewegungen: {count}",
   "cam.resource.multi": "Mehrere Operationen",
   "cam.kernel.deburr": "Kanten entgraten, Fasenbreite mm (0 = aus)",
+  "cam.kernel.tabs": "Haltestege an durchgeschnittenen Konturen, Anzahl (0 = keine, je 4 mm x 2 mm)",
   "cam.kernel.plan": "Operationen planen",
   "cam.kernel.planHint": "Der Plan des Kernels aus dem Teil. Ändern Sie ein Werkzeug, überschreiben Sie rpm / Vorschub / Zustellung in Z / Zustellung in Y, ordnen Sie eine Operation um oder entfernen Sie sie; Generieren führt diese Liste aus.",
   "cam.kernel.planReset": "Automatischer Plan",

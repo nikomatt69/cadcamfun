@@ -233,3 +233,16 @@ test("a parametric part with an island in a pocket is machined from its exact mo
   expect(plain.status).toBe(201)
   expect((await app.call(`/api/toolpaths/${plain.body.id}/setup-sheet`)).status).toBe(400)
 })
+
+test("tabs ask the planner to hold an outline cut through the full stock height, and the artifact keeps them (spec 69 A1)", async () => {
+  const prismatic = { ...input, elements: [islandPart] }
+  const held = Schema.decodeUnknownSync(CamKernelResult)((await post({ ...prismatic, tabs: { count: 2, width: 4, height: 2 } })).body)
+  const free = Schema.decodeUnknownSync(CamKernelResult)((await post(prismatic)).body)
+  if (held.status !== "ok" || free.status !== "ok") throw new Error("the kernel failed")
+  expect(held.value.notes.join(" ")).toMatch(/2 tabs of 4 mm x 2 mm hold the part/)
+  expect(free.value.notes.join(" ")).not.toMatch(/tabs of/)
+  // Material is left standing, and the replay still judges the program.
+  expect(held.value.stock.finalVolume).toBeGreaterThan(free.value.stock.finalVolume)
+  expect(held.value.claims.find((claim) => claim.id === "no-gouge")?.status).toBe("passed")
+  expect((await post({ ...prismatic, tabs: { count: 0, width: 4, height: 2 } })).status).toBe(400)
+})

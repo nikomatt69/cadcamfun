@@ -17,7 +17,7 @@ export type ToolpathSettings = cam.generator.ToolpathSettings
 export type GeometryType = cam.generator.GeometryType
 export type PrinterExtras = cam.generator.PrinterExtras
 /** The kernel job the panel builds: presets, quality, and the edited plan / cutter library (absent = the kernel decides). */
-export type KernelSettings = Pick<CamKernelRequest, "setupOrientation" | "material" | "machine" | "machineConfig" | "origin" | "finishAllowance" | "scallop" | "resolution" | "deburr" | "subprograms" | "smoothing" | "postDefinition" | "operations" | "tools" | "print">
+export type KernelSettings = Pick<CamKernelRequest, "setupOrientation" | "material" | "machine" | "machineConfig" | "origin" | "finishAllowance" | "scallop" | "resolution" | "deburr" | "tabs" | "subprograms" | "smoothing" | "postDefinition" | "operations" | "tools" | "print">
 const initialKernelSettings = (): KernelSettings => ({ material: "6061", machine: cam.kernel.DEFAULT_MACHINE.id, origin: "stock-center" })
 
 export interface LibraryTool {
@@ -262,7 +262,7 @@ export const restoreKernelSettings = (request: CamKernelRequest): void => {
   // Absent keys, never undefined values (the request schema takes the former): deburr, the edited plan, the cutter library and the subprogram choice come back too.
   const optional: Record<string, unknown> = {
     setupOrientation: request.setupOrientation, finishAllowance: request.finishAllowance, scallop: request.scallop, resolution: request.resolution,
-    deburr: request.deburr, subprograms: request.subprograms, smoothing: request.smoothing, postDefinition: request.postDefinition, operations: request.operations, tools: request.tools,
+    deburr: request.deburr, tabs: request.tabs, subprograms: request.subprograms, smoothing: request.smoothing, postDefinition: request.postDefinition, operations: request.operations, tools: request.tools,
     ...(request.machineConfig !== undefined ? { machineConfig: request.machineConfig } : {})
   }
   for (const key of Object.keys(optional)) if (optional[key] === undefined) delete optional[key]

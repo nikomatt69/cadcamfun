@@ -149,7 +149,11 @@ export type OperationSpec =
   | (OperationBase & { readonly strategy: "face"; readonly bottom: number })
   | (OperationBase & { readonly strategy: "adaptive"; readonly region: RegionSpec; readonly top: number; readonly bottom: number; readonly allowance?: number })
   | (OperationBase & { readonly strategy: "pocket"; readonly region: RegionSpec; readonly top: number; readonly bottom: number; readonly allowance?: number; readonly finish?: boolean })
-  | (OperationBase & { readonly strategy: "profile"; readonly loop: ReadonlyArray<Vec2>; readonly side: "outside" | "inside"; readonly top: number; readonly bottom: number; readonly allowance?: number; readonly finish?: boolean; readonly within?: RegionSpec })
+  /**
+   * `tabs` hold a through-cut part: material left standing at `position` (0..1 along the tool-centre path), `width` mm long
+   * and `height` mm above `bottom`. `leadIn` is how the cutter enters and leaves the wall (default `arc`, `leadRadius` mm).
+   */
+  | (OperationBase & { readonly strategy: "profile"; readonly loop: ReadonlyArray<Vec2>; readonly side: "outside" | "inside"; readonly top: number; readonly bottom: number; readonly allowance?: number; readonly finish?: boolean; readonly within?: RegionSpec; readonly tabs?: ReadonlyArray<ProfileTab>; readonly leadIn?: ProfileLeadIn; readonly leadRadius?: number })
   | (OperationBase & { readonly strategy: "bore"; readonly center: Vec2; readonly diameter: number; readonly top: number; readonly bottom: number; readonly allowance?: number })
   /**
    * Holes at points: drilled (peck / chip break from the cutting data), spotted, rigid-tapped with a `tap` cutter (the feed is its
@@ -172,6 +176,26 @@ export type OperationSpec =
 
 export type Strategy = OperationSpec["strategy"]
 
+/** Material a profile leaves standing to hold a through-cut part (`ProfileParams.tabs`). */
+export interface ProfileTab {
+  /** 0..1 along the tool-centre path. */
+  readonly position: number
+  /** Length of the material left standing along the wall, mm (the cutter is lifted over a window one cutter diameter longer). */
+  readonly width: number
+  /** Height above the operation's `bottom`, mm. */
+  readonly height: number
+}
+
+export type ProfileLeadIn = "direct" | "arc" | "ramp" | "helix"
+export const PROFILE_LEAD_INS = ["direct", "arc", "ramp", "helix"] as const
+
+/** Tabs the planner puts on every outline it cuts through the full stock height: `count` evenly spaced along the path. */
+export interface TabRequirement {
+  readonly count: number
+  readonly width: number
+  readonly height: number
+}
+
 export const SURFACE_MODES = ["roughing", "rest", "parallel", "waterline", "steep-shallow", "scallop", "spiral", "radial", "flat"] as const
 export type SurfaceMode = typeof SURFACE_MODES[number]
 
@@ -186,6 +210,8 @@ export interface QualityRequirement {
   readonly resolution?: number
   /** Break the top edges of outlines, pockets and holes with a chamfer of this width, mm (the planner adds 2D chamfer operations). */
   readonly deburr?: number
+  /** Hold the outlines the program cuts through the full stock height with tabs (spec 69 A1); without it the plan only says so in a note. */
+  readonly tabs?: TabRequirement
 }
 
 /**

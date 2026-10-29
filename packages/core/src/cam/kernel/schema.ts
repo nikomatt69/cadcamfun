@@ -7,7 +7,7 @@ import { SETUP_ORIENTATIONS } from "../setup.ts"
 import { Schema } from "effect"
 import { CoolantSchema } from "../ir.ts"
 import type { Cutter } from "./cutters.ts"
-import { SURFACE_MODES, type OperationSpec, type PrintRequirement } from "./contracts.ts"
+import { PROFILE_LEAD_INS, SURFACE_MODES, type OperationSpec, type PrintRequirement } from "./contracts.ts"
 import { MultiaxisStrategySchema } from "../operations/multiaxis.ts"
 
 export const SetupOrientationSchema = Schema.Literals(SETUP_ORIENTATIONS)
@@ -52,7 +52,11 @@ export const OperationSpecSchema = Schema.Union([
   Schema.Struct({ ...overrides, strategy: Schema.Literal("face"), bottom: Schema.Finite }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("adaptive"), region, top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative) }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("pocket"), region, top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative), finish: Schema.optionalKey(Schema.Boolean), within: Schema.optionalKey(region) }),
-  Schema.Struct({ ...overrides, strategy: Schema.Literal("profile"), loop: ring, side: Schema.Literals(["outside", "inside"]), top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative), finish: Schema.optionalKey(Schema.Boolean) }),
+  Schema.Struct({
+    ...overrides, strategy: Schema.Literal("profile"), loop: ring, side: Schema.Literals(["outside", "inside"]), top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative), finish: Schema.optionalKey(Schema.Boolean),
+    tabs: Schema.optionalKey(Schema.Array(Schema.Struct({ position: Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 })), width: positive, height: positive })).check(Schema.isMaxLength(64))),
+    leadIn: Schema.optionalKey(Schema.Literals(PROFILE_LEAD_INS)), leadRadius: Schema.optionalKey(positive)
+  }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("bore"), center: point, diameter: positive, top: Schema.Finite, bottom: Schema.Finite, allowance: Schema.optionalKey(nonNegative) }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("drill"), points: Schema.Array(point).check(Schema.isMinLength(1), Schema.isMaxLength(5000)), top: Schema.Finite, bottom: Schema.Finite, cut: Schema.optionalKey(Schema.Literals(["drill", "spot", "tap", "ream"])) }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("thread"), center: point, diameter: positive, pitch: positive, internal: Schema.Boolean, top: Schema.Finite, length: positive, rightHand: Schema.optionalKey(Schema.Boolean) }),

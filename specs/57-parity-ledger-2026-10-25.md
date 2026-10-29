@@ -175,6 +175,7 @@ Found while building this ledger; each has a new spec. Where the item was in an 
 | G6 | **Generative design / topology optimisation**: nothing exists and spec 48 (FEA) is not built | Fusion generative design | horizon item of [62](62-execution-plan-2026-q4.md) §6; no spec until spec 48 F1–F5 pass |
 | G7 | **Rendering, appearance library, animation of assemblies / toolpaths as media** | Fusion Render / Animation workspaces | out of scope for this plan, recorded so it is a choice and not an omission |
 | G8 | A spec 55 corpus-first rule is violated by every earlier spec: no area has a measured level | no parity statement is possible | spec 55 E1–E3 is the first item of the plan |
+| G9 | Enterprise-class CAM gaps found on 2026-10-29 that no spec above names: a 5-axis program cannot reach `verified-program`; one setup per job; no fixtures or stock model; no cutter compensation output from the kernel; tool assembly not used by the executor; tabs/leads not exposed | hyperMILL-class kernel | [68](68-cam-kernel-enterprise-gap-audit.md) (audit), [69](69-cam-enterprise-step-plan.md) (steps) |
 
 ## 4. Owner decisions still open (spec 39 §4, plus new)
 
@@ -195,6 +196,8 @@ No answer to D1–D7 is recorded in the repository or in the project notes as of
 | D11 (new) | calibration data source for the force model (a cutting-test partner, vendor data entered by the user, or none) | spec 61 §3.6 |
 | D12 (new) | legacy `cam/generator/*` programs (no kernel artifact): keep read-only, convert on request, or retire | the claim that CAM has one structure; spec 59 §6 follow-up |
 
+Update 2026-10-29: D9 (`ask`), D10 (library item, per user) and D12 (legacy programs read-only, status `unknown`) were decided by the owner; see [70](70-integrated-next-steps-2026-10-29.md) §6. The rows above are kept as written.
+
 ## 5. Corrections to earlier text
 
 - Spec 39 §1.1 sizes are lower bounds; on 2026-10-25 `packages/core/src/cad` is 116 files / 29 223 lines, `cad/brep` 83 files / 16 727 lines,
@@ -211,3 +214,4 @@ No answer to D1–D7 is recorded in the repository or in the project notes as of
 - 2026-10-27: X6 row (IGES 124). Outside any spec: the history rebuild keeps one exact replay advanced on demand (`exactReplay`), so named faces and curved fillets no longer replay the exact prefix each time. Heidenhain Klartext writes repeated toolpaths as label subprograms (`CALL LBL n`, incremental bodies after `M30`); a post definition with `base: "heidenhain"` still writes ISO text through the shared writer, not Klartext (open).
 - 2026-10-27: E1 partial, E2 and E3 built (spec 55 wave 0 of spec 62); first scorecard generated.
 - 2026-10-27: G1 partly closed by spec 58 T1–T3; D8 taken at its default (read-compatible superset).
+- 2026-10-29: G9 added (CAM enterprise audit, spec 68) with the step plan of spec 69; 28 `open` capabilities added to `parity.json`; decisions D13 (mesh stock default) and D14 (fixture library source) proposed in spec 69 §4.

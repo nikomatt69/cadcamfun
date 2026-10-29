@@ -26,6 +26,7 @@ export const CamKernelRequest = Schema.Struct({
   /** Cutter library with holders (the kernel's default crib when absent). */
   tools: CamManufactureInput.fields.tools,
   deburr: CamManufactureInput.fields.deburr,
+  tabs: CamManufactureInput.fields.tabs,
   subprograms: CamManufactureInput.fields.subprograms,
   smoothing: CamManufactureInput.fields.smoothing,
   /** A post definition (spec 54 C1; library category "post") that writes the NC in place of the machine's post; checked by the kernel. */

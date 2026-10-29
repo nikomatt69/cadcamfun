@@ -517,6 +517,7 @@
   "cam.resource.moves": "Movimenti: {count}",
   "cam.resource.multi": "Operazioni multiple",
   "cam.kernel.deburr": "Sbava i bordi, larghezza smusso mm (0 = disattivato)",
+  "cam.kernel.tabs": "Linguette sui contorni tagliati a tutto spessore, numero (0 = nessuna, 4 mm x 2 mm ciascuna)",
   "cam.kernel.plan": "Pianifica le operazioni",
   "cam.kernel.planHint": "Il piano del kernel derivato dalla parte. Cambia un utensile, sovrascrivi rpm / avanzamento / profondità di passata / passo laterale, riordina o rimuovi un'operazione; Genera esegue questo elenco.",
   "cam.kernel.planReset": "Piano automatico",

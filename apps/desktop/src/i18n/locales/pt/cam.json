@@ -517,6 +517,7 @@
   "cam.resource.moves": "Movimentos: {count}",
   "cam.resource.multi": "Múltiplas operações",
   "cam.kernel.deburr": "Deburrar arestas, largura do chanfro mm (0 = desligado)",
+  "cam.kernel.tabs": "Abas em contornos cortados de lado a lado, quantidade (0 = nenhuma, 4 mm x 2 mm cada)",
   "cam.kernel.plan": "Planejar operações",
   "cam.kernel.planHint": "O plano do kernel a partir da peça. Troque uma ferramenta, sobrescreva rpm / avanço / profundidade de corte / largura de passo, reordene ou remova uma operação; Gerar executa esta lista.",
   "cam.kernel.planReset": "Plano automático",

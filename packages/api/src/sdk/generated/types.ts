@@ -1304,6 +1304,9 @@ export type ToolpathGeneratorManufacturePayload = {
         readonly bottom: number
         readonly allowance?: number
         readonly finish?: boolean
+        readonly tabs?: ReadonlyArray<{ readonly position: number; readonly width: number; readonly height: number }>
+        readonly leadIn?: "direct" | "arc" | "ramp" | "helix"
+        readonly leadRadius?: number
       }
     | {
         readonly id: string
@@ -1487,6 +1490,7 @@ export type ToolpathGeneratorManufacturePayload = {
     readonly number?: number
   }>
   readonly deburr?: number
+  readonly tabs?: { readonly count: number; readonly width: number; readonly height: number }
   readonly subprograms?: boolean
   readonly smoothing?: number
   readonly postDefinition?: JsonValue
@@ -6182,6 +6186,7 @@ export type ToolpathGeneratorManufactureInput = {
   readonly operations?: ToolpathGeneratorManufacturePayload["operations"]
   readonly tools?: ToolpathGeneratorManufacturePayload["tools"]
   readonly deburr?: ToolpathGeneratorManufacturePayload["deburr"]
+  readonly tabs?: ToolpathGeneratorManufacturePayload["tabs"]
   readonly subprograms?: ToolpathGeneratorManufacturePayload["subprograms"]
   readonly smoothing?: ToolpathGeneratorManufacturePayload["smoothing"]
   readonly postDefinition?: ToolpathGeneratorManufacturePayload["postDefinition"]

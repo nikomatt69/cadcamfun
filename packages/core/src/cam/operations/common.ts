@@ -142,15 +142,60 @@ export const followPath = (b: MoveBuilder, path: Path, z: number, feed: number):
  * One traversal of `path` descending linearly (by cumulative XY length) from `z0`
  * to `z1`. Lines become sloped `Linear`s, arcs become helical `Arc`s.
  */
-const rampTraversal = (b: MoveBuilder, path: Path, z0: number, z1: number, feed: number): void => {
+const rampTraversal = (b: MoveBuilder, path: Path, z0: number, z1: number, feed: number, tabs: ReadonlyArray<TabWindow> = []): void => {
   const total = pathLength(path)
-  let cum = 0
   const starts = segStarts(path)
+  const lowest = Math.min(z0, z1)
+  const active = tabs.filter((t) => t.z > lowest + 1e-9 && t.s1 > t.s0)
+  if (active.length === 0 || total === 0) {
+    let cum = 0
+    path.segs.forEach((seg, i) => {
+      cum += segLength(starts[i]!, seg)
+      const z = total === 0 ? z1 : z0 + ((z1 - z0) * cum) / total
+      b.seg(seg, z, feed)
+    })
+    return
+  }
+  // The ramp never goes below the top of a tab it passes: inside a tab window the cutter keeps the tab's height until the ramp
+  // is above it, then drops to the ramp again where the window ends.
+  const rampAt = (s: number): number => z0 + ((z1 - z0) * s) / total
+  const slope = (z1 - z0) / total
+  let cum = 0
   path.segs.forEach((seg, i) => {
-    cum += segLength(starts[i]!, seg)
-    const z = total === 0 ? z1 : z0 + ((z1 - z0) * cum) / total
-    b.seg(seg, z, feed)
+    const len = segLength(starts[i]!, seg)
+    const cuts: number[] = [0, len]
+    for (const t of active) {
+      for (const edge of [t.s0, t.s1]) {
+        const local = edge - cum
+        if (local > 1e-9 && local < len - 1e-9) cuts.push(local)
+      }
+      // Where the ramp crosses the tab's top inside the window.
+      if (Math.abs(slope) > 1e-12) {
+        const local = (t.z - z0) / slope - cum
+        if (local > 1e-9 && local < len - 1e-9 && cum + local > t.s0 && cum + local < t.s1) cuts.push(local)
+      }
+    }
+    cuts.sort((x, y) => x - y)
+    for (let k = 0; k + 1 < cuts.length; k++) {
+      const a = cuts[k]!, c = cuts[k + 1]!
+      if (c - a < 1e-9) continue
+      const mid = cum + (a + c) / 2
+      const tab = active.find((t) => mid > t.s0 + 1e-9 && mid < t.s1 - 1e-9 && t.z > rampAt(mid) + 1e-9)
+      const piece = c >= len - 1e-9 ? seg : sliceSeg(starts[i]!, seg, 0, c)
+      const p = b.pos
+      if (tab !== undefined) {
+        if (Math.abs(p.z - tab.z) > 1e-9) b.linear({ x: p.x, y: p.y, z: tab.z }, feed)
+        b.seg(piece, tab.z, feed)
+      } else {
+        const zStart = rampAt(cum + a)
+        if (Math.abs(p.z - zStart) > 1e-9) b.linear({ x: p.x, y: p.y, z: zStart }, feed)
+        b.seg(piece, rampAt(cum + c), feed)
+      }
+    }
+    cum += len
   })
+  const p = b.pos
+  if (Math.abs(p.z - z1) > 1e-9) b.linear({ x: p.x, y: p.y, z: z1 }, feed)
 }
 
 /**
@@ -165,7 +210,8 @@ export const descendAlong = (
   zFrom: number,
   zTo: number,
   angleDeg: number,
-  feed: number
+  feed: number,
+  tabs: ReadonlyArray<TabWindow> = []
 ): void => {
   const drop = zFrom - zTo
   if (drop < 1e-9) return
@@ -181,7 +227,7 @@ export const descendAlong = (
   for (let i = 0; i < count; i++) {
     const za = zFrom - (drop * i) / count
     const zb = i === count - 1 ? zTo : zFrom - (drop * (i + 1)) / count
-    rampTraversal(b, path.closed || i % 2 === 0 ? path : back, za, zb, feed)
+    rampTraversal(b, path.closed || i % 2 === 0 ? path : back, za, zb, feed, path.closed ? tabs : [])
   }
 }
 

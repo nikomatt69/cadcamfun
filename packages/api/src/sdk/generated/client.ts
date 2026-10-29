@@ -3907,6 +3907,7 @@ export function make(options: ClientOptions) {
               operations: input["operations"],
               tools: input["tools"],
               deburr: input["deburr"],
+              tabs: input["tabs"],
               subprograms: input["subprograms"],
               smoothing: input["smoothing"],
               postDefinition: input["postDefinition"],

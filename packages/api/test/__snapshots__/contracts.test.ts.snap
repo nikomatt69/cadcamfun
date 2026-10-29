@@ -1523,6 +1523,18 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "callId": {
+                    "anyOf": [
+                      {
+                        "maxLength": 200,
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "drawingId": {
                     "anyOf": [
                       {
@@ -8096,6 +8108,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "reply_permission",
                       "consolidate_memory",
                       "context",
+                      "acceptance",
+                      "set_acceptance",
                     ],
                     "type": "string",
                   },
@@ -8110,6 +8124,14 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         },
                         "type": "array",
                       },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "criteria": {
+                    "anyOf": [
+                      {},
                       {
                         "type": "null",
                       },
@@ -8612,6 +8634,102 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "compacted",
                       ],
                       "type": "object",
+                    },
+                    "engineeringAcceptance": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "checks": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                  },
+                                  "reason": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                      },
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                  },
+                                  "report": {
+                                    "anyOf": [
+                                      {},
+                                      {
+                                        "type": "null",
+                                      },
+                                    ],
+                                  },
+                                  "status": {
+                                    "enum": [
+                                      "pass",
+                                      "fail",
+                                      "unmeasured",
+                                      "stale",
+                                    ],
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "id",
+                                  "status",
+                                ],
+                                "type": "object",
+                              },
+                              "type": "array",
+                            },
+                            "criteriaDigest": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                            "drawingId": {
+                              "type": "string",
+                            },
+                            "note": {
+                              "type": "string",
+                            },
+                            "projectId": {
+                              "type": "string",
+                            },
+                            "revision": {
+                              "type": "string",
+                            },
+                            "status": {
+                              "enum": [
+                                "accepted",
+                                "failed",
+                                "unmeasured",
+                                "stale",
+                                "not_configured",
+                              ],
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "status",
+                            "projectId",
+                            "drawingId",
+                            "revision",
+                            "checks",
+                            "note",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
                     },
                     "goal": {
                       "anyOf": [
@@ -58476,6 +58594,19 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "minLength": 1,
                               "type": "string",
                             },
+                            "leadIn": {
+                              "enum": [
+                                "direct",
+                                "arc",
+                                "ramp",
+                                "helix",
+                              ],
+                              "type": "string",
+                            },
+                            "leadRadius": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
                             "loop": {
                               "items": {
                                 "additionalProperties": false,
@@ -58534,6 +58665,34 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "profile",
                               ],
                               "type": "string",
+                            },
+                            "tabs": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "height": {
+                                    "exclusiveMinimum": 0,
+                                    "type": "number",
+                                  },
+                                  "position": {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number",
+                                  },
+                                  "width": {
+                                    "exclusiveMinimum": 0,
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "position",
+                                  "width",
+                                  "height",
+                                ],
+                                "type": "object",
+                              },
+                              "maxItems": 64,
+                              "type": "array",
                             },
                             "tool": {
                               "maxLength": 80,
@@ -59676,6 +59835,32 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   },
                   "subprograms": {
                     "type": "boolean",
+                  },
+                  "tabs": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "count": {
+                        "maximum": 64,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                      "height": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 50,
+                        "type": "number",
+                      },
+                      "width": {
+                        "exclusiveMinimum": 0,
+                        "maximum": 100,
+                        "type": "number",
+                      },
+                    },
+                    "required": [
+                      "count",
+                      "width",
+                      "height",
+                    ],
+                    "type": "object",
                   },
                   "tolerance": {
                     "exclusiveMinimum": 0,

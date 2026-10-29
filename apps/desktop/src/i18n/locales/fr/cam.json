@@ -517,6 +517,7 @@
   "cam.resource.moves": "Mouvements : {count}",
   "cam.resource.multi": "Opérations multiples",
   "cam.kernel.deburr": "Ébavurer les arêtes, largeur du chanfrein en mm (0 = désactivé)",
+  "cam.kernel.tabs": "Ponts sur les contours détourés, nombre (0 = aucun, 4 mm x 2 mm chacun)",
   "cam.kernel.plan": "Planifier les opérations",
   "cam.kernel.planHint": "Le plan du moteur pour la pièce. Modifiez un outil, forcez rpm / avance / profondeur de passe / largeur de passe, réorganisez ou supprimez une opération ; Générer exécute cette liste.",
   "cam.kernel.planReset": "Plan automatique",

@@ -10,6 +10,8 @@ this plan wins; on design, the detail specs win. The Rust / Tauri workstream is 
 3. **Spec 41 (naming) is the hub** of 45, 46, 47, 48, 49, 50, 54 R1 refs, 58 lineage and 59 A5, and it is still unbuilt. It stays large and cross-cutting; spec 58 T3 (lineage recorded during replay) removes part of its pressure and is done first.
 4. **Built since 2026-10-24** and therefore removed from the plan: spec 51 F4 (swarf, cone / cylinder / flat walls) and F9 (TCP words), spec 54 C1 (post as data), H1 (setup sheet), part of R1 / R4, spec 40 U0 / U1 / U2 / U4 / U5 / U6 (U2 and R1 of 54 partial).
 
+5. **CAM enterprise chapter (2026-10-29).** The CAM items of the waves below are broken down into closable steps A1–J4 in [spec 69](69-cam-enterprise-step-plan.md), from the gap audit of [spec 68](68-cam-kernel-enterprise-gap-audit.md); for CAM order, spec 69 wins over §3 (it adds the release path of 5-axis programs, the multi-setup job model, fixtures, tool assembly and cutter compensation, none of which the waves named).
+
 ## 2. Lanes: parallel work with disjoint directories
 
 A lane may be run by one agent or session; two lanes never edit the same directory. Adapters (`packages/api`, `apps/sidecar`, `packages/ai`, `apps/desktop`) are shared by every lane and are **serialised**: one lane at a time
@@ -155,4 +157,6 @@ green and listed. 4. The item's row in spec 57 and the state table of its spec a
 
 ## 9. Change log
 
+- 2026-10-29: the order of §5 is merged with the RM roadmap in [70](70-integrated-next-steps-2026-10-29.md); items 1 and 2 are built in part (spec 55 E2–E3 built, E1 partial; spec 58 T1–T3 built), the rest of §5 continues there. Lanes and gates of this plan are unchanged.
 - 2026-10-25: created with specs 57–61.
+- 2026-10-29: pointer to the CAM enterprise step plan (spec 69).

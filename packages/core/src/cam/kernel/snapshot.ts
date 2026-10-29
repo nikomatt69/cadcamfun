@@ -8,7 +8,7 @@ import { meshBounds } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
 import type { SetupOrientation } from "../setup.ts"
 import type { WorkOffset } from "../ir.ts"
-import { KERNEL_SCHEMA_VERSION, type CamResult, type ManufacturingJob, type OperationSpec, type PrintRequirement, type WorkOrigin } from "./contracts.ts"
+import { KERNEL_SCHEMA_VERSION, type CamResult, type ManufacturingJob, type OperationSpec, type PrintRequirement, type TabRequirement, type WorkOrigin } from "./contracts.ts"
 import type { Cutter } from "./cutters.ts"
 import { findMachine, MACHINE_CATALOGUE } from "./machines.ts"
 import { kernelMachineOfConfig, machineRefusal, type MachineConfigRow } from "./machine-config.ts"
@@ -29,6 +29,8 @@ export interface KernelSnapshot {
   readonly tolerance?: number
   readonly resolution?: number
   readonly deburr?: number
+  /** Tabs that hold the outlines the program cuts through the full stock height (spec 69 A1). */
+  readonly tabs?: TabRequirement
   /** Write toolpaths that repeat translated as subprograms (`M98` on Fanuc and Haas, `CALL LBL` labels on Heidenhain Klartext). */
   readonly subprograms?: boolean
   /** High-speed contour smoothing with this tolerance, mm (`PostOptions.smoothing`). */
@@ -64,7 +66,7 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
   const quality = {
     ...(s.finishAllowance !== undefined ? { finishAllowance: s.finishAllowance } : {}), ...(s.scallop !== undefined ? { scallop: s.scallop } : {}),
     ...(s.tolerance !== undefined ? { tolerance: s.tolerance } : {}), ...(s.resolution !== undefined ? { resolution: s.resolution } : {}),
-    ...(s.deburr !== undefined ? { deburr: s.deburr } : {})
+    ...(s.deburr !== undefined ? { deburr: s.deburr } : {}), ...(s.tabs !== undefined ? { tabs: s.tabs } : {})
   }
   return {
     status: "ok",

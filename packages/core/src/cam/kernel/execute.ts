@@ -33,7 +33,7 @@ import { tableRotation, type RotaryAngles, type RotaryLayout } from "../indexing
 import { carryHeightField, remainingVolume, removeTipPath, stockContact, voxelStock, type VoxelStock } from "./stock.ts"
 import { TriangleSoup } from "../model/mesh-queries.ts"
 import { PocketParams, generatePocket } from "../operations/pocket.ts"
-import { ProfileParams, generateProfile } from "../operations/profile.ts"
+import { ProfileParams, generateProfile, profileTabFootprints } from "../operations/profile.ts"
 import { SurfaceParams, generateSurface } from "../operations/surface.ts"
 import { ThreadParams, generateThread } from "../operations/thread.ts"
 import { ChamferParams, chamferGeometry, generateChamfer } from "../operations/chamfer.ts"
@@ -212,7 +212,7 @@ export const prepareJob = (job: ManufacturingJob, options: PrepareOptions = {}):
     ? planJob({
         ...(job.setupOrientation !== undefined ? { setupOrientation: job.setupOrientation } : {}),
         elements, bounds, stock, tools, material, rigidity: machine.limits.rigidity ?? "standard", finishAllowance, scallop, flats: horizontalFaces(meshes),
-        rigidTap: (definition?.ok === true ? definition.dialect : dialectOf(machine.post))?.rigidTap !== undefined, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {})
+        rigidTap: (definition?.ok === true ? definition.dialect : dialectOf(machine.post))?.rigidTap !== undefined, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {}), ...(job.quality?.tabs !== undefined ? { tabs: job.quality.tabs } : {})
       })
     : undefined
   const operations = job.operations ?? plan!.operations
@@ -467,6 +467,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     return partModel
   }
 
+  /** Material the program leaves standing on purpose (profile tabs): within `radius` of the stretch of path, up to `z` (work Z). */
+  const declaredLeft: Array<{ readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>; readonly radius: number; readonly z: number }> = []
   const outcomes: OperationOutcome[] = []
   const toolpaths: Toolpath[] = []
   const opOfToolpath: number[] = []
@@ -573,11 +575,16 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
         }
         case "profile": {
           const params = decode(ProfileParams, {
-            ...common, side: op.side, allowance: allowance ?? 0, leadIn: "arc", leadRadius: Math.max(0.5, Math.min(radius, 5)),
-            helixPitch: data.helixPitch, rampAngle: Math.max(0.1, Math.min(45, data.rampAngle)), arcFit: true, tolerance: prepared.tolerance
+            ...common, side: op.side, allowance: allowance ?? 0, leadIn: op.leadIn ?? "arc", leadRadius: op.leadRadius ?? Math.max(0.5, Math.min(radius, 5)),
+            helixPitch: data.helixPitch, rampAngle: Math.max(0.1, Math.min(45, data.rampAngle)), arcFit: true, tolerance: prepared.tolerance,
+            // A tab is material left standing: the cutter, which has its own width, is lifted over a window one diameter longer.
+            ...(op.tabs !== undefined ? { tabs: op.tabs.map((t) => ({ ...t, width: t.width + tool.diameter })) } : {})
           })
           const within = op.within === undefined ? undefined : { boundary: op.within.boundary.map((p) => shift2(p, o)), islands: (op.within.islands ?? []).map((r) => r.map((p) => shift2(p, o))) }
-          generated = { toolpath: generateProfile(params, { points: op.loop.map((p) => shift2(p, o)), closed: true }, legacy, opStock, within), warnings: [] }
+          const geometry = { points: op.loop.map((p) => shift2(p, o)), closed: true }
+          // The tabs are material the program leaves on purpose: the stock check expects it within a cutter radius of each tab.
+          if (op.tabs !== undefined) for (const t of profileTabFootprints(params, geometry, legacy, opStock)) declaredLeft.push({ points: t.points, radius: tool.diameter / 2, z: t.z })
+          generated = { toolpath: generateProfile(params, geometry, legacy, opStock, within), warnings: [] }
           break
         }
         case "drill": {
@@ -934,8 +941,24 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   // Material left above the part plus its allowance.
   const allowed = Math.max(0.05, prepared.scallop * 1.5) + prepared.tolerance + Math.max(hf.cellX, hf.cellY) * 0.1
   let remainingVolume = 0, maxRemaining = 0
+  // Tabs: the columns within a cutter radius of a tab may stand up to its top.
+  const declaredTop = new Float64Array(hf.top.length).fill(-Infinity)
+  for (const d of declaredLeft) {
+    const r = d.radius + Math.max(hf.cellX, hf.cellY)
+    for (let a = 0; a + 1 < d.points.length || (a === 0 && d.points.length === 1); a++) {
+      const p = d.points[a]!, q = d.points[Math.min(a + 1, d.points.length - 1)]!
+      const i0 = Math.max(0, Math.floor((Math.min(p.x, q.x) - r - sMin.x) / hf.cellX)), i1 = Math.min(nx - 1, Math.ceil((Math.max(p.x, q.x) + r - sMin.x) / hf.cellX))
+      const j0 = Math.max(0, Math.floor((Math.min(p.y, q.y) - r - sMin.y) / hf.cellY)), j1 = Math.min(ny - 1, Math.ceil((Math.max(p.y, q.y) + r - sMin.y) / hf.cellY))
+      const dx = q.x - p.x, dy = q.y - p.y, len2 = dx * dx + dy * dy
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const x = hf.centreX(i), y = hf.centreY(j)
+        const t = len2 > 0 ? Math.max(0, Math.min(1, ((x - p.x) * dx + (y - p.y) * dy) / len2)) : 0
+        if (Math.hypot(x - (p.x + t * dx), y - (p.y + t * dy)) <= r) { const k = j * nx + i; declaredTop[k] = Math.max(declaredTop[k]!, d.z) }
+      }
+    }
+  }
   for (let k = 0; k < hf.top.length; k++) {
-    const excess = hf.top[k]! - targetMax[k]!
+    const excess = hf.top[k]! - Math.max(targetMax[k]!, declaredTop[k]!)
     if (excess > allowed) { remainingVolume += (excess - allowed) * hf.cellArea; maxRemaining = Math.max(maxRemaining, excess) }
   }
   if (replayStoppedAt !== undefined) {

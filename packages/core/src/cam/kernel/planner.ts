@@ -22,7 +22,7 @@ import { setupTransform, type SetupOrientation } from "../setup.ts"
 import { exactFeatures } from "../brep-part.ts"
 import { historyFeatures, type HistoryFeatures, type MachiningHole } from "../generator/history-features.ts"
 import type { CadElement } from "../generator/schema.ts"
-import type { OperationSpec, StockBox } from "./contracts.ts"
+import type { OperationSpec, ProfileTab, StockBox, TabRequirement } from "./contracts.ts"
 import { pointLength, reamDrill, type Cutter } from "./cutters.ts"
 import { suitability, type Rigidity } from "./cutting-data.ts"
 import type { WorkpieceMaterial } from "./materials.ts"
@@ -40,6 +40,8 @@ export interface PlanInput {
   readonly scallop: number
   /** Chamfer width that breaks the top edges of outlines, pockets and holes, mm (no deburring when absent). */
   readonly deburr?: number
+  /** Tabs that hold an outline cut through the full stock height (none when absent: the plan only says so in a note). */
+  readonly tabs?: TabRequirement
   /** The machine's control taps rigidly (G84): tapped holes are tapped, otherwise their threads are milled. */
   readonly rigidTap?: boolean
   /** Upward horizontal faces of the part, by height (`horizontalFaces`): a freeform part with some gets a flat-area finish. */
@@ -71,6 +73,10 @@ export const horizontalFaces = (meshes: ReadonlyArray<{ readonly positions: Arra
   }
   return found.sort((x, y) => y.z - x.z)
 }
+
+/** `count` tabs evenly spaced along the path, the first half a spacing in. */
+export const evenTabs = (t: TabRequirement): ProfileTab[] =>
+  Array.from({ length: Math.max(1, Math.floor(t.count)) }, (_, k) => ({ position: (k + 0.5) / Math.max(1, Math.floor(t.count)), width: t.width, height: t.height }))
 
 export interface Plan {
   readonly operations: ReadonlyArray<OperationSpec>
@@ -222,6 +228,7 @@ export const planJob = (input: PlanInput): Plan => {
   for (const o of outlines) {
     const depth = o.top - o.bottom
     if (depth <= 1e-6) continue
+    const firstOutlineOp = ops.length
     // Material outside the outline down to its bottom: everything above `o.bottom` around every outline that reaches it.
     const tool = endMill(maxRough, depth)
     if (tool === undefined) { unmachined.push(`Outline ${o.id}: no end mill in the library reaches ${r3(depth)} mm`); continue }
@@ -253,9 +260,15 @@ export const planJob = (input: PlanInput): Plan => {
         ops.push({ id: `rough-${o.id}`, name: `Adaptive rough around ${o.id}`, strategy: "adaptive", tool: tool.id, region: { boundary: stockRing(tool.diameter + 1), islands }, top: o.top, bottom: o.bottom })
       }
     } else unmachined.push(`Outline ${o.id} reaches past the stock: the stock is smaller than the part`)
-    if (o.bottom <= stock.min.z + 1e-6) notes.push(`Outline ${o.id} is cut through the full stock height: hold the part by tabs, a vacuum table or a sacrificial plate`)
+    const through = o.bottom <= stock.min.z + 1e-6
+    const tabs: ReadonlyArray<ProfileTab> | undefined = through && input.tabs !== undefined ? evenTabs(input.tabs) : undefined
+    if (through && tabs === undefined) notes.push(`Outline ${o.id} is cut through the full stock height: hold the part by tabs (quality.tabs), a vacuum table or a sacrificial plate`)
+    if (tabs !== undefined) {
+      notes.push(`Outline ${o.id} is cut through the full stock height: ${tabs.length} tabs of ${input.tabs!.width} mm x ${input.tabs!.height} mm hold the part; cut them off after the program`)
+      for (let k = firstOutlineOp; k < ops.length; k++) { const op = ops[k]!; if (op.strategy === "profile") ops[k] = { ...op, tabs } }
+    }
     reachNote(tool, depth, `Outline ${o.id}`)
-    finishes.push({ id: `finish-${o.id}`, name: `Finish walls of ${o.id}`, strategy: "profile", tool: tool.id, loop: ccw(o.outer), side: "outside", top: o.top, bottom: o.bottom, allowance: 0, finish: true })
+    finishes.push({ id: `finish-${o.id}`, name: `Finish walls of ${o.id}`, strategy: "profile", tool: tool.id, loop: ccw(o.outer), side: "outside", top: o.top, bottom: o.bottom, allowance: 0, finish: true, ...(tabs !== undefined ? { tabs } : {}) })
   }
 
   for (const p of pocketRegions) {

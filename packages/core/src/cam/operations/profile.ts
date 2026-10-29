@@ -52,6 +52,7 @@ import {
   longestSegmentMidpoint,
   pathFromPoints,
   pathLength,
+  pathPolyline,
   rotateClosedPath,
   startTangent
 } from "../path.ts"
@@ -352,6 +353,50 @@ const tabWindows = (path: Path, params: ProfileParams, levels: Levels): TabWindo
   return windows
 }
 
+/** Where a tab stands: the tool-centre path under it, and the height its top reaches above the operation's bottom. */
+export interface TabFootprint {
+  readonly points: ReadonlyArray<Vec2>
+  /** Z of the top of the material left standing. */
+  readonly z: number
+}
+
+/**
+ * The material `params.tabs` leave standing, as the stretch of tool-centre path each one raises the cutter over. The cutter
+ * (radius `toolRadius`) does not cut below `z` within that radius of the stretch, which is what the stock replay has to expect.
+ * Uses the same plans as `generateProfile`, so the footprints and the moves agree.
+ */
+export const profileTabFootprints = (params: ProfileParams, geometry: GeometryInput, tool: Tool, stock: Stock): TabFootprint[] => {
+  const levels = levelsOf(params, stock.origin.z)
+  const out: TabFootprint[] = []
+  for (const source of sourcesOf(geometry, params.tolerance)) {
+    for (const plan of planSource(source, params, tool)) {
+      const path = plan.path
+      const total = pathLength(path)
+      if (path.segs.length === 0 || total <= 0) continue
+      const poly = pathPolyline(path, 0.01)
+      const cum = [0]
+      for (let i = 1; i < poly.length; i++) cum.push(cum[i - 1]! + Math.hypot(poly[i]!.x - poly[i - 1]!.x, poly[i]!.y - poly[i - 1]!.y))
+      const scale = cum[cum.length - 1]! / total
+      for (const w of tabWindows(path, params, levels)) {
+        const s0 = w.s0 * scale, s1 = w.s1 * scale
+        const pts: Vec2[] = []
+        const at = (s: number): Vec2 => {
+          let i = 1
+          while (i < cum.length - 1 && cum[i]! < s) i++
+          const span = cum[i]! - cum[i - 1]!
+          const t = span > 0 ? (s - cum[i - 1]!) / span : 0
+          return { x: poly[i - 1]!.x + (poly[i]!.x - poly[i - 1]!.x) * t, y: poly[i - 1]!.y + (poly[i]!.y - poly[i - 1]!.y) * t }
+        }
+        pts.push(at(s0))
+        for (let i = 1; i < poly.length - 1; i++) if (cum[i]! > s0 && cum[i]! < s1) pts.push(poly[i]!)
+        pts.push(at(s1))
+        out.push({ points: pts, z: w.z })
+      }
+    }
+  }
+  return out
+}
+
 const emitPlan = (b: MoveBuilder, plan: ProfilePlan, params: ProfileParams, tool: Tool, levels: Levels): void => {
   const path = plan.path
   if (path.segs.length === 0) return
@@ -362,7 +407,7 @@ const emitPlan = (b: MoveBuilder, plan: ProfilePlan, params: ProfileParams, tool
       enter(b, plan, z, params, tool, levels)
     } else {
       // Closed contour: step down along the path, never rapid at depth (bug 4).
-      descendAlong(b, path, passes[index - 1]!, z, params.rampAngle, params.plungeFeed)
+      descendAlong(b, path, passes[index - 1]!, z, params.rampAngle, params.plungeFeed, tabs)
     }
     lapWithTabs(b, path, z, params.feed, params.plungeFeed, tabs)
     if (!path.closed) liftTo(b, levels.retractZ)
