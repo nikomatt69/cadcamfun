@@ -597,6 +597,7 @@
   "cam.operations.isolate": "この工程だけを表示",
   "cam.operations.only": "のみ",
   "cam.operations.go": "工程へ移動",
+  "cam.operations.multiTool": "複数工具の工程：この工具は工程の一部です",
   "cam.operations.showAll": "すべての工程を表示",
   "cam.visualizer.colorMode": "パスの色分け基準",
   "cam.visualizer.color.tool": "工具",

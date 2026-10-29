@@ -304,7 +304,12 @@ export const ToolpathSchema = Schema.Struct({
   toolId: Schema.String.check(Schema.isMinLength(1)),
   spindleRpm: NonNegative,
   coolant: CoolantSchema,
-  moves: Schema.Array(MoveSchema)
+  moves: Schema.Array(MoveSchema),
+  /**
+   * The operation this toolpath belongs to. Toolpaths with the same operation id are one operation of the program that changes
+   * tools inside it (one toolpath per tool); a toolpath without it is an operation by itself.
+   */
+  operation: Schema.optionalKey(Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1)), name: Schema.String }))
 })
 export type Toolpath = typeof ToolpathSchema.Type
 

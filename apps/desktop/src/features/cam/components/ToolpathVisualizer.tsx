@@ -127,6 +127,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {})
   }))
   const spans = createMemo(() => cam.viewer.operationSpans(timeline()))
+  /** Operations that change tools inside (one toolpath per tool): their toolpaths, to say "tool 2 of 3" on each row. */
+  const multiTool = createMemo(() => new Map(cam.generator.operationsOf(props.program.toolpaths).filter((o) => o.multiTool).flatMap((o) => o.toolpaths.map((path, k) => [path, { position: k + 1, total: o.toolpaths.length }] as const))))
   const names = createMemo(() => props.program.toolpaths.map((tp, i) => tp.name || `#${i + 1}`))
   const bandColors = createMemo(() => {
     const byTool = toolColors(props.program)
@@ -548,6 +550,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                   <li class={`flex items-center gap-2 rounded px-1.5 py-1 text-xs ${current() ? "bg-blue-600/30" : "hover:bg-white/5"}`} data-testid="operation-row">
                     <span class="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ background: colorHex(bandColors()[span.path] ?? 0x38bdf8) }} />
                     <span class="flex-1 min-w-0" title={names()[span.path]}><span class="block truncate">{names()[span.path]}</span><span class="block text-[10px] text-slate-400" data-testid="operation-model">{(() => { const model = path !== undefined ? previewToolFor(path.toolId, props) : undefined; return model !== undefined ? cam.describeTool(model) : t("cam.visualizer.toolUnknown") })()}</span><span class="block text-[10px] text-blue-300">{props.operationTools?.find((tool) => tool.toolId === path?.toolId)?.operations?.map(operationLabel).join(" · ")}</span></span>
+                    <Show when={multiTool().get(span.path)}>{(m) => <span class="rounded bg-amber-500/20 px-1 text-[10px] text-amber-200" title={t("cam.operations.multiTool")} data-testid="operation-multitool">{m().position}/{m().total}</span>}</Show>
                     <span class="tabular-nums text-slate-400">{Math.round(span.end - span.start)} s</span>
                     <span class="text-slate-400" title={(() => { const m = path !== undefined ? props.toolModels?.get(path.toolId) : undefined; return m !== undefined ? cam.describeTool(m) : undefined })()} data-testid="operation-tool">{path?.toolId ?? ""}</span>
                     <button type="button" class="rounded p-0.5 hover:bg-white/10" aria-label={t("cam.operations.toggle")} aria-pressed={visible()} data-testid="operation-visible" onClick={() => toggleHidden(span.path)}>{visible() ? <Eye size={14} /> : <EyeOff size={14} />}</button>

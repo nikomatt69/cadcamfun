@@ -597,6 +597,7 @@
   "cam.operations.isolate": "أظهر هذه العملية وحدها",
   "cam.operations.only": "وحدها",
   "cam.operations.go": "اذهب إلى العملية",
+  "cam.operations.multiTool": "عملية بعدة أدوات: هذه الأداة جزء من العملية",
   "cam.operations.showAll": "أظهر كل العمليات",
   "cam.visualizer.colorMode": "لوّن المسار حسب",
   "cam.visualizer.color.tool": "الأداة",

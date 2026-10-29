@@ -597,6 +597,7 @@
   "cam.operations.isolate": "केवल यह ऑपरेशन दिखाएँ",
   "cam.operations.only": "केवल",
   "cam.operations.go": "ऑपरेशन पर जाएँ",
+  "cam.operations.multiTool": "कई औज़ारों वाला ऑपरेशन: यह औज़ार ऑपरेशन का हिस्सा है",
   "cam.operations.showAll": "सभी ऑपरेशन दिखाएँ",
   "cam.visualizer.colorMode": "पथ को इसके अनुसार रंगें",
   "cam.visualizer.color.tool": "टूल",

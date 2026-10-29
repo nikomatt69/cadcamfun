@@ -597,6 +597,7 @@
   "cam.operations.isolate": "Mostrar somente esta operação",
   "cam.operations.only": "Somente",
   "cam.operations.go": "Ir para a operação",
+  "cam.operations.multiTool": "Operação com várias ferramentas: parte da operação",
   "cam.operations.showAll": "Mostrar todas as operações",
   "cam.visualizer.colorMode": "Colorir o caminho por",
   "cam.visualizer.color.tool": "Ferramenta",

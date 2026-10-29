@@ -597,6 +597,7 @@
   "cam.operations.isolate": "Показать только эту операцию",
   "cam.operations.only": "Только",
   "cam.operations.go": "Перейти к операции",
+  "cam.operations.multiTool": "Операция с несколькими инструментами: часть операции",
   "cam.operations.showAll": "Показать все операции",
   "cam.visualizer.colorMode": "Цвет траектории по",
   "cam.visualizer.color.tool": "Инструмент",

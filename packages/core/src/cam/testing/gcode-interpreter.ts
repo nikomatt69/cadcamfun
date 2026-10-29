@@ -28,6 +28,7 @@
 
 import { alongLine, joinOf, offsetElement, type CompElement, type CompLine, type CompSide } from "./cutter-comp.ts"
 import { headerTools } from "./header-tools.ts"
+import { nameTools, usesToolChangeWord } from "./tool-words.ts"
 import { decodeKlartext } from "./heidenhain.ts"
 import { finishCycle, patternCycle, peckCycle, roughCycle, threadCycle, type LatheMove, type ProfilePoint } from "./lathe-cycles.ts"
 
@@ -135,6 +136,8 @@ export interface InterpretResult {
   readonly mCodes: ReadonlyArray<string>
   /** Tool numbers selected with `T`. */
   readonly tools: ReadonlyArray<number>
+  /** Names of tools the program gave as `T="NAME"` (Siemens), by the number they were given in order of appearance. */
+  readonly toolNames: ReadonlyMap<number, string>
   /** Program text had a program end (`M2`/`M30`). */
   readonly ended: boolean
   /** Words with an effect on motion that were not replayed. */
@@ -176,6 +179,14 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
       errors.push(`Line ${problem.line}: unsupported Klartext block ${problem.word}`)
     }
   }
+  // Siemens `T="NAME"` / `T=3`: a named tool takes the number of its first appearance, recorded in `toolNames`.
+  const named = nameTools(text)
+  text = named.text
+  const toolNames = named.names
+  // A program that has an `M6` selects the tool with `T` and changes it at `M6` (a `T2` read lines earlier is a preselect); without
+  // one (a turret lathe: `T0101`) the `T` word changes the tool itself.
+  const usesToolChange = usesToolChangeWord(text)
+  let pendingTool: number | undefined
   const mCodes: string[] = []
   const tools: number[] = []
   let drained = 0
@@ -560,6 +571,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     if (words.length === 0) return "next"
 
     const get = (letter: string): number | undefined => words.find((w) => w.letter === letter)?.value
+    let changeTool = false
     let cycleStarted = false
     let ending = false
     let returning = false
@@ -640,6 +652,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         } else if (m === 3) spindle = "cw"
         else if (m === 4) spindle = "ccw"
         else if (m === 5 || m === 19) spindle = "off"
+        else if (m === 6) changeTool = true
         else if (m === 7) coolant = "mist"
         else if (m === 8) coolant = "flood"
         else if (m === 9) coolant = "off"
@@ -647,8 +660,9 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         else if (m === 83) eAbsolute = false
         if ([104, 109, 140, 190, 106, 107, 141, 191].includes(m)) sIsParameter = true
       } else if (w.letter === "T") {
-        tools.push(Math.round(w.value))
-        tool = Math.round(w.value)
+        const n = Math.round(w.value)
+        pendingTool = n
+        if (!usesToolChange) { tools.push(n); tool = n }
       } else if (w.letter === "F") {
         // In a dwell block F is the time (Siemens `G4 F<s>`), never the feed: the modal feed stays.
         if (!words.some((v) => v.letter === "G" && Math.round(v.value * 10) === 40)) feed = w.value * unit
@@ -657,6 +671,8 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         rotary = { ...rotary, [w.letter.toLowerCase()]: w.value }
       }
     }
+    // `M6` puts the selected tool in the spindle (`T1 M6`, `M6 T1`, or a `T2` read lines earlier).
+    if (changeTool && pendingTool !== undefined) { tools.push(pendingTool); tool = pendingTool }
     const s = get("S")
     if (s !== undefined && !sIsParameter) {
       // `G50 S` / `G92 S` alone limit the spindle of a lathe; otherwise S is the speed (rpm, or m/min under G96).
@@ -984,7 +1000,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   flushComp()
   drain()
 
-  return { segments, errors, end: pos, cutLength, rapidLength, minZ, mCodes, tools, ended, unsupported, ...(states !== undefined ? { states } : {}) }
+  return { segments, errors, end: pos, cutLength, rapidLength, minZ, mCodes, tools, toolNames, ended, unsupported, ...(states !== undefined ? { states } : {}) }
 }
 
 // -- frame maths ----------------------------------------------------------------------------------------------------------

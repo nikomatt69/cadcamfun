@@ -597,6 +597,7 @@
   "cam.operations.isolate": "仅显示此加工操作",
   "cam.operations.only": "仅",
   "cam.operations.go": "跳转到该加工操作",
+  "cam.operations.multiTool": "多刀具工序：此刀具是该工序的一部分",
   "cam.operations.showAll": "显示所有加工操作",
   "cam.visualizer.colorMode": "路径着色依据",
   "cam.visualizer.color.tool": "刀具",

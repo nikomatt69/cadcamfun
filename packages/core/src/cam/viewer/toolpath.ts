@@ -11,6 +11,7 @@
  *  - fixed cycles are expanded in place (flagged `isFixedCycle`) instead of replacing the whole toolpath.
  */
 import { hasG, lastOf, tokenize, valuesOf, type GBlock } from "./words.ts"
+import { findToolChanges, type ToolChange } from "../testing/tool-words.ts"
 
 export type ShapeType = "circle" | "sphere" | "cone" | "extrude"
 
@@ -39,12 +40,8 @@ export interface ToolpathPoint {
   line?: number
 }
 
-export interface ToolChange {
-  /** The `T` word. */
-  readonly number: number
-  /** 1-based line of the change. */
-  readonly line: number
-}
+export type { ToolChange } from "../testing/tool-words.ts"
+
 
 export interface ParsedToolpath {
   readonly points: ToolpathPoint[]
@@ -95,7 +92,6 @@ const fixedCycleOf = (code: number): string | undefined => CYCLE_CODES[code]
 /** `arcResolution`: the longest chord, in mm, an arc or shape is split into. */
 export const parseToolpath = (gcode: string, arcResolution = 10): ParsedToolpath => {
   const points: ToolpathPoint[] = []
-  const toolChanges: ToolChange[] = []
   let x = 0
   let y = 0
   let z = 0
@@ -113,7 +109,6 @@ export const parseToolpath = (gcode: string, arcResolution = 10): ParsedToolpath
 
     if (hasG(block, 90)) absolute = true
     if (hasG(block, 91)) absolute = false
-    for (const t of valuesOf(block, "T")) toolChanges.push({ number: t, line })
 
     const f = lastOf(block, "F")
     if (f !== undefined) feed = f
@@ -290,7 +285,7 @@ export const parseToolpath = (gcode: string, arcResolution = 10): ParsedToolpath
     for (let p = at; p < points.length; p++) points[p]!.line = line
   })
 
-  return { points, toolChanges }
+  return { points, toolChanges: findToolChanges(gcode) }
 }
 
 // ---------------------------------------------------------------------------------------------------------------
