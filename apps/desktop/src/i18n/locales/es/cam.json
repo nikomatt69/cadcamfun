@@ -518,6 +518,8 @@
   "cam.resource.multi": "Múltiples operaciones",
   "cam.kernel.deburr": "Desbarbar aristas, ancho del chaflán mm (0 = desactivado)",
   "cam.kernel.tabs": "Pestañas en contornos cortados de lado a lado, cantidad (0 = ninguna, 4 mm x 2 mm cada una)",
+  "cam.kernel.nativeCycles": "Usar los ciclos propios del control (Heidenhain: fresado de taladros y roscas)",
+  "cam.kernel.nativeCyclesHint": "El programa contiene el ciclo fijo del control (CYCL DEF 208, 262, 267) en lugar de los movimientos equivalentes; solo en una máquina Heidenhain",
   "cam.kernel.plan": "Planificar operaciones",
   "cam.kernel.planHint": "El plan del kernel a partir de la pieza. Cambia una herramienta, sobrescribe rpm / avance / paso en Z / paso lateral, reordena o elimina una operación; Generar ejecuta esta lista.",
   "cam.kernel.planReset": "Plan automático",

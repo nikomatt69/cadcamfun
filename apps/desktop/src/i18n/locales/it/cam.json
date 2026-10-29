@@ -518,6 +518,8 @@
   "cam.resource.multi": "Operazioni multiple",
   "cam.kernel.deburr": "Sbava i bordi, larghezza smusso mm (0 = disattivato)",
   "cam.kernel.tabs": "Linguette sui contorni tagliati a tutto spessore, numero (0 = nessuna, 4 mm x 2 mm ciascuna)",
+  "cam.kernel.nativeCycles": "Usa i cicli propri del controllo (Heidenhain: fresatura fori e filetti)",
+  "cam.kernel.nativeCyclesHint": "Il programma contiene il ciclo fisso del controllo (CYCL DEF 208, 262, 267) al posto delle mosse equivalenti; solo su una macchina Heidenhain",
   "cam.kernel.plan": "Pianifica le operazioni",
   "cam.kernel.planHint": "Il piano del kernel derivato dalla parte. Cambia un utensile, sovrascrivi rpm / avanzamento / profondità di passata / passo laterale, riordina o rimuovi un'operazione; Genera esegue questo elenco.",
   "cam.kernel.planReset": "Piano automatico",

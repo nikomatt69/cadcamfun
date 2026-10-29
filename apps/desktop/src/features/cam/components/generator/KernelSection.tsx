@@ -101,7 +101,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
       stockChanged || value.program.workOffset !== (current.workOffset ?? "G54") ||
       source !== undefined && ((source.tolerance ?? 0.01) !== (current.tolerance ?? 0.01) || (source.origin ?? "stock-center") !== (current.origin ?? "stock-center") || source.finishAllowance !== current.finishAllowance || source.scallop !== current.scallop || source.resolution !== current.resolution) ||
       value.identity.part !== cam.kernel.digestOf("cam-kernel/part@1", { kind: "elements", elements: current.elements }) ||
-      source !== undefined && cam.kernel.canonicalJson([source.operations ?? null, source.tools ?? null, source.deburr ?? null, source.tabs ?? null, source.subprograms ?? false, source.smoothing ?? null, source.postDefinition ?? null]) !== cam.kernel.canonicalJson([current.operations ?? null, current.tools ?? null, current.deburr ?? null, current.subprograms ?? false, current.smoothing ?? null, current.postDefinition ?? null])
+      source !== undefined && cam.kernel.canonicalJson([source.operations ?? null, source.tools ?? null, source.deburr ?? null, source.tabs ?? null, source.nativeCycles ?? false, source.subprograms ?? false, source.smoothing ?? null, source.postDefinition ?? null]) !== cam.kernel.canonicalJson([current.operations ?? null, current.tools ?? null, current.deburr ?? null, current.subprograms ?? false, current.smoothing ?? null, current.postDefinition ?? null])
   }
   const requestId = createMemo(() => request()?.id)
   createEffect(() => {
@@ -231,11 +231,11 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
             }
             gen.patchKernelSettings({ machine: value, machineConfig: undefined })
           }}>
-          <optgroup label="Built-in machines">
+          <optgroup label={t("cam.machine.builtin")}>
             <For each={cam.kernel.MACHINES}>{(item) => <option value={item.id}>{item.name} · {item.post}</option>}</For>
           </optgroup>
           <Show when={savedMachines().length > 0}>
-            <optgroup label="Your machines">
+            <optgroup label={t("cam.gen.mach.yours")}>
               <For each={savedMachines()}>{(item) => <option value={`config:${item.id}`}>{item.name}</option>}</For>
             </optgroup>
           </Show>
@@ -287,6 +287,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
           <label class={LABEL}>{t("cam.kernel.deburr")}<NumberField id="kernel-deburr" min="0" max="5" step="0.05" value={settings().deburr ?? 0} accept={(value) => Number.isFinite(value) && value >= 0 && value <= 5} onValue={(value) => gen.patchKernelSettings({ deburr: value > 0 ? value : undefined })} /></label>
           <label class={LABEL}>{t("cam.kernel.tabs")}<NumberField id="kernel-tabs" min="0" max="64" step="1" value={settings().tabs?.count ?? 0} accept={(value) => Number.isInteger(value) && value >= 0 && value <= 64} onValue={(value) => gen.patchKernelSettings({ tabs: value > 0 ? { count: value, width: 4, height: 2 } : undefined })} /></label>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings().subprograms === true} onChange={(event) => gen.patchKernelSettings({ subprograms: event.currentTarget.checked ? true : undefined })} data-testid="kernel-subprograms" />{t("cam.kernel.subprograms")}</label>
+          <label class="flex items-center gap-2 text-sm" title={t("cam.kernel.nativeCyclesHint")}><input type="checkbox" checked={settings().nativeCycles === true} onChange={(event) => gen.patchKernelSettings({ nativeCycles: event.currentTarget.checked ? true : undefined })} data-testid="kernel-native-cycles" />{t("cam.kernel.nativeCycles")}</label>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings().smoothing !== undefined} onChange={(event) => gen.patchKernelSettings({ smoothing: event.currentTarget.checked ? 0.01 : undefined })} data-testid="kernel-smoothing" />{t("cam.kernel.smoothing")}</label>
           <Show when={settings().smoothing !== undefined}><label class={LABEL}>{t("cam.kernel.smoothingTolerance")}<NumberField id="kernel-smoothing-tolerance" min="0.001" max="1" step="0.001" value={settings().smoothing!} accept={(value) => Number.isFinite(value) && value > 0 && value <= 1} onValue={(value) => gen.patchKernelSettings({ smoothing: value })} /></label></Show>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings().resolution === undefined} onChange={(event) => gen.patchKernelSettings({ resolution: event.currentTarget.checked ? undefined : 0.25 })} data-testid="kernel-auto-resolution" />{t("cam.kernel.autoResolution")}</label>
@@ -315,9 +316,9 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
                   <div class="flex items-center justify-between gap-1">
                     <span class="font-medium truncate" title={op.name ?? op.id}>{index() + 1}. {op.name ?? op.id}</span>
                     <span class="flex gap-0.5">
-                      <button type="button" class="px-1 rounded hover:bg-gray-100" aria-label="Move up" onClick={() => moveOperation(index(), -1)}><ChevronUp size={12} /></button>
-                      <button type="button" class="px-1 rounded hover:bg-gray-100" aria-label="Move down" onClick={() => moveOperation(index(), 1)}><ChevronDown size={12} /></button>
-                      <button type="button" class="px-1 rounded text-red-600 hover:bg-red-50" aria-label="Remove" data-testid="kernel-plan-remove" onClick={() => setOperations(operations().filter((_, i) => i !== index()))}><X size={12} /></button>
+                      <button type="button" class="px-1 rounded hover:bg-gray-100" aria-label={t("cam.multi.moveUp")} onClick={() => moveOperation(index(), -1)}><ChevronUp size={12} /></button>
+                      <button type="button" class="px-1 rounded hover:bg-gray-100" aria-label={t("cam.multi.moveDown")} onClick={() => moveOperation(index(), 1)}><ChevronDown size={12} /></button>
+                      <button type="button" class="px-1 rounded text-red-600 hover:bg-red-50" aria-label={t("cam.multi.remove")} data-testid="kernel-plan-remove" onClick={() => setOperations(operations().filter((_, i) => i !== index()))}><X size={12} /></button>
                     </span>
                   </div>
                   <div class="flex items-center gap-1">

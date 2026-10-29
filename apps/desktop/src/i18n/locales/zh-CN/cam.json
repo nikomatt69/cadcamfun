@@ -518,6 +518,8 @@
   "cam.resource.multi": "多个加工操作",
   "cam.kernel.deburr": "去毛刺，倒角宽度 mm（0 = 关闭）",
   "cam.kernel.tabs": "贯穿轮廓上的连接片数量（0 = 无，每个 4 mm x 2 mm）",
+  "cam.kernel.nativeCycles": "使用数控系统自带循环（Heidenhain：铣孔与铣螺纹）",
+  "cam.kernel.nativeCyclesHint": "程序使用系统的固定循环（CYCL DEF 208、262、267）代替等效的移动；仅适用于 Heidenhain 机床",
   "cam.kernel.plan": "规划加工操作",
   "cam.kernel.planHint": "内核根据零件生成的规划。可更换刀具、覆盖转速 / 进给 / 切深 / 行距、重新排序或删除加工操作；生成时按此列表执行。",
   "cam.kernel.planReset": "自动规划",

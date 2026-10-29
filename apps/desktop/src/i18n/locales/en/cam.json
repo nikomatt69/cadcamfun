@@ -518,6 +518,8 @@
   "cam.resource.multi": "Multiple operations",
   "cam.kernel.deburr": "Deburr edges, chamfer width mm (0 = off)",
   "cam.kernel.tabs": "Tabs on through-cut outlines, count (0 = none, 4 mm x 2 mm each)",
+  "cam.kernel.nativeCycles": "Use the control's own cycles (Heidenhain: bore and thread milling)",
+  "cam.kernel.nativeCyclesHint": "The program holds the control's fixed cycle (CYCL DEF 208, 262, 267) in place of the moves that do the same; only on a Heidenhain machine",
   "cam.kernel.plan": "Plan operations",
   "cam.kernel.planHint": "The kernel's plan from the part. Change a tool, override rpm / feed / stepdown / stepover, reorder or remove an operation; Generate runs this list.",
   "cam.kernel.planReset": "Automatic plan",
