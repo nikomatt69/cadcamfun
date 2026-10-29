@@ -71,6 +71,10 @@ interface CycleTable { readonly name: string; readonly rows: ReadonlyArray<reado
 
 export const KLARTEXT_CYCLES: Readonly<Record<number, CycleTable>> = {
   // 208 BORE MILLING: a helix of pitch Q334 at the radius that leaves the nominal diameter Q335, Q342 the diameter to rough to first.
+  // 262 THREAD MILLING / 267 OUTSIDE THREAD MILLING: Q239 is the pitch, positive for a right-hand thread; Q201 the (negative) thread depth;
+  // Q355 = 0 is one helix through the whole thread; Q207 the milling feed, Q253 and Q512 the feed to pre-position and to approach.
+  262: { name: "THREAD MILLING", rows: [[335, "NOMINAL DIAMETER", undefined], [239, "PITCH", undefined], [201, "DEPTH OF THREAD", undefined], [355, "THREADS PER STEP", 0], [253, "F PRE-POSITIONING", 750], [351, "CLIMB OR UP-CUT", 1], [200, "SET-UP CLEARANCE", 0], [203, "SURFACE COORDINATE", undefined], [204, "2ND SET-UP CLEARANCE", 0], [207, "FEED RATE FOR MILLING", undefined], [512, "FEED FOR APPROACHING", 0]] },
+  267: { name: "OUTSIDE THREAD MILLING", rows: [[335, "NOMINAL DIAMETER", undefined], [239, "PITCH", undefined], [201, "DEPTH OF THREAD", undefined], [355, "THREADS PER STEP", 0], [253, "F PRE-POSITIONING", 750], [351, "CLIMB OR UP-CUT", 1], [200, "SET-UP CLEARANCE", 0], [203, "SURFACE COORDINATE", undefined], [204, "2ND SET-UP CLEARANCE", 0], [207, "FEED RATE FOR MILLING", undefined], [512, "FEED FOR APPROACHING", 0], [358, "DEPTH FOR COUNTERSINKING", 0], [359, "COUNTERSINKING OFFSET", 0]] },
   208: { name: "BORE MILLING", rows: [[200, "SET-UP CLEARANCE", 0], [201, "DEPTH", undefined], [206, "FEED RATE FOR PLUNGING", undefined], [334, "INFEED PER HELIX", undefined], [203, "SURFACE COORDINATE", undefined], [204, "2ND SET-UP CLEARANCE", 0], [335, "NOMINAL DIAMETER", undefined], [342, "ROUGHING DIAMETER", 0], [351, "CLIMB OR UP-CUT", 1]] }
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { makeProgram, type Move } from "../../src/cam/ir.ts"
 import { posts } from "../../src/cam/post/index.ts"
 import { klartextCycle } from "../../src/cam/post/klartext-cycles.ts"
+import { threadMillMoves } from "../../src/cam/operations/thread-mill.ts"
 import { interpretGcode } from "../../src/cam/testing/gcode-interpreter.ts"
 
 const program = (moves: Move[], units: "mm" | "inch" = "mm") => ({ ...makeProgram("H", [{ id: "a", name: "a", toolId: "T1", spindleRpm: 1000, coolant: "off", moves }]), units })
@@ -77,5 +78,42 @@ describe("Heidenhain drilling is the control's own fixed cycle (spec 69 G4c.1)",
 
   test("a hole whose bottom is not below the R plane is refused", () => {
     expect(() => klartextCycle(hole(10, "drill", { to: { x: 10, y: 10, z: 3 } }) as never, 3)).toThrow(/below the R plane/)
+  })
+})
+
+describe("thread milling cycles written from marked moves (spec 69 G4c.2)", () => {
+  const t = { center: { x: 20, y: 10 }, surface: 0, clearance: 2, secondClearance: 10, length: 6, diameter: 10, pitch: 1.5, toolRadius: 2, internal: false, rightHand: true, climb: true, feed: 200 }
+  const marked = (internal: boolean): Move[] => {
+    const tt = { ...t, internal }
+    return [
+      { _tag: "Rapid", to: { x: 0, y: 0, z: 20 } },
+      { _tag: "CycleBegin", family: "heidenhain", number: internal ? 262 : 267, name: "THREAD", params: { x: 20, y: 10, Q335: 10, Q239: 1.5, Q201: -6, Q200: 2, Q203: 0, Q204: 10, Q207: 200 } },
+      ...threadMillMoves(tt),
+      { _tag: "CycleEnd" }
+    ]
+  }
+  const nc = (internal: boolean) => posts.heidenhain.emit(program(marked(internal)), { nativeCycles: true })
+
+  test("outside thread milling is 267, the cutter runs round the boss at (D + d) / 2, clockwise for climb milling", () => {
+    const text = nc(false)
+    expect(text).toMatch(/CYCL DEF 267 OUTSIDE THREAD MILLING ~/)
+    expect(text).toMatch(/Q358=\+0 ;DEPTH FOR COUNTERSINKING/)
+    const run = interpretGcode(text, { toolRadius: () => 2 })
+    const arcs = run.segments.flatMap((s) => (s.kind === "arc" ? [s] : []))
+    expect(arcs).toHaveLength(4)
+    for (const a of arcs) { expect(a.radiusStart).toBeCloseTo(7, 6); expect(a.clockwise).toBe(true); expect(a.to.z - a.from.z).toBeCloseTo(-1.5, 6) }
+    expect(arcs[0]!.from.z).toBeCloseTo(0, 6)
+  })
+
+  test("inside thread milling is 262, and the moves are written when the option is off", () => {
+    expect(nc(true)).toMatch(/CYCL DEF 262 THREAD MILLING ~/)
+    const off = posts.heidenhain.emit(program(marked(true)), {})
+    expect(off).not.toMatch(/CYCL DEF 262/)
+    expect(off.split("\n").length).toBeGreaterThan(100) // the helix is written as the moves it is: lines of a Klartext that cannot turn and rise in one block
+  })
+
+  test("a cycle the post does not know, or a parameter it lacks, is refused with its name", () => {
+    expect(() => posts.heidenhain.emit(program([{ _tag: "CycleBegin", family: "heidenhain", number: 999, name: "X", params: { x: 0, y: 0 } } as Move, { _tag: "CycleEnd" }]), { nativeCycles: true })).toThrow(/cycle 999 is not one this post writes/)
+    expect(() => posts.heidenhain.emit(program([{ _tag: "CycleBegin", family: "heidenhain", number: 262, name: "X", params: { x: 0, y: 0 } } as Move, { _tag: "CycleEnd" }]), { nativeCycles: true })).toThrow(/needs Q335/)
   })
 })

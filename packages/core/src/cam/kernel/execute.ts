@@ -35,8 +35,9 @@ import { TriangleSoup } from "../model/mesh-queries.ts"
 import { PocketParams, generatePocket } from "../operations/pocket.ts"
 import { ProfileParams, generateProfile, profileTabFootprints } from "../operations/profile.ts"
 import { boreMillMoves } from "../operations/bore-mill.ts"
+import { threadMillMoves } from "../operations/thread-mill.ts"
 import { SurfaceParams, generateSurface } from "../operations/surface.ts"
-import { ThreadParams, generateThread } from "../operations/thread.ts"
+import { ThreadParams, generateThread, threadMinorDiameter } from "../operations/thread.ts"
 import { ChamferParams, chamferGeometry, generateChamfer } from "../operations/chamfer.ts"
 import { compileDefinition, dialectOf, getPost } from "../post/index.ts"
 import { genericPost } from "../post/generic.ts"
@@ -627,7 +628,21 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
             rightHand: op.rightHand ?? true, passes: Math.max(1, Math.min(20, data.passes ?? 2)), springPasses: 1, tolerance: prepared.tolerance
           })
           const r = generateThread(params, legacy, opStock)
-          generated = { toolpath: r.toolpath, warnings: r.warnings }
+          // A Heidenhain thread is the control's own cycle 262 (inside) or 267 (outside) when asked for: one helix at full depth, no radial passes.
+          const nativeThread = job.post?.options?.nativeCycles === true && machine.post === "heidenhain" && job.post.definition === undefined &&
+            (!op.internal || tool.diameter < threadMinorDiameter(op.diameter, op.pitch, true)) && r.toolpath.moves.length > 0
+          if (nativeThread) {
+            const right = op.rightHand ?? true
+            const begin = {
+              _tag: "CycleBegin" as const, family: "heidenhain" as const, number: op.internal ? 262 : 267, name: op.internal ? "THREAD MILLING" : "OUTSIDE THREAD MILLING",
+              params: { x: c.x, y: c.y, Q335: op.diameter, Q239: right ? op.pitch : -op.pitch, Q201: -op.length, Q200: 2, Q203: op.top - o.z, Q204: 10, Q207: feed }
+            }
+            const path = threadMillMoves({
+              center: c, surface: op.top - o.z, clearance: 2, secondClearance: 10, length: op.length, diameter: op.diameter, pitch: op.pitch,
+              toolRadius: tool.diameter / 2, internal: op.internal, rightHand: right, climb: true, feed
+            })
+            generated = { toolpath: { ...r.toolpath, moves: [begin, ...path, { _tag: "CycleEnd" as const }] }, warnings: r.warnings }
+          } else generated = { toolpath: r.toolpath, warnings: r.warnings }
           break
         }
         case "engrave": {

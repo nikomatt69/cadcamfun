@@ -58,6 +58,41 @@ export const decodeKlartext = (text: string, toolRadius?: (tool: number) => numb
     out.push(`G0 X${f(cx)} Y${f(cy)}`, `G0 Z${f(end)}`)
     return out.join("\n")
   }
+  /**
+   * Cycles 262 THREAD MILLING and 267 OUTSIDE THREAD MILLING as the path of the tool centre: one helix of pitch |Q239| through the thread
+   * depth Q201 at radius (D - d) / 2 inside a hole and (D + d) / 2 round a boss. A positive Q239 is a right-hand thread, which rises with
+   * counter-clockwise travel; internal climb is counter-clockwise, external climb clockwise (Q351 = +1).
+   */
+  const thread = (c: { readonly number: number; readonly q: ReadonlyMap<number, number> }, x: string | undefined, y: string | undefined): string => {
+    const q = (n: number, fallback = 0): number => c.q.get(n) ?? fallback
+    const R = toolNumber !== undefined ? toolRadius?.(toolNumber) : undefined
+    if (R === undefined || !(R > 0)) return ""
+    const internal = c.number === 262
+    const rc = internal ? q(335) / 2 - R : q(335) / 2 + R
+    const pitch = Math.abs(q(239)), length = Math.abs(q(201))
+    if (!(rc > 1e-9) || !(pitch > 0) || !(length > 0)) return ""
+    const climb = q(351, 1) >= 0
+    const ccw = internal ? climb : !climb
+    const rising = ccw === (q(239) > 0)
+    const cx = Number(x ?? 0), cy = Number(y ?? 0)
+    const surface = q(203), top = surface + q(200), end = surface + q(204), feed = q(207)
+    const z0 = rising ? surface - length : surface
+    const dir = rising ? 1 : -1
+    const f = (n: number): string => String(Number(n.toFixed(6)))
+    const word = ccw ? "G3" : "G2"
+    const turns = length / pitch, whole = Math.floor(turns + 1e-9), frac = turns - whole
+    const out = ["G90 G91.1", `G0 X${f(cx)} Y${f(cy)}`, `G0 Z${f(top)}`, `G0 X${f(cx + rc)} Y${f(cy)}`, `G1 Z${f(z0)} F${feed}`]
+    for (let i = 1; i <= whole; i++) out.push(`${word} X${f(cx + rc)} Y${f(cy)} Z${f(z0 + dir * i * pitch)} I${f(-rc)} J0 F${feed}`)
+    let lastX = cx + rc, lastY = cy
+    if (frac > 1e-9) {
+      const angle = (ccw ? 1 : -1) * frac * 2 * Math.PI
+      lastX = cx + rc * Math.cos(angle)
+      lastY = cy + rc * Math.sin(angle)
+      out.push(`${word} X${f(lastX)} Y${f(lastY)} Z${f(z0 + dir * length)} I${f(-rc)} J0 F${feed}`)
+    }
+    out.push(`G0 X${f(lastX)} Y${f(lastY)} Z${f(top)}`, `G0 X${f(cx)} Y${f(cy)}`, `G0 Z${f(end)}`)
+    return out.join("\n")
+  }
   /** One ISO canned-cycle block for a call of cycle `c` over (x, y); `G80` first when the previous block was a call too. */
   const cycleCall = (c: { readonly number: number; readonly q: ReadonlyMap<number, number> }, x: string | undefined, y: string | undefined): string => {
     const q = (n: number, fallback = 0): number => c.q.get(n) ?? fallback
@@ -87,7 +122,7 @@ export const decodeKlartext = (text: string, toolRadius?: (tool: number) => numb
     const end = /^END PGM ([A-Z0-9_]+) (MM|INCH)$/.exec(line)
     if (end) return end[1] !== name || (end[2] === "INCH") !== inch ? bad() : ended ? "" : "M30"
     if (/^CYCL DEF 247 (?:PRESETTING|DATUM SETTING)$/.test(line)) { datum = true; return "" }
-    const header = /^CYCL DEF (200|201|202|203|205|206|207|208)\b/.exec(line)
+    const header = /^CYCL DEF (200|201|202|203|205|206|207|208|262|267)\b/.exec(line)
     if (header) { defining = { number: Number(header[1]), q: new Map() }; if (!continued) { cycle = defining; defining = undefined } return "" }
     const param = /^Q(\d+)=([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/.exec(line)
     if (param && defining) {
@@ -121,8 +156,8 @@ export const decodeKlartext = (text: string, toolRadius?: (tool: number) => numb
     const holeCall = /^L (?:X(\S+) )?(?:Y(\S+) )?R0 FMAX M99((?: M\d+)*)$/.exec(line)
     if (holeCall && cycle) {
       const ms = holeCall[3]!.trim()
-      if (cycle.number === 208) {
-        const path = cycleCall(cycle, holeCall[1], holeCall[2])
+      if (cycle.number === 208 || cycle.number === 262 || cycle.number === 267) {
+        const path = cycle.number === 208 ? cycleCall(cycle, holeCall[1], holeCall[2]) : thread(cycle, holeCall[1], holeCall[2])
         return path === "" ? bad() : ms === "" ? path : `${ms}\n${path}`
       }
       return `${cycleCall(cycle, holeCall[1], holeCall[2])}${ms === "" ? "" : ` ${ms}`}`
