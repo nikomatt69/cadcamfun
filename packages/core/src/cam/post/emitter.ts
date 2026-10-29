@@ -29,6 +29,7 @@ import { type ArcMode, type Dialect, type PostOptions, defaultPostOptions } from
 import { assertCycleSafe } from "../cycle-safety.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
 import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
+import { klartextCycle } from "./klartext-cycles.ts"
 import type { WordExpr } from "../macro.ts"
 
 const MM_PER_INCH = 25.4
@@ -455,14 +456,38 @@ class Writer {
     this.commit(move.to, a.x, a.y, a.z)
   }
 
+  /** The Klartext definition of the hole's cycle (once while it stays the same) and the positioning block that calls it (`M99`). */
+  private klartextCycleSignature: string | undefined
+
+  private klartextHole(move: CycleMove, from: Vec3): void {
+    if (from.z < move.retractHeight) this.rapid({ ...from, z: move.retractHeight })
+    const cycle = klartextCycle(move, this.options.decimals)
+    if (cycle.signature !== this.klartextCycleSignature) {
+      for (const line of cycle.define) this.lines.push(line)
+      this.klartextCycleSignature = cycle.signature
+    }
+    const x = this.num(move.to.x), y = this.num(move.to.y)
+    const sg = (t: string): string => (t.startsWith("-") ? t : `+${t}`)
+    this.lines.push(`${KLARTEXT_PREFIX}L X${sg(x)} Y${sg(y)} R0 FMAX M99`)
+    this.px = Number(x)
+    this.py = Number(y)
+    this.pz = Number(this.num(move.retractHeight))
+    this.ir = { x: move.to.x, y: move.to.y, z: move.retractHeight }
+  }
+
   cycleMove(move: CycleMove): void {
     assertCycleSafe(move)
     const from = this.ir ?? { x: move.to.x, y: move.to.y, z: move.retractHeight }
-    if (move.cycle === "tap" && (!this.options.useCannedCycles || !this.dialect.canned || this.dialect.rigidTap === undefined)) {
+    const klartext = this.dialect.klartextCycles === true && this.scale === 1
+    if (move.cycle === "tap" && !klartext && (!this.options.useCannedCycles || !this.dialect.canned || this.dialect.rigidTap === undefined)) {
       throw new RangeError(`${this.dialect.id}: rigid tapping needs the control's G84 cycle (canned cycles on); mill the thread instead`)
     }
     if (move.cycle === "tap" && this.spindleRpm > 0 && Math.abs(move.feed - move.pitch! * this.spindleRpm) > 1e-6 * move.feed + 1e-9) {
       throw new RangeError(`Tapping feed ${move.feed} mm/min is not the pitch ${move.pitch} x ${this.spindleRpm} rpm: the tap would strip the thread`)
+    }
+    if (klartext) {
+      this.klartextHole(move, from)
+      return
     }
     if (!this.options.useCannedCycles || !this.dialect.canned) {
       for (const m of expandCycle(move, from)) this.move(m)

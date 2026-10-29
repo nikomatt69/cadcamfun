@@ -545,7 +545,8 @@ export const expandMacros = (source: string): Expanded => {
     }
 
     if (family === "heidenhain") {
-      const continues = /~\s*$/.test(strip(rawLine).replace(/^\d+\s+/, ""))
+      // A `~` ends a row that goes on (it follows the comment: `Q200=+2 ;SET-UP CLEARANCE ~`).
+      const continues = /~\s*$/.test(rawLine)
       const wasContinued = cycleContinues
       cycleContinues = continues
       if (/^(BEGIN|END) PGM\b/.test(upper)) { emit(rawLine, line); pc++; return }

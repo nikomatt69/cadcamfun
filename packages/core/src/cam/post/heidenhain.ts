@@ -75,7 +75,7 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
   if (!Number.isInteger(start) || start < 0 || !Number.isInteger(step) || step <= 0) throw new RangeError("Klartext block numbering must use non-negative start and positive step")
   // Retain the shared writer's arc validation, cycle expansion, rounding and protective tool-change retractions.
   const writer: Dialect = {
-    ...dialect, arcModes: ["ijk"], arcLimits: { helical: false, fullCircle: false }, canned: false, smoothing: klartextSmoothing,
+    ...dialect, arcModes: ["ijk"], arcLimits: { helical: false, fullCircle: false }, canned: false, klartextCycles: inch ? undefined : true, smoothing: klartextSmoothing,
     workOffset: (offset) => `PRESET ${Number(offset.slice(1)) - 53}`,
     subprograms: options.subprograms === true ? klartextLabels : undefined
   }
@@ -117,7 +117,9 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
     // Variables, jumps and macro calls come from the shared writer as finished Klartext blocks (`macro-syntax.ts`).
     if (line.startsWith(KLARTEXT_PREFIX)) {
       const text = line.slice(KLARTEXT_PREFIX.length)
-      if (text.startsWith(";")) lines.push(text)
+      // A cycle parameter row ("  Q200=+2 ;..") is a continuation of its `CYCL DEF`, with no block number of its own.
+      if (text.startsWith(";") || text.startsWith("  ")) lines.push(text)
+      else if (/\bM99$/.test(text)) move(text)
       else block(text)
       continue
     }

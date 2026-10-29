@@ -87,6 +87,8 @@ export interface Dialect {
   readonly id: PostId
   /** Whether the control has canned drilling cycles. */
   readonly canned: boolean
+  /** Klartext: a drilling move is the control's own fixed cycle (`CYCL DEF 200` …, called with `M99`), not an ISO code and not an expansion (`klartext-cycles.ts`). */
+  readonly klartextCycles?: boolean
   /** Arc formats the control accepts (`linearize` is always possible). */
   readonly arcModes: ReadonlyArray<ArcMode>
   /** Unit of `G4 P` and the `P` word of `G82`. */
