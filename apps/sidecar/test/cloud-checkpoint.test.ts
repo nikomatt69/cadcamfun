@@ -7,6 +7,13 @@ import { CloudCheckpoint } from "../src/services/cloud-checkpoint.ts"
 import { CheckpointStore } from "../../../packages/cloud/src/checkpoint-store.ts"
 import type { CheckpointManifest } from "../../../packages/cloud/src/checkpoint-protocol.ts"
 
+/** DOM `BodyInit` accepts `ArrayBuffer`, not `Uint8Array<ArrayBufferLike>`. */
+const bytesBody = (bytes: Uint8Array): ArrayBuffer => {
+  const buffer = new ArrayBuffer(bytes.byteLength)
+  new Uint8Array(buffer).set(bytes)
+  return buffer
+}
+
 const directories: string[] = []
 afterEach(async () => { for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }) })
 const directory = async () => { const dir = await mkdtemp(join(tmpdir(), "cadcam-cloud-state-")); directories.push(dir); return dir }
@@ -22,7 +29,7 @@ const storage = () => {
   }, {
     exists: async (hash) => objects.has(hash),
     put: async (hash, bytes) => { objects.set(hash, bytes) },
-    get: async (hash) => { const bytes = objects.get(hash); return bytes ? new Response(bytes).body : null },
+    get: async (hash) => { const bytes = objects.get(hash); return bytes ? new Response(bytesBody(bytes)).body : null },
   })
   const transport = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => fail ? new Response(null, { status: 503 }) : store.fetch(new Request(input, init)), { preconnect: () => {} })
   return { transport, fail: () => { fail = true }, manifest: () => manifest, objects }
