@@ -35,6 +35,8 @@ export interface KernelSnapshot {
   readonly subprograms?: boolean
   /** High-speed contour smoothing with this tolerance, mm (`PostOptions.smoothing`). */
   readonly smoothing?: number
+  /** Write the control's own fixed cycle where the program marks one (Heidenhain bore milling 208; spec 69 G4c.2). */
+  readonly nativeCycles?: boolean
   /** A post definition that writes the NC in place of the machine's built-in post (spec 54 C1). Inline, so a stored program re-runs with the post it was made with. */
   readonly postDefinition?: unknown
   /** How a printer job is sliced (read only when the machine is a printer). */
@@ -76,9 +78,9 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
       ...(s.setupOrientation !== undefined ? { setupOrientation: s.setupOrientation } : {}),
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.workOffset !== undefined ? { workOffset: s.workOffset } : {}),
       ...(s.operations !== undefined ? { operations: s.operations } : {}), ...(s.tools !== undefined ? { tools: s.tools } : {}),
-      ...(s.subprograms === true || s.smoothing !== undefined || s.postDefinition !== undefined
+      ...(s.subprograms === true || s.smoothing !== undefined || s.nativeCycles === true || s.postDefinition !== undefined
         ? { post: {
-          ...(s.subprograms === true || s.smoothing !== undefined ? { options: { ...(s.subprograms === true ? { subprograms: true } : {}), ...(s.smoothing !== undefined ? { smoothing: s.smoothing } : {}) } } : {}),
+          ...(s.subprograms === true || s.smoothing !== undefined || s.nativeCycles === true ? { options: { ...(s.subprograms === true ? { subprograms: true } : {}), ...(s.smoothing !== undefined ? { smoothing: s.smoothing } : {}), ...(s.nativeCycles === true ? { nativeCycles: true } : {}) } } : {}),
           ...(s.postDefinition !== undefined ? { definition: s.postDefinition } : {})
         } }
         : {}),

@@ -59,6 +59,8 @@ export const CamManufactureInput = Schema.Struct({
   tabs: Schema.optionalKey(Schema.Struct({ count: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 64 })), width: positive.check(Schema.isLessThanOrEqualTo(100)), height: positive.check(Schema.isLessThanOrEqualTo(50)) })),
   /** Write toolpaths that repeat translated (hole patterns, copies of a pocket) once as a subprogram (`M98` on the Fanuc and Haas posts, `CALL LBL` on the Heidenhain Klartext post). */
   subprograms: Schema.optionalKey(Schema.Boolean),
+  /** Write the control's own fixed cycle where the kernel has one (Heidenhain: bore milling cycle 208) instead of the moves that do the same. */
+  nativeCycles: Schema.optionalKey(Schema.Boolean),
   /** High-speed contour smoothing with this tolerance, mm (Fanuc AICC G5.1, Haas G187, Siemens CYCLE832, Heidenhain cycle 32, LinuxCNC G64 P); ignored by a control without it. */
   smoothing: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(1))),
   /** A post definition (spec 54 C1) that writes the NC in place of the machine's post: inline, or the id of a library item (category "post"), or the `postDefinitionId` of the machine configuration. */
@@ -108,7 +110,7 @@ export const CamManufactureOperationInput = Schema.Struct({
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance,
   scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision),
   operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr, tabs: CamManufactureInput.fields.tabs,
-  subprograms: CamManufactureInput.fields.subprograms, smoothing: CamManufactureInput.fields.smoothing, print: CamManufactureInput.fields.print
+  subprograms: CamManufactureInput.fields.subprograms, nativeCycles: CamManufactureInput.fields.nativeCycles, smoothing: CamManufactureInput.fields.smoothing, print: CamManufactureInput.fields.print
 })
 
 export const CamCreateInput = Schema.Struct({ type: id, params: Schema.optionalKey(params), expectedRevision: Schema.optionalKey(revision) })

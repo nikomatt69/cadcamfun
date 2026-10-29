@@ -60936,6 +60936,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     "reprap",
                                   ],
                                   "type": "string",
+                  "nativeCycles": {
+                    "type": "boolean",
+                  },
                                 },
                                 "filament": {
                                   "additionalProperties": false,

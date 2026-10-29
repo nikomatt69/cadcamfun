@@ -28,6 +28,7 @@ export const CamKernelRequest = Schema.Struct({
   deburr: CamManufactureInput.fields.deburr,
   tabs: CamManufactureInput.fields.tabs,
   subprograms: CamManufactureInput.fields.subprograms,
+  nativeCycles: CamManufactureInput.fields.nativeCycles,
   smoothing: CamManufactureInput.fields.smoothing,
   /** A post definition (spec 54 C1; library category "post") that writes the NC in place of the machine's post; checked by the kernel. */
   postDefinition: CamManufactureInput.fields.postDefinition,

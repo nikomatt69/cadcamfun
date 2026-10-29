@@ -2747,6 +2747,7 @@ type Endpoint27_0Input = {
   readonly deburr?: Endpoint27_0Request["payload"]["deburr"]
   readonly tabs?: Endpoint27_0Request["payload"]["tabs"]
   readonly subprograms?: Endpoint27_0Request["payload"]["subprograms"]
+  readonly nativeCycles?: Endpoint27_0Request["payload"]["nativeCycles"]
   readonly smoothing?: Endpoint27_0Request["payload"]["smoothing"]
   readonly postDefinition?: Endpoint27_0Request["payload"]["postDefinition"]
   readonly print?: Endpoint27_0Request["payload"]["print"]
@@ -2775,6 +2776,7 @@ const Endpoint27_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27
       deburr: input["deburr"],
       tabs: input["tabs"],
       subprograms: input["subprograms"],
+      nativeCycles: input["nativeCycles"],
       smoothing: input["smoothing"],
       postDefinition: input["postDefinition"],
       print: input["print"],

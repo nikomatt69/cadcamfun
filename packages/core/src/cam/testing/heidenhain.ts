@@ -13,7 +13,15 @@
 const NUMBER = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)"
 const AXIS = new RegExp(`^(I?)([XYZABC])(${NUMBER})$`)
 
-export const decodeKlartext = (text: string): { readonly text: string; readonly unsupported: ReadonlyArray<{ readonly line: number; readonly word: string }> } => {
+export interface DecodedKlartext {
+  readonly text: string
+  readonly unsupported: ReadonlyArray<{ readonly line: number; readonly word: string }>
+  /** For each line of `text`, the 1-based Klartext line it came from (a fixed cycle that moves in a path is several lines). */
+  readonly lines: ReadonlyArray<number>
+}
+
+/** `toolRadius` gives the radius of a tool number: the cycles that mill a path (208) need it to replay the tool centre's path. */
+export const decodeKlartext = (text: string, toolRadius?: (tool: number) => number | undefined): DecodedKlartext => {
   const unsupported: Array<{ line: number; word: string }> = []
   let dwell = false, tolerance = false, datum = false, inch = false, name: string | undefined, ended = false
   let centre: { readonly absolute: boolean; readonly x: number; readonly y: number } | undefined
@@ -22,6 +30,34 @@ export const decodeKlartext = (text: string): { readonly text: string; readonly 
   let cycle: { readonly number: number; readonly q: ReadonlyMap<number, number> } | undefined
   let cycleOn = false
   let spindle = 0
+  let toolNumber: number | undefined
+  /**
+   * Cycle 208 BORE MILLING as the path of the tool centre: a helix of pitch Q334 down to the depth at the radius that leaves the
+   * nominal diameter Q335 (first at the roughing diameter Q342 when it is given), a full circle at the bottom, and back to the centre.
+   */
+  const bore208 = (c: { readonly q: ReadonlyMap<number, number> }, x: string | undefined, y: string | undefined): string => {
+    const q = (n: number, fallback = 0): number => c.q.get(n) ?? fallback
+    const R = toolNumber !== undefined ? toolRadius?.(toolNumber) : undefined
+    if (R === undefined || !(R > 0)) return ""
+    const cx = Number(x ?? 0), cy = Number(y ?? 0)
+    const surface = q(203), top = surface + q(200), end = surface + q(204), bottom = surface + q(201)
+    const pitch = q(334) > 0 ? q(334) : 1, feed = q(206)
+    const direction = q(351, 1) >= 0 ? "G3" : "G2"
+    const radii: number[] = []
+    if (q(342) > 0 && q(342) < q(335) - 1e-9) radii.push(q(342) / 2 - R)
+    radii.push(q(335) / 2 - R)
+    if (radii.some((r) => !(r > 1e-9))) return ""
+    const f = (n: number): string => String(Number(n.toFixed(6)))
+    const out = ["G90 G91.1", `G0 X${f(cx)} Y${f(cy)}`, `G0 Z${f(top)}`]
+    for (const r of radii) {
+      out.push(`G0 X${f(cx + r)} Y${f(cy)}`, `G1 Z${f(surface)} F${feed}`)
+      const turns = Math.max(1, Math.ceil((surface - bottom) / pitch - 1e-9))
+      for (let i = 1; i <= turns; i++) out.push(`${direction} X${f(cx + r)} Y${f(cy)} Z${f(i === turns ? bottom : surface - ((surface - bottom) * i) / turns)} I${f(-r)} J0 F${feed}`)
+      out.push(`${direction} X${f(cx + r)} Y${f(cy)} I${f(-r)} J0 F${feed}`, `G0 Z${f(top)}`)
+    }
+    out.push(`G0 X${f(cx)} Y${f(cy)}`, `G0 Z${f(end)}`)
+    return out.join("\n")
+  }
   /** One ISO canned-cycle block for a call of cycle `c` over (x, y); `G80` first when the previous block was a call too. */
   const cycleCall = (c: { readonly number: number; readonly q: ReadonlyMap<number, number> }, x: string | undefined, y: string | undefined): string => {
     const q = (n: number, fallback = 0): number => c.q.get(n) ?? fallback
@@ -30,6 +66,7 @@ export const decodeKlartext = (text: string): { readonly text: string; readonly 
     const at = [x !== undefined ? `X${Number(x)}` : undefined, y !== undefined ? `Y${Number(y)}` : undefined]
     let code: string
     switch (c.number) {
+      case 208: return bore208(c, x, y)
       case 200: code = q(202) > 0 && q(202) < Math.abs(q(201)) - 1e-9 ? `G83 Q${q(202)} F${q(206)}` : q(211) > 0 ? `G82 P${q(211)} F${q(206)}` : `G81 F${q(206)}`; break
       case 203: case 205: code = q(257) > 0 ? `G73 Q${q(257)} F${q(206)}` : `G83 Q${q(202)} F${q(206)}`; break
       case 201: code = `G85 F${q(206)}`; break
@@ -50,7 +87,7 @@ export const decodeKlartext = (text: string): { readonly text: string; readonly 
     const end = /^END PGM ([A-Z0-9_]+) (MM|INCH)$/.exec(line)
     if (end) return end[1] !== name || (end[2] === "INCH") !== inch ? bad() : ended ? "" : "M30"
     if (/^CYCL DEF 247 (?:PRESETTING|DATUM SETTING)$/.test(line)) { datum = true; return "" }
-    const header = /^CYCL DEF (200|201|202|203|205|206|207)\b/.exec(line)
+    const header = /^CYCL DEF (200|201|202|203|205|206|207|208)\b/.exec(line)
     if (header) { defining = { number: Number(header[1]), q: new Map() }; if (!continued) { cycle = defining; defining = undefined } return "" }
     const param = /^Q(\d+)=([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/.exec(line)
     if (param && defining) {
@@ -61,7 +98,7 @@ export const decodeKlartext = (text: string): { readonly text: string; readonly 
     const row = /^Q339=\+?(\d+)$/.exec(line)
     if (row && datum) { datum = false; const n = Number(row[1]); return n >= 1 && n <= 6 ? `G${53 + n}` : bad() }
     const tool = new RegExp(`^TOOL CALL(?: (\\d+))? Z(?: S(\\d+(?:\\.\\d+)?))?$`).exec(line)
-    if (tool) { if (tool[2] !== undefined) spindle = Number(tool[2]) }
+    if (tool) { if (tool[2] !== undefined) spindle = Number(tool[2]); if (tool[1] !== undefined) toolNumber = Number(tool[1]) }
     if (tool) return [tool[1] !== undefined ? `T${tool[1]} M6` : "", tool[2] !== undefined ? `S${tool[2]}` : ""].filter(Boolean).join(" ")
     if (/^M(?:0|1|2|3|4|5|7|8|9|30|128|129)$/.test(line)) { if (line === "M2" || line === "M30") ended = true; return line }
     if (line === "CYCL DEF 9.0 DWELL TIME") { dwell = true; return "" }
@@ -81,8 +118,15 @@ export const decodeKlartext = (text: string): { readonly text: string; readonly 
     }
     const circle = line.startsWith("C ")
     if (!circle && !line.startsWith("L ")) return bad()
-    const holeCall = /^L (?:X(\S+) )?(?:Y(\S+) )?R0 FMAX M99$/.exec(line)
-    if (holeCall && cycle) return cycleCall(cycle, holeCall[1], holeCall[2])
+    const holeCall = /^L (?:X(\S+) )?(?:Y(\S+) )?R0 FMAX M99((?: M\d+)*)$/.exec(line)
+    if (holeCall && cycle) {
+      const ms = holeCall[3]!.trim()
+      if (cycle.number === 208) {
+        const path = cycleCall(cycle, holeCall[1], holeCall[2])
+        return path === "" ? bad() : ms === "" ? path : `${ms}\n${path}`
+      }
+      return `${cycleCall(cycle, holeCall[1], holeCall[2])}${ms === "" ? "" : ` ${ms}`}`
+    }
     let rapid = false, feed: string | undefined, direction: string | undefined, mode: "" | "I" | undefined
     const axes: string[] = [], ms: string[] = []
     for (const token of line.slice(2).trim().split(/\s+/)) {
@@ -112,13 +156,16 @@ export const decodeKlartext = (text: string): { readonly text: string; readonly 
     if (axes.length === 0) return ms.join(" ")
     return [distance, rapid ? "G0" : "G1", ...axes, feed, ...ms].filter((w): w is string => w !== undefined).join(" ")
   }
-  const lines = text.split(/\r?\n/).map((raw, i) => {
-    const out = decodeLine(raw, i)
+  const origin: number[] = []
+  const lines = text.split(/\r?\n/).flatMap((raw, i) => {
+    let out = decodeLine(raw, i)
     // A fixed cycle called on one block ends with the next block that does something: cancel it there (`G80`).
-    if (cycleOn && out !== "" && !/^G90 G99 G8\d|^G90 G99 G73/.test(out)) { cycleOn = false; return `G80 ${out}` }
-    return out
+    if (cycleOn && out !== "" && !/^G90 G99 G8\d|^G90 G99 G73/.test(out)) { cycleOn = false; out = `G80 ${out}` }
+    const parts = out.split("\n")
+    for (let k = 0; k < parts.length; k++) origin.push(i + 1)
+    return parts
   })
   if (dwell) unsupported.push({ line: lines.length, word: "Incomplete Klartext dwell cycle" })
   if (datum) unsupported.push({ line: lines.length, word: "Incomplete Klartext datum setting cycle" })
-  return { text: lines.join("\n"), unsupported }
+  return { text: lines.join("\n"), unsupported, lines: origin }
 }

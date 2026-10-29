@@ -1492,6 +1492,7 @@ export type ToolpathGeneratorManufacturePayload = {
   readonly deburr?: number
   readonly tabs?: { readonly count: number; readonly width: number; readonly height: number }
   readonly subprograms?: boolean
+  readonly nativeCycles?: boolean
   readonly smoothing?: number
   readonly postDefinition?: JsonValue
   readonly print?: {
@@ -6290,6 +6291,7 @@ export type ToolpathGeneratorManufactureOutput =
             | "spot"
             | "chamfer"
             | "engrave"
+  readonly nativeCycles?: ToolpathGeneratorManufacturePayload["nativeCycles"]
             | "thread-mill"
             | "tap"
             | "ream"

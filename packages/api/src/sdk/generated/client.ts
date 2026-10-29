@@ -3933,6 +3933,7 @@ export function make(options: ClientOptions) {
           requestOptions,
         ),
       verify: (input: ToolpathGeneratorVerifyInput, requestOptions?: RequestOptions) =>
+              nativeCycles: input["nativeCycles"],
         request<ToolpathGeneratorVerifyOutput>(
           {
             method: "POST",

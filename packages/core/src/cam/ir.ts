@@ -13,7 +13,7 @@
  *  - an `Arc` whose `to` has the same XY as its start is a **full circle**.
  */
 import { Schema } from "effect"
-import { AssignSchema, ElseSchema, EndIfSchema, EndWhileSchema, GotoSchema, IfSchema, LabelSchema, MacroCallSchema, MessageSchema, WhileSchema, WordExprSchema } from "./macro.ts"
+import { AssignSchema, CycleBeginSchema, CycleEndSchema, ElseSchema, EndIfSchema, EndWhileSchema, GotoSchema, IfSchema, LabelSchema, MacroCallSchema, MessageSchema, WhileSchema, WordExprSchema } from "./macro.ts"
 import { angleInArc, normalizeAngle } from "../cad/arc-math.ts"
 import { Vec2Schema, Vec3Schema } from "../cad/entities.ts"
 import { TAU, type Vec2, type Vec3 } from "../cad/vec.ts"
@@ -121,6 +121,8 @@ export const MoveSchema = Schema.Union([
   EndWhileSchema,
   LabelSchema,
   GotoSchema,
+  CycleBeginSchema,
+  CycleEndSchema,
   MessageSchema
 ])
 
@@ -192,8 +194,8 @@ export const arcExtrema = (move: ArcMove, from: Vec3): ReadonlyArray<Vec3> => {
 }
 
 /** A move that moves nothing: it is data for the post (a variable, a macro, a branch, a message) or for the operator. */
-export const isControlNode = (move: Move): move is Extract<Move, { readonly _tag: "Assign" | "MacroCall" | "If" | "Else" | "EndIf" | "While" | "EndWhile" | "Label" | "Goto" | "Message" }> =>
-  move._tag === "Assign" || move._tag === "Label" || move._tag === "Goto" || move._tag === "MacroCall" || move._tag === "If" || move._tag === "Else" || move._tag === "EndIf" || move._tag === "While" || move._tag === "EndWhile" || move._tag === "Message"
+export const isControlNode = (move: Move): move is Extract<Move, { readonly _tag: "Assign" | "MacroCall" | "If" | "Else" | "EndIf" | "While" | "EndWhile" | "Label" | "Goto" | "CycleBegin" | "CycleEnd" | "Message" }> =>
+  move._tag === "Assign" || move._tag === "CycleBegin" || move._tag === "CycleEnd" || move._tag === "Label" || move._tag === "Goto" || move._tag === "MacroCall" || move._tag === "If" || move._tag === "Else" || move._tag === "EndIf" || move._tag === "While" || move._tag === "EndWhile" || move._tag === "Message"
 
 /** Length of a move from `from`; arcs use the true radius and sweep and include the helical rise. */
 export const moveLength = (move: Move, from: Vec3): number => {
@@ -219,6 +221,8 @@ export const moveLength = (move: Move, from: Vec3): number => {
     case "EndWhile":
     case "Label":
     case "Goto":
+    case "CycleBegin":
+    case "CycleEnd":
     case "Message":
       return 0
   }

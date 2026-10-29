@@ -97,6 +97,19 @@ export const GotoSchema = Schema.TaggedStruct("Goto", {
   condition: Schema.optionalKey(ConditionSchema)
 })
 
+/**
+ * A control's own fixed cycle around the moves that do the same (spec 69 G4c). Everything between `CycleBegin` and `CycleEnd` is
+ * the cycle's expansion: the viewer, the verifier and every post but the cycle's own see those moves. The post of `family` writes
+ * the cycle (`number`, its `params` by `Qnnn` key, the call position `x` / `y`) in place of them.
+ */
+export const CycleBeginSchema = Schema.TaggedStruct("CycleBegin", {
+  family: Schema.Literals(["heidenhain"]),
+  number: Schema.Int.check(Schema.isGreaterThan(0)),
+  name: Schema.String.check(Schema.isMinLength(1)),
+  params: Schema.Record(Schema.String, Schema.Finite)
+})
+export const CycleEndSchema = Schema.TaggedStruct("CycleEnd", {})
+
 export const MessageSchema = Schema.TaggedStruct("Message", { text: Schema.String })
 
 export type AssignMove = typeof AssignSchema.Type
@@ -104,6 +117,7 @@ export type MacroCallMove = typeof MacroCallSchema.Type
 export type IfMove = typeof IfSchema.Type
 export type WhileMove = typeof WhileSchema.Type
 export type MessageMove = typeof MessageSchema.Type
+export type CycleBeginMove = typeof CycleBeginSchema.Type
 export type LabelMove = typeof LabelSchema.Type
 export type GotoMove = typeof GotoSchema.Type
 

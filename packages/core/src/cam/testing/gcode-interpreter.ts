@@ -184,7 +184,9 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     }
   }
   if (/\bBEGIN PGM\b/i.test(text)) {
-    const decoded = decodeKlartext(text)
+    const decoded = decodeKlartext(text, (tool) => options.toolRadius?.(undefined, tool))
+    // A fixed cycle that moves in a path is several lines: findings still name the Klartext line (and the source line behind it).
+    lineMap = decoded.lines.map((l) => lineMap?.[l - 1] ?? l)
     text = decoded.text
     for (const problem of decoded.unsupported) {
       unsupported.push(problem)

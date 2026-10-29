@@ -32,6 +32,11 @@ export interface PostOptions {
    * `false` when the program is written in machine coordinates (the control has no tool-centre-point control, or it is not to be
    * used): no tip-control word is written even if the dialect has one. Default: written whenever rotary moves are simultaneous.
    */
+  /**
+   * Write the control's own fixed cycle where the program marks one (`CycleBegin` .. `CycleEnd`, Heidenhain bore milling 208): the cycle
+   * replaces the moves that expand it. Off by default: every post then writes the moves.
+   */
+  readonly nativeCycles?: boolean
   readonly tcp?: boolean
   /**
    * Raise Z to the highest point the program has reached before a tool change

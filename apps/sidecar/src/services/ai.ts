@@ -277,9 +277,9 @@ const toolHandlers = Effect.gen(function*() {
         part: { kind: "elements", elements: elements as never }, ...(stored !== undefined ? { stockFromPartBottom: { x: stored.x, y: stored.y, width: stored.width, height: stored.height, depth: stored.depth } } : {}),
         ...(machine !== undefined ? { machine } : {}), ...(input.origin !== undefined ? { origin: input.origin } : {}),
         ...(input.operations !== undefined ? { operations: input.operations } : {}), ...(input.tools !== undefined ? { tools: input.tools } : {}),
-        ...(input.subprograms === true || input.smoothing !== undefined || input.postDefinition !== undefined
+        ...(input.subprograms === true || input.smoothing !== undefined || input.nativeCycles === true || input.postDefinition !== undefined
           ? { post: {
-            ...(input.subprograms === true || input.smoothing !== undefined ? { options: { ...(input.subprograms === true ? { subprograms: true } : {}), ...(input.smoothing !== undefined ? { smoothing: input.smoothing } : {}) } } : {}),
+            ...(input.subprograms === true || input.smoothing !== undefined || input.nativeCycles === true ? { options: { ...(input.subprograms === true ? { subprograms: true } : {}), ...(input.smoothing !== undefined ? { smoothing: input.smoothing } : {}), ...(input.nativeCycles === true ? { nativeCycles: true } : {}) } } : {}),
             ...(input.postDefinition !== undefined ? { definition: input.postDefinition } : {})
           } }
           : {}),

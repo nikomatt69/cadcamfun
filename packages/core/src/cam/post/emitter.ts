@@ -29,7 +29,7 @@ import { type ArcMode, type Dialect, type PostOptions, defaultPostOptions } from
 import { assertCycleSafe } from "../cycle-safety.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
 import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
-import { klartextCycle } from "./klartext-cycles.ts"
+import { klartextCycle, klartextFixedCycle } from "./klartext-cycles.ts"
 import type { WordExpr } from "../macro.ts"
 
 const MM_PER_INCH = 25.4
@@ -458,6 +458,40 @@ class Writer {
 
   /** The Klartext definition of the hole's cycle (once while it stays the same) and the positioning block that calls it (`M99`). */
   private klartextCycleSignature: string | undefined
+  /** Inside the moves of a marked fixed cycle that was written natively: they are the cycle's expansion, not written. */
+  private skipping = false
+  private skippedEnd: Vec3 | undefined
+
+  private cycleBegin(move: Extract<Move, { readonly _tag: "CycleBegin" }>): void {
+    if (this.dialect.klartextCycles !== true || this.scale !== 1 || move.family !== "heidenhain" || this.options.nativeCycles !== true) return
+    this.endCycle()
+    const cycle = klartextFixedCycle(move.number, move.params, this.options.decimals)
+    if (cycle.signature !== this.klartextCycleSignature) {
+      for (const line of cycle.define) this.lines.push(line)
+      this.klartextCycleSignature = cycle.signature
+    }
+    const x = move.params["x"], y = move.params["y"]
+    if (x === undefined || y === undefined) throw new RangeError(`Cycle ${move.number} needs its call position (x, y)`)
+    const here = this.ir
+    const top = (move.params["Q203"] ?? 0) + (move.params["Q204"] ?? 0)
+    if (here !== undefined && here.z < top) this.rapid({ ...here, z: top })
+    const sg = (t: string): string => (t.startsWith("-") ? t : `+${t}`)
+    this.lines.push(`${KLARTEXT_PREFIX}L X${sg(this.num(x))} Y${sg(this.num(y))} R0 FMAX M99`)
+    this.skipping = true
+    this.skippedEnd = { x, y, z: top }
+  }
+
+  private cycleEnd(): void {
+    if (!this.skipping) return
+    this.skipping = false
+    const at = this.skippedEnd!
+    // The cycle leaves the tool over the centre at the 2nd set-up clearance: say so with a block of our own, so what follows (and the
+    // M functions that ride on a positioning block) starts from a position the program states.
+    this.px = this.py = this.pz = undefined
+    this.motion = undefined
+    this.ir = { ...at }
+    this.rapid(at)
+  }
 
   private klartextHole(move: CycleMove, from: Vec3): void {
     if (from.z < move.retractHeight) this.rapid({ ...from, z: move.retractHeight })
@@ -556,6 +590,9 @@ class Writer {
   }
 
   move(move: Move): void {
+    if (move._tag === "CycleBegin") { this.cycleBegin(move); return }
+    if (move._tag === "CycleEnd") { this.cycleEnd(); return }
+    if (this.skipping) return
     switch (move._tag) {
       case "Rapid":
         this.rapid(move.to, move.rotary, move.expr)

@@ -34,6 +34,7 @@ import { carryHeightField, remainingVolume, removeTipPath, stockContact, voxelSt
 import { TriangleSoup } from "../model/mesh-queries.ts"
 import { PocketParams, generatePocket } from "../operations/pocket.ts"
 import { ProfileParams, generateProfile, profileTabFootprints } from "../operations/profile.ts"
+import { boreMillMoves } from "../operations/bore-mill.ts"
 import { SurfaceParams, generateSurface } from "../operations/surface.ts"
 import { ThreadParams, generateThread } from "../operations/thread.ts"
 import { ChamferParams, chamferGeometry, generateChamfer } from "../operations/chamfer.ts"
@@ -570,7 +571,24 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
             ? { _tag: "Circle", id: `${op.id}-circle`, layerId: "cam", visible: true, locked: false, center: shift2(op.center, o), radius: op.diameter / 2 }
             : { boundary: { points: op.region.boundary.map((p) => shift2(p, o)), closed: true }, islands: (op.region.islands ?? []).map((r) => ({ points: r.map((p) => shift2(p, o)), closed: true })) }
           if (op.strategy === "bore" && tool.diameter >= op.diameter) { fail("NoSuitableTool", `${op.id}: the cutter Ø${tool.diameter} does not fit the Ø${op.diameter} bore`, data); return }
-          generated = { toolpath: generatePocket(params, geometry as never, legacy, opStock), warnings: [] }
+          const pocket = generatePocket(params, geometry as never, legacy, opStock)
+          // A Heidenhain bore is the control's own cycle 208 when asked for: the moves stay in the program between markers, so the viewer and
+          // the other posts see them, and the Klartext post writes the cycle in their place. A bore wider than twice the cutter radius
+          // leaves a core under a helix cycle (a slug the replay would still see as stock), so it stays moves.
+          const nativeBore = op.strategy === "bore" && job.post?.options?.nativeCycles === true && machine.post === "heidenhain" && job.post.definition === undefined &&
+            op.diameter / 2 <= tool.diameter
+          if (nativeBore && op.strategy === "bore") {
+            const c = shift2(op.center, o)
+            const begin = {
+              _tag: "CycleBegin" as const, family: "heidenhain" as const, number: 208, name: "BORE MILLING",
+              params: { x: c.x, y: c.y, Q200: 2, Q201: op.bottom - op.top, Q206: plungeFeed, Q334: data.helixPitch, Q203: op.top - o.z, Q204: 10, Q335: op.diameter, Q342: 0, Q351: 1 }
+            }
+            const path = boreMillMoves({
+              center: c, surface: op.top - o.z, clearance: 2, secondClearance: 10, bottom: op.bottom - o.z, toolRadius: tool.diameter / 2,
+              diameter: op.diameter, pitch: data.helixPitch, feed: plungeFeed, climb: true
+            })
+            generated = { toolpath: { ...pocket, moves: [begin, ...path, { _tag: "CycleEnd" as const }] }, warnings: [] }
+          } else generated = { toolpath: pocket, warnings: [] }
           break
         }
         case "profile": {
@@ -805,7 +823,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
 
   const initial = { x: 0, y: 0, z: CLEARANCE + 10 }
   // The replay reads dwells in the post's unit (Fanuc and Haas write milliseconds on `G4 P`).
-  const interpreted = nc === "" ? undefined : interpretGcode(nc, { start: initial, dwell: (written?.ok === true ? written.dialect : dialectOf(post.id))?.dwell ?? "seconds", okuma: post.id === "okuma" })
+  const radiusOfNumber = new Map(Object.entries(numbers).map(([id, number]) => [number, toolOf(id).diameter / 2] as const))
+  const interpreted = nc === "" ? undefined : interpretGcode(nc, { start: initial, toolRadius: (_d, tool) => (tool === undefined ? undefined : radiusOfNumber.get(tool)), dwell: (written?.ok === true ? written.dialect : dialectOf(post.id))?.dwell ?? "seconds", okuma: post.id === "okuma" })
   const removedByOp = new Map<number, number>()
   const cutLengthByOp = new Map<number, number>()
   let rapidHits = 0, shankHits = 0, holderHits = 0, noTool = 0

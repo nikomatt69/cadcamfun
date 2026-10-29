@@ -63,3 +63,26 @@ export const klartextCycle = (move: CycleMove, decimals: number): KlartextCycle 
   }
   return { define, signature: define.join("\n") }
 }
+
+// ---------------------------------------------------------------- cycles the IR marks (CycleBegin .. CycleEnd)
+
+/** A cycle's parameter rows in the order of the cycle manual: number, label, and a default (absent = the caller must give it). */
+interface CycleTable { readonly name: string; readonly rows: ReadonlyArray<readonly [number, string, number | undefined]> }
+
+export const KLARTEXT_CYCLES: Readonly<Record<number, CycleTable>> = {
+  // 208 BORE MILLING: a helix of pitch Q334 at the radius that leaves the nominal diameter Q335, Q342 the diameter to rough to first.
+  208: { name: "BORE MILLING", rows: [[200, "SET-UP CLEARANCE", 0], [201, "DEPTH", undefined], [206, "FEED RATE FOR PLUNGING", undefined], [334, "INFEED PER HELIX", undefined], [203, "SURFACE COORDINATE", undefined], [204, "2ND SET-UP CLEARANCE", 0], [335, "NOMINAL DIAMETER", undefined], [342, "ROUGHING DIAMETER", 0], [351, "CLIMB OR UP-CUT", 1]] }
+}
+
+/** The definition of the marked cycle `number` with `params` (`Q200` .. keys); refuses a cycle it does not know or a parameter it lacks. */
+export const klartextFixedCycle = (number: number, params: Readonly<Record<string, number>>, decimals: number): KlartextCycle => {
+  const table = KLARTEXT_CYCLES[number]
+  if (table === undefined) throw new RangeError(`Klartext cycle ${number} is not one this post writes (known: ${Object.keys(KLARTEXT_CYCLES).join(", ")})`)
+  const rows = table.rows.map(([q, label, fallback]) => {
+    const v = params[`Q${q}`] ?? fallback
+    if (v === undefined) throw new RangeError(`Cycle ${number} ${table.name} needs Q${q} (${label.toLowerCase()})`)
+    return [q, v, label] as const
+  })
+  const lines = [`${KLARTEXT_PREFIX}CYCL DEF ${number} ${table.name} ~`, ...rows.map(([n, v, label], i) => `${KLARTEXT_PREFIX}  Q${n}=${sign(v, decimals)} ;${label}${i === rows.length - 1 ? "" : " ~"}`)]
+  return { define: lines, signature: lines.join("\n") }
+}
