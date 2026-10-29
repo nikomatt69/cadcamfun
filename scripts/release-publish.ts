@@ -138,12 +138,67 @@ export async function npmPublish(directory: string, channel: string): Promise<Pu
 }
 
 /**
+ * npm hides a token that cannot publish a scoped package behind 404.
+ *
+ * The same status is used for a missing package, a scope the account does not own,
+ * and an expired or read-only token. The desktop release has already been built by
+ * the time this runs, so that refusal must not throw the installers away.
+ */
+const NPM_AUTH_REFUSAL = /Scope not found|E404|E403|E401|403 Forbidden|401 Unauthorized|You do not have permission|Unable to authenticate|one-time password|EOTP/i;
+
+/** What a failed `npm publish` does to the rest of the release. */
+export type NpmFailureDisposition = "fallback" | "continue" | "fail";
+
+/**
+ * Decide whether a failed publish aborts the release.
+ *
+ * A configured fallback name is tried once. An authorization refusal without
+ * one lets the GitHub release continue. A transport error or a corrupt
+ * manifest still fails the release.
+ */
+export function npmFailureDisposition(log: string, fallbackName: string | undefined): NpmFailureDisposition {
+  if (!NPM_AUTH_REFUSAL.test(log)) return "fail";
+  return fallbackName === undefined ? "continue" : "fallback";
+}
+
+/** The registry's refusal, not the `npm error code` line that only repeats it. */
+function npmErrorSummary(log: string): string {
+  const lines = log
+    .split("\n")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.startsWith("npm error"));
+  const detail = lines.find((entry) => !entry.startsWith("npm error code") && /404|403|401|Forbidden|Unauthorized|Not Found/.test(entry));
+  const chosen = detail ?? lines.find((entry) => entry.startsWith("npm error code"));
+  return chosen?.replace(/^npm error\s*/, "") ?? "the registry refused the publish";
+}
+
+/**
+ * Say who the token is, without echoing the token or npm's error body.
+ *
+ * `whoami` prints only the account name. A rejected token has no name to print.
+ */
+async function npmIdentity(): Promise<string> {
+  const who = await captureCommand(["npm", "whoami"]);
+  const name = who.stdout.trim();
+  return who.code === 0 && /^[a-z0-9][a-z0-9._-]{0,40}$/i.test(name) ? name : "rejected";
+}
+
+/** The desktop release continues; the plugin stays on the version already on npm. */
+async function warnNpmRefused(name: string, version: string, log: string): Promise<void> {
+  const identity = await npmIdentity();
+  warn(
+    `${name}@${version} was not published (${npmErrorSummary(log)}). npm identity: ${identity}. The desktop release continues; NPM_TOKEN needs publish access to this package.`,
+  );
+}
+
+/**
  * Publish one package to npm.
  *
  * A version that is already on the registry is skipped, so a re-run of the release is
- * harmless. When the scope itself cannot be published — the owner may not own it — the
- * package falls back to a name that is, and only that case falls back: any other failure
- * (an expired token, a network error) must stay red.
+ * harmless. When the scope itself cannot be published — the owner may not own it, or
+ * the token can no longer write it — the package falls back to a configured name.
+ * If that also cannot be published, the GitHub release still continues. Any other
+ * failure (a network error, a corrupt manifest) stays red.
  */
 export async function publishNpmPackage(
   pkg: PublishablePackage,
@@ -166,22 +221,35 @@ export async function publishNpmPackage(
     return;
   }
   const log = publish.log;
-  const scopeProblem = /Scope not found|E404|E403|403 Forbidden|You do not have permission/i.test(log);
-  if (!scopeProblem || options.fallbackName === undefined) {
+  const disposition = npmFailureDisposition(log, options.fallbackName);
+  if (disposition === "fail") {
     process.stderr.write(log);
     throw new Error(`npm publish failed for ${pkg.name}@${pkg.version}`);
   }
-  warn(`${pkg.name} could not be published (scope missing or not writable); publishing as ${options.fallbackName}`);
+  if (disposition === "continue") {
+    await warnNpmRefused(pkg.name, pkg.version, log);
+    return;
+  }
+  const fallbackName = options.fallbackName;
+  if (fallbackName === undefined) {
+    await warnNpmRefused(pkg.name, pkg.version, log);
+    return;
+  }
+  warn(`${pkg.name} could not be published (scope missing or not writable); publishing as ${fallbackName}`);
   try {
     const parsed = JSON.parse(original) as Record<string, unknown>;
-    parsed["name"] = options.fallbackName;
+    parsed["name"] = fallbackName;
     await writeFile(manifestPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
     const retry = await npmPublish(pkg.directory, options.channel);
     if (retry.code !== 0) {
+      if (npmFailureDisposition(retry.log, undefined) === "continue") {
+        await warnNpmRefused(fallbackName, pkg.version, retry.log);
+        return;
+      }
       process.stderr.write(retry.log);
-      throw new Error(`npm publish failed for ${options.fallbackName}@${pkg.version}`);
+      throw new Error(`npm publish failed for ${fallbackName}@${pkg.version}`);
     }
-    say(`  published ${options.fallbackName}@${pkg.version}`);
+    say(`  published ${fallbackName}@${pkg.version}`);
   } finally {
     await writeFile(manifestPath, original, "utf8");
   }

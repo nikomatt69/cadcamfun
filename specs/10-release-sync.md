@@ -201,7 +201,7 @@ runs in CI and before a release.
 
 | Name | Kind | Needed for | Without it |
 | --- | --- | --- | --- |
-| `NPM_TOKEN` | secret | publishing the npm package | the release warns and continues |
+| `NPM_TOKEN` | secret | publishing the npm package | the release warns and continues. A token npm refuses (404 or 403 on a scoped publish) also warns and continues, so the desktop release is not dropped |
 | `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | secret | signing the updater bundles | the bundle fails |
 | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | secret | signing and notarising the macOS builds | ad-hoc signing when absent (a team ID alone is allowed); incomplete signing credentials fail |
 | `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD` | secret | signing the Windows builds | unsigned installers when absent; incomplete credentials fail |
@@ -295,6 +295,8 @@ Earlier checkpoints:
 - At the 2026-10-05 checkpoint, actual signed installers, notarization, GitHub publication, updater signature verification, runtime update flow and backup/rollback acceptance had not run. The updater key was still a placeholder; the local signing follow-up below supersedes that key configuration status.
 
 ## 7. Change log
+
+- 2026-10-29: CI run `40963436623` built all six desktop targets, then `npm publish` of `@cadcamfunv2/cadcamfun-nikcli-plugin@0.1.43` returned E404 and the job stopped before the GitHub release existed. The package is already on npm through 0.1.41 (published 2026-10-28 with the same workflow). npm uses 404 when a token cannot write a scoped package. An authorization refusal now warns and the desktop release continues; a configured fallback name is still tried first; a network error or a corrupt manifest still fails the job. `NPM_TOKEN` still needs publish access for the plugin to reach the registry.
 
 - 2026-10-26: repaired metadata preparation from failed CI run `40239061846`. Rebase ownership now comes from the stamped files, including `Cargo.lock`; conflict checkout uses the actual `--ours` option, then reapplies the release version and refreshes `bun.lock`. Remote dependency/configuration changes and earlier changelog entries survive. A real Git-rebase regression covers both lockfiles, version agreement, preserved remote changes and refusal of unrelated source conflicts. Intel macOS builds and the bundled-sidecar smoke now use `macos-15-intel`, while ARM64 uses `macos-15`, replacing the deprecated macOS 14/Rosetta path that failed in run `40238319444`. The smoke has a real startup deadline, bounded stderr diagnostics, exit/signal reporting, request deadlines and cleanup on failure. The downloaded Intel artifact and its locally hardened-runtime-signed copy pass startup, authenticated API, kernel-worker and graceful-shutdown checks on the local Apple Silicon host; this does not qualify the updated GitHub runner jobs. Actual CI publication with these changes still requires committing/pushing and a successful pipeline run.
 
