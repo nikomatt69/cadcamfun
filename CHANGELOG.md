@@ -3,6 +3,16 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.44 (October 2026)
+
+## Core
+
+- Typecheck the cloud worker against its own types
+
+## API
+
+- Regenerate clients for cloud enroll and pair
+
 ## v0.1.43 (October 2026)
 
 ## Core
