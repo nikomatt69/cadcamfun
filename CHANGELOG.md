@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.45 (October 2026)
+
+## Build and release
+
+- Keep the desktop release when npm refuses the plugin
+
 ## v0.1.44 (October 2026)
 
 ## Core
