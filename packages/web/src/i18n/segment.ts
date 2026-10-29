@@ -78,6 +78,14 @@ export function isStableSegment(key: string): boolean {
   if (marks >= 4) return true
   if (key.includes("=>") || key.startsWith("import ") || key.startsWith("export ") || key.startsWith("const ")) return true
   if (/^[A-Za-z0-9_./:@|+#-]+$/.test(key) && (key.includes("/") || key.includes("@"))) return true
+  if (!key.includes(" ") && /^[A-Za-z][\w-]*(\.[A-Za-z][\w-]*)+$/.test(key)) return true
+  if (!key.includes(" ") && key.includes("_") && /^[A-Za-z0-9_]+$/.test(key)) return true
+  if (!key.includes(" ") && key.includes("/")) return true
+  if (!key.includes(" ") && /^\{[A-Za-z0-9]+\}$/.test(key)) return true
+  if (!key.includes(" ") && /^[A-Za-z0-9]+Encoded$/.test(key)) return true
+  if (!key.includes(" ") && /^[a-z]+(?:[A-Z][A-Za-z0-9]*)+$/.test(key)) return true
+  if (!key.includes(" ") && /^[A-Z][a-z]+(?:[A-Z][a-z0-9]*)+$/.test(key)) return true
+  if (/^(GET|POST|PUT|PATCH|DELETE|HEAD)$/.test(key)) return true
   return false
 }
 

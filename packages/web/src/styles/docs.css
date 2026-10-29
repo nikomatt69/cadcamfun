@@ -325,6 +325,66 @@ html.docs-root {
   }
 }
 
+.doc-code figcaption {
+  border-bottom: var(--plate-stroke-w) solid var(--plate-ink);
+}
+
+[data-theme="dark"] .doc-code figcaption {
+  border-bottom: none;
+}
+
+.doc-code-copy {
+  display: inline-grid;
+  place-items: center;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgb(var(--terminal-muted));
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.doc-code-copy-label {
+  grid-area: 1 / 1;
+  transition:
+    opacity 200ms var(--ease-out),
+    filter 200ms var(--ease-out);
+}
+
+.doc-code-copy [data-label-done] {
+  opacity: 0;
+  filter: blur(2px);
+  color: rgb(var(--terminal-success));
+}
+
+.doc-code-copy[data-copied] [data-label-idle] {
+  opacity: 0;
+  filter: blur(2px);
+}
+
+.doc-code-copy[data-copied] [data-label-done] {
+  opacity: 1;
+  filter: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .doc-code-copy:hover {
+    color: rgb(var(--terminal-text));
+    background: var(--surface-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doc-code-copy-label {
+    filter: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .docs-rail-open {
     transform: none;

@@ -2,6 +2,7 @@
 import "../styles/global.css"
 import "../styles/docs.css"
 import "../styles/brand.css"
+import "../styles/api.css"
 import SocialMeta from "../components/SocialMeta.astro"
 import Navbar from "../components/Navbar.astro"
 import DocsSubnav from "../components/docs/DocsSubnav.astro"
@@ -9,6 +10,7 @@ import DocsSidebar from "../components/docs/DocsSidebar.astro"
 import DocToc from "../components/docs/DocToc.astro"
 import Mark from "../components/Mark.astro"
 import DocAssistant from "../components/docs/DocAssistant.astro"
+import DocViewerMount from "../components/docs/DocViewerMount.astro"
 import LocaleSelector from "../components/LocaleSelector.astro"
 import { LOCALE_CODES, localeInfo, localizePath, splitLocalePath } from "../i18n/locales"
 import { ui } from "../i18n/ui"
@@ -128,6 +130,129 @@ const dir = localeInfo(locale).dir
       </div>
     </footer>
     <DocAssistant pathname={pathname} />
+    <DocViewerMount />
+    <script>
+      const pg = document.querySelector<HTMLElement>("[data-api-playground]")
+      if (pg) {
+        const KEY = "cadcamfun.api.playground"
+        const msg = (name: string, fallback: string) =>
+          pg.querySelector<HTMLElement>(`[data-pg-msg="${name}"]`)?.textContent?.replace(/\s+/g, " ").trim() || fallback
+        type Conn = { baseUrl?: string; token?: string; session?: string }
+        const load = (): Conn => { try { return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Conn } catch { return {} } }
+        const save = (c: Conn) => localStorage.setItem(KEY, JSON.stringify(c))
+        const headersOf = (c: Conn, json: boolean): Record<string, string> => ({
+          ...(c.token ? { authorization: `Bearer ${c.token}` } : {}),
+          ...(c.session ? { "x-session-token": c.session } : {}),
+          ...(json ? { "content-type": "application/json" } : {}),
+        })
+        const inputs = [...pg.querySelectorAll<HTMLInputElement>("[data-pg-input]")]
+        const state = pg.querySelector<HTMLElement>("[data-pg-state]")!
+        const label = pg.querySelector<HTMLElement>("[data-pg-state-label]")!
+        const hint = pg.querySelector<HTMLElement>("[data-pg-hint]")!
+        const conn = load()
+        for (const input of inputs) {
+          const k = input.dataset.pgInput as keyof Conn
+          input.value = conn[k] ?? ""
+          input.addEventListener("change", () => { const c = load(); c[k] = input.value.trim(); save(c) })
+        }
+        const set = (s: string, text: string) => { state.dataset.pgState = s; label.textContent = text }
+        pg.querySelector("[data-pg-connect]")!.addEventListener("click", async () => {
+          const c = load()
+          if (!c.baseUrl) { hint.hidden = false; hint.textContent = msg("need-url", "Enter the sidecar URL first."); return }
+          set("busy", msg("checking", "Checking…"))
+          try {
+            const r = await fetch(new URL("/health", c.baseUrl), { headers: headersOf(c, false) })
+            set(r.ok ? "ok" : "error", r.ok ? msg("connected", "Connected") : `HTTP ${r.status}`)
+            hint.hidden = r.ok
+            if (!r.ok) hint.textContent = r.status === 401
+              ? msg("auth", "The sidecar answered 401: check the bearer token.")
+              : msg("status", "The sidecar answered {status}.").replaceAll("{status}", String(r.status))
+          } catch {
+            set("error", msg("unreachable", "Unreachable"))
+            hint.hidden = false
+            hint.textContent = msg("cors", "No response. Check the URL and port; from a non-loopback origin the browser blocks the request (CORS).")
+          }
+        })
+        pg.querySelector("[data-pg-clear]")!.addEventListener("click", () => { localStorage.removeItem(KEY); inputs.forEach((i) => (i.value = "")); set("idle", msg("idle", "Not connected")) })
+        const build = (form: HTMLElement): { url: string; init: RequestInit; curl: string } | string => {
+          const c = load()
+          if (!c.baseUrl) return msg("need-base", "Set the base URL in the playground at the top of the page.")
+          let path = form.dataset.path ?? "/"
+          const query = new URLSearchParams()
+          const headers = headersOf(c, form.dataset.media === "application/json")
+          for (const input of form.querySelectorAll<HTMLInputElement>("[data-try-param]")) {
+            const v = input.value.trim()
+            if (!v) continue
+            if (input.dataset.tryIn === "path") path = path.replace(`{${input.dataset.tryParam}}`, encodeURIComponent(v))
+            else if (input.dataset.tryIn === "header") headers[input.dataset.tryParam!] = v
+            else query.set(input.dataset.tryParam!, v)
+          }
+          if (/\{[^}]+\}/.test(path)) return msg("need-path", "Fill in every path parameter.")
+          const url = new URL(path, c.baseUrl)
+          query.forEach((v, k) => url.searchParams.set(k, v))
+          const body = form.querySelector<HTMLTextAreaElement>("[data-try-body]")?.value
+          const method = form.dataset.method ?? "GET"
+          const init: RequestInit = { method, headers, ...(body && method !== "GET" ? { body } : {}) }
+          const curl = [`curl -sS -X ${method} '${url}'`, ...Object.entries(headers).map(([k, v]) => `  -H '${k}: ${k === "authorization" ? "Bearer $CADCAMFUN_TOKEN" : v}'`), ...(init.body ? [`  --data '${String(init.body).replace(/'/g, "'\\''")}'`] : [])].join(" \\\n")
+          return { url: url.toString(), init, curl }
+        }
+        for (const form of document.querySelectorAll<HTMLElement>("[data-api-try]")) {
+          const note = form.querySelector<HTMLElement>("[data-try-note]")!
+          form.querySelector("[data-try-curl]")!.addEventListener("click", async () => {
+            const b = build(form)
+            if (typeof b === "string") { note.textContent = b; return }
+            await navigator.clipboard?.writeText(b.curl)
+            note.textContent = msg("copied", "Copied")
+          })
+          form.querySelector("[data-try-send]")!.addEventListener("click", async () => {
+            const b = build(form)
+            if (typeof b === "string") { note.textContent = b; return }
+            const result = form.querySelector<HTMLElement>("[data-try-result]")!
+            const status = form.querySelector<HTMLElement>("[data-try-status]")!
+            note.textContent = msg("sending", "Sending…")
+            const t0 = performance.now()
+            try {
+              const r = await fetch(b.url, b.init)
+              const text = await r.text()
+              let shown = text
+              try { shown = JSON.stringify(JSON.parse(text), null, 2) } catch {}
+              status.textContent = String(r.status)
+              status.className = `api-pill api-pill-status-${String(r.status)[0]}`
+              form.querySelector<HTMLElement>("[data-try-output]")!.textContent = shown.slice(0, 20000)
+              note.textContent = ""
+            } catch {
+              status.textContent = msg("failed", "failed")
+              status.className = "api-pill api-pill-status-5"
+              form.querySelector<HTMLElement>("[data-try-output]")!.textContent = msg("request-failed", "The request failed before a response: wrong URL, sidecar stopped, or blocked by CORS.")
+              note.textContent = ""
+            }
+            form.querySelector<HTMLElement>("[data-try-timing]")!.textContent = `${Math.round(performance.now() - t0)} ms`
+            form.querySelector<HTMLElement>("[data-try-url]")!.textContent = b.url
+            result.hidden = false
+          })
+        }
+      }
+    </script>
+    <script>
+      document.querySelectorAll<HTMLButtonElement>("[data-doc-code-copy]").forEach((button) => {
+        let timer = 0
+        button.addEventListener("click", async () => {
+          const code = button.closest("figure")?.querySelector("pre code")?.textContent ?? ""
+          try {
+            await navigator.clipboard.writeText(code)
+          } catch {
+            return
+          }
+          button.setAttribute("data-copied", "")
+          button.setAttribute("aria-label", button.dataset.labelCopied ?? "Copied")
+          window.clearTimeout(timer)
+          timer = window.setTimeout(() => {
+            button.removeAttribute("data-copied")
+            button.setAttribute("aria-label", button.dataset.labelCopy ?? "Copy code")
+          }, 1600)
+        })
+      })
+    </script>
     <script>
       const button = document.getElementById("mobile-docs-toggle")
       const sidebar = document.getElementById("docs-sidebar")

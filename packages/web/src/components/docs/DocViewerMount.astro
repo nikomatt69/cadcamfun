@@ -1,0 +1,151 @@
+---
+/** Mounts 3D previews that were copied into a translated article. */
+---
+<script>
+  import * as THREE from "three"
+  import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
+
+  type Solid = { kind: string; size?: number[]; profile?: number[][]; holes?: number[][][]; height?: number; radius?: number; at?: number[]; positions?: number[]; indices?: number[]; color?: string; opacity?: number }
+  type Label = { text: string; at: number[]; color?: string; size?: number }
+  type Path = { points: number[][]; rapid?: boolean; color?: string }
+
+  const mount = (figure: HTMLElement) => {
+    if (figure.dataset.mounted) return
+    figure.dataset.mounted = "1"
+    const host = figure.querySelector<HTMLElement>(".doc-viewer3d-canvas")!
+    const data = JSON.parse(figure.dataset.scene ?? "{}") as { solids: Solid[]; paths: Path[]; labels?: Label[]; animate: boolean }
+    let renderer: THREE.WebGLRenderer
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    } catch {
+      host.innerHTML = "<p style='padding:12px;font-size:13px'>WebGL is not available in this browser.</p>"
+      return
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    host.appendChild(renderer.domElement)
+    const scene = new THREE.Scene()
+    THREE.Object3D.DEFAULT_UP.set(0, 0, 1)
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 10000)
+    camera.up.set(0, 0, 1)
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6))
+    const sun = new THREE.DirectionalLight(0xffffff, 1.4)
+    sun.position.set(80, -120, 160)
+    scene.add(sun)
+
+    const group = new THREE.Group()
+    for (const s of data.solids) {
+      let geometry: THREE.BufferGeometry | undefined
+      const at = s.at ?? [0, 0, 0]
+      if (s.kind === "box" && s.size) {
+        geometry = new THREE.BoxGeometry(s.size[0], s.size[1], s.size[2])
+        geometry.translate(at[0] + s.size[0] / 2, at[1] + s.size[1] / 2, at[2] + s.size[2] / 2)
+      } else if (s.kind === "cylinder" && s.radius && s.height) {
+        geometry = new THREE.CylinderGeometry(s.radius, s.radius, s.height, 48)
+        geometry.rotateX(Math.PI / 2)
+        geometry.translate(at[0], at[1], at[2] + s.height / 2)
+      } else if (s.kind === "sphere" && s.radius) {
+        geometry = new THREE.SphereGeometry(s.radius, 32, 16)
+        geometry.translate(at[0], at[1], at[2])
+      } else if (s.kind === "mesh" && s.positions && s.indices) {
+        geometry = new THREE.BufferGeometry()
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(s.positions, 3))
+        geometry.setIndex(s.indices)
+        geometry.computeVertexNormals()
+        geometry.translate(at[0], at[1], at[2])
+      } else if (s.kind === "extrude" && s.profile) {
+        const shape = new THREE.Shape(s.profile.map(([x, y]) => new THREE.Vector2(x, y)))
+        for (const hole of s.holes ?? []) shape.holes.push(new THREE.Path(hole.map(([x, y]) => new THREE.Vector2(x, y))))
+        geometry = new THREE.ExtrudeGeometry(shape, { depth: s.height ?? 1, bevelEnabled: false, curveSegments: 32 })
+        geometry.translate(at[0], at[1], at[2])
+      }
+      if (!geometry) continue
+      const material = new THREE.MeshStandardMaterial({ color: s.color ?? "#8aa4c8", metalness: 0.2, roughness: 0.55, transparent: (s.opacity ?? 1) < 1, opacity: s.opacity ?? 1 })
+      const mesh = new THREE.Mesh(geometry, material)
+      group.add(mesh)
+      group.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 25), new THREE.LineBasicMaterial({ color: 0x1b2430 })))
+    }
+    const pathLines: THREE.Line[] = []
+    for (const p of data.paths) {
+      const geometry = new THREE.BufferGeometry().setFromPoints(p.points.map(([x, y, z]) => new THREE.Vector3(x, y, z)))
+      const material = p.rapid
+        ? new THREE.LineDashedMaterial({ color: p.color ?? "#e0a030", dashSize: 1.5, gapSize: 1 })
+        : new THREE.LineBasicMaterial({ color: p.color ?? "#2fbf71" })
+      const line = new THREE.Line(geometry, material)
+      if (p.rapid) line.computeLineDistances()
+      pathLines.push(line)
+      group.add(line)
+    }
+    for (const l of data.labels ?? []) {
+      const canvas = document.createElement("canvas")
+      const ctx = canvas.getContext("2d")
+      if (!ctx) continue
+      const font = "600 48px ui-monospace, SFMono-Regular, Menlo, monospace"
+      ctx.font = font
+      canvas.width = Math.ceil(ctx.measureText(l.text).width) + 24
+      canvas.height = 64
+      ctx.font = font
+      ctx.fillStyle = l.color ?? "#d8e0ea"
+      ctx.textBaseline = "middle"
+      ctx.fillText(l.text, 12, 32)
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true }))
+      const h = l.size ?? 4
+      sprite.scale.set((h * canvas.width) / canvas.height, h, 1)
+      sprite.position.set(l.at[0] ?? 0, l.at[1] ?? 0, l.at[2] ?? 0)
+      sprite.renderOrder = 10
+      group.add(sprite)
+    }
+    scene.add(group)
+
+    const box = new THREE.Box3().setFromObject(group)
+    const size = box.getSize(new THREE.Vector3())
+    const center = box.getCenter(new THREE.Vector3())
+    const radius = Math.max(size.length() / 2, 1)
+    const grid = new THREE.GridHelper(Math.ceil(radius * 3), 20, 0x5a6878, 0x3a4652)
+    grid.rotateX(Math.PI / 2)
+    grid.position.set(center.x, center.y, box.min.z - 0.01)
+    scene.add(grid)
+    scene.add(new THREE.AxesHelper(radius * 0.6))
+    camera.position.set(center.x + radius * 1.6, center.y - radius * 2.2, center.z + radius * 1.5)
+    const controls = new OrbitControls(camera, renderer.domElement)
+    controls.target.copy(center)
+    controls.enableDamping = true
+    controls.update()
+
+    const resize = () => {
+      const w = host.clientWidth, h = host.clientHeight
+      renderer.setSize(w, h)
+      camera.aspect = w / Math.max(h, 1)
+      camera.updateProjectionMatrix()
+    }
+    new ResizeObserver(resize).observe(host)
+    resize()
+
+    // Toolpath replay: reveal the path vertices progressively.
+    const total = pathLines.reduce((n, l) => n + l.geometry.attributes.position!.count, 0)
+    let shown = data.animate ? 0 : total
+    const reveal = () => {
+      let left = shown
+      for (const l of pathLines) {
+        const c = l.geometry.attributes.position!.count
+        l.geometry.setDrawRange(0, Math.max(0, Math.min(c, left)))
+        left -= c
+      }
+    }
+    figure.querySelector(".doc-viewer3d-play")?.addEventListener("click", () => { shown = 0 })
+    const loop = () => {
+      if (shown < total) { shown = Math.min(total, shown + Math.max(1, total / 240)); reveal() }
+      controls.update()
+      renderer.render(scene, camera)
+      requestAnimationFrame(loop)
+    }
+    reveal()
+    loop()
+  }
+
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) { mount(e.target as HTMLElement); io.unobserve(e.target) }
+  })
+  document.querySelectorAll<HTMLElement>(".doc-viewer3d").forEach((f) => io.observe(f))
+</script>

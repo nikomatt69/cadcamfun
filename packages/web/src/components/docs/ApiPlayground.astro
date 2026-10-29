@@ -19,6 +19,22 @@
     </div>
   </div>
   <p class="api-pg-hint" data-pg-hint hidden></p>
+  <div hidden data-pg-messages>
+    <span data-pg-msg="need-url">Enter the sidecar URL first.</span>
+    <span data-pg-msg="checking">Checking…</span>
+    <span data-pg-msg="connected">Connected</span>
+    <span data-pg-msg="unreachable">Unreachable</span>
+    <span data-pg-msg="idle">Not connected</span>
+    <span data-pg-msg="auth">The sidecar answered 401: check the bearer token.</span>
+    <span data-pg-msg="status" set:html={"The sidecar answered {status}."}></span>
+    <span data-pg-msg="cors">No response. Check the URL and port; from a non-loopback origin the browser blocks the request (CORS).</span>
+    <span data-pg-msg="need-base">Set the base URL in the playground at the top of the page.</span>
+    <span data-pg-msg="need-path">Fill in every path parameter.</span>
+    <span data-pg-msg="copied">Copied</span>
+    <span data-pg-msg="sending">Sending…</span>
+    <span data-pg-msg="failed">failed</span>
+    <span data-pg-msg="request-failed">The request failed before a response: wrong URL, sidecar stopped, or blocked by CORS.</span>
+  </div>
   <details class="api-details api-pg-details">
     <summary>How this works</summary>
     <div class="api-details-body">
