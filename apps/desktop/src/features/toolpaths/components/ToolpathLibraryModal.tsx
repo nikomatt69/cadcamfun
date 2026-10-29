@@ -43,7 +43,7 @@ export function PredefinedToolpathsLibrary(props: PredefinedToolpathsLibraryProp
     setLoading(true)
     void run<ReadonlyArray<LibraryPick>>(app.client.toolpathExtras.library({
       query: {
-        projectId: props.projectId || t("cam.workholding.none"),
+        projectId: props.projectId || "none",
         type: type() || undefined,
         operationType: operation() || undefined,
         search: search() || undefined

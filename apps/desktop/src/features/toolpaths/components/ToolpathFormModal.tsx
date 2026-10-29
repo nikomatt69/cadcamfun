@@ -44,8 +44,8 @@ export function ToolpathFormModal(props: ToolpathFormModalProps): JSX.Element {
     const row = props.row
     setName(row?.name ?? "")
     setDescription(row?.description ?? "")
-    setType(row?.type ?? t("pages.mill"))
-    setOperationType(row?.operationType ?? t("cam.strategy.contour"))
+    setType(row?.type ?? "mill")
+    setOperationType(row?.operationType ?? "contour")
     setProjectId(row?.projectId ?? props.defaultProjectId)
     setIsPublic(row?.isPublic ?? false)
   }, { defer: true }))
@@ -53,7 +53,7 @@ export function ToolpathFormModal(props: ToolpathFormModalProps): JSX.Element {
   // Keep the operation valid for the chosen machine type.
   createEffect(on(type, (next) => {
     const allowed = OPERATIONS_BY_TYPE[next] ?? []
-    if (!allowed.includes(operationType()) && operationType() !== "multi-operation" && operationType() !== "kernel") setOperationType(allowed[0] ?? t("cam.strategy.contour"))
+    if (!allowed.includes(operationType()) && operationType() !== "multi-operation" && operationType() !== "kernel") setOperationType(allowed[0] ?? "contour")
   }, { defer: true }))
 
   const submit = (event: Event): void => {

@@ -6,7 +6,7 @@ import { lookup } from "node:dns/promises"
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { isIP } from "node:net"
 import { join } from "node:path"
-import { checkServerIdentity } from "node:tls"
+import { checkServerIdentity, type PeerCertificate } from "node:tls"
 import { AppConfigService } from "../config.ts"
 import { CloudSyncError, MAX_CLOUD_BODY, sha256 } from "./cloud-transfer.ts"
 
@@ -57,7 +57,7 @@ export class CloudHttp extends Context.Service<CloudHttp, {
       headers.set("host", hostname)
       return fetch(target, {
         ...init, headers, redirect: "error", signal: init.signal ?? AbortSignal.timeout(120_000),
-        tls: { serverName: hostname, rejectUnauthorized: true, checkServerIdentity: (_peer, certificate) => checkServerIdentity(hostname, certificate) },
+        tls: { serverName: hostname, rejectUnauthorized: true, checkServerIdentity: (_peer: string, certificate: PeerCertificate) => checkServerIdentity(hostname, certificate) },
       })
     },
   }))
