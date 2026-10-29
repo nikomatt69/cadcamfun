@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { classifyPublishLog } from "./release-publish.ts";
+import { classifyPublishLog, npmFailureDisposition } from "./release-publish.ts";
 import { assertBunVersion, expectedBunVersion, RELEASE_REPOSITORY, RELEASE_UPDATER_ENDPOINT } from "./release-helpers.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -92,4 +92,19 @@ test("npm's answer about a publish is read as an outcome", () => {
   expect(classifyPublishLog("npm error code E409\nnpm error You cannot publish over the previously published versions: 6.0.0.")).toBe("already-published");
   expect(classifyPublishLog("npm error code E429\nnpm error Too Many Requests - retry later")).toBe("rate-limited");
   expect(classifyPublishLog("npm error code E403\nnpm error 403 Forbidden - PUT https://registry.npmjs.org/@nikoemme_%2Fcadcamfun-nikcli-plugin")).toBe("failed");
+});
+
+test("an npm 404 on a scoped package does not discard the desktop release", () => {
+  // Run 40963436623: the package exists, and npm answers a token that cannot
+  // publish it with 404. That refusal must not drop the installers.
+  const refused = [
+    "npm error code E404",
+    "npm error 404 Not Found - PUT https://registry.npmjs.org/@cadcamfunv2%2fcadcamfun-nikcli-plugin - Not found",
+    "npm error 404  '@cadcamfunv2/cadcamfun-nikcli-plugin@0.1.43' is not in this registry.",
+  ].join("\n");
+  expect(npmFailureDisposition(refused, undefined)).toBe("continue");
+  expect(npmFailureDisposition(refused, "@cadcamfunv2/cadcamfun-nikcli-plugin-public")).toBe("fallback");
+  expect(npmFailureDisposition("npm error code E403\nnpm error 403 Forbidden - PUT https://registry.npmjs.org/@scope%2Fpkg", undefined)).toBe("continue");
+  expect(npmFailureDisposition("npm error code E429\nnpm error Too Many Requests - retry later", undefined)).toBe("fail");
+  expect(npmFailureDisposition("npm error network socket hang up", undefined)).toBe("fail");
 });
