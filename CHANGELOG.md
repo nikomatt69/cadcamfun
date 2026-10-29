@@ -3,6 +3,36 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.43 (October 2026)
+
+## Core
+
+- Typecheck the cloud worker against its own types
+- Remove unused files and enhance GCodeEditor component
+- Add Docker support with Dockerfile and docker-compose configuration
+- Core/cam: Heidenhain thread milling as cycles 262 and 267 from the kernel's thread operation (spec 69 G4c.2)
+- Core/cam: Heidenhain bore milling as cycle 208, from the kernel's bore operation (spec 69 G4c.2)
+- Core/cam/post: Heidenhain drilling as the control's fixed cycles (spec 69 G4c.1)
+- Core/cam: variables, macros and jumps in the IR, every post and the replay (spec 69 G4)
+- Core/cam: tool changes of every control and multi-tool operations in the visualizer (spec 69 G4b)
+- Core/cam: profile tabs, lead-in and quality.tabs in kernel jobs (spec 69 A1)
+
+## Desktop
+
+- Desktop/cam: switch for the control's own cycles in the kernel panel (spec 69 G4c.2)
+
+## API
+
+- Regenerate clients for cloud enroll and pair
+
+## Web
+
+- Remove unused files and enhance internationalization support
+
+## Documentation
+
+- Step plan state after Heidenhain bore milling (spec 69 G4c.2)
+
 ## v0.1.42 (October 2026)
 
 ## Core
