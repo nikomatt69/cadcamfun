@@ -168,7 +168,7 @@ export function KeybindingsSettings(): JSX.Element {
                   <div class="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-sm dark:bg-blue-900/20" role="status">
                     <span class="font-medium">{t("keys.record")}</span>
                     <span class="text-xs text-slate-500">{t("keys.recordHint")}</span>
-                    <input type="text" value={typed()} onInput={(event) => setTyped(event.currentTarget.value)} placeholder="Mod+Shift+K" aria-label={t("keys.add")}
+                    <input type="text" value={typed()} onInput={(event) => setTyped(event.currentTarget.value)} placeholder="Mod+Shift+K" aria-label={t("keys.add")} // i18n-ok key chord
                       onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitTyped(row.command) } }}
                       class="w-40 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs dark:border-slate-600 dark:bg-slate-800" />
                     <button type="button" class="text-xs underline" onClick={finish}>{t("keys.cancel")}</button>

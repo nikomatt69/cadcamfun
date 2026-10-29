@@ -25,5 +25,6 @@
   "invitation.decline": "Rifiuta",
   "invitation.missing": "Questo link di invito non è valido oppure è già stato utilizzato.",
   "invitation.alreadyAccepted": "Questo invito è già stato accettato. Reindirizzamento alla dashboard…",
-  "invitation.signInFirst": "Accedi o crea un account per accettare questo invito."
+  "invitation.signInFirst": "Accedi o crea un account per accettare questo invito.",
+  "schema.invalid": "I valori non soddisfano lo schema"
 }

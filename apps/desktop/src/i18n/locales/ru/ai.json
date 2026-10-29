@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "Искать что-либо в диалоге на экране.",
   "ai.cmd.find.empty": "Укажите, что искать: /find wall thickness",
   "ai.cmd.older": "ранние",
-  "ai.cmd.older.desc": "Прочитать сообщения перед теми, что на экране."
+  "ai.cmd.older.desc": "Прочитать сообщения перед теми, что на экране.",
+  "ai.catalogue.searchModels": "Искать модели провайдера",
+  "ai.stream.invalidEvent": "Ассистент прислал недопустимое событие. Восстановление сессии может вернуть результаты.",
+  "ai.vision.captureFailed": "Не удалось снять область просмотра.",
+  "mcp.directory.search": "Поиск серверов..."
 }

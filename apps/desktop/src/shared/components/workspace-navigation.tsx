@@ -7,7 +7,14 @@ import {
   FileText, Globe, Home, Package, Puzzle, Server, Settings, SquarePlus, User, Users, Wrench, LayoutGrid, BookOpen
 } from "lucide-solid"
 
-interface NavItem { name: string; href: string; icon: JSX.Element; current?: boolean; children?: NavItem[] }
+interface NavItem {
+  readonly id: string
+  readonly name: string
+  readonly href: string
+  readonly icon: JSX.Element
+  readonly current?: boolean
+  readonly children?: readonly NavItem[]
+}
 
 
 export default function WorkspaceNavigation(props: { readonly isOpen: boolean }): JSX.Element {
@@ -17,47 +24,47 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
   const [expanded, setExpanded] = createSignal<Record<string, boolean>>({ projects: true, resources: false, settings: false })
   const path = () => location.pathname
   const navigation = (): NavItem[] => [
-    { name: "Dashboard", href: "/", icon: <Home size={20} />, current: path() === "/" },
+    { id: "dashboard", name: t("shell.dashboard"), href: "/", icon: <Home size={20} />, current: path() === "/" },
     {
-      name: "Projects", href: "#", icon: <FileText size={20} />, current: path().startsWith("/projects"),
+      id: "projects", name: t("shell.projects"), href: "#", icon: <FileText size={20} />, current: path().startsWith("/projects"),
       children: [
-        { name: "All Projects", href: "/projects", icon: <FileText size={16} />, current: path() === "/projects" },
-        { name: "New Project", href: "/projects", icon: <SquarePlus size={16} />, current: path() === "/projects" }
+        { id: "all-projects", name: t("shell.allProjects"), href: "/projects", icon: <FileText size={16} />, current: path() === "/projects" },
+        { id: "new-project", name: t("shell.newProject"), href: "/projects", icon: <SquarePlus size={16} />, current: path() === "/projects" }
       ]
     },
-    { name: "CAD Editor", href: "/cad", icon: <LayoutGrid size={20} />, current: path() === "/cad" },
-    { name: "CAM Editor", href: "/cam", icon: <Wrench size={20} />, current: path() === "/cam" },
-    { name: t("shell.manuals"), href: "/manuals", icon: <BookOpen size={20} />, current: path() === "/manuals" },
+    { id: "cad", name: t("shell.cad"), href: "/cad", icon: <LayoutGrid size={20} />, current: path() === "/cad" },
+    { id: "cam", name: t("shell.cam"), href: "/cam", icon: <Wrench size={20} />, current: path() === "/cam" },
+    { id: "manuals", name: t("shell.manuals"), href: "/manuals", icon: <BookOpen size={20} />, current: path() === "/manuals" },
     {
-      name: "Resources", href: "#", icon: <Package size={20} />,
+      id: "resources", name: t("shell.resources"), href: "#", icon: <Package size={20} />,
       current: ["/components", "/materials", "/machine", "/tools", "/drawing-instruments", "/library"].some((prefix) => path().startsWith(prefix)),
       children: [
-        { name: "Toolpaths", href: "/toolpaths", icon: <Wrench size={16} />, current: path().startsWith("/toolpaths") },
-        { name: "Components", href: "/components", icon: <Package size={16} />, current: path().startsWith("/components") },
-        { name: "Materials", href: "/materials", icon: <Database size={16} />, current: path().startsWith("/materials") },
-        { name: "Configurations", href: "/machine", icon: <Server size={16} />, current: path().startsWith("/machine") },
-        { name: "Tools", href: "/tools", icon: <Wrench size={16} />, current: path().startsWith("/tools") }
+        { id: "toolpaths", name: t("shell.toolpaths"), href: "/toolpaths", icon: <Wrench size={16} />, current: path().startsWith("/toolpaths") },
+        { id: "components", name: t("shell.components"), href: "/components", icon: <Package size={16} />, current: path().startsWith("/components") },
+        { id: "materials", name: t("shell.materials"), href: "/materials", icon: <Database size={16} />, current: path().startsWith("/materials") },
+        { id: "configurations", name: t("shell.configurations"), href: "/machine", icon: <Server size={16} />, current: path().startsWith("/machine") },
+        { id: "tools", name: t("shell.tools"), href: "/tools", icon: <Wrench size={16} />, current: path().startsWith("/tools") }
       ]
     },
-    { name: "Organization", href: "/organizations", icon: <Users size={20} />, current: path().startsWith("/organizations") },
-    { name: "Plugins", href: "/plugins", icon: <Puzzle size={20} />, current: path().startsWith("/plugins") },
-    { name: "Website", href: "https://cadcam.fun", icon: <Globe size={20} />, current: false },
+    { id: "organization", name: t("shell.organization"), href: "/organizations", icon: <Users size={20} />, current: path().startsWith("/organizations") },
+    { id: "plugins", name: t("shell.plugins"), href: "/plugins", icon: <Puzzle size={20} />, current: path().startsWith("/plugins") },
+    { id: "website", name: t("shell.website"), href: "https://cadcam.fun", icon: <Globe size={20} />, current: false },
     {
-      name: "AI", href: "/ai", icon: <Cpu size={20} />, current: path().startsWith("/ai"),
-      children: [{ name: "Dashboard", href: "/ai", icon: <BarChart2 size={16} />, current: path() === "/ai" }]
+      id: "ai", name: t("shell.ai"), href: "/ai", icon: <Cpu size={20} />, current: path().startsWith("/ai"),
+      children: [{ id: "ai-dashboard", name: t("shell.dashboard"), href: "/ai", icon: <BarChart2 size={16} />, current: path() === "/ai" }]
     },
     {
-      name: "Analytics", href: "#", icon: <BarChart2 size={20} />, current: path().startsWith("/analytics"),
+      id: "analytics", name: t("shell.analytics"), href: "#", icon: <BarChart2 size={20} />, current: path().startsWith("/analytics"),
       children: [
-        { name: "Dashboard", href: "/analytics", icon: <BarChart2 size={16} />, current: path() === "/analytics" },
-        { name: "Activity History", href: "/analytics/history", icon: <Activity size={16} />, current: path() === "/analytics/history" }
+        { id: "analytics-dashboard", name: t("shell.dashboard"), href: "/analytics", icon: <BarChart2 size={16} />, current: path() === "/analytics" },
+        { id: "history", name: t("shell.history"), href: "/analytics/history", icon: <Activity size={16} />, current: path() === "/analytics/history" }
       ]
     },
     {
-      name: "Settings", href: "#", icon: <Settings size={20} />, current: path().startsWith("/settings") || path() === "/profile",
+      id: "settings", name: t("shell.settings"), href: "#", icon: <Settings size={20} />, current: path().startsWith("/settings") || path() === "/profile",
       children: [
-        { name: "Profile", href: "/profile", icon: <User size={16} />, current: path() === "/profile" },
-        { name: "Preferences", href: "/settings", icon: <Settings size={16} />, current: path() === "/settings" }
+        { id: "profile", name: t("shell.profile"), href: "/profile", icon: <User size={16} />, current: path() === "/profile" },
+        { id: "preferences", name: t("shell.preferences"), href: "/settings", icon: <Settings size={16} />, current: path() === "/settings" }
       ]
     }
   ]
@@ -69,14 +76,14 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
 
   const NavEntry = (entry: { item: NavItem }): JSX.Element => {
     const hasChildren = () => (entry.item.children?.length ?? 0) > 0
-    const isExpanded = () => hasChildren() && !!expanded()[entry.item.name.toLowerCase()]
+    const isExpanded = () => hasChildren() && !!expanded()[entry.item.id]
     return (
       <div class="rounded-xl">
         <button type="button"
           aria-expanded={hasChildren() ? isExpanded() : undefined}
           class={`group flex rounded-xl items-center justify-center px-1 py-1 text-sm font-medium rounded-md cursor-pointer transition-colors ${entry.item.current ? "text-blue-700 dark:text-blue-400" : "text-gray-700 dark:text-gray-300"} ${entry.item.current ? "bg-gray-100 dark:bg-blue-900/20" : "hover:bg-gray-100 dark:hover:bg-gray-800/60"}`}
           onClick={() => {
-            if (hasChildren()) setExpanded((previous) => ({ ...previous, [entry.item.name.toLowerCase()]: !previous[entry.item.name.toLowerCase()] }))
+            if (hasChildren()) setExpanded((previous) => ({ ...previous, [entry.item.id]: !previous[entry.item.id] }))
             else if (entry.item.href !== "#") go(entry.item.href)
           }}
         >

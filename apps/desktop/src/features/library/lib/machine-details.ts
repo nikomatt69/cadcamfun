@@ -5,6 +5,7 @@
  * invented: the page says what the configuration says.
  */
 import { cam } from "@cadcamfun/core"
+import { t } from "../../../i18n/index.ts"
 
 export type MachineProfile = ReturnType<typeof cam.kernel.profileOfConfig>
 
@@ -23,67 +24,67 @@ export const machineSections = (profile: MachineProfile): ReadonlyArray<MachineS
   const sections: Array<MachineSection> = []
   const add = (title: string, facts: ReadonlyArray<MachineFact>): void => { if (facts.length > 0) sections.push({ title, facts }) }
   const controller = profile.controller
-  add("Machine", [
-    ...fact("Type", words(profile.kind)),
-    ...fact("Controller", controller),
-    ...fact("Post", profile.post ?? (controller === undefined ? undefined : cam.kernel.postOfController(controller))),
-    ...fact("Axes", profile.axes === undefined ? undefined : String(profile.axes)),
-    ...fact("Rigidity", profile.rigidity === undefined ? undefined : words(profile.rigidity))
+  add(t("library.machine.section.machine"), [
+    ...fact(t("library.field.type"), words(profile.kind)),
+    ...fact(t("library.field.controller"), controller),
+    ...fact(t("library.machine.post"), profile.post ?? (controller === undefined ? undefined : cam.kernel.postOfController(controller))),
+    ...fact(t("cam.axes"), profile.axes === undefined ? undefined : String(profile.axes)),
+    ...fact(t("library.detail.rigidity"), profile.rigidity === undefined ? undefined : words(profile.rigidity))
   ])
-  add("Axes", (profile.axisTable ?? []).flatMap((axis) => fact(
+  add(t("cam.axes"), (profile.axisTable ?? []).flatMap((axis) => fact(
     `${axis.id} (${axis.kind})`,
-    `${range(axis.min, axis.max, axis.kind === "rotary" ? "°" : "mm")}${axis.continuous === true ? ", continuous" : ""}${axis.sense === -1 ? ", reversed" : ""}`
+    `${range(axis.min, axis.max, axis.kind === "rotary" ? "°" : "mm")}${axis.continuous === true ? t("library.machine.continuous") : ""}${axis.sense === -1 ? t("library.machine.reversed") : ""}`
   )))
   const spindle = profile.spindle
-  add("Spindle", spindle === undefined ? [] : [
-    ...fact("Max speed", unit(spindle.maxRpm, "rpm")), ...fact("Min speed", unit(spindle.minRpm, "rpm")),
-    ...fact("Power", unit(spindle.powerKw, "kW")), ...fact("Torque", unit(spindle.torqueNm, "N·m"))
+  add(t("library.machine.section.spindle"), spindle === undefined ? [] : [
+    ...fact(t("library.machine.maxSpeed"), unit(spindle.maxRpm, "rpm")), ...fact(t("library.machine.minSpeed"), unit(spindle.minRpm, "rpm")),
+    ...fact(t("library.machine.power"), unit(spindle.powerKw, "kW")), ...fact(t("library.machine.torque"), unit(spindle.torqueNm, "N·m"))
   ])
-  add("Feeds", profile.feed === undefined ? [] : [...fact("Max feed", unit(profile.feed.max, "mm/min")), ...fact("Rapid traverse", unit(profile.feed.rapid, "mm/min"))])
+  add(t("library.machine.section.feeds"), profile.feed === undefined ? [] : [...fact(t("library.detail.maxFeed"), unit(profile.feed.max, "mm/min")), ...fact(t("library.machine.rapid"), unit(profile.feed.rapid, "mm/min"))])
   const volume = profile.workVolume, travel = profile.travel, table = profile.table
-  add("Work area", [
-    ...fact("Work volume", volume === undefined ? undefined : `${trim(volume.x)} × ${trim(volume.y)} × ${trim(volume.z)} mm`),
+  add(t("library.machine.section.work"), [
+    ...fact(t("library.machine.workVolume"), volume === undefined ? undefined : `${trim(volume.x)} × ${trim(volume.y)} × ${trim(volume.z)} mm`),
     ...(travel === undefined ? [] : [
-      ...fact("Travel X", range(travel.minX, travel.maxX, "mm")), ...fact("Travel Y", range(travel.minY, travel.maxY, "mm")), ...fact("Travel Z", range(travel.minZ, travel.maxZ, "mm"))
+      ...fact(t("library.machine.travelX"), range(travel.minX, travel.maxX, "mm")), ...fact(t("library.machine.travelY"), range(travel.minY, travel.maxY, "mm")), ...fact(t("library.machine.travelZ"), range(travel.minZ, travel.maxZ, "mm"))
     ]),
-    ...fact("Table", table === undefined ? undefined : `${trim(table.length)} × ${trim(table.width)} mm`),
-    ...fact("Gap under the stock", table === undefined ? undefined : unit(table.gap, "mm"))
+    ...fact(t("library.machine.table"), table === undefined ? undefined : `${trim(table.length)} × ${trim(table.width)} mm`),
+    ...fact(t("library.machine.gap"), table === undefined ? undefined : unit(table.gap, "mm"))
   ])
   const rotary = profile.rotary
-  add("Rotary table", rotary === undefined ? [] : [
-    ...fact("Layout", rotary.layout), ...fact("Tilt", rotary.tilt === undefined ? undefined : range(rotary.tilt.min, rotary.tilt.max, "°")),
-    ...fact("Rotation", rotary.rotation === undefined ? undefined : range(rotary.rotation.min, rotary.rotation.max, "°")),
-    ...fact("Pivot", rotary.pivot === undefined ? undefined : `${trim(rotary.pivot.x)}, ${trim(rotary.pivot.y)}, ${trim(rotary.pivot.z)} mm`),
-    ...fact("Tool centre point", rotary.tcp === undefined ? undefined : rotary.tcp === "control" ? "Applied by the control" : "Program in machine coordinates")
+  add(t("library.machine.section.rotary"), rotary === undefined ? [] : [
+    ...fact(t("library.machine.layout"), rotary.layout), ...fact(t("library.machine.tilt"), rotary.tilt === undefined ? undefined : range(rotary.tilt.min, rotary.tilt.max, "°")),
+    ...fact(t("library.machine.rotation"), rotary.rotation === undefined ? undefined : range(rotary.rotation.min, rotary.rotation.max, "°")),
+    ...fact(t("library.machine.pivot"), rotary.pivot === undefined ? undefined : `${trim(rotary.pivot.x)}, ${trim(rotary.pivot.y)}, ${trim(rotary.pivot.z)} mm`),
+    ...fact(t("library.machine.tcp"), rotary.tcp === undefined ? undefined : rotary.tcp === "control" ? t("library.machine.tcpControl") : t("library.machine.tcpProgram"))
   ])
   const turning = profile.turning
-  add("Turning", turning === undefined ? [] : [
-    ...fact("Max bar diameter", unit(turning.maxBarDiameter, "mm")), ...fact("Max bar length", unit(turning.maxBarLength, "mm")), ...fact("Chuck diameter", unit(turning.chuckDiameter, "mm")),
-    ...fact("B head", turning.b === undefined ? undefined : range(turning.b.min, turning.b.max, "°")), ...fact("C spindle", turning.c === undefined ? undefined : `${range(turning.c.min, turning.c.max, "°")}${turning.continuousC === true ? ", continuous" : ""}`),
-    ...fact("Y travel", unit(turning.yTravel, "mm")), ...fact("Turret", turning.turret === undefined ? undefined : words(turning.turret))
+  add(t("library.detail.turning"), turning === undefined ? [] : [
+    ...fact(t("library.machine.maxBarDiameter"), unit(turning.maxBarDiameter, "mm")), ...fact(t("library.machine.maxBarLength"), unit(turning.maxBarLength, "mm")), ...fact(t("library.machine.chuck"), unit(turning.chuckDiameter, "mm")),
+    ...fact(t("library.machine.bHead"), turning.b === undefined ? undefined : range(turning.b.min, turning.b.max, "°")), ...fact(t("library.machine.cSpindle"), turning.c === undefined ? undefined : `${range(turning.c.min, turning.c.max, "°")}${turning.continuousC === true ? t("library.machine.continuous") : ""}`),
+    ...fact(t("library.machine.yTravel"), unit(turning.yTravel, "mm")), ...fact(t("library.machine.turret"), turning.turret === undefined ? undefined : words(turning.turret))
   ])
   const changer = profile.toolChanger
-  add("Tool changer", changer === undefined ? [] : [
-    ...fact("Type", changer.type === undefined ? undefined : words(changer.type)), ...fact("Capacity", changer.capacity === undefined ? undefined : `${changer.capacity} tools`),
-    ...fact("Change time", unit(changer.changeSeconds, "s")), ...fact("Max tool diameter", unit(changer.maxToolDiameter, "mm")), ...fact("Max tool length", unit(changer.maxToolLength, "mm"))
+  add(t("library.machine.section.changer"), changer === undefined ? [] : [
+    ...fact(t("library.field.type"), changer.type === undefined ? undefined : words(changer.type)), ...fact(t("library.machine.capacity"), changer.capacity === undefined ? undefined : t("library.machine.toolCount", { count: changer.capacity })),
+    ...fact(t("library.machine.changeTime"), unit(changer.changeSeconds, "s")), ...fact(t("library.machine.maxToolDiameter"), unit(changer.maxToolDiameter, "mm")), ...fact(t("library.machine.maxToolLength"), unit(changer.maxToolLength, "mm"))
   ])
-  add("Coolant", profile.coolant === undefined ? [] : fact("Modes", profile.coolant.modes.length === 0 ? "None" : profile.coolant.modes.join(", ")))
+  add(t("library.detail.coolant"), profile.coolant === undefined ? [] : fact(t("library.machine.modes"), profile.coolant.modes.length === 0 ? t("library.machine.none") : profile.coolant.modes.join(", ")))
   const probing = profile.probing
-  add("Probing", probing === undefined ? [] : [
-    ...fact("Cycles", probing.cycles === undefined || probing.cycles.length === 0 ? undefined : probing.cycles.join(", ")),
-    ...fact("Stylus radius", unit(probing.stylusRadius, "mm")), ...fact("Probe feed", unit(probing.feed, "mm/min")), ...fact("Dialect", probing.dialect)
+  add(t("library.machine.section.probing"), probing === undefined ? [] : [
+    ...fact(t("library.machine.cycles"), probing.cycles === undefined || probing.cycles.length === 0 ? undefined : probing.cycles.join(", ")),
+    ...fact(t("library.machine.stylus"), unit(probing.stylusRadius, "mm")), ...fact(t("library.machine.probeFeed"), unit(probing.feed, "mm/min")), ...fact(t("library.machine.dialect"), probing.dialect)
   ])
   const accuracy = profile.accuracy
-  add("Accuracy", accuracy === undefined ? [] : [...fact("Positioning", unit(accuracy.positioningMm, "mm")), ...fact("Repeatability", unit(accuracy.repeatabilityMm, "mm")), ...fact("Spindle runout", unit(accuracy.runoutMm, "mm"))])
+  add(t("library.machine.section.accuracy"), accuracy === undefined ? [] : [...fact(t("library.machine.positioning"), unit(accuracy.positioningMm, "mm")), ...fact(t("library.machine.repeatability"), unit(accuracy.repeatabilityMm, "mm")), ...fact(t("library.machine.runout"), unit(accuracy.runoutMm, "mm"))])
   const printer = profile.printer
-  add("Printer", printer === undefined ? [] : [
-    ...fact("Technology", printer.technology),
-    ...fact("Bed", printer.bed === undefined ? undefined : `${trim(printer.bed.width)} × ${trim(printer.bed.depth)} mm${printer.bed.origin === "center" ? ", origin in the centre" : ""}`),
-    ...fact("Build height", unit(printer.buildHeight, "mm")), ...fact("Nozzle", unit(printer.nozzleDiameter, "mm")), ...fact("Filament", unit(printer.filamentDiameter, "mm")),
-    ...fact("Max nozzle temperature", unit(printer.maxNozzleTemperature, "°C")), ...fact("Max bed temperature", unit(printer.maxBedTemperature, "°C")), ...fact("Max speed", unit(printer.maxSpeed, "mm/s")),
-    ...fact("Kinematics", printer.kinematics), ...fact("Firmware", printer.flavor), ...fact("Extruder", printer.extruder)
+  add(t("library.machine.section.printer"), printer === undefined ? [] : [
+    ...fact(t("library.machine.technology"), printer.technology),
+    ...fact(t("library.machine.bed"), printer.bed === undefined ? undefined : `${trim(printer.bed.width)} × ${trim(printer.bed.depth)} mm${printer.bed.origin === "center" ? t("library.machine.originCentre") : ""}`),
+    ...fact(t("library.machine.buildHeight"), unit(printer.buildHeight, "mm")), ...fact(t("library.machine.nozzle"), unit(printer.nozzleDiameter, "mm")), ...fact(t("library.machine.filament"), unit(printer.filamentDiameter, "mm")),
+    ...fact(t("library.machine.maxNozzle"), unit(printer.maxNozzleTemperature, "°C")), ...fact(t("library.machine.maxBed"), unit(printer.maxBedTemperature, "°C")), ...fact(t("library.machine.maxSpeed"), unit(printer.maxSpeed, "mm/s")),
+    ...fact(t("library.machine.kinematics"), printer.kinematics), ...fact(t("library.machine.firmware"), printer.flavor), ...fact(t("library.machine.extruder"), printer.extruder)
   ])
-  add("Source", [...fact("Figures from", profile.reference?.source), ...fact("Notes", profile.reference?.notes)])
+  add(t("library.machine.section.source"), [...fact(t("library.machine.figuresFrom"), profile.reference?.source), ...fact(t("library.detail.notes"), profile.reference?.notes)])
   return sections
 }
 

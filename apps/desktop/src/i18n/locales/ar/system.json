@@ -25,5 +25,6 @@
   "invitation.decline": "رفض",
   "invitation.missing": "رابط الدعوة هذا غير صالح أو تم استخدامه بالفعل.",
   "invitation.alreadyAccepted": "تم قبول هذه الدعوة بالفعل. جارٍ التحويل إلى لوحة التحكم…",
-  "invitation.signInFirst": "سجّل الدخول أو أنشئ حسابًا لقبول هذه الدعوة."
+  "invitation.signInFirst": "سجّل الدخول أو أنشئ حسابًا لقبول هذه الدعوة.",
+  "schema.invalid": "القيم لا تطابق المخطط"
 }

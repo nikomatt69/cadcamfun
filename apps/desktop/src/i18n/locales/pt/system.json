@@ -25,5 +25,6 @@
   "invitation.decline": "Recusar",
   "invitation.missing": "Este link de convite é inválido ou já foi usado.",
   "invitation.alreadyAccepted": "Este convite já foi aceito. Redirecionando para o seu painel…",
-  "invitation.signInFirst": "Entre ou crie uma conta para aceitar este convite."
+  "invitation.signInFirst": "Entre ou crie uma conta para aceitar este convite.",
+  "schema.invalid": "Os valores não satisfazem o esquema"
 }

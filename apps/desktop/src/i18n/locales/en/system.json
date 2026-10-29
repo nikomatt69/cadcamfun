@@ -25,5 +25,6 @@
   "invitation.decline": "Decline",
   "invitation.missing": "This invitation link is invalid or has already been used.",
   "invitation.alreadyAccepted": "This invitation has already been accepted. Redirecting to your dashboard…",
-  "invitation.signInFirst": "Sign in or create an account to accept this invitation."
+  "invitation.signInFirst": "Sign in or create an account to accept this invitation.",
+  "schema.invalid": "The values do not satisfy the schema"
 }

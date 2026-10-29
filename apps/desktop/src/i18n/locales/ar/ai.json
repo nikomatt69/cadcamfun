@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "ابحث عن شيء في المحادثة الظاهرة.",
   "ai.cmd.find.empty": "حدد ما تبحث عنه: /find wall thickness",
   "ai.cmd.older": "أقدم",
-  "ai.cmd.older.desc": "اقرأ الرسائل السابقة للرسائل الظاهرة."
+  "ai.cmd.older.desc": "اقرأ الرسائل السابقة للرسائل الظاهرة.",
+  "ai.catalogue.searchModels": "ابحث في نماذج المزود",
+  "ai.stream.invalidEvent": "أرسل المساعد حدثًا غير صالح. قد يعيد استرداد الجلسة نتائجها.",
+  "ai.vision.captureFailed": "فشل التقاط نافذة العرض.",
+  "mcp.directory.search": "بحث في الخوادم..."
 }

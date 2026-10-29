@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "Cerca qualcosa nella conversazione a schermo.",
   "ai.cmd.find.empty": "Indica cosa cercare: /find wall thickness",
   "ai.cmd.older": "precedenti",
-  "ai.cmd.older.desc": "Leggi i messaggi precedenti a quelli a schermo."
+  "ai.cmd.older.desc": "Leggi i messaggi precedenti a quelli a schermo.",
+  "ai.catalogue.searchModels": "Cerca modelli del provider",
+  "ai.stream.invalidEvent": "L'assistente ha inviato un evento non valido. Recuperare la sessione può ripristinarne i risultati.",
+  "ai.vision.captureFailed": "Acquisizione della vista non riuscita.",
+  "mcp.directory.search": "Cerca server..."
 }

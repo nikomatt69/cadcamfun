@@ -125,5 +125,6 @@
   "pages.create.reusable.components.to.use.across.your.cad.drawings": "Créez des composants réutilisables dans vos dessins CAO.",
   "pages.create.component": "Créer un composant",
   "pages.create.toolpaths.to.generate.g.code.for.your.machine": "Créez des parcours pour générer le G-code de votre machine.",
-  "pages.search.projects": "Rechercher des projets…"
+  "pages.search.projects": "Rechercher des projets…",
+  "pages.drawing.deleteConfirm": "Supprimer le dessin « {name} » ?"
 }

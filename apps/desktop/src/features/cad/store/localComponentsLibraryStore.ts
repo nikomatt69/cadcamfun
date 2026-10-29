@@ -1,4 +1,5 @@
 import { create } from "../../../shared/state/zustand.ts"
+import { t } from "../../../i18n/index.ts"
 
 const STORAGE_KEY = "cadcam_local_components_library"
 
@@ -45,7 +46,7 @@ export const useLocalComponentsLibraryStore = create<ComponentsLibraryState>((se
   loadLibrary: () => {
     set({ isLoading: true, error: null })
     try { set({ components: read(), isLoading: false }) }
-    catch (error) { set({ error: `Failed to load components library: ${error instanceof Error ? error.message : "Unknown error"}`, isLoading: false }) }
+    catch (error) { set({ error: t("library.local.loadFailed", { error: error instanceof Error ? error.message : t("common.unknownError") }), isLoading: false }) }
   },
 
   saveLibrary: () => {
@@ -53,7 +54,7 @@ export const useLocalComponentsLibraryStore = create<ComponentsLibraryState>((se
       localStorage.setItem(STORAGE_KEY, JSON.stringify(get().components))
       return true
     } catch (error) {
-      set({ error: `Failed to save library: ${error instanceof Error ? error.message : "Storage limit may be exceeded"}` })
+      set({ error: t("library.local.saveFailed", { error: error instanceof Error ? error.message : t("library.local.storageLimit") }) })
       return false
     }
   },

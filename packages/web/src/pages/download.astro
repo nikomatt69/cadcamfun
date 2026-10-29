@@ -1,9 +1,12 @@
 ---
 import Layout from "../layouts/Layout.astro"
 import Navbar from "../components/Navbar.astro"
+import { text } from "../i18n/catalog"
+import { ui } from "../i18n/ui"
 
-export const prerender = true
+export const prerender = false
 
+const locale = Astro.locals.locale ?? "en"
 const description = "Download CADCAMFUN for macOS, Windows, and Linux. Desktop installers from the GitHub releases, with checksums."
 
 const brand = [
@@ -12,63 +15,81 @@ const brand = [
   { file: "logo-on-dark.png", label: "Logo on dark" },
   { file: "og-image.png", label: "Social image" },
 ]
+
+const labels = {
+  dmg: text(locale, "Disk image"),
+  msi: text(locale, "MSI installer"),
+  nsis: text(locale, "NSIS installer"),
+  deb: text(locale, "Debian package"),
+  rpm: text(locale, "RPM package"),
+  checksums: text(locale, "SHA-256 checksums"),
+  notes: text(locale, "Release notes"),
+  notInRelease: text(locale, "Not in this release."),
+  detected: text(locale, "Detected {os}. Matching builds are marked below."),
+  empty: text(locale, "No stable desktop installers are published yet. Build from source with the quickstart."),
+  failed: text(locale, "The release list could not be loaded. Open the GitHub releases page, or try again in a moment."),
+  loading: text(locale, "Loading releases…"),
+  version: text(locale, "Version"),
+  allReleases: text(locale, "All releases"),
+  copy: text(locale, "Copy"),
+}
 ---
 
 <Layout title="Download — CADCAMFUN" description={description}>
   <Navbar />
   <main id="main-content" class="page-section">
     <div class="page-shell">
-      <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-terminal-muted">Download</p>
-      <h1 class="font-display mt-3 max-w-3xl text-[clamp(2.2rem,5vw,3.6rem)] font-bold leading-[1.05] tracking-[-0.03em]">Get CADCAMFUN for your platform.</h1>
+      <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-terminal-muted">{ui(locale, "download")}</p>
+      <h1 class="font-display mt-3 max-w-3xl text-[clamp(2.2rem,5vw,3.6rem)] font-bold leading-[1.05] tracking-[-0.03em]">{text(locale, "Get CADCAMFUN for your platform.")}</h1>
       <p class="mt-4 max-w-2xl text-[16px] leading-relaxed text-terminal-muted">
-        Desktop installers for macOS, Windows, and Linux. Each file is the asset published on the matching GitHub release. The in-app updater covers macOS and Windows.
+        {text(locale, "Desktop installers for macOS, Windows, and Linux. Each file is the asset published on the matching GitHub release. The in-app updater covers macOS and Windows.")}
       </p>
       <p id="download-detected" class="mt-4 text-[14px] text-terminal-muted"></p>
 
       <div class="mt-8 flex flex-wrap items-end gap-4">
         <label class="block text-[13px] font-semibold" for="download-version">
-          Version
+          {labels.version}
           <select id="download-version" class="glass-chip mt-2 block bg-transparent px-3 py-2 text-[15px] font-medium"></select>
         </label>
-        <a id="download-notes" class="pressable text-[14px] font-semibold text-terminal-accent" href="https://github.com/nikomatt69/cadcamfun/releases">All releases</a>
+        <a id="download-notes" class="pressable text-[14px] font-semibold text-terminal-accent" href="https://github.com/nikomatt69/cadcamfun/releases">{labels.allReleases}</a>
       </div>
-      <p id="download-status" class="mt-6 text-[15px] text-terminal-muted" role="status">Loading releases…</p>
+      <p id="download-status" class="mt-6 text-[15px] text-terminal-muted" role="status">{labels.loading}</p>
       <div id="download-platforms" class="mt-8 flex flex-col gap-8"></div>
 
       <section class="mt-14" aria-labelledby="homebrew-heading">
-        <h2 id="homebrew-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">macOS with Homebrew</h2>
+        <h2 id="homebrew-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">{text(locale, "macOS with Homebrew")}</h2>
         <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">
-          When the release cask is published, this installs the macOS app. It does not replace the Windows or Linux packages above.
+          {text(locale, "When the release cask is published, this installs the macOS app. It does not replace the Windows or Linux packages above.")}
         </p>
         <div class="material mt-4 flex items-center justify-between gap-3 rounded-[var(--radius-card)] px-4 py-3">
           <code class="overflow-x-auto font-mono text-[13px]">brew install --cask nikomatt69/tap/cadcamfun</code>
-          <button id="homebrew-copy" type="button" class="pressable glass-chip shrink-0 px-3 py-1.5 text-[13px] font-semibold">Copy</button>
+          <button id="homebrew-copy" type="button" class="pressable glass-chip shrink-0 px-3 py-1.5 text-[13px] font-semibold">{labels.copy}</button>
         </div>
       </section>
 
       <section class="mt-14" aria-labelledby="updater-heading">
-        <h2 id="updater-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">Updates</h2>
+        <h2 id="updater-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">{text(locale, "Updates")}</h2>
         <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">
-          Installed macOS and Windows copies check <code>latest.json</code> on the latest GitHub release. Linux publishes <code>.deb</code> and <code>.rpm</code> only; there is no AppImage and no in-app Linux update. Checksums for a platform are the <code>SHA256SUMS</code> file on that platform’s release.
+          {text(locale, "Installed macOS and Windows copies check")} <code>latest.json</code> {text(locale, "on the latest GitHub release. Linux publishes")} <code>.deb</code> {text(locale, "and")} <code>.rpm</code> {text(locale, "only; there is no AppImage and no in-app Linux update. Checksums for a platform are the")} <code>SHA256SUMS</code> {text(locale, "file on that platform’s release.")}
         </p>
       </section>
 
       <section class="mt-14" aria-labelledby="companion-heading">
-        <h2 id="companion-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">iOS companion</h2>
+        <h2 id="companion-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">{text(locale, "iOS companion")}</h2>
         <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">
-          The phone app is not an App Store or TestFlight download. Build it from the repository and pair it with a desktop that is already running.
+          {text(locale, "The phone app is not an App Store or TestFlight download. Build it from the repository and pair it with a desktop that is already running.")}
         </p>
-        <a href="/docs/guides/companion-pairing" class="pressable mt-4 inline-flex text-[14px] font-semibold text-terminal-accent">Companion pairing</a>
+        <a href="/docs/guides/companion-pairing" class="pressable mt-4 inline-flex text-[14px] font-semibold text-terminal-accent">{text(locale, "Companion pairing")}</a>
       </section>
 
       <section class="mt-14" aria-labelledby="brand-heading">
-        <h2 id="brand-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">Brand</h2>
-        <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">The marks shipped with this site. Download a file directly; there is no separate kit archive.</p>
+        <h2 id="brand-heading" class="font-display text-[1.6rem] font-bold tracking-[-0.03em]">{text(locale, "Brand")}</h2>
+        <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-terminal-muted">{text(locale, "The marks shipped with this site. Download a file directly; there is no separate kit archive.")}</p>
         <ul class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {brand.map((item) => (
             <li class="material rounded-[var(--radius-card)] p-4">
               <img src={`/brand/${item.file}`} alt="" class="h-16 w-auto object-contain" />
-              <p class="mt-3 text-[14px] font-semibold">{item.label}</p>
+              <p class="mt-3 text-[14px] font-semibold">{text(locale, item.label)}</p>
               <a class="mt-1 inline-flex text-[13px] font-semibold text-terminal-accent" href={`/brand/${item.file}`} download>{item.file}</a>
             </li>
           ))}
@@ -76,27 +97,26 @@ const brand = [
       </section>
 
       <p class="mt-14 text-[14px] text-terminal-muted">
-        Developing the app from a clone uses <a class="font-semibold text-terminal-accent" href="/docs/guides/quickstart">Quickstart</a>, not these installers.
-        The asset list and updater limits are described in <a class="font-semibold text-terminal-accent" href="/docs/guides/install">Install</a>.
+        {text(locale, "Developing the app from a clone uses")} <a class="font-semibold text-terminal-accent" href="/docs/guides/quickstart">{text(locale, "Quickstart")}</a>{text(locale, ", not these installers. The asset list and updater limits are described in")} <a class="font-semibold text-terminal-accent" href="/docs/guides/install">{text(locale, "Install")}</a>.
       </p>
     </div>
   </main>
 </Layout>
 
-<script>
+<script define:vars={{ labels }}>
   type Kind = "dmg" | "msi" | "nsis" | "deb" | "rpm" | "checksums" | "notes"
   type Asset = { name: string; url: string; size: number; kind: Kind }
   type Platform = { slug: string; assets: Asset[] }
   type Version = { version: string; publishedAt: string; platforms: Platform[] }
 
   const KIND_LABEL: Record<Kind, string> = {
-    dmg: "Disk image",
-    msi: "MSI installer",
-    nsis: "NSIS installer",
-    deb: "Debian package",
-    rpm: "RPM package",
-    checksums: "SHA-256 checksums",
-    notes: "Release notes",
+    dmg: labels.dmg,
+    msi: labels.msi,
+    nsis: labels.nsis,
+    deb: labels.deb,
+    rpm: labels.rpm,
+    checksums: labels.checksums,
+    notes: labels.notes,
   }
   const SLUG_LABEL: Record<string, string> = {
     "macos-arm64": "Apple Silicon",
@@ -164,7 +184,7 @@ const brand = [
         if (!platform) {
           const empty = document.createElement("p")
           empty.className = "mt-2 text-[13px] text-terminal-muted"
-          empty.textContent = "Not in this release."
+          empty.textContent = labels.notInRelease
           card.append(empty)
         } else {
           const assets = document.createElement("ul")
@@ -191,7 +211,7 @@ const brand = [
   const highlighted = detectedSlugs()
   if (detected) {
     const os = highlighted[0]?.startsWith("macos") ? "macOS" : highlighted[0]?.startsWith("windows") ? "Windows" : highlighted[0]?.startsWith("linux") ? "Linux" : ""
-    detected.textContent = os ? `Detected ${os}. Matching builds are marked below.` : ""
+    detected.textContent = os ? labels.detected.replace("{os}", os) : ""
   }
 
   document.querySelector("#homebrew-copy")?.addEventListener("click", async () => {
@@ -208,7 +228,7 @@ const brand = [
     const body = (await response.json()) as { versions?: Version[] }
     versions = body.versions ?? []
     if (versions.length === 0) {
-      if (status) status.textContent = "No stable desktop installers are published yet. Build from source with the quickstart."
+      if (status) status.textContent = labels.empty
     } else if (versionSelect) {
       if (status) status.textContent = ""
       for (const version of versions) {
@@ -220,6 +240,6 @@ const brand = [
       render(versions[0])
     }
   } catch {
-    if (status) status.textContent = "The release list could not be loaded. Open the GitHub releases page, or try again in a moment."
+    if (status) status.textContent = labels.failed
   }
 </script>

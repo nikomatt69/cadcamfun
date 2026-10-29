@@ -172,7 +172,7 @@ function ProviderRow(props: {
           >
             <div class="space-y-1.5 pt-1">
               <div class="assistant-section-label">{t("ai.catalogue.modelsLabel")}</div>
-              <input type="search" class={FIELD} aria-label="Search provider models" placeholder="Search provider models" value={modelSearch()} onInput={(event) => { setModelSearch(event.currentTarget.value); setModelLimit(50) }} />
+              <input type="search" class={FIELD} aria-label={t("ai.catalogue.searchModels")} placeholder={t("ai.catalogue.searchModels")} value={modelSearch()} onInput={(event) => { setModelSearch(event.currentTarget.value); setModelLimit(50) }} />
               <ul class="assistant-model-list">
                 <For each={matchingModels().slice(0, modelLimit())}>
                   {(model) => (

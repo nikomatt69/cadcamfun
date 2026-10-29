@@ -112,7 +112,7 @@ export function TwoFactorScreen(): JSX.Element {
                 <div style={{ display: "flex", "flex-direction": "column", gap: "12px" }}>
                   <h2 class="ent-section__title">{t("twofactor.scanTitle")}</h2>
                   <div class="ent-card" style={{ padding: "14px", display: "flex", "justify-content": "center" }}>
-                    <img src={qrCode() ?? ""} alt="2FA QR Code" style={{ width: "176px", height: "176px" }} />
+                    <img src={qrCode() ?? ""} alt={t("twofactor.qrAlt")} style={{ width: "176px", height: "176px" }} />
                   </div>
                   <p class="ent-header__description">{t("twofactor.scanBody")}</p>
                   <form style={{ display: "flex", "flex-direction": "column", gap: "10px" }} onSubmit={handleVerifySetup}>

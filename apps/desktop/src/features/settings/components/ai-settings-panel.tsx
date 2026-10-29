@@ -30,20 +30,20 @@ const testConnection = async (endpointPath: string, apiKey: string | undefined):
     })
     if (!response.ok) {
       const errorText = await response.text()
-      return { success: false, message: `Connection error: ${response.status} - ${errorText}` }
+      return { success: false, message: t("settings.ai.connectionError", { status: response.status, detail: errorText }) }
     }
     const data = (await response.json()) as { protocol?: string; resources?: unknown[]; tools?: unknown[] }
     if (data.protocol !== undefined && data.resources !== undefined && data.tools !== undefined) {
       return {
         success: true,
-        message: `Connessione riuscita. Protocollo: ${data.protocol}, ${data.resources.length} risorse, ${data.tools.length} strumenti disponibili.`
+        message: t("settings.ai.connectionOk", { protocol: data.protocol, resources: data.resources.length, tools: data.tools.length })
       }
     }
-    return { success: false, message: "The response format is invalid." }
+    return { success: false, message: t("settings.ai.invalidFormat") }
   } catch (error) {
     return {
       success: false,
-      message: `Connection test failed: ${error instanceof Error ? error.message : String(error)}`
+      message: t("settings.ai.connectionFailed", { error: error instanceof Error ? error.message : String(error) })
     }
   }
 }
@@ -198,13 +198,12 @@ export function AISettingsPanel(): JSX.Element {
             class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
           />
           <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-            <span>Preciso (0.0)</span>
-            <span>Equilibrato (0.5)</span>
-            <span>Creativo (1.0)</span>
+            <span>{t("settings.ai.precise")}</span>
+            <span>{t("settings.ai.balancedTemp")}</span>
+            <span>{t("settings.ai.creative")}</span>
           </div>
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Control the randomness of responses. Lower values produce more consistent results, higher values more
-            creative.
+            {t("settings.ai.temperatureHint")}
           </p>
         </div>
 
@@ -217,7 +216,7 @@ export function AISettingsPanel(): JSX.Element {
                 {t("settings.ai.mcp")}
               </label>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Optimize AI requests with advanced semantic caching
+                {t("settings.ai.mcpHint")}
               </p>
             </div>
             <div class="relative inline-block w-12 align-middle select-none">
@@ -261,7 +260,7 @@ export function AISettingsPanel(): JSX.Element {
                       class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
                     />
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Default: uses the application&apos;s local endpoint.
+                      {t("settings.ai.mcpDefault")}
                     </p>
                   </div>
 
@@ -272,7 +271,7 @@ export function AISettingsPanel(): JSX.Element {
                     <input
                       type="password"
                       id="mcp-api-key"
-                      placeholder="Enter your MCP API key"
+                      placeholder={t("settings.ai.mcpKeyPlaceholder")}
                       value={mcpApiKey()}
                       autocomplete="off"
                       onInput={(event) => setMcpApiKey(event.currentTarget.value)}
@@ -290,12 +289,12 @@ export function AISettingsPanel(): JSX.Element {
                       onChange={(event) => updateSettings({ mcpStrategy: event.currentTarget.value as McpStrategy })}
                       class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
                     >
-                      <option value="aggressive">Aggressiva (massimo risparmio)</option>
-                      <option value="balanced">Bilanciata (predefinita)</option>
-                      <option value="conservative">Conservativa (massima precisione)</option>
+                      <option value="aggressive">{t("settings.ai.strategyAggressive")}</option>
+                      <option value="balanced">{t("settings.ai.strategyBalanced")}</option>
+                      <option value="conservative">{t("settings.ai.strategyConservative")}</option>
                     </select>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      The strategy determines when to reuse similar responses from previous requests.
+                      {t("settings.ai.strategyHint")}
                     </p>
                   </div>
 
@@ -436,9 +435,9 @@ export function AISettingsPanel(): JSX.Element {
                 class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
               />
               <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                <span>More suggestions (0.1)</span>
-                <span>Balanced (0.5)</span>
-                <span>Only relevant (0.9)</span>
+                <span>{t("settings.ai.moreSuggestions")}</span>
+                <span>{t("settings.ai.balancedSuggest")}</span>
+                <span>{t("settings.ai.onlyRelevant")}</span>
               </div>
             </div>
 

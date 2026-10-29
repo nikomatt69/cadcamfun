@@ -27,5 +27,6 @@
   "cad.height": "Höhe",
   "cad.depth": "Tiefe",
   "cad.snapSettings": "Fangeinstellungen",
-  "cad.enableSnapping": "Objektfang aktivieren"
+  "cad.enableSnapping": "Objektfang aktivieren",
+  "viewport.editor2d": "2D-Zeichnungseditor"
 }

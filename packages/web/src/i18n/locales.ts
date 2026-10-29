@@ -65,6 +65,10 @@ export const localeFromTag = (tag: string | null | undefined): Locale | null => 
 }
 
 /** Best shipped language from an `Accept-Language` header, honouring q-values. */
+/** Explicit `?lang=` wins, then the saved cookie, otherwise English. */
+export const localeFromChoice = (chosen: string | null | undefined, cookie: string | null | undefined): Locale =>
+  (isLocale(chosen) ? chosen : null) ?? (isLocale(cookie) ? cookie : null) ?? DEFAULT_LOCALE
+
 export const localeFromAcceptLanguage = (header: string | null | undefined): Locale | null => {
   if (!header) return null
   const ranked = header.split(",").map((part, index) => {

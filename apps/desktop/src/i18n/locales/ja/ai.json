@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "画面に表示されている会話内から探します。",
   "ai.cmd.find.empty": "検索内容を指定してください: /find 肉厚",
   "ai.cmd.older": "older",
-  "ai.cmd.older.desc": "画面に表示されているメッセージより前のメッセージを読みます。"
+  "ai.cmd.older.desc": "画面に表示されているメッセージより前のメッセージを読みます。",
+  "ai.catalogue.searchModels": "プロバイダのモデルを検索",
+  "ai.stream.invalidEvent": "アシスタントが無効なイベントを送りました。セッションを回復すると結果が戻ることがあります。",
+  "ai.vision.captureFailed": "ビューポートの取得に失敗しました。",
+  "mcp.directory.search": "サーバーを検索…"
 }

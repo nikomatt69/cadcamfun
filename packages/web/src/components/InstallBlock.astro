@@ -1,4 +1,7 @@
 ---
+import { text } from "../i18n/catalog"
+
+const locale = Astro.locals.locale ?? "en"
 const commands = `bun install
 bun test packages apps
 bun run desktop:dev`
@@ -7,19 +10,19 @@ bun run desktop:dev`
 <section class="page-section" aria-labelledby="start-heading">
   <div class="page-shell grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)] lg:items-center">
     <div>
-      <p class="font-mono text-eyebrow uppercase text-terminal-text">Quickstart</p>
+      <p class="font-mono text-eyebrow uppercase text-terminal-text">{text(locale, "Quickstart")}</p>
       <h2 id="start-heading" class="font-display mt-3 text-[clamp(1.8rem,3vw,2.5rem)] font-bold tracking-[-0.035em]">
-        One workspace. The desktop opens from here.
+        {text(locale, "One workspace. The desktop opens from here.")}
       </h2>
       <p class="mt-4 max-w-md text-[15px] leading-relaxed text-terminal-muted">
-        Published desktop installers are on the download page. These commands are for a source checkout: install with Bun, run the tests, then build the sidecar and open the Tauri window.
+        {text(locale, "Published desktop installers are on the download page. These commands are for a source checkout: install with Bun, run the tests, then build the sidecar and open the Tauri window.")}
       </p>
       <div class="mt-6 flex flex-wrap gap-4">
         <a href="/download" class="pressable inline-flex text-[14px] font-semibold text-terminal-accent">
-          Download installers
+          {text(locale, "Download installers")}
         </a>
         <a href="/docs/guides/quickstart" class="pressable inline-flex text-[14px] font-semibold text-terminal-accent">
-          Full quickstart
+          {text(locale, "Full quickstart")}
         </a>
       </div>
     </div>

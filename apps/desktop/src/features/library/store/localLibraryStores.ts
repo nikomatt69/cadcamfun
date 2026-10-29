@@ -4,6 +4,7 @@
  * The components library already lives in `cad/store/localComponentsLibraryStore.ts`.
  */
 import { create } from "../../../shared/state/zustand.ts"
+import { t } from "../../../i18n/index.ts"
 
 const TOOLS_STORAGE_KEY = "cadcam_local_tools_library"
 const MATERIALS_STORAGE_KEY = "cadcam_local_materials_library"
@@ -26,7 +27,7 @@ const store = (key: string, data: unknown): boolean => {
   } catch { return false }
 }
 
-const message = (error: unknown): string => (error instanceof Error ? error.message : "Unknown error")
+const message = (error: unknown): string => (error instanceof Error ? error.message : t("common.unknownError"))
 
 export interface LocalTool {
   id: string
@@ -73,14 +74,14 @@ export const useLocalToolsLibraryStore = create<ToolsLibraryState>((set, get) =>
   loadLibrary: () => {
     set({ isLoading: true, error: null })
     try { set({ tools: retrieve<LocalTool[]>(TOOLS_STORAGE_KEY) || [], isLoading: false }) }
-    catch (error) { set({ error: `Failed to load tools library: ${message(error)}`, isLoading: false }) }
+    catch (error) { set({ error: t("library.local.toolsLoadFailed", { error: message(error) }), isLoading: false }) }
   },
 
   saveLibrary: () => {
     try {
-      if (!store(TOOLS_STORAGE_KEY, get().tools)) { set({ error: "Failed to save library: Storage limit may be exceeded" }); return false }
+      if (!store(TOOLS_STORAGE_KEY, get().tools)) { set({ error: t("library.local.saveLimit") }); return false }
       return true
-    } catch (error) { set({ error: `Failed to save tools library: ${message(error)}` }); return false }
+    } catch (error) { set({ error: t("library.local.toolsSaveFailed", { error: message(error) }) }); return false }
   },
 
   addTool: (tool) => {
@@ -175,14 +176,14 @@ export const useLocalMaterialsLibraryStore = create<MaterialsLibraryState>((set,
   loadLibrary: () => {
     set({ isLoading: true, error: null })
     try { set({ materials: retrieve<LocalMaterial[]>(MATERIALS_STORAGE_KEY) || [], isLoading: false }) }
-    catch (error) { set({ error: `Failed to load materials library: ${message(error)}`, isLoading: false }) }
+    catch (error) { set({ error: t("library.local.materialsLoadFailed", { error: message(error) }), isLoading: false }) }
   },
 
   saveLibrary: () => {
     try {
-      if (!store(MATERIALS_STORAGE_KEY, get().materials)) { set({ error: "Failed to save library: Storage limit may be exceeded" }); return false }
+      if (!store(MATERIALS_STORAGE_KEY, get().materials)) { set({ error: t("library.local.saveLimit") }); return false }
       return true
-    } catch (error) { set({ error: `Failed to save materials library: ${message(error)}` }); return false }
+    } catch (error) { set({ error: t("library.local.materialsSaveFailed", { error: message(error) }) }); return false }
   },
 
   addMaterial: (material) => {

@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "Look for something in the conversation on screen.",
   "ai.cmd.find.empty": "Say what to look for: /find wall thickness",
   "ai.cmd.older": "older",
-  "ai.cmd.older.desc": "Read the messages before the ones on screen."
+  "ai.cmd.older.desc": "Read the messages before the ones on screen.",
+  "ai.catalogue.searchModels": "Search provider models",
+  "ai.stream.invalidEvent": "The assistant sent an invalid event. Recovering the session may restore its results.",
+  "ai.vision.captureFailed": "Viewport capture failed.",
+  "mcp.directory.search": "Search servers..."
 }

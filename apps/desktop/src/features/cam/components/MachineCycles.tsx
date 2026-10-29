@@ -3,9 +3,21 @@ import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Badge, Note, PanelCard } from "../../../shared/components/panel/ui.tsx"
 import { t } from "../../../i18n/index.ts"
 import { cycleIconFor } from "./MachineCycleIcons.tsx"
+import type { Key } from "../../../i18n/index.ts"
 import { availableCycles, controllerName, cycleSupport, defaultCycleValues, generateCycleCode, type CycleController, type CycleValues } from "./cycles/cycleApi.ts"
-import { groupByFamily, matchesFilter } from "./cycles/cycleFamilies.ts"
+import { groupByFamily, matchesFilter, type CycleFamily } from "./cycles/cycleFamilies.ts"
 import { ParameterForm } from "./cycles/ParameterForm.tsx"
+
+const FAMILY_LABEL: Record<CycleFamily, Key> = {
+  drilling: "cam.cycles.family.drilling",
+  thread: "cam.cycles.family.thread",
+  pocket: "cam.cycles.family.pocket",
+  contour: "cam.cycles.family.contour",
+  pattern: "cam.cycles.family.pattern",
+  transform: "cam.cycles.family.transform",
+  probing: "cam.cycles.family.probing",
+  other: "cam.cycles.family.other"
+}
 
 export type { CycleController } from "./cycles/cycleApi.ts"
 export interface MachineCyclesProps {
@@ -36,7 +48,7 @@ export default function MachineCycles(props: MachineCyclesProps): JSX.Element {
     <PanelCard title={t("cam.cycles.fixed")} actions={<Badge testId="cycles-count">{all().length}</Badge>}>
       <Show when={all().length > 0} fallback={<Note testId="cycles-unsupported">{t("cam.cycles.noCycles", { controller: controllerName(props.controllerType) })}</Note>}>
         <For each={groups()} fallback={<Note>{t("cam.cycles.noMatch")}</Note>}>{(group) => <>
-          <h4 class="panel-label" data-testid={`cycle-family-${group.family}`}>{t(`cam.cycles.family.${group.family}`)}</h4>
+          <h4 class="panel-label" data-testid={`cycle-family-${group.family}`}>{t(FAMILY_LABEL[group.family])}</h4>
           <div class="machine-cycle-list">
             <For each={group.items}>{(cycle) => <button type="button" data-cycle-id={cycle.id}
               class="machine-cycle-choice" aria-pressed={selectedCycleId() === cycle.id} onClick={() => selectCycle(cycle.id)}>

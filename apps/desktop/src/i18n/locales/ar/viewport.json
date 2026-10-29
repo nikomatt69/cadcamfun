@@ -27,5 +27,6 @@
   "cad.height": "الارتفاع",
   "cad.depth": "العمق",
   "cad.snapSettings": "إعدادات الالتقاط",
-  "cad.enableSnapping": "تفعيل الالتقاط"
+  "cad.enableSnapping": "تفعيل الالتقاط",
+  "viewport.editor2d": "محرر الرسم ثنائي الأبعاد"
 }

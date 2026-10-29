@@ -25,5 +25,6 @@
   "invitation.decline": "Rechazar",
   "invitation.missing": "Este enlace de invitación no es válido o ya se ha utilizado.",
   "invitation.alreadyAccepted": "Esta invitación ya se ha aceptado. Redirigiendo a tu panel…",
-  "invitation.signInFirst": "Inicia sesión o crea una cuenta para aceptar esta invitación."
+  "invitation.signInFirst": "Inicia sesión o crea una cuenta para aceptar esta invitación.",
+  "schema.invalid": "Los valores no cumplen el esquema"
 }

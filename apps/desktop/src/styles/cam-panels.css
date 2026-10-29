@@ -5,7 +5,7 @@
 .cam-editor { display: flex; flex-direction: column; gap: 10px; }
 .cam-editor .panel-header { margin: 0; padding-bottom: 8px; flex-wrap: wrap; }
 .cam-editor__facts { display: flex; flex-wrap: wrap; gap: 0 10px; margin: 0; font-size: 11px; color: var(--panel-text-muted); font-variant-numeric: tabular-nums; }
-.cam-editor__body { display: flex; flex: 1; min-height: 180px; border: 1px solid var(--panel-border-strong); border-radius: 4px; background: var(--panel-bg-inset); overflow: hidden; font: 12px/20px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.cam-editor__body { display: flex; flex: 1; min-height: 180px; border: 1px solid var(--panel-border-strong); border-radius: 4px; background: var(--panel-bg-inset); overflow: hidden; font: 12px/20px ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; }
 .cam-editor__body:focus-within { outline: 2px solid var(--panel-accent); outline-offset: -1px; }
 .cam-editor__gutter { flex: none; overflow: hidden; border-right: 1px solid var(--panel-border); color: var(--panel-text-faint); text-align: right; user-select: none; }
 .cam-editor__gutter-lines, .cam-editor__paint-lines { position: relative; width: max-content; min-width: 100%; will-change: transform; }
@@ -16,7 +16,7 @@
 .cam-editor__paint { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .cam-editor__band { position: absolute; left: 0; right: 0; height: 20px; margin-top: 10px; background: var(--panel-accent-soft); opacity: 0.55; pointer-events: none; }
 .cam-editor__gutter .cam-editor__band { opacity: 0.9; }
-.panel .cam-editor__code { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; resize: none; border: 0; border-radius: 0; padding: 10px 12px; background: transparent; color: var(--panel-text); font: inherit; white-space: pre; overflow: auto; tab-size: 2; outline: none; }
+.panel .cam-editor__code { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; resize: none; border: 0; border-radius: 0; padding: 10px 12px; background: transparent; color: var(--panel-text); font: inherit; white-space: pre; overflow: auto; outline: none; }
 .panel .cam-editor__code--painted { color: transparent; caret-color: var(--panel-text); }
 .panel .cam-editor__code--painted::selection { background: color-mix(in srgb, var(--panel-accent) 28%, transparent); }
 .cam-editor .gc-g { color: var(--panel-accent); }

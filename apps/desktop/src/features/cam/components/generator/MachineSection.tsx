@@ -2,6 +2,7 @@ import { For, type JSX } from "solid-js"
 import { Settings } from "lucide-solid"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { Field, INPUT, Section } from "./ui.tsx"
+import { KernelMachineControls } from "./KernelSection.tsx"
 import { t, type Key } from "../../../../i18n/index.ts"
 
 const MACHINES: ReadonlyArray<{ readonly id: "mill" | "lathe" | "3dprinter"; readonly label: Key }> = [
@@ -25,6 +26,7 @@ export function MachineSection(): JSX.Element {
           <For each={MACHINES}>{(machine) => <option value={machine.id}>{t(machine.label)}</option>}</For>
         </select>
       </Field>
+      <KernelMachineControls />
     </Section>
   )
 }

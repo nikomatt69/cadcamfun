@@ -238,7 +238,7 @@ export function SettingsScreen(): JSX.Element {
                       {t("settings.notif.comments")}
                     </label>
                     <p class="text-slate-500 dark:text-slate-400">
-                      Get notified when someone comments on your posts.
+                      {t("settings.notif.commentsHint")}
                     </p>
                   </div>
                 </div>
@@ -256,7 +256,7 @@ export function SettingsScreen(): JSX.Element {
                     <label for="mentions" class="font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.notif.mentions")}
                     </label>
-                    <p class="text-slate-500 dark:text-slate-400">Get notified when someone mentions you.</p>
+                    <p class="text-slate-500 dark:text-slate-400">{t("settings.notif.mentionsHint")}</p>
                   </div>
                 </div>
               </div>
@@ -266,14 +266,14 @@ export function SettingsScreen(): JSX.Element {
           {/* Native desktop notifications, synced with the DB feed and the paired phone */}
           <div class="mt-6">
             <fieldset>
-              <legend class="text-base font-medium text-slate-900 dark:text-white">Native desktop notifications</legend>
+              <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.notif.native")}</legend>
               <div class="mt-4 flex items-start">
                 <div class="flex items-center h-5">
                   <input id="native-notifications" name="native-notifications" type="checkbox" checked={app.settings.settings().nativeNotifications} onChange={(event) => app.settings.update({ nativeNotifications: event.currentTarget.checked })} class="h-4 w-4 accent-blue-600" />
                 </div>
                 <div class="ml-3 text-sm">
-                  <label for="native-notifications" class="font-medium text-slate-700 dark:text-slate-300">Show system notifications</label>
-                  <p class="text-slate-500 dark:text-slate-400">For workflow failures, pull requests, reviews and assistant commits. The feed stays synced with your phone either way.</p>
+                  <label for="native-notifications" class="font-medium text-slate-700 dark:text-slate-300">{t("settings.notif.system")}</label>
+                  <p class="text-slate-500 dark:text-slate-400">{t("settings.notif.systemHint")}</p>
                 </div>
               </div>
             </fieldset>
@@ -312,7 +312,7 @@ export function SettingsScreen(): JSX.Element {
                     <label for="push-everything" class="font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.notif.pushAll")}
                     </label>
-                    <p class="text-slate-500 dark:text-slate-400">Receive all push notifications.</p>
+                    <p class="text-slate-500 dark:text-slate-400">{t("settings.notif.pushAllHint")}</p>
                   </div>
                 </div>
                 <div class="flex items-start">
@@ -328,7 +328,7 @@ export function SettingsScreen(): JSX.Element {
                     <label for="push-email" class="font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.notif.pushEmail")}
                     </label>
-                    <p class="text-slate-500 dark:text-slate-400">Only receive notifications via email.</p>
+                    <p class="text-slate-500 dark:text-slate-400">{t("settings.notif.pushEmailHint")}</p>
                   </div>
                 </div>
                 <div class="flex items-start">
@@ -344,7 +344,7 @@ export function SettingsScreen(): JSX.Element {
                     <label for="push-nothing" class="font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.notif.pushNone")}
                     </label>
-                    <p class="text-slate-500 dark:text-slate-400">Do not receive push notifications.</p>
+                    <p class="text-slate-500 dark:text-slate-400">{t("settings.notif.pushNoneHint")}</p>
                   </div>
                 </div>
               </div>

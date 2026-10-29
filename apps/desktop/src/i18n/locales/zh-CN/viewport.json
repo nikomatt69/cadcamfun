@@ -27,5 +27,6 @@
   "cad.height": "高度",
   "cad.depth": "深度",
   "cad.snapSettings": "捕捉设置",
-  "cad.enableSnapping": "启用捕捉"
+  "cad.enableSnapping": "启用捕捉",
+  "viewport.editor2d": "二维图纸编辑器"
 }

@@ -1,19 +1,24 @@
 ---
+import { text } from "../../i18n/catalog"
+import type { Locale } from "../../i18n/locales"
+
 interface Item {
   title: string
   href: string
 }
 interface Props {
   items: Item[]
+  locale?: Locale
 }
+const locale: Locale = Astro.props.locale ?? Astro.locals.locale ?? "en"
 const { items } = Astro.props
 ---
 
-<nav class="not-prose mt-12 grid gap-3 sm:grid-cols-2" aria-label="Related">
+<nav class="not-prose mt-12 grid gap-3 sm:grid-cols-2" aria-label={text(locale, "Related")}>
   {items.map((item) => (
     <a href={item.href} class="lift pressable material rounded-[var(--radius-md)] px-4 py-3">
-      <span class="font-mono text-[10.5px] uppercase tracking-[0.14em] text-terminal-muted">Next</span>
-      <span class="mt-1 block font-display text-[1rem] font-bold">{item.title}</span>
+      <span class="font-mono text-[10.5px] uppercase tracking-[0.14em] text-terminal-muted">{text(locale, "Next")}</span>
+      <span class="mt-1 block font-display text-[1rem] font-bold">{text(locale, item.title)}</span>
     </a>
   ))}
 </nav>

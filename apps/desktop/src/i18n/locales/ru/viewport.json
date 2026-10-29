@@ -27,5 +27,6 @@
   "cad.height": "Высота",
   "cad.depth": "Глубина",
   "cad.snapSettings": "Настройки привязки",
-  "cad.enableSnapping": "Включить привязку"
+  "cad.enableSnapping": "Включить привязку",
+  "viewport.editor2d": "Редактор 2D-чертежа"
 }

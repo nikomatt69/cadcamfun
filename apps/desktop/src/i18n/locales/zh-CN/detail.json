@@ -125,5 +125,6 @@
   "pages.create.reusable.components.to.use.across.your.cad.drawings": "创建可在 CAD 图纸中重复使用的组件。",
   "pages.create.component": "创建组件",
   "pages.create.toolpaths.to.generate.g.code.for.your.machine": "创建刀具路径以生成机床 G 代码。",
-  "pages.search.projects": "搜索项目…"
+  "pages.search.projects": "搜索项目…",
+  "pages.drawing.deleteConfirm": "删除图纸“{name}”？"
 }

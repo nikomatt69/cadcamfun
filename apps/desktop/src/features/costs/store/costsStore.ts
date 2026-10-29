@@ -8,6 +8,7 @@
 import { createStore } from "solid-js/store"
 import type { AppState } from "../../../shared/state/context.ts"
 import { toast } from "../../../shared/ui/toast.tsx"
+import { t } from "../../../i18n/index.ts"
 import { toEstimateView, type CostEstimateView } from "../lib/costsFormat.ts"
 
 export interface ToolWearCost { id: string; toolId: string; wearRatePerMeter: number; replacementCost: number; replacementThreshold: number; currencyCode: string }
@@ -36,7 +37,7 @@ export const defaultSettings: CostSettings = {
 
 const describe = (cause: unknown): string => {
   if (typeof cause === "object" && cause !== null && typeof (cause as { message?: unknown }).message === "string") return (cause as { message: string }).message
-  return cause === undefined ? "Errore sconosciuto" : String(cause)
+  return cause === undefined ? t("costs.unknown") : String(cause)
 }
 
 const readSettings = (): CostSettings => {
@@ -96,7 +97,7 @@ export function createProductionCostsStore(app: AppState) {
         isLoading: false
       })
     } catch (cause) {
-      fail("Errore nel caricamento dei dati", cause, "Errore nel caricamento dei dati di costo")
+      fail(t("costs.toast.loadPrefix"), cause, t("costs.toast.loadFailed"))
     }
   }
 
@@ -105,9 +106,9 @@ export function createProductionCostsStore(app: AppState) {
       setState({ isLoading: true, error: null })
       const created = await run<any>(api().createToolWear({ payload: cost }))
       setState({ toolWearCosts: [...state.toolWearCosts, created as ToolWearCost], isLoading: false })
-      toast.success("Costo utensile aggiunto con successo")
+      toast.success(t("costs.toast.toolAdded"))
       return created.id as string
-    } catch (cause) { fail("Errore nell'aggiunta del costo di usura", cause, "Errore nell'aggiunta del costo utensile"); return "" }
+    } catch (cause) { fail(t("costs.toast.toolAddPrefix"), cause, t("costs.toast.toolAddFailed")); return "" }
   }
   const updateToolWearCost = async (id: string, updates: Partial<Omit<ToolWearCost, "id">>): Promise<boolean> => {
     try {
@@ -115,18 +116,18 @@ export function createProductionCostsStore(app: AppState) {
       const { toolId: _toolId, ...payload } = updates
       const updated = await run<any>(api().updateToolWear({ params: { id }, payload }))
       setState({ toolWearCosts: state.toolWearCosts.map((cost) => (cost.id === id ? { ...cost, ...(updated as ToolWearCost) } : cost)), isLoading: false })
-      toast.success("Costo utensile aggiornato con successo")
+      toast.success(t("costs.toast.toolUpdated"))
       return true
-    } catch (cause) { fail("Errore nell'aggiornamento del costo di usura", cause, "Errore nell'aggiornamento del costo utensile"); return false }
+    } catch (cause) { fail(t("costs.toast.toolUpdatePrefix"), cause, t("costs.toast.toolUpdateFailed")); return false }
   }
   const deleteToolWearCost = async (id: string): Promise<boolean> => {
     try {
       setState({ isLoading: true, error: null })
       await run(api().deleteToolWear({ params: { id } }))
       setState({ toolWearCosts: state.toolWearCosts.filter((cost) => cost.id !== id), isLoading: false })
-      toast.success("Costo utensile eliminato con successo")
+      toast.success(t("costs.toast.toolDeleted"))
       return true
-    } catch (cause) { fail("Errore nell'eliminazione del costo di usura", cause, "Errore nell'eliminazione del costo utensile"); return false }
+    } catch (cause) { fail(t("costs.toast.toolDeletePrefix"), cause, t("costs.toast.toolDeleteFailed")); return false }
   }
 
   const addMaterialCost = async (cost: Omit<MaterialCost, "id">): Promise<string> => {
@@ -134,9 +135,9 @@ export function createProductionCostsStore(app: AppState) {
       setState({ isLoading: true, error: null })
       const created = await run<any>(api().createMaterialCost({ payload: cost }))
       setState({ materialCosts: [...state.materialCosts, created as MaterialCost], isLoading: false })
-      toast.success("Costo materiale aggiunto con successo")
+      toast.success(t("costs.toast.materialAdded"))
       return created.id as string
-    } catch (cause) { fail("Errore nell'aggiunta del costo di materiale", cause, "Errore nell'aggiunta del costo materiale"); return "" }
+    } catch (cause) { fail(t("costs.toast.materialAddPrefix"), cause, t("costs.toast.materialAddFailed")); return "" }
   }
   const updateMaterialCost = async (id: string, updates: Partial<Omit<MaterialCost, "id">>): Promise<boolean> => {
     try {
@@ -144,18 +145,18 @@ export function createProductionCostsStore(app: AppState) {
       const { materialId: _materialId, ...payload } = updates
       const updated = await run<any>(api().updateMaterialCost({ params: { id }, payload }))
       setState({ materialCosts: state.materialCosts.map((cost) => (cost.id === id ? { ...cost, ...(updated as MaterialCost) } : cost)), isLoading: false })
-      toast.success("Costo materiale aggiornato con successo")
+      toast.success(t("costs.toast.materialUpdated"))
       return true
-    } catch (cause) { fail("Errore nell'aggiornamento del costo di materiale", cause, "Errore nell'aggiornamento del costo materiale"); return false }
+    } catch (cause) { fail(t("costs.toast.materialUpdatePrefix"), cause, t("costs.toast.materialUpdateFailed")); return false }
   }
   const deleteMaterialCost = async (id: string): Promise<boolean> => {
     try {
       setState({ isLoading: true, error: null })
       await run(api().deleteMaterialCost({ params: { id } }))
       setState({ materialCosts: state.materialCosts.filter((cost) => cost.id !== id), isLoading: false })
-      toast.success("Costo materiale eliminato con successo")
+      toast.success(t("costs.toast.materialDeleted"))
       return true
-    } catch (cause) { fail("Errore nell'eliminazione del costo di materiale", cause, "Errore nell'eliminazione del costo materiale"); return false }
+    } catch (cause) { fail(t("costs.toast.materialDeletePrefix"), cause, t("costs.toast.materialDeleteFailed")); return false }
   }
 
   const addOperationCost = async (cost: Omit<OperationCost, "id">): Promise<string> => {
@@ -163,27 +164,27 @@ export function createProductionCostsStore(app: AppState) {
       setState({ isLoading: true, error: null })
       const created = await run<any>(api().createOperationCost({ payload: cost }))
       setState({ operationCosts: [...state.operationCosts, created as OperationCost], isLoading: false })
-      toast.success("Costo operazione aggiunto con successo")
+      toast.success(t("costs.toast.operationAdded"))
       return created.id as string
-    } catch (cause) { fail("Errore nell'aggiunta del costo di operazione", cause, "Errore nell'aggiunta del costo operazione"); return "" }
+    } catch (cause) { fail(t("costs.toast.operationAddPrefix"), cause, t("costs.toast.operationAddFailed")); return "" }
   }
   const updateOperationCost = async (id: string, updates: Partial<Omit<OperationCost, "id">>): Promise<boolean> => {
     try {
       setState({ isLoading: true, error: null })
       const updated = await run<any>(api().updateOperationCost({ params: { id }, payload: updates }))
       setState({ operationCosts: state.operationCosts.map((cost) => (cost.id === id ? { ...cost, ...(updated as OperationCost) } : cost)), isLoading: false })
-      toast.success("Costo operazione aggiornato con successo")
+      toast.success(t("costs.toast.operationUpdated"))
       return true
-    } catch (cause) { fail("Errore nell'aggiornamento del costo di operazione", cause, "Errore nell'aggiornamento del costo operazione"); return false }
+    } catch (cause) { fail(t("costs.toast.operationUpdatePrefix"), cause, t("costs.toast.operationUpdateFailed")); return false }
   }
   const deleteOperationCost = async (id: string): Promise<boolean> => {
     try {
       setState({ isLoading: true, error: null })
       await run(api().deleteOperationCost({ params: { id } }))
       setState({ operationCosts: state.operationCosts.filter((cost) => cost.id !== id), isLoading: false })
-      toast.success("Costo operazione eliminato con successo")
+      toast.success(t("costs.toast.operationDeleted"))
       return true
-    } catch (cause) { fail("Errore nell'eliminazione del costo di operazione", cause, "Errore nell'eliminazione del costo operazione"); return false }
+    } catch (cause) { fail(t("costs.toast.operationDeletePrefix"), cause, t("costs.toast.operationDeleteFailed")); return false }
   }
 
   /** What the sidecar's `calculate` answers: the legacy "estimate" before it is saved (no id yet). */
@@ -193,7 +194,7 @@ export function createProductionCostsStore(app: AppState) {
       const estimate = await run<any>(api().calculateEstimate({ payload: { toolpathId } }))
       setState({ isLoading: false })
       return estimate
-    } catch (cause) { fail("Errore nel calcolo della stima dei costi", cause, "Errore nel calcolo dei costi di produzione"); return null }
+    } catch (cause) { fail(t("costs.toast.estimatePrefix"), cause, t("costs.toast.estimateFailed")); return null }
   }
 
   /** Saves a calculated estimate. Returns the saved view (with its id), or `null` when it failed. */
@@ -206,7 +207,7 @@ export function createProductionCostsStore(app: AppState) {
         const updated = await run<any>(api().updateEstimate({ params: { id: estimate.id }, payload: { currencyCode: estimate.currencyCode, details: estimate.details } }))
         saved = toEstimateView({ ...updated, details: estimate.details ?? updated.details })
         setState({ costEstimates: state.costEstimates.map((candidate) => (candidate.id === saved.id ? saved : candidate)), isLoading: false })
-        toast.success("Stima dei costi aggiornata con successo")
+        toast.success(t("costs.toast.estimateUpdated"))
       } else {
         const created = await run<any>(api().createEstimate({ payload: {
           toolpathId: estimate.toolpathId, totalCost: estimate.totalCost, materialCost: estimate.materialCost, toolWearCost: estimate.toolWearCost,
@@ -215,14 +216,14 @@ export function createProductionCostsStore(app: AppState) {
         } }))
         saved = toEstimateView(created)
         setState({ costEstimates: [...state.costEstimates, saved], isLoading: false })
-        toast.success("Stima dei costi creata con successo")
+        toast.success(t("costs.toast.estimateCreated"))
       }
       setState({ activeEstimateId: saved.id })
       return saved
     } catch (cause) {
       const message = describe(cause)
-      setState({ error: `Errore nel salvataggio della stima: ${message}`, isLoading: false })
-      toast.error(`Errore nel salvataggio della stima: ${message}`)
+      setState({ error: t("costs.toast.estimateSaveFailed", { message }), isLoading: false })
+      toast.error(t("costs.toast.estimateSaveFailed", { message }))
       return null
     }
   }
@@ -241,9 +242,9 @@ export function createProductionCostsStore(app: AppState) {
         isLoading: false,
         activeEstimateId: state.activeEstimateId === id ? null : state.activeEstimateId
       })
-      toast.success("Stima eliminata con successo")
+      toast.success(t("costs.toast.estimateDeleted"))
       return true
-    } catch (cause) { fail("Errore nell'eliminazione della stima", cause, "Errore nell'eliminazione della stima"); return false }
+    } catch (cause) { fail(t("costs.toast.estimateDeletePrefix"), cause, t("costs.toast.estimateDeleteFailed")); return false }
   }
 
   const updateSettings = async (updates: Partial<Omit<CostSettings, "id">>): Promise<boolean> => {
@@ -252,9 +253,9 @@ export function createProductionCostsStore(app: AppState) {
       const next = { ...state.settings, ...updates }
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next))
       setState({ settings: next, isLoading: false })
-      toast.success("Impostazioni aggiornate con successo")
+      toast.success(t("costs.toast.settingsUpdated"))
       return true
-    } catch (cause) { fail("Errore nell'aggiornamento delle impostazioni", cause, "Errore nell'aggiornamento delle impostazioni"); return false }
+    } catch (cause) { fail(t("costs.toast.settingsPrefix"), cause, t("costs.toast.settingsFailed")); return false }
   }
 
   return {

@@ -103,8 +103,8 @@ export function CommandPalette(props: Props): JSX.Element {
       <p class="assistant-palette-foot">
         <span><kbd>↑</kbd><kbd>↓</kbd>{t("ai.palette.nav")}</span>
         <span><kbd>⏎</kbd>{t("ai.palette.run")}</span>
-        <span><kbd>Tab</kbd>{t("ai.palette.complete")}</span>
-        <span><kbd>Esc</kbd>{t("ai.palette.close")}</span>
+        <span><kbd>Tab</kbd>{t("ai.palette.complete")}</span> {/* i18n-ok key name */}
+        <span><kbd>Esc</kbd>{t("ai.palette.close")}</span> {/* i18n-ok key name */}
       </p>
     </div>
   )

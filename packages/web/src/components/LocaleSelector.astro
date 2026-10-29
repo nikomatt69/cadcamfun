@@ -23,7 +23,12 @@ const onDocs = bare === "/docs" || bare.startsWith("/docs/")
     select.addEventListener("change", () => {
       const code = select.value
       document.cookie = `cadcamfun_locale=${code}; Path=/; Max-Age=31536000; SameSite=Lax`
-      if (!onDocs) { window.location.reload(); return }
+      if (!onDocs) {
+        const url = new URL(window.location.href)
+        url.searchParams.set("lang", code)
+        window.location.href = `${url.pathname}${url.search}`
+        return
+      }
       const target = code === "en" ? bare : `/${code}${bare}`
       window.location.href = `${target}?lang=${encodeURIComponent(code)}`
     })

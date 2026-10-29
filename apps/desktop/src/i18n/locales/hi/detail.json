@@ -125,5 +125,6 @@
   "pages.create.reusable.components.to.use.across.your.cad.drawings": "CAD ड्रॉइंग में पुनः उपयोग करने योग्य घटक बनाएँ।",
   "pages.create.component": "घटक बनाएँ",
   "pages.create.toolpaths.to.generate.g.code.for.your.machine": "मशीन के लिए G-code बनाने हेतु टूलपाथ बनाएँ।",
-  "pages.search.projects": "प्रोजेक्ट खोजें…"
+  "pages.search.projects": "प्रोजेक्ट खोजें…",
+  "pages.drawing.deleteConfirm": "ड्राइंग \"{name}\" हटाएँ?"
 }

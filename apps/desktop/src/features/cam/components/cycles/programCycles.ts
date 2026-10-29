@@ -1,5 +1,6 @@
 /**
- * Cycles found in the program text, for the "Cycles in the program" section: ISO canned cycles (G73-G79, G81-G89),
+ * Cycles found in the program text, for the "Cycles in the program" section: ISO canned cycles (G73-G79, G81-G89,
+ * including a modal line such as `G99 G81`),
  * Heidenhain `CYCL DEF n` blocks with their `Qnnn=` rows and their calls (`CYCL CALL`, `L ... M99`), and Siemens
  * `CYCLEnn(...)` style calls. Pure text analysis, no editing.
  */
@@ -9,7 +10,8 @@ export type ProgramCycle =
   | { readonly kind: "heidenhain-call"; readonly line: number; readonly text: string }
   | { readonly kind: "siemens"; readonly line: number; readonly text: string; readonly name: string; readonly args: ReadonlyArray<string> }
 
-const ISO = /^\s*G(7[3-9]|8[1-9])\b/i
+/** A canned-cycle word anywhere in the code of the line (`G81` or `G99 G81`), not only at the start. */
+const ISO = /\bG(7[3-9]|8[1-9])\b/i
 const CYCL_DEF = /^\s*(?:\d+\s+)?CYCL\s+DEF\s+(\d+(?:\.\d+)?)\s*(.*)$/i
 const CYCL_CALL = /^\s*(?:\d+\s+)?CYCL\s+CALL\b/i
 const LINE_CALL = /^\s*(?:\d+\s+)?L\b.*\bM99\b/i
@@ -41,7 +43,8 @@ export const findProgramCycles = (gcode: string): ReadonlyArray<ProgramCycle> =>
     if (CYCL_CALL.test(text) || LINE_CALL.test(text)) { found.push({ kind: "heidenhain-call", line: index, text: text.trim() }); continue }
     const siemens = SIEMENS.exec(text)
     if (siemens) { found.push({ kind: "siemens", line: index, text: text.trim(), name: (siemens[1] ?? "").toUpperCase(), args: (siemens[2] ?? "").split(",").map((arg) => arg.trim()) }); continue }
-    if (ISO.test(text)) found.push({ kind: "iso", line: index, text: text.trim() })
+    const code = text.replace(/\([^)]*\)/g, "").replace(/;.*$/, "")
+    if (ISO.test(code)) found.push({ kind: "iso", line: index, text: text.trim() })
   }
   return found
 }

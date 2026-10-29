@@ -11,6 +11,7 @@
  *   instead of inside it, so the thumb doesn't get clipped).
  */
 import { type JSX, Show, createUniqueId, createSignal } from "solid-js"
+import { t } from "../../i18n/index.ts"
 
 export interface SliderProps {
   readonly value: number
@@ -91,7 +92,7 @@ export function NumberStepper(props: NumberStepperProps): JSX.Element {
         <label class="ui-stepper-label">{props.label}</label>
       </Show>
       <div class="ui-stepper-row">
-        <button type="button" class="ui-stepper-btn" aria-label="Decrease" disabled={props.disabled === true} onClick={() => props.onChange(Math.max(min(), props.value - step()))}>−</button>
+        <button type="button" class="ui-stepper-btn" aria-label={t("common.decrease")} disabled={props.disabled === true} onClick={() => props.onChange(Math.max(min(), props.value - step()))}>−</button>
         <input
           class="ui-stepper-input"
           type="text"
@@ -102,7 +103,7 @@ export function NumberStepper(props: NumberStepperProps): JSX.Element {
           onBlur={commit}
           onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit() } }}
         />
-        <button type="button" class="ui-stepper-btn" aria-label="Increase" disabled={props.disabled === true} onClick={() => props.onChange(Math.min(max(), props.value + step()))}>+</button>
+        <button type="button" class="ui-stepper-btn" aria-label={t("common.increase")} disabled={props.disabled === true} onClick={() => props.onChange(Math.min(max(), props.value + step()))}>+</button>
       </div>
       <span class="ui-stepper-hint" aria-hidden="true">{fmt()(props.value)}</span>
     </div>

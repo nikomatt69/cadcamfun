@@ -32,6 +32,35 @@ export function extractTitle(html: string) {
   return decodeHtml(match?.[1].replace(/<[^>]+>/g, "").trim() || "CADCAMFUN documentation")
 }
 
+function parsed(html: string): Document {
+  return domino.createDocument(html, true)
+}
+
+/** The page body, without the layout header that the localized route renders itself. */
+export function extractArticleBody(html: string): string {
+  const body = parsed(html).querySelector(".content-body")
+  return body?.innerHTML ?? extractDocument(html)
+}
+
+export function extractSubtitle(html: string): string {
+  return parsed(html).querySelector("p.text-page-subtitle")?.textContent?.replace(/\s+/g, " ").trim() ?? ""
+}
+
+export function extractDescription(html: string): string {
+  return parsed(html).querySelector('meta[name="description"]')?.getAttribute("content")?.replace(/\s+/g, " ").trim() ?? ""
+}
+
+export function extractToc(html: string): Array<{ title: string; href: string; depth: number }> {
+  const items: Array<{ title: string; href: string; depth: number }> = []
+  parsed(html).querySelectorAll("a.doc-toc-link").forEach((link) => {
+    const title = link.textContent?.replace(/\s+/g, " ").trim() ?? ""
+    const href = link.getAttribute("href") ?? ""
+    if (!title || !href) return
+    items.push({ title, href, depth: Number(link.getAttribute("data-depth") ?? "2") || 2 })
+  })
+  return items
+}
+
 /**
  * Converts the `data-llm-document` article of a docs page to GFM Markdown.
  *

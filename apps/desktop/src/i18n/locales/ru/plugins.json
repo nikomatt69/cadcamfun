@@ -7,5 +7,8 @@
   "plugins.dropPackage": "Перетащите пакет плагина сюда",
   "plugins.browsePackage": "или нажмите, чтобы выбрать файл (.zip или .vsix)",
   "plugins.invalidPackage": "Недопустимый тип файла. Загрузите пакет плагина (.zip или .vsix)",
-  "plugins.packageTooLarge": "Файл слишком большой. Максимальный размер — 10MB"
+  "plugins.packageTooLarge": "Файл слишком большой. Максимальный размер — 10MB",
+  "plugins.search": "Поиск плагинов...",
+  "plugins.none": "Плагины не найдены",
+  "plugins.noneMatch": "Ни один плагин не подходит под поиск."
 }

@@ -542,5 +542,9 @@
   "shell.engine.recovered": "計算エンジンが復旧しました。",
   "shell.engine.failed": "計算エンジンを再起動できませんでした。続行するにはアプリを再起動してください。",
   "update.noneAvailable": "インストールできるアップデートはありません。もう一度アップデートを確認してください。",
-  "update.busy": "別のアップデート処理が実行中です。しばらくしてからもう一度お試しください。"
+  "update.busy": "別のアップデート処理が実行中です。しばらくしてからもう一度お試しください。",
+  "shell.notifications.unread": "未読 {count}",
+  "shell.notifications.markAll": "すべて既読にする",
+  "shell.notifications.empty": "通知はまだありません。プロジェクト、ワークフロー、アシスタントの更新がここに出ます。",
+  "twofactor.qrAlt": "2FAのQRコード"
 }

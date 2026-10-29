@@ -25,5 +25,6 @@
   "invitation.decline": "Ablehnen",
   "invitation.missing": "Dieser Einladungslink ist ungültig oder wurde bereits verwendet.",
   "invitation.alreadyAccepted": "Diese Einladung wurde bereits angenommen. Sie werden zu Ihrem Dashboard weitergeleitet…",
-  "invitation.signInFirst": "Melden Sie sich an oder erstellen Sie ein Konto, um diese Einladung anzunehmen."
+  "invitation.signInFirst": "Melden Sie sich an oder erstellen Sie ein Konto, um diese Einladung anzunehmen.",
+  "schema.invalid": "Die Werte erfüllen das Schema nicht"
 }

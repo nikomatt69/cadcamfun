@@ -21,7 +21,7 @@ import {
   generationCount,
   type ResourceKind
 } from "../lib/resource-generation.ts"
-import { t } from "../../../i18n/index.ts"
+import { t, type Key } from "../../../i18n/index.ts"
 
 const INPUT = "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
 const LABEL = "mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
@@ -52,7 +52,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
   const submit = (): void => {
     const store = ai
     if (store === undefined) {
-      toast.error("The assistant is not available: open a project and configure a provider, then try again.")
+      toast.error(t("library.generate.unavailable"))
       return
     }
     const prompt = buildGenerationPrompt({
@@ -66,7 +66,8 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
     // Reuse the assistant, not a second pipeline: the brief goes through the same session the panel shows.
     app.setPanelOpen(true)
     void store.send(prompt)
-    toast.success(`Generating ${quantity() === 1 ? spec.singular.toLowerCase() : `${quantity()} ${spec.plural.toLowerCase()}`} — follow the assistant in the panel.`)
+    const what = quantity() === 1 ? t(`library.kind.${props.kind}.oneLower` as Key) : `${quantity()} ${t(`library.kind.${props.kind}.lower` as Key)}`
+    toast.success(t("library.generate.progress", { what }))
     // The next generation starts from a clean form, not from the previous request.
     setRequest("")
     setQuantity(MIN_GENERATION_COUNT)
@@ -76,37 +77,37 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
   }
 
   return (
-    <Modal open={props.open} title={`Generate ${spec.plural}`} onClose={props.onClose} wide>
+    <Modal open={props.open} title={t("library.generate.title", { name: t(`library.kind.${props.kind}.many` as Key) })} onClose={props.onClose} wide>
       <p class="text-sm text-slate-600 dark:text-slate-400">
-        The assistant builds {spec.plural.toLowerCase()} from your description and writes them through the same libraries this page lists, filling every parameter.
+        {t("library.generate.intro", { name: t(`library.kind.${props.kind}.lower` as Key) })}
       </p>
 
       <Show when={props.kind === "components" && (props.projectName === undefined || props.projectName === "")}>
         <p class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200" role="alert" data-testid="generate-no-project">
-          No project is open: the assistant builds the geometry in the open project, so open or create one first.
+          {t("library.generate.noProject")}
         </p>
       </Show>
 
       <div>
-        <label for="generate-request" class={LABEL}>What should be generated?</label>
+        <label for="generate-request" class={LABEL}>{t("library.generate.what")}</label>
         <textarea
           id="generate-request"
           name="request"
           rows={3}
           class={INPUT}
           maxLength={MAX_REQUEST_CHARS}
-          placeholder={spec.placeholder}
+          placeholder={t(`library.generate.placeholder.${props.kind}` as Key)}
           value={request()}
           onInput={(event) => setRequest(event.currentTarget.value)}
         />
         <div class="mt-2 flex flex-wrap gap-1.5">
-          <For each={spec.examples}>{(example) => (
+          <For each={spec.examples}>{(example, index) => (
             <button
               type="button"
               class="rounded-full border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:text-blue-300"
-              onClick={() => setRequest(example)}
+              onClick={() => setRequest(t(`library.generate.ex.${props.kind}.${index()}` as Key))}
             >
-              {example}
+              {t(`library.generate.ex.${props.kind}.${index()}` as Key)}
             </button>
           )}</For>
         </div>
@@ -114,7 +115,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label for="generate-quantity" class={LABEL}>How many?</label>
+          <label for="generate-quantity" class={LABEL}>{t("library.generate.howMany")}</label>
           <input
             id="generate-quantity"
             name="quantity"
@@ -129,12 +130,12 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
         <div class="flex flex-col justify-end gap-1.5 text-sm text-slate-700 dark:text-slate-300">
           <label class="inline-flex items-center gap-2">
             <input type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700" checked={makePublic()} onChange={(event) => setMakePublic(event.currentTarget.checked)} />
-            Make the new {spec.plural.toLowerCase()} {t("save.publicProject")}
+            {t("library.generate.makePublic", { name: t(`library.kind.${props.kind}.lower` as Key), visibility: t("save.publicProject") })}
           </label>
           <Show when={props.kind !== "components"}>
             <label class="inline-flex items-center gap-2">
               <input type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700" checked={setDefault()} onChange={(event) => setSetDefault(event.currentTarget.checked)} />
-              Set them as the project defaults
+              {t("library.generate.setDefault")}
             </label>
           </Show>
         </div>
@@ -142,7 +143,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
 
       <div class="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/40">
         <button type="button" class="flex w-full items-center justify-between text-left text-sm font-medium text-slate-700 dark:text-slate-200" onClick={() => setShowParameters(!showParameters())} aria-expanded={showParameters()}>
-          <span>Parameters the assistant fills ({spec.parameters.length})</span>
+          <span>{t("library.generate.parameters", { count: spec.parameters.length })}</span>
           <span class="text-slate-400">{showParameters() ? t("update.hide") : t("cad.createComponent.show")}</span>
         </button>
         <Show when={showParameters()}>
@@ -150,14 +151,14 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
             <For each={spec.parameters}>{(parameter) => (
               <li class="flex gap-2 text-xs text-slate-600 dark:text-slate-400">
                 <code class="font-mono text-blue-600 dark:text-blue-400">{parameter.name}</code>
-                <span>{parameter.hint}</span>
+                <span>{t(`library.generate.hint.${props.kind}.${parameter.name}` as Key)}</span>
               </li>
             )}</For>
           </ul>
         </Show>
       </div>
 
-      <p class="text-xs text-slate-500 dark:text-slate-400">{spec.note}</p>
+      <p class="text-xs text-slate-500 dark:text-slate-400">{t(`library.generate.note.${props.kind}` as Key)}</p>
 
       <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
         <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-800" onClick={props.onClose}>{t("common.cancel")}</button>
@@ -168,7 +169,7 @@ export function ResourceGeneratorDialog(props: ResourceGeneratorProps): JSX.Elem
           disabled={request().trim() === ""}
           onClick={submit}
         >
-          <Sparkles size={16} aria-hidden="true" />Generate with AI
+          <Sparkles size={16} aria-hidden="true" />{t("library.detail.generateAi")}
         </button>
       </div>
     </Modal>

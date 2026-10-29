@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "在屏幕上的对话中查找内容。",
   "ai.cmd.find.empty": "说明要查找的内容：/find 壁厚",
   "ai.cmd.older": "更早",
-  "ai.cmd.older.desc": "阅读屏幕上这些消息之前的消息。"
+  "ai.cmd.older.desc": "阅读屏幕上这些消息之前的消息。",
+  "ai.catalogue.searchModels": "搜索供应商模型",
+  "ai.stream.invalidEvent": "助手发送了无效事件。恢复会话也许能找回结果。",
+  "ai.vision.captureFailed": "视口截取失败。",
+  "mcp.directory.search": "搜索服务器…"
 }

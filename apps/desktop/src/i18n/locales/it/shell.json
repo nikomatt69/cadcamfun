@@ -14,7 +14,7 @@
   "shell.collapseSidebar": "Riduci barra laterale",
   "shell.expandSidebar": "Espandi barra laterale",
   "shell.closeSidebar": "Chiudi barra laterale",
-  "shell.dashboard": "Dashboard",
+  "shell.dashboard": "Cruscotto",
   "shell.projects": "Progetti",
   "shell.allProjects": "Tutti i progetti",
   "shell.newProject": "Nuovo progetto",
@@ -542,5 +542,9 @@
   "shell.engine.recovered": "Il motore di calcolo è nuovamente in funzione.",
   "shell.engine.failed": "Non è stato possibile riavviare il motore di calcolo. Riavvia l'app per continuare.",
   "update.noneAvailable": "Non c'è alcun aggiornamento da installare. Controlla di nuovo gli aggiornamenti.",
-  "update.busy": "Un'altra operazione di aggiornamento è in corso. Riprova tra poco."
+  "update.busy": "Un'altra operazione di aggiornamento è in corso. Riprova tra poco.",
+  "shell.notifications.unread": "{count} non lette",
+  "shell.notifications.markAll": "Segna tutte come lette",
+  "shell.notifications.empty": "Nessuna notifica. Qui compariranno aggiornamenti di progetti, flussi e assistente.",
+  "twofactor.qrAlt": "Codice QR 2FA"
 }

@@ -542,5 +542,9 @@
   "shell.engine.recovered": "عاد محرك الحساب إلى العمل.",
   "shell.engine.failed": "تعذّر إعادة تشغيل محرك الحساب. أعد تشغيل التطبيق للمتابعة.",
   "update.noneAvailable": "لا يوجد تحديث لتثبيته. ابحث عن تحديثات مرة أخرى.",
-  "update.busy": "تعمل عملية تحديث أخرى. حاول بعد لحظات."
+  "update.busy": "تعمل عملية تحديث أخرى. حاول بعد لحظات.",
+  "shell.notifications.unread": "{count} غير مقروءة",
+  "shell.notifications.markAll": "تعليم الكل كمقروء",
+  "shell.notifications.empty": "لا إشعارات بعد. ستظهر هنا تحديثات المشاريع وسير العمل والمساعد.",
+  "twofactor.qrAlt": "رمز QR للتحقق بخطوتين"
 }

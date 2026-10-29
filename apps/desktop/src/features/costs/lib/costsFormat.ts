@@ -2,6 +2,7 @@
  * Formatting + report helpers of the legacy `productionCostsService` (locale `it-IT`, as there), plus the
  * mapping from the sidecar's estimate shape to the one the legacy screens read (`details.materialVolume`, ...).
  */
+import { currentLocale, t } from "../../../i18n/index.ts"
 
 export interface EstimateDetailsView {
   materialId?: string | undefined
@@ -34,11 +35,11 @@ export interface CostEstimateView {
 }
 
 export function formatCurrency(value: number, currencyCode: string = "EUR"): string {
-  return new Intl.NumberFormat("it-IT", { style: "currency", currency: currencyCode }).format(value)
+  return new Intl.NumberFormat(currentLocale(), { style: "currency", currency: currencyCode }).format(value)
 }
 
 export function formatPercentage(value: number): string {
-  return new Intl.NumberFormat("it-IT", { style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value / 100)
+  return new Intl.NumberFormat(currentLocale(), { style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value / 100)
 }
 
 export function formatTime(minutes: number): string {
@@ -56,29 +57,29 @@ export function formatDimension(value: number): string {
 }
 
 export function generateCostReport(estimate: CostEstimateView, includeDetails: boolean = false): string {
-  let report = `--- Cost Report ---
-Toolpath ID: ${estimate.toolpathId}
-Total Cost: ${formatCurrency(estimate.totalCost, estimate.currencyCode)}
-Date: ${new Date(estimate.updatedAt).toLocaleString("it-IT")}
+  let report = `${t("costs.report.title")}
+${t("costs.report.toolpath", { id: estimate.toolpathId })}
+${t("costs.report.total", { cost: formatCurrency(estimate.totalCost, estimate.currencyCode) })}
+${t("costs.report.date", { date: new Date(estimate.updatedAt).toLocaleString(currentLocale()) })}
 
-Breakdown:
-- Material Cost: ${formatCurrency(estimate.materialCost, estimate.currencyCode)}
-- Tool Wear Cost: ${formatCurrency(estimate.toolWearCost, estimate.currencyCode)}
-- Machine Time: ${formatTime(estimate.machineTime)}
-- Machine Time Cost: ${formatCurrency(estimate.machineTimeCost, estimate.currencyCode)}
-- Operator Time Cost: ${formatCurrency(estimate.operatorTimeCost, estimate.currencyCode)}
-- Setup Cost: ${formatCurrency(estimate.setupCost, estimate.currencyCode)}
+${t("costs.report.breakdown")}
+- ${t("costs.report.material", { cost: formatCurrency(estimate.materialCost, estimate.currencyCode) })}
+- ${t("costs.report.toolWear", { cost: formatCurrency(estimate.toolWearCost, estimate.currencyCode) })}
+- ${t("costs.report.machineTime", { time: formatTime(estimate.machineTime) })}
+- ${t("costs.report.machineTimeCost", { cost: formatCurrency(estimate.machineTimeCost, estimate.currencyCode) })}
+- ${t("costs.report.operator", { cost: formatCurrency(estimate.operatorTimeCost, estimate.currencyCode) })}
+- ${t("costs.report.setup", { cost: formatCurrency(estimate.setupCost, estimate.currencyCode) })}
 `
   if (includeDetails && estimate.details) {
-    report += "\nDetails:\n"
-    if (estimate.details.materialId) report += `- Material ID: ${estimate.details.materialId}\n`
-    if (estimate.details.toolId) report += `- Tool ID: ${estimate.details.toolId}\n`
-    if (estimate.details.materialVolume) report += `- Material Volume: ${formatVolume(estimate.details.materialVolume)}\n`
-    if (estimate.details.toolPathLength) report += `- Toolpath Length: ${formatDimension(estimate.details.toolPathLength)}\n`
-    if (estimate.details.toolWearPercentage) report += `- Tool Wear: ${formatPercentage(estimate.details.toolWearPercentage)}\n`
-    if (estimate.details.feedRate) report += `- Feed Rate: ${estimate.details.feedRate} mm/min\n`
+    report += `\n${t("costs.report.details")}\n`
+    if (estimate.details.materialId) report += `- ${t("costs.report.materialId", { id: estimate.details.materialId })}\n`
+    if (estimate.details.toolId) report += `- ${t("costs.report.toolId", { id: estimate.details.toolId })}\n`
+    if (estimate.details.materialVolume) report += `- ${t("costs.report.volume", { value: formatVolume(estimate.details.materialVolume) })}\n`
+    if (estimate.details.toolPathLength) report += `- ${t("costs.report.length", { value: formatDimension(estimate.details.toolPathLength) })}\n`
+    if (estimate.details.toolWearPercentage) report += `- ${t("costs.report.wear", { value: formatPercentage(estimate.details.toolWearPercentage) })}\n`
+    if (estimate.details.feedRate) report += `- ${t("costs.report.feed", { value: estimate.details.feedRate })}\n`
   }
-  report += "--- End of Report ---"
+  report += t("costs.report.end")
   return report
 }
 

@@ -104,7 +104,7 @@ export function McpDirectoryScreen(): JSX.Element {
           <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
             <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search servers..." value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
+            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("mcp.directory.search")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
         <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>

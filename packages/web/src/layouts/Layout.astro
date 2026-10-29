@@ -5,6 +5,10 @@ import "../styles/brand.css"
 import SocialMeta from "../components/SocialMeta.astro"
 import Mark from "../components/Mark.astro"
 
+import { localeInfo, type Locale } from "../i18n/locales"
+import { text } from "../i18n/catalog"
+import { ui } from "../i18n/ui"
+
 interface Props {
   title?: string
   description?: string
@@ -13,10 +17,12 @@ const {
   title = "CADCAMFUN",
   description = "CADCAMFUN is a local-first native CAD/CAM desktop app: drawing, modelling, toolpaths, and G-code.",
 } = Astro.props
+const locale: Locale = Astro.locals.locale ?? "en"
+const dir = localeInfo(locale).dir
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={locale} dir={dir}>
   <head>
     <meta charset="UTF-8" />
     <link rel="preload" href="/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin />
@@ -24,9 +30,9 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#e2eaf4" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
-    <title>{title}</title>
-    <meta name="description" content={description} />
-    <SocialMeta title={title} description={description} />
+    <title>{text(locale, title)}</title>
+    <meta name="description" content={text(locale, description)} />
+    <SocialMeta title={text(locale, title)} description={text(locale, description)} />
     <script is:inline>
       (() => {
         const stored = localStorage.getItem("theme")
@@ -36,16 +42,16 @@ const {
     </script>
   </head>
   <body class="flex min-h-screen flex-col">
-    <a class="sr-only focus:not-sr-only focus:fixed focus:left-[var(--nav-inset)] focus:top-[var(--nav-inset)] focus:z-[100] focus:rounded-[6px] focus:bg-terminal-text focus:px-4 focus:py-2 focus:text-terminal-bg" href="#main-content">Skip to content</a>
+    <a class="sr-only focus:not-sr-only focus:fixed focus:left-[var(--nav-inset)] focus:top-[var(--nav-inset)] focus:z-[100] focus:rounded-[6px] focus:bg-terminal-text focus:px-4 focus:py-2 focus:text-terminal-bg" href="#main-content">{ui(locale, "skip")}</a>
     <slot />
     <footer class="mt-auto w-full px-[var(--nav-inset)] pb-[var(--nav-inset)] pt-[var(--plate-gap)]">
       <div class="glass-bar mx-auto w-full max-w-[var(--content-max)] py-6">
         <div class="page-shell flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <a href="/" aria-label="CADCAMFUN home"><Mark class="h-7 w-auto" /></a>
-          <nav class="flex gap-5 text-[13px] font-medium text-terminal-muted" aria-label="Footer">
-            <a href="/download">Download</a>
-            <a href="/docs">Docs</a>
-            <a href="/studio">Studio</a>
+          <a href="/" aria-label={ui(locale, "home")}><Mark class="h-7 w-auto" /></a>
+          <nav class="flex gap-5 text-[13px] font-medium text-terminal-muted" aria-label={ui(locale, "footerNav")}>
+            <a href="/download">{ui(locale, "download")}</a>
+            <a href="/docs">{ui(locale, "docs")}</a>
+            <a href="/studio">{ui(locale, "studio")}</a>
             <a href="https://github.com/nikomatt69/cadcamfun" target="_blank" rel="noopener noreferrer">GitHub</a>
           </nav>
         </div>

@@ -46,7 +46,13 @@ interface ResourceMeta {
 
 const TH = "px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400"
 
-const MACHINE_TYPES: Readonly<Record<string, string>> = { mill: "Mill", lathe: "Lathe", printer: "3D Printer", "3Dprinter": "3D Printer", laser: "Laser" }
+const MACHINE_TYPES = (): Readonly<Record<string, string>> => ({
+  mill: t("pages.mill"),
+  lathe: t("pages.lathe"),
+  printer: t("pages.3d.printer"),
+  "3Dprinter": t("pages.3d.printer"),
+  laser: t("library.detail.laser")
+})
 
 const str = (value: unknown): string => (value === null || value === undefined ? "" : String(value))
 const asRecord = (value: unknown): Record<string, unknown> => (typeof value === "object" && value !== null && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : {})
@@ -73,8 +79,8 @@ const machineFacts = (row: Row): ReadonlyArray<Fact> => {
   const axes = profile.axisTable?.filter((axis) => axis.kind === "linear").length
   return [
     { get label() { return t("library.field.controller") }, value: dash(profile.controller ?? profile.post) },
-    { label: "Max spindle", value: `${dash(profile.spindle?.maxRpm)} rpm` },
-    { label: "Max feed", value: `${dash(profile.feed?.max)} mm/min` },
+    { get label() { return t("library.detail.maxSpindleShort") }, value: `${dash(profile.spindle?.maxRpm)} rpm` },
+    { get label() { return t("library.detail.maxFeed") }, value: `${dash(profile.feed?.max)} mm/min` },
     ...(axes === undefined ? [] : [{ get label() { return t("cam.axes") }, value: String(axes) }]),
     ...(envelope === "" ? [] : [{ get label() { return t("cam.machine.facts.envelope") }, value: envelope }])
   ]
@@ -88,10 +94,10 @@ const maybeAi = (): ReturnType<typeof useAiStore> | undefined => {
 const RESOURCES: Readonly<Record<ResourceKind, ResourceMeta>> = {
   materials: {
     get singular() { return t("library.field.material") }, get plural() { return t("cam.ribbon.materials") }, path: "/materials", icon: Layers,
-    badge: () => "Material",
+    badge: () => t("library.field.material"),
     facts: (row) => {
       const p = asRecord(row["properties"])
-      return [{ get label() { return t("library.material.density") }, value: `${dash(p["density"])} kg/m³` }, { label: "Hardness", value: dash(p["hardness"]) }]
+      return [{ get label() { return t("library.material.density") }, value: `${dash(p["density"])} kg/m³` }, { get label() { return t("library.detail.hardness") }, value: dash(p["hardness"]) }]
     }
   },
   tools: {
@@ -100,8 +106,8 @@ const RESOURCES: Readonly<Record<ResourceKind, ResourceMeta>> = {
     facts: (row) => [{ get label() { return t("library.tool.diameter") }, value: `${dash(row["diameter"])} mm` }, { get label() { return t("library.field.material") }, value: cap(dash(row["material"])) }]
   },
   machines: {
-    singular: "Configuration", get plural() { return t("shell.configurations") }, path: "/machine", icon: Cpu,
-    badge: (row) => MACHINE_TYPES[str(row["type"])] ?? (cap(str(row["type"])) || t("cam.machine")),
+    get singular() { return t("library.detail.configuration") }, get plural() { return t("shell.configurations") }, path: "/machine", icon: Cpu,
+    badge: (row) => MACHINE_TYPES()[str(row["type"])] ?? (cap(str(row["type"])) || t("cam.machine")),
     facts: machineFacts
   },
   components: {
@@ -181,7 +187,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
   onCacheInvalidated(app.cache, () => { void load(); loadProjects() })
 
   const typeOptions = createMemo(() => {
-    if (props.kind === "machines") return Object.keys(MACHINE_TYPES)
+    if (props.kind === "machines") return Object.keys(MACHINE_TYPES())
     if (props.kind === "materials") return []
     return [...new Set(rows().map((row) => str(row["type"])).filter((value) => value !== ""))].sort()
   })
@@ -236,12 +242,12 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
       const created = await run<unknown>(createCall(props.kind, form))
       // Machine configs answer `{ data }`; the other kinds answer the row.
       const id = str(asRecord(props.kind === "machines" ? asRecord(created)["data"] : created)["id"])
-      toast.success(`${meta.singular} created successfully`)
+      toast.success(t("library.detail.created", { title: meta.singular }))
       setCreateOpen(false)
       refresh()
       if (id !== "") navigate(`${meta.path}/${encodeURIComponent(id)}`)
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : `Failed to create ${meta.singular.toLowerCase()}`)
+      toast.error(cause instanceof Error ? cause.message : t("library.detail.createFailed", { title: meta.singular }))
     } finally {
       setBusy(false)
     }
@@ -254,7 +260,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
     if (kind === "materials") return app.client.materials.create({ payload: { name, description, isPublic, properties: { density: Number(form.get("density")) || 0, color: str(form.get("color")) || "#cccccc" } } })
     if (kind === "tools") return app.client.tools.create({ payload: { name, notes: description, isPublic, type: str(form.get("type")), diameter: Number(form.get("diameter")) || 0, material: str(form.get("material")), numberOfFlutes: Number(form.get("numberOfFlutes")) || null } })
     if (kind === "machines") {
-      return app.client.machineConfigs.create({ payload: { name, description, isPublic, type: str(form.get("type")) || t("pages.mill"), config: { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: str(form.get("controller")) || t("cam.post.target.grbl.label") } } })
+      return app.client.machineConfigs.create({ payload: { name, description, isPublic, type: str(form.get("type")) || "mill", config: { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: str(form.get("controller")) || "grbl" } } })
     }
     return app.client.components.createForProject({ params: { id: str(form.get("projectId")) }, payload: { name, description, isPublic, type: str(form.get("type")) || null, data: {} } })
   }
@@ -269,11 +275,11 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
       else if (props.kind === "tools") await run(app.client.tools.remove({ params: { id } }))
       else if (props.kind === "components") await run(app.client.components.remove({ params: { id } }))
       else await run(app.client.machineConfigs.remove({ params: { id } }))
-      toast.success(`${meta.singular} deleted successfully`)
+      toast.success(t("library.detail.deleted", { title: meta.singular }))
       setDeleting(undefined)
       refresh()
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : `Failed to delete ${meta.singular.toLowerCase()}`)
+      toast.error(cause instanceof Error ? cause.message : t("library.detail.deleteFailed", { title: meta.singular }))
     } finally {
       setBusy(false)
     }
@@ -284,7 +290,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
 
   return (
     <WorkspacePage
-      title={`${meta.plural} Library`}
+      title={t("library.detail.libraryTitle", { name: meta.plural })}
       description={t("library.description", { type: lower })}
       actions={<>
             <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />{t("cam.explorer.generate")}</button>
@@ -295,7 +301,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                 <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">{t("legacy.search")}</span>
                 <div class="relative">
                   <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={`Search ${lower}...`} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
+                  <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("library.detail.search", { name: lower })} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
                 </div>
               </label>
 
@@ -304,7 +310,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                   <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">{t("library.type")}</span>
                   <select name="type" class={FIELD} value={type()} onChange={(event) => setType(event.currentTarget.value)}>
                     <option value="">{t("pages.all.types")}</option>
-                    <For each={typeOptions()}>{(value) => <option value={value}>{MACHINE_TYPES[value] ?? cap(value)}</option>}</For>
+                    <For each={typeOptions()}>{(value) => <option value={value}>{MACHINE_TYPES()[value] ?? cap(value)}</option>}</For>
                   </select>
                 </label>
               </Show>
@@ -337,10 +343,10 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                   <button type="button" class="workspace-view-toggle__btn" title={t("library.list")} aria-label={t("library.list")} aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={15} aria-hidden="true" /></button>
                 </div>
               </div>
-              <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {rows().length} {lower}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{t("library.detail.countOf", { shown: filtered().length, total: rows().length, name: lower })}</p>
       </>}
       overlays={<>
-      <Modal open={createOpen()} title={`Create New ${meta.singular}`} onClose={() => setCreateOpen(false)}>
+      <Modal open={createOpen()} title={t("library.detail.createTitle", { name: meta.singular })} onClose={() => setCreateOpen(false)}>
         <form class="space-y-4" onSubmit={(event) => { event.preventDefault(); void create(new FormData(event.currentTarget)) }}>
           <div>
             <label for="resource-name" class={LABEL}>{meta.singular} {t("library.field.name")}</label>
@@ -368,11 +374,11 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label for="resource-machine-type" class={LABEL}>{t("pages.machine.type")}</label>
-                <select id="resource-machine-type" name="type" class={INPUT}><For each={Object.keys(MACHINE_TYPES)}>{(value) => <option value={value}>{MACHINE_TYPES[value]}</option>}</For></select>
+                <select id="resource-machine-type" name="type" class={INPUT}><For each={Object.keys(MACHINE_TYPES())}>{(value) => <option value={value}>{MACHINE_TYPES()[value]}</option>}</For></select>
               </div>
               <div><label for="resource-controller" class={LABEL}>{t("library.field.controller")}</label><input id="resource-controller" name="controller" type="text" class={INPUT} value="grbl" /></div>
             </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Work volume and limits start with defaults; adjust them on the machine page.</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">{t("library.detail.volumeDefaults")}</p>
           </Show>
           <Show when={props.kind === "components"}>
             <div>
@@ -382,11 +388,11 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                 <For each={projects()}>{(project) => <option value={project.id} selected={project.id === projectId()}>{project.name}</option>}</For>
               </select>
             </div>
-            <div><label for="resource-component-type" class={LABEL}>Type (optional)</label><input id="resource-component-type" name="type" type="text" class={INPUT} placeholder="mechanical" /></div>
+            <div><label for="resource-component-type" class={LABEL}>{t("library.detail.typeOptional")}</label><input id="resource-component-type" name="type" type="text" class={INPUT} placeholder={t("library.detail.typeExample")} /></div>
           </Show>
           <div class="flex items-center">
             <input id="resource-public" name="isPublic" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700" />
-            <label for="resource-public" class="ml-2 block text-sm text-slate-900 dark:text-slate-300">Make {meta.singular.toLowerCase()} public (visible to all users)</label>
+            <label for="resource-public" class="ml-2 block text-sm text-slate-900 dark:text-slate-300">{t("library.detail.makeKindPublic", { name: meta.singular })}</label>
           </div>
           <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
             <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-800" onClick={() => setCreateOpen(false)}>{t("common.cancel")}</button>
@@ -395,8 +401,8 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
         </form>
       </Modal>
 
-      <Modal open={deleting() !== undefined} title={`Delete ${meta.singular.toLowerCase()}`} onClose={() => setDeleting(undefined)}>
-        <p class="text-sm text-slate-700 dark:text-slate-300">Are you sure you want to delete this {meta.singular.toLowerCase()}? This action cannot be undone.</p>
+      <Modal open={deleting() !== undefined} title={t("library.detail.deleteTitle", { name: meta.singular })} onClose={() => setDeleting(undefined)}>
+        <p class="text-sm text-slate-700 dark:text-slate-300">{t("library.detail.deleteConfirm", { name: meta.singular })}</p>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-gray-700" onClick={() => setDeleting(undefined)}>{t("common.cancel")}</button>
           <button type="button" class="rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50" disabled={busy()} onClick={() => void confirmDelete()}>{t("common.delete")}</button>
@@ -419,11 +425,11 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                     <StageEmpty
                       icon={<Icon size={22} />}
                       title={t("library.emptyKind", { type: lower })}
-                      hint={hasFilters() ? `No ${lower} match your search criteria.` : `Create your first ${meta.singular.toLowerCase()} to get started.`}
+                      hint={hasFilters() ? t("library.detail.noMatch", { name: lower }) : t("library.detail.createFirst", { name: meta.singular })}
                     >
                         <Show when={hasFilters()} fallback={<>
                           <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setCreateOpen(true)}>{t("keys.group.create")} {meta.singular}</button>
-                          <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />Generate with AI</button>
+                          <button type="button" class={TOOLBAR_BUTTON} onClick={() => setGenerateOpen(true)}><Sparkles size={16} aria-hidden="true" />{t("library.detail.generateAi")}</button>
                         </>}>
                           <button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>{t("library.reset")}</button>
                         </Show>
@@ -490,7 +496,7 @@ export function ResourcesScreen(props: ResourcesScreenProps): JSX.Element {
                                 <div class="workspace-resource-fact"><span>{fact.label}</span><span>{fact.value}</span></div>
                               )}</For>
                               <Show when={props.kind === "components" && str(row["projectId"]) !== ""}>
-                                <div class="flex justify-between"><span>Project:</span><span class="truncate font-medium text-slate-700 dark:text-slate-300">{projectName(str(row["projectId"]))}</span></div>
+                                <div class="flex justify-between"><span>{t("library.detail.project")}</span><span class="truncate font-medium text-slate-700 dark:text-slate-300">{projectName(str(row["projectId"]))}</span></div>
                               </Show>
                               <div class="flex justify-between"><span>ID:</span><code class="font-mono text-blue-600 dark:text-blue-400">{str(row["id"]).substring(0, 8)}...</code></div>
                             </div>

@@ -1,9 +1,15 @@
 ---
+import { text } from "../../i18n/catalog"
+
 interface Props {
   language?: string
   title?: string
 }
 const { language = "text", title } = Astro.props
+const locale = Astro.locals.locale ?? "en"
+const copyLabel = text(locale, "Copy")
+const copiedLabel = text(locale, "Copied")
+const copyCodeLabel = text(locale, "Copy code")
 const raw = Astro.slots.has("default") ? await Astro.slots.render("default") : ""
 // The rendered slot is already HTML-escaped; `{code}` escapes again, so decode
 // first or quotes and `&&` show up as `&quot;` and `&amp;&amp;` on the page.
@@ -22,10 +28,10 @@ const code = decode(raw.replace(/<[^>]+>/g, "")).replace(/^\s*\n/, "").replace(/
 
 <figure class="doc-code material not-prose my-6 rounded-[var(--radius-md)]">
   <figcaption class="flex items-center justify-between gap-3 px-4 py-2">
-    <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">{title ?? language}</span>
-    <button type="button" class="doc-code-copy pressable" data-doc-code-copy aria-label="Copy code">
-      <span class="doc-code-copy-label" data-label-idle>Copy</span>
-      <span class="doc-code-copy-label" data-label-done aria-hidden="true">Copied</span>
+    <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">{title ? text(locale, title) : language}</span>
+    <button type="button" class="doc-code-copy pressable" data-doc-code-copy data-label-copy={copyCodeLabel} data-label-copied={copiedLabel} aria-label={copyCodeLabel}>
+      <span class="doc-code-copy-label" data-label-idle>{copyLabel}</span>
+      <span class="doc-code-copy-label" data-label-done aria-hidden="true">{copiedLabel}</span>
     </button>
   </figcaption>
   <pre class="overflow-x-auto px-4 py-3 text-[13px] leading-6"><code>{code}</code></pre>
@@ -105,11 +111,11 @@ const code = decode(raw.replace(/<[^>]+>/g, "")).replace(/^\s*\n/, "").replace(/
         return
       }
       button.setAttribute("data-copied", "")
-      button.setAttribute("aria-label", "Copied")
+      button.setAttribute("aria-label", button.dataset.labelCopied ?? "Copied")
       window.clearTimeout(timer)
       timer = window.setTimeout(() => {
         button.removeAttribute("data-copied")
-        button.setAttribute("aria-label", "Copy code")
+        button.setAttribute("aria-label", button.dataset.labelCopy ?? "Copy code")
       }, 1600)
     })
   })

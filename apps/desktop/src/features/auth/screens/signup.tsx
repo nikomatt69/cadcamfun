@@ -95,7 +95,7 @@ export function SignUpScreen(): JSX.Element {
           </Button>
 
           <Notice tone="default">
-            <strong>Passkey:</strong> Create your account first, then add biometric authentication from your profile settings.
+            <strong>{t("auth.passkey.label")}</strong> {t("auth.passkey.signupHint")}
           </Notice>
 
           <div class="ent-section" style={{ margin: "2px 0 0" }}>
@@ -105,13 +105,13 @@ export function SignUpScreen(): JSX.Element {
 
           <form style={{ display: "flex", "flex-direction": "column", gap: "12px" }} onSubmit={handleSubmit}>
             <Field label={t("signup.nameLabel")} id="name">
-              <TextField id="name" name="name" required placeholder="Enter your name" />
+              <TextField id="name" name="name" required placeholder={t("auth.placeholder.name")} />
             </Field>
             <Field label={t("signup.emailLabel")} id="email">
-              <TextField id="email" name="email" type="email" required placeholder="Enter your email" />
+              <TextField id="email" name="email" type="email" required placeholder={t("auth.placeholder.email")} />
             </Field>
             <Field label={t("signup.passwordLabel")} id="password" hint="Password must be at least 8 characters long">
-              <TextField id="password" name="password" type="password" required placeholder="Enter your password" />
+              <TextField id="password" name="password" type="password" required placeholder={t("auth.placeholder.password")} />
             </Field>
 
             <Button tone="primary" type="submit" block disabled={busy("email")}>

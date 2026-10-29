@@ -7,5 +7,8 @@
   "plugins.dropPackage": "Arrastra aquí el paquete de tu complemento",
   "plugins.browsePackage": "o haz clic para buscar archivos (.zip o .vsix)",
   "plugins.invalidPackage": "Tipo de archivo no válido. Sube un paquete de complemento (.zip o .vsix)",
-  "plugins.packageTooLarge": "Archivo demasiado grande. El tamaño máximo es 10MB"
+  "plugins.packageTooLarge": "Archivo demasiado grande. El tamaño máximo es 10MB",
+  "plugins.search": "Buscar plugins...",
+  "plugins.none": "No se han encontrado plugins",
+  "plugins.noneMatch": "Ningún plugin coincide con la búsqueda."
 }

@@ -1,4 +1,6 @@
+import { text } from "./catalog"
 import { DEFAULT_LOCALE, type Locale } from "./locales"
+import { isStableSegment } from "./segment"
 
 /** Every user-visible chrome string of the docs, per language. English is the source. */
 export const UI = {
@@ -32,5 +34,9 @@ const NAV: Partial<Record<Locale, Readonly<Record<string, string>>>> = {
   ar: { Docs: "الوثائق", Guides: "الأدلة", Reference: "المرجع", Start: "البدء", Modelling: "النمذجة", Extensions: "الإضافات", Repository: "المستودع", Workspace: "مساحة العمل", Overview: "نظرة عامة", Architecture: "البنية", Conventions: "الاصطلاحات", Configuration: "الإعدادات", "CAD geometry": "هندسة CAD", History: "السجل", "API Reference": "مرجع API", "Packages and apps": "الحزم والتطبيقات", "Source map": "خريطة المصادر", "Local development": "التطوير المحلي", Contributing: "المساهمة", Quickstart: "بدء سريع", Accounts: "الحسابات" },
 }
 
-export const navTitle = (title: string, locale: Locale): string =>
-  locale === DEFAULT_LOCALE ? title : (NAV[locale]?.[title] ?? title)
+export const navTitle = (title: string, locale: Locale): string => {
+  if (locale === DEFAULT_LOCALE) return title
+  const fromNav = NAV[locale]?.[title]
+  if (fromNav && (fromNav !== title || isStableSegment(title))) return fromNav
+  return text(locale, title)
+}

@@ -120,9 +120,9 @@ export function PasskeySettings(): JSX.Element {
               </h3>
               <p class="mb-4 text-sm text-amber-800 dark:text-amber-300">{t("settings.passkeys.unsupportedBody")}</p>
               <ul class="list-inside list-disc space-y-1 text-sm text-amber-800 dark:text-amber-300">
-                <li>A modern browser (Chrome 67+, Safari 14+, Firefox 60+)</li>
-                <li>A device with biometric authentication (TouchID, FaceID, Windows Hello)</li>
-                <li>Or a security key (YubiKey, etc.)</li>
+                <li>{t("settings.passkeys.needBrowser")}</li>
+                <li>{t("settings.passkeys.needBiometric")}</li>
+                <li>{t("settings.passkeys.needKey")}</li>
               </ul>
             </div>
           </div>

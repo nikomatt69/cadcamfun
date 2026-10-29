@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "Busca algo en la conversación que está en pantalla.",
   "ai.cmd.find.empty": "Indica qué buscar: /find espesor de pared",
   "ai.cmd.older": "anteriores",
-  "ai.cmd.older.desc": "Lee los mensajes anteriores a los que están en pantalla."
+  "ai.cmd.older.desc": "Lee los mensajes anteriores a los que están en pantalla.",
+  "ai.catalogue.searchModels": "Buscar modelos del proveedor",
+  "ai.stream.invalidEvent": "El asistente envió un evento no válido. Recuperar la sesión puede restaurar sus resultados.",
+  "ai.vision.captureFailed": "Falló la captura de la vista.",
+  "mcp.directory.search": "Buscar servidores..."
 }

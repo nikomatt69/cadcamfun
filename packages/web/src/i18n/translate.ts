@@ -1,19 +1,22 @@
 import domino from "@mixmark-io/domino"
 import { createHash } from "node:crypto"
+import { catalogFor } from "./catalog"
 import { DEFAULT_LOCALE, localeInfo, localizePath, type Locale } from "./locales"
+import { isStableSegment, lookupSegment, segmentKey } from "./segment"
 
 /**
  * Body translation for localized docs pages. The English article HTML is the
  * source; every visible text node outside code/pre/script is a segment.
  * Segments go to Workers AI in one batch and are cached in KV by content
  * hash, so a page is translated once per language until its text changes.
- * Without an AI binding (local dev, tests) the caller gets the English
- * segments back and shows the pending notice — chrome stays translated.
+ * A checked-in catalog supplies the translation. Workers AI fills only the
+ * segments the catalog does not have yet. Without either, English remains.
  */
 
 export type SegmentTranslator = (segments: ReadonlyArray<string>, locale: Locale) => Promise<ReadonlyArray<string>>
 
-const SKIP = new Set(["CODE", "PRE", "SCRIPT", "STYLE", "KBD", "SVG", "BUTTON", "TEXTAREA"])
+const SKIP = new Set(["CODE", "PRE", "SCRIPT", "STYLE", "KBD", "SVG", "TEXTAREA"])
+const TRANSLATED_ATTRS = ["aria-label", "title", "placeholder", "alt"] as const
 
 interface TextNodeLike { nodeType: number; nodeValue: string | null; parentNode: { nodeName: string; hasAttribute?: (n: string) => boolean } | null }
 
@@ -50,27 +53,85 @@ export interface TranslatedArticle { html: string; translated: boolean; segments
  * a translator that throws or returns a wrong-shaped result leaves the
  * English text in place (`translated: false`) instead of breaking the page.
  */
-export async function translateArticleHtml(articleHtml: string, locale: Locale, translator?: SegmentTranslator): Promise<TranslatedArticle> {
+interface AttrSlot { element: Element; name: string; value: string }
+
+function collectAttrs(document: Document): AttrSlot[] {
+  const slots: AttrSlot[] = []
+  const walk = (node: Node): void => {
+    if (SKIP.has(node.nodeName)) return
+    if (node.nodeType === 1) {
+      const element = node as Element
+      for (const name of TRANSLATED_ATTRS) {
+        const value = element.getAttribute(name)
+        if (value && value.trim().length > 0) slots.push({ element, name, value })
+      }
+    }
+    node.childNodes.forEach((child) => walk(child as Node))
+  }
+  walk(document.body as unknown as Node)
+  return slots
+}
+
+async function resolveSegments(
+  segments: readonly string[],
+  locale: Locale,
+  translator: SegmentTranslator | undefined,
+  dict: Readonly<Record<string, string>>,
+): Promise<{ values: string[]; complete: boolean }> {
+  const resolved: Array<string | undefined> = segments.map((source) => {
+    const hit = lookupSegment(dict, source)
+    if (hit != null) return hit
+    if (isStableSegment(segmentKey(source))) return source.trim()
+    return undefined
+  })
+  const missing = resolved.flatMap((value, index) => (value == null ? [index] : []))
+  if (missing.length > 0 && translator) {
+    try {
+      const out = await translator(missing.map((index) => segments[index]!), locale)
+      if (out.length === missing.length) missing.forEach((index, offset) => { resolved[index] = out[offset] })
+    } catch {
+      // A failed model leaves those segments in English.
+    }
+  }
+  return {
+    values: resolved.map((value, index) => value ?? segments[index]!),
+    complete: resolved.every((value) => value != null),
+  }
+}
+
+/** Translate plain strings (titles, subtitles, table-of-contents entries) with the same catalog. */
+export async function translateTextList(
+  segments: readonly string[],
+  locale: Locale,
+  translator?: SegmentTranslator,
+  dict: Readonly<Record<string, string>> = catalogFor(locale),
+): Promise<{ values: string[]; complete: boolean }> {
+  if (locale === DEFAULT_LOCALE || segments.length === 0) return { values: [...segments], complete: true }
+  return resolveSegments(segments, locale, translator, dict)
+}
+
+export async function translateArticleHtml(
+  articleHtml: string,
+  locale: Locale,
+  translator?: SegmentTranslator,
+  dict: Readonly<Record<string, string>> = catalogFor(locale),
+): Promise<TranslatedArticle> {
   if (locale === DEFAULT_LOCALE) return { html: articleHtml, translated: true, segments: 0 }
   const document = domino.createDocument(`<body>${articleHtml}</body>`, true)
   rewriteLinks(document, locale)
   const { segments, nodes } = collectSegments(document)
-  if (!translator || segments.length === 0) {
-    return { html: document.body.innerHTML, translated: false, segments: segments.length }
-  }
-  try {
-    const out = await translator(segments, locale)
-    if (out.length !== segments.length) return { html: document.body.innerHTML, translated: false, segments: segments.length }
-    nodes.forEach((node, i) => {
-      const src = segments[i]!
-      const lead = src.match(/^\s*/)?.[0] ?? ""
-      const trail = src.match(/\s*$/)?.[0] ?? ""
-      node.nodeValue = `${lead}${(out[i] ?? src).trim()}${trail}`
-    })
-    return { html: document.body.innerHTML, translated: true, segments: segments.length }
-  } catch {
-    return { html: document.body.innerHTML, translated: false, segments: segments.length }
-  }
+  const attrs = collectAttrs(document)
+  const sources = [...segments, ...attrs.map((slot) => slot.value)]
+  if (sources.length === 0) return { html: document.body.innerHTML, translated: true, segments: 0 }
+  const { values, complete } = await resolveSegments(sources, locale, translator, dict)
+  nodes.forEach((node, index) => {
+    const src = segments[index]!
+    const lead = src.match(/^\s*/)?.[0] ?? ""
+    const trail = src.match(/\s*$/)?.[0] ?? ""
+    node.nodeValue = `${lead}${values[index]!.trim()}${trail}`
+  })
+  attrs.forEach((slot, index) => slot.element.setAttribute(slot.name, values[segments.length + index]!.trim()))
+  return { html: document.body.innerHTML, translated: complete, segments: sources.length }
 }
 
 const hash = (value: string): string => createHash("sha256").update(value).digest("hex").slice(0, 24)

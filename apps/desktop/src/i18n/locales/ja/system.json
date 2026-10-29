@@ -25,5 +25,6 @@
   "invitation.decline": "辞退",
   "invitation.missing": "この招待リンクは無効か、すでに使用されています。",
   "invitation.alreadyAccepted": "この招待はすでに承諾済みです。ダッシュボードにリダイレクトします…",
-  "invitation.signInFirst": "この招待を承諾するには、サインインするかアカウントを作成してください。"
+  "invitation.signInFirst": "この招待を承諾するには、サインインするかアカウントを作成してください。",
+  "schema.invalid": "値がスキーマを満たしません"
 }

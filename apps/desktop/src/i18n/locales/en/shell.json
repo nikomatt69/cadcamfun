@@ -542,5 +542,9 @@
   "shell.engine.recovered": "The calculation engine is running again.",
   "shell.engine.failed": "The calculation engine could not be restarted. Restart the app to continue.",
   "update.noneAvailable": "There is no update to install. Check for updates again.",
-  "update.busy": "Another update operation is running. Try again in a moment."
+  "update.busy": "Another update operation is running. Try again in a moment.",
+  "shell.notifications.unread": "{count} unread",
+  "shell.notifications.markAll": "Mark all read",
+  "shell.notifications.empty": "No notifications yet. Project, workflow and assistant updates will appear here.",
+  "twofactor.qrAlt": "2FA QR Code"
 }

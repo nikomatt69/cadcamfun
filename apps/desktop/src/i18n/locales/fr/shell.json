@@ -542,5 +542,9 @@
   "shell.engine.recovered": "Le moteur de calcul fonctionne de nouveau.",
   "shell.engine.failed": "Le moteur de calcul n'a pas pu être redémarré. Redémarrez l'application pour continuer.",
   "update.noneAvailable": "Aucune mise à jour à installer. Recherchez à nouveau des mises à jour.",
-  "update.busy": "Une autre opération de mise à jour est en cours. Réessayez dans un instant."
+  "update.busy": "Une autre opération de mise à jour est en cours. Réessayez dans un instant.",
+  "shell.notifications.unread": "{count} non lues",
+  "shell.notifications.markAll": "Tout marquer comme lu",
+  "shell.notifications.empty": "Pas encore de notifications. Les mises à jour de projets, de flux et de l'assistant apparaîtront ici.",
+  "twofactor.qrAlt": "Code QR 2FA"
 }

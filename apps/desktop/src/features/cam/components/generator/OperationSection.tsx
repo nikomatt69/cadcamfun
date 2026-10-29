@@ -15,6 +15,7 @@ import StrategyPalette, {
   paletteToCoreOperation,
   type MachineFamily
 } from "./StrategyPalette.tsx"
+import { KernelOperationControls } from "./KernelSection.tsx"
 
 const BTN_BLUE = "panel-btn"
 const BTN_GREEN = "panel-btn"
@@ -487,6 +488,7 @@ export function OperationSection(): JSX.Element {
           </div>
         </Show>
       </Show>
+      <KernelOperationControls />
     </Section>
   )
 }

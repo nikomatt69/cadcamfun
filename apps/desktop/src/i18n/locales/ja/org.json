@@ -353,5 +353,9 @@
   "chat.unnamedUser": "名前未設定のユーザー",
   "chat.noEmail": "メールなし",
   "chat.createGroup": "グループを作成",
-  "chat.startConversation": "会話を開始"
+  "chat.startConversation": "会話を開始",
+  "dash.from": "開始",
+  "org.search": "組織を検索…",
+  "org.none": "組織が見つかりません",
+  "org.noneMatch": "検索に一致する組織はありません。"
 }

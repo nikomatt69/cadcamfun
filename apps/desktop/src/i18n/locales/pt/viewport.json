@@ -27,5 +27,6 @@
   "cad.height": "Altura",
   "cad.depth": "Profundidade",
   "cad.snapSettings": "Configurações de encaixe",
-  "cad.enableSnapping": "Ativar encaixe"
+  "cad.enableSnapping": "Ativar encaixe",
+  "viewport.editor2d": "Editor de desenho 2D"
 }

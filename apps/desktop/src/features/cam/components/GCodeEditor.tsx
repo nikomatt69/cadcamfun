@@ -16,6 +16,14 @@ export interface GCodeEditorProps {
 const HIGHLIGHT_LIMIT = 4000
 const INDENT = "  "
 
+/** Colouring whose text is exactly the lines joined by newlines: a break only between lines, never around them. */
+function Painted(props: { readonly lines: readonly string[] }): JSX.Element {
+  return <For each={props.lines}>{(line, index) => {
+    const tokens = tokenizeGcodeLine(line)
+    return <>{index() > 0 ? "\n" : null}{tokens.map((token) => <span class={`gc-${token.kind}`}>{token.text}</span>)}</>
+  }}</For>
+}
+
 export default function GCodeEditor(props: GCodeEditorProps): JSX.Element {
   const summary = createMemo(() => gcodeSummary(props.value))
   const lines = createMemo(() => props.value.split("\n"))
@@ -61,13 +69,7 @@ export default function GCodeEditor(props: GCodeEditorProps): JSX.Element {
         <div class="cam-editor__paint" aria-hidden="true">
           <div class="cam-editor__paint-lines" style={{ transform: shift() }}>
             <div class="cam-editor__band" style={{ top: bandTop() }} />
-            <pre>
-              <Show when={colored()}>
-                <For each={lines()}>{(line) => <>
-                  <For each={tokenizeGcodeLine(line)}>{(token) => <span class={`gc-${token.kind}`}>{token.text}</span>}</For>{"\n"}
-                </>}</For>
-              </Show>
-            </pre>
+            <pre><Show when={colored()}><Painted lines={lines()} /></Show></pre>
           </div>
         </div>
         <textarea aria-label={t("cam.editor")} class="cam-editor__code" classList={{ "cam-editor__code--painted": colored() }}

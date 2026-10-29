@@ -27,5 +27,6 @@
   "cad.height": "Hauteur",
   "cad.depth": "Profondeur",
   "cad.snapSettings": "Paramètres d'accrochage",
-  "cad.enableSnapping": "Activer l'accrochage"
+  "cad.enableSnapping": "Activer l'accrochage",
+  "viewport.editor2d": "Éditeur de dessin 2D"
 }

@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { LOCALE_CODES, isLocale, localeFromAcceptLanguage, localeFromCountry, localizePath, resolveLocale, splitLocalePath } from "../src/i18n/locales"
-import { UI } from "../src/i18n/ui"
+import { LOCALE_CODES, isLocale, localeFromAcceptLanguage, localeFromChoice, localeFromCountry, localizePath, resolveLocale, splitLocalePath } from "../src/i18n/locales"
+import { UI, navTitle } from "../src/i18n/ui"
 import { translateArticleHtml, workersAiTranslator } from "../src/i18n/translate"
+import { catalogFor } from "../src/i18n/catalog"
+import { identicalAllowed } from "../src/i18n/segment"
+import { docsNav } from "../src/data/docsSidebar"
+import { readFileSync } from "node:fs"
 
 describe("locale registry", () => {
   test("ships exactly the desktop app's eleven languages", () => {
@@ -92,5 +96,65 @@ describe("article translation", () => {
     const out = await translateArticleHtml(`<p>Hello</p>`, "it", async () => { throw new Error("down") })
     expect(out.translated).toBe(false)
     expect(out.html).toContain("Hello")
+  })
+  test("a catalog dict translates with no model", async () => {
+    const out = await translateArticleHtml(`<h2>Posts</h2><p>Emit with <code>cam.post</code> now.</p>`, "de", undefined, {
+      Posts: "Beiträge",
+      "Emit with": "Senden mit",
+      "now.": "jetzt.",
+    })
+    expect(out.translated).toBe(true)
+    expect(out.html).toContain("Beiträge")
+    expect(out.html).toContain("<code>cam.post</code>")
+    expect(out.html).toContain("jetzt.")
+  })
+  test("digits in a catalog value are restored", async () => {
+    const out = await translateArticleHtml(`<p>12 endpoints</p>`, "it", undefined, { "# endpoints": "# endpoint" })
+    expect(out.translated).toBe(true)
+    expect(out.html).toContain("12 endpoint")
+  })
+})
+
+describe("saved language outside the docs", () => {
+  test("query choice wins over the cookie", () => {
+    expect(localeFromChoice("de", "it")).toBe("de")
+    expect(localeFromChoice(null, "ja")).toBe("ja")
+    expect(localeFromChoice("nope", "fr")).toBe("fr")
+    expect(localeFromChoice(null, null)).toBe("en")
+  })
+})
+
+describe("catalog coverage", () => {
+  const segments = JSON.parse(readFileSync(new URL("../src/i18n/catalog/segments.json", import.meta.url), "utf8")) as string[]
+  const titles = [
+    ...docsNav.flatMap((section) => [section.title, ...section.groups.flatMap((group) => [group.title, ...group.items.map((item) => item.title)])]),
+  ]
+
+  test("every visible segment is translated in every language", () => {
+    const gaps: string[] = []
+    for (const locale of LOCALE_CODES) {
+      if (locale === "en") continue
+      const dict = catalogFor(locale)
+      for (const key of segments) {
+        const value = dict[key]
+        if (!value || !value.trim()) gaps.push(`${locale} missing ${key}`)
+        else if (value === key && !identicalAllowed(key)) gaps.push(`${locale} unchanged ${key}`)
+      }
+    }
+    expect(gaps.slice(0, 12)).toEqual([])
+    expect(gaps.length).toBe(0)
+  })
+
+  test("every sidebar title resolves in every language", () => {
+    const gaps: string[] = []
+    for (const locale of LOCALE_CODES) {
+      if (locale === "en") continue
+      for (const title of titles) {
+        const value = navTitle(title, locale)
+        if (!value.trim()) gaps.push(`${locale} ${title}`)
+        else if (["CAM and G-code", "Viewport", "Mesh and CSG"].includes(title) && value === title) gaps.push(`${locale} ${title}`)
+      }
+    }
+    expect(gaps).toEqual([])
   })
 })

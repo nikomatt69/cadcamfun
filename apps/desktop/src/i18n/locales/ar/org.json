@@ -353,5 +353,9 @@
   "chat.unnamedUser": "مستخدم بلا اسم",
   "chat.noEmail": "بدون بريد إلكتروني",
   "chat.createGroup": "إنشاء مجموعة",
-  "chat.startConversation": "بدء محادثة"
+  "chat.startConversation": "بدء محادثة",
+  "dash.from": "من",
+  "org.search": "بحث في المؤسسات...",
+  "org.none": "لم يُعثر على مؤسسات",
+  "org.noneMatch": "لا تطابق أي مؤسسة معايير البحث."
 }

@@ -7,5 +7,8 @@
   "plugins.dropPackage": "أفلت حزمة الإضافة هنا",
   "plugins.browsePackage": "أو انقر للاستعراض عن الملفات (.zip أو .vsix)",
   "plugins.invalidPackage": "نوع ملف غير صالح. يرجى رفع حزمة إضافة (.zip أو .vsix)",
-  "plugins.packageTooLarge": "الملف كبير جدًا. الحد الأقصى للحجم هو 10MB"
+  "plugins.packageTooLarge": "الملف كبير جدًا. الحد الأقصى للحجم هو 10MB",
+  "plugins.search": "بحث في الإضافات...",
+  "plugins.none": "لم يُعثر على إضافات",
+  "plugins.noneMatch": "لا تطابق أي إضافة معايير البحث."
 }

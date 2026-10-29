@@ -255,7 +255,7 @@ export function ProfileSettings(): JSX.Element {
       data.bio,
       data.location,
       data.title,
-      data.skills.length > 0 ? t("ai.context.category.skills") : "",
+      data.skills.length > 0 ? "skills" : "",
       profileImage()
     ]
     const completed = fields.filter((field) => field).length
@@ -370,7 +370,7 @@ export function ProfileSettings(): JSX.Element {
                       {t("settings.profile.removePhoto")}
                     </button>
                   </Show>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">JPG, PNG, or GIF. Max 2MB.</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{t("settings.profile.photoHint")}</p>
                 </div>
               </Show>
             </div>
@@ -528,7 +528,7 @@ export function ProfileSettings(): JSX.Element {
                       value={profileData().title}
                       onInput={(event) => setProfileData((previous) => ({ ...previous, title: event.currentTarget.value }))}
                       disabled={!isEditing()}
-                      placeholder="e.g., CAD Designer"
+                      placeholder={t("settings.profile.jobPlaceholder")}
                       class={fieldClass(false)}
                     />
                   </div>
@@ -542,7 +542,7 @@ export function ProfileSettings(): JSX.Element {
                       value={profileData().company}
                       onInput={(event) => setProfileData((previous) => ({ ...previous, company: event.currentTarget.value }))}
                       disabled={!isEditing()}
-                      placeholder="Your company name"
+                      placeholder={t("settings.profile.companyPlaceholder")}
                       class={fieldClass(false)}
                     />
                   </div>
@@ -557,7 +557,7 @@ export function ProfileSettings(): JSX.Element {
                       value={profileData().location}
                       onInput={(event) => setProfileData((previous) => ({ ...previous, location: event.currentTarget.value }))}
                       disabled={!isEditing()}
-                      placeholder="City, Country"
+                      placeholder={t("settings.profile.locationPlaceholder")}
                       class={fieldClass(false)}
                     />
                   </div>
@@ -572,7 +572,7 @@ export function ProfileSettings(): JSX.Element {
                       value={profileData().website}
                       onInput={(event) => setProfileData((previous) => ({ ...previous, website: event.currentTarget.value }))}
                       disabled={!isEditing()}
-                      placeholder="https://yourwebsite.com"
+                      placeholder={t("settings.profile.websitePlaceholder")}
                       class={fieldClass(errors().website !== undefined)}
                     />
                     <Show when={errors().website !== undefined}>
@@ -592,7 +592,7 @@ export function ProfileSettings(): JSX.Element {
                   onInput={(event) => setProfileData((previous) => ({ ...previous, bio: event.currentTarget.value }))}
                   disabled={!isEditing()}
                   rows={4}
-                  placeholder="Tell us about yourself, your experience, and what you're passionate about..."
+                  placeholder={t("settings.profile.bioPlaceholder")}
                   class={`w-full resize-none rounded-md border px-2.5 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 ${
                     !isEditing()
                       ? "cursor-not-allowed border-slate-200/70 bg-slate-50/80 text-slate-500 dark:border-slate-700/50 dark:bg-slate-800/80 dark:text-slate-400"
@@ -641,7 +641,7 @@ export function ProfileSettings(): JSX.Element {
                           addSkill(newSkill())
                         }
                       }}
-                      placeholder="Add a skill..."
+                      placeholder={t("settings.profile.skillPlaceholder")}
                       class="w-full rounded-md border border-slate-200/70 bg-white/80 px-2.5 py-1.5 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700/50 dark:bg-slate-800/60 dark:text-slate-100"
                     />
 

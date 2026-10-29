@@ -21,7 +21,6 @@ import { AdvancedSection } from "./generator/AdvancedSection.tsx"
 import { AiSection } from "./generator/AiSection.tsx"
 import { CuttingSection } from "./generator/CuttingSection.tsx"
 import { EvidenceSection } from "./generator/EvidenceSection.tsx"
-import { FixedCyclesSection } from "./generator/FixedCyclesSection.tsx"
 import { LatheSection } from "./generator/LatheSection.tsx"
 import { MachineSection } from "./generator/MachineSection.tsx"
 import { MaterialSection } from "./generator/MaterialSection.tsx"
@@ -29,11 +28,11 @@ import { OperationSection } from "./generator/OperationSection.tsx"
 import { OriginSection } from "./generator/OriginSection.tsx"
 import { WorkholdingSection } from "./generator/WorkholdingSection.tsx"
 import KernelPrintSection from "./generator/KernelPrintSection.tsx"
+import { KernelRunControls, KernelSession } from "./generator/KernelSection.tsx"
 import { PrintProfileSection } from "./generator/PrintProfileSection.tsx"
 import { PrintResultSection } from "./generator/PrintResultSection.tsx"
 import { Note } from "./generator/ui.tsx"
 import { ToolSection } from "./generator/ToolSection.tsx"
-import KernelSection from "./generator/KernelSection.tsx"
 import SaveCamModal from "./SaveCamModal.tsx"
 
 export interface ToolpathGeneratorProps {
@@ -116,12 +115,6 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
     }
   }
 
-  const onCycleGCode = (gcode: string): void => {
-    gen.setCurrentGCode(gcode)
-    camStore.setGcode(gcode)
-    props.onGCodeGenerated(gcode)
-  }
-
   const saveAsToolpath = (): void => {
     if (!camStore.gcode) { toast.error(t("cam.generator.noGcode")); return }
     if (props.onSave) props.onSave()
@@ -129,6 +122,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
   }
 
   return (
+    <KernelSession onGCodeGenerated={props.onGCodeGenerated}>
     <div
       class={`panel workstation-generator__form ${gen.showFullscreen ? "fixed p-6 m-4 inset-0 z-50 overflow-auto bg-white dark:bg-gray-900" : "p-2"}`}
       data-testid="toolpath-generator"
@@ -157,11 +151,9 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
       <MachineSection />
       <OriginSection />
       <WorkholdingSection />
-      <Show when={gen.settings.machineType === "mill"}><KernelSection onGCodeGenerated={props.onGCodeGenerated} /></Show>
       <OperationSection />
       <PrintProfileSection />
       <KernelPrintSection onGCodeGenerated={props.onGCodeGenerated} />
-      <Show when={gen.settings.machineType !== "3dprinter"}><FixedCyclesSection onGCode={onCycleGCode} /></Show>
       <MaterialSection />
       <ToolSection />
       <LatheSection />
@@ -181,6 +173,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
       </Show>
 
       <div class="panel-footer">
+        <KernelRunControls />
         <div class="panel-actions">
           <button type="button" onClick={() => void generate()} disabled={gen.isGenerating} data-testid="generate-toolpath" class="panel-btn panel-btn--primary panel-btn--block">
             <Show when={gen.isGenerating} fallback={<><Code size={14} />{t("cam.generator.generate")}</>}>
@@ -211,5 +204,6 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
         </div>
       </div>
     </div>
+    </KernelSession>
   )
 }

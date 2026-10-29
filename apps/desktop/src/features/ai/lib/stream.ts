@@ -17,6 +17,7 @@ import type { ChatAttachment } from "./attachments.ts"
 import { TOOL_IDS, type ToolId } from "./tools.ts"
 import { ToolInputSchemas } from "./tool-schemas.ts"
 import { sanitizeError } from "./errors.ts"
+import { t } from "../../../i18n/index.ts"
 
 export class AiStreamError extends Schema.TaggedError<AiStreamError>()("AiStreamError", {
   message: Schema.String
@@ -234,7 +235,7 @@ const isIgnoredEvent = (raw: unknown): boolean => {
 
 const decodeEventSafely = (raw: unknown): Effect.Effect<AiEvent, AiStreamError> => Effect.try({
   try: () => decodeWireEvent(typeof raw === "string" ? JSON.parse(raw) : raw),
-  catch: () => new AiStreamError({ message: "The assistant sent an invalid event. Recovering the session may restore its results." })
+  catch: () => new AiStreamError({ message: t("ai.stream.invalidEvent") })
 })
 
 const cap = (text: string, limit: number, marker: string): string =>

@@ -353,5 +353,9 @@
   "chat.unnamedUser": "बेनाम उपयोगकर्ता",
   "chat.noEmail": "कोई ईमेल नहीं",
   "chat.createGroup": "समूह बनाएँ",
-  "chat.startConversation": "बातचीत शुरू करें"
+  "chat.startConversation": "बातचीत शुरू करें",
+  "dash.from": "से",
+  "org.search": "संगठन खोजें...",
+  "org.none": "कोई संगठन नहीं मिला",
+  "org.noneMatch": "कोई संगठन खोज से मेल नहीं खाता।"
 }

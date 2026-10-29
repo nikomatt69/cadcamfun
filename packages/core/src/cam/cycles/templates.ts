@@ -6,7 +6,10 @@
  * templates keep the legacy string layout. The only change is `icon`, a name the UI maps to an SVG.
  */
 
-export type CycleController = "fanuc" | "heidenhain"
+/** The two dialects the 17 legacy templates emit themselves. Other posts reuse these blocks or a native subset (`catalog.ts`). */
+export type TemplateDialect = "fanuc" | "heidenhain"
+
+export type CycleFamily = "drilling" | "thread" | "pocket" | "contour"
 
 export type CycleIconName =
   | "drill" | "pocket" | "contour" | "tap" | "deep-drill" | "slot" | "boring" | "back-boring" | "thread-milling"
@@ -16,7 +19,7 @@ export type CycleIconName =
 export interface CycleParameter {
   readonly name: string
   readonly label: string
-  readonly type: "number" | "select" | "checkbox"
+  readonly type: "number" | "select" | "checkbox" | "text"
   readonly defaultValue: number | string | boolean
   readonly min?: number
   readonly max?: number
@@ -35,15 +38,17 @@ export interface CycleTemplate {
   readonly name: string
   readonly description: string
   readonly icon: CycleIconName
-  readonly controllerTypes: ReadonlyArray<CycleController>
+  readonly family: CycleFamily
+  readonly controllerTypes: ReadonlyArray<TemplateDialect>
   readonly parameters: ReadonlyArray<CycleParameter>
-  readonly generateCode: (params: CycleValues, controllerType: CycleController) => string
+  readonly generateCode: (params: CycleValues, controllerType: TemplateDialect) => string
 }
 
 export const cycleTemplates: ReadonlyArray<CycleTemplate> = [
     // Simple drilling cycle
     {
       id: "simple-drilling",
+      family: "drilling",
       name: "Simple Drilling",
       description: "Base drilling cycle with depth and feedrate",
       icon: "drill",
@@ -159,6 +164,7 @@ M5`;
     // Rectangular pocket cycle
     {
       id: "rectangular-pocket",
+      family: "pocket",
       name: "Rectangular Pocket",
       description: "Cycle for milling a rectangular pocket",
       icon: "pocket",
@@ -334,6 +340,7 @@ M5`;
     // Contour milling cycle
     {
       id: "contour-milling",
+      family: "contour",
       name: "Contour Milling",
       description: "Cycle for milling an external or internal profile",
       icon: "contour",
@@ -506,6 +513,7 @@ M5`;
     // Tapping cycle
     {
       id: "tapping-cycle",
+      family: "thread",
       name: "Tapping",
       description: "Tapping cycle for metric threads",
       icon: "tap",
@@ -625,6 +633,7 @@ M5`;
     // Deep drilling cycle
     {
       id: "deep-drilling",
+      family: "drilling",
       name: "Deep Drilling",
       description: "Deep drilling cycle with chip evacuation",
       icon: "deep-drill",
@@ -777,6 +786,7 @@ M5`;
     // Slot milling cycle
     {
       id: "slot-milling",
+      family: "pocket",
       name: "Slot Milling",
       description: "Cycle for milling linear slots",
       icon: "slot",
@@ -990,6 +1000,7 @@ M5`;
     // Boring cycle
     {
       id: "boring-cycle",
+      family: "drilling",
       name: "Boring",
       description: "Precision boring cycle",
       icon: "boring",
@@ -1132,6 +1143,7 @@ M5`;
     // Back boring cycle
     {
       id: "back-boring",
+      family: "drilling",
       name: "Back Boring",
       description: "Inverse boring cycle for machining from the bottom",
       icon: "back-boring",
@@ -1291,6 +1303,7 @@ M5`;
     // Thread milling cycle
     {
       id: "thread-milling",
+      family: "thread",
       name: "Thread Milling",
       description: "Cycle for internal or external thread milling",
       icon: "thread-milling",
@@ -1476,6 +1489,7 @@ M5`;
     // Circular pocket milling cycle
     {
       id: "circular-pocket",
+      family: "pocket",
       name: "Circular Pocket",
       description: "Cycle for milling circular pockets",
       icon: "circular-pocket",
@@ -1671,6 +1685,7 @@ M5`;
     // Circular island milling cycle
     {
       id: "circular-island",
+      family: "pocket",
       name: "Circular Island",
       description: "Cycle for milling circular islands",
       icon: "circular-island",
@@ -1868,6 +1883,7 @@ M5`;
     // Chip breaking drilling cycle
     {
       id: "chip-breaking-drill",
+      family: "drilling",
       name: "Chip Breaking Drilling",
       description: "Drilling cycle with programmed chip breaking",
       icon: "chip-breaking",
@@ -2014,6 +2030,7 @@ M5`;
     // T-slot milling cycle
     {
       id: "t-slot-milling",
+      family: "pocket",
       name: "T-Slot Milling",
       description: "Cycle for milling T-slots",
       icon: "t-slot",
@@ -2199,6 +2216,7 @@ M5`;
     // Center drilling cycle
     {
       id: "center-drilling",
+      family: "drilling",
       name: "Center Drilling",
       description: "Center drilling cycle for hole preparation",
       icon: "center-drill",
@@ -2334,6 +2352,7 @@ M5`;
     // Chamfering cycle
     {
       id: "chamfering-cycle",
+      family: "contour",
       name: "Chamfering",
       description: "Cycle for milling chamfers",
       icon: "chamfer",
@@ -2496,6 +2515,7 @@ M5`;
     // Peck drilling cycle (G83)
     {
       id: "peck-drilling",
+      family: "drilling",
       name: "Peck Drilling",
       description: "Drilling cycle with full retract for chip clearing",
       icon: "peck-drill",
@@ -2627,6 +2647,7 @@ M5`;
     // Plunge Milling cycle
     {
       id: "plunge-milling",
+      family: "pocket",
       name: "Plunge Milling",
       description: "Plunge milling cycle for rapid roughing",
       icon: "plunge-milling",
@@ -2809,9 +2830,9 @@ M5`;
     }
 ] as const satisfies ReadonlyArray<CycleTemplate>
 
-/** Templates available for `controller` (legacy `availableCycles`). */
-export const availableCycles = (controller: CycleController): ReadonlyArray<CycleTemplate> =>
-  cycleTemplates.filter((cycle) => cycle.controllerTypes.includes(controller))
+/** Templates whose own `generateCode` speaks `dialect` (Fanuc EIA or Klartext). */
+export const templatesFor = (dialect: TemplateDialect): ReadonlyArray<CycleTemplate> =>
+  cycleTemplates.filter((cycle) => cycle.controllerTypes.includes(dialect))
 
 export const findCycle = (id: string): CycleTemplate | undefined => cycleTemplates.find((cycle) => cycle.id === id)
 
@@ -2819,6 +2840,6 @@ export const findCycle = (id: string): CycleTemplate | undefined => cycleTemplat
 export const defaultCycleValues = (cycle: CycleTemplate): CycleValues =>
   Object.fromEntries(cycle.parameters.map((param) => [param.name, param.defaultValue]))
 
-/** The block a template emits for `values` (legacy `generateCode`). */
-export const generateCycleCode = (cycle: CycleTemplate, values: CycleValues, controller: CycleController): string =>
-  cycle.generateCode(values, controller)
+/** The block a template emits in its own dialect (legacy `generateCode`). */
+export const emitTemplate = (cycle: CycleTemplate, values: CycleValues, dialect: TemplateDialect): string =>
+  cycle.generateCode(values, dialect)

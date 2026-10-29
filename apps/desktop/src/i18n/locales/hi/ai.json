@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "Look for something in the conversation on screen.",
   "ai.cmd.find.empty": "Say what to look for: /find wall thickness",
   "ai.cmd.older": "older",
-  "ai.cmd.older.desc": "Read the messages before the ones on screen."
+  "ai.cmd.older.desc": "Read the messages before the ones on screen.",
+  "ai.catalogue.searchModels": "प्रदाता मॉडल खोजें",
+  "ai.stream.invalidEvent": "सहायक ने अमान्य घटना भेजी। सत्र पुनर्प्राप्त करने से परिणाम लौट सकते हैं।",
+  "ai.vision.captureFailed": "व्यूपोर्ट कैप्चर विफल।",
+  "mcp.directory.search": "सर्वर खोजें..."
 }

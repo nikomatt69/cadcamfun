@@ -6,6 +6,7 @@ import { useCamStore } from "../../cam/store/camStore.ts"
 import { toJsonSafe } from "../../../shared/state/json-safe.ts"
 import { currentDrawingContext } from "./drawing-context.ts"
 import { captureVisibleViewport } from "./viewport-capture.ts"
+import { t } from "../../../i18n/index.ts"
 
 /** The program text a capture carries; a program longer than this is cut, and the cut is said. */
 const MAX_PROGRAM_CHARS = 200_000
@@ -52,7 +53,7 @@ export const startVisionBridge = (app: AppState): (() => void) => {
             mime: "image/png",
             context
           }
-        } catch (error) { value = { requestId: request.requestId, error: error instanceof Error ? error.message : "Viewport capture failed." } }
+        } catch (error) { value = { requestId: request.requestId, error: error instanceof Error ? error.message : t("ai.vision.captureFailed") } }
         if (!disposed) await app.runtime.run(app.client.kv.set({ params: { key: `ai.vision.reply.${projectId}.${request.requestId}` }, payload: { value } }))
       }
       if (completed.size > 200) completed.clear()

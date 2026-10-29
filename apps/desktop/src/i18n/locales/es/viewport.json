@@ -27,5 +27,6 @@
   "cad.height": "Alto",
   "cad.depth": "Profundidad",
   "cad.snapSettings": "Ajustes de ajuste",
-  "cad.enableSnapping": "Activar el ajuste"
+  "cad.enableSnapping": "Activar el ajuste",
+  "viewport.editor2d": "Editor de dibujo 2D"
 }

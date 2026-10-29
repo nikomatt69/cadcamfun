@@ -98,7 +98,7 @@ export function OrganizationsScreen(): JSX.Element {
           <span class={RAIL_LABEL}>{t("legacy.search")}</span>
           <div class="relative">
             <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search organizations..." value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
+            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("org.search")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
         <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />{t("pages.clear.filters")}</button>
@@ -131,7 +131,7 @@ export function OrganizationsScreen(): JSX.Element {
           <Show
             when={filtered().length > 0}
             fallback={
-              <StageEmpty icon={<Building size={24} aria-hidden="true" />} title={search() !== "" ? "No organizations found" : t("org.empty.title")} hint={search() !== "" ? "No organizations match your search criteria." : t("org.empty.body")}>
+              <StageEmpty icon={<Building size={24} aria-hidden="true" />} title={search() !== "" ? t("org.none") : t("org.empty.title")} hint={search() !== "" ? t("org.noneMatch") : t("org.empty.body")}>
                 <Show when={search() !== ""} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>{t("org.empty.cta")}</button>}>
                   <button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>{t("manuals.clear")}</button>
                 </Show>

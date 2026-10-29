@@ -7,5 +7,8 @@
   "plugins.dropPackage": "将插件包拖放到此处",
   "plugins.browsePackage": "或点击浏览文件（.zip 或 .vsix）",
   "plugins.invalidPackage": "文件类型无效。请上传插件包（.zip 或 .vsix）",
-  "plugins.packageTooLarge": "文件过大。最大大小为 10MB"
+  "plugins.packageTooLarge": "文件过大。最大大小为 10MB",
+  "plugins.search": "搜索插件…",
+  "plugins.none": "未找到插件",
+  "plugins.noneMatch": "没有插件符合搜索条件。"
 }

@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "Procurar algo na conversa que está na tela.",
   "ai.cmd.find.empty": "Diga o que procurar: /find wall thickness",
   "ai.cmd.older": "anteriores",
-  "ai.cmd.older.desc": "Ler as mensagens anteriores às que estão na tela."
+  "ai.cmd.older.desc": "Ler as mensagens anteriores às que estão na tela.",
+  "ai.catalogue.searchModels": "Pesquisar modelos do provedor",
+  "ai.stream.invalidEvent": "O assistente enviou um evento inválido. Recuperar a sessão pode restaurar os resultados.",
+  "ai.vision.captureFailed": "Falha na captura da vista.",
+  "mcp.directory.search": "Pesquisar servidores..."
 }

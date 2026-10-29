@@ -27,5 +27,6 @@
   "cad.height": "高さ",
   "cad.depth": "深さ",
   "cad.snapSettings": "スナップ設定",
-  "cad.enableSnapping": "スナップを有効にする"
+  "cad.enableSnapping": "スナップを有効にする",
+  "viewport.editor2d": "2D図面エディタ"
 }

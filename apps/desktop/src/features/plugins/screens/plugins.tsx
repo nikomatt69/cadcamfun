@@ -108,7 +108,7 @@ export function PluginsScreen(): JSX.Element {
         <span class={RAIL_LABEL}>{t("legacy.search")}</span>
         <div class="relative">
           <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search plugins..." value={search()} onInput={(e) => setSearch(e.currentTarget.value)} />
+          <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("plugins.search")} value={search()} onInput={(e) => setSearch(e.currentTarget.value)} />
         </div>
       </label>
       <label class="block">
@@ -147,7 +147,7 @@ export function PluginsScreen(): JSX.Element {
     <Show when={!plugins.loading() || plugins.data()}>
       <Show
         when={filtered().length > 0}
-        fallback={<StageEmpty icon={<Puzzle size={24} aria-hidden="true" />} title="No plugins found" hint={hasFilters() ? "No plugins match your search criteria." : t("plugins.empty")}>
+        fallback={<StageEmpty icon={<Puzzle size={24} aria-hidden="true" />} title={t("plugins.none")} hint={hasFilters() ? t("plugins.noneMatch") : t("plugins.empty")}>
           <Show when={hasFilters()} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openInstall}>{t("plugins.install")}</button>}><button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>{t("manuals.clear")}</button></Show>
         </StageEmpty>}
       >
@@ -299,7 +299,7 @@ export function PluginDetailScreen(): JSX.Element {
             ${configurationKeys.length > 0 ? `**Configuration Options:** (Provides options like: ${configurationKeys.join(", ")})` : ""}
             ${contributesKeys.length > 0 ? `**Features/Contributions:** (Provides features related to: ${contributesKeys.join(", ")})` : ""}
 
-            Please include the following sections:
+            Please include the following sections: // i18n-ok model prompt
             - Overview/Description (expand on the provided description)
             - Features (elaborate based on contributions)
             - Installation (Generic steps: Use 'Install Plugin' button in the app)
@@ -485,7 +485,7 @@ export function PluginDetailScreen(): JSX.Element {
               <Show when={readme() !== undefined && !generating()}>
                 <div>
                   <p class="mb-3 text-sm text-slate-500 dark:text-slate-400">
-                    {t("plugins.detail.readmeHelp1")} <code class="rounded bg-slate-100 p-1 text-xs dark:bg-slate-900">README.md</code> {t("plugins.detail.readmeHelp2")}
+                    {t("plugins.detail.readmeHelp1")} <code class="rounded bg-slate-100 p-1 text-xs dark:bg-slate-900">README.md</code> {t("plugins.detail.readmeHelp2")} {/* i18n-ok filename */}
                   </p>
                   <textarea
                     readOnly

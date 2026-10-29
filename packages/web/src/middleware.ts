@@ -1,5 +1,5 @@
 import { defineMiddleware } from "astro:middleware"
-import { isDocsPath, isLocale, LOCALE_COOKIE, localizePath, resolveLocale, splitLocalePath, type Locale } from "./i18n/locales"
+import { isDocsPath, isLocale, LOCALE_COOKIE, localeFromChoice, localizePath, resolveLocale, splitLocalePath, type Locale } from "./i18n/locales"
 
 const cookieFor = (locale: Locale): string =>
   `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`
@@ -40,7 +40,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return response
   }
 
-  if (!isDocsPath(pathname) || (context.request.method !== "GET" && context.request.method !== "HEAD")) {
+  if (!isDocsPath(pathname)) {
+    const chosen = searchParams.get("lang")
+    const locale = localeFromChoice(chosen, readCookie(context.request.headers.get("cookie"), LOCALE_COOKIE))
+    context.locals.locale = locale
+    const response = await next()
+    if (isLocale(chosen)) response.headers.append("Set-Cookie", cookieFor(chosen))
+    response.headers.set("Content-Language", locale)
+    return response
+  }
+
+  if (context.request.method !== "GET" && context.request.method !== "HEAD") {
     context.locals.locale = "en"
     return next()
   }

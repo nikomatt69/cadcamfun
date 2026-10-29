@@ -9,6 +9,7 @@
  * It is pure and DOM-free, which is what makes it unit-testable with `bun:test`.
  */
 import { Exit, Schema } from "effect"
+import { t } from "../../i18n/index.ts"
 
 export type FieldKind = "number" | "integer" | "boolean" | "string" | "enum" | "unknown"
 
@@ -249,7 +250,7 @@ export const decodeForm = <S extends Schema.Constraint>(
   if (Exit.isSuccess(exit)) return { _tag: "Valid", value: exit.value }
   // A cross-field filter (or anything the field pass cannot express) fails here;
   // the form shows one generic issue instead of crashing.
-  return { _tag: "Invalid", issues: [{ key: "", message: "The values do not satisfy the schema" }] }
+  return { _tag: "Invalid", issues: [{ key: "", message: t("schema.invalid") }] }
 }
 
 /**

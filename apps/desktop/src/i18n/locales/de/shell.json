@@ -542,5 +542,9 @@
   "shell.engine.recovered": "Die Berechnungs-Engine läuft wieder.",
   "shell.engine.failed": "Die Berechnungs-Engine konnte nicht neu gestartet werden. Starten Sie die App neu, um fortzufahren.",
   "update.noneAvailable": "Es gibt kein Update zur Installation. Suchen Sie erneut nach Updates.",
-  "update.busy": "Ein anderer Update-Vorgang läuft. Versuchen Sie es gleich noch einmal."
+  "update.busy": "Ein anderer Update-Vorgang läuft. Versuchen Sie es gleich noch einmal.",
+  "shell.notifications.unread": "{count} ungelesen",
+  "shell.notifications.markAll": "Alle als gelesen",
+  "shell.notifications.empty": "Noch keine Hinweise. Projekt-, Ablauf- und Assistentenmeldungen erscheinen hier.",
+  "twofactor.qrAlt": "2FA-QR-Code"
 }

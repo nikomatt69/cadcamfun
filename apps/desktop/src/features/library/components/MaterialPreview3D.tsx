@@ -10,6 +10,7 @@ import { disposeObject } from "../../cad/lib/sceneHelpers.ts"
 import { FrameScheduler } from "../../cad/lib/frame-scheduler.ts"
 import { PREVIEW_BACKGROUND, addPreviewLook, hexColor } from "../lib/preview-scene.ts"
 import { PREVIEW_STAGE, PreviewFrame, stageNote } from "./PreviewFrame.tsx"
+import { t, type Key } from "../../../i18n/index.ts"
 
 const METAL_DENSITY = 2000 // kg/m³ — aluminium and above are metals, plastics / woods sit below
 
@@ -74,9 +75,9 @@ export function MaterialPreview3D(props: { readonly properties: Readonly<Record<
       frames.dispose(); controls.dispose(); disposeObject(scene); look.dispose(); renderer.dispose(); renderer.domElement.remove()
     })
   })
-  return <PreviewFrame title="Material sample" testId="material-preview" hint="Drag to orbit · Scroll to zoom">
-    <div ref={host} class={PREVIEW_STAGE} style={{ height: `${props.height ?? 260}px` }} role="img" aria-label="3D material sample">
-      <Show when={unavailable()}><p role="status" class={stageNote("info")}>3D preview unavailable (no WebGL)</p></Show>
+  return <PreviewFrame title={t("library.preview.material")} testId="material-preview" hint={t("library.preview.orbit")}>
+    <div ref={host} class={PREVIEW_STAGE} style={{ height: `${props.height ?? 260}px` }} role="img" aria-label={t("library.preview.materialAria")}>
+      <Show when={unavailable()}><p role="status" class={stageNote("info")}>{t("library.preview.noWebgl")}</p></Show>
     </div>
   </PreviewFrame>
 }

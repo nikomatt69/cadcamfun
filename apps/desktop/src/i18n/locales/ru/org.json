@@ -353,5 +353,9 @@
   "chat.unnamedUser": "Без имени",
   "chat.noEmail": "Нет email",
   "chat.createGroup": "Создать группу",
-  "chat.startConversation": "Начать беседу"
+  "chat.startConversation": "Начать беседу",
+  "dash.from": "С",
+  "org.search": "Поиск организаций...",
+  "org.none": "Организации не найдены",
+  "org.noneMatch": "Ни одна организация не подходит под поиск."
 }

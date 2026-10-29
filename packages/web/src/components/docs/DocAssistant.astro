@@ -1,19 +1,29 @@
 ---
 import { docsIndex } from "../../data/docsIndex"
+import { text } from "../../i18n/catalog"
+import type { Locale } from "../../i18n/locales"
 
 interface Props {
   pathname: string
 }
 
 const { pathname } = Astro.props
+const locale: Locale = Astro.locals.locale ?? "en"
 const currentPage = docsIndex.find((entry) => entry.href === pathname)
 
 const suggestions = [
-  "How do I install and run CADCAMFUN locally?",
-  "How does a toolpath become G-code for my machine?",
-  currentPage ? `Explain ${currentPage.title} in simple terms` : "What is CADCAMFUN?",
-  "Build me a checklist for generating and verifying G-code",
+  text(locale, "How do I install and run CADCAMFUN locally?"),
+  text(locale, "How does a toolpath become G-code for my machine?"),
+  currentPage ? text(locale, "Explain {title} in simple terms", { title: currentPage.title }) : text(locale, "What is CADCAMFUN?"),
+  text(locale, "Build me a checklist for generating and verifying G-code"),
 ]
+const copy = {
+  reading: text(locale, "Reading the docs…"),
+  interrupted: text(locale, "The connection to the assistant was interrupted."),
+  noAnswer: text(locale, "No answer was returned. Try rephrasing your question."),
+  expand: text(locale, "Expand the documentation assistant"),
+  minimize: text(locale, "Minimize the documentation assistant"),
+}
 ---
 
 <div data-doc-assistant data-llm-exclude data-path={pathname} data-state="closed" class="da-root print:hidden">
@@ -26,41 +36,41 @@ const suggestions = [
     class="da-launcher pressable glass-chip"
   >
     <span class="da-dot" aria-hidden="true"></span>
-    <span>Ask the docs</span>
-    <span data-assistant-unread class="da-unread" hidden>New</span>
+    <span>{text(locale, "Ask the docs")}</span>
+    <span data-assistant-unread class="da-unread" hidden>{text(locale, "New")}</span>
   </button>
 
   <!-- Mobile scrim: only under an expanded panel, never on desktop -->
   <div data-assistant-backdrop hidden class="da-backdrop"></div>
 
-  <section id="doc-assistant-panel" data-assistant-panel role="dialog" aria-label="CADCAMFUN documentation assistant" class="da-panel">
+  <section id="doc-assistant-panel" data-assistant-panel role="dialog" aria-label={text(locale, "CADCAMFUN documentation assistant")} class="da-panel">
     <header data-assistant-header class="da-header">
       <span aria-hidden="true" class="da-grabber"></span>
 
-      <button type="button" data-assistant-title aria-label="Expand the documentation assistant" class="da-title">
+      <button type="button" data-assistant-title aria-label={copy.expand} class="da-title">
         <span class="da-eyebrow">
           <img src="/brand/icon.png" alt="" width="14" height="14" />
-          Docs assistant
-          <span data-assistant-badge hidden title="Engine answering your questions" class="da-badge"></span>
+          {text(locale, "Docs assistant")}
+          <span data-assistant-badge hidden title={text(locale, "Engine answering your questions")} class="da-badge"></span>
         </span>
-        <span class="da-heading">Ask the docs</span>
+        <span class="da-heading">{text(locale, "Ask the docs")}</span>
         <span class="da-sub">
-          {currentPage ? `Grounded in the docs · reading ${currentPage.title}` : "Grounded in the CADCAMFUN documentation"}
+          {currentPage ? text(locale, "Grounded in the docs · reading {title}", { title: currentPage.title }) : text(locale, "Grounded in the CADCAMFUN documentation")}
         </span>
       </button>
 
       <div class="da-actions">
-        <button type="button" data-assistant-reset title="Clear conversation" aria-label="Clear conversation" class="da-icon pressable">
+        <button type="button" data-assistant-reset title={text(locale, "Clear conversation")} aria-label={text(locale, "Clear conversation")} class="da-icon pressable">
           <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
           </svg>
         </button>
-        <button type="button" data-assistant-minimize title="Minimize" aria-label="Minimize the documentation assistant" class="da-icon pressable">
+        <button type="button" data-assistant-minimize title={text(locale, "Minimize")} aria-label={copy.minimize} class="da-icon pressable">
           <svg class="da-chevron" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"></path>
           </svg>
         </button>
-        <button type="button" data-assistant-close title="Close" aria-label="Close the documentation assistant" class="da-icon pressable">
+        <button type="button" data-assistant-close title={text(locale, "Close")} aria-label={text(locale, "Close the documentation assistant")} class="da-icon pressable">
           <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"></path>
           </svg>
@@ -71,9 +81,7 @@ const suggestions = [
     <div data-assistant-log class="da-log custom-scrollbar">
       <div data-assistant-empty class="da-empty">
         <p>
-          Ask anything about CADCAMFUN: the geometry kernel, CAM operations and posts, the sidecar API, the desktop
-          app, the database, or the repository workflow. Answers come from these docs and cite the pages they used.
-          It can also publish a checklist, setup sheet or cheatsheet as a shareable guide. No account needed.
+          {text(locale, "Ask anything about CADCAMFUN: the geometry kernel, CAM operations and posts, the sidecar API, the desktop app, the database, or the repository workflow. Answers come from these docs and cite the pages they used. It can also publish a checklist, setup sheet or cheatsheet as a shareable guide. No account needed.")}
         </p>
         <div class="da-suggestions">
           {suggestions.map((suggestion) => (
@@ -87,21 +95,21 @@ const suggestions = [
 
     <form data-assistant-form class="da-form">
       <div class="da-compose">
-        <label class="sr-only" for="doc-assistant-input">Your question</label>
+        <label class="sr-only" for="doc-assistant-input">{text(locale, "Your question")}</label>
         <textarea
           id="doc-assistant-input"
           data-assistant-input
           rows="1"
           maxlength="1200"
-          placeholder="Ask about CADCAMFUN…"
+          placeholder={text(locale, "Ask about CADCAMFUN…")}
           class="da-input"></textarea>
-        <button type="submit" data-assistant-send aria-label="Send question" class="da-send pressable plate-face">
+        <button type="submit" data-assistant-send aria-label={text(locale, "Send question")} class="da-send pressable plate-face">
           <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 12 14-7-5.5 7L19 19 5 12Z"></path>
           </svg>
         </button>
       </div>
-      <p class="da-disclaimer">AI-generated from the docs. It can be wrong. Verify commands and simulate G-code before running it on a machine.</p>
+      <p class="da-disclaimer">{text(locale, "AI-generated from the docs. It can be wrong. Verify commands and simulate G-code before running it on a machine.")}</p>
     </form>
   </section>
 </div>
@@ -779,7 +787,7 @@ const suggestions = [
   }
 </style>
 
-<script>
+<script define:vars={{ copy }}>
   type Role = "user" | "assistant"
   type Source = { title: string; href: string }
   type Artifact = { id: string; url: string; title: string; filename: string }
@@ -1000,7 +1008,7 @@ const suggestions = [
 
       const body = element("div", "da-body")
       body.dataset.assistantBody = ""
-      body.innerHTML = message.content ? renderMarkdown(message.content) : '<span class="da-thinking">Reading the docs…</span>'
+      body.innerHTML = message.content ? renderMarkdown(message.content) : `<span class="da-thinking">${copy.reading}</span>`
       wrapper.append(body)
 
       if (message.artifact) {
@@ -1066,7 +1074,7 @@ const suggestions = [
       save(STATE_KEY, next)
 
       launcher.setAttribute("aria-expanded", next === "closed" ? "false" : "true")
-      minimize?.setAttribute("aria-label", next === "minimized" ? "Expand the documentation assistant" : "Minimize the documentation assistant")
+      minimize?.setAttribute("aria-label", next === "minimized" ? copy.expand : copy.minimize)
       minimize?.setAttribute("title", next === "minimized" ? "Expand" : "Minimize")
 
       const scrim = next === "open" && mobile.matches
@@ -1179,12 +1187,12 @@ const suggestions = [
         if (buffer.trim()) handleEvent(buffer)
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
-          target.error = "The connection to the assistant was interrupted."
+          target.error = copy.interrupted
         }
       } finally {
         controller = null
         setBusy(false)
-        if (!target.content && !target.error) target.error = "No answer was returned. Try rephrasing your question."
+        if (!target.content && !target.error) target.error = copy.noAnswer
         render()
         save(STORE_KEY, messages.slice(-MAX_STORED))
         if (state === "minimized") markUnread(true)

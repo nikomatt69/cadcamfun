@@ -125,5 +125,6 @@
   "pages.create.reusable.components.to.use.across.your.cad.drawings": "أنشئ مكونات قابلة لإعادة الاستخدام في رسومات CAD.",
   "pages.create.component": "إنشاء مكون",
   "pages.create.toolpaths.to.generate.g.code.for.your.machine": "أنشئ مسارات أدوات لتوليد كود G لآلتك.",
-  "pages.search.projects": "ابحث عن مشاريع…"
+  "pages.search.projects": "ابحث عن مشاريع…",
+  "pages.drawing.deleteConfirm": "حذف الرسم \"{name}\"؟"
 }

@@ -66,7 +66,7 @@ export default function ToolWearCostForm(props: ToolWearCostFormProps): JSX.Elem
 
   return (
     <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow-md">
-      <h3 class="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-200">{isEditing() ? "Modify Tool Wear Cost" : "Add New Tool Wear Cost"}</h3>
+      <h3 class="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-200">{isEditing() ? t("costs.wear.editTitle") : t("costs.wear.addTitle")}</h3>
 
       <form onSubmit={(event) => void handleSubmit(event)} class="space-y-4">
         <div>
@@ -74,7 +74,7 @@ export default function ToolWearCostForm(props: ToolWearCostFormProps): JSX.Elem
           <select id="toolId" name="toolId" value={formData.toolId} onChange={handleChange} class="w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required disabled={isEditing() || isLoadingTools() || !!toolError()}>
             <Show
               when={!isLoadingTools()}
-              fallback={<option value="">Loading tools...</option>}
+              fallback={<option value="">{t("costs.wear.loading")}</option>}
             >
               <Show when={!toolError()} fallback={<option value="">{toolError()}</option>}>
                 <option value="">{t("cam.gen.tool.selectOne")}</option>
@@ -85,7 +85,7 @@ export default function ToolWearCostForm(props: ToolWearCostFormProps): JSX.Elem
                   <For each={allTools().filter((tool) => tool.id === formData.toolId)}>{(tool) => <option value={tool.id} selected>{toolLabel(tool)}</option>}</For>
                 </Show>
                 <Show when={isEditing() && formData.toolId && !allTools().find((tool) => tool.id === formData.toolId)}>
-                  <option value={formData.toolId} disabled>{`Tool (ID: ${formData.toolId}) - Loaded`}</option>
+                  <option value={formData.toolId} disabled>{t("costs.wear.loaded", { id: formData.toolId })}</option>
                 </Show>
               </Show>
             </Show>
@@ -93,39 +93,39 @@ export default function ToolWearCostForm(props: ToolWearCostFormProps): JSX.Elem
         </div>
 
         <div>
-          <label for="wearRatePerMeter" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Wear Rate per Meter (%)</label>
+          <label for="wearRatePerMeter" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.wear.rate")}</label>
           <input id="wearRatePerMeter" type="number" name="wearRatePerMeter" value={formData.wearRatePerMeter} onInput={handleChange} min="0" step="0.01" class="w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required />
-          <p class="text-xs text-gray-500 mt-1">Percentage of tool wear per meter of path. Es. 0.5 for 0.5%.</p>
+          <p class="text-xs text-gray-500 mt-1">{t("costs.wear.rateHint")}</p>
         </div>
 
         <div>
-          <label for="replacementCost" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Replacement Cost ({formData.currencyCode})</label>
+          <label for="replacementCost" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.wear.replacement", { currency: formData.currencyCode })}</label>
           <input id="replacementCost" type="number" name="replacementCost" value={formData.replacementCost} onInput={handleChange} min="0" step="0.01" class="w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required />
         </div>
 
         <div>
-          <label for="replacementThreshold" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Replacement Threshold (%)</label>
+          <label for="replacementThreshold" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.wear.threshold")}</label>
           <input id="replacementThreshold" type="number" name="replacementThreshold" value={formData.replacementThreshold} onInput={handleChange} min="0" max="100" step="1" class="w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required />
-          <p class="text-xs text-gray-500 mt-1">Maximum wear percentage before the tool is considered to be replaced.</p>
+          <p class="text-xs text-gray-500 mt-1">{t("costs.wear.thresholdHint")}</p>
         </div>
 
         <div>
           <label for="currencyCode" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{t("costs.currency")}</label>
           <select id="currencyCode" name="currencyCode" value={formData.currencyCode} onChange={handleChange} class="w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
-            <option value="EUR">EUR (€)</option>
-            <option value="USD">USD ($)</option>
-            <option value="GBP">GBP (£)</option>
+            <option value="EUR">EUR (€)</option> {/* i18n-ok currency code */}
+            <option value="USD">USD ($)</option> {/* i18n-ok currency code */}
+            <option value="GBP">GBP (£)</option> {/* i18n-ok currency code */}
           </select>
         </div>
 
         <div class="flex items-center justify-end space-x-3 pt-2">
           <Show when={isEditing() || formData.toolId}>
             <button type="button" onClick={() => { resetForm(); if (props.onSubmissionDone && isEditing()) props.onSubmissionDone() }} class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-              {t("mcp.form.cancel")}{isEditing() ? "" : "/Clear"}
+              {isEditing() ? t("mcp.form.cancel") : t("costs.form.cancelClear")}
             </button>
           </Show>
           <button type="submit" disabled={costs.state.isLoading || isLoadingTools() || !formData.toolId} class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-700 dark:hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-300">
-            {costs.state.isLoading ? t("mcp.form.saving") : isEditing() ? t("settings.profile.save") : "Add Cost"}
+            {costs.state.isLoading ? t("mcp.form.saving") : isEditing() ? t("settings.profile.save") : t("costs.form.add")}
           </button>
         </div>
       </form>

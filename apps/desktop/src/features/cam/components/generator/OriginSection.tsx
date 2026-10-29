@@ -48,7 +48,11 @@ export function OriginSection(): JSX.Element {
       </div>
       <div>
         <label class="panel-label">{t("cam.gen.or.originType")}</label>
-        <select class={FIELD} value={origin()} onChange={(event) => gen.updateSettings("originType", event.currentTarget.value as typeof gen.settings.originType)}>
+        <select class={FIELD} value={origin()} onChange={(event) => {
+          const value = event.currentTarget.value as typeof gen.settings.originType
+          gen.updateSettings("originType", value)
+          gen.patchKernelSettings({ origin: value === "workpiece-corner" || value === "workpiece-corner2" ? "stock-corner" : "stock-center" })
+        }}>
           <option value="workpiece-center">{t("cam.gen.or.center")}</option>
           <option value="workpiece-corner">{t("cam.gen.or.cornerBL")}</option>
           <option value="workpiece-corner2">{t("cam.gen.or.cornerTL")}</option>

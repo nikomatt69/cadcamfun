@@ -7,5 +7,8 @@
   "plugins.dropPackage": "Drop your plugin package here",
   "plugins.browsePackage": "or click to browse files (.zip or .vsix)",
   "plugins.invalidPackage": "Invalid file type. Please upload a plugin package (.zip or .vsix)",
-  "plugins.packageTooLarge": "File too large. Maximum size is 10MB"
+  "plugins.packageTooLarge": "File too large. Maximum size is 10MB",
+  "plugins.search": "Search plugins...",
+  "plugins.none": "No plugins found",
+  "plugins.noneMatch": "No plugins match your search criteria."
 }

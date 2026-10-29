@@ -54,7 +54,7 @@ export const RESOURCE_GENERATION: Readonly<Record<ResourceKind, ResourceGenerati
       { name: "isPublic", hint: "library visibility" }
     ],
     examples: ["Aluminium 6061-T6 plate", "S235JR structural steel", "Delrin POM-C", "8 mm cast acrylic"],
-    placeholder: "Name the material (alloy, condition, stock form); every property is filled from it.",
+    placeholder: "Name the material (alloy, condition, stock form); every property is filled from it.", // i18n-ok model brief; the dialog shows library.generate.placeholder.materials
     note: "The assistant writes materials with `library_edit` → `upsert_material`; all properties are stored, not just the name."
   },
   tools: {
@@ -87,7 +87,7 @@ export const RESOURCE_GENERATION: Readonly<Record<ResourceKind, ResourceGenerati
       "M6 spiral tap for aluminium",
       "90° countersink, Ø10 mm shank"
     ],
-    placeholder: "Describe the cutter(s): type, sizes, material to machine. Every dimension and its holder are filled in.",
+    placeholder: "Describe the cutter(s): type, sizes, material to machine. Every dimension and its holder are filled in.", // i18n-ok model brief; the dialog shows library.generate.placeholder.tools
     note: "The assistant writes cutters with `library_edit` → `upsert_tool`; a parameter the cutter type does not have is left out with a reason, never filled with a guess."
   },
   machines: {
@@ -107,7 +107,7 @@ export const RESOURCE_GENERATION: Readonly<Record<ResourceKind, ResourceGenerati
       { name: "isPublic", hint: "library visibility" }
     ],
     examples: ["Haas VF-2 mill, Fanuc", "Tormach 8L lathe, LinuxCNC", "Generic GRBL mill 300×180×60 mm", "Bambu Lab X1C, 256×256×256 mm"],
-    placeholder: "Name the machine and its controller; the travel envelope, spindle and feed ceilings come with it.",
+    placeholder: "Name the machine and its controller; the travel envelope, spindle and feed ceilings come with it.", // i18n-ok model brief; the dialog shows library.generate.placeholder.machines
     note: "The assistant writes machines with `library_edit` → `upsert_machine_config`: kinematics per axis, post processor, work offsets and ceilings — the same rows the CAM reads."
   },
   components: {
@@ -124,7 +124,7 @@ export const RESOURCE_GENERATION: Readonly<Record<ResourceKind, ResourceGenerati
       { name: "isPublic", hint: "library visibility" }
     ],
     examples: ["An L-bracket 60×60×6 mm with two Ø6 holes", "A 20-tooth spur gear, module 2", "A 12 mm shaft coupler with two set screws"],
-    placeholder: "Describe the part with its overall size; the assistant builds it, saves it and fills its metadata.",
+    placeholder: "Describe the part with its overall size; the assistant builds it, saves it and fills its metadata.", // i18n-ok model brief; the dialog shows library.generate.placeholder.components
     note: "A component is real geometry: the assistant builds the part in the open project with `cad_edit`, saves it with `parts` → `save`, and the draft elements stay on their layer so you can see and reuse them."
   }
 }

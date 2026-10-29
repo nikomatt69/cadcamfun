@@ -353,5 +353,9 @@
   "chat.unnamedUser": "未命名用户",
   "chat.noEmail": "无邮箱",
   "chat.createGroup": "创建群组",
-  "chat.startConversation": "开始会话"
+  "chat.startConversation": "开始会话",
+  "dash.from": "从",
+  "org.search": "搜索组织…",
+  "org.none": "未找到组织",
+  "org.noneMatch": "没有组织符合搜索条件。"
 }

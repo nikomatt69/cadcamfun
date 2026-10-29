@@ -1,11 +1,9 @@
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
-import { RotateCw } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { panelCycles, type PanelCycle } from "../../lib/cyclePanel.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { t } from "../../../../i18n/index.ts"
-import { Section } from "./ui.tsx"
 
 const g = cam.generator
 
@@ -90,11 +88,12 @@ function FixedCycleInfoPanel(props: { readonly cycles: ReadonlyArray<PanelCycle>
 }
 
 /** "Fixed Cycles": cycles found in the program, the editor for the picked one, create / remove. */
-export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) => void }): JSX.Element {
+export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) => void; readonly gcode?: string }): JSX.Element {
   const gen = useGeneratorStore()
   const job = useJob()
   const [generated, setGenerated] = createSignal("")
-  const cycles = createMemo(() => panelCycles(gen.currentGCode))
+  const source = (): string => props.gcode ?? gen.currentGCode
+  const cycles = createMemo(() => panelCycles(source()))
 
   // Legacy `handleCycleSelect`: rebuilds a G81 line from the picked cycle and opens it in the editor.
   const selectCycle = (index: number): void => {
@@ -105,7 +104,7 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
 
   // Replaces the cycle lines of the current program by `cycle` and hands the program back (legacy `handleFixedCycleGCode`).
   const apply = (cycle: string): void => {
-    const next = g.replaceFixedCycles(gen.currentGCode, cycle)
+    const next = g.replaceFixedCycles(source(), cycle)
     gen.setCurrentGCode(next)
     gen.setResult(next, g.detectFixedCycles(next))
     props.onGCode(next)
@@ -123,7 +122,7 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
   }
 
   return (
-    <Section id="fixedCycles" icon={RotateCw} title={t("cam.ribbon.cycles")} testId="fixed-cycles-section">
+    <div data-testid="fixed-cycles-section">
       <div class="toolpath-generator-integration">
         <div class="fixed-cycles-actions">
           <h3>{t("cam.ribbon.cycles")}</h3>
@@ -180,7 +179,7 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
             type="button"
             class="px-3 py-1 bg-gray-200 text-gray-800 text-sm rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
             onClick={() => {
-              const next = g.removeFixedCycles(gen.currentGCode)
+              const next = g.removeFixedCycles(source())
               gen.setResult(next, [])
               gen.setSelectedCycle(null)
               props.onGCode(next)
@@ -190,6 +189,6 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
           </button>
         </Show>
       </div>
-    </Section>
+    </div>
   )
 }

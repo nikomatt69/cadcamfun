@@ -1,9 +1,9 @@
 ---
 export const prerender = false
 import DocsLayout from "../../../layouts/DocsLayout.astro"
-import { docsFetcher, docsPaths, extractDocument, extractTitle } from "../../../lib/docsMarkdown"
+import { docsFetcher, docsPaths, extractArticleBody, extractDescription, extractSubtitle, extractTitle, extractToc } from "../../../lib/docsMarkdown"
 import { isLocale, localizePath, type Locale } from "../../../i18n/locales"
-import { translateArticleHtml, workersAiTranslator } from "../../../i18n/translate"
+import { translateArticleHtml, translateTextList, workersAiTranslator } from "../../../i18n/translate"
 import { ui } from "../../../i18n/ui"
 
 const rawLocale = Astro.params.locale ?? ""
@@ -17,8 +17,11 @@ if (!docsPaths.has(bare)) Astro.response.status = 404
 const env = Astro.locals.runtime?.env
 const translator = workersAiTranslator(env)
 let title = "Documentation"
+let description = ""
+let subtitle = ""
 let articleHtml = ""
 let translated = false
+let toc: Array<{ title: string; href: string; depth: number }> = []
 if (docsPaths.has(bare)) {
   try {
     const source = new URL(bare, Astro.url.origin)
@@ -26,13 +29,18 @@ if (docsPaths.has(bare)) {
     if (!page.ok) throw new Error(`Could not load ${bare}: ${page.status}`)
     const html = await page.text()
     title = extractTitle(html)
-    const result = await translateArticleHtml(extractDocument(html), locale, translator)
+    description = extractDescription(html)
+    subtitle = extractSubtitle(html)
+    toc = extractToc(html)
+    const result = await translateArticleHtml(extractArticleBody(html), locale, translator)
     articleHtml = result.html
-    translated = result.translated
-    if (translator && translated) {
-      const [nextTitle] = await translator([title], locale).catch(() => [title])
-      if (nextTitle) title = nextTitle
-    }
+    const listed = await translateTextList([title, description, subtitle, ...toc.map((item) => item.title)], locale, translator)
+    const [nextTitle, nextDescription, nextSubtitle, ...tocTitles] = listed.values
+    if (nextTitle) title = nextTitle
+    description = nextDescription ?? description
+    subtitle = nextSubtitle ?? ""
+    toc = toc.map((item, index) => ({ ...item, title: tocTitles[index] || item.title }))
+    translated = result.translated && listed.complete
   } catch {
     Astro.response.status = 502
   }
@@ -40,7 +48,7 @@ if (docsPaths.has(bare)) {
 Astro.response.headers.set("Content-Language", locale)
 ---
 
-<DocsLayout title={title} description={title} locale={locale}>
+<DocsLayout title={title} subtitle={subtitle} description={description || title} toc={toc} locale={locale}>
   {docsPaths.has(bare) ? (
     <>
       <p class="not-prose mb-6 rounded-[6px] border border-terminal-border px-4 py-3 text-sm text-terminal-muted">

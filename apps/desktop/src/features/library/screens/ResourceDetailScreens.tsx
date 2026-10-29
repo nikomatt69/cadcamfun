@@ -77,9 +77,9 @@ const payloadOf = (kind: Kind, form: Row): Record<string, unknown> => {
   // the kernel reads, whichever shape the row was written in.
   if (kind === "machines") {
     const profile = cam.kernel.profileOfConfig(asRecord(form["config"]), str(form["type"]))
-    return { name: str(form["name"]).trim(), type: str(form["type"]) || t("pages.mill"), description: str(form["description"]) || null, config: cam.kernel.configOfProfile(profile), isPublic: form["isPublic"] === true }
+    return { name: str(form["name"]).trim(), type: str(form["type"]) || "mill", description: str(form["description"]) || null, config: cam.kernel.configOfProfile(profile), isPublic: form["isPublic"] === true }
   }
-  return { name: str(form["name"]).trim(), type: str(form["type"]) || t("pages.mill"), description: str(form["description"]) || null, config: asRecord(form["config"]), isPublic: form["isPublic"] === true }
+  return { name: str(form["name"]).trim(), type: str(form["type"]) || "mill", description: str(form["description"]) || null, config: asRecord(form["config"]), isPublic: form["isPublic"] === true }
 }
 
 /** The editable form derived from a stored row. */
@@ -110,7 +110,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const [error, setError] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
   const [editing, setEditing] = createSignal(false)
-  const [tab, setTab] = createSignal<"overview" | "details" | "raw" | "preview" | "structure">(props.kind === "components" && (urlParams.preview === "true" || urlParams.tab === "preview") ? t("preview") : props.kind === "components" && urlParams.tab === "structure" ? t("cam.resource.structure") : t("dash.tab.overview"))
+  const [tab, setTab] = createSignal<"overview" | "details" | "raw" | "preview" | "structure">(props.kind === "components" && (urlParams.preview === "true" || urlParams.tab === "preview") ? "preview" : props.kind === "components" && urlParams.tab === "structure" ? "structure" : "overview")
   const [deleteOpen, setDeleteOpen] = createSignal(false)
 
   const load = async (): Promise<void> => {
@@ -159,12 +159,12 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
       else if (props.kind === "tools") await run(app.client.tools.update({ params: { id }, payload }))
       else if (props.kind === "components") await run(app.client.components.update({ params: { id }, payload }))
       else await run(app.client.machineConfigs.update({ params: { id }, payload }))
-      toast.success(`${meta.title} updated successfully`)
+      toast.success(t("library.detail.updated", { title: meta.title }))
       setEditing(false)
       invalidatePrefix(app.cache, meta.plural)
       await load()
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : `Failed to update ${meta.title.toLowerCase()}`)
+      toast.error(cause instanceof Error ? cause.message : t("library.detail.updateFailed", { title: meta.title }))
     } finally {
       setBusy(false)
     }
@@ -187,14 +187,14 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
       if (profile.spindle !== undefined) stored["maxSpindleSpeed"] = profile.spindle.maxRpm
       if (profile.feed !== undefined) stored["maxFeedRate"] = profile.feed.max
       const created = await run<unknown>(app.client.machineConfigs.create({ payload: {
-        name: `${str(current["name"])} (copy)`, type: str(current["type"]) || t("pages.mill"), description: str(current["description"]) || null, config: stored, isPublic: false
+        name: `${str(current["name"])} (copy)`, type: str(current["type"]) || "mill", description: str(current["description"]) || null, config: stored, isPublic: false
       } }))
       const id = str(asRecord(asRecord(created)["data"])["id"])
-      toast.success("Machine duplicated")
+      toast.success(t("library.detail.duplicated"))
       invalidatePrefix(app.cache, meta.plural)
       if (id !== "") navigate(`${meta.listPath}/${encodeURIComponent(id)}`)
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "Failed to duplicate the machine")
+      toast.error(cause instanceof Error ? cause.message : t("library.detail.duplicateFailed"))
     } finally {
       setBusy(false)
     }
@@ -210,11 +210,11 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
       else if (props.kind === "tools") await run(app.client.tools.remove({ params: { id } }))
       else if (props.kind === "components") await run(app.client.components.remove({ params: { id } }))
       else await run(app.client.machineConfigs.remove({ params: { id } }))
-      toast.success(`${meta.title} deleted successfully`)
+      toast.success(t("library.detail.deleted", { title: meta.title }))
       invalidatePrefix(app.cache, meta.plural)
       navigate(meta.listPath)
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : `Failed to delete ${meta.title.toLowerCase()}`)
+      toast.error(cause instanceof Error ? cause.message : t("library.detail.deleteFailed", { title: meta.title }))
       setBusy(false)
     }
   }
@@ -225,10 +225,10 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const tabs = (): ReadonlyArray<WorkspaceTabItem<DetailTab>> => [
     { id: "overview", get label() { return t("dash.tab.overview") } },
     { id: "details", get label() { return t("shell.details") } },
-    { id: "raw", label: "Raw data" },
+    { id: "raw", get label() { return t("library.detail.rawTab") } },
     ...(props.kind === "components" ? [
-      { id: "preview" as const, label: t("cam.resource.previewTab") },
-      { id: "structure" as const, label: t("cam.resource.structure") }
+      { id: "preview" as const, get label() { return t("cam.resource.previewTab") } },
+      { id: "structure" as const, get label() { return t("cam.resource.structure") } }
     ] : [])
   ]
 
@@ -238,7 +238,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
       title={name()}
       subtitle={meta.title}
       backHref={meta.listPath}
-      backLabel={`Back to ${meta.plural}`}
+      backLabel={t("library.detail.back", { name: meta.plural })}
       actions={
         <Show when={!editing()} fallback={<>
           <button type="button" class={TOOLBAR_PRIMARY} onClick={() => void save()} disabled={busy() || str(form()["name"]).trim() === ""}><Save size={14} aria-hidden="true" />{t("common.save")}</button>
@@ -254,8 +254,8 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
         </Show>
       }
       overlays={
-        <Modal open={deleteOpen()} title={`Delete ${meta.title.toLowerCase()}`} onClose={() => setDeleteOpen(false)}>
-          <p class="text-xs text-slate-600 dark:text-slate-300">Are you sure you want to delete this {meta.title.toLowerCase()}? This action cannot be undone.</p>
+        <Modal open={deleteOpen()} title={t("library.detail.deleteTitle", { name: meta.title })} onClose={() => setDeleteOpen(false)}>
+          <p class="text-xs text-slate-600 dark:text-slate-300">{t("library.detail.deleteConfirm", { name: meta.title })}</p>
           <div class="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
             <button type="button" class={CANCEL_BUTTON} onClick={() => setDeleteOpen(false)}>{t("common.cancel")}</button>
             <button type="button" class={DANGER_BUTTON} disabled={busy()} onClick={() => void remove()}>{t("common.delete")}</button>
@@ -263,10 +263,10 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
         </Modal>
       }
     >
-      <Show when={!loading()} fallback={<StageLoading label={`Loading ${meta.plural}...`} />}>
+      <Show when={!loading()} fallback={<StageLoading label={t("library.detail.loading", { name: meta.plural })} />}>
         <Show when={error() === undefined} fallback={<StageError message={error() ?? ""} onRetry={() => void load()} />}>
           <Show when={row()}>{(current) => <>
-            <WorkspaceTabs class="mb-3" tabs={tabs()} value={tab()} onChange={setTab} label={`${meta.title} sections`} />
+            <WorkspaceTabs class="mb-3" tabs={tabs()} value={tab()} onChange={setTab} label={t("library.detail.sections", { title: meta.title })} />
 
             <Show when={tab() === "overview"}>
               <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -289,12 +289,12 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                   <Show when={props.kind === "materials"}><div class="mt-3"><MaterialBars properties={asRecord(current()["properties"])} /></div></Show>
                 </div>
                 <aside class={`${PANEL} !p-3`}>
-                  <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">Information</h3>
+                  <h3 class="mb-2 text-[13px] font-semibold text-slate-900 dark:text-white">{t("library.detail.information")}</h3>
                   <dl class="panel-kv">
                     <dt>{t("org.overview.created")}</dt><dd>{formatDate(current()["createdAt"]) || "-"}</dd>
-                    <dt>Last updated</dt><dd>{formatDate(current()["updatedAt"]) || "-"}</dd>
+                    <dt>{t("library.detail.lastUpdated")}</dt><dd>{formatDate(current()["updatedAt"]) || "-"}</dd>
                     <dt>ID</dt><dd class="font-mono">{str(current()["id"]).substring(0, 8)}…</dd>
-                    <dt>{t("pages.visibility")}</dt><dd class={current()["isPublic"] === true ? "text-green-700 dark:text-green-400" : ""}>{current()["builtin"] === true ? "Built-in preset" : current()["isPublic"] === true ? t("save.publicProject") : t("pages.private")}</dd>
+                    <dt>{t("pages.visibility")}</dt><dd class={current()["isPublic"] === true ? "text-green-700 dark:text-green-400" : ""}>{current()["builtin"] === true ? t("library.detail.builtinPreset") : current()["isPublic"] === true ? t("save.publicProject") : t("pages.private")}</dd>
                   </dl>
                 </aside>
               </div>
@@ -334,7 +334,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
             <Show when={tab() === "raw"}>
               <div class={`${PANEL} !p-3`}>
                 <div class="mb-2 flex justify-end">
-                  <button type="button" class={TOOLBAR_BUTTON} onClick={() => { void copyText(JSON.stringify(current(), null, 2)).then(() => toast.success(t("shell.clipboard.copied")), () => toast.error(t("shell.clipboard.failed"))) }}><Copy size={14} aria-hidden="true" />Copy JSON</button>
+                  <button type="button" class={TOOLBAR_BUTTON} onClick={() => { void copyText(JSON.stringify(current(), null, 2)).then(() => toast.success(t("shell.clipboard.copied")), () => toast.error(t("shell.clipboard.failed"))) }}><Copy size={14} aria-hidden="true" />{t("library.detail.copyJson")}</button>
                 </div>
                 <pre class="max-h-[60vh] overflow-auto rounded-[5px] border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{JSON.stringify(current(), null, 2)}</pre>
               </div>
@@ -362,21 +362,21 @@ const builtinMachine = async (app: ReturnType<typeof useApp>, id: string | undef
   return found === undefined ? undefined : { ...found, builtin: true }
 }
 
-const summaryFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: string; readonly value: string }> => {
+const summaryFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly id?: string; readonly label: string; readonly value: string }> => {
   if (kind === "materials") {
     const p = asRecord(row["properties"])
     const density = densityKgM3(num(p["density"]))
-    return [{ get label() { return t("library.material.density") }, value: density > 0 ? `${density} kg/m³` : "-" }, { label: "Hardness", value: str(p["hardness"]) || "-" }, { label: "Yield strength", value: num(p["yieldStrength"]) > 0 ? `${str(p["yieldStrength"])} MPa` : "-" }, { get label() { return t("library.color") }, value: hexColor(p["color"]) }]
+    return [{ get label() { return t("library.material.density") }, value: density > 0 ? `${density} kg/m³` : "-" }, { get label() { return t("library.detail.hardness") }, value: str(p["hardness"]) || "-" }, { id: "yield", get label() { return t("library.detail.yield") }, value: num(p["yieldStrength"]) > 0 ? `${str(p["yieldStrength"])} MPa` : "-" }, { get label() { return t("library.color") }, value: hexColor(p["color"]) }]
   }
   if (kind === "tools") {
     return [{ get label() { return t("library.field.type") }, value: str(row["type"]) || "-" }, { get label() { return t("library.tool.diameter") }, value: `${str(row["diameter"]) || "-"} mm` }, { get label() { return t("library.field.material") }, value: str(row["material"]) || "-" }, { get label() { return t("library.field.flutes") }, value: str(row["numberOfFlutes"]) || "-" },
-      { label: "3D model", value: cam.describeTool(cam.toolModelOf(toolResourceOf(row), cam.toolMachineOf(str(row["type"])))) }]
+      { get label() { return t("library.detail.model3d") }, value: cam.describeTool(cam.toolModelOf(toolResourceOf(row), cam.toolMachineOf(str(row["type"])))) }]
   }
   if (kind === "machines") {
     // Read through the profile, so a configuration in any shape (the form's, the assistant's, the catalogue's) shows its figures.
     const c = asRecord(row["config"]), profile = cam.kernel.profileOfConfig(c, str(row["type"]))
     return [{ get label() { return t("library.field.type") }, value: str(row["type"]) || "-" }, { get label() { return t("library.field.controller") }, value: profile.controller ?? (str(c["controller"]) || "-") }, { get label() { return t("subscription.status") }, value: str(c["status"]) || "-" },
-      { label: "Max spindle speed", value: profile.spindle === undefined ? "-" : `${profile.spindle.maxRpm} rpm` }]
+      { get label() { return t("library.detail.maxSpindle") }, value: profile.spindle === undefined ? "-" : `${profile.spindle.maxRpm} rpm` }]
   }
   const elements = resourceElements(row["data"] ?? row)
   const kinds = [...new Set(componentEntries(elements).map(({ element }) => element.type))]
@@ -385,17 +385,17 @@ const summaryFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: st
 }
 
 /** The full list of the Details tab: every figure the resource carries, with its unit. */
-const detailFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly label: string; readonly value: string }> => {
+const detailFields = (kind: Kind, row: Row): ReadonlyArray<{ readonly id?: string; readonly label: string; readonly value: string }> => {
   const withUnit = (value: unknown, unit: string): string => (num(value) > 0 ? `${str(value)} ${unit}` : "-")
   if (kind === "materials") {
     const p = asRecord(row["properties"])
-    return [...summaryFields(kind, row).filter((field) => field.label !== "Yield strength"), { label: "Yield strength", value: withUnit(p["yieldStrength"], "MPa") },
-      { label: "Ultimate strength", value: withUnit(p["ultimateStrength"], "MPa") }, { label: "Elastic modulus", value: withUnit(p["elasticModulus"], "GPa") },
-      { label: "Poisson ratio", value: num(p["poissonRatio"]) > 0 ? str(p["poissonRatio"]) : "-" }, { label: "Thermal conductivity", value: withUnit(p["thermalConductivity"], "W/(m·K)") }]
+    return [...summaryFields(kind, row).filter((field) => field.id !== "yield"), { get label() { return t("library.detail.yield") }, value: withUnit(p["yieldStrength"], "MPa") },
+      { get label() { return t("library.detail.ultimate") }, value: withUnit(p["ultimateStrength"], "MPa") }, { get label() { return t("library.detail.elastic") }, value: withUnit(p["elasticModulus"], "GPa") },
+      { get label() { return t("library.detail.poisson") }, value: num(p["poissonRatio"]) > 0 ? str(p["poissonRatio"]) : "-" }, { get label() { return t("library.detail.thermal") }, value: withUnit(p["thermalConductivity"], "W/(m·K)") }]
   }
   if (kind === "tools") {
-    return [...summaryFields(kind, row), { get label() { return t("library.field.maxRpm") }, value: str(row["maxRPM"]) || "-" }, { label: "Coolant", value: str(row["coolantType"]) || "-" },
-      { get label() { return t("pages.cutting.length") }, value: withUnit(row["cuttingLength"], "mm") }, { label: "Total length", value: withUnit(row["totalLength"], "mm") }, { label: "Shank diameter", value: withUnit(row["shankDiameter"], "mm") }]
+    return [...summaryFields(kind, row), { get label() { return t("library.field.maxRpm") }, value: str(row["maxRPM"]) || "-" }, { get label() { return t("library.detail.coolant") }, value: str(row["coolantType"]) || "-" },
+      { get label() { return t("pages.cutting.length") }, value: withUnit(row["cuttingLength"], "mm") }, { get label() { return t("library.detail.totalLength") }, value: withUnit(row["totalLength"], "mm") }, { get label() { return t("library.detail.shank") }, value: withUnit(row["shankDiameter"], "mm") }]
   }
   return summaryFields(kind, row)
 }
@@ -406,12 +406,12 @@ function DetailsView(props: { readonly kind: Kind; readonly row: Row | undefined
   return <div class="space-y-3">
     <Show when={props.kind === "machines"} fallback={<StatGrid items={detailFields(props.kind, props.row ?? {})} />}>
       <div class="space-y-4" data-testid="machine-sections">
-        <Show when={(props.row ?? {})["builtin"] === true}><p class="text-xs text-slate-500 dark:text-slate-400">A built-in preset: the figures the kernel plans against when no configuration is chosen. Duplicate it to adapt it.</p></Show>
+        <Show when={(props.row ?? {})["builtin"] === true}><p class="text-xs text-slate-500 dark:text-slate-400">{t("library.detail.builtinNote")}</p></Show>
         <For each={sections()}>{(section) => <div>
           <h4 class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{section.title}</h4>
           <StatGrid items={section.facts} />
         </div>}</For>
-        <Show when={sections().length === 0}><p class="text-xs italic text-slate-500 dark:text-slate-400">This configuration does not state any figures yet. Edit it to add them.</p></Show>
+        <Show when={sections().length === 0}><p class="text-xs italic text-slate-500 dark:text-slate-400">{t("library.detail.noFigures")}</p></Show>
       </div>
     </Show>
     <Show when={props.kind === "materials"}><MaterialBars properties={asRecord((props.row ?? {})["properties"])} /></Show>
@@ -423,10 +423,10 @@ function MaterialBars(props: { readonly properties: Row }): JSX.Element {
   const value = (key: string): number => num(props.properties[key])
   return <div class="grid grid-cols-1 gap-2.5 rounded-[5px] border border-slate-200 p-3 dark:border-slate-700/70 md:grid-cols-2">
     <PropertyBar label={t("library.material.density")} value={densityKgM3(value("density"))} max={9000} unit="kg/m³" />
-    <PropertyBar label="Yield strength" value={value("yieldStrength")} max={1800} unit="MPa" />
-    <PropertyBar label="Ultimate strength" value={value("ultimateStrength")} max={2000} unit="MPa" />
-    <PropertyBar label="Elastic modulus" value={value("elasticModulus")} max={400} unit="GPa" />
-    <PropertyBar label="Thermal conductivity" value={value("thermalConductivity")} max={400} unit="W/(m·K)" />
+    <PropertyBar label={t("library.detail.yield")} value={value("yieldStrength")} max={1800} unit="MPa" />
+    <PropertyBar label={t("library.detail.ultimate")} value={value("ultimateStrength")} max={2000} unit="MPa" />
+    <PropertyBar label={t("library.detail.elastic")} value={value("elasticModulus")} max={400} unit="GPa" />
+    <PropertyBar label={t("library.detail.thermal")} value={value("thermalConductivity")} max={400} unit="W/(m·K)" />
   </div>
 }
 
@@ -444,40 +444,40 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
     </div>
   )
   return <form class="grid grid-cols-1 gap-3 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
-    {input("res-name", "Name", "name")}
-    <Show when={props.kind === "machines" || props.kind === "components"}>{input("res-type", "Type", "type")}</Show>
+    {input("res-name", t("library.field.name"), "name")}
+    <Show when={props.kind === "machines" || props.kind === "components"}>{input("res-type", t("library.type"), "type")}</Show>
     <Show when={props.kind === "tools"}>
       <div>
         <label for="res-type" class={LABEL}>{t("library.type")}</label>
         <select id="res-type" name="type" class={INPUT} value={str(props.form["type"])} onChange={(e) => props.onPatch("type", e.currentTarget.value)}>
-          <Show when={str(props.form["type"]) !== "" && cam.toolMachineOf(str(props.form["type"])) === undefined}><option value={str(props.form["type"])}>{str(props.form["type"])} (drawn as an end mill)</option></Show>
-          <For each={[["mill", "Milling"], ["lathe", "Turning"], ["3dprinter", "3D printing nozzle"]] as const}>{([machine, label]) => (
+          <Show when={str(props.form["type"]) !== "" && cam.toolMachineOf(str(props.form["type"])) === undefined}><option value={str(props.form["type"])}>{t("library.detail.drawnAs", { type: str(props.form["type"]) })}</option></Show>
+          <For each={[[t("library.detail.milling"), "mill"], [t("library.detail.turning"), "lathe"], [t("library.detail.nozzle"), "3dprinter"]] as const}>{([label, machine]) => (
             <optgroup label={label}><For each={cam.TOOL_TYPES[machine]}>{(type) => <option value={type}>{type}</option>}</For></optgroup>
           )}</For>
         </select>
       </div>
-      {input("res-diameter", "Diameter (mm)", "diameter", "number")}
-      {input("res-material", "Material", "material")}
-      {input("res-flutes", "Number of flutes", "numberOfFlutes", "number")}
-      {input("res-rpm", "Max RPM", "maxRPM", "number")}
-      {input("res-coolant", "Coolant type", "coolantType")}
-      {input("res-cutting", "Cutting length (mm)", "cuttingLength", "number")}
-      {input("res-total", "Total length (mm)", "totalLength", "number")}
-      {input("res-shank", "Shank diameter (mm)", "shankDiameter", "number")}
+      {input("res-diameter", t("library.detail.diameterMm"), "diameter", "number")}
+      {input("res-material", t("library.material"), "material")}
+      {input("res-flutes", t("library.flutes"), "numberOfFlutes", "number")}
+      {input("res-rpm", t("library.field.maxRpm"), "maxRPM", "number")}
+      {input("res-coolant", t("library.detail.coolantType"), "coolantType")}
+      {input("res-cutting", t("library.detail.cuttingLengthMm"), "cuttingLength", "number")}
+      {input("res-total", t("library.detail.totalLengthMm"), "totalLength", "number")}
+      {input("res-shank", t("library.detail.shankMm"), "shankDiameter", "number")}
       <ToolShapeFields form={props.form} onPatch={props.onPatch} />
     </Show>
     <Show when={props.kind === "materials"}>
-      {numeric("res-density", "Density (kg/m³)", "density")}
-      {numeric("res-hardness", "Hardness (HB / HV / HRC value)", "hardness")}
-      {numeric("res-thermal", "Thermal conductivity (W/(m·K))", "thermalConductivity")}
-      {numeric("res-elastic", "Elastic modulus (GPa)", "elasticModulus")}
-      {numeric("res-poisson", "Poisson ratio (0 – 0.5)", "poissonRatio", 0, 0.5)}
-      {numeric("res-yield", "Yield strength (MPa)", "yieldStrength")}
-      {numeric("res-ultimate", "Ultimate strength (MPa)", "ultimateStrength")}
+      {numeric("res-density", t("library.detail.densityKg"), "density")}
+      {numeric("res-hardness", t("library.detail.hardnessValue"), "hardness")}
+      {numeric("res-thermal", t("library.detail.thermalUnit"), "thermalConductivity")}
+      {numeric("res-elastic", t("library.detail.elasticGpa"), "elasticModulus")}
+      {numeric("res-poisson", t("library.detail.poissonRange"), "poissonRatio", 0, 0.5)}
+      {numeric("res-yield", t("library.detail.yieldMpa"), "yieldStrength")}
+      {numeric("res-ultimate", t("library.detail.ultimateMpa"), "ultimateStrength")}
       <div>
         <label for="res-color" class={LABEL}>{t("library.color")}</label>
         <div class="flex items-center gap-2">
-          <input id="res-color-picker" type="color" aria-label="Pick the colour" class="h-[34px] w-10 cursor-pointer rounded-[5px] border border-slate-300 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-800" value={hexColor(props.form["color"]).length === 7 ? hexColor(props.form["color"]) : "#cccccc"} onInput={(e) => props.onPatch("color", e.currentTarget.value)} />
+          <input id="res-color-picker" type="color" aria-label={t("library.detail.pickColor")} class="h-[34px] w-10 cursor-pointer rounded-[5px] border border-slate-300 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-800" value={hexColor(props.form["color"]).length === 7 ? hexColor(props.form["color"]) : "#cccccc"} onInput={(e) => props.onPatch("color", e.currentTarget.value)} />
           <input id="res-color" name="color" type="text" class={INPUT} value={str(props.form["color"])} onInput={(e) => props.onPatch("color", e.currentTarget.value)} />
         </div>
       </div>
@@ -487,13 +487,13 @@ function DetailsForm(props: { readonly kind: Kind; readonly form: Row; readonly 
     </Show>
     <Show when={props.kind !== "materials"}>
       <div class="md:col-span-2">
-        <label for="res-description" class={LABEL}>{props.kind === "tools" ? "Notes" : t("save.description")}</label>
-        <textarea id="res-description" rows={3} class={INPUT} value={str(props.form["description"] ?? props.form["notes"])} onInput={(e) => props.onPatch(props.kind === "tools" ? "notes" : t("save.description"), e.currentTarget.value)} />
+        <label for="res-description" class={LABEL}>{props.kind === "tools" ? t("library.detail.notes") : t("save.description")}</label>
+        <textarea id="res-description" rows={3} class={INPUT} value={str(props.form["description"] ?? props.form["notes"])} onInput={(e) => props.onPatch(props.kind === "tools" ? "notes" : "description", e.currentTarget.value)} />
       </div>
     </Show>
     <div class="flex items-center gap-2 md:col-span-2">
       <input id="res-public" name="isPublic" type="checkbox" class="h-3.5 w-3.5 border-slate-300 accent-blue-600 dark:border-slate-600" checked={props.form["isPublic"] === true} onChange={(e) => props.onPatch("isPublic", e.currentTarget.checked)} />
-      <label for="res-public" class="text-xs text-slate-700 dark:text-slate-300">Make public (visible to all users)</label>
+      <label for="res-public" class="text-xs text-slate-700 dark:text-slate-300">{t("library.detail.makePublic")}</label>
     </div>
   </form>
 }
@@ -544,41 +544,41 @@ function MachineProfileFields(props: { readonly form: Row; readonly onPatchConfi
         })} />
     </div>
     <div>
-      <label for="res-post" class={LABEL}>Post (NC dialect)</label>
+      <label for="res-post" class={LABEL}>{t("library.detail.post")}</label>
       <select id="res-post" class={INPUT} value={profile().post ?? ""} onChange={(e) =>
         patch((draft) => {
           const value = e.currentTarget.value
           if (value === "") delete draft["post"]
           else draft["post"] = value
         })}>
-        <option value="">From the controller</option>
+        <option value="">{t("library.detail.fromController")}</option>
         <For each={cam.kernel.POST_IDS}>{(id) => <option value={id}>{id}</option>}</For>
       </select>
     </div>
-    {profileNumber("res-max-rpm", "Max spindle speed", "spindle", "maxRpm", "rpm")}
-    {profileNumber("res-min-rpm", "Min spindle speed", "spindle", "minRpm", "rpm")}
-    {profileNumber("res-spindle-power", "Spindle power", "spindle", "powerKw", "kW")}
-    {profileNumber("res-spindle-torque", "Spindle torque", "spindle", "torqueNm", "N·m")}
-    {profileNumber("res-max-feed", "Max feed", "feed", "max", "mm/min")}
-    {profileNumber("res-rapid-feed", "Rapid feed", "feed", "rapid", "mm/min")}
-    {profileNumber("res-table-length", "Table length", "table", "length", "mm")}
-    {profileNumber("res-table-width", "Table width", "table", "width", "mm")}
-    {profileNumber("res-table-gap", "Table gap under the stock", "table", "gap", "mm")}
-    {profileNumber("res-positioning", "Positioning accuracy", "accuracy", "positioningMm", "mm")}
+    {profileNumber("res-max-rpm", t("library.detail.maxSpindle"), "spindle", "maxRpm", "rpm")}
+    {profileNumber("res-min-rpm", t("library.detail.minSpindle"), "spindle", "minRpm", "rpm")}
+    {profileNumber("res-spindle-power", t("library.detail.spindlePower"), "spindle", "powerKw", "kW")}
+    {profileNumber("res-spindle-torque", t("library.detail.spindleTorque"), "spindle", "torqueNm", "N·m")}
+    {profileNumber("res-max-feed", t("library.detail.maxFeed"), "feed", "max", "mm/min")}
+    {profileNumber("res-rapid-feed", t("library.detail.rapidFeed"), "feed", "rapid", "mm/min")}
+    {profileNumber("res-table-length", t("library.detail.tableLength"), "table", "length", "mm")}
+    {profileNumber("res-table-width", t("library.detail.tableWidth"), "table", "width", "mm")}
+    {profileNumber("res-table-gap", t("library.detail.tableGap"), "table", "gap", "mm")}
+    {profileNumber("res-positioning", t("library.detail.positioning"), "accuracy", "positioningMm", "mm")}
     <div>
-      <label for="res-rigidity" class={LABEL}>Rigidity</label>
+      <label for="res-rigidity" class={LABEL}>{t("library.detail.rigidity")}</label>
       <select id="res-rigidity" class={INPUT} value={profile().rigidity ?? ""} onChange={(e) =>
         patch((draft) => {
           const value = e.currentTarget.value
           if (value === "") delete draft["rigidity"]
           else draft["rigidity"] = value
         })}>
-        <option value="">Not stated</option>
+        <option value="">{t("library.detail.notStated")}</option>
         <For each={["hobby", "light", "standard", "heavy"] as const}>{(value) => <option value={value}>{value}</option>}</For>
       </select>
     </div>
     <div class="md:col-span-2">
-      <p class={LABEL}>Work volume (mm) — the space the part takes</p>
+      <p class={LABEL}>{t("library.detail.workVolume")}</p>
       <div class="grid grid-cols-3 gap-2">
         {(["x", "y", "z"] as const).map((axis) => (
           <div>
@@ -612,16 +612,16 @@ function ToolShapeFields(props: { readonly form: Row; readonly onPatch: (key: st
   const m = () => model()
   return <>
     <Show when={(m().family === "mill" && (m() as cam.MillModel).cornerRadius !== undefined) || (m().family === "lathe" && (m() as cam.LatheModel).insert !== "grooving" && (m() as cam.LatheModel).insert !== "parting" && (m() as cam.LatheModel).insert !== "threading" && (m() as cam.LatheModel).insert !== "knurling")}>
-      {field("res-corner", m().family === "lathe" ? "Nose radius (mm)" : "Corner radius (mm)", "cornerRadius")}
+      {field("res-corner", m().family === "lathe" ? t("library.detail.noseRadius") : t("library.detail.cornerRadius"), "cornerRadius")}
     </Show>
     <Show when={m().family === "mill" && (m() as cam.MillModel).angle !== undefined}>
-      {field("res-angle", (m() as cam.MillModel).shape === "tapered" ? "Taper angle per side (°)" : "Included angle (°)", "tipAngle", 1)}
+      {field("res-angle", (m() as cam.MillModel).shape === "tapered" ? t("library.detail.taperAngle") : t("library.detail.includedAngle"), "tipAngle", 1)}
     </Show>
-    <Show when={m().family === "mill" && (m() as cam.MillModel).shape === "threadmill"}>{field("res-pitch", "Thread pitch (mm)", "threadPitch", 0.1)}</Show>
+    <Show when={m().family === "mill" && (m() as cam.MillModel).shape === "threadmill"}>{field("res-pitch", t("library.detail.threadPitch"), "threadPitch", 0.1)}</Show>
     <Show when={m().family === "mill" || m().family === "probe"}>
-      {field("res-stickout", "Stickout from the holder (mm)", "stickout", 1)}
-      {field("res-holder-d", "Holder diameter (mm)", "holderDiameter", 1)}
-      {field("res-holder-l", "Holder length (mm)", "holderLength", 1)}
+      {field("res-stickout", t("library.detail.stickout"), "stickout", 1)}
+      {field("res-holder-d", t("library.detail.holderDiameter"), "holderDiameter", 1)}
+      {field("res-holder-l", t("library.detail.holderLength"), "holderLength", 1)}
     </Show>
   </>
 }

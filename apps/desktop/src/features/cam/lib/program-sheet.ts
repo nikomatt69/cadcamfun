@@ -9,6 +9,7 @@
  * The layout is pure (it is the part worth testing); the drawing is a thin canvas pass over it.
  */
 import { cam } from "@cadcamfun/core"
+import { t } from "../../../i18n/index.ts"
 
 /** A point of the toolpath, in the program's own millimetres. */
 export interface ProgramSheetPoint {
@@ -111,8 +112,6 @@ export const SHEET_PICTURE_HEIGHT = 470
 export const SHEET_LISTING_X = 520
 export const SHEET_MAX_LINE_CHARS = 70
 
-const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? "" : "s"}`
-
 /**
  * The toolpaths of a program as the sheet draws them: the cutting plane of the machine (XY for a
  * mill, the profile plane XZ for a lathe), rapids apart from cuts.
@@ -160,18 +159,20 @@ export const programSheetLayout = (gcode: string, summary: ProgramSheetSummary =
   const moves = summary.moves ?? toolpaths.reduce((sum, path) => sum + path.moves, 0)
   const paths = summary.paths ?? []
   const header = [
-    `Machine: ${summary.machine ?? "unknown"}`,
-    `Program: ${summary.name ?? "unnamed"}`,
-    `Toolpaths: ${plural(toolpaths.length, "toolpath")}${toolpaths.length > 0 ? ` (${toolpaths.map((path) => `${path.name || path.id} [${path.toolId}]`).join(", ")})` : ""}`,
-    `Moves: ${moves}${summary.durationSeconds !== undefined ? `   Estimated time: ${Math.round(summary.durationSeconds)} s` : ""}`,
-    `Lines: ${all.length}${omitted > 0 ? `   (${omitted} more not shown)` : ""}`
+    t("cam.programSheet.machine", { name: summary.machine ?? t("cam.programSheet.unknown") }),
+    t("cam.programSheet.program", { name: summary.name ?? t("cam.programSheet.unnamed") }),
+    t("cam.programSheet.toolpaths", {
+      list: `${toolpaths.length} ${toolpaths.length === 1 ? t("cam.programSheet.toolpath") : t("cam.programSheet.toolpathsWord")}${toolpaths.length > 0 ? ` (${toolpaths.map((path) => `${path.name || path.id} [${path.toolId}]`).join(", ")})` : ""}`
+    }),
+    t("cam.programSheet.moves", { count: moves, extra: summary.durationSeconds !== undefined ? t("cam.programSheet.estimated", { seconds: Math.round(summary.durationSeconds) }) : "" }),
+    t("cam.programSheet.lines", { count: all.length, extra: omitted > 0 ? t("cam.programSheet.omitted", { count: omitted }) : "" })
   ]
   const pictureHeight = paths.length > 0 ? SHEET_PICTURE_HEIGHT : 0
   const listingHeight = Math.max(1, shown.length) * SHEET_LINE_HEIGHT
   return {
     width: SHEET_WIDTH,
     height: SHEET_HEADER_HEIGHT + Math.max(pictureHeight, listingHeight) + 28,
-    title: "CADCAMFUN — CAM program",
+    title: t("cam.programSheet.title"),
     header,
     lines: shown.map((text, index) => ({ number: index + 1, text: text.length > SHEET_MAX_LINE_CHARS ? `${text.slice(0, SHEET_MAX_LINE_CHARS - 1)}…` : text })),
     totalLines: all.length,

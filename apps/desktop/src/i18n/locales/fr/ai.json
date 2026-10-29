@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "Chercher quelque chose dans la conversation affichée.",
   "ai.cmd.find.empty": "Indiquez ce qu’il faut chercher : /find wall thickness",
   "ai.cmd.older": "anciens",
-  "ai.cmd.older.desc": "Lire les messages antérieurs à ceux affichés."
+  "ai.cmd.older.desc": "Lire les messages antérieurs à ceux affichés.",
+  "ai.catalogue.searchModels": "Rechercher les modèles du fournisseur",
+  "ai.stream.invalidEvent": "L'assistant a envoyé un événement invalide. Récupérer la session peut en restaurer les résultats.",
+  "ai.vision.captureFailed": "Échec de la capture de la vue.",
+  "mcp.directory.search": "Rechercher des serveurs..."
 }

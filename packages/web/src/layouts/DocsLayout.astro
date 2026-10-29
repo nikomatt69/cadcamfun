@@ -113,7 +113,7 @@ const dir = localeInfo(locale).dir
       {toc.length > 0 && (
         <div class="hidden w-56 shrink-0 xl:block">
           <div class="sticky top-[var(--chrome-top)] pt-10">
-            <DocToc items={toc} />
+        <DocToc items={toc} locale={locale} />
           </div>
         </div>
       )}
@@ -121,7 +121,7 @@ const dir = localeInfo(locale).dir
     <footer class="mt-auto w-full px-[var(--nav-inset)] pb-[var(--nav-inset)] pt-[var(--plate-gap)]">
       <div class="glass-bar mx-auto w-full max-w-[var(--content-max)] py-6">
         <div class="page-shell flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <a href="/" aria-label="CADCAMFUN home"><Mark class="h-7 w-auto" /></a>
+          <a href="/" aria-label={ui(locale, "home")}><Mark class="h-7 w-auto" /></a>
           <p class="text-[13px] text-terminal-muted">CADCAMFUN · {ui(locale, "footer")}</p>
           <LocaleSelector locale={locale} />
         </div>

@@ -25,5 +25,6 @@
   "invitation.decline": "拒绝",
   "invitation.missing": "此邀请链接无效或已被使用。",
   "invitation.alreadyAccepted": "此邀请已被接受。正在跳转到您的仪表盘…",
-  "invitation.signInFirst": "请登录或创建账户以接受此邀请。"
+  "invitation.signInFirst": "请登录或创建账户以接受此邀请。",
+  "schema.invalid": "这些值不符合模式"
 }

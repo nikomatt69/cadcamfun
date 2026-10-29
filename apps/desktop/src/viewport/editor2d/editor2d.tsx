@@ -1,4 +1,5 @@
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js"
+import { t } from "../../i18n/index.ts"
 import { boundingBox, DEFAULT_SNAP_SETTINGS, type Drawing, type Entity, type Snap, type Vec2 } from "@cadcamfun/core"
 import { createEditorState } from "../../shared/state/editor.ts"
 import { addEntities, removeEntities, type Command } from "../../shared/state/commands.ts"
@@ -169,5 +170,5 @@ export function Editor2D(props: Editor2DProps) {
     onCleanup(() => { observer.disconnect(); cancelAnimationFrame(frame) })
     redraw()
   })
-  return <canvas ref={canvas} aria-label="2D drawing editor" tabIndex={0} style={{ width: "100%", height: "100%", display: "block", "touch-action": "none" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { pointers.clear(); dragging = false; activate() }} onContextMenu={e => e.preventDefault()} onWheel={e => { e.preventDefault(); setCamera(c => zoomAt(c, Math.exp(-e.deltaY * 0.001), screen(e))) }} onKeyDown={key} onKeyUp={e => { if (e.code === "Space") space = false }} onBlur={() => { space = false; dragging = false; pointers.clear() }} />
+  return <canvas ref={canvas} aria-label={t("viewport.editor2d")} tabIndex={0} style={{ width: "100%", height: "100%", display: "block", "touch-action": "none" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { pointers.clear(); dragging = false; activate() }} onContextMenu={e => e.preventDefault()} onWheel={e => { e.preventDefault(); setCamera(c => zoomAt(c, Math.exp(-e.deltaY * 0.001), screen(e))) }} onKeyDown={key} onKeyUp={e => { if (e.code === "Space") space = false }} onBlur={() => { space = false; dragging = false; pointers.clear() }} />
 }

@@ -12,6 +12,7 @@ import { FrameScheduler } from "../../cad/lib/frame-scheduler.ts"
 import { PREVIEW_BACKGROUND, addPreviewLook } from "../lib/preview-scene.ts"
 import { machineEnvelope } from "../lib/machine-details.ts"
 import { machineObject } from "../lib/machine-object.ts"
+import { t } from "../../../i18n/index.ts"
 import { PREVIEW_STAGE, PreviewFrame, stageNote } from "./PreviewFrame.tsx"
 
 export function MachinePreview3D(props: { readonly profile: ReturnType<typeof cam.kernel.profileOfConfig> }): JSX.Element {
@@ -61,10 +62,10 @@ export function MachinePreview3D(props: { readonly profile: ReturnType<typeof ca
       frames.dispose(); controls.dispose(); disposeObject(content); look.dispose(); renderer.dispose(); renderer.domElement.remove()
     })
   })
-  return <PreviewFrame title="Machine envelope" testId="machine-preview" onFit={() => fit()} hint="Drag to orbit · Scroll to zoom · Blue box: the space the part takes">
-    <div ref={host} class={`${PREVIEW_STAGE} h-72`} role="img" aria-label="Machine envelope">
-      <Show when={unavailable()}><p role="status" class={stageNote("info")}>3D preview unavailable (no WebGL)</p></Show>
-      <Show when={!unavailable() && envelope().volume === undefined}><p role="status" class={stageNote("info")}>This configuration does not state a work volume, so there is nothing to draw.</p></Show>
+  return <PreviewFrame title={t("library.preview.machine")} testId="machine-preview" onFit={() => fit()} hint={t("library.preview.machineHint")}>
+    <div ref={host} class={`${PREVIEW_STAGE} h-72`} role="img" aria-label={t("library.preview.machine")}>
+      <Show when={unavailable()}><p role="status" class={stageNote("info")}>{t("library.preview.noWebgl")}</p></Show>
+      <Show when={!unavailable() && envelope().volume === undefined}><p role="status" class={stageNote("info")}>{t("library.preview.noVolume")}</p></Show>
     </div>
   </PreviewFrame>
 }

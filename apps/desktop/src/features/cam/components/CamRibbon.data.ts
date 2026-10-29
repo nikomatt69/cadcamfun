@@ -187,12 +187,12 @@ export const RIBBON_GROUPS: Readonly<Record<RibbonTabId, ReadonlyArray<RibbonGro
       accent: "neutral",
       actions: [
         { id: "post-fanuc", labelKey: "cam.ribbon.fanuc", accent: "blue", route: "post-fanuc" },
-        { id: "post-haas", label: "Haas NGC", accent: "blue", route: "post-haas" },
-        { id: "post-siemens", label: "Siemens 840D sl", accent: "cyan", route: "post-siemens" },
+        { id: "post-haas", label: "Haas NGC", accent: "blue", route: "post-haas" }, // i18n-ok controller name
+        { id: "post-siemens", label: "Siemens 840D sl", accent: "cyan", route: "post-siemens" }, // i18n-ok controller name
         { id: "post-heidenhain", labelKey: "cam.ribbon.heidenhain", accent: "purple", route: "post-heidenhain" },
-        { id: "post-okuma", label: "Okuma OSP", accent: "cyan", route: "post-okuma" },
-        { id: "post-mazak", label: "Mazak EIA/ISO", accent: "blue", route: "post-mazak" },
-        { id: "post-linuxcnc", label: "LinuxCNC", accent: "green", route: "post-linuxcnc" },
+        { id: "post-okuma", label: "Okuma OSP", accent: "cyan", route: "post-okuma" }, // i18n-ok controller name
+        { id: "post-mazak", label: "Mazak EIA/ISO", accent: "blue", route: "post-mazak" }, // i18n-ok controller name
+        { id: "post-linuxcnc", label: "LinuxCNC", accent: "green", route: "post-linuxcnc" }, // i18n-ok controller name
         { id: "post-grbl", label: "GRBL", accent: "amber", route: "post-grbl" },
         { id: "post-generic", labelKey: "cam.ribbon.generic", accent: "neutral", route: "post-gcode" },
         { id: "open-post-tab", labelKey: "cam.ribbon.openPost", accent: "neutral", route: "active-post" }

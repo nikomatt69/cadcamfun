@@ -61,7 +61,7 @@ function ChangeList(props: { readonly changes: ReadonlyArray<Change> }): JSX.Ele
       <For each={props.changes}>
         {(c) => (
           <li class="text-sm">
-            <strong>{c.name ?? c.path}</strong><span class={PILL(c.status === "added" ? "success" : c.status === "deleted" ? "failure" : t("titlebar.item.open"))}>{c.status}</span>
+            <strong>{c.name ?? c.path}</strong><span class={PILL(c.status === "added" ? "success" : c.status === "deleted" ? "failure" : "open")}>{c.status}</span>
             <ul class="ml-4 mt-1 font-mono text-xs">
               <For each={c.changes.slice(0, 30)}>
                 {(p) => <li>{p.pointer} <Show when={p.before !== undefined}><del class="text-red-600">{show(p.before)}</del></Show> <Show when={p.after !== undefined}><ins class="text-green-600 no-underline">{show(p.after)}</ins></Show></li>}
@@ -129,7 +129,7 @@ function RunTimeline(props: { readonly run: Run }): JSX.Element {
                       {(e as { uses: string }).uses}
                     </span>
                     <Show when={(e as { message?: string }).message}>
-                      <span class="text-slate-500"> {t("dashboard.metric.unavailable")} {(e as { message: string }).message}</span>
+                      <span class="text-slate-500"> — {(e as { message: string }).message}</span>
                     </Show>
                     <Show when={(e as { status: string }).status === "skipped"}>
                       <span class="text-slate-400"> ({t("vcs.actions.skipped")})</span>
@@ -155,7 +155,7 @@ export function ProjectHistoryScreen(): JSX.Element {
   /** When set, History shows only the commits that touched this file (a drawing, component, toolpath, material…). */
   const path = () => (typeof search.path === "string" && search.path !== "" ? search.path : undefined)
   const id = () => params.id
-  const [tab, setTab] = createSignal<Tab>(typeof new URLSearchParams(window.location.search).get("path") === "string" ? t("vcs.tab.history") : t("vcs.tab.changes"))
+  const [tab, setTab] = createSignal<Tab>(typeof new URLSearchParams(window.location.search).get("path") === "string" ? "history" : "changes")
   const [token, setToken] = createSignal("")
   const [remoteValue, setRemote] = createSignal("")
   const [message, setMessage] = createSignal("")

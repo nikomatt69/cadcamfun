@@ -1,4 +1,7 @@
 ---
+import { ui } from "../../i18n/ui"
+import type { Locale } from "../../i18n/locales"
+
 interface Item {
   title: string
   href: string
@@ -6,13 +9,15 @@ interface Item {
 }
 interface Props {
   items?: Item[]
+  locale?: Locale
 }
-const { items = [] } = Astro.props
+const { items = [], locale = "en" } = Astro.props
+const label = ui(locale, "onThisPage")
 ---
 
 <div class="material rounded-[var(--radius-card)] px-4 py-4">
-  <p class="pl-4 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-terminal-accent">On this page</p>
-  <nav aria-label="On this page" class="doc-toc relative mt-3 flex flex-col pl-4">
+  <p class="pl-4 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-terminal-accent">{label}</p>
+  <nav aria-label={label} class="doc-toc relative mt-3 flex flex-col pl-4">
     <div class="doc-toc-line absolute bottom-0 left-0 top-0" aria-hidden="true"></div>
     {items.map((item) => (
       <a href={item.href} class="doc-toc-link relative py-1.5 text-[13.5px] text-terminal-muted" data-depth={item.depth ?? 2}>

@@ -27,5 +27,6 @@
   "cad.height": "ऊँचाई",
   "cad.depth": "गहराई",
   "cad.snapSettings": "स्नैप सेटिंग्स",
-  "cad.enableSnapping": "स्नैपिंग सक्षम करें"
+  "cad.enableSnapping": "स्नैपिंग सक्षम करें",
+  "viewport.editor2d": "2D ड्राइंग संपादक"
 }

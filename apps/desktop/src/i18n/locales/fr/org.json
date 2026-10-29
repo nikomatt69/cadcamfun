@@ -353,5 +353,9 @@
   "chat.unnamedUser": "Utilisateur sans nom",
   "chat.noEmail": "Aucun e-mail",
   "chat.createGroup": "Créer un groupe",
-  "chat.startConversation": "Démarrer la conversation"
+  "chat.startConversation": "Démarrer la conversation",
+  "dash.from": "Du",
+  "org.search": "Rechercher des organisations...",
+  "org.none": "Aucune organisation trouvée",
+  "org.noneMatch": "Aucune organisation ne correspond à la recherche."
 }

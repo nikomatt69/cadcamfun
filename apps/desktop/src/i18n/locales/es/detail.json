@@ -125,5 +125,6 @@
   "pages.create.reusable.components.to.use.across.your.cad.drawings": "Crea componentes reutilizables para tus dibujos CAD.",
   "pages.create.component": "Crear componente",
   "pages.create.toolpaths.to.generate.g.code.for.your.machine": "Crea trayectorias para generar código G para tu máquina.",
-  "pages.search.projects": "Buscar proyectos…"
+  "pages.search.projects": "Buscar proyectos…",
+  "pages.drawing.deleteConfirm": "¿Eliminar el dibujo \"{name}\"?"
 }

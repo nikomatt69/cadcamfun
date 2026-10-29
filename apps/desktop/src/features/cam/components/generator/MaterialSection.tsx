@@ -1,4 +1,4 @@
-import { For, Show, createSignal, type JSX } from "solid-js"
+import { For, Show, createEffect, createSignal, type JSX } from "solid-js"
 import { Package } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { predefinedMaterials } from "../../../cad/lib/predefinedLibraries.ts"
@@ -32,6 +32,11 @@ export function MaterialSection(): JSX.Element {
   const [grade, setGrade] = createSignal<string | undefined>(undefined)
   const [toolMaterial, setToolMaterial] = createSignal<"carbide" | "hss">("carbide")
   const [machineId, setMachineId] = createSignal(cam.kernel.DEFAULT_MACHINE.id)
+  // The select shows the kernel grade. Changing it is what the kernel plans with; until then the stored grade stays.
+  createEffect(() => {
+    const resolved = cam.kernel.findMaterial(gen.kernelSettings.material)?.id
+    if (resolved !== undefined) setGrade(resolved)
+  })
   const familyGrade = () => cam.kernel.findMaterial(cam.kernel.LEGACY_MATERIAL_GRADE[gen.settings.material] ?? gen.settings.material)
   const currentGrade = () => (grade() !== undefined ? cam.kernel.findMaterial(grade()!) : undefined) ?? familyGrade()
   /** Grades of the same ISO group as the panel's family (all grades for "other"). */
@@ -61,7 +66,10 @@ export function MaterialSection(): JSX.Element {
     if (!found) return
     gen.patchSettings({ material: materialTypeOf(found.name) })
     const known = cam.kernel.findMaterial(found.name)
-    if (known !== undefined) setGrade(known.id)
+    if (known !== undefined) {
+      setGrade(known.id)
+      if (gen.settings.machineType === "mill") gen.patchKernelSettings({ material: known.id })
+    }
     gen.flash(`Material "${found.name}" loaded from library`)
   }
 
@@ -87,7 +95,11 @@ export function MaterialSection(): JSX.Element {
       <div class="grid grid-cols-1 gap-2" data-testid="cutting-data-panel">
         <div>
           <label class={LABEL}>{t("cam.gen.mat.grade")}</label>
-          <select class={INPUT} data-testid="material-grade" value={currentGrade()?.id ?? ""} onChange={(event) => setGrade(event.currentTarget.value || undefined)}>
+          <select class={INPUT} data-testid="material-grade" value={currentGrade()?.id ?? ""} onChange={(event) => {
+            const id = event.currentTarget.value
+            setGrade(id.length > 0 ? id : undefined)
+            if (id.length > 0 && gen.settings.machineType === "mill") gen.patchKernelSettings({ material: id })
+          }}>
             <For each={grades()}>{(m) => <option value={m.id}>{m.name} (ISO {m.iso})</option>}</For>
           </select>
         </div>

@@ -125,5 +125,6 @@
   "pages.create.reusable.components.to.use.across.your.cad.drawings": "Create reusable components to use across your CAD drawings.",
   "pages.create.component": "Create Component",
   "pages.create.toolpaths.to.generate.g.code.for.your.machine": "Create toolpaths to generate G-code for your machine.",
-  "pages.search.projects": "Search projects..."
+  "pages.search.projects": "Search projects...",
+  "pages.drawing.deleteConfirm": "Delete drawing \"{name}\"?"
 }

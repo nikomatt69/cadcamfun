@@ -107,10 +107,10 @@ export function SignInScreen(): JSX.Element {
 
           <form style={{ display: "flex", "flex-direction": "column", gap: "12px" }} onSubmit={handleEmailSignIn}>
             <Field label={t("signin.emailLabel")} id="email">
-              <TextField id="email" name="email" type="email" required placeholder="Enter your email" />
+              <TextField id="email" name="email" type="email" required placeholder={t("auth.placeholder.email")} />
             </Field>
             <Field label={t("signin.passwordLabel")} id="password">
-              <TextField id="password" name="password" type="password" required placeholder="Enter your password" />
+              <TextField id="password" name="password" type="password" required placeholder={t("auth.placeholder.password")} />
             </Field>
 
             <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", gap: "8px" }}>

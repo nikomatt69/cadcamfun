@@ -125,5 +125,6 @@
   "pages.create.reusable.components.to.use.across.your.cad.drawings": "Создавайте компоненты для повторного использования в CAD-чертежах.",
   "pages.create.component": "Создать компонент",
   "pages.create.toolpaths.to.generate.g.code.for.your.machine": "Создавайте траектории для генерации G-кода для станка.",
-  "pages.search.projects": "Поиск проектов…"
+  "pages.search.projects": "Поиск проектов…",
+  "pages.drawing.deleteConfirm": "Удалить чертёж \"{name}\"?"
 }

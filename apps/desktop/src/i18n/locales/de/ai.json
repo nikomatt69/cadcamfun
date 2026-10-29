@@ -619,5 +619,9 @@
   "ai.cmd.find.desc": "Im angezeigten Teil der Unterhaltung nach etwas suchen.",
   "ai.cmd.find.empty": "Geben Sie an, wonach gesucht werden soll: /find wall thickness",
   "ai.cmd.older": "älter",
-  "ai.cmd.older.desc": "Die Nachrichten vor denen auf dem Bildschirm lesen."
+  "ai.cmd.older.desc": "Die Nachrichten vor denen auf dem Bildschirm lesen.",
+  "ai.catalogue.searchModels": "Anbietermodelle suchen",
+  "ai.stream.invalidEvent": "Der Assistent hat ein ungültiges Ereignis gesendet. Das Wiederherstellen der Sitzung kann die Ergebnisse zurückholen.",
+  "ai.vision.captureFailed": "Aufnahme der Ansicht fehlgeschlagen.",
+  "mcp.directory.search": "Server suchen…"
 }

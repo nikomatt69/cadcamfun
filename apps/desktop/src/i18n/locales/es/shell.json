@@ -542,5 +542,9 @@
   "shell.engine.recovered": "El motor de cálculo vuelve a funcionar.",
   "shell.engine.failed": "No se pudo reiniciar el motor de cálculo. Reinicia la aplicación para continuar.",
   "update.noneAvailable": "No hay ninguna actualización que instalar. Busca actualizaciones de nuevo.",
-  "update.busy": "Hay otra operación de actualización en curso. Inténtalo de nuevo en un momento."
+  "update.busy": "Hay otra operación de actualización en curso. Inténtalo de nuevo en un momento.",
+  "shell.notifications.unread": "{count} sin leer",
+  "shell.notifications.markAll": "Marcar todas como leídas",
+  "shell.notifications.empty": "Aún no hay avisos. Aquí aparecerán los de proyectos, flujos y el asistente.",
+  "twofactor.qrAlt": "Código QR de 2FA"
 }

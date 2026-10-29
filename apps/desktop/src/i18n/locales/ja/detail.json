@@ -125,5 +125,6 @@
   "pages.create.reusable.components.to.use.across.your.cad.drawings": "CAD 図面間で再利用できる部品を作成します。",
   "pages.create.component": "部品を作成",
   "pages.create.toolpaths.to.generate.g.code.for.your.machine": "ツールパスを作成して機械の G コードを生成します。",
-  "pages.search.projects": "プロジェクトを検索…"
+  "pages.search.projects": "プロジェクトを検索…",
+  "pages.drawing.deleteConfirm": "図面「{name}」を削除しますか？"
 }

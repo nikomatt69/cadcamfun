@@ -1,6 +1,25 @@
 ---
 import Layout from "../../layouts/Layout.astro"
 import Navbar from "../../components/Navbar.astro"
+import { text } from "../../i18n/catalog"
+
+const locale = Astro.locals.locale ?? "en"
+const copy = {
+  noKeys: text(locale, "No API keys."),
+  revoke: text(locale, "Revoke"),
+  revokeFailed: text(locale, "Could not revoke the key"),
+  studioDown: text(locale, "The local Studio API is not running. Start it with bun run dev in packages/web."),
+  accountNeedsApi: text(locale, "Account editing uses that same local API."),
+  signedIn: text(locale, "Signed in"),
+  noProjects: text(locale, "No projects in this database."),
+  accountFailed: text(locale, "The account could not be loaded."),
+  profileFailed: text(locale, "Could not save the profile"),
+  passwordFailed: text(locale, "Could not change the password"),
+  gitFailed: text(locale, "Could not save the git identity"),
+  keyFailed: text(locale, "Could not create the key"),
+  keyOnce: text(locale, "Copy this key now. It will not be shown again: {key}"),
+}
+---
 
 export const prerender = false
 ---
@@ -11,81 +30,81 @@ export const prerender = false
     <div class="page-shell">
       <div class="flex items-end justify-between gap-4">
         <div>
-          <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-terminal-muted">Studio</p>
-          <h1 class="font-display mt-3 text-[clamp(2rem,4vw,3.2rem)] font-bold tracking-[-0.03em]">Local workspace</h1>
+          <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-terminal-muted">{text(locale, "Studio")}</p>
+          <h1 class="font-display mt-3 text-[clamp(2rem,4vw,3.2rem)] font-bold tracking-[-0.03em]">{text(locale, "Local workspace")}</h1>
         </div>
-        <button id="studio-logout" type="button" class="pressable glass-chip px-4 py-2 text-[13px] font-semibold">Sign out</button>
+        <button id="studio-logout" type="button" class="pressable glass-chip px-4 py-2 text-[13px] font-semibold">{text(locale, "Sign out")}</button>
       </div>
       <p id="studio-who" class="mt-4 text-[15px] text-terminal-muted"></p>
 
-      <h2 class="font-display mt-10 text-[1.4rem] font-bold tracking-[-0.03em]">Workspace</h2>
+      <h2 class="font-display mt-10 text-[1.4rem] font-bold tracking-[-0.03em]">{text(locale, "Workspace")}</h2>
       <div id="studio-counts" class="mt-4 grid gap-3 sm:grid-cols-4"></div>
       <div class="material mt-6 overflow-hidden rounded-[var(--radius-card)]">
         <table class="w-full text-left text-[14px]">
           <thead>
             <tr>
-              <th class="px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">Project</th>
-              <th class="px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">Updated</th>
+              <th class="px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">{text(locale, "Project")}</th>
+              <th class="px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">{text(locale, "Updated")}</th>
             </tr>
           </thead>
           <tbody id="studio-projects"></tbody>
         </table>
       </div>
 
-      <h2 id="account" class="font-display mt-14 text-[1.4rem] font-bold tracking-[-0.03em]">Account</h2>
+      <h2 id="account" class="font-display mt-14 text-[1.4rem] font-bold tracking-[-0.03em]">{text(locale, "Account")}</h2>
       <p class="mt-2 max-w-2xl text-[14px] leading-relaxed text-terminal-muted">
-        Profile, password, API keys, and the git name used for commits. These write the local database for the signed-in user. Email stays as stored.
+        {text(locale, "Profile, password, API keys, and the git name used for commits. These write the local database for the signed-in user. Email stays as stored.")}
       </p>
       <p id="account-status" class="mt-3 text-[14px] text-terminal-muted" role="status"></p>
 
       <form id="profile-form" class="material mt-6 hidden rounded-[var(--radius-card)] p-6" hidden>
-        <h3 class="text-[15px] font-semibold">Profile</h3>
+        <h3 class="text-[15px] font-semibold">{text(locale, "Profile")}</h3>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
-          <label class="block text-[13px] font-semibold">Name<input id="profile-name" name="name" required maxlength="100" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
-          <label class="block text-[13px] font-semibold">Email<input id="profile-email" type="email" readonly class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal text-terminal-muted" /></label>
-          <label class="block text-[13px] font-semibold">Title<input id="profile-title" name="title" maxlength="200" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
-          <label class="block text-[13px] font-semibold">Company<input id="profile-company" name="company" maxlength="200" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
-          <label class="block text-[13px] font-semibold">Location<input id="profile-location" name="location" maxlength="200" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
-          <label class="block text-[13px] font-semibold">Website<input id="profile-website" name="website" maxlength="300" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">{text(locale, "Name")}<input id="profile-name" name="name" required maxlength="100" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">{text(locale, "Email")}<input id="profile-email" type="email" readonly class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal text-terminal-muted" /></label>
+          <label class="block text-[13px] font-semibold">{text(locale, "Title")}<input id="profile-title" name="title" maxlength="200" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">{text(locale, "Company")}<input id="profile-company" name="company" maxlength="200" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">{text(locale, "Location")}<input id="profile-location" name="location" maxlength="200" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">{text(locale, "Website")}<input id="profile-website" name="website" maxlength="300" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
         </div>
-        <label class="mt-4 block text-[13px] font-semibold">Bio<textarea id="profile-bio" name="bio" maxlength="500" rows="3" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal"></textarea></label>
+        <label class="mt-4 block text-[13px] font-semibold">{text(locale, "Bio")}<textarea id="profile-bio" name="bio" maxlength="500" rows="3" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal"></textarea></label>
         <div class="mt-4 flex flex-wrap gap-6 text-[14px]">
-          <label class="flex items-center gap-2 font-medium"><input id="profile-public" name="publicProfile" type="checkbox" /> Public profile</label>
-          <label class="flex items-center gap-2 font-medium"><input id="profile-show-email" name="showEmail" type="checkbox" /> Show email</label>
+          <label class="flex items-center gap-2 font-medium"><input id="profile-public" name="publicProfile" type="checkbox" /> {text(locale, "Public profile")}</label>
+          <label class="flex items-center gap-2 font-medium"><input id="profile-show-email" name="showEmail" type="checkbox" /> {text(locale, "Show email")}</label>
         </div>
         <p id="profile-error" class="mt-3 hidden text-[13px]" role="alert"></p>
-        <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">Save profile</button>
+        <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">{text(locale, "Save profile")}</button>
       </form>
 
       <form id="password-form" class="material mt-4 hidden rounded-[var(--radius-card)] p-6" hidden>
-        <h3 class="text-[15px] font-semibold">Password</h3>
-        <p class="mt-2 text-[13px] text-terminal-muted">Updates the password this Studio login checks. A desktop credential row for the same user is updated with the same hash.</p>
+        <h3 class="text-[15px] font-semibold">{text(locale, "Password")}</h3>
+        <p class="mt-2 text-[13px] text-terminal-muted">{text(locale, "Updates the password this Studio login checks. A desktop credential row for the same user is updated with the same hash.")}</p>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
-          <label class="block text-[13px] font-semibold">Current password<input id="password-current" name="currentPassword" type="password" autocomplete="current-password" required class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
-          <label class="block text-[13px] font-semibold">New password<input id="password-next" name="newPassword" type="password" autocomplete="new-password" required minlength="8" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">{text(locale, "Current password")}<input id="password-current" name="currentPassword" type="password" autocomplete="current-password" required class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">{text(locale, "New password")}<input id="password-next" name="newPassword" type="password" autocomplete="new-password" required minlength="8" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
         </div>
         <p id="password-error" class="mt-3 hidden text-[13px]" role="alert"></p>
-        <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">Change password</button>
+        <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">{text(locale, "Change password")}</button>
       </form>
 
       <form id="git-form" class="material mt-4 hidden rounded-[var(--radius-card)] p-6" hidden>
-        <h3 class="text-[15px] font-semibold">Git identity</h3>
-        <p class="mt-2 text-[13px] text-terminal-muted">The name and email written on this user's commits.</p>
+        <h3 class="text-[15px] font-semibold">{text(locale, "Git identity")}</h3>
+        <p class="mt-2 text-[13px] text-terminal-muted">{text(locale, "The name and email written on this user's commits.")}</p>
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
-          <label class="block text-[13px] font-semibold">Name<input id="git-name" name="name" required maxlength="100" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
-          <label class="block text-[13px] font-semibold">Email<input id="git-email" name="email" type="email" required maxlength="254" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">{text(locale, "Name")}<input id="git-name" name="name" required maxlength="100" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <label class="block text-[13px] font-semibold">{text(locale, "Email")}<input id="git-email" name="email" type="email" required maxlength="254" class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
         </div>
         <p id="git-error" class="mt-3 hidden text-[13px]" role="alert"></p>
-        <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">Save git identity</button>
+        <button type="submit" class="pressable btn-fill mt-4 rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">{text(locale, "Save git identity")}</button>
       </form>
 
       <section id="keys-panel" class="material mt-4 hidden rounded-[var(--radius-card)] p-6" hidden>
-        <h3 class="text-[15px] font-semibold">API keys</h3>
-        <p class="mt-2 text-[13px] text-terminal-muted">The secret is shown once. Studio stores only its SHA-256 hash, the same way the sidecar does.</p>
+        <h3 class="text-[15px] font-semibold">{text(locale, "API keys")}</h3>
+        <p class="mt-2 text-[13px] text-terminal-muted">{text(locale, "The secret is shown once. Studio stores only its SHA-256 hash, the same way the sidecar does.")}</p>
         <ul id="keys-list" class="mt-4 flex flex-col gap-2 text-[14px]"></ul>
         <form id="key-form" class="mt-4 flex flex-wrap items-end gap-3">
-          <label class="block text-[13px] font-semibold">Name<input id="key-name" name="name" required maxlength="100" class="glass-chip mt-2 w-64 bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
-          <button type="submit" class="pressable btn-fill rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">Create key</button>
+          <label class="block text-[13px] font-semibold">{text(locale, "Name")}<input id="key-name" name="name" required maxlength="100" class="glass-chip mt-2 w-64 bg-transparent px-3 py-2 text-[15px] font-normal" /></label>
+          <button type="submit" class="pressable btn-fill rounded-[var(--radius-sm)] px-4 py-2 text-[14px] font-semibold">{text(locale, "Create key")}</button>
         </form>
         <p id="key-secret" class="mt-4 hidden break-all font-mono text-[13px]"></p>
         <p id="key-error" class="mt-3 hidden text-[13px]" role="alert"></p>
@@ -94,7 +113,7 @@ export const prerender = false
   </main>
 </Layout>
 
-<script>
+<script define:vars={{ copy }}>
   type Profile = {
     email: string | null
     name: string | null
@@ -163,7 +182,7 @@ export const prerender = false
     if (keys.length === 0) {
       const empty = document.createElement("li")
       empty.className = "text-terminal-muted"
-      empty.textContent = "No API keys."
+      empty.textContent = copy.noKeys
       list.append(empty)
       return
     }
@@ -175,11 +194,11 @@ export const prerender = false
       const button = document.createElement("button")
       button.type = "button"
       button.className = "pressable glass-chip px-3 py-1 text-[12px] font-semibold"
-      button.textContent = "Revoke"
+      button.textContent = copy.revoke
       button.addEventListener("click", async () => {
         const result = await send(`/studio/api/api-keys?keyId=${encodeURIComponent(key.id)}`, "DELETE")
         if (!result.ok) {
-          alertLine("#key-error", result.payload?.error ?? "Could not revoke the key")
+          alertLine("#key-error", result.payload?.error ?? copy.revokeFailed)
           return
         }
         alertLine("#key-error", "")
@@ -193,8 +212,8 @@ export const prerender = false
   const overview = await fetch("/studio/api/overview")
   if (overview.status === 401) location.href = "/studio/login"
   else if (!overview.ok) {
-    if (who) who.textContent = "The local Studio API is not running. Start it with bun run dev in packages/web."
-    if (accountStatus) accountStatus.textContent = "Account editing uses that same local API."
+    if (who) who.textContent = copy.studioDown
+    if (accountStatus) accountStatus.textContent = copy.accountNeedsApi
   } else {
     const body = (await overview.json()) as {
       user: { email: string | null; name: string | null }
@@ -202,7 +221,7 @@ export const prerender = false
       counts: Record<string, number>
       projects: { id: string; name: string; updatedAt: string }[]
     }
-    if (who) who.textContent = `${body.user.name ?? body.user.email ?? "Signed in"} · ${body.database}`
+    if (who) who.textContent = `${body.user.name ?? body.user.email ?? copy.signedIn} · ${body.database}`
     if (counts) {
       for (const [key, value] of Object.entries(body.counts)) {
         const card = document.createElement("div")
@@ -223,7 +242,7 @@ export const prerender = false
         const cell = document.createElement("td")
         cell.className = "px-4 py-4 text-terminal-muted"
         cell.colSpan = 2
-        cell.textContent = "No projects in this database."
+        cell.textContent = copy.noProjects
         row.append(cell)
         projects.append(row)
       } else {
@@ -255,7 +274,7 @@ export const prerender = false
       show("#git-form")
       show("#keys-panel")
     } else if (accountStatus && account.status !== 401) {
-      accountStatus.textContent = account.payload?.error ?? "The account could not be loaded."
+      accountStatus.textContent = account.payload?.error ?? copy.accountFailed
     }
   }
 
@@ -274,13 +293,13 @@ export const prerender = false
       showEmail: (document.querySelector("#profile-show-email") as HTMLInputElement | null)?.checked ?? false,
     })
     if (!result.ok) {
-      alertLine("#profile-error", result.payload?.error ?? "Could not save the profile")
+      alertLine("#profile-error", result.payload?.error ?? copy.profileFailed)
       return
     }
     alertLine("#profile-error", "")
     const profile = (result.payload as { profile?: Profile } | null)?.profile
     if (profile) fillProfile(profile)
-    if (who && profile) who.textContent = who.textContent?.replace(/^[^·]+/, `${profile.name ?? profile.email ?? "Signed in"} `) ?? who.textContent
+    if (who && profile) who.textContent = who.textContent?.replace(/^[^·]+/, `${profile.name ?? profile.email ?? copy.signedIn} `) ?? who.textContent
   })
 
   document.querySelector("#password-form")?.addEventListener("submit", async (event) => {
@@ -291,7 +310,7 @@ export const prerender = false
       currentPassword: data.get("currentPassword"),
       newPassword: data.get("newPassword"),
     })
-    alertLine("#password-error", result.ok ? "" : (result.payload?.error ?? "Could not change the password"))
+    alertLine("#password-error", result.ok ? "" : (result.payload?.error ?? copy.passwordFailed))
     if (result.ok) form.reset()
   })
 
@@ -299,7 +318,7 @@ export const prerender = false
     event.preventDefault()
     const data = new FormData(event.currentTarget as HTMLFormElement)
     const result = await send("/studio/api/git-profile", "PUT", { name: data.get("name"), email: data.get("email") })
-    alertLine("#git-error", result.ok ? "" : (result.payload?.error ?? "Could not save the git identity"))
+    alertLine("#git-error", result.ok ? "" : (result.payload?.error ?? copy.gitFailed))
   })
 
   document.querySelector("#key-form")?.addEventListener("submit", async (event) => {
@@ -308,14 +327,14 @@ export const prerender = false
     const data = new FormData(form)
     const result = await send("/studio/api/api-keys", "POST", { name: data.get("name") })
     if (!result.ok) {
-      alertLine("#key-error", result.payload?.error ?? "Could not create the key")
+      alertLine("#key-error", result.payload?.error ?? copy.keyFailed)
       return
     }
     alertLine("#key-error", "")
     const created = result.payload as { apiKey?: string; apiKeys?: ApiKeyRow[] } | null
     const secret = document.querySelector("#key-secret")
     if (secret) {
-      secret.textContent = created?.apiKey ? `Copy this key now. It will not be shown again: ${created.apiKey}` : ""
+      secret.textContent = created?.apiKey ? copy.keyOnce.replace("{key}", created.apiKey) : ""
       secret.classList.toggle("hidden", !created?.apiKey)
     }
     renderKeys(created?.apiKeys ?? [])

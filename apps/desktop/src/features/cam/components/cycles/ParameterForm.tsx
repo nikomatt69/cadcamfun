@@ -19,9 +19,13 @@ export function ParameterForm(props: {
       }>
         <Field label={param.label} unit={param.unit} hint={param.description} for={id(param.name)}>
           <Show when={param.type === "number"} fallback={
-            <select id={id(param.name)} class={INPUT} value={String(props.values[param.name] ?? "")} onChange={(event) => props.onChange(param.name, event.currentTarget.value)}>
-              <For each={param.options}>{(option) => <option value={option.value}>{option.label}</option>}</For>
-            </select>
+            <Show when={param.type === "text"} fallback={
+              <select id={id(param.name)} class={INPUT} value={String(props.values[param.name] ?? "")} onChange={(event) => props.onChange(param.name, event.currentTarget.value)}>
+                <For each={param.options}>{(option) => <option value={option.value}>{option.label}</option>}</For>
+              </select>
+            }>
+              <input id={id(param.name)} class={INPUT} type="text" value={String(props.values[param.name] ?? "")} onInput={(event) => props.onChange(param.name, event.currentTarget.value)} />
+            </Show>
           }>
             <NumberField id={id(param.name)} class={INPUT} value={Number(props.values[param.name] ?? 0)} min={param.min} max={param.max} step={param.step}
               onChange={(value) => props.onChange(param.name, value)} />

@@ -25,5 +25,6 @@
   "invitation.decline": "Refuser",
   "invitation.missing": "Ce lien d'invitation est invalide ou a déjà été utilisé.",
   "invitation.alreadyAccepted": "Cette invitation a déjà été acceptée. Redirection vers votre tableau de bord…",
-  "invitation.signInFirst": "Connectez-vous ou créez un compte pour accepter cette invitation."
+  "invitation.signInFirst": "Connectez-vous ou créez un compte pour accepter cette invitation.",
+  "schema.invalid": "Les valeurs ne respectent pas le schéma"
 }

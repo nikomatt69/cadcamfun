@@ -31,11 +31,11 @@ import VerifyPanel from "../components/VerifyPanel.tsx"
 import ToolpathVisualizer from "../components/ToolpathVisualizer.tsx"
 import TitleBlockOverlay from "../../cad/components/TitleBlockOverlay.tsx"
 import GCodeEditor from "../components/GCodeEditor.tsx"
-import MachineCycles from "../components/MachineCycles.tsx"
 import PostProcessorTab, { type PostProcessorType } from "../components/PostProcessorTab.tsx"
 import { CostsModal, ToolLibraryModal } from "../components/CamModals.tsx"
 import CamRibbon from "../components/CamRibbon.tsx"
-import { FixedCycleEditor } from "../components/generator/FixedCyclesSection.tsx"
+import { CyclesTab } from "../components/cycles/CyclesTab.tsx"
+import { controllerOfPost } from "../components/cycles/cycleApi.ts"
 import "../../../styles/workstation.css"
 import SaveCamModal from "../components/SaveCamModal.tsx"
 import { projectSession } from "../../projects/lib/project-session.ts"
@@ -370,7 +370,7 @@ export default function CamPage(): JSX.Element {
     setSelectedPostProcessor(next)
     camStore.setController(storeController(next))
   }
-  const cycleController = (): "fanuc" | "heidenhain" => (selectedPostProcessor() === "heidenhain" ? "heidenhain" : "fanuc")
+  const cycleController = (): ReturnType<typeof controllerOfPost> => controllerOfPost(selectedPostProcessor())
 
 
   return (
@@ -491,10 +491,7 @@ export default function CamPage(): JSX.Element {
                   <VerifyPanel />
                 </Show>
                 <Show when={camStore.rightTab === "cycles"}>
-                  <MachineCycles controllerType={cycleController()} onCycleCodeGenerated={onCycleCode} />
-                  <Show when={gcode().trim().length > 0}>
-                    <CycleLines gcode={gcode()} />
-                  </Show>
+                  <CyclesTab controller={cycleController()} gcode={gcode()} onInsert={onCycleCode} onReplace={setGcode} />
                 </Show>
               </div>
           </WorkspaceInspector>
@@ -510,17 +507,5 @@ export default function CamPage(): JSX.Element {
       <CamHistoryModal open={showHistory()} onClose={() => setShowHistory(false)} />
       <Show when={saveRequest()}>{(request) => <SaveCamModal code={request().code} extension={request().extension} projectOnly={request().projectOnly} onClose={() => setSaveRequest(undefined)} />}</Show>
     </div>
-  )
-}
-
-/** The fixed-cycle lines of the current program, each editable in place (legacy `FixedCyclesUIRenderer`). */
-function CycleLines(props: { readonly gcode: string }): JSX.Element {
-  const lines = createMemo(() => props.gcode.split(/\r?\n/).filter((line) => /^\s*G(7[4-9]|8[1-9])\b/i.test(line)))
-  return (
-    <Show when={lines().length > 0}>
-      <div class="p-3 space-y-2" data-testid="cycle-lines">
-        {lines().map((line) => <FixedCycleEditor line={line.trim()} />)}
-      </div>
-    </Show>
   )
 }

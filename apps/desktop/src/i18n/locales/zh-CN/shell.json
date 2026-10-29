@@ -542,5 +542,9 @@
   "shell.engine.recovered": "计算引擎已恢复运行。",
   "shell.engine.failed": "无法重启计算引擎。请重启应用以继续。",
   "update.noneAvailable": "没有可安装的更新。请再次检查更新。",
-  "update.busy": "另一个更新操作正在进行中。请稍后重试。"
+  "update.busy": "另一个更新操作正在进行中。请稍后重试。",
+  "shell.notifications.unread": "{count} 条未读",
+  "shell.notifications.markAll": "全部标为已读",
+  "shell.notifications.empty": "还没有通知。项目、工作流和助手的更新会显示在这里。",
+  "twofactor.qrAlt": "双重验证二维码"
 }

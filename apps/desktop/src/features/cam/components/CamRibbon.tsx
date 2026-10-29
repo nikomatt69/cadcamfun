@@ -30,7 +30,7 @@ import {
   Sparkles,
   Upload,
   Wand2,
-  Wrench
+  Wrench // i18n-ok icon import
 } from "lucide-solid"
 import { useGeneratorStore } from "../store/generatorStore.ts"
 import { paletteToCoreOperation } from "./generator/StrategyPalette.data.ts"

@@ -3,7 +3,7 @@ import { t } from "../../../i18n/index.ts"
  * The 3D tool of a tool resource (spec 31): its type and properties through `cam.toolModelOf`, drawn by `toolObject` — the
  * very object the CAM preview moves along the program. What the resource does not give is listed as assumed.
  */
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
+import { Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { cam } from "@cadcamfun/core"
@@ -20,7 +20,7 @@ const numberOrNull = (value: unknown): number | null => {
 
 /** A resource row (stored or being edited) as the tool model reads it. */
 export const toolResourceOf = (row: Readonly<Record<string, unknown>>): cam.ToolResource => ({
-  type: String(row["type"] ?? t("cam.explorer.toolType.endmill")),
+  type: String(row["type"] ?? "endmill"),
   diameter: numberOrNull(row["diameter"]) ?? 0,
   numberOfFlutes: numberOrNull(row["numberOfFlutes"]),
   cuttingLength: numberOrNull(row["cuttingLength"]),
@@ -88,14 +88,14 @@ export function ToolPreview3D(props: { readonly tool: Readonly<Record<string, un
     onCleanup(() => { cancelAnimationFrame(frame); observer.disconnect(); controls.dispose(); if (object) disposeObject(object); look.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; fit = () => {} })
   })
   return (
-    <PreviewFrame title="Tool model" testId="tool-preview" onFit={() => fit()} hint="Drag to orbit · Scroll to zoom">
+    <PreviewFrame title={t("library.preview.tool")} testId="tool-preview" onFit={() => fit()} hint={t("library.preview.orbit")}>
       <div ref={host} class={PREVIEW_STAGE} style={{ height: `${props.height ?? 260}px` }}>
-        <Show when={unavailable()}><p role="status" class={stageNote("info")}>3D preview unavailable (no WebGL)</p></Show>
+        <Show when={unavailable()}><p role="status" class={stageNote("info")}>{t("library.preview.noWebgl")}</p></Show>
       </div>
       <p data-testid="tool-preview-description" class="text-xs text-slate-700 dark:text-slate-300">{cam.describeTool(model())}</p>
       <Show when={model().assumed.length > 0}>
         <p data-testid="tool-preview-assumed" class="text-[11px] text-amber-600 dark:text-amber-400">
-          Not given, drawn from the tool type: <For each={model().assumed}>{(field, i) => <span>{i() > 0 ? ", " : ""}{field}</span>}</For>. The CAM preview and the set-up checks use the same shape.
+          {t("library.preview.assumed", { fields: model().assumed.join(", ") })}
         </p>
       </Show>
     </PreviewFrame>

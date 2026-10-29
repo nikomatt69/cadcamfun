@@ -146,6 +146,39 @@ describe("CAM page", () => {
     } finally { dispose() }
   }, 60000)
 
+  test("cycles follow the selected post: Klartext, a macro, the program, and Siemens", async () => {
+    const { dispose } = app.visit("/cam")
+    try {
+      await app.wait(() => editor())
+      await type(editor()!, "CYCL DEF 200 DRILLING\nQ200=2 ; SET-UP\n")
+      await click('[data-ribbon-tab="post"]')
+      await click('[data-ribbon-action="post-heidenhain"]')
+      await clickText("button", "Cycles")
+      const program = await find('[data-testid="program-cycle"]')
+      expect(program.textContent).toContain("CYCL DEF 200")
+      expect(program.textContent).toContain("Q200=2")
+      await clickText("button", "Simple Drilling")
+      await app.wait(() => {
+        const preview = document.querySelector('[data-testid="cycle-preview"]')?.textContent ?? ""
+        return preview.includes("CYCL DEF") && !preview.includes("G81")
+      })
+      await click('[data-macro-id="assign"]')
+      await app.wait(() => document.querySelector('[data-testid="macro-preview"]')?.textContent?.includes("Q10"))
+      const before = editor()!.value
+      await clickText("button", "Insert macro")
+      expect(editor()!.value.length).toBeGreaterThan(before.length)
+      expect(editor()!.value).toContain("Q10")
+      await click('[data-ribbon-action="post-siemens"]')
+      await clickText("button", "Cycles")
+      await clickText("button", "Simple Drilling")
+      await app.wait(() => {
+        const preview = document.querySelector('[data-testid="cycle-preview"]')?.textContent ?? ""
+        return preview.includes("CYCLE81") && !preview.includes("G81")
+      })
+      expect(document.querySelector('[data-testid="cycles-note"]')?.textContent).toContain("CYCLE81")
+    } finally { dispose() }
+  }, 60000)
+
   test("import reads a file into the editor", async () => {
     const { dispose } = app.visit("/cam")
     try {

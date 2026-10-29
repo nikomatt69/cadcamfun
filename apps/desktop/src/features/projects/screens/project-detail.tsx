@@ -129,7 +129,7 @@ export function ProjectDetailScreen(): JSX.Element {
     touchContents(); setDrawings((previous) => [copy, ...previous]); flash(t("pages.drawing.duplicated"))
   })
   const deleteDrawing = (row: Card): Promise<void> => attempt(async () => {
-    if (!window.confirm(`Delete drawing "${row.name}"?`)) return
+    if (!window.confirm(t("pages.drawing.deleteConfirm", { name: row.name }))) return
     await run(app.client.drawings.remove({ params: { id: row.id } }))
     touchContents(); setDrawings((previous) => previous.filter((item) => item.id !== row.id)); flash(t("pages.drawing.deleted"))
   })
