@@ -29,6 +29,7 @@
 import { alongLine, joinOf, offsetElement, type CompElement, type CompLine, type CompSide } from "./cutter-comp.ts"
 import { headerTools } from "./header-tools.ts"
 import { nameTools, usesToolChangeWord } from "./tool-words.ts"
+import { expandMacros, hasMacroSyntax } from "./macro-runtime.ts"
 import { decodeKlartext } from "./heidenhain.ts"
 import { finishCycle, patternCycle, peckCycle, roughCycle, threadCycle, type LatheMove, type ProfilePoint } from "./lathe-cycles.ts"
 
@@ -171,6 +172,17 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   const segments: GSegment[] = []
   const errors: string[] = []
   const unsupported: Array<{ line: number; word: string }> = []
+  // Variables, expressions, jumps, loops and macro calls run first, as the control would: the replay then sees the program it cuts.
+  let lineMap: ReadonlyArray<number> | undefined
+  if (hasMacroSyntax(text)) {
+    const expanded = expandMacros(text)
+    text = expanded.text
+    lineMap = expanded.lines
+    for (const message of expanded.errors) {
+      errors.push(message)
+      unsupported.push({ line: Number(/^line (\d+)/.exec(message)?.[1] ?? 0), word: "macro" })
+    }
+  }
   if (/\bBEGIN PGM\b/i.test(text)) {
     const decoded = decodeKlartext(text)
     text = decoded.text
@@ -560,7 +572,7 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
   }
 
   const execLine = (raw: string, index: number, depth: number): Flow => {
-    physical = index + 1
+    physical = lineMap?.[index] ?? index + 1
     const lineNo = site ?? physical
     const code = stripLine(raw)
     if (code === "" || code.startsWith("%")) return "next"

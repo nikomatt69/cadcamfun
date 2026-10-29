@@ -2,7 +2,7 @@
  * The motion a verification replays: G-code text or a Toolpath IR program, reduced to straight and
  * circular segments with the source line, then sampled along the path.
  */
-import { arcSweepBetween, expandMoves, moveTarget, type Program } from "../ir.ts"
+import { arcSweepBetween, expandMoves, isControlNode, moveTarget, type Program } from "../ir.ts"
 import { interpretGcode, type P3 } from "../testing/gcode-interpreter.ts"
 
 export interface PathSegment {
@@ -48,7 +48,7 @@ export const pathFromProgram = (program: Program, start?: P3): ReplayedPath => {
     let index = 0
     for (const move of expandMoves(toolpath.moves, at)) {
       const to = moveTarget(move)
-      if (to === undefined || move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Cycle" || move._tag === "Orient") {
+      if (to === undefined || move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Cycle" || move._tag === "Orient" || isControlNode(move)) {
         index++
         continue
       }

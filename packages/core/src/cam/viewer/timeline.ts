@@ -5,7 +5,7 @@
  * read this one list, so what is drawn at time t is what the checks talk about.
  */
 import type { Vec3 } from "../../cad/vec.ts"
-import { expandMoves, type Program } from "../ir.ts"
+import { expandMoves, isControlNode, type Program } from "../ir.ts"
 import { anglesAfter, previewMoveDuration } from "./motion-duration.ts"
 import type { MachineKind } from "../machine.ts"
 import { lerpAngles } from "./rotary.ts"
@@ -53,7 +53,7 @@ export const buildTimeline = (program: Program, track?: MotionTrack, rapidRate =
   let angles: RotaryAngles = {}
   program.toolpaths.forEach((path, p) => {
     expandMoves(path.moves, from).forEach((move, index) => {
-      if (move._tag === "Comment" || move._tag === "Cycle") return
+      if (move._tag === "Comment" || move._tag === "Cycle" || isControlNode(move)) return
       const state = stateAt(used, p, index)
       const anglesFrom = angles
       angles = anglesAfter(move, angles)

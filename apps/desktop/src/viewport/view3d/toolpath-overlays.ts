@@ -30,7 +30,7 @@ export const toolpathOverlayModel = (program: cam.Program): ToolpathOverlayModel
 
   for (const path of program.toolpaths) {
     for (const move of path.moves) {
-      if (move._tag === "Comment" || move._tag === "Orient" || move._tag === "Dwell") continue
+      if (move._tag === "Comment" || move._tag === "Orient" || move._tag === "Dwell" || cam.isControlNode(move)) continue
       if (move._tag === "Cycle") {
         points.push({ index: points.length, position: move.to, kind: "cycle" })
         from = move.to

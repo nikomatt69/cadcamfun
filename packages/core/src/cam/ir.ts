@@ -13,6 +13,7 @@
  *  - an `Arc` whose `to` has the same XY as its start is a **full circle**.
  */
 import { Schema } from "effect"
+import { AssignSchema, ElseSchema, EndIfSchema, EndWhileSchema, GotoSchema, IfSchema, LabelSchema, MacroCallSchema, MessageSchema, WhileSchema, WordExprSchema } from "./macro.ts"
 import { angleInArc, normalizeAngle } from "../cad/arc-math.ts"
 import { Vec2Schema, Vec3Schema } from "../cad/entities.ts"
 import { TAU, type Vec2, type Vec3 } from "../cad/vec.ts"
@@ -40,14 +41,17 @@ export type Rotary = typeof RotarySchema.Type
 
 export const RapidSchema = Schema.TaggedStruct("Rapid", {
   to: Vec3Schema,
-  rotary: Schema.optionalKey(RotarySchema)
+  rotary: Schema.optionalKey(RotarySchema),
+  /** Words the control computes (`macro.ts`); `to` stays the nominal position. */
+  expr: Schema.optionalKey(WordExprSchema)
 })
 
 export const LinearSchema = Schema.TaggedStruct("Linear", {
   to: Vec3Schema,
   /** mm/min. */
   feed: Positive,
-  rotary: Schema.optionalKey(RotarySchema)
+  rotary: Schema.optionalKey(RotarySchema),
+  expr: Schema.optionalKey(WordExprSchema)
 })
 
 /** Arc in the XY plane; helical when `to.z` differs from the start Z. */
@@ -107,7 +111,17 @@ export const MoveSchema = Schema.Union([
   DwellSchema,
   CommentSchema,
   CycleSchema,
-  OrientSchema
+  OrientSchema,
+  AssignSchema,
+  MacroCallSchema,
+  IfSchema,
+  ElseSchema,
+  EndIfSchema,
+  WhileSchema,
+  EndWhileSchema,
+  LabelSchema,
+  GotoSchema,
+  MessageSchema
 ])
 
 export type RapidMove = typeof RapidSchema.Type
@@ -177,6 +191,10 @@ export const arcExtrema = (move: ArcMove, from: Vec3): ReadonlyArray<Vec3> => {
   return out
 }
 
+/** A move that moves nothing: it is data for the post (a variable, a macro, a branch, a message) or for the operator. */
+export const isControlNode = (move: Move): move is Extract<Move, { readonly _tag: "Assign" | "MacroCall" | "If" | "Else" | "EndIf" | "While" | "EndWhile" | "Label" | "Goto" | "Message" }> =>
+  move._tag === "Assign" || move._tag === "Label" || move._tag === "Goto" || move._tag === "MacroCall" || move._tag === "If" || move._tag === "Else" || move._tag === "EndIf" || move._tag === "While" || move._tag === "EndWhile" || move._tag === "Message"
+
 /** Length of a move from `from`; arcs use the true radius and sweep and include the helical rise. */
 export const moveLength = (move: Move, from: Vec3): number => {
   switch (move._tag) {
@@ -192,6 +210,16 @@ export const moveLength = (move: Move, from: Vec3): number => {
     case "Dwell":
     case "Comment":
     case "Orient":
+    case "Assign":
+    case "MacroCall":
+    case "If":
+    case "Else":
+    case "EndIf":
+    case "While":
+    case "EndWhile":
+    case "Label":
+    case "Goto":
+    case "Message":
       return 0
   }
 }
@@ -413,7 +441,7 @@ export const toolpathBounds = (toolpath: Toolpath): Bounds3D => {
   }
   let started = false
   walk(toolpath, (move, from) => {
-    if (move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Orient") return
+    if (move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Orient" || isControlNode(move)) return
     if (!started) {
       include(from.x, from.y, from.z)
       started = true

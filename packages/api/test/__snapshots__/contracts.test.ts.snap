@@ -57423,6 +57423,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           ],
                                           "type": "string",
                                         },
+                                        "expr": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "feed": {},
+                                            "x": {},
+                                            "y": {},
+                                            "z": {},
+                                          },
+                                          "type": "object",
+                                        },
                                         "rotary": {
                                           "additionalProperties": false,
                                           "properties": {
@@ -57473,6 +57483,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             "Linear",
                                           ],
                                           "type": "string",
+                                        },
+                                        "expr": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "feed": {},
+                                            "x": {},
+                                            "y": {},
+                                            "z": {},
+                                          },
+                                          "type": "object",
                                         },
                                         "feed": {
                                           "exclusiveMinimum": 0,
@@ -57718,12 +57738,332 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       ],
                                       "type": "object",
                                     },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Assign",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "value": {},
+                                        "variable": {
+                                          "anyOf": [
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "index": {
+                                                  "minimum": 0,
+                                                  "type": "integer",
+                                                },
+                                                "scope": {
+                                                  "enum": [
+                                                    "local",
+                                                    "global",
+                                                    "system",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "scope",
+                                                "index",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "name": {
+                                                  "minLength": 1,
+                                                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "name",
+                                              ],
+                                              "type": "object",
+                                            },
+                                          ],
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "variable",
+                                        "value",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "MacroCall",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "args": {
+                                          "patternProperties": {
+                                            "^[A-Za-z]$": {},
+                                          },
+                                          "type": "object",
+                                        },
+                                        "name": {
+                                          "minLength": 1,
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "name",
+                                        "args",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "If",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "condition": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "a": {},
+                                            "b": {},
+                                            "cmp": {
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge",
+                                              ],
+                                              "type": "string",
+                                            },
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b",
+                                          ],
+                                          "type": "object",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "condition",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Else",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "EndIf",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "While",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "condition": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "a": {},
+                                            "b": {},
+                                            "cmp": {
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge",
+                                              ],
+                                              "type": "string",
+                                            },
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b",
+                                          ],
+                                          "type": "object",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "condition",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "EndWhile",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Label",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "name": {
+                                          "minLength": 1,
+                                          "pattern": "^[A-Za-z0-9_]+$",
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "name",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Goto",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "condition": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "a": {},
+                                            "b": {},
+                                            "cmp": {
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge",
+                                              ],
+                                              "type": "string",
+                                            },
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        "direction": {
+                                          "enum": [
+                                            "auto",
+                                            "forward",
+                                            "backward",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "label": {
+                                          "minLength": 1,
+                                          "pattern": "^[A-Za-z0-9_]+$",
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "label",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Message",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "text": {
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "text",
+                                      ],
+                                      "type": "object",
+                                    },
                                   ],
                                 },
                                 "type": "array",
                               },
                               "name": {
                                 "type": "string",
+                              },
+                              "operation": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                ],
+                                "type": "object",
                               },
                               "spindleRpm": {
                                 "minimum": 0,
@@ -60877,6 +61217,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                   ],
                                                   "type": "string",
                                                 },
+                                                "expr": {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "feed": {},
+                                                    "x": {},
+                                                    "y": {},
+                                                    "z": {},
+                                                  },
+                                                  "type": "object",
+                                                },
                                                 "rotary": {
                                                   "additionalProperties": false,
                                                   "properties": {
@@ -60927,6 +61277,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                                     "Linear",
                                                   ],
                                                   "type": "string",
+                                                },
+                                                "expr": {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "feed": {},
+                                                    "x": {},
+                                                    "y": {},
+                                                    "z": {},
+                                                  },
+                                                  "type": "object",
                                                 },
                                                 "feed": {
                                                   "exclusiveMinimum": 0,
@@ -61172,12 +61532,332 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                               ],
                                               "type": "object",
                                             },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "Assign",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "value": {},
+                                                "variable": {
+                                                  "anyOf": [
+                                                    {
+                                                      "additionalProperties": false,
+                                                      "properties": {
+                                                        "index": {
+                                                          "minimum": 0,
+                                                          "type": "integer",
+                                                        },
+                                                        "scope": {
+                                                          "enum": [
+                                                            "local",
+                                                            "global",
+                                                            "system",
+                                                          ],
+                                                          "type": "string",
+                                                        },
+                                                      },
+                                                      "required": [
+                                                        "scope",
+                                                        "index",
+                                                      ],
+                                                      "type": "object",
+                                                    },
+                                                    {
+                                                      "additionalProperties": false,
+                                                      "properties": {
+                                                        "name": {
+                                                          "minLength": 1,
+                                                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                                                          "type": "string",
+                                                        },
+                                                      },
+                                                      "required": [
+                                                        "name",
+                                                      ],
+                                                      "type": "object",
+                                                    },
+                                                  ],
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "variable",
+                                                "value",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "MacroCall",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "args": {
+                                                  "patternProperties": {
+                                                    "^[A-Za-z]$": {},
+                                                  },
+                                                  "type": "object",
+                                                },
+                                                "name": {
+                                                  "minLength": 1,
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "name",
+                                                "args",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "If",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "condition": {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "a": {},
+                                                    "b": {},
+                                                    "cmp": {
+                                                      "enum": [
+                                                        "eq",
+                                                        "ne",
+                                                        "lt",
+                                                        "le",
+                                                        "gt",
+                                                        "ge",
+                                                      ],
+                                                      "type": "string",
+                                                    },
+                                                  },
+                                                  "required": [
+                                                    "cmp",
+                                                    "a",
+                                                    "b",
+                                                  ],
+                                                  "type": "object",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "condition",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "Else",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "EndIf",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "While",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "condition": {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "a": {},
+                                                    "b": {},
+                                                    "cmp": {
+                                                      "enum": [
+                                                        "eq",
+                                                        "ne",
+                                                        "lt",
+                                                        "le",
+                                                        "gt",
+                                                        "ge",
+                                                      ],
+                                                      "type": "string",
+                                                    },
+                                                  },
+                                                  "required": [
+                                                    "cmp",
+                                                    "a",
+                                                    "b",
+                                                  ],
+                                                  "type": "object",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "condition",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "EndWhile",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "Label",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "name": {
+                                                  "minLength": 1,
+                                                  "pattern": "^[A-Za-z0-9_]+$",
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "name",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "Goto",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "condition": {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "a": {},
+                                                    "b": {},
+                                                    "cmp": {
+                                                      "enum": [
+                                                        "eq",
+                                                        "ne",
+                                                        "lt",
+                                                        "le",
+                                                        "gt",
+                                                        "ge",
+                                                      ],
+                                                      "type": "string",
+                                                    },
+                                                  },
+                                                  "required": [
+                                                    "cmp",
+                                                    "a",
+                                                    "b",
+                                                  ],
+                                                  "type": "object",
+                                                },
+                                                "direction": {
+                                                  "enum": [
+                                                    "auto",
+                                                    "forward",
+                                                    "backward",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "label": {
+                                                  "minLength": 1,
+                                                  "pattern": "^[A-Za-z0-9_]+$",
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "label",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "_tag": {
+                                                  "enum": [
+                                                    "Message",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                                "text": {
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "_tag",
+                                                "text",
+                                              ],
+                                              "type": "object",
+                                            },
                                           ],
                                         },
                                         "type": "array",
                                       },
                                       "name": {
                                         "type": "string",
+                                      },
+                                      "operation": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "id": {
+                                            "minLength": 1,
+                                            "type": "string",
+                                          },
+                                          "name": {
+                                            "type": "string",
+                                          },
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name",
+                                        ],
+                                        "type": "object",
                                       },
                                       "spindleRpm": {
                                         "minimum": 0,
@@ -61944,6 +62624,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           ],
                                           "type": "string",
                                         },
+                                        "expr": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "feed": {},
+                                            "x": {},
+                                            "y": {},
+                                            "z": {},
+                                          },
+                                          "type": "object",
+                                        },
                                         "rotary": {
                                           "additionalProperties": false,
                                           "properties": {
@@ -61994,6 +62684,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             "Linear",
                                           ],
                                           "type": "string",
+                                        },
+                                        "expr": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "feed": {},
+                                            "x": {},
+                                            "y": {},
+                                            "z": {},
+                                          },
+                                          "type": "object",
                                         },
                                         "feed": {
                                           "exclusiveMinimum": 0,
@@ -62239,12 +62939,332 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       ],
                                       "type": "object",
                                     },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Assign",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "value": {},
+                                        "variable": {
+                                          "anyOf": [
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "index": {
+                                                  "minimum": 0,
+                                                  "type": "integer",
+                                                },
+                                                "scope": {
+                                                  "enum": [
+                                                    "local",
+                                                    "global",
+                                                    "system",
+                                                  ],
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "scope",
+                                                "index",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "name": {
+                                                  "minLength": 1,
+                                                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                                                  "type": "string",
+                                                },
+                                              },
+                                              "required": [
+                                                "name",
+                                              ],
+                                              "type": "object",
+                                            },
+                                          ],
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "variable",
+                                        "value",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "MacroCall",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "args": {
+                                          "patternProperties": {
+                                            "^[A-Za-z]$": {},
+                                          },
+                                          "type": "object",
+                                        },
+                                        "name": {
+                                          "minLength": 1,
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "name",
+                                        "args",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "If",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "condition": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "a": {},
+                                            "b": {},
+                                            "cmp": {
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge",
+                                              ],
+                                              "type": "string",
+                                            },
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b",
+                                          ],
+                                          "type": "object",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "condition",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Else",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "EndIf",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "While",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "condition": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "a": {},
+                                            "b": {},
+                                            "cmp": {
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge",
+                                              ],
+                                              "type": "string",
+                                            },
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b",
+                                          ],
+                                          "type": "object",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "condition",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "EndWhile",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Label",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "name": {
+                                          "minLength": 1,
+                                          "pattern": "^[A-Za-z0-9_]+$",
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "name",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Goto",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "condition": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "a": {},
+                                            "b": {},
+                                            "cmp": {
+                                              "enum": [
+                                                "eq",
+                                                "ne",
+                                                "lt",
+                                                "le",
+                                                "gt",
+                                                "ge",
+                                              ],
+                                              "type": "string",
+                                            },
+                                          },
+                                          "required": [
+                                            "cmp",
+                                            "a",
+                                            "b",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        "direction": {
+                                          "enum": [
+                                            "auto",
+                                            "forward",
+                                            "backward",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "label": {
+                                          "minLength": 1,
+                                          "pattern": "^[A-Za-z0-9_]+$",
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "label",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "_tag": {
+                                          "enum": [
+                                            "Message",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "text": {
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "_tag",
+                                        "text",
+                                      ],
+                                      "type": "object",
+                                    },
                                   ],
                                 },
                                 "type": "array",
                               },
                               "name": {
                                 "type": "string",
+                              },
+                              "operation": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string",
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                ],
+                                "type": "object",
                               },
                               "spindleRpm": {
                                 "minimum": 0,
@@ -63439,6 +64459,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         ],
                                         "type": "string",
                                       },
+                                      "expr": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "feed": {},
+                                          "x": {},
+                                          "y": {},
+                                          "z": {},
+                                        },
+                                        "type": "object",
+                                      },
                                       "rotary": {
                                         "additionalProperties": false,
                                         "properties": {
@@ -63489,6 +64519,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           "Linear",
                                         ],
                                         "type": "string",
+                                      },
+                                      "expr": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "feed": {},
+                                          "x": {},
+                                          "y": {},
+                                          "z": {},
+                                        },
+                                        "type": "object",
                                       },
                                       "feed": {
                                         "exclusiveMinimum": 0,
@@ -63734,12 +64774,332 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     ],
                                     "type": "object",
                                   },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "Assign",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "value": {},
+                                      "variable": {
+                                        "anyOf": [
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "index": {
+                                                "minimum": 0,
+                                                "type": "integer",
+                                              },
+                                              "scope": {
+                                                "enum": [
+                                                  "local",
+                                                  "global",
+                                                  "system",
+                                                ],
+                                                "type": "string",
+                                              },
+                                            },
+                                            "required": [
+                                              "scope",
+                                              "index",
+                                            ],
+                                            "type": "object",
+                                          },
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "name": {
+                                                "minLength": 1,
+                                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                                                "type": "string",
+                                              },
+                                            },
+                                            "required": [
+                                              "name",
+                                            ],
+                                            "type": "object",
+                                          },
+                                        ],
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "variable",
+                                      "value",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "MacroCall",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "args": {
+                                        "patternProperties": {
+                                          "^[A-Za-z]$": {},
+                                        },
+                                        "type": "object",
+                                      },
+                                      "name": {
+                                        "minLength": 1,
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "name",
+                                      "args",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "If",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "condition": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "a": {},
+                                          "b": {},
+                                          "cmp": {
+                                            "enum": [
+                                              "eq",
+                                              "ne",
+                                              "lt",
+                                              "le",
+                                              "gt",
+                                              "ge",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        },
+                                        "required": [
+                                          "cmp",
+                                          "a",
+                                          "b",
+                                        ],
+                                        "type": "object",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "condition",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "Else",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "EndIf",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "While",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "condition": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "a": {},
+                                          "b": {},
+                                          "cmp": {
+                                            "enum": [
+                                              "eq",
+                                              "ne",
+                                              "lt",
+                                              "le",
+                                              "gt",
+                                              "ge",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        },
+                                        "required": [
+                                          "cmp",
+                                          "a",
+                                          "b",
+                                        ],
+                                        "type": "object",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "condition",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "EndWhile",
+                                        ],
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "Label",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "name": {
+                                        "minLength": 1,
+                                        "pattern": "^[A-Za-z0-9_]+$",
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "name",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "Goto",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "condition": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "a": {},
+                                          "b": {},
+                                          "cmp": {
+                                            "enum": [
+                                              "eq",
+                                              "ne",
+                                              "lt",
+                                              "le",
+                                              "gt",
+                                              "ge",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        },
+                                        "required": [
+                                          "cmp",
+                                          "a",
+                                          "b",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "direction": {
+                                        "enum": [
+                                          "auto",
+                                          "forward",
+                                          "backward",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "label": {
+                                        "minLength": 1,
+                                        "pattern": "^[A-Za-z0-9_]+$",
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "label",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "_tag": {
+                                        "enum": [
+                                          "Message",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "text": {
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "_tag",
+                                      "text",
+                                    ],
+                                    "type": "object",
+                                  },
                                 ],
                               },
                               "type": "array",
                             },
                             "name": {
                               "type": "string",
+                            },
+                            "operation": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "id": {
+                                  "minLength": 1,
+                                  "type": "string",
+                                },
+                                "name": {
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                              ],
+                              "type": "object",
                             },
                             "spindleRpm": {
                               "minimum": 0,

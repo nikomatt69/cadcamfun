@@ -1540,12 +1540,24 @@ export type ToolpathGeneratorVerifyPayload = {
             readonly _tag: "Rapid"
             readonly to: { readonly x: number; readonly y: number; readonly z: number }
             readonly rotary?: { readonly a?: number; readonly b?: number; readonly c?: number }
+            readonly expr?: {
+              readonly x?: JsonValue
+              readonly y?: JsonValue
+              readonly z?: JsonValue
+              readonly feed?: JsonValue
+            }
           }
         | {
             readonly _tag: "Linear"
             readonly to: { readonly x: number; readonly y: number; readonly z: number }
             readonly feed: number
             readonly rotary?: { readonly a?: number; readonly b?: number; readonly c?: number }
+            readonly expr?: {
+              readonly x?: JsonValue
+              readonly y?: JsonValue
+              readonly z?: JsonValue
+              readonly feed?: JsonValue
+            }
           }
         | {
             readonly _tag: "Arc"
@@ -1567,7 +1579,47 @@ export type ToolpathGeneratorVerifyPayload = {
             readonly pitch?: number
           }
         | { readonly _tag: "Orient"; readonly a?: number; readonly b?: number; readonly c?: number }
+        | {
+            readonly _tag: "Assign"
+            readonly variable:
+              | { readonly scope: "local" | "global" | "system"; readonly index: number }
+              | { readonly name: string }
+            readonly value: JsonValue
+          }
+        | { readonly _tag: "MacroCall"; readonly name: string; readonly args: { readonly [x: string]: JsonValue } }
+        | {
+            readonly _tag: "If"
+            readonly condition: {
+              readonly cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"
+              readonly a: JsonValue
+              readonly b: JsonValue
+            }
+          }
+        | { readonly _tag: "Else" }
+        | { readonly _tag: "EndIf" }
+        | {
+            readonly _tag: "While"
+            readonly condition: {
+              readonly cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"
+              readonly a: JsonValue
+              readonly b: JsonValue
+            }
+          }
+        | { readonly _tag: "EndWhile" }
+        | { readonly _tag: "Label"; readonly name: string }
+        | {
+            readonly _tag: "Goto"
+            readonly label: string
+            readonly direction?: "auto" | "forward" | "backward"
+            readonly condition?: {
+              readonly cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"
+              readonly a: JsonValue
+              readonly b: JsonValue
+            }
+          }
+        | { readonly _tag: "Message"; readonly text: string }
       >
+      readonly operation?: { readonly id: string; readonly name: string }
     }>
     readonly metadata?: { readonly [x: string]: string }
   }
@@ -6318,12 +6370,14 @@ export type ToolpathGeneratorManufactureOutput =
                   _tag: "Rapid"
                   to: { x: number; y: number; z: number }
                   rotary?: { a?: number; b?: number; c?: number }
+                  expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
                 }
               | {
                   _tag: "Linear"
                   to: { x: number; y: number; z: number }
                   feed: number
                   rotary?: { a?: number; b?: number; c?: number }
+                  expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
                 }
               | {
                   _tag: "Arc"
@@ -6345,7 +6399,30 @@ export type ToolpathGeneratorManufactureOutput =
                   pitch?: number
                 }
               | { _tag: "Orient"; a?: number; b?: number; c?: number }
+              | {
+                  _tag: "Assign"
+                  variable: { scope: "local" | "global" | "system"; index: number } | { name: string }
+                  value: JsonValue
+                }
+              | { _tag: "MacroCall"; name: string; args: { [x: string]: JsonValue } }
+              | { _tag: "If"; condition: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue } }
+              | { _tag: "Else" }
+              | { _tag: "EndIf" }
+              | {
+                  _tag: "While"
+                  condition: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
+                }
+              | { _tag: "EndWhile" }
+              | { _tag: "Label"; name: string }
+              | {
+                  _tag: "Goto"
+                  label: string
+                  direction?: "auto" | "forward" | "backward"
+                  condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
+                }
+              | { _tag: "Message"; text: string }
             >
+            operation?: { id: string; name: string }
           }>
           metadata?: { [x: string]: string }
         }
@@ -6552,12 +6629,18 @@ export type ToolpathGeneratorParseOutput = {
       spindleRpm: number
       coolant: "off" | "flood" | "mist"
       moves: Array<
-        | { _tag: "Rapid"; to: { x: number; y: number; z: number }; rotary?: { a?: number; b?: number; c?: number } }
+        | {
+            _tag: "Rapid"
+            to: { x: number; y: number; z: number }
+            rotary?: { a?: number; b?: number; c?: number }
+            expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
+          }
         | {
             _tag: "Linear"
             to: { x: number; y: number; z: number }
             feed: number
             rotary?: { a?: number; b?: number; c?: number }
+            expr?: { x?: JsonValue; y?: JsonValue; z?: JsonValue; feed?: JsonValue }
           }
         | {
             _tag: "Arc"
@@ -6579,7 +6662,27 @@ export type ToolpathGeneratorParseOutput = {
             pitch?: number
           }
         | { _tag: "Orient"; a?: number; b?: number; c?: number }
+        | {
+            _tag: "Assign"
+            variable: { scope: "local" | "global" | "system"; index: number } | { name: string }
+            value: JsonValue
+          }
+        | { _tag: "MacroCall"; name: string; args: { [x: string]: JsonValue } }
+        | { _tag: "If"; condition: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue } }
+        | { _tag: "Else" }
+        | { _tag: "EndIf" }
+        | { _tag: "While"; condition: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue } }
+        | { _tag: "EndWhile" }
+        | { _tag: "Label"; name: string }
+        | {
+            _tag: "Goto"
+            label: string
+            direction?: "auto" | "forward" | "backward"
+            condition?: { cmp: "eq" | "ne" | "lt" | "le" | "gt" | "ge"; a: JsonValue; b: JsonValue }
+          }
+        | { _tag: "Message"; text: string }
       >
+      operation?: { id: string; name: string }
     }>
     metadata?: { [x: string]: string }
   }

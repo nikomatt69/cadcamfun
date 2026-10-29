@@ -21,12 +21,15 @@ import {
   type Toolpath,
   arcSweepBetween,
   expandCycle,
+  isControlNode,
   isFullCircle,
   moveTarget
 } from "../ir.ts"
 import { type ArcMode, type Dialect, type PostOptions, defaultPostOptions } from "./types.ts"
 import { assertCycleSafe } from "../cycle-safety.ts"
 import { bodyOf, planSubprograms } from "./subprograms.ts"
+import { KLARTEXT_PREFIX, MacroEmitter, familyOf } from "./macro-syntax.ts"
+import type { WordExpr } from "../macro.ts"
 
 const MM_PER_INCH = 25.4
 
@@ -144,6 +147,8 @@ class Writer {
   coolant: "off" | "flood" | "mist" = "off"
   tool = 0
   readonly scale: number
+  /** Variables, macros and control flow in this control's words (spec 69 G4). */
+  readonly macro: MacroEmitter
 
   constructor(
     private readonly options: PostOptions,
@@ -156,6 +161,7 @@ class Writer {
     this.blockNumber = blockStart ?? options.lineNumbers?.start ?? 0
     this.step = options.lineNumbers?.step ?? 0
     this.scale = units === "inch" ? 1 / MM_PER_INCH : 1
+    this.macro = new MacroEmitter(familyOf(dialect.id))
   }
 
   raw(line: string): void {
@@ -222,9 +228,55 @@ class Writer {
     }
   }
 
-  rapid(to: Vec3, rotary?: Rotary): void {
+  /**
+   * Replaces the numeric axis words of the axes `expr` computes by the control's own words (`X[#100+5]`), after the blocks a
+   * computed value needs first. The nominal position stays the position the writer tracks, but the control's value is not the
+   * rounded number, so the axis is written again on the next numeric move.
+   */
+  private withExpr(a: { words: string[]; x: number; y: number; z: number }, expr: WordExpr | undefined): void {
+    if (expr === undefined) return
+    if (this.incremental) throw new RangeError("A computed word cannot be written in a subprogram body that is incremental")
+    for (const [key, letter] of [["x", "X"], ["y", "Y"], ["z", "Z"]] as const) {
+      const e = expr[key]
+      if (e === undefined) continue
+      const w = this.macro.word(letter, e)
+      for (const line of w.pre) this.macroLine(line)
+      const text = `${letter}${w.text}`
+      const at = a.words.findIndex((x) => x.startsWith(letter))
+      if (at >= 0) a.words[at] = text
+      else a.words.push(text)
+      if (key === "x") this.px = undefined
+      if (key === "y") this.py = undefined
+      if (key === "z") this.pz = undefined
+    }
+  }
+
+  /** One block of a control node: labels and o-words stand on their own, everything else is a block like any other. */
+  private macroLine(line: string): void {
+    if (line.startsWith(KLARTEXT_PREFIX)) { this.lines.push(line); return }
+    if (/^(N\d+|[A-Za-z_][A-Za-z0-9_]*:|o[<\d].*|;.*|\(.*\))$/.test(line)) { this.lines.push(line); return }
+    this.block(line)
+  }
+
+  controlNode(move: Extract<Move, { readonly _tag: "Assign" | "MacroCall" | "If" | "Else" | "EndIf" | "While" | "EndWhile" | "Label" | "Goto" | "Message" }>): void {
+    this.endCycle()
+    for (const line of this.macro.node(move)) this.macroLine(line)
+    // A branch or a jump leaves the control's modal state unknown to the writer: the next move states its mode and axes again.
+    if (move._tag !== "Assign" && move._tag !== "Message" && move._tag !== "MacroCall") this.forgetModalState()
+  }
+
+  private forgetModalState(): void {
+    this.px = undefined
+    this.py = undefined
+    this.pz = undefined
+    this.motion = undefined
+    this.feed = undefined
+  }
+
+  rapid(to: Vec3, rotary?: Rotary, expr?: WordExpr): void {
     this.endCycle()
     const a = this.axes(to)
+    this.withExpr(a, expr)
     // Tip control first: switching it on checks the rotary axes where they stand, before this move turns them.
     this.ensureTcp(rotary !== undefined)
     const r = this.rotaryWords(rotary)
@@ -246,16 +298,24 @@ class Writer {
     this.commit(to, a.x, a.y, a.z)
   }
 
-  linear(to: Vec3, feed: number, rotary?: Rotary): void {
+  linear(to: Vec3, feed: number, rotary?: Rotary, expr?: WordExpr): void {
     this.endCycle()
     const a = this.axes(to)
+    this.withExpr(a, expr)
     this.ensureTcp(rotary !== undefined)
     const r = this.rotaryWords(rotary)
     if (a.words.length === 0 && r.length === 0) {
       this.ir = { ...to }
       return
     }
-    this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, this.feedWord(feed))
+    let feedWord = this.feedWord(feed)
+    if (expr?.feed !== undefined) {
+      const w = this.macro.word("F", expr.feed)
+      for (const line of w.pre) this.macroLine(line)
+      feedWord = `F${w.text}`
+      this.feed = undefined
+    }
+    this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, feedWord)
     this.motion = "G1"
     this.commit(to, a.x, a.y, a.z)
   }
@@ -473,10 +533,10 @@ class Writer {
   move(move: Move): void {
     switch (move._tag) {
       case "Rapid":
-        this.rapid(move.to, move.rotary)
+        this.rapid(move.to, move.rotary, move.expr)
         break
       case "Linear":
-        this.linear(move.to, move.feed, move.rotary)
+        this.linear(move.to, move.feed, move.rotary, move.expr)
         break
       case "Arc":
         this.arc(move)
@@ -492,6 +552,18 @@ class Writer {
         break
       case "Orient":
         this.orient(move)
+        break
+      case "Assign":
+      case "MacroCall":
+      case "If":
+      case "Else":
+      case "EndIf":
+      case "While":
+      case "EndWhile":
+      case "Label":
+      case "Goto":
+      case "Message":
+        this.controlNode(move)
         break
     }
   }
@@ -718,6 +790,7 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
   if (w.ir !== undefined && Number.isFinite(zMax)) w.rapid({ x: w.ir.x, y: w.ir.y, z: Math.max(zMax, w.ir.z) })
   // Leave the control with tool length compensation, never with tool-centre-point control still on
   // (Haas cancels it at M30 too, but a clean end block is what an operator expects to read).
+  if (w.macro.open > 0) throw new RangeError(`The program leaves ${w.macro.open} If or While open: every If needs its EndIf and every While its EndWhile`)
   w.endTcp()
   w.smoothing(false)
   w.block("M5")

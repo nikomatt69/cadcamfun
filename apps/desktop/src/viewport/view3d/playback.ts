@@ -59,6 +59,7 @@ const countSegments = (program: cam.Program, tolerance: number, start: Vec3): nu
       angles = after
       if (move._tag === "Orient") { count += samples; continue }
       if (move._tag === "Dwell") { count++; continue }
+      if (cam.isControlNode(move)) continue
       if (move._tag === "Arc") { count += arcChordCount(from, move, tolerance); from = move.to; continue }
       count += samples
       from = move.to
@@ -113,7 +114,7 @@ export const buildPlayback = (
   for (const [path, toolpath] of program.toolpaths.entries()) {
     const tool = tools.index.get(toolpath.toolId) ?? 0
     for (const [move, entry] of cam.expandMoves(toolpath.moves, from).entries()) {
-      if (entry._tag === "Comment" || entry._tag === "Cycle") continue
+      if (entry._tag === "Comment" || entry._tag === "Cycle" || cam.isControlNode(entry)) continue
       const after = cam.viewer.anglesAfter(entry, angles)
       const moveStart = time
       const duration = cam.viewer.previewMoveDuration(entry, from, angles, after, rapidRate)

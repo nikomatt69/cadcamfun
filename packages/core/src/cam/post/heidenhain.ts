@@ -1,5 +1,6 @@
 import type { Program } from "../ir.ts"
 import { emitProgram } from "./emitter.ts"
+import { KLARTEXT_PREFIX } from "./macro-syntax.ts"
 import { genericDialect } from "./generic.ts"
 import type { Dialect, Post, PostOptions } from "./types.ts"
 
@@ -62,7 +63,7 @@ const labelExits = (source: string): ReadonlyMap<number, { readonly motion: Moti
 
 const START_M = new Set(["M3", "M4", "M7", "M8", "M128"])
 const END_M = new Set(["M0", "M1", "M2", "M5", "M9", "M30", "M129"])
-const signed = (text: string): string => `${Number(text) >= 0 && !text.startsWith("+") ? "+" : ""}${text}`
+const signed = (text: string): string => (/^[+-]?Q/.test(text) ? (text.startsWith("+") || text.startsWith("-") ? text : `+${text}`) : `${Number(text) >= 0 && !text.startsWith("+") ? "+" : ""}${text}`)
 
 /** Writes `program` as Klartext with `dialect` (the built-in one, or a definition's): see {@link heidenhainDialect}. */
 export const emitKlartext = (program: Program, options: Partial<PostOptions>, dialect: Dialect): string => {
@@ -113,6 +114,13 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
   for (const raw of source.split(/\r?\n/)) {
     let line = raw.trim()
     if (!line) continue
+    // Variables, jumps and macro calls come from the shared writer as finished Klartext blocks (`macro-syntax.ts`).
+    if (line.startsWith(KLARTEXT_PREFIX)) {
+      const text = line.slice(KLARTEXT_PREFIX.length)
+      if (text.startsWith(";")) lines.push(text)
+      else block(text)
+      continue
+    }
     if (line.startsWith(";")) { lines.push(line.replace(/\bSUBPROGRAM O(\d+)/, "SUBPROGRAM LBL $1")); continue }
     const call = /^M98 P(\d+)$/.exec(line)
     if (call) {
@@ -145,7 +153,7 @@ export const emitKlartext = (program: Program, options: Partial<PostOptions>, di
     const code = /^G([0-3])(?:\s|$)/.exec(line)
     if (code) { motion = `G${code[1]}` as Motion; line = line.replace(/^G[0-3]\s*/, "") }
     // Every remaining token must be a supported axis, centre or feed, never a silently dropped controller command.
-    const WORD = /[XYZABCIJF][+-]?(?:\d+(?:\.\d*)?|\.\d+)/g
+    const WORD = /[XYZABCIJF][+-]?(?:\d+(?:\.\d*)?|\.\d+|Q\d+)/g
     const words = line.match(WORD) ?? []
     if (!words.length || line.replace(WORD, "").trim() !== "") throw new RangeError(`Klartext cannot express block: ${raw}`)
     if (pendingTool) toolCall()

@@ -12,7 +12,7 @@
  * the tool stands and is written incrementally: one text serves every copy.
  */
 import type { Vec3 } from "../../cad/vec.ts"
-import type { ArcMove, Move, Program, Toolpath } from "../ir.ts"
+import { isControlNode, type ArcMove, type Move, type Program, type Toolpath } from "../ir.ts"
 
 /** Moves two toolpaths must have after their positioning move to be worth a subprogram. */
 export const MIN_BODY_MOVES = 6
@@ -61,8 +61,8 @@ const candidateOf = (toolpath: Toolpath): Candidate | undefined => {
   for (let i = 0; i < toolpath.moves.length; i++) {
     const m = toolpath.moves[i]!
     if (m._tag === "Comment") continue
-    if (m._tag === "Cycle" || m._tag === "Orient") return undefined
-    if ((m._tag === "Rapid" || m._tag === "Linear") && m.rotary !== undefined) return undefined
+    if (m._tag === "Cycle" || m._tag === "Orient" || isControlNode(m)) return undefined
+    if ((m._tag === "Rapid" || m._tag === "Linear") && (m.rotary !== undefined || m.expr !== undefined)) return undefined
     if (head < 0) {
       if (m._tag !== "Rapid" && m._tag !== "Linear") return undefined
       head = i
