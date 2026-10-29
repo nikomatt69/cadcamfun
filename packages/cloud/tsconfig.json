@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2022", "WebWorker"],
-    "types": ["@types/bun", "../identity/worker-configuration.d.ts"],
+    "types": ["@types/bun", "./worker-configuration.d.ts"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
@@ -12,5 +12,5 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "worker-configuration.d.ts"]
 }

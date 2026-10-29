@@ -14,14 +14,14 @@ const directory = async () => { const dir = await mkdtemp(join(tmpdir(), "cadcam
 const storage = () => {
   let manifest: CheckpointManifest | null = null
   let fail = false
-  const objects = new Map<string, Uint8Array>()
+  const objects = new Map<string, Uint8Array<ArrayBuffer>>()
   const store = new CheckpointStore({
     epoch: async () => "epoch",
     manifest: async () => manifest,
     publish: async (_epoch, expected, next) => { if ((manifest?.revision ?? null) !== expected && manifest?.revision !== next.revision) return false; manifest = next; return true },
   }, {
     exists: async (hash) => objects.has(hash),
-    put: async (hash, bytes) => { objects.set(hash, bytes) },
+    put: async (hash, bytes) => { objects.set(hash, new Uint8Array(bytes)) },
     get: async (hash) => { const bytes = objects.get(hash); return bytes ? new Response(bytes).body : null },
   })
   const transport = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => fail ? new Response(null, { status: 503 }) : store.fetch(new Request(input, init)), { preconnect: () => {} })
