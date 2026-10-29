@@ -302,8 +302,8 @@ export function ToolpathsScreen(): JSX.Element {
                                   </div>
                                 </td>
                                 <td>
-                                  <span class={`${BADGE} mr-1`}>{TYPE_LABEL[row.type ?? t("pages.mill")] ?? row.type ?? t("pages.mill")}</span>
-                                  <span class={BADGE}>{OPERATION_LABEL[row.operationType ?? t("cam.strategy.contour")] ?? row.operationType ?? t("cam.strategy.contour")}</span>
+                                  <span class={`${BADGE} mr-1`}>{TYPE_LABEL[row.type ?? "mill"] ?? row.type ?? t("pages.mill")}</span>
+                                  <span class={BADGE}>{OPERATION_LABEL[row.operationType ?? "contour"] ?? row.operationType ?? t("cam.strategy.contour")}</span>
                                 </td>
                                 <td class="text-slate-500 dark:text-slate-400">{projectName(row.projectId)}</td>
                                 <td class="text-slate-500 dark:text-slate-400">{formatDate(row.updatedAt)}</td>
@@ -328,14 +328,14 @@ export function ToolpathsScreen(): JSX.Element {
                         <div class={CARD} onClick={() => openDetail(row)} role="link" tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter") openDetail(row) }}>
                           <CardBanner
                             icon={<Wrench size={18} aria-hidden="true" />}
-                            badge={TYPE_LABEL[row.type ?? t("pages.mill")] ?? row.type ?? t("pages.mill")}
+                            badge={TYPE_LABEL[row.type ?? "mill"] ?? row.type ?? t("pages.mill")}
                             leftBadge={row.isPublic ? t("save.publicProject") : undefined}
                           />
                           <div class="flex flex-1 flex-col gap-1.5 p-3">
                             <h3 class="text-xs font-semibold text-slate-900 dark:text-white">{row.name}</h3>
                             <Show when={row.description}><p class="line-clamp-2 text-[11px] text-slate-500 dark:text-slate-400">{row.description}</p></Show>
                             <div class="mt-auto space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
-                              <div class="flex items-center justify-between gap-2"><span>{t("cam.operations.current")}</span><span class={BADGE}>{OPERATION_LABEL[row.operationType ?? t("cam.strategy.contour")] ?? row.operationType ?? t("cam.strategy.contour")}</span></div>
+                              <div class="flex items-center justify-between gap-2"><span>{t("cam.operations.current")}</span><span class={BADGE}>{OPERATION_LABEL[row.operationType ?? "contour"] ?? row.operationType ?? t("cam.strategy.contour")}</span></div>
                               <div class="flex items-center justify-between gap-2"><span>ID</span><code class="font-mono text-[10px] text-slate-400 dark:text-slate-500">{row.id.substring(0, 8)}...</code></div>
                             </div>
                           </div>

@@ -252,7 +252,7 @@ export function Shell(props: ShellProps): JSX.Element {
             </div>
           </main>
           <Show when={layout() === "page"}><ReferenceFooter /></Show>
-          <Show when={showScrollTop() && layout() === "page"}><button type="button" class="reference-scroll-top" aria-label={t("shell.scrollTop")} onClick={() => main?.scrollTo({ top: 0, behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? t("cam.kernel.fromData") : "smooth" })}><ChevronUp size={20} /></button></Show>
+          <Show when={showScrollTop() && layout() === "page"}><button type="button" class="reference-scroll-top" aria-label={t("shell.scrollTop")} onClick={() => main?.scrollTo({ top: 0, behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })}><ChevronUp size={20} /></button></Show>
         </div>
 
         <AssistantPanel open={app.panelOpen()} onClose={() => app.setPanelOpen(false)} />

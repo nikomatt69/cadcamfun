@@ -55,8 +55,8 @@ interface Draft {
 const draftOf = (row: ToolpathRow): Draft => ({
   name: row.name,
   description: row.description ?? "",
-  type: row.type ?? t("pages.mill"),
-  operationType: row.operationType ?? t("cam.strategy.contour"),
+  type: row.type ?? "mill",
+  operationType: row.operationType ?? "contour",
   isPublic: row.isPublic,
   gcode: row.gcode ?? ""
 })
@@ -247,8 +247,8 @@ export function ToolpathDetailScreen(): JSX.Element {
     )
   }
 
-  const typeLabel = (value: string | null | undefined): string => TYPE_LABEL[value ?? t("pages.mill")] ?? value ?? t("cam.explorer.unknown")
-  const operationLabel = (value: string | null | undefined): string => OPERATION_LABEL[value ?? t("cam.strategy.contour")] ?? value ?? t("cam.explorer.unknown")
+  const typeLabel = (value: string | null | undefined): string => TYPE_LABEL[value ?? "mill"] ?? value ?? t("cam.explorer.unknown")
+  const operationLabel = (value: string | null | undefined): string => OPERATION_LABEL[value ?? "contour"] ?? value ?? t("cam.explorer.unknown")
 
   return (
     <>

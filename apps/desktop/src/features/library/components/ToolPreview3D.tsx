@@ -20,7 +20,7 @@ const numberOrNull = (value: unknown): number | null => {
 
 /** A resource row (stored or being edited) as the tool model reads it. */
 export const toolResourceOf = (row: Readonly<Record<string, unknown>>): cam.ToolResource => ({
-  type: String(row["type"] ?? t("cam.explorer.toolType.endmill")),
+  type: String(row["type"] ?? "endmill"),
   diameter: numberOrNull(row["diameter"]) ?? 0,
   numberOfFlutes: numberOrNull(row["numberOfFlutes"]),
   cuttingLength: numberOrNull(row["cuttingLength"]),

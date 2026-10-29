@@ -77,9 +77,9 @@ const payloadOf = (kind: Kind, form: Row): Record<string, unknown> => {
   // the kernel reads, whichever shape the row was written in.
   if (kind === "machines") {
     const profile = cam.kernel.profileOfConfig(asRecord(form["config"]), str(form["type"]))
-    return { name: str(form["name"]).trim(), type: str(form["type"]) || t("pages.mill"), description: str(form["description"]) || null, config: cam.kernel.configOfProfile(profile), isPublic: form["isPublic"] === true }
+    return { name: str(form["name"]).trim(), type: str(form["type"]) || "mill", description: str(form["description"]) || null, config: cam.kernel.configOfProfile(profile), isPublic: form["isPublic"] === true }
   }
-  return { name: str(form["name"]).trim(), type: str(form["type"]) || t("pages.mill"), description: str(form["description"]) || null, config: asRecord(form["config"]), isPublic: form["isPublic"] === true }
+  return { name: str(form["name"]).trim(), type: str(form["type"]) || "mill", description: str(form["description"]) || null, config: asRecord(form["config"]), isPublic: form["isPublic"] === true }
 }
 
 /** The editable form derived from a stored row. */
@@ -110,7 +110,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const [error, setError] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
   const [editing, setEditing] = createSignal(false)
-  const [tab, setTab] = createSignal<"overview" | "details" | "raw" | "preview" | "structure">(props.kind === "components" && (urlParams.preview === "true" || urlParams.tab === "preview") ? t("preview") : props.kind === "components" && urlParams.tab === "structure" ? t("cam.resource.structure") : t("dash.tab.overview"))
+  const [tab, setTab] = createSignal<"overview" | "details" | "raw" | "preview" | "structure">(props.kind === "components" && (urlParams.preview === "true" || urlParams.tab === "preview") ? "preview" : props.kind === "components" && urlParams.tab === "structure" ? "structure" : "overview")
   const [deleteOpen, setDeleteOpen] = createSignal(false)
 
   const load = async (): Promise<void> => {
@@ -187,7 +187,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
       if (profile.spindle !== undefined) stored["maxSpindleSpeed"] = profile.spindle.maxRpm
       if (profile.feed !== undefined) stored["maxFeedRate"] = profile.feed.max
       const created = await run<unknown>(app.client.machineConfigs.create({ payload: {
-        name: `${str(current["name"])} (copy)`, type: str(current["type"]) || t("pages.mill"), description: str(current["description"]) || null, config: stored, isPublic: false
+        name: `${str(current["name"])} (copy)`, type: str(current["type"]) || "mill", description: str(current["description"]) || null, config: stored, isPublic: false
       } }))
       const id = str(asRecord(asRecord(created)["data"])["id"])
       toast.success("Machine duplicated")

@@ -264,7 +264,7 @@ const VIEWS: Readonly<Record<string, ViewFn>> = {
     const p = rec(input["params"]) ?? {}
     const d = rec(data)
     return { icon: "⌖", pending: "Creating the operation...", title: `Operation created: ${str(input["type"]) ?? "?"}`,
-      detail: () => <Pair rows={[["Id", str(d?.["operationId"])], ["Tool", p["toolDiameter"] !== undefined ? `${str(p["toolType"]) ?? t("cam.explorer.toolType.endmill")} Ø${String(p["toolDiameter"])} mm` : undefined], ["Depth", p["depth"] !== undefined ? `${String(p["depth"])} mm` : undefined], ["Stepdown", p["stepdown"] !== undefined ? `${String(p["stepdown"])} mm` : undefined], ["Feed", p["feedrate"] !== undefined ? `${String(p["feedrate"])} mm/min` : undefined], ["Spindle", p["rpm"] !== undefined ? `${String(p["rpm"])} rpm` : undefined], ["Material", str(p["material"])], ["Machine", str(p["machineType"])]]} /> }
+      detail: () => <Pair rows={[["Id", str(d?.["operationId"])], ["Tool", p["toolDiameter"] !== undefined ? `${str(p["toolType"]) ?? "endmill"} Ø${String(p["toolDiameter"])} mm` : undefined], ["Depth", p["depth"] !== undefined ? `${String(p["depth"])} mm` : undefined], ["Stepdown", p["stepdown"] !== undefined ? `${String(p["stepdown"])} mm` : undefined], ["Feed", p["feedrate"] !== undefined ? `${String(p["feedrate"])} mm/min` : undefined], ["Spindle", p["rpm"] !== undefined ? `${String(p["rpm"])} rpm` : undefined], ["Material", str(p["material"])], ["Machine", str(p["machineType"])]]} /> }
   },
   "cam_edit.update": ({ input }) => {
     const keys = Object.keys(rec(input["params"]) ?? {})

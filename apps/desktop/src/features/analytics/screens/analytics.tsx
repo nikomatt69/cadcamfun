@@ -150,7 +150,7 @@ export function AnalyticsScreen(): JSX.Element {
               <For each={METRIC_OPTIONS}>{([value, labelKey]) => <option value={value}>{t(labelKey)}</option>}</For>
             </select>
           </label>
-          <button type="button" class={TOOLBAR_BUTTON} onClick={() => setChartType((previous) => (previous === "line" ? "bar" : t("cam.visualizer.line")))}>
+          <button type="button" class={TOOLBAR_BUTTON} onClick={() => setChartType((previous) => (previous === "line" ? "bar" : "line"))}>
             <BarChart2 size={16} aria-hidden="true" />
             {t(chartType() === "line" ? "dash.showBar" : "dash.showLine")}
           </button>

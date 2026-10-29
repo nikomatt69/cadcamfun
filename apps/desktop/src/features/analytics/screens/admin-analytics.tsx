@@ -183,7 +183,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
                     <button
                       type="button"
                       class="flex items-center text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                      onClick={() => setChartType((previous) => (previous === "line" ? "bar" : t("cam.visualizer.line")))}
+                      onClick={() => setChartType((previous) => (previous === "line" ? "bar" : "line"))}
                     >
                       <BarChart2 class="mr-1 h-4 w-4" />
                       {chartType() === "line" ? t("admin.analytics.showBar") : t("admin.analytics.showLine")}
