@@ -1851,6 +1851,14 @@ export type CloudSetConnectionPayload = {
   readonly token: string
 }
 
+export type CloudEnrollPayload = {
+  readonly origin: string
+  readonly name: string
+  readonly setupCode?: string | undefined
+}
+
+export type CloudPairPayload = { readonly name: string }
+
 export type CloudApplyPayload = { readonly expectedHead?: string | undefined }
 
 export type CloudSendPayload = { readonly message?: string | undefined }
@@ -8170,6 +8178,23 @@ export type CloudDisconnectOutput = {
   workspaceId: string | null
   deviceId: string
 }
+
+export type CloudEnrollInput = {
+  readonly origin: CloudEnrollPayload["origin"]
+  readonly name: CloudEnrollPayload["name"]
+  readonly setupCode?: CloudEnrollPayload["setupCode"]
+}
+
+export type CloudEnrollOutput = {
+  configured: boolean
+  origin: string | null
+  workspaceId: string | null
+  deviceId: string
+}
+
+export type CloudPairInput = { readonly name: CloudPairPayload["name"] }
+
+export type CloudPairOutput = { id: string; link: string }
 
 export type CloudProjectsOutput = Array<{
   id: string
