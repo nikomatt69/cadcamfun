@@ -551,6 +551,10 @@ import type {
   CloudSetConnectionInput,
   CloudSetConnectionOutput,
   CloudDisconnectOutput,
+  CloudEnrollInput,
+  CloudEnrollOutput,
+  CloudPairInput,
+  CloudPairOutput,
   CloudProjectsOutput,
   CloudCloneInput,
   CloudCloneOutput,
@@ -4656,6 +4660,30 @@ export function make(options: ClientOptions) {
           {
             method: "DELETE",
             path: `/api/cloud/connection`,
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      enroll: (input: CloudEnrollInput, requestOptions?: RequestOptions) =>
+        request<CloudEnrollOutput>(
+          {
+            method: "POST",
+            path: `/api/cloud/enroll`,
+            body: { origin: input["origin"], name: input["name"], setupCode: input["setupCode"] },
+            successStatus: 200,
+            declaredStatuses: [400, 409, 403, 404, 401, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      pair: (input: CloudPairInput, requestOptions?: RequestOptions) =>
+        request<CloudPairOutput>(
+          {
+            method: "POST",
+            path: `/api/cloud/pair`,
+            body: { name: input["name"] },
             successStatus: 200,
             declaredStatuses: [400, 409, 403, 404, 401, 500],
             empty: false,
