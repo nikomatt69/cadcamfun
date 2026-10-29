@@ -110,7 +110,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const [error, setError] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
   const [editing, setEditing] = createSignal(false)
-  const [tab, setTab] = createSignal<"overview" | "details" | "raw" | "preview" | "structure">(props.kind === "components" && (urlParams.preview === "true" || urlParams.tab === "preview") ? t("preview") : props.kind === "components" && urlParams.tab === "structure" ? t("cam.resource.structure") : t("dash.tab.overview"))
+  const [tab, setTab] = createSignal<"overview" | "details" | "raw" | "preview" | "structure">(props.kind === "components" && (urlParams.preview === "true" || urlParams.tab === "preview") ? "preview" : props.kind === "components" && urlParams.tab === "structure" ? "structure" : "overview")
   const [deleteOpen, setDeleteOpen] = createSignal(false)
 
   const load = async (): Promise<void> => {

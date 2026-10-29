@@ -599,7 +599,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               </section>
               <section class="space-y-2 border-t border-slate-700 pt-3">
                 <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.tool")}</h4>
-                {toggle(t("cam.visualizer.pathDone"), () => progress() === "done", (on) => setProgress(on ? t("ai.tasks.status.completed") : t("cam.visualizer.allLayers")))}
+                {toggle(t("cam.visualizer.pathDone"), () => progress() === "done", (on) => setProgress(on ? "done" : "all"))}
                 {toggle(t("cam.visualizer.stopAtCollision"), stopAtCollision, setStopAtCollision)}
                 {toggle(t("cam.visualizer.showTool"), showTool, setShowTool)}
                 <Show when={showTool()}>{toggle(t("cam.visualizer.showHolder"), showHolder, setShowHolder)}</Show>

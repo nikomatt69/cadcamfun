@@ -155,7 +155,7 @@ export function ProjectHistoryScreen(): JSX.Element {
   /** When set, History shows only the commits that touched this file (a drawing, component, toolpath, material…). */
   const path = () => (typeof search.path === "string" && search.path !== "" ? search.path : undefined)
   const id = () => params.id
-  const [tab, setTab] = createSignal<Tab>(typeof new URLSearchParams(window.location.search).get("path") === "string" ? t("vcs.tab.history") : t("vcs.tab.changes"))
+  const [tab, setTab] = createSignal<Tab>(typeof new URLSearchParams(window.location.search).get("path") === "string" ? "history" : "changes")
   const [token, setToken] = createSignal("")
   const [remoteValue, setRemote] = createSignal("")
   const [message, setMessage] = createSignal("")
